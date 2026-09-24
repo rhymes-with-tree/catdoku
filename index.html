@@ -128,6 +128,7 @@ button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
   <div class="help">
     <p>Place one 🐱 in every row, every column, and every color. Cats can't touch, not even diagonally.</p>
     <p>Tap a square once for 🐾, twice for 🐱, and again to clear it. Drag across squares to 🐾 several at once. Turn on Erase 🐾 to tap or drag paw marks away.</p>
+    <p>With Auto grade off, Complete checks your board but costs 1 ♥ if it isn't solved yet. Audit shows what's wrong, for 1 ♥.</p>
   </div>
 </main>
 
@@ -339,6 +340,17 @@ function peers(i) {
   }
   return out;
 }
+// Wrong-cat marks stay until that cat is removed; other marks clear on the next move.
+function keepCatMarks(except) { game.wrong = game.wrong.filter(k => k !== except && game.cells[k].cat); }
+function catsOnBoard() { return game.cells.map((c, k) => c.cat ? k : -1).filter(k => k >= 0); }
+function isSolution(k) { return game.sol[Math.floor(k / game.N)] === k % game.N; }
+function loseLives(n) {
+  game.hearts = Math.max(0, game.hearts - n);
+  if (game.hearts <= 0) showLost();
+  return game.hearts;
+}
+const livesLeft = h => `${h} ${h === 1 ? "life" : "lives"} left.`;
+
 function snapshot() {
   game.history.push(JSON.stringify(game.cells));
   if (game.history.length > 500) game.history.shift();
@@ -347,7 +359,7 @@ function snapshot() {
 /* ---------- actions ---------- */
 function tap(i) {
   const cell = game.cells[i];
-  game.wrong = [];
+  keepCatMarks(i);
   const s = show(cell);
   if (erasing) { if (s === "paw") { snapshot(); erasePaw(i); } render(); save(); return; }
   if (s === "empty") { snapshot(); cell.manual = true; }
@@ -429,6 +441,7 @@ function setNextSize(n) {
 
 function showLost() {
   game.status = "lost";
+  note("");
   setNextSize(game.N - 1);
   save();
   const btns = [["Restart board", restart, true], [`New puzzle (${settings.size} × ${settings.size})`, newPuzzle]];
@@ -454,16 +467,24 @@ function revive() {
 
 function complete() {
   if (game.status !== "playing") return;
-  const N = game.N;
-  const cats = game.cells.map((c, k) => c.cat ? k : -1).filter(k => k >= 0);
-  const wrong = cats.filter(k => game.sol[Math.floor(k / N)] !== k % N);
-  if (!wrong.length && cats.length === N) { win(); render(); save(); return; }
+  const cats = catsOnBoard();
+  if (cats.length === game.N && cats.every(isSolution)) { win(); render(); save(); return; }
+  // Deliberately says nothing about what's wrong: that's what Audit is for.
+  const h = loseLives(1);
+  if (h > 0) note(`Not solved yet. ${livesLeft(h)}`, 6000);
+  render(); save();
+}
+
+// Turning Auto grade on mid-game grades the board as it stands: each wrong cat is marked and costs a life.
+function gradeNow() {
+  if (!game || game.status !== "playing") return;
+  const cats = catsOnBoard(), wrong = cats.filter(k => !isSolution(k));
   game.wrong = wrong;
-  const left = N - (cats.length - wrong.length);
-  let m;
-  if (wrong.length) m = `${wrong.length} ${wrong.length === 1 ? "cat is" : "cats are"} in the wrong spot.`;
-  else m = `No mistakes yet. ${left} ${left === 1 ? "cat" : "cats"} still to place.`;
-  note(m, 6000); render(); save();
+  if (wrong.length) {
+    flashBad(wrong[0]);
+    const h = loseLives(wrong.length);
+    if (h > 0) note(`${wrong.length} ${wrong.length === 1 ? "cat was" : "cats were"} in the wrong spot. ${livesLeft(h)}`, 6000);
+  } else if (cats.length === game.N) win();
 }
 
 function win() {
@@ -644,7 +665,7 @@ board.addEventListener("pointermove", e => {
   if (!press) return;
   const i = cellAt(e.clientX, e.clientY);
   if (i < 0 || i === press.last) return;
-  if (!press.drag) { press.drag = true; game.wrong = []; paintPaw(press.start, press); }
+  if (!press.drag) { press.drag = true; keepCatMarks(); paintPaw(press.start, press); }
   paintPaw(i, press); press.last = i; render();
 });
 function endPress() {
@@ -667,7 +688,11 @@ $("restartBtn").onclick = () => { if (!busy) restart(); };
 $("completeBtn").onclick = complete;
 $("auditBtn").onclick = audit;
 $("eraseBtn").onclick = () => { erasing = !erasing; if (game) render(); };
-$("gradeTgl").onchange = e => { settings.autoGrade = e.target.checked; save(); if (game) { game.wrong = []; note(""); render(); } };
+$("gradeTgl").onchange = e => {
+  settings.autoGrade = e.target.checked;
+  if (game) { game.wrong = []; note(""); if (settings.autoGrade) gradeNow(); render(); }
+  save();
+};
 $("exclTgl").onchange = e => { settings.autoExclude = e.target.checked; save(); };
 document.addEventListener("keydown", e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); }
