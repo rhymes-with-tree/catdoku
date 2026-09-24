@@ -37,18 +37,22 @@ button:active{transform:translateY(1px)}
 button:disabled{opacity:.4;cursor:default}
 button.primary{background:var(--ink);color:var(--paper)}
 :focus-visible{outline:3px solid var(--pacific-blue);outline-offset:2px}
-.toggles{display:flex;gap:18px;flex-wrap:wrap}
-.toggle{display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;user-select:none}
+.toggles{display:flex;gap:12px;flex-wrap:nowrap;align-items:flex-start}
+.toggle{display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;user-select:none;white-space:nowrap}
 .toggle input{position:absolute;opacity:0;width:1px;height:1px}
-.sw{width:42px;height:24px;border-radius:12px;background:var(--line);position:relative;transition:background .15s}
+.sw{flex:none;width:42px;height:24px;border-radius:12px;background:var(--line);position:relative;transition:background .15s}
 .sw::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s}
 .toggle input:checked + .sw{background:var(--sage-green)}
 .toggle input:checked + .sw::after{left:21px}
 .toggle input:focus-visible + .sw{outline:3px solid var(--pacific-blue);outline-offset:2px}
-.status{width:var(--board);min-height:30px;display:flex;justify-content:space-between;align-items:center;font-weight:600}
-.hearts{font-size:22px;letter-spacing:2px;color:var(--fuchsia-plum)}
+.status{width:var(--board);min-height:30px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:2px 12px;font-weight:600}
+.hearts{font-size:20px;letter-spacing:1px;color:var(--fuchsia-plum)}
 .hearts .lost{color:var(--line)}
-.msg{color:var(--ink-soft)}
+.msg{flex:1 1 150px;text-align:right;color:var(--ink-soft);line-height:1.25}
+.msg:empty{display:none}
+.opt{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:2px}
+.hint{font-size:14px;line-height:1.25;color:var(--ink-soft)}
+.streak{margin:6px 0 0;font-size:15px;font-weight:600;color:var(--ink-soft)}
 .wrap{position:relative;width:var(--board);height:var(--board)}
 #board{width:100%;height:100%;display:grid;border:3px solid var(--ink);border-radius:6px;overflow:hidden;
   touch-action:none;user-select:none;-webkit-user-select:none;background:var(--ink)}
@@ -65,7 +69,7 @@ button.primary{background:var(--ink);color:var(--paper)}
 .overlay{position:fixed;inset:0;z-index:10;display:none;align-items:center;justify-content:center;background:rgba(236,238,231,.85);padding:20px;overflow:auto}
 .catpic{display:block;width:100%;max-height:190px;object-fit:cover;border-radius:10px;border:2px solid var(--ink);margin:0 0 14px;background:var(--line);aspect-ratio:4/3}
 .card .fact{font-size:15px;color:var(--ink);background:var(--paper);border-radius:10px;padding:10px 12px;margin:0 0 4px;text-align:left}
-.card .catname{font-size:24px;font-weight:800;color:var(--ink);line-height:1.2;margin:0 0 6px}
+.card .catname{font-size:24px;font-weight:800;color:var(--ink);line-height:1.2;margin:0 0 16px}
 .breed{width:var(--board);margin:0;font-size:15px;color:var(--ink-soft)}
 .breed b{color:var(--ink)}
 .overlay.show{display:flex}
@@ -86,7 +90,7 @@ button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
 </head>
 <body>
 <main>
-  <header><h1>Catdoku</h1><div class="stripe"></div></header>
+  <header><h1>Catdoku</h1><div class="stripe"></div><p class="streak" id="streak" hidden></p></header>
 
   <div class="bar">
     <label>Board
@@ -100,8 +104,8 @@ button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
   </div>
 
   <div class="bar toggles">
-    <label class="toggle"><input type="checkbox" id="gradeTgl"><span class="sw"></span>Auto grade</label>
-    <label class="toggle"><input type="checkbox" id="exclTgl"><span class="sw"></span>Auto exclude</label>
+    <div class="opt"><label class="toggle"><input type="checkbox" id="gradeTgl"><span class="sw"></span>Auto grade</label><span class="hint">Auto grade makes it harder</span></div>
+    <div class="opt"><label class="toggle"><input type="checkbox" id="exclTgl"><span class="sw"></span>Auto exclude</label><span class="hint">Auto exclude makes it easier</span></div>
   </div>
 
   <div class="status"><span class="left"><span class="hearts" id="hearts" aria-label="Lives left"></span><span class="found" id="found"></span></span><span class="msg" id="msg" aria-live="polite"></span></div>
@@ -124,6 +128,7 @@ button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
   <div class="help">
     <p>Place one 🐱 in every row, every column, and every color. Cats can't touch, not even diagonally.</p>
     <p>Tap a square once for 🐾, twice for 🐱, and again to clear it. Drag across squares to 🐾 several at once. Turn on Erase 🐾 to tap or drag paw marks away.</p>
+    <p>With Auto grade off, Complete checks your board but costs 1 ♥ if it isn't solved yet. Audit shows what's wrong, for 1 ♥.</p>
   </div>
 </main>
 
@@ -151,7 +156,8 @@ const CAT_NAMES = {
 // Whimsical, fancy, and pun names come up twice as often as the rest.
 const NAME_POOL = [...Object.values(CAT_NAMES).flat(), ...CAT_NAMES.whimsical, ...CAT_NAMES.fancy, ...CAT_NAMES.puns];
 const randomCatName = () => NAME_POOL[Math.floor(Math.random() * NAME_POOL.length)];
-const HEARTS = 3;
+const HEARTS = 3;          // lives per start, and per revive
+const MIN_N = 5, MAX_N = 14;
 const STORE = "catdoku.v1";
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 function randomPlacement(N){
@@ -308,16 +314,18 @@ function assignColors(reg, N) {
 
 /* ---------- state ---------- */
 const $ = id => document.getElementById(id);
-let settings = {autoGrade: true, autoExclude: true, size: 8};
+let settings = {autoGrade: false, autoExclude: true, size: 8};
+let stats = {streak: 0, best: 0};
 let game = null, busy = false, msgTimer = null, erasing = false;
 
 function blankCells(N) { return Array.from({length: N * N}, () => ({cat: false, manual: false, src: []})); }
 function show(c) { return c.cat ? "cat" : (c.manual || c.src.length) ? "paw" : "empty"; }
-function save() { try { localStorage.setItem(STORE, JSON.stringify({settings, game})); } catch (e) {} }
+function save() { try { localStorage.setItem(STORE, JSON.stringify({settings, game, stats})); } catch (e) {} }
 function load() {
   try {
     const d = JSON.parse(localStorage.getItem(STORE));
     if (d && d.settings) settings = Object.assign(settings, d.settings);
+    if (d && d.stats) stats = Object.assign(stats, d.stats);
     if (d && d.game && d.game.cells) { game = d.game; if (game.livesUsed == null) game.livesUsed = HEARTS; }
   } catch (e) {}
 }
@@ -332,6 +340,17 @@ function peers(i) {
   }
   return out;
 }
+// Wrong-cat marks stay until that cat is removed; other marks clear on the next move.
+function keepCatMarks(except) { game.wrong = game.wrong.filter(k => k !== except && game.cells[k].cat); }
+function catsOnBoard() { return game.cells.map((c, k) => c.cat ? k : -1).filter(k => k >= 0); }
+function isSolution(k) { return game.sol[Math.floor(k / game.N)] === k % game.N; }
+function loseLives(n) {
+  game.hearts = Math.max(0, game.hearts - n);
+  if (game.hearts <= 0) showLost();
+  return game.hearts;
+}
+const livesLeft = h => `${h} ${h === 1 ? "life" : "lives"} left.`;
+
 function snapshot() {
   game.history.push(JSON.stringify(game.cells));
   if (game.history.length > 500) game.history.shift();
@@ -340,7 +359,7 @@ function snapshot() {
 /* ---------- actions ---------- */
 function tap(i) {
   const cell = game.cells[i];
-  game.wrong = [];
+  keepCatMarks(i);
   const s = show(cell);
   if (erasing) { if (s === "paw") { snapshot(); erasePaw(i); } render(); save(); return; }
   if (s === "empty") { snapshot(); cell.manual = true; }
@@ -393,6 +412,8 @@ function undo() {
 }
 
 function restart() {
+  if (game.status === "lost") breakStreak();
+  setNextSize(game.N);
   game.cells = blankCells(game.N); game.history = []; game.wrong = [];
   game.hearts = HEARTS; game.livesUsed = HEARTS; game.status = "playing";
   closeCard(); render(); save(); note("");
@@ -412,9 +433,18 @@ function audit() {
   render(); save();
 }
 
+function setNextSize(n) {
+  settings.size = Math.min(MAX_N, Math.max(MIN_N, n));
+  $("size").value = settings.size;
+  prefetch(settings.size);
+}
+
 function showLost() {
   game.status = "lost";
-  const btns = [["Restart board", restart, true], ["New puzzle", newPuzzle]];
+  note("");
+  setNextSize(game.N - 1);
+  save();
+  const btns = [["Restart board", restart, true], [`New puzzle (${settings.size} × ${settings.size})`, newPuzzle]];
   let text = "Pick how you want to keep going.";
   if (game.livesUsed < MAX_LIVES) btns.push(["Wait, I'm only mostly dead! Mostly dead is slightly alive, folks!", revive]);
   else text = `All ${MAX_LIVES} lives on this run are used up.`;
@@ -424,40 +454,71 @@ function showLost() {
 
 function revive() {
   if (game.livesUsed >= MAX_LIVES) return;
-  game.livesUsed++; game.hearts = 1; game.status = "playing";
+  const added = Math.min(HEARTS, MAX_LIVES - game.livesUsed);
+  game.livesUsed += added; game.hearts = added; game.status = "playing";
+  setNextSize(game.N);
   render(); save();
-  const left = MAX_LIVES - game.livesUsed;
-  const words = left ? `${left} ${left === 1 ? "revive" : "revives"} left` : "Last life";
+  const left = Math.ceil((MAX_LIVES - game.livesUsed) / HEARTS);
+  const words = left ? `${left} ${left === 1 ? "revive" : "revives"} left` : "Last lives";
   const says = "https://cataas.com/cat/says/" + encodeURIComponent(words) + "?fontSize=48&fontColor=white&" + bust();
-  openCard("Slightly alive!", `Back with 1 life. ${left ? words + " on this run." : "No revives left on this run."}`,
+  openCard("Slightly alive!", `Back with ${added} more ${added === 1 ? "life" : "lives"}. ${left ? words + " on this run." : "No revives left on this run."}`,
     [["Keep playing", closeCard, true]], catImg(says, `A cat saying ${words}`, "https://cataas.com/cat?width=500&" + bust()));
 }
 
 function complete() {
   if (game.status !== "playing") return;
-  const N = game.N;
-  const cats = game.cells.map((c, k) => c.cat ? k : -1).filter(k => k >= 0);
-  const wrong = cats.filter(k => game.sol[Math.floor(k / N)] !== k % N);
-  if (!wrong.length && cats.length === N) { win(); render(); save(); return; }
+  const cats = catsOnBoard();
+  if (cats.length === game.N && cats.every(isSolution)) { win(); render(); save(); return; }
+  // Deliberately says nothing about what's wrong: that's what Audit is for.
+  const h = loseLives(1);
+  if (h > 0) note(`Not solved yet. ${livesLeft(h)}`, 6000);
+  render(); save();
+}
+
+// Turning Auto grade on mid-game grades the board as it stands: each wrong cat is marked and costs a life.
+function gradeNow() {
+  if (!game || game.status !== "playing") return;
+  const cats = catsOnBoard(), wrong = cats.filter(k => !isSolution(k));
   game.wrong = wrong;
-  const left = N - (cats.length - wrong.length);
-  let m;
-  if (wrong.length) m = `${wrong.length} ${wrong.length === 1 ? "cat is" : "cats are"} in the wrong spot.`;
-  else m = `No mistakes yet. ${left} ${left === 1 ? "cat" : "cats"} still to place.`;
-  note(m, 6000); render(); save();
+  if (wrong.length) {
+    flashBad(wrong[0]);
+    const h = loseLives(wrong.length);
+    if (h > 0) note(`${wrong.length} ${wrong.length === 1 ? "cat was" : "cats were"} in the wrong spot. ${livesLeft(h)}`, 6000);
+  } else if (cats.length === game.N) win();
 }
 
 function win() {
   game.status = "won";
+  stats.streak++; stats.best = Math.max(stats.best, stats.streak);
+  // A win on the first three lives moves up a size; a win that needed a revive stays put.
+  setNextSize(game.livesUsed <= HEARTS ? game.N + 1 : game.N);
+  save();
+  showWon();
+}
+
+function showWon() {
   const media = document.createElement("div");
+  const text = document.createElement("p");
+  text.textContent = `Every cat on the ${game.N} × ${game.N} board has its own territory.`;
   const name = document.createElement("p"); name.className = "catname"; name.textContent = `Meet ${randomCatName()}!`;
-  media.append(randomCatPhoto(), name);
-  openCard("Solved!", `Every cat on the ${game.N} × ${game.N} board has its own territory.`,
-    [["New puzzle", newPuzzle, true]], media);
+  media.append(text, randomCatPhoto(), name);
+  if (stats.streak > 1) {
+    const s = document.createElement("p"); s.textContent = `🔥 ${stats.streak} wins in a row`; media.append(s);
+  }
+  openCard("Solved!", "", [[`New puzzle (${settings.size} × ${settings.size})`, newPuzzle, true]], media);
+  renderStreak();
+}
+
+function breakStreak() { stats.streak = 0; renderStreak(); }
+function renderStreak() {
+  const el = $("streak");
+  el.hidden = !stats.best;
+  el.textContent = `🔥 Win streak ${stats.streak} · Best ${stats.best}`;
 }
 
 async function newPuzzle() {
   if (busy) return;
+  if (game && (game.status === "lost" || (game.status === "playing" && game.history.length))) breakStreak();
   busy = true;
   const N = settings.size;
   openCard("Shuffling cats…", N >= 11 ? "Big boards can take several seconds to build." : "", []);
@@ -573,8 +634,9 @@ function render() {
     el.classList.toggle("wrong", game.wrong.includes(i));
     el.setAttribute("aria-label", `Row ${Math.floor(i / N) + 1}, column ${i % N + 1}: ${s === "empty" ? "blank" : s}`);
   });
-  $("hearts").innerHTML = Array.from({length: Math.max(HEARTS, game.hearts)},
+  $("hearts").innerHTML = Array.from({length: Math.max(HEARTS, game.livesUsed)},
     (_, k) => k < game.hearts ? "♥" : '<span class="lost">♥</span>').join("");
+  $("hearts").setAttribute("aria-label", `${game.hearts} ${game.hearts === 1 ? "life" : "lives"} left`);
   $("found").textContent = `🐱 ${game.cells.filter(c => c.cat).length} / ${game.N}`;
   $("completeBtn").style.display = settings.autoGrade ? "none" : "";
   $("auditBtn").style.display = settings.autoGrade ? "none" : "";
@@ -604,7 +666,7 @@ board.addEventListener("pointermove", e => {
   if (!press) return;
   const i = cellAt(e.clientX, e.clientY);
   if (i < 0 || i === press.last) return;
-  if (!press.drag) { press.drag = true; game.wrong = []; paintPaw(press.start, press); }
+  if (!press.drag) { press.drag = true; keepCatMarks(); paintPaw(press.start, press); }
   paintPaw(i, press); press.last = i; render();
 });
 function endPress() {
@@ -627,7 +689,11 @@ $("restartBtn").onclick = () => { if (!busy) restart(); };
 $("completeBtn").onclick = complete;
 $("auditBtn").onclick = audit;
 $("eraseBtn").onclick = () => { erasing = !erasing; if (game) render(); };
-$("gradeTgl").onchange = e => { settings.autoGrade = e.target.checked; save(); if (game) { game.wrong = []; note(""); render(); } };
+$("gradeTgl").onchange = e => {
+  settings.autoGrade = e.target.checked;
+  if (game) { game.wrong = []; note(""); if (settings.autoGrade) gradeNow(); render(); }
+  save();
+};
 $("exclTgl").onchange = e => { settings.autoExclude = e.target.checked; save(); };
 document.addEventListener("keydown", e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); }
@@ -635,12 +701,14 @@ document.addEventListener("keydown", e => {
 
 /* ---------- start ---------- */
 load();
+renderStreak();
 $("size").value = settings.size;
 if (game) {
   buildBoard(); render(); note("");
-  if (game.status === "won") win();
+  $("size").value = settings.size;
+  if (game.status === "won") showWon();
   else if (game.status === "lost") showLost();
-  prefetch(game.N);
+  prefetch(settings.size);
 } else newPuzzle();
 </script>
 </body>
