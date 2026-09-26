@@ -29,12 +29,17 @@ const G = (() => {
       const src = fns.map(f => f.toString()).join("\n") +
         `\nonmessage = e => postMessage({id: e.data.id, p: ${entry}(e.data.n)});`;
       worker = new Worker(URL.createObjectURL(new Blob([src], {type: "text/javascript"})));
-      worker.onmessage = e => { const r = pending.get(e.data.id); pending.delete(e.data.id); r && r(e.data.p); };
-      worker.onerror = () => { worker = null; };
+      worker.onmessage = e => { const r = pending.get(e.data.id); pending.delete(e.data.id); r && r.res(e.data.p); };
+      // If the worker can't run (some pages block them), build waiting puzzles here instead of hanging.
+      worker.onerror = () => {
+        worker = null;
+        for (const {res, n} of pending.values()) setTimeout(() => res(self[entry](n)), 0);
+        pending.clear();
+      };
     } catch (e) { worker = null; }
     const make = self[entry];
     const generate = n => new Promise(res => {
-      if (worker) { const k = ++id; pending.set(k, res); worker.postMessage({id: k, n}); }
+      if (worker) { const k = ++id; pending.set(k, {res, n}); worker.postMessage({id: k, n}); }
       else setTimeout(() => res(make(n)), 30);
     }).then(p => p || generate(n));
     let spare = null;
