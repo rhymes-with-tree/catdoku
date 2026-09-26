@@ -16,11 +16,16 @@
 .cell{border-top:1px solid var(--line);border-left:1px solid var(--line);cursor:pointer}
 .cell.r0{border-top:none}.cell.c0{border-left:none}
 #yarn{position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);pointer-events:none}
-#yarn .trail{fill:none;stroke:#E16A4A;stroke-linecap:round;stroke-linejoin:round;stroke-width:.42}
-#yarn .fill{fill:#E16A4A;opacity:.14}
-#yarn .dot{fill:var(--ink)}
-#yarn .dot.hit{fill:#BD5538}
-#yarn text{fill:var(--paper);font-family:var(--font);font-weight:800;font-size:.36px;text-anchor:middle;dominant-baseline:central}
+#yarn .trail{fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-width:.42}
+#yarn .fill{opacity:.18}
+#yarn .dot{stroke:var(--ink);stroke-width:.05}
+#yarn .knot{fill:var(--paper)}
+.skein{width:var(--board);display:flex;flex-direction:column;gap:2px}
+.strand{--b:22px;position:relative;height:30px}
+.strand .ply{position:absolute;left:0;right:0;top:7px;height:16px;border-radius:8px;border:2px solid var(--ink)}
+.bead{position:absolute;top:calc(15px - var(--b) / 2);width:var(--b);height:var(--b);margin-left:calc(var(--b) / -2);border-radius:50%;border:2px solid var(--ink)}
+.bead.hit::after{content:"";position:absolute;inset:28%;border-radius:50%;background:var(--paper)}
+.ends{display:flex;justify-content:space-between;font-size:13px;font-weight:600;color:var(--ink-soft)}
 </style>
 </head>
 <body>
@@ -38,6 +43,11 @@
     <button id="newBtn" class="primary">New puzzle</button>
   </div>
 
+  <div class="skein" aria-label="The yarn: colors in order from start to end">
+    <div class="strand" id="strand"></div>
+    <div class="ends"><span>Start</span><span>End</span></div>
+  </div>
+
   <div class="status"><span id="count"></span><span class="msg" id="msg" aria-live="polite"></span></div>
 
   <div class="wrap">
@@ -52,8 +62,9 @@
   </div>
 
   <div class="help">
-    <p>Draw one strand of yarn that visits the numbers in order, 1, 2, 3…, and passes through every square exactly once.</p>
-    <p>Start on 1 and drag. Drag back to take yarn back, or tap any square on the strand to cut it there.</p>
+    <p>Draw one strand of yarn through the colored dots in the same order as the yarn above, passing through every square exactly once.</p>
+    <p>Start on the dot matching the left end of the yarn and drag. Drag back to take yarn back, or tap any square on the strand to cut it there.</p>
+    <p>Small boards use bold, mixed colors. Bigger boards blend through a narrower range, so neighboring colors get harder to tell apart.</p>
   </div>
 </main>
 
@@ -142,6 +153,28 @@ function makeYarn(N){
   return null;
 }
 
+/* ---------- yarn colors ---------- */
+// Bold, clearly different colors for small boards.
+const SKEINS = ["#D2382F", "#E8812A", "#E9C02E", "#4E9A4A", "#2A9A93", "#2F6DB5", "#7A4BA8", "#E27AA9", "#7B5234", "#2A2530", "#9A9A9A"];
+// How much of the color wheel bigger boards blend across (degrees).
+const SPAN = {7: 200, 8: 130, 9: 110};
+function oklchHex(L, C, h) {
+  for (let c = C; c >= 0; c -= 0.005) {                      // lower chroma until the color fits sRGB
+    const a = c * Math.cos(h * Math.PI / 180), b = c * Math.sin(h * Math.PI / 180);
+    const l = (L + .3963377774 * a + .2158037573 * b) ** 3, m = (L - .1055613458 * a - .0638541728 * b) ** 3, s = (L - .0894841775 * a - 1.291485548 * b) ** 3;
+    const rgb = [4.0767416621 * l - 3.3077115913 * m + .2309699292 * s, -1.2684380046 * l + 2.6097574011 * m - .3413193965 * s, -.0041960863 * l - .7034186147 * m + 1.707614701 * s];
+    if (rgb.every(v => v >= -1e-4 && v <= 1.0001) || c < 0.005)
+      return "#" + rgb.map(v => { v = Math.min(1, Math.max(0, v)); v = v <= .0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - .055; return Math.round(v * 255).toString(16).padStart(2, "0"); }).join("");
+  }
+}
+// One color per dot, in order. No two dots share a color, so the order is never ambiguous.
+function yarnColors(K, N) {
+  if (!SPAN[N] && K <= SKEINS.length) return shuffle(SKEINS.slice()).slice(0, K);
+  const span = SPAN[N] || 200, h0 = Math.random() * 360, dir = Math.random() < .5 ? 1 : -1;
+  const [L0, L1] = Math.random() < .5 ? [.48, .74] : [.74, .48];
+  return Array.from({length: K}, (_, i) => { const t = K > 1 ? i / (K - 1) : 0; return oklchHex(L0 + (L1 - L0) * t, .15, h0 + dir * span * t); });
+}
+
 const STORE = "catdoku.yarn.v1";
 const $ = G.$;
 let state = G.load(STORE);
@@ -162,7 +195,7 @@ function step(v) {
   const end = t[t.length - 1];
   if (!adjacent(end, v)) return false;
   if (game.clue[end] === lastNum()) return false;           // the last number ends the strand
-  if (game.clue[v] && game.clue[v] !== nextNum()) { G.note(`Get to ${nextNum()} first.`); return false; }
+  if (game.clue[v] && game.clue[v] !== nextNum()) { G.note("That color comes later on the yarn."); return false; }
   t.push(v); return true;
 }
 // Fast drags skip squares: walk a straight line one square at a time.
@@ -195,7 +228,7 @@ async function newPuzzle() {
   const N = settings.size;
   G.openCard("Untangling yarn…", N >= 8 ? "Big boards can take a few seconds to build." : "", []);
   const p = await build.take(N);
-  game = {N, clue: p.clue, path: p.path, trail: [], history: [], won: false};
+  game = {N, clue: p.clue, path: p.path, colors: yarnColors(Math.max(...p.clue), N), trail: [], history: [], won: false};
   busy = false;
   G.closeCard(); buildBoard(); render(); save(); G.note("");
   build.prefetch(N);
@@ -215,31 +248,54 @@ function buildBoard() {
   $("size").value = N;
 }
 
+function svgEl(tag, attrs) { const el = document.createElementNS("http://www.w3.org/2000/svg", tag); for (const a in attrs) el.setAttribute(a, attrs[a]); return el; }
+
+// The skein at the top: an ombre strand with one bead per dot, marked once reached.
+function renderSkein(reachedCount) {
+  const cols = game.colors, K = cols.length, strand = $("strand");
+  // Beads shrink on long yarns so the blend between them stays visible.
+  const bead = Math.round(Math.max(10, Math.min(22, (strand.clientWidth || 360) / K * .5)));
+  strand.style.setProperty("--b", bead + "px");
+  const at = i => K > 1 ? i / (K - 1) : .5, pos = t => `calc(${bead / 2}px + (100% - ${bead}px) * ${t})`;
+  strand.innerHTML = "";
+  const ply = document.createElement("div"); ply.className = "ply";
+  ply.style.background = `linear-gradient(90deg, ${cols.map((c, i) => `${c} ${pos(at(i))}`).join(", ")})`;
+  strand.append(ply);
+  cols.forEach((c, i) => {
+    const b = document.createElement("div"); b.className = "bead" + (i < reachedCount ? " hit" : "");
+    b.style.left = pos(at(i)); b.style.background = c; strand.append(b);
+  });
+}
+
 function render() {
-  const N = game.N, t = game.trail, ns = "http://www.w3.org/2000/svg", svg = $("yarn");
+  const N = game.N, t = game.trail, svg = $("yarn"), cols = game.colors;
   const xy = k => [k % N + .5, Math.floor(k / N) + .5];
   svg.innerHTML = "";
-  for (const k of t) { const r = document.createElementNS(ns, "rect"); const [x, y] = xy(k);
-    Object.entries({x: x - .5, y: y - .5, width: 1, height: 1, class: "fill"}).forEach(([a, v]) => r.setAttribute(a, v)); svg.append(r); }
-  if (t.length) {
-    const pl = document.createElementNS(ns, "polyline");
-    pl.setAttribute("points", t.map(k => xy(k).join(",")).join(" ") + (t.length === 1 ? " " + xy(t[0]).join(",") : ""));
-    pl.setAttribute("class", "trail"); svg.append(pl);
+  // Each stretch of yarn takes the color of the last dot it passed.
+  const segs = [];
+  for (const k of t) {
+    if (game.clue[k]) { if (segs.length) segs[segs.length - 1].cells.push(k); segs.push({color: cols[game.clue[k] - 1], cells: []}); }
+    segs[segs.length - 1].cells.push(k);
+  }
+  for (const sg of segs) for (const k of sg.cells) { const [x, y] = xy(k); svg.append(svgEl("rect", {x: x - .5, y: y - .5, width: 1, height: 1, class: "fill", fill: sg.color})); }
+  for (const sg of segs) {
+    const pts = sg.cells.map(k => xy(k).join(","));
+    if (pts.length === 1) pts.push(pts[0]);
+    svg.append(svgEl("polyline", {points: pts.join(" "), class: "trail", stroke: sg.color}));
   }
   const reached = new Set(t);
   game.clue.forEach((n, k) => {
     if (!n) return;
-    const [x, y] = xy(k), c = document.createElementNS(ns, "circle"), tx = document.createElementNS(ns, "text");
-    c.setAttribute("cx", x); c.setAttribute("cy", y); c.setAttribute("r", .3);
-    c.setAttribute("class", "dot" + (reached.has(k) ? " hit" : ""));
-    tx.setAttribute("x", x); tx.setAttribute("y", y); tx.textContent = n;
-    svg.append(c, tx);
+    const [x, y] = xy(k);
+    svg.append(svgEl("circle", {cx: x, cy: y, r: .3, class: "dot", fill: cols[n - 1]}));
+    if (reached.has(k)) svg.append(svgEl("circle", {cx: x, cy: y, r: .09, class: "knot"}));
   });
+  renderSkein(segs.length);
   $("count").textContent = `🧶 ${t.length} / ${N * N}`;
   $("undoBtn").disabled = !game.history.length || game.won;
   $("clearBtn").disabled = !t.length || game.won;
   [...$("board").children].forEach((el, k) =>
-    el.setAttribute("aria-label", `Row ${Math.floor(k / N) + 1}, column ${k % N + 1}${game.clue[k] ? ", number " + game.clue[k] : ""}${reached.has(k) ? ", on the yarn" : ""}`));
+    el.setAttribute("aria-label", `Row ${Math.floor(k / N) + 1}, column ${k % N + 1}${game.clue[k] ? `, dot ${game.clue[k]} of ${cols.length}` : ""}${reached.has(k) ? ", on the yarn" : ""}`));
 }
 
 /* ---------- input ---------- */
@@ -253,7 +309,7 @@ board.addEventListener("pointerdown", e => {
   snapshot();                                          // dropped again in endPress if nothing changed
   const t = game.trail, onIt = t.indexOf(i);
   if (onIt >= 0) t.length = onIt + 1;                  // tap on the strand: cut it here
-  else if (!t.length && game.clue[i] !== 1) { G.note("Start on the 1."); }
+  else if (!t.length && game.clue[i] !== 1) { G.note("Start on the color at the left end of the yarn."); }
   else stepToward(i);
   press = {last: i};
   render(); checkWin();
@@ -284,6 +340,7 @@ document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.ke
 
 G.nav("yarn");
 $("size").value = settings.size;
+if (game && game.clue && !game.colors) game.colors = yarnColors(Math.max(...game.clue), game.N);
 if (game && game.clue) { buildBoard(); render(); if (game.won) G.winCard(`The yarn runs through all ${game.N * game.N} squares.`, newPuzzle); build.prefetch(game.N); }
 else newPuzzle();
 </script>
