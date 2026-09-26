@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Shikaku</title>
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css">
+<style>
+.board{background:var(--panel)}
+.cell{position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer;
+  border-top:1px solid var(--line);border-left:1px solid var(--line);font-weight:800;line-height:1;
+  font-size:calc(var(--board) / var(--n) * .46);z-index:2}
+.cell.r0{border-top:none}.cell.c0{border-left:none}
+#rects{position:absolute;inset:3px;pointer-events:none;z-index:1}
+.rect{position:absolute;border-radius:6px;border:3px solid var(--ink)}
+.rect.bad{background:repeating-linear-gradient(45deg,rgba(42,37,48,.10) 0 6px,rgba(42,37,48,.02) 6px 12px);border-style:dashed}
+.rect.draft{background:rgba(115,167,174,.25);border:3px dashed var(--ink)}
+.rect .size{position:absolute;right:4px;bottom:1px;font-size:13px;font-weight:700;color:var(--ink)}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Shikaku</h1><div class="stripe"></div></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="bar">
+    <label>Board
+      <select id="size" aria-label="Board size">
+        <option value="5">5 × 5</option><option value="6">6 × 6</option><option value="7">7 × 7</option>
+        <option value="8">8 × 8</option><option value="9">9 × 9</option><option value="10">10 × 10</option>
+        <option value="11">11 × 11</option><option value="12">12 × 12</option>
+      </select>
+    </label>
+    <button id="newBtn" class="primary">New puzzle</button>
+  </div>
+
+  <div class="status"><span id="count"></span><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap">
+    <div class="board" id="board" role="grid" aria-label="Puzzle board"></div>
+    <div id="rects"></div>
+    <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+  </div>
+
+  <div class="actions">
+    <button id="undoBtn">Undo</button>
+    <button id="clearBtn">Clear</button>
+  </div>
+
+  <div class="help">
+    <p>Split the board into rectangles. Each rectangle holds exactly one number, and that number is its area.</p>
+    <p>Drag from corner to corner to draw a rectangle. Tap a rectangle to remove it. Drawing over rectangles replaces them.</p>
+  </div>
+</main>
+
+<script src="../games.js"></script>
+<script>
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+// Split the grid into random rectangles, scanning for the first uncovered cell each time.
+function randomRects(N,maxA){
+  const own=new Int16Array(N*N).fill(-1),rects=[];
+  for(let i=0;i<N*N;i++){
+    if(own[i]>=0)continue;
+    const r0=Math.floor(i/N),c0=i%N,opts=[];
+    for(let h=1;r0+h<=N;h++){
+      let wMax=0;while(c0+wMax<N&&own[r0*N+c0+wMax]<0)wMax++;
+      for(let w=1;w<=wMax;w++){
+        let free=true;for(let r=r0;r<r0+h&&free;r++)for(let c=c0;c<c0+w;c++)if(own[r*N+c]>=0){free=false;break;}
+        if(!free)break;
+        const a=w*h;if(a>maxA)break;
+        // favour mid-sized pieces; singles rarely; long thin strips less
+        const wt=a===1?0.15:(Math.max(w,h)>4*Math.min(w,h)?0.3:1);
+        opts.push({r:r0,c:c0,w,h,wt});
+      }
+    }
+    let t=Math.random()*opts.reduce((s,o)=>s+o.wt,0),pick=opts[0];
+    for(const o of opts){t-=o.wt;if(t<=0){pick=o;break;}}
+    for(let r=pick.r;r<pick.r+pick.h;r++)for(let c=pick.c;c<pick.c+pick.w;c++)own[r*N+c]=rects.length;
+    rects.push({r:pick.r,c:pick.c,w:pick.w,h:pick.h});
+  }
+  return rects;
+}
+// Every rectangle of the right area that holds this clue and no other.
+function candidates(N,clue,cell){
+  const a=clue[cell],r0=Math.floor(cell/N),c0=cell%N,out=[];
+  for(let h=1;h<=a;h++){if(a%h)continue;const w=a/h;if(w>N||h>N)continue;
+    for(let r=r0-h+1;r<=r0;r++)for(let c=c0-w+1;c<=c0;c++){
+      if(r<0||c<0||r+h>N||c+w>N)continue;
+      let ok=true;for(let y=r;y<r+h&&ok;y++)for(let x=c;x<c+w;x++){const k=y*N+x;if(k!==cell&&clue[k]){ok=false;break;}}
+      if(ok)out.push({r,c,w,h});
+    }}
+  return out;
+}
+function solveShikaku(N,clue,limit){
+  const M=N*N,cells=[];for(let i=0;i<M;i++)if(clue[i])cells.push(i);
+  const cand=cells.map(k=>candidates(N,clue,k).map(R=>{const s=[];for(let y=R.r;y<R.r+R.h;y++)for(let x=R.c;x<R.c+R.w;x++)s.push(y*N+x);return {R,s};}));
+  const cov=new Uint8Array(M),used=new Uint8Array(cells.length),pick=new Array(cells.length),sols=[];
+  (function go(left){
+    if(!left){sols.push(pick.map(p=>p.R));return sols.length>=limit;}
+    let best=-1,bestOpts=null;
+    for(let j=0;j<cells.length;j++){if(used[j])continue;
+      const o=cand[j].filter(x=>x.s.every(k=>!cov[k]));
+      if(!bestOpts||o.length<bestOpts.length){best=j;bestOpts=o;if(o.length<=1)break;}}
+    if(!bestOpts.length)return false;
+    used[best]=1;
+    for(const o of bestOpts){for(const k of o.s)cov[k]=1;pick[best]=o;
+      const stop=go(left-1);for(const k of o.s)cov[k]=0;if(stop){used[best]=0;return true;}}
+    used[best]=0;return false;
+  })(cells.length);
+  return sols;
+}
+function makeShikaku(N){
+  const maxA=Math.max(4,Math.round(N*1.5));
+  for(let attempt=0;attempt<200;attempt++){
+    const rects=randomRects(N,maxA);
+    for(let tries=0;tries<8;tries++){
+      const clue=new Array(N*N).fill(0);
+      for(const R of rects){const y=R.r+Math.floor(Math.random()*R.h),x=R.c+Math.floor(Math.random()*R.w);clue[y*N+x]=R.w*R.h;}
+      if(solveShikaku(N,clue,2).length===1)return {N,clue,rects};
+    }
+  }
+  return null;
+}
+
+const COLORS = ["#BD5538","#73A7AE","#ECA818","#6AA673","#B94588","#B3B94B","#7885BA","#E16A4A","#AD8EC2","#3C8681","#DFC49A","#DD9DAD","#9FC7DB"];
+const STORE = "catdoku.shikaku.v1";
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({size: 7}, state.settings);
+let game = state.game || null, busy = false;
+const build = G.builder([shuffle, randomRects, candidates, solveShikaku, makeShikaku], "makeShikaku");
+const save = () => G.save(STORE, {settings, game});
+
+const cellsOf = R => { const out = []; for (let y = R.r; y < R.r + R.h; y++) for (let x = R.c; x < R.c + R.w; x++) out.push(y * game.N + x); return out; };
+const overlaps = (A, B) => A.r < B.r + B.h && B.r < A.r + A.h && A.c < B.c + B.w && B.c < A.c + A.w;
+const rectFrom = (a, b) => { const N = game.N, r1 = Math.floor(a / N), c1 = a % N, r2 = Math.floor(b / N), c2 = b % N;
+  return {r: Math.min(r1, r2), c: Math.min(c1, c2), h: Math.abs(r1 - r2) + 1, w: Math.abs(c1 - c2) + 1}; };
+function valid(R) {
+  const nums = cellsOf(R).map(k => game.clue[k]).filter(Boolean);
+  return nums.length === 1 && nums[0] === R.w * R.h;
+}
+
+function snapshot() { game.history.push(JSON.stringify(game.rects)); if (game.history.length > 300) game.history.shift(); }
+function undo() { if (!game.history.length || game.won) return; game.rects = JSON.parse(game.history.pop()); render(); save(); }
+function clearAll() { if (game.won || !game.rects.length) return; snapshot(); game.rects = []; render(); save(); }
+
+function place(R) {
+  snapshot();
+  game.rects = game.rects.filter(X => !overlaps(X, R));
+  R.id = game.nextId++;
+  game.rects.push(R);
+}
+function removeAt(k) {
+  const N = game.N, r = Math.floor(k / N), c = k % N;
+  const i = game.rects.findIndex(R => r >= R.r && r < R.r + R.h && c >= R.c && c < R.c + R.w);
+  if (i < 0) return false;
+  snapshot(); game.rects.splice(i, 1); return true;
+}
+
+function checkWin() {
+  const covered = game.rects.reduce((s, R) => s + R.w * R.h, 0);
+  if (covered === game.N * game.N && game.rects.every(valid)) {
+    game.won = true; save();
+    G.winCard(`Every number has its own rectangle — ${game.rects.length} in all.`, newPuzzle);
+  }
+}
+
+async function newPuzzle() {
+  if (busy) return;
+  busy = true;
+  const N = settings.size;
+  G.openCard("Measuring…", "", []);
+  const p = await build.take(N);
+  game = {N, clue: p.clue, answer: p.rects, rects: [], nextId: 0, history: [], won: false};
+  busy = false;
+  G.closeCard(); buildBoard(); render(); save(); G.note("");
+  build.prefetch(N);
+}
+
+function buildBoard() {
+  const N = game.N, b = $("board");
+  b.innerHTML = "";
+  b.style.gridTemplateColumns = b.style.gridTemplateRows = `repeat(${N}, minmax(0, 1fr))`;
+  b.style.setProperty("--n", N);
+  for (let i = 0; i < N * N; i++) {
+    const el = document.createElement("div");
+    el.className = "cell" + (i < N ? " r0" : "") + (i % N ? "" : " c0");
+    el.textContent = game.clue[i] || "";
+    el.dataset.i = i; el.setAttribute("role", "gridcell");
+    el.setAttribute("aria-label", `Row ${Math.floor(i / N) + 1}, column ${i % N + 1}${game.clue[i] ? ", number " + game.clue[i] : ""}`);
+    b.append(el);
+  }
+  $("size").value = N;
+}
+
+function drawRect(R, cls, color, label) {
+  const N = game.N, el = document.createElement("div"), pct = v => (v / N * 100) + "%";
+  el.className = "rect " + cls;
+  Object.assign(el.style, {left: pct(R.c), top: pct(R.r), width: pct(R.w), height: pct(R.h)});
+  if (color) el.style.background = color;
+  if (label) { const s = document.createElement("span"); s.className = "size"; s.textContent = label; el.append(s); }
+  $("rects").append(el);
+}
+function render() {
+  const layer = $("rects"); layer.innerHTML = "";
+  for (const R of game.rects) {
+    const ok = valid(R);
+    drawRect(R, ok ? "" : "bad", ok ? COLORS[R.id % COLORS.length] + "B3" : "", ok ? "" : R.w * R.h);
+  }
+  if (press && press.draft) drawRect(press.draft, "draft", "", `${press.draft.w} × ${press.draft.h} = ${press.draft.w * press.draft.h}`);
+  const covered = game.rects.reduce((s, R) => s + R.w * R.h, 0);
+  $("count").textContent = `▦ ${covered} / ${game.N * game.N}`;
+  $("undoBtn").disabled = !game.history.length || game.won;
+  $("clearBtn").disabled = !game.rects.length || game.won;
+}
+
+/* ---------- input ---------- */
+let press = null;
+const board = $("board");
+board.addEventListener("pointerdown", e => {
+  if (!game || game.won || busy) return;
+  const i = G.cellAt(e.clientX, e.clientY); if (i < 0) return;
+  e.preventDefault();
+  try { board.setPointerCapture(e.pointerId); } catch (_) {}
+  press = {start: i, last: i, draft: null};
+});
+board.addEventListener("pointermove", e => {
+  if (!press) return;
+  const i = G.cellAt(e.clientX, e.clientY);
+  if (i < 0 || i === press.last) return;
+  press.last = i; press.draft = rectFrom(press.start, i);
+  render();
+});
+function endPress() {
+  if (!press) return;
+  const p = press; press = null;
+  if (p.draft) place(p.draft);                                   // a drag draws
+  else if (!removeAt(p.start)) place(rectFrom(p.start, p.start)); // a tap removes, or draws a 1 × 1
+  render(); save(); checkWin();
+}
+board.addEventListener("pointerup", endPress);
+board.addEventListener("pointercancel", () => { press = null; render(); });
+
+$("newBtn").onclick = newPuzzle;
+$("size").onchange = e => { settings.size = +e.target.value; save(); newPuzzle(); };
+$("undoBtn").onclick = undo;
+$("clearBtn").onclick = clearAll;
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); } });
+
+G.nav("shikaku");
+$("size").value = settings.size;
+if (game && game.clue) { buildBoard(); render(); if (game.won) G.winCard(`Every number has its own rectangle — ${game.rects.length} in all.`, newPuzzle); build.prefetch(game.N); }
+else newPuzzle();
+</script>
+</body>
+</html>

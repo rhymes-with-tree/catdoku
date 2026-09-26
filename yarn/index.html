@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Yarn</title>
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css">
+<style>
+.board{background:var(--panel)}
+.cell{border-top:1px solid var(--line);border-left:1px solid var(--line);cursor:pointer}
+.cell.r0{border-top:none}.cell.c0{border-left:none}
+#yarn{position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);pointer-events:none}
+#yarn .trail,#yarn .shade,#yarn .twist{fill:none;stroke-linejoin:round}
+#yarn .shade{stroke:var(--ink);stroke-opacity:.28;stroke-width:.5;stroke-linecap:round}
+#yarn .trail{stroke-width:.42;stroke-linecap:round}
+#yarn .twist{stroke:#fff;stroke-opacity:.45;stroke-width:.13;stroke-dasharray:.13 .13;stroke-linecap:round}
+#yarn .fill{opacity:.16}
+#yarn .ball{stroke:var(--ink);stroke-width:.045}
+#yarn .wind{fill:none;stroke:var(--ink);stroke-opacity:.38;stroke-width:.03;stroke-linecap:round}
+#yarn .knot{fill:var(--paper)}
+#yarn .num{fill:#fff;stroke:var(--ink);stroke-width:.06;paint-order:stroke;font-family:var(--font);font-weight:800;font-size:.34px;text-anchor:middle;dominant-baseline:central}
+#yarn .kitten{font-size:.6px;text-anchor:middle;dominant-baseline:central}
+.skein{width:var(--board);display:flex;flex-direction:column;gap:2px}
+.strand{--b:22px;position:relative;height:30px}
+.strand .ply{position:absolute;left:0;right:0;top:7px;height:16px;border-radius:8px;border:2px solid var(--ink);overflow:hidden}
+.strand .ply::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(115deg,rgba(255,255,255,.34) 0 3px,transparent 3px 8px)}
+.bead{position:absolute;top:calc(15px - var(--b) / 2);width:var(--b);height:var(--b);margin-left:calc(var(--b) / -2);border-radius:50%;border:2px solid var(--ink)}
+.bead.hit::after{content:"";position:absolute;inset:28%;border-radius:50%;background:var(--paper)}
+.ends{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:600;color:var(--ink-soft)}
+.ends .colorway{font-style:italic;color:var(--ink)}
+.toggle{display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;user-select:none;white-space:nowrap}
+.toggle input{position:absolute;opacity:0;width:1px;height:1px}
+.sw{flex:none;width:42px;height:24px;border-radius:12px;background:var(--line);position:relative;transition:background .15s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s}
+.toggle input:checked + .sw{background:var(--sage-green)}
+.toggle input:checked + .sw::after{left:21px}
+.toggle input:focus-visible + .sw{outline:3px solid var(--pacific-blue);outline-offset:2px}
+.hint{font-size:14px;color:var(--ink-soft)}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Yarn</h1><div class="stripe"></div></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="bar">
+    <label>Board
+      <select id="size" aria-label="Board size">
+        <option value="5">5 × 5</option><option value="6">6 × 6</option><option value="7">7 × 7</option>
+        <option value="8">8 × 8</option><option value="9">9 × 9</option>
+      </select>
+    </label>
+    <button id="newBtn" class="primary">New puzzle</button>
+  </div>
+
+  <div class="bar">
+    <label class="toggle"><input type="checkbox" id="numTgl"><span class="sw"></span>Show numbers</label>
+    <span class="hint">For color-blind play</span>
+  </div>
+
+  <div class="skein" aria-label="The yarn: colors in order from start to end">
+    <div class="strand" id="strand"></div>
+    <div class="ends"><span>Start</span><span class="colorway" id="colorway"></span><span>End</span></div>
+  </div>
+
+  <div class="status"><span id="count"></span><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap">
+    <div class="board" id="board" role="grid" aria-label="Puzzle board"></div>
+    <svg id="yarn" aria-hidden="true"></svg>
+    <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+  </div>
+
+  <div class="actions">
+    <button id="undoBtn">Undo</button>
+    <button id="clearBtn">Clear</button>
+  </div>
+
+  <div class="help">
+    <p>Help the kitten lead one strand of yarn through every ball of yarn, lightest to darkest, passing through every square exactly once. The skein at the top shows the order.</p>
+    <p>Start on the lightest ball and drag. Drag back to take yarn back, or tap any square on the strand to cut it there.</p>
+    <p>Small boards use a whole colorway, so each ball looks clearly different. Bigger boards use a narrower slice of it, so neighboring shades get harder to tell apart.</p>
+  </div>
+</main>
+
+<script src="../games.js"></script>
+<script>
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function nbrs(i,N){const r=Math.floor(i/N),c=i%N,o=[];if(r>0)o.push(i-N);if(r<N-1)o.push(i+N);if(c>0)o.push(i-1);if(c<N-1)o.push(i+1);return o;}
+// Random Hamiltonian path by "backbite" moves starting from a serpentine.
+function randomPath(N){
+  let p=[];for(let r=0;r<N;r++)for(let c=0;c<N;c++)p.push(r*N+(r%2?N-1-c:c));
+  const M=N*N,pos=new Int32Array(M);
+  const idx=()=>{for(let k=0;k<M;k++)pos[p[k]]=k;};idx();
+  for(let it=0;it<M*40;it++){
+    if(Math.random()<.5){p.reverse();idx();}
+    const end=p[0],cand=nbrs(end,N).filter(v=>v!==p[1]);
+    const v=cand[Math.floor(Math.random()*cand.length)],k=pos[v];
+    // reverse p[0..k-1]: v stays adjacent to old end, new end is p[k-1]
+    const head=p.slice(0,k).reverse();p=head.concat(p.slice(k));
+    for(let j=0;j<k;j++)pos[p[j]]=j;
+  }
+  return p;
+}
+// Count solutions (up to limit) for a path through all cells hitting clue cells in order.
+function solveYarn(N,clue,limit,budget){
+  const M=N*N,vis=new Uint8Array(M),order=[],sols=[];let nodes=0,aborted=false;
+  const K=Math.max(...clue);const start=clue.indexOf(1),fin=clue.indexOf(K);
+  const nb=[];for(let i=0;i<M;i++)nb.push(nbrs(i,N));
+  function ok(head,count){
+    // every unvisited cell except fin needs >=2 open neighbours (head counts); fin needs >=1
+    for(let u=0;u<M;u++){if(vis[u])continue;let d=0;for(const w of nb[u])if(!vis[w]||w===head)d++;
+      if(d<(u===fin?1:2))return false;}
+    // unvisited cells connected
+    let seed=-1;for(const w of nb[head])if(!vis[w]){seed=w;break;}
+    if(seed<0)return count===M;
+    const seen=new Uint8Array(M),st=[seed];seen[seed]=1;let n=1;
+    while(st.length){const u=st.pop();for(const w of nb[u])if(!vis[w]&&!seen[w]){seen[w]=1;n++;st.push(w);}}
+    return n===M-count;
+  }
+  (function go(head,count,next){
+    if(aborted)return true;
+    if(++nodes>budget){aborted=true;return true;}
+    if(count===M){sols.push(order.slice());return sols.length>=limit;}
+    for(const v of nb[head]){
+      if(vis[v])continue;
+      if(clue[v]&&clue[v]!==next)continue;
+      if(v===fin&&count+1!==M)continue;
+      vis[v]=1;order.push(v);
+      if(ok(v,count+1)&&go(v,count+1,clue[v]?next+1:next)){vis[v]=0;order.pop();return true;}
+      vis[v]=0;order.pop();
+    }
+    return false;
+  })(start,(vis[start]=1,order.push(start),1),2);
+  return {sols,aborted,nodes};
+}
+// Drop clues one at a time (never the ends) while the answer stays unique.
+function minimizeYarn(N,path,marks){
+  const M=N*N,build=ms=>{const clue=new Array(M).fill(0);[...ms].sort((a,b)=>a-b).forEach((k,j)=>clue[path[k]]=j+1);return clue;};
+  for(const k of shuffle([...marks].filter(k=>k!==0&&k!==M-1))){
+    marks.delete(k);
+    const r=solveYarn(N,build(marks),2,40000);
+    if(r.aborted||r.sols.length!==1)marks.add(k);
+  }
+  return build(marks);
+}
+function makeYarn(N){
+  const M=N*N;
+  for(let attempt=0;attempt<30;attempt++){
+    const path=randomPath(N);
+    const marks=new Set([0,M-1]);
+    const gap=Math.max(3,Math.round(M/(N+1)));
+    for(let k=gap;k<M-2;k+=gap)marks.add(k+Math.floor(Math.random()*3)-1);
+    for(let it=0;it<M;it++){
+      const clue=new Array(M).fill(0);[...marks].sort((a,b)=>a-b).forEach((k,j)=>clue[path[k]]=j+1);
+      const r=solveYarn(N,clue,2,60000);
+      if(!r.aborted&&r.sols.length===1)return {N,path,clue:minimizeYarn(N,path,marks)};
+      let add=-1;
+      if(!r.aborted&&r.sols.length>1){const other=r.sols.find(s=>s.some((v,k)=>v!==path[k]))||r.sols[1];
+        const diff=[];for(let k=1;k<M-1;k++)if(other[k]!==path[k]&&!marks.has(k))diff.push(k);
+        add=diff[Math.floor(Math.random()*diff.length)];}
+      if(add<0){ // too slow to decide: add a clue in the widest gap
+        const s=[...marks].sort((a,b)=>a-b);let best=0,bi=0;for(let j=1;j<s.length;j++)if(s[j]-s[j-1]>best){best=s[j]-s[j-1];bi=j;}
+        if(best<2)break;add=s[bi-1]+Math.floor(best/2);}
+      marks.add(add);
+    }
+  }
+  return null;
+}
+
+/* ---------- yarn colors ---------- */
+// Colorways run light to dark, so the darkest ball is always the finish.
+const COLORWAYS = {
+  Sunset:   ["#FCE38A", "#F9A65A", "#EE6A4D", "#C2374B", "#6E2350"],
+  Lavender: ["#EADCF8", "#C7A6EC", "#9B6FD6", "#6C45B0", "#3E2479"],
+  Ocean:    ["#CFF4EA", "#7FD8C8", "#2FA7B0", "#1F6FA8", "#1D3A74"],
+  Moss:     ["#EEF5C8", "#BFD97A", "#7FB24E", "#3F7F3A", "#1E4A2A"],
+  Berry:    ["#FBD3E4", "#F29CC1", "#E0569A", "#A8246E", "#5C1242"],
+  Pumpkin:  ["#FFE7B3", "#F7B44A", "#E37424", "#A94419", "#5A2A14"],
+  Bluebell: ["#DDE6FB", "#A8BCF3", "#6E8BE0", "#4059B8", "#243277"],
+  Heather:  ["#F8D7DE", "#E7A3C4", "#B97AC7", "#7C57B3", "#3F2E7A"],
+};
+// How much of the colorway each board size uses; less means closer shades.
+const WIDTH = {5: 1, 6: .85, 7: .7, 8: .55, 9: .45};
+
+function hexLab(hex) {
+  const [r, g, b] = [1, 3, 5].map(i => { const v = parseInt(hex.slice(i, i + 2), 16) / 255; return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; });
+  const l = Math.cbrt(.4122214708 * r + .5363325363 * g + .0514459929 * b), m = Math.cbrt(.2119034982 * r + .6806995451 * g + .1073969566 * b), s = Math.cbrt(.0883024619 * r + .2817188376 * g + .6299787005 * b);
+  return [.2104542553 * l + .793617785 * m - .0040720468 * s, 1.9779984951 * l - 2.428592205 * m + .4505937099 * s, .0259040371 * l + .7827717662 * m - .808675766 * s];
+}
+function labHex([L, a, b]) {
+  const l = (L + .3963377774 * a + .2158037573 * b) ** 3, m = (L - .1055613458 * a - .0638541728 * b) ** 3, s = (L - .0894841775 * a - 1.291485548 * b) ** 3;
+  return "#" + [4.0767416621 * l - 3.3077115913 * m + .2309699292 * s, -1.2684380046 * l + 2.6097574011 * m - .3413193965 * s, -.0041960863 * l - .7034186147 * m + 1.707614701 * s]
+    .map(v => { v = Math.min(1, Math.max(0, v)); v = v <= .0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - .055; return Math.round(v * 255).toString(16).padStart(2, "0"); }).join("");
+}
+// A point t (0..1) along a colorway, blended smoothly between its anchors.
+function rampAt(anchors, t) {
+  const x = Math.min(anchors.length - 1.0001, t * (anchors.length - 1)), i = Math.floor(x), f = x - i;
+  const A = hexLab(anchors[i]), B = hexLab(anchors[i + 1]);
+  return labHex(A.map((v, k) => v + (B[k] - v) * f));
+}
+// One color per ball, in order along a random slice of a random colorway.
+function yarnColors(K, N) {
+  const names = Object.keys(COLORWAYS), name = names[Math.floor(Math.random() * names.length)];
+  const w = WIDTH[N] ?? .5, a0 = Math.random() * (1 - w);
+  return {colorway: name, colors: Array.from({length: K}, (_, i) => rampAt(COLORWAYS[name], a0 + w * (K > 1 ? i / (K - 1) : 0)))};
+}
+
+const STORE = "catdoku.yarn.v1";
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({size: 6, numbers: false}, state.settings);
+let game = state.game || null, busy = false;
+const build = G.builder([shuffle, nbrs, randomPath, solveYarn, minimizeYarn, makeYarn], "makeYarn");
+const save = () => G.save(STORE, {settings, game});
+
+const lastNum = () => Math.max(...game.clue);
+const adjacent = (a, b) => { const N = game.N; return Math.abs(a - b) === N || (Math.abs(a - b) === 1 && Math.floor(a / N) === Math.floor(b / N)); };
+const nextNum = () => game.trail.reduce((n, k) => game.clue[k] ? game.clue[k] + 1 : n, 1);
+
+// Try to extend the strand into square v. Returns true if it moved.
+function step(v) {
+  const t = game.trail, i = t.indexOf(v);
+  if (i >= 0) { if (i < t.length - 1) { t.length = i + 1; return true; } return false; }
+  if (!t.length) { if (game.clue[v] !== 1) return false; t.push(v); return true; }
+  const end = t[t.length - 1];
+  if (!adjacent(end, v)) return false;
+  if (game.clue[end] === lastNum()) return false;           // the last number ends the strand
+  if (game.clue[v] && game.clue[v] !== nextNum()) { G.note("That ball comes later on the skein."); return false; }
+  t.push(v); return true;
+}
+// Fast drags skip squares: walk a straight line one square at a time.
+function stepToward(v) {
+  const t = game.trail, N = game.N;
+  if (!t.length || t.includes(v)) return step(v);
+  let end = t[t.length - 1], moved = false;
+  const er = Math.floor(end / N), ec = end % N, vr = Math.floor(v / N), vc = v % N;
+  if (er !== vr && ec !== vc) return step(v);
+  const d = er === vr ? Math.sign(vc - ec) : N * Math.sign(vr - er);
+  while (end !== v) { if (!step(end + d)) break; end += d; moved = true; }
+  return moved;
+}
+
+function checkWin() {
+  const t = game.trail;
+  if (t.length === game.N * game.N && game.clue[t[t.length - 1]] === lastNum()) {
+    game.won = true; save();
+    G.winCard(`Every inch of ${game.colorway} yarn is wound through all ${t.length} squares.`, newPuzzle);
+  }
+}
+
+function snapshot() { game.history.push(game.trail.slice()); if (game.history.length > 300) game.history.shift(); }
+function undo() { if (!game.history.length || game.won) return; game.trail = game.history.pop(); render(); save(); }
+function clearAll() { if (game.won || !game.trail.length) return; snapshot(); game.trail = []; render(); save(); }
+
+async function newPuzzle() {
+  if (busy) return;
+  busy = true;
+  const N = settings.size;
+  G.openCard("Untangling yarn…", N >= 8 ? "Big boards can take a few seconds to build." : "", []);
+  const p = await build.take(N);
+  game = Object.assign({N, clue: p.clue, path: p.path, trail: [], history: [], won: false}, yarnColors(Math.max(...p.clue), N));
+  busy = false;
+  G.closeCard(); buildBoard(); render(); save(); G.note("");
+  build.prefetch(N);
+}
+
+function buildBoard() {
+  const N = game.N, b = $("board");
+  b.innerHTML = "";
+  b.style.gridTemplateColumns = b.style.gridTemplateRows = `repeat(${N}, minmax(0, 1fr))`;
+  for (let i = 0; i < N * N; i++) {
+    const el = document.createElement("div");
+    el.className = "cell" + (i < N ? " r0" : "") + (i % N ? "" : " c0");
+    el.dataset.i = i; el.setAttribute("role", "gridcell");
+    b.append(el);
+  }
+  $("yarn").setAttribute("viewBox", `0 0 ${N} ${N}`);
+  $("size").value = N;
+}
+
+function svgEl(tag, attrs) { const el = document.createElementNS("http://www.w3.org/2000/svg", tag); for (const a in attrs) el.setAttribute(a, attrs[a]); return el; }
+
+// The skein at the top: an ombre strand with one bead per dot, marked once reached.
+function renderSkein(reachedCount) {
+  const cols = game.colors, K = cols.length, strand = $("strand");
+  // Beads shrink on long yarns so the blend between them stays visible.
+  const bead = Math.round(Math.max(10, Math.min(22, (strand.clientWidth || 360) / K * .5)));
+  strand.style.setProperty("--b", bead + "px");
+  const at = i => K > 1 ? i / (K - 1) : .5, pos = t => `calc(${bead / 2}px + (100% - ${bead}px) * ${t})`;
+  strand.innerHTML = "";
+  $("colorway").textContent = game.colorway;
+  const ply = document.createElement("div"); ply.className = "ply";
+  ply.style.background = `linear-gradient(90deg, ${cols.map((c, i) => `${c} ${pos(at(i))}`).join(", ")})`;
+  strand.append(ply);
+  cols.forEach((c, i) => {
+    const b = document.createElement("div"); b.className = "bead" + (i < reachedCount ? " hit" : "");
+    b.style.left = pos(at(i)); b.style.background = c; strand.append(b);
+  });
+}
+
+function render() {
+  const N = game.N, t = game.trail, svg = $("yarn"), cols = game.colors;
+  const xy = k => [k % N + .5, Math.floor(k / N) + .5];
+  svg.innerHTML = "";
+  // Each stretch of yarn takes the color of the last dot it passed.
+  const segs = [];
+  for (const k of t) {
+    if (game.clue[k]) { if (segs.length) segs[segs.length - 1].cells.push(k); segs.push({color: cols[game.clue[k] - 1], cells: []}); }
+    segs[segs.length - 1].cells.push(k);
+  }
+  for (const sg of segs) for (const k of sg.cells) { const [x, y] = xy(k); svg.append(svgEl("rect", {x: x - .5, y: y - .5, width: 1, height: 1, class: "fill", fill: sg.color})); }
+  // The strand: a soft shadow, the dyed yarn in sections, then a stitched highlight for the plies.
+  const whole = t.map(k => xy(k).join(","));
+  if (whole.length === 1) whole.push(whole[0]);
+  if (t.length) svg.append(svgEl("polyline", {points: whole.join(" "), class: "shade"}));
+  for (const sg of segs) {
+    const pts = sg.cells.map(k => xy(k).join(","));
+    if (pts.length === 1) pts.push(pts[0]);
+    svg.append(svgEl("polyline", {points: pts.join(" "), class: "trail", stroke: sg.color}));
+  }
+  if (t.length > 1) svg.append(svgEl("polyline", {points: whole.join(" "), class: "twist"}));
+  const reached = new Set(t);
+  game.clue.forEach((n, k) => {
+    if (!n) return;
+    const [x, y] = xy(k), g = svgEl("g", {transform: `translate(${x} ${y})`});
+    g.append(svgEl("circle", {r: .32, class: "ball", fill: cols[n - 1]}));
+    for (const d of ["M-.25 -.08Q0 .16 .25 -.1", "M-.2 .15Q.02 -.06 .24 .12", "M-.06 -.3Q.16 0 -.03 .31"]) g.append(svgEl("path", {d, class: "wind"}));
+    if (reached.has(k)) g.append(svgEl("circle", {r: .08, class: "knot"}));
+    if (settings.numbers) { const tx = svgEl("text", {class: "num"}); tx.textContent = n; g.append(tx); }
+    svg.append(g);
+  });
+  // The kitten sits at the loose end of the yarn.
+  if (t.length) { const [x, y] = xy(t[t.length - 1]), kit = svgEl("text", {x, y: y - .02, class: "kitten"}); kit.textContent = "🐈"; svg.append(kit); }
+  renderSkein(segs.length);
+  $("count").textContent = `🧶 ${t.length} / ${N * N}`;
+  $("undoBtn").disabled = !game.history.length || game.won;
+  $("clearBtn").disabled = !t.length || game.won;
+  [...$("board").children].forEach((el, k) =>
+    el.setAttribute("aria-label", `Row ${Math.floor(k / N) + 1}, column ${k % N + 1}${game.clue[k] ? `, dot ${game.clue[k]} of ${cols.length}` : ""}${reached.has(k) ? ", on the yarn" : ""}`));
+}
+
+/* ---------- input ---------- */
+let press = null;
+const board = $("board");
+board.addEventListener("pointerdown", e => {
+  if (!game || game.won || busy) return;
+  const i = G.cellAt(e.clientX, e.clientY); if (i < 0) return;
+  e.preventDefault();
+  try { board.setPointerCapture(e.pointerId); } catch (_) {}
+  snapshot();                                          // dropped again in endPress if nothing changed
+  const t = game.trail, onIt = t.indexOf(i);
+  if (onIt >= 0) t.length = onIt + 1;                  // tap on the strand: cut it here
+  else if (!t.length && game.clue[i] !== 1) { G.note("Start on the lightest ball, the left end of the skein."); }
+  else stepToward(i);
+  press = {last: i};
+  render(); checkWin();
+});
+board.addEventListener("pointermove", e => {
+  if (!press || game.won) return;
+  const i = G.cellAt(e.clientX, e.clientY);
+  if (i < 0 || i === press.last) return;
+  press.last = i;
+  const t = game.trail;
+  if (t.length > 1 && t[t.length - 2] === i) t.pop(); else stepToward(i);
+  render(); checkWin();
+});
+function endPress() {
+  if (!press) return;
+  const h = game.history;
+  if (h.length && h[h.length - 1].join() === game.trail.join()) h.pop();
+  press = null; render(); save();
+}
+board.addEventListener("pointerup", endPress);
+board.addEventListener("pointercancel", endPress);
+
+$("newBtn").onclick = newPuzzle;
+$("size").onchange = e => { settings.size = +e.target.value; save(); newPuzzle(); };
+$("undoBtn").onclick = undo;
+$("numTgl").onchange = e => { settings.numbers = e.target.checked; save(); if (game) render(); };
+$("clearBtn").onclick = clearAll;
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); } });
+
+G.nav("yarn");
+$("numTgl").checked = settings.numbers;
+$("size").value = settings.size;
+if (game && game.clue && !game.colorway) Object.assign(game, yarnColors(Math.max(...game.clue), game.N));
+if (game && game.clue) { buildBoard(); render(); if (game.won) G.winCard(`Every inch of ${game.colorway} yarn is wound through all ${game.N * game.N} squares.`, newPuzzle); build.prefetch(game.N); }
+else newPuzzle();
+</script>
+</body>
+</html>

@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Four Colors</title>
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css">
+<style>
+.board{background:var(--ink)}
+.cell{position:relative;cursor:pointer;background:var(--panel);
+  border-top:1px solid rgba(42,37,48,.10);border-left:1px solid rgba(42,37,48,.10)}
+.cell.bt{border-top:3px solid var(--ink)}.cell.bl{border-left:3px solid var(--ink)}
+.cell.r0{border-top:none}.cell.c0{border-left:none}
+.cell.pin::before{content:"";position:absolute;left:50%;top:50%;width:22%;height:22%;transform:translate(-50%,-50%);border-radius:50%;background:var(--ink);opacity:.75}
+.cell.clash::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(45deg,rgba(42,37,48,.35) 0 4px,transparent 4px 10px)}
+.paints{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;width:var(--board)}
+.paint{width:46px;height:46px;border-radius:50%;padding:0;border:3px solid var(--ink)}
+.paint[aria-pressed="true"]{outline:4px solid var(--ink);outline-offset:3px}
+.paint.erase{background:var(--panel);font-size:20px}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Four Colors</h1><div class="stripe"></div></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="bar">
+    <label>Map
+      <select id="size" aria-label="Map size">
+        <option value="6">6 × 6</option><option value="7">7 × 7</option><option value="8">8 × 8</option>
+        <option value="9">9 × 9</option><option value="10">10 × 10</option><option value="11">11 × 11</option>
+        <option value="12">12 × 12</option>
+      </select>
+    </label>
+    <button id="newBtn" class="primary">New puzzle</button>
+  </div>
+
+  <div class="paints" id="paints" role="group" aria-label="Paint colors"></div>
+
+  <div class="status"><span id="count"></span><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap">
+    <div class="board" id="board" role="grid" aria-label="Map"></div>
+    <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+  </div>
+
+  <div class="actions">
+    <button id="undoBtn">Undo</button>
+    <button id="clearBtn">Clear</button>
+  </div>
+
+  <div class="help">
+    <p>Color every region with one of four colors so no two neighboring regions match. Regions that only touch at a corner don't count as neighbors.</p>
+    <p>Regions with a dot are already painted. Pick a color, then tap or drag across regions. Tap a region again to clear it. Neighbors that clash get striped.</p>
+  </div>
+</main>
+
+<script src="../games.js"></script>
+<script>
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function nbrs(i,N){const r=Math.floor(i/N),c=i%N,o=[];if(r>0)o.push(i-N);if(r<N-1)o.push(i+N);if(c>0)o.push(i-1);if(c<N-1)o.push(i+1);return o;}
+// Grow R connected regions from random seeds.
+function randomMap(N,R){
+  const reg=new Int16Array(N*N).fill(-1);
+  shuffle([...Array(N*N).keys()]).slice(0,R).forEach((s,g)=>reg[s]=g);
+  let left=N*N-R;
+  while(left>0){
+    const cand=[];
+    for(let i=0;i<N*N;i++){if(reg[i]!==-1)continue;for(const j of nbrs(i,N))if(reg[j]!==-1)cand.push([i,reg[j]]);}
+    const [i,g]=cand[Math.floor(Math.random()*cand.length)];reg[i]=g;left--;
+  }
+  return Array.from(reg);
+}
+function adjacency(N,R,reg){
+  const adj=Array.from({length:R},()=>new Set());
+  for(let i=0;i<N*N;i++)for(const j of nbrs(i,N))if(reg[i]!==reg[j])adj[reg[i]].add(reg[j]);
+  return adj.map(s=>[...s]);
+}
+// Count 4-colourings that agree with the givens (-1 = open), up to limit.
+function solveColors(adj,given,limit,randomize){
+  const R=adj.length,col=given.slice(),sols=[];
+  const order=[...Array(R).keys()].filter(g=>col[g]<0);
+  (function go(){
+    // most-constrained open region first
+    let best=-1,bestOpts=null;
+    for(const g of order){if(col[g]>=0)continue;
+      const opts=[0,1,2,3].filter(c=>adj[g].every(h=>col[h]!==c));
+      if(!bestOpts||opts.length<bestOpts.length){best=g;bestOpts=opts;if(opts.length<=1)break;}}
+    if(best<0){sols.push(col.slice());return sols.length>=limit;}
+    if(randomize)shuffle(bestOpts);
+    for(const c of bestOpts){col[best]=c;if(go()){col[best]=-1;return true;}}
+    col[best]=-1;return false;
+  })();
+  return sols;
+}
+// Build several candidate maps and keep the one that needs the fewest pre-coloured regions.
+function makeFourColor(N,tries=12){
+  let best=null;
+  for(let t=0;t<tries;t++){const p=makeOneMap(N);if(p&&(!best||p.given.filter(c=>c>=0).length<best.given.filter(c=>c>=0).length))best=p;}
+  return best;
+}
+function makeOneMap(N){
+  const R=Math.round(N*N/3.5);
+  for(let attempt=0;attempt<50;attempt++){
+    const reg=randomMap(N,R),adj=adjacency(N,R,reg);
+    const sol=solveColors(adj,new Array(R).fill(-1),1,true)[0];
+    if(!sol)continue;
+    const given=new Array(R).fill(-1);
+    // add givens where another colouring disagrees, until the answer is unique
+    for(;;){
+      const s=solveColors(adj,given,2,false);
+      if(s.length===1)break;
+      const other=s.find(x=>x.some((c,g)=>c!==sol[g]));
+      const diff=[...Array(R).keys()].filter(g=>given[g]<0&&other[g]!==sol[g]);
+      const g=diff[Math.floor(Math.random()*diff.length)];given[g]=sol[g];
+    }
+    // then drop any given that isn't needed
+    for(const g of shuffle([...Array(R).keys()].filter(g=>given[g]>=0))){
+      given[g]=-1;if(solveColors(adj,given,2,false).length!==1)given[g]=sol[g];
+    }
+    return {N,R,reg,adj,sol,given};
+  }
+  return null;
+}
+
+const PAINT = ["#E16A4A", "#73A7AE", "#ECA818", "#6AA673"];
+const PAINT_NAMES = ["Red", "Blue", "Yellow", "Green"];
+const STORE = "catdoku.fourcolors.v1";
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({size: 8}, state.settings);
+let game = state.game || null, busy = false, brush = 0;
+const build = G.builder([shuffle, nbrs, randomMap, adjacency, solveColors, makeFourColor, makeOneMap], "makeFourColor");
+const save = () => G.save(STORE, {settings, game});
+
+const clashes = () => {
+  const bad = new Set();
+  game.adj.forEach((ns, g) => { if (game.col[g] >= 0) for (const h of ns) if (game.col[h] === game.col[g]) { bad.add(g); bad.add(h); } });
+  return bad;
+};
+
+function snapshot() { game.history.push(game.col.slice()); if (game.history.length > 300) game.history.shift(); }
+function undo() { if (!game.history.length || game.won) return; game.col = game.history.pop(); render(); save(); }
+function clearAll() { if (game.won) return; snapshot(); game.col = game.given.slice(); render(); save(); }
+
+// Paint a region. On a tap, painting a region its own color clears it.
+function paint(g, isTap) {
+  if (game.given[g] >= 0) { if (isTap) G.note("Dotted regions are already painted."); return false; }
+  const c = brush < 0 || (isTap && game.col[g] === brush) ? -1 : brush;
+  if (game.col[g] === c) return false;
+  game.col[g] = c; return true;
+}
+
+function checkWin() {
+  if (game.col.every(c => c >= 0) && !clashes().size) {
+    game.won = true; save();
+    G.winCard(`All ${game.R} regions colored with just four colors, and no neighbors match.`, newPuzzle);
+  }
+}
+
+async function newPuzzle() {
+  if (busy) return;
+  busy = true;
+  const N = settings.size;
+  G.openCard("Drawing a map…", "", []);
+  const p = await build.take(N);
+  game = {N, R: p.R, reg: p.reg, adj: p.adj, given: p.given, col: p.given.slice(), history: [], won: false};
+  busy = false;
+  G.closeCard(); buildBoard(); render(); save(); G.note("");
+  build.prefetch(N);
+}
+
+function buildBoard() {
+  const N = game.N, b = $("board"), reg = game.reg;
+  b.innerHTML = "";
+  b.style.gridTemplateColumns = b.style.gridTemplateRows = `repeat(${N}, minmax(0, 1fr))`;
+  // a dot in the most central cell of each pre-painted region
+  const pins = new Set();
+  for (let g = 0; g < game.R; g++) {
+    if (game.given[g] < 0) continue;
+    const cells = reg.map((x, i) => x === g ? i : -1).filter(i => i >= 0);
+    const cy = cells.reduce((s, i) => s + Math.floor(i / N), 0) / cells.length, cx = cells.reduce((s, i) => s + i % N, 0) / cells.length;
+    pins.add(cells.reduce((b, i) => (Math.floor(i / N) - cy) ** 2 + (i % N - cx) ** 2 < (Math.floor(b / N) - cy) ** 2 + (b % N - cx) ** 2 ? i : b));
+  }
+  for (let i = 0; i < N * N; i++) {
+    const r = Math.floor(i / N), c = i % N, el = document.createElement("div");
+    el.className = "cell";
+    if (r === 0) el.classList.add("r0"); else if (reg[i - N] !== reg[i]) el.classList.add("bt");
+    if (c === 0) el.classList.add("c0"); else if (reg[i - 1] !== reg[i]) el.classList.add("bl");
+    if (pins.has(i)) el.classList.add("pin");
+    el.dataset.i = i; el.setAttribute("role", "gridcell");
+    b.append(el);
+  }
+  $("size").value = N;
+}
+
+function render() {
+  const bad = clashes(), kids = $("board").children;
+  for (let i = 0; i < kids.length; i++) {
+    const g = game.reg[i], c = game.col[g];
+    kids[i].style.background = c >= 0 ? PAINT[c] : "";
+    kids[i].classList.toggle("clash", bad.has(g));
+    kids[i].setAttribute("aria-label", `Row ${Math.floor(i / game.N) + 1}, column ${i % game.N + 1}: ${c >= 0 ? PAINT_NAMES[c] : "blank"}${game.given[g] >= 0 ? ", fixed" : ""}`);
+  }
+  const done = game.col.filter(c => c >= 0).length;
+  $("count").textContent = `🎨 ${done} / ${game.R} regions`;
+  if (bad.size) G.note(`${bad.size} regions clash with a neighbor.`, 0); else if ($("msg").textContent.includes("clash")) G.note("");
+  $("undoBtn").disabled = !game.history.length || game.won;
+  $("clearBtn").disabled = game.won || game.col.every((c, g) => c === game.given[g]);
+  [...$("paints").children].forEach((b, k) => b.setAttribute("aria-pressed", k === brush || (k === 4 && brush < 0)));
+}
+
+/* ---------- input ---------- */
+PAINT.forEach((c, k) => {
+  const b = document.createElement("button"); b.className = "paint"; b.style.background = c;
+  b.setAttribute("aria-label", PAINT_NAMES[k]); b.onclick = () => { brush = k; if (game) render(); };
+  $("paints").append(b);
+});
+{ const b = document.createElement("button"); b.className = "paint erase"; b.textContent = "✕"; b.setAttribute("aria-label", "Eraser");
+  b.onclick = () => { brush = -1; if (game) render(); }; $("paints").append(b); }
+
+let press = null;
+const board = $("board");
+board.addEventListener("pointerdown", e => {
+  if (!game || game.won || busy) return;
+  const i = G.cellAt(e.clientX, e.clientY); if (i < 0) return;
+  e.preventDefault();
+  try { board.setPointerCapture(e.pointerId); } catch (_) {}
+  press = {start: game.reg[i], last: game.reg[i], drag: false, before: game.col.slice()};
+});
+board.addEventListener("pointermove", e => {
+  if (!press) return;
+  const i = G.cellAt(e.clientX, e.clientY); if (i < 0) return;
+  const g = game.reg[i];
+  if (g === press.last) return;
+  if (!press.drag) { press.drag = true; paint(press.start, false); }
+  press.last = g; paint(g, false); render();
+});
+function endPress() {
+  if (!press) return;
+  const p = press; press = null;
+  if (!p.drag) paint(p.start, true);
+  if (p.before.join() !== game.col.join()) { game.history.push(p.before); if (game.history.length > 300) game.history.shift(); }
+  render(); save(); checkWin();
+}
+board.addEventListener("pointerup", endPress);
+board.addEventListener("pointercancel", () => { if (press) { game.col = press.before; press = null; render(); } });
+
+$("newBtn").onclick = newPuzzle;
+$("size").onchange = e => { settings.size = +e.target.value; save(); newPuzzle(); };
+$("undoBtn").onclick = undo;
+$("clearBtn").onclick = clearAll;
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); } });
+
+G.nav("four-colors");
+$("size").value = settings.size;
+if (game && game.reg) { buildBoard(); render(); if (game.won) G.winCard(`All ${game.R} regions colored with just four colors, and no neighbors match.`, newPuzzle); build.prefetch(game.N); }
+else newPuzzle();
+</script>
+</body>
+</html>

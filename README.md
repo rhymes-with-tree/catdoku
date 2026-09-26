@@ -15,3 +15,14 @@ Open `index.html` in any modern browser. No build step or dependencies.
 - Undo, restart, audit, and lives with revives
 - Progress saved in `localStorage`
 - Cat photos, facts, and breeds from public cat APIs (all optional; the game works offline)
+
+## More games
+
+Linked from the top of every page, and sharing Catdoku's look and home-screen app:
+
+- **Yarn** (`yarn/`): draw one strand from 1 through every number in order, filling every square.
+- **Shikaku** (`shikaku/`): split the board into rectangles; each holds one number equal to its area.
+- **Four Colors** (`four-colors/`): color a map with four colors so no two neighboring regions match.
+
+Every puzzle is generated in the browser and checked to have exactly one solution.
+Shared styling and helpers live in `games.css` and `games.js`.
