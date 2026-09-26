@@ -21,8 +21,7 @@
 #yarn .trail{stroke-width:.42;stroke-linecap:round}
 #yarn .twist{stroke:#fff;stroke-opacity:.45;stroke-width:.13;stroke-dasharray:.13 .13;stroke-linecap:round}
 #yarn .fill{opacity:.16}
-#yarn .ball{stroke:var(--ink);stroke-width:.045}
-#yarn .wind{fill:none;stroke:var(--ink);stroke-opacity:.38;stroke-width:.03;stroke-linecap:round}
+#yarn .wrap{fill:none;stroke-width:.05}
 #yarn .knot{fill:var(--paper)}
 #yarn .num{fill:#fff;stroke:var(--ink);stroke-width:.06;paint-order:stroke;font-family:var(--font);font-weight:800;font-size:.34px;text-anchor:middle;dominant-baseline:central}
 .skein{width:var(--board);display:flex;flex-direction:column;gap:2px}
@@ -291,6 +290,42 @@ function buildBoard() {
 
 function svgEl(tag, attrs) { const el = document.createElementNS("http://www.w3.org/2000/svg", tag); for (const a in attrs) el.setAttribute(a, attrs[a]); return el; }
 
+/* ---------- balls of yarn ---------- */
+// Shared clip and shading for every ball (drawn at radius 1, then scaled).
+function ballDefs() {
+  const defs = svgEl("defs", {}), clip = svgEl("clipPath", {id: "ballClip"});
+  clip.append(svgEl("circle", {r: .96}));
+  const lit = svgEl("radialGradient", {id: "ballLit", cx: .32, cy: .28, r: .75});
+  lit.append(svgEl("stop", {offset: 0, "stop-color": "#fff", "stop-opacity": .38}), svgEl("stop", {offset: .55, "stop-color": "#fff", "stop-opacity": 0}));
+  const dim = svgEl("radialGradient", {id: "ballDim", cx: .32, cy: .28, r: .95});
+  dim.append(svgEl("stop", {offset: .55, "stop-color": "#2A2530", "stop-opacity": 0}), svgEl("stop", {offset: 1, "stop-color": "#2A2530", "stop-opacity": .35}));
+  defs.append(clip, lit, dim);
+  return defs;
+}
+// Strands wound around three axes, like a real ball: each group is a set of ellipses through the same two poles.
+const WRAPS = [{rot: 18, ry: [.1, .3, .5, .7, .88]}, {rot: 108, ry: [.2, .45, .7]}, {rot: -40, ry: [.35, .62]}];
+// A darker strand shade: lower lightness, same hue; yellows lean gold instead of going olive.
+function strandShade(color) {
+  const [L, a, b] = hexLab(color), C = Math.hypot(a, b) * 1.15;
+  let h = Math.atan2(b, a) * 180 / Math.PI;
+  if (h > 70 && h < 130) h -= 22;
+  return labHex([L * .6, C * Math.cos(h * Math.PI / 180), C * Math.sin(h * Math.PI / 180)]);
+}
+function yarnBall(color, r) {
+  const dark = strandShade(color), light = rampAt([color, "#FFFFFF"], .5);
+  const g = svgEl("g", {transform: `scale(${r})`});
+  g.append(svgEl("ellipse", {cx: .04, cy: .97, rx: .7, ry: .12, fill: "#2A2530", "fill-opacity": .13}));
+  g.append(svgEl("circle", {r: 1, fill: color}));
+  const w = svgEl("g", {"clip-path": "url(#ballClip)"});
+  for (const {rot, ry} of WRAPS) for (const k of ry) {
+    w.append(svgEl("ellipse", {rx: 1, ry: k, class: "wrap", stroke: light, "stroke-opacity": .8, transform: `rotate(${rot}) translate(0 -.045)`}));
+    w.append(svgEl("ellipse", {rx: 1, ry: k, class: "wrap", stroke: dark, transform: `rotate(${rot})`}));
+  }
+  g.append(w, svgEl("circle", {r: 1, fill: "url(#ballDim)"}), svgEl("circle", {r: 1, fill: "url(#ballLit)"}),
+    svgEl("circle", {r: 1, fill: "none", stroke: dark, "stroke-width": .07}));
+  return g;
+}
+
 // The skein at the top: an ombre strand with one bead per dot, marked once reached.
 function renderSkein(reachedCount) {
   const cols = game.colors, K = cols.length, strand = $("strand");
@@ -313,6 +348,7 @@ function render() {
   const N = game.N, t = game.trail, svg = $("yarn"), cols = game.colors;
   const xy = k => [k % N + .5, Math.floor(k / N) + .5];
   svg.innerHTML = "";
+  svg.append(ballDefs());
   // Each stretch of yarn takes the color of the last dot it passed.
   const segs = [];
   for (const k of t) {
@@ -334,8 +370,7 @@ function render() {
   game.clue.forEach((n, k) => {
     if (!n) return;
     const [x, y] = xy(k), g = svgEl("g", {transform: `translate(${x} ${y})`});
-    g.append(svgEl("circle", {r: .32, class: "ball", fill: cols[n - 1]}));
-    for (const d of ["M-.25 -.08Q0 .16 .25 -.1", "M-.2 .15Q.02 -.06 .24 .12", "M-.06 -.3Q.16 0 -.03 .31"]) g.append(svgEl("path", {d, class: "wind"}));
+    g.append(yarnBall(cols[n - 1], .32));
     if (reached.has(k)) g.append(svgEl("circle", {r: .08, class: "knot"}));
     if (settings.numbers) { const tx = svgEl("text", {class: "num"}); tx.textContent = n; g.append(tx); }
     svg.append(g);
