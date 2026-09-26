@@ -60,8 +60,8 @@
   <div class="bar">
     <label>Colors
       <select id="shades" aria-label="How close the colors are">
-        <option value="1">Wide range</option><option value="0.7">Medium</option>
-        <option value="0.5">Close</option><option value="0.35">Very close</option>
+        <option value="wide">Wide range</option><option value="medium">Medium</option>
+        <option value="close">Close</option><option value="veryclose">Very close</option>
       </select>
     </label>
     <label class="toggle"><input type="checkbox" id="numTgl"><span class="sw"></span>Show numbers</label>
@@ -88,7 +88,7 @@
   <div class="help">
     <p>Lead one strand of yarn through every ball of yarn, lightest to darkest, passing through every square exactly once. The skein at the top shows the order.</p>
     <p>Start on the lightest ball and drag. Drag back to take yarn back, or tap any square on the strand to cut it there.</p>
-    <p>Colors sets how much of the colorway a puzzle uses. Wide range makes each ball clearly different; Very close makes neighboring shades hard to tell apart. Show numbers puts the order on each ball, for color-blind play.</p>
+    <p>Colors sets how different the balls look. Wide range runs through several colors; Medium stays within one color family; Close and Very close use a narrow slice of it, so neighboring shades are hard to tell apart. Show numbers puts the order on each ball, for color-blind play.</p>
   </div>
 </main>
 
@@ -189,6 +189,19 @@ const COLORWAYS = {
   Bluebell: ["#DDE6FB", "#A8BCF3", "#6E8BE0", "#4059B8", "#243277"],
   Heather:  ["#F8D7DE", "#E7A3C4", "#B97AC7", "#7C57B3", "#3F2E7A"],
 };
+// Wide range: the same colorways stretched through neighboring colors, still light to dark.
+const WIDE_COLORWAYS = {
+  Sunset:   ["#FFF3A6", "#FFC24B", "#F77F3B", "#E0404F", "#B0246F", "#6A2C8F", "#2E2166"],
+  Lavender: ["#FFE3F1", "#F7B0D8", "#D98BE0", "#A77BE8", "#6E6BD8", "#3F4CB0", "#1E2A6E"],
+  Ocean:    ["#F4F9B0", "#B4EBA0", "#5FD0B0", "#27A9C4", "#2F72C0", "#3B3F9A", "#241D5C"],
+  Moss:     ["#FFF6B0", "#D8EA7A", "#8CCB5A", "#3FA56A", "#1F7F74", "#1C5A6E", "#15304A"],
+  Berry:    ["#FFE0C8", "#FFAFA8", "#F36F8E", "#D23A87", "#9E2A8E", "#5E237E", "#2C1450"],
+  Pumpkin:  ["#FFF6C2", "#FFD36E", "#F9A13A", "#E0602A", "#B8372E", "#7E2238", "#3E1426"],
+  Bluebell: ["#E4FBF7", "#A6E9EE", "#6FC0F0", "#6E8BE0", "#6A5CC8", "#4E3398", "#2A1A5C"],
+  Heather:  ["#FFF0D6", "#F9C9C0", "#E7A3C4", "#B97AC7", "#7C57B3", "#4B3C8E", "#26204F"],
+};
+// The Colors picker: which colorway set, and how much of it a puzzle uses (less means closer shades).
+const SHADES = {wide: {ramps: WIDE_COLORWAYS, w: 1}, medium: {ramps: COLORWAYS, w: 1}, close: {ramps: COLORWAYS, w: .5}, veryclose: {ramps: COLORWAYS, w: .35}};
 
 function hexLab(hex) {
   const [r, g, b] = [1, 3, 5].map(i => { const v = parseInt(hex.slice(i, i + 2), 16) / 255; return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; });
@@ -207,18 +220,19 @@ function rampAt(anchors, t) {
   return labHex(A.map((v, k) => v + (B[k] - v) * f));
 }
 // One color per ball, in order along a random slice of a colorway.
-// w is the share of the colorway used (the Colors picker): less means closer shades.
-function yarnColors(K, w, name) {
-  const names = Object.keys(COLORWAYS);
-  if (!COLORWAYS[name]) name = names[Math.floor(Math.random() * names.length)];
+function yarnColors(K, level, name) {
+  const {ramps, w} = SHADES[level] || SHADES.wide, names = Object.keys(ramps);
+  if (!ramps[name]) name = names[Math.floor(Math.random() * names.length)];
   const a0 = Math.random() * (1 - w);
-  return {colorway: name, colors: Array.from({length: K}, (_, i) => rampAt(COLORWAYS[name], a0 + w * (K > 1 ? i / (K - 1) : 0)))};
+  return {colorway: name, colors: Array.from({length: K}, (_, i) => rampAt(ramps[name], a0 + w * (K > 1 ? i / (K - 1) : 0)))};
 }
 
 const STORE = "catdoku.yarn.v1";
 const $ = G.$;
 let state = G.load(STORE);
-let settings = Object.assign({size: 6, shades: 1, numbers: false}, state.settings);
+let settings = Object.assign({size: 6, shades: "wide", numbers: false}, state.settings);
+// Earlier versions saved the picker as a number.
+if (typeof settings.shades === "number") settings.shades = {1: "wide", .7: "medium", .5: "close", .35: "veryclose"}[settings.shades] || "wide";
 let game = state.game || null, busy = false;
 const build = G.builder([shuffle, nbrs, randomPath, solveYarn, minimizeYarn, makeYarn], "makeYarn");
 const save = () => G.save(STORE, {settings, game});
@@ -304,12 +318,12 @@ function ballDefs() {
 }
 // Strands wound around three axes, like a real ball: each group is a set of ellipses through the same two poles.
 const WRAPS = [{rot: 18, ry: [.1, .3, .5, .7, .88]}, {rot: 108, ry: [.2, .45, .7]}, {rot: -40, ry: [.35, .62]}];
-// A darker strand shade: lower lightness, same hue; yellows lean gold instead of going olive.
+// A darker strand shade: lower lightness (less for pale balls), same hue; yellows lean gold instead of going olive.
 function strandShade(color) {
   const [L, a, b] = hexLab(color), C = Math.hypot(a, b) * 1.15;
   let h = Math.atan2(b, a) * 180 / Math.PI;
-  if (h > 70 && h < 130) h -= 22;
-  return labHex([L * .6, C * Math.cos(h * Math.PI / 180), C * Math.sin(h * Math.PI / 180)]);
+  if (h > 75 && h < 102) h -= 22;
+  return labHex([L - Math.min(.3, L * .4), C * Math.cos(h * Math.PI / 180), C * Math.sin(h * Math.PI / 180)]);
 }
 function yarnBall(color, r) {
   const dark = strandShade(color), light = rampAt([color, "#FFFFFF"], .5);
@@ -422,7 +436,7 @@ $("size").onchange = e => { settings.size = +e.target.value; save(); newPuzzle()
 $("undoBtn").onclick = undo;
 // Colors don't change the answer, so the current puzzle is simply re-dyed.
 $("shades").onchange = e => {
-  settings.shades = +e.target.value;
+  settings.shades = e.target.value;
   if (game) { Object.assign(game, yarnColors(game.colors.length, settings.shades, game.colorway)); render(); }
   save();
 };
@@ -432,7 +446,7 @@ document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.ke
 
 G.nav("yarn");
 $("numTgl").checked = settings.numbers;
-$("shades").value = String(settings.shades);
+$("shades").value = settings.shades;
 $("size").value = settings.size;
 if (game && game.clue && !game.colorway) Object.assign(game, yarnColors(Math.max(...game.clue), settings.shades));
 if (game && game.clue) { buildBoard(); render(); if (game.won) G.winCard(`Every inch of ${game.colorway} yarn is wound through all ${game.N * game.N} squares.`, newPuzzle); build.prefetch(game.N); }
