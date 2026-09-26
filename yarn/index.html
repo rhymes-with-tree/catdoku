@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Yarn</title>
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css">
+<style>
+.board{background:var(--panel)}
+.cell{border-top:1px solid var(--line);border-left:1px solid var(--line);cursor:pointer}
+.cell.r0{border-top:none}.cell.c0{border-left:none}
+#yarn{position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);pointer-events:none}
+#yarn .trail{fill:none;stroke:#E16A4A;stroke-linecap:round;stroke-linejoin:round;stroke-width:.42}
+#yarn .fill{fill:#E16A4A;opacity:.14}
+#yarn .dot{fill:var(--ink)}
+#yarn .dot.hit{fill:#BD5538}
+#yarn text{fill:var(--paper);font-family:var(--font);font-weight:800;font-size:.36px;text-anchor:middle;dominant-baseline:central}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Yarn</h1><div class="stripe"></div></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="bar">
+    <label>Board
+      <select id="size" aria-label="Board size">
+        <option value="5">5 × 5</option><option value="6">6 × 6</option><option value="7">7 × 7</option>
+        <option value="8">8 × 8</option><option value="9">9 × 9</option>
+      </select>
+    </label>
+    <button id="newBtn" class="primary">New puzzle</button>
+  </div>
+
+  <div class="status"><span id="count"></span><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap">
+    <div class="board" id="board" role="grid" aria-label="Puzzle board"></div>
+    <svg id="yarn" aria-hidden="true"></svg>
+    <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+  </div>
+
+  <div class="actions">
+    <button id="undoBtn">Undo</button>
+    <button id="clearBtn">Clear</button>
+  </div>
+
+  <div class="help">
+    <p>Draw one strand of yarn that visits the numbers in order, 1, 2, 3…, and passes through every square exactly once.</p>
+    <p>Start on 1 and drag. Drag back to take yarn back, or tap any square on the strand to cut it there.</p>
+  </div>
+</main>
+
+<script src="../games.js"></script>
+<script>
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function nbrs(i,N){const r=Math.floor(i/N),c=i%N,o=[];if(r>0)o.push(i-N);if(r<N-1)o.push(i+N);if(c>0)o.push(i-1);if(c<N-1)o.push(i+1);return o;}
+// Random Hamiltonian path by "backbite" moves starting from a serpentine.
+function randomPath(N){
+  let p=[];for(let r=0;r<N;r++)for(let c=0;c<N;c++)p.push(r*N+(r%2?N-1-c:c));
+  const M=N*N,pos=new Int32Array(M);
+  const idx=()=>{for(let k=0;k<M;k++)pos[p[k]]=k;};idx();
+  for(let it=0;it<M*40;it++){
+    if(Math.random()<.5){p.reverse();idx();}
+    const end=p[0],cand=nbrs(end,N).filter(v=>v!==p[1]);
+    const v=cand[Math.floor(Math.random()*cand.length)],k=pos[v];
+    // reverse p[0..k-1]: v stays adjacent to old end, new end is p[k-1]
+    const head=p.slice(0,k).reverse();p=head.concat(p.slice(k));
+    for(let j=0;j<k;j++)pos[p[j]]=j;
+  }
+  return p;
+}
+// Count solutions (up to limit) for a path through all cells hitting clue cells in order.
+function solveYarn(N,clue,limit,budget){
+  const M=N*N,vis=new Uint8Array(M),order=[],sols=[];let nodes=0,aborted=false;
+  const K=Math.max(...clue);const start=clue.indexOf(1),fin=clue.indexOf(K);
+  const nb=[];for(let i=0;i<M;i++)nb.push(nbrs(i,N));
+  function ok(head,count){
+    // every unvisited cell except fin needs >=2 open neighbours (head counts); fin needs >=1
+    for(let u=0;u<M;u++){if(vis[u])continue;let d=0;for(const w of nb[u])if(!vis[w]||w===head)d++;
+      if(d<(u===fin?1:2))return false;}
+    // unvisited cells connected
+    let seed=-1;for(const w of nb[head])if(!vis[w]){seed=w;break;}
+    if(seed<0)return count===M;
+    const seen=new Uint8Array(M),st=[seed];seen[seed]=1;let n=1;
+    while(st.length){const u=st.pop();for(const w of nb[u])if(!vis[w]&&!seen[w]){seen[w]=1;n++;st.push(w);}}
+    return n===M-count;
+  }
+  (function go(head,count,next){
+    if(aborted)return true;
+    if(++nodes>budget){aborted=true;return true;}
+    if(count===M){sols.push(order.slice());return sols.length>=limit;}
+    for(const v of nb[head]){
+      if(vis[v])continue;
+      if(clue[v]&&clue[v]!==next)continue;
+      if(v===fin&&count+1!==M)continue;
+      vis[v]=1;order.push(v);
+      if(ok(v,count+1)&&go(v,count+1,clue[v]?next+1:next)){vis[v]=0;order.pop();return true;}
+      vis[v]=0;order.pop();
+    }
+    return false;
+  })(start,(vis[start]=1,order.push(start),1),2);
+  return {sols,aborted,nodes};
+}
+// Drop clues one at a time (never the ends) while the answer stays unique.
+function minimizeYarn(N,path,marks){
+  const M=N*N,build=ms=>{const clue=new Array(M).fill(0);[...ms].sort((a,b)=>a-b).forEach((k,j)=>clue[path[k]]=j+1);return clue;};
+  for(const k of shuffle([...marks].filter(k=>k!==0&&k!==M-1))){
+    marks.delete(k);
+    const r=solveYarn(N,build(marks),2,40000);
+    if(r.aborted||r.sols.length!==1)marks.add(k);
+  }
+  return build(marks);
+}
+function makeYarn(N){
+  const M=N*N;
+  for(let attempt=0;attempt<30;attempt++){
+    const path=randomPath(N);
+    const marks=new Set([0,M-1]);
+    const gap=Math.max(3,Math.round(M/(N+1)));
+    for(let k=gap;k<M-2;k+=gap)marks.add(k+Math.floor(Math.random()*3)-1);
+    for(let it=0;it<M;it++){
+      const clue=new Array(M).fill(0);[...marks].sort((a,b)=>a-b).forEach((k,j)=>clue[path[k]]=j+1);
+      const r=solveYarn(N,clue,2,60000);
+      if(!r.aborted&&r.sols.length===1)return {N,path,clue:minimizeYarn(N,path,marks)};
+      let add=-1;
+      if(!r.aborted&&r.sols.length>1){const other=r.sols.find(s=>s.some((v,k)=>v!==path[k]))||r.sols[1];
+        const diff=[];for(let k=1;k<M-1;k++)if(other[k]!==path[k]&&!marks.has(k))diff.push(k);
+        add=diff[Math.floor(Math.random()*diff.length)];}
+      if(add<0){ // too slow to decide: add a clue in the widest gap
+        const s=[...marks].sort((a,b)=>a-b);let best=0,bi=0;for(let j=1;j<s.length;j++)if(s[j]-s[j-1]>best){best=s[j]-s[j-1];bi=j;}
+        if(best<2)break;add=s[bi-1]+Math.floor(best/2);}
+      marks.add(add);
+    }
+  }
+  return null;
+}
+
+const STORE = "catdoku.yarn.v1";
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({size: 6}, state.settings);
+let game = state.game || null, busy = false;
+const build = G.builder([shuffle, nbrs, randomPath, solveYarn, minimizeYarn, makeYarn], "makeYarn");
+const save = () => G.save(STORE, {settings, game});
+
+const lastNum = () => Math.max(...game.clue);
+const adjacent = (a, b) => { const N = game.N; return Math.abs(a - b) === N || (Math.abs(a - b) === 1 && Math.floor(a / N) === Math.floor(b / N)); };
+const nextNum = () => game.trail.reduce((n, k) => game.clue[k] ? game.clue[k] + 1 : n, 1);
+
+// Try to extend the strand into square v. Returns true if it moved.
+function step(v) {
+  const t = game.trail, i = t.indexOf(v);
+  if (i >= 0) { if (i < t.length - 1) { t.length = i + 1; return true; } return false; }
+  if (!t.length) { if (game.clue[v] !== 1) return false; t.push(v); return true; }
+  const end = t[t.length - 1];
+  if (!adjacent(end, v)) return false;
+  if (game.clue[end] === lastNum()) return false;           // the last number ends the strand
+  if (game.clue[v] && game.clue[v] !== nextNum()) { G.note(`Get to ${nextNum()} first.`); return false; }
+  t.push(v); return true;
+}
+// Fast drags skip squares: walk a straight line one square at a time.
+function stepToward(v) {
+  const t = game.trail, N = game.N;
+  if (!t.length || t.includes(v)) return step(v);
+  let end = t[t.length - 1], moved = false;
+  const er = Math.floor(end / N), ec = end % N, vr = Math.floor(v / N), vc = v % N;
+  if (er !== vr && ec !== vc) return step(v);
+  const d = er === vr ? Math.sign(vc - ec) : N * Math.sign(vr - er);
+  while (end !== v) { if (!step(end + d)) break; end += d; moved = true; }
+  return moved;
+}
+
+function checkWin() {
+  const t = game.trail;
+  if (t.length === game.N * game.N && game.clue[t[t.length - 1]] === lastNum()) {
+    game.won = true; save();
+    G.winCard(`The yarn runs through all ${t.length} squares.`, newPuzzle);
+  }
+}
+
+function snapshot() { game.history.push(game.trail.slice()); if (game.history.length > 300) game.history.shift(); }
+function undo() { if (!game.history.length || game.won) return; game.trail = game.history.pop(); render(); save(); }
+function clearAll() { if (game.won || !game.trail.length) return; snapshot(); game.trail = []; render(); save(); }
+
+async function newPuzzle() {
+  if (busy) return;
+  busy = true;
+  const N = settings.size;
+  G.openCard("Untangling yarn…", N >= 8 ? "Big boards can take a few seconds to build." : "", []);
+  const p = await build.take(N);
+  game = {N, clue: p.clue, path: p.path, trail: [], history: [], won: false};
+  busy = false;
+  G.closeCard(); buildBoard(); render(); save(); G.note("");
+  build.prefetch(N);
+}
+
+function buildBoard() {
+  const N = game.N, b = $("board");
+  b.innerHTML = "";
+  b.style.gridTemplateColumns = b.style.gridTemplateRows = `repeat(${N}, minmax(0, 1fr))`;
+  for (let i = 0; i < N * N; i++) {
+    const el = document.createElement("div");
+    el.className = "cell" + (i < N ? " r0" : "") + (i % N ? "" : " c0");
+    el.dataset.i = i; el.setAttribute("role", "gridcell");
+    b.append(el);
+  }
+  $("yarn").setAttribute("viewBox", `0 0 ${N} ${N}`);
+  $("size").value = N;
+}
+
+function render() {
+  const N = game.N, t = game.trail, ns = "http://www.w3.org/2000/svg", svg = $("yarn");
+  const xy = k => [k % N + .5, Math.floor(k / N) + .5];
+  svg.innerHTML = "";
+  for (const k of t) { const r = document.createElementNS(ns, "rect"); const [x, y] = xy(k);
+    Object.entries({x: x - .5, y: y - .5, width: 1, height: 1, class: "fill"}).forEach(([a, v]) => r.setAttribute(a, v)); svg.append(r); }
+  if (t.length) {
+    const pl = document.createElementNS(ns, "polyline");
+    pl.setAttribute("points", t.map(k => xy(k).join(",")).join(" ") + (t.length === 1 ? " " + xy(t[0]).join(",") : ""));
+    pl.setAttribute("class", "trail"); svg.append(pl);
+  }
+  const reached = new Set(t);
+  game.clue.forEach((n, k) => {
+    if (!n) return;
+    const [x, y] = xy(k), c = document.createElementNS(ns, "circle"), tx = document.createElementNS(ns, "text");
+    c.setAttribute("cx", x); c.setAttribute("cy", y); c.setAttribute("r", .3);
+    c.setAttribute("class", "dot" + (reached.has(k) ? " hit" : ""));
+    tx.setAttribute("x", x); tx.setAttribute("y", y); tx.textContent = n;
+    svg.append(c, tx);
+  });
+  $("count").textContent = `🧶 ${t.length} / ${N * N}`;
+  $("undoBtn").disabled = !game.history.length || game.won;
+  $("clearBtn").disabled = !t.length || game.won;
+  [...$("board").children].forEach((el, k) =>
+    el.setAttribute("aria-label", `Row ${Math.floor(k / N) + 1}, column ${k % N + 1}${game.clue[k] ? ", number " + game.clue[k] : ""}${reached.has(k) ? ", on the yarn" : ""}`));
+}
+
+/* ---------- input ---------- */
+let press = null;
+const board = $("board");
+board.addEventListener("pointerdown", e => {
+  if (!game || game.won || busy) return;
+  const i = G.cellAt(e.clientX, e.clientY); if (i < 0) return;
+  e.preventDefault();
+  try { board.setPointerCapture(e.pointerId); } catch (_) {}
+  snapshot();                                          // dropped again in endPress if nothing changed
+  const t = game.trail, onIt = t.indexOf(i);
+  if (onIt >= 0) t.length = onIt + 1;                  // tap on the strand: cut it here
+  else if (!t.length && game.clue[i] !== 1) { G.note("Start on the 1."); }
+  else stepToward(i);
+  press = {last: i};
+  render(); checkWin();
+});
+board.addEventListener("pointermove", e => {
+  if (!press || game.won) return;
+  const i = G.cellAt(e.clientX, e.clientY);
+  if (i < 0 || i === press.last) return;
+  press.last = i;
+  const t = game.trail;
+  if (t.length > 1 && t[t.length - 2] === i) t.pop(); else stepToward(i);
+  render(); checkWin();
+});
+function endPress() {
+  if (!press) return;
+  const h = game.history;
+  if (h.length && h[h.length - 1].join() === game.trail.join()) h.pop();
+  press = null; render(); save();
+}
+board.addEventListener("pointerup", endPress);
+board.addEventListener("pointercancel", endPress);
+
+$("newBtn").onclick = newPuzzle;
+$("size").onchange = e => { settings.size = +e.target.value; save(); newPuzzle(); };
+$("undoBtn").onclick = undo;
+$("clearBtn").onclick = clearAll;
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); } });
+
+G.nav("yarn");
+$("size").value = settings.size;
+if (game && game.clue) { buildBoard(); render(); if (game.won) G.winCard(`The yarn runs through all ${game.N * game.N} squares.`, newPuzzle); build.prefetch(game.N); }
+else newPuzzle();
+</script>
+</body>
+</html>
