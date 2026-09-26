@@ -20,7 +20,7 @@ Open `index.html` in any modern browser. No build step or dependencies.
 
 Linked from the top of every page, and sharing Catdoku's look and home-screen app:
 
-- **Yarn** (`yarn/`): draw one strand from 1 through every number in order, filling every square.
+- **Yarn** (`yarn/`): lead one strand through balls of yarn from lightest to darkest, filling every square.
 - **Shikaku** (`shikaku/`): split the board into rectangles; each holds one number equal to its area.
 - **Four Colors** (`four-colors/`): color a map with four colors so no two neighboring regions match.
 
