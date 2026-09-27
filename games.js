@@ -2,7 +2,7 @@
    saved progress, background puzzle building, and the win card. */
 const G = (() => {
   const GAMES = [
-    ["Catdoku", "catdoku"], ["Yarn", "yarn"],
+    ["Catdoku", "catdoku"], ["Yarn", "yarn"], ["Patches", "patches"],
   ];
   const $ = id => document.getElementById(id);
 
@@ -68,7 +68,10 @@ const G = (() => {
   const NAMES = ["Biscuit", "Mochi", "Pickles", "Noodle", "Sprocket", "Whiskerdoodle", "Pounce", "Kerfuffle",
     "Sir Pounce-a-Lot", "Lady Marmalade", "Duke Fluffington", "Captain Mittens", "Professor Paws", "Count Catula",
     "Juniper", "Clover", "Figaro", "Atticus", "Ophelia", "Purrlock Holmes", "Chairman Meow", "Cleocatra",
-    "Pablo Picatso", "Meowzart", "Catrick Swayze", "Frida Catlo", "Paw Revere", "Dolly Purrton", "Luna", "Otis"];
+    "Pablo Picatso", "Meowzart", "Catrick Swayze", "Frida Catlo", "Paw Revere", "Dolly Purrton", "Luna", "Otis", "Patches",
+    // every name from T. S. Eliot's "The Naming of Cats"
+    "Peter", "Augustus", "Alonzo", "James", "Victor", "Jonathan", "George", "Bill Bailey", "Plato", "Admetus", "Electra", "Demeter",
+    "Munkustrap", "Quaxo", "Coricopat", "Bombalurina", "Jellylorum"];
   const bust = () => "t=" + Date.now();
   function catPhoto() {
     const img = document.createElement("img"), backup = "https://cataas.com/cat?width=500&" + bust();

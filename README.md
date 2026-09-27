@@ -22,3 +22,8 @@ A second puzzle in `yarn/`, linked from the top of every page and sharing Catdok
 Lead one strand through balls of yarn from lightest to darkest, passing through every square once.
 Every puzzle is generated in the browser and checked to have exactly one solution.
 Shared styling and helpers live in `games.css` and `games.js`.
+
+## Patches
+
+A third puzzle in `patches/`: sew a quilt by giving every patch one of four fabrics so no two patches that share a seam match.
+Patches with a button come already sewn. Every quilt is generated in the browser and checked to have exactly one solution.
