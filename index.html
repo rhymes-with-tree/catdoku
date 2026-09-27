@@ -89,6 +89,11 @@ button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
 .actions{width:var(--board);display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 .help{width:var(--board);color:var(--ink-soft);font-size:15px;margin:4px 0 0}
 .help p{margin:0 0 4px}
+/* How to play card */
+.howto{display:block;width:100%;max-width:200px;margin:0 auto 12px}
+.card ol.steps{text-align:left;margin:0 0 14px;padding-left:24px;color:var(--ink);font-size:16px;line-height:1.35}
+.card ol.steps li{margin:0 0 8px}
+.card .tip{font-size:14px;margin:0 0 14px}
 @media (prefers-reduced-motion:reduce){.cell.bad{animation:none}.sw,.sw::after{transition:none}}
 </style>
 </head>
@@ -128,6 +133,7 @@ button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
     <button id="restartBtn">Restart board</button>
     <button id="auditBtn">Audit (costs 1 ♥)</button>
     <button id="completeBtn" class="primary">Complete</button>
+    <button id="helpBtn">How to play</button>
   </div>
 
   <div class="help">
@@ -144,7 +150,10 @@ const PALETTE = ["#BD5538","#73A7AE","#ECA818","#6AA673","#B94588","#B3B94B",
 const MAX_LIVES = 9;
 const CAT_NAMES = {
   classic: ["Oliver","Luna","Milo","Chloe","Leo","Bella","Simon","Tilly","Felix","Daisy","Oscar","Pearl","Jasper","Hazel","Gus","Mabel","Otis","Rosie","Arlo","Winnie",
-            "Walter","Ruby","Frank","Ivy","Theo","June","Murray","Poppy","Edith"],
+            "Walter","Ruby","Frank","Ivy","Theo","June","Murray","Poppy","Edith","Patches"],
+  // every name from T. S. Eliot's "The Naming of Cats"
+  eliot: ["Peter","Augustus","Alonzo","James","Victor","Jonathan","George","Bill Bailey","Plato","Admetus","Electra","Demeter",
+          "Munkustrap","Quaxo","Coricopat","Bombalurina","Jellylorum"],
   food: ["Biscuit","Mochi","Pickles","Nacho","Waffles","Dumpling","Pepper","Olive","Nutmeg","Muffin","Tofu","Pumpkin","Clementine","Toast","Paprika","Gnocchi","Butterbean","Cannoli","Pretzel","Sesame",
          "Crouton","Bagel"],
   whimsical: ["Pounce","Sprocket","Doodle","Noodle","Wiggles","Zigzag","Bumble","Pipsqueak","Fidget","Scooter","Ruckus","Jellybean","Tumble","Skedaddle","Kerfuffle","Snickerdoodle","Hullabaloo","Flapjack","Whiskerdoodle","Rascal",
@@ -704,6 +713,44 @@ document.addEventListener("keydown", e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); }
 });
 
+/* ---------- how to play ---------- */
+// A small solved example: four cats on a 4 × 4 board with four colors, plus a few paw notes.
+function exampleArt() {
+  const ns = "http://www.w3.org/2000/svg", el = (t, a) => { const e = document.createElementNS(ns, t); for (const k in a) e.setAttribute(k, a[k]); return e; };
+  const reg = [0,0,1,1, 0,2,2,1, 3,2,2,1, 3,3,2,1], cats = [1, 7, 8, 14], paws = [0, 4, 6], cols = PALETTE.slice(0, 4);
+  const svg = el("svg", {viewBox: "-0.08 -0.08 4.16 4.16", class: "howto", "aria-hidden": "true"});
+  reg.forEach((g, i) => svg.append(el("rect", {x: i % 4, y: Math.floor(i / 4), width: 1, height: 1, fill: cols[g]})));
+  for (let k = 1; k < 4; k++) svg.append(el("path", {d: `M${k} 0V4M0 ${k}H4`, stroke: "rgba(42,37,48,.22)", "stroke-width": .03}));
+  // thick lines where the color changes
+  let d = "";
+  reg.forEach((g, i) => { const x = i % 4, y = Math.floor(i / 4);
+    if (x < 3 && reg[i + 1] !== g) d += `M${x + 1} ${y}V${y + 1}`;
+    if (y < 3 && reg[i + 4] !== g) d += `M${x} ${y + 1}H${x + 1}`; });
+  svg.append(el("path", {d, stroke: "#2A2530", "stroke-width": .09, "stroke-linecap": "square"}));
+  svg.append(el("rect", {width: 4, height: 4, rx: .08, fill: "none", stroke: "#2A2530", "stroke-width": .12}));
+  const emoji = (i, t, size) => { const tx = el("text", {x: i % 4 + .5, y: Math.floor(i / 4) + .56, "text-anchor": "middle", "dominant-baseline": "middle", "font-size": size}); tx.textContent = t; svg.append(tx); };
+  cats.forEach(i => emoji(i, "🐱", .62));
+  paws.forEach(i => emoji(i, "🐾", .4));
+  return svg;
+}
+function showHelp() {
+  const media = document.createElement("div");
+  media.append(exampleArt());
+  const ol = document.createElement("ol"); ol.className = "steps";
+  for (const t of ["Place one 🐱 in every row, every column, and every color.",
+                   "Cats can't touch, not even diagonally.",
+                   "Tap a square once for 🐾 (no cat here), twice for 🐱, and again to clear it. Drag to paw several squares at once."]) {
+    const li = document.createElement("li"); li.textContent = t; ol.append(li);
+  }
+  const tip = document.createElement("p"); tip.className = "tip";
+  tip.textContent = "Auto exclude fills in paws for you after each cat. Auto grade checks each cat as you place it, and makes the game harder.";
+  media.append(ol, tip);
+  openCard("How to play", "", [["Let's play", () => { closeCard(); settings.seenHelp = true; save(); }, true]], media);
+}
+// First visit only: show the directions once the first puzzle is on the board.
+function helpOnFirstVisit() { if (!settings.seenHelp && game && game.status === "playing") showHelp(); }
+$("helpBtn").onclick = () => { if (!busy) showHelp(); };
+
 /* ---------- start ---------- */
 load();
 renderStreak();
@@ -713,8 +760,9 @@ if (game) {
   $("size").value = settings.size;
   if (game.status === "won") showWon();
   else if (game.status === "lost") showLost();
+  else helpOnFirstVisit();
   prefetch(settings.size);
-} else newPuzzle();
+} else newPuzzle().then(helpOnFirstVisit);
 </script>
 </body>
 </html>
