@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Patches</title>
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css">
+<style>
+/* The board is a quilt: a stitched binding round the edge, dashed seams between patches. */
+.board{background:#F3EEDF;border:8px solid #7A4A6E;border-radius:12px;outline:2px dashed rgba(255,244,230,.85);outline-offset:-5px}
+.cell{position:relative;cursor:pointer;background-origin:border-box}  /* patterns line up across seams */
+.cell.bt{border-top:2.5px dashed rgba(42,37,48,.72)}.cell.bl{border-left:2.5px dashed rgba(42,37,48,.72)}
+.cell.r0{border-top:none}.cell.c0{border-left:none}
+/* a sewn-on button marks patches that come already sewn */
+.cell.pin::before{content:"";position:absolute;left:50%;top:50%;width:36%;height:36%;transform:translate(-50%,-50%);border-radius:50%;
+  border:2px solid #2A2530;box-shadow:0 1px 2px rgba(42,37,48,.35);
+  background:radial-gradient(circle at 37% 37%,#2A2530 9%,transparent 11%),radial-gradient(circle at 63% 37%,#2A2530 9%,transparent 11%),
+    radial-gradient(circle at 37% 63%,#2A2530 9%,transparent 11%),radial-gradient(circle at 63% 63%,#2A2530 9%,transparent 11%),#F6F1E7}
+.cell.clash::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(45deg,rgba(176,32,48,.6) 0 3px,transparent 3px 9px)}
+.paints{display:flex;gap:8px;align-items:flex-start;justify-content:center;flex-wrap:wrap;width:var(--board)}
+.paint{display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;padding:2px;font-size:13px;font-weight:600;color:var(--ink-soft)}
+.paint:hover{background:none}
+.paint .swatch{width:44px;height:44px;border-radius:50%;border:3px solid var(--ink);display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--ink)}
+.paint[aria-pressed="true"] .swatch{outline:4px solid var(--ink);outline-offset:3px}
+.paint[aria-pressed="true"]{color:var(--ink);background:none}
+/* Cats: a tabby napping over the quilt's top-right corner, a calico stretching across its bottom-left corner. */
+main{--nw:min(calc(var(--board) * .4), 210px);--sw:min(calc(var(--board) * .5), 260px)}
+/* the patch count and fabrics sit just above the quilt, to the left of the tabby */
+.status,.paints{box-sizing:border-box;padding-right:calc(var(--nw) * .9)}
+.paints{min-height:calc(var(--nw) * .56 - 58px);
+  align-content:flex-end;justify-content:flex-start;margin-bottom:-6px}
+.wrap{margin:0 0 calc(var(--sw) * .43)}
+@media (max-width:480px){.paints{gap:4px 6px}.paint{font-size:12px}.paint .swatch{width:38px;height:38px;font-size:17px}}
+.cat{position:absolute;height:auto;pointer-events:none;user-select:none;z-index:3}
+.cat.nap{width:var(--nw);right:-2%;bottom:calc(100% - var(--nw) * .22)}
+.cat.stretch{width:var(--sw);left:max(-16%, calc((var(--board) - 100vw) / 2));top:calc(100% - var(--sw) * .24)}
+/* How to play card */
+.board.mini{width:170px;height:170px;margin:0 auto 12px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(4,minmax(0,1fr))}
+.board.mini .cell{cursor:default}
+.card ol.steps{text-align:left;margin:0 0 14px;padding-left:24px;color:var(--ink);font-size:16px;line-height:1.35}
+.card ol.steps li{margin:0 0 8px}
+.card .tip{font-size:14px;margin:0 0 14px}
+.toggle{display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;user-select:none;white-space:nowrap}
+.toggle input{position:absolute;opacity:0;width:1px;height:1px}
+.sw{flex:none;width:42px;height:24px;border-radius:12px;background:var(--line);position:relative;transition:background .15s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s}
+.toggle input:checked + .sw{background:var(--sage-green)}
+.toggle input:checked + .sw::after{left:21px}
+.toggle input:focus-visible + .sw{outline:3px solid var(--pacific-blue);outline-offset:2px}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Patches</h1><div class="stripe"></div><p class="tagline">Sew a four-fabric quilt</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="bar">
+    <label>Quilt Size
+      <select id="size" aria-label="Quilt size">
+        <option value="6">6 × 6</option><option value="7">7 × 7</option><option value="8">8 × 8</option>
+        <option value="9">9 × 9</option><option value="10">10 × 10</option><option value="11">11 × 11</option>
+        <option value="12">12 × 12</option>
+      </select>
+    </label>
+    <button id="newBtn" class="primary">New puzzle</button>
+  </div>
+
+  <div class="bar">
+    <label class="toggle"><input type="checkbox" id="fabricTgl"><span class="sw"></span>Fabric patterns</label>
+  </div>
+
+  <div class="status"><span id="count"></span><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="paints" id="paints" role="group" aria-label="Fabrics"></div>
+
+  <div class="wrap">
+    <div class="board" id="board" role="grid" aria-label="Quilt"></div>
+    <img class="cat nap" src="cat-nap.png" alt="" aria-hidden="true">
+    <img class="cat stretch" src="cat-stretch.png" alt="" aria-hidden="true">
+    <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+  </div>
+
+  <div class="actions">
+    <button id="undoBtn">Undo</button>
+    <button id="clearBtn">Clear</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+
+  <div class="help">
+    <p>Sew a quilt: give every patch one of four fabrics so no two patches that share a seam match. Patches may touch at a corner.</p>
+    <p>Patches with a button are already sewn and cannot be changed or moved. Pick a fabric, then tap or drag across patches. Turn off Fabric patterns for plain colors. Tap a patch again, or use Unpick, to take it off. Matching patches side by side get red hatching.</p>
+  </div>
+</main>
+
+<script src="../games.js"></script>
+<script>
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function nbrs(i,N){const r=Math.floor(i/N),c=i%N,o=[];if(r>0)o.push(i-N);if(r<N-1)o.push(i+N);if(c>0)o.push(i-1);if(c<N-1)o.push(i+1);return o;}
+// Grow R connected regions from random seeds.
+function randomMap(N,R){
+  const reg=new Int16Array(N*N).fill(-1);
+  shuffle([...Array(N*N).keys()]).slice(0,R).forEach((s,g)=>reg[s]=g);
+  let left=N*N-R;
+  while(left>0){
+    const cand=[];
+    for(let i=0;i<N*N;i++){if(reg[i]!==-1)continue;for(const j of nbrs(i,N))if(reg[j]!==-1)cand.push([i,reg[j]]);}
+    const [i,g]=cand[Math.floor(Math.random()*cand.length)];reg[i]=g;left--;
+  }
+  return Array.from(reg);
+}
+function adjacency(N,R,reg){
+  const adj=Array.from({length:R},()=>new Set());
+  for(let i=0;i<N*N;i++)for(const j of nbrs(i,N))if(reg[i]!==reg[j])adj[reg[i]].add(reg[j]);
+  return adj.map(s=>[...s]);
+}
+// Count 4-colourings that agree with the givens (-1 = open), up to limit.
+function solveColors(adj,given,limit,randomize){
+  const R=adj.length,col=given.slice(),sols=[];
+  const order=[...Array(R).keys()].filter(g=>col[g]<0);
+  (function go(){
+    // most-constrained open region first
+    let best=-1,bestOpts=null;
+    for(const g of order){if(col[g]>=0)continue;
+      const opts=[0,1,2,3].filter(c=>adj[g].every(h=>col[h]!==c));
+      if(!bestOpts||opts.length<bestOpts.length){best=g;bestOpts=opts;if(opts.length<=1)break;}}
+    if(best<0){sols.push(col.slice());return sols.length>=limit;}
+    if(randomize)shuffle(bestOpts);
+    for(const c of bestOpts){col[best]=c;if(go()){col[best]=-1;return true;}}
+    col[best]=-1;return false;
+  })();
+  return sols;
+}
+// Build several candidate maps and keep the one that needs the fewest pre-coloured regions.
+function makeFourColor(N,tries=12){
+  let best=null;
+  for(let t=0;t<tries;t++){const p=makeOneMap(N);if(p&&(!best||p.given.filter(c=>c>=0).length<best.given.filter(c=>c>=0).length))best=p;}
+  return best;
+}
+function makeOneMap(N){
+  const R=Math.round(N*N/3.5);
+  for(let attempt=0;attempt<50;attempt++){
+    const reg=randomMap(N,R),adj=adjacency(N,R,reg);
+    const sol=solveColors(adj,new Array(R).fill(-1),1,true)[0];
+    if(!sol)continue;
+    const given=new Array(R).fill(-1);
+    // add givens where another colouring disagrees, until the answer is unique
+    for(;;){
+      const s=solveColors(adj,given,2,false);
+      if(s.length===1)break;
+      const other=s.find(x=>x.some((c,g)=>c!==sol[g]));
+      const diff=[...Array(R).keys()].filter(g=>given[g]<0&&other[g]!==sol[g]);
+      const g=diff[Math.floor(Math.random()*diff.length)];given[g]=sol[g];
+    }
+    // then drop any given that isn't needed
+    for(const g of shuffle([...Array(R).keys()].filter(g=>given[g]>=0))){
+      given[g]=-1;if(solveColors(adj,given,2,false).length!==1)given[g]=sol[g];
+    }
+    return {N,R,reg,adj,sol,given};
+  }
+  return null;
+}
+
+// Four fabrics that differ in pattern as well as color. Each is CSS background layers on a tile
+// that repeats seamlessly across a patch (see fabricOn).
+const FABRICS = [
+  {name: "Gingham", tile: 14, bg: "#F7E0DA",
+   layers: ["linear-gradient(90deg, rgba(196,52,58,.55) 50%, transparent 50%)", "linear-gradient(0deg, rgba(196,52,58,.55) 50%, transparent 50%)"]},
+  {name: "Polka dot", tile: 14, bg: "#35507E",
+   layers: ["radial-gradient(circle, #F4EFE2 20%, transparent 23%)"]},
+  {name: "Stripe", tile: 12, bg: "#EBBE4E",
+   layers: ["linear-gradient(90deg, transparent 0 55%, #B27A12 55% 80%, #FFF4D2 80% 88%, transparent 88%)"]},
+  {name: "Zigzag", tile: 16, bg: "#6FA85A",
+   layers: ["linear-gradient(135deg, #EEF3DC 25%, transparent 25%)", "linear-gradient(225deg, #EEF3DC 25%, transparent 25%)",
+            "linear-gradient(315deg, #EEF3DC 25%, transparent 25%)", "linear-gradient(45deg, #EEF3DC 25%, transparent 25%)"],
+   shift: [[-.5, 0], [-.5, 0], [0, 0], [0, 0]]},   // layer offsets, as a share of the tile
+];
+// With fabric patterns off: one flat color per fabric.
+const SOLIDS = [{name: "Red", bg: "#D24A4F"}, {name: "Navy", bg: "#35507E"}, {name: "Mustard", bg: "#E3B23C"}, {name: "Green", bg: "#5E9E4B"}];
+const MUSLIN = {tile: 4, bg: "#F3EEDF", layers: ["linear-gradient(90deg, rgba(120,98,66,.07) 1px, transparent 1px)", "linear-gradient(0deg, rgba(120,98,66,.07) 1px, transparent 1px)"]};
+// Dress an element in a fabric, offset so the pattern runs on unbroken from square to square.
+function fabricOn(el, f, dx = 0, dy = 0) {
+  el.style.backgroundColor = f.bg;
+  const layers = f.layers || [];
+  el.style.backgroundImage = layers.join(", ") || "none";
+  el.style.backgroundSize = layers.map(() => `${f.tile}px ${f.tile}px`).join(", ");
+  el.style.backgroundPosition = layers.map((_, k) => {
+    const [sx, sy] = (f.shift || [])[k] || [0, 0];
+    return `${sx * f.tile - dx}px ${sy * f.tile - dy}px`;
+  }).join(", ");
+}
+const STORE = "catdoku.patches.v1";
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({size: 8, fabric: true}, state.settings);
+const look = () => settings.fabric ? FABRICS : SOLIDS;
+let game = state.game || null, busy = false, brush = 0;
+const build = G.builder([shuffle, nbrs, randomMap, adjacency, solveColors, makeFourColor, makeOneMap], "makeFourColor");
+const save = () => G.save(STORE, {settings, game});
+
+const clashes = () => {
+  const bad = new Set();
+  game.adj.forEach((ns, g) => { if (game.col[g] >= 0) for (const h of ns) if (game.col[h] === game.col[g]) { bad.add(g); bad.add(h); } });
+  return bad;
+};
+
+function snapshot() { game.history.push(game.col.slice()); if (game.history.length > 300) game.history.shift(); }
+function undo() { if (!game.history.length || game.won) return; game.col = game.history.pop(); render(); save(); }
+function clearAll() { if (game.won) return; snapshot(); game.col = game.given.slice(); render(); save(); }
+
+// Paint a region. On a tap, painting a region its own color clears it.
+function paint(g, isTap) {
+  if (game.given[g] >= 0) { if (isTap) G.note("Patches with a button are already sewn and can't be changed."); return false; }
+  const c = brush < 0 || (isTap && game.col[g] === brush) ? -1 : brush;
+  if (game.col[g] === c) return false;
+  game.col[g] = c; return true;
+}
+
+function checkWin() {
+  if (game.col.every(c => c >= 0) && !clashes().size) {
+    game.won = true; save();
+    G.winCard(`The quilt is finished: ${game.R} patches, and no matching fabrics side by side. Perfect for a nap.`, newPuzzle);
+  }
+}
+
+async function newPuzzle() {
+  if (busy) return;
+  busy = true;
+  const N = settings.size;
+  G.openCard("Cutting patches…", "", []);
+  const p = await build.take(N);
+  game = {N, R: p.R, reg: p.reg, adj: p.adj, given: p.given, col: p.given.slice(), history: [], won: false};
+  busy = false;
+  G.closeCard(); buildBoard(); render(); save(); G.note("");
+  build.prefetch(N);
+}
+
+function buildBoard() {
+  const N = game.N, b = $("board"), reg = game.reg;
+  b.innerHTML = "";
+  b.style.gridTemplateColumns = b.style.gridTemplateRows = `repeat(${N}, minmax(0, 1fr))`;
+  // a dot in the most central cell of each pre-painted region
+  const pins = new Set();
+  for (let g = 0; g < game.R; g++) {
+    if (game.given[g] < 0) continue;
+    const cells = reg.map((x, i) => x === g ? i : -1).filter(i => i >= 0);
+    const cy = cells.reduce((s, i) => s + Math.floor(i / N), 0) / cells.length, cx = cells.reduce((s, i) => s + i % N, 0) / cells.length;
+    pins.add(cells.reduce((b, i) => (Math.floor(i / N) - cy) ** 2 + (i % N - cx) ** 2 < (Math.floor(b / N) - cy) ** 2 + (b % N - cx) ** 2 ? i : b));
+  }
+  for (let i = 0; i < N * N; i++) {
+    const r = Math.floor(i / N), c = i % N, el = document.createElement("div");
+    el.className = "cell";
+    if (r === 0) el.classList.add("r0"); else if (reg[i - N] !== reg[i]) el.classList.add("bt");
+    if (c === 0) el.classList.add("c0"); else if (reg[i - 1] !== reg[i]) el.classList.add("bl");
+    if (pins.has(i)) el.classList.add("pin");
+    el.dataset.i = i; el.setAttribute("role", "gridcell");
+    b.append(el);
+  }
+  $("size").value = N;
+}
+
+function render() {
+  const bad = clashes(), kids = $("board").children, N = game.N, step = $("board").clientWidth / N || 40;
+  for (let i = 0; i < kids.length; i++) {
+    const g = game.reg[i], c = game.col[g];
+    fabricOn(kids[i], c >= 0 ? look()[c] : MUSLIN, (i % N) * step, Math.floor(i / N) * step);
+    kids[i].classList.toggle("clash", bad.has(g));
+    kids[i].setAttribute("aria-label", `Row ${Math.floor(i / N) + 1}, column ${i % N + 1}: ${c >= 0 ? look()[c].name : "plain muslin"}${game.given[g] >= 0 ? ", already sewn" : ""}`);
+  }
+  const done = game.col.filter(c => c >= 0).length;
+  $("count").textContent = `🧵 ${done} / ${game.R} patches`;
+  if (bad.size) G.note(`${bad.size} patches match a neighbor.`, 0); else if ($("msg").textContent.includes("match a neighbor")) G.note("");
+  $("undoBtn").disabled = !game.history.length || game.won;
+  $("clearBtn").disabled = game.won || game.col.every((c, g) => c === game.given[g]);
+  [...$("paints").children].forEach((b, k) => b.setAttribute("aria-pressed", k === brush || (k === 4 && brush < 0)));
+}
+
+/* ---------- input ---------- */
+// Fabric swatches, then Unpick (the seam ripper) to take a patch off.
+function swatchButton(label, dress, onPick) {
+  const b = document.createElement("button"), sw = document.createElement("span"), tx = document.createElement("span");
+  b.className = "paint"; sw.className = "swatch"; dress(sw); tx.textContent = label;
+  b.append(sw, tx); b.onclick = () => { onPick(); if (game) render(); };
+  $("paints").append(b);
+}
+function buildSwatches() {
+  $("paints").innerHTML = "";
+  look().forEach((f, k) => swatchButton(f.name, sw => fabricOn(sw, f), () => { brush = k; }));
+  swatchButton("Unpick", sw => { fabricOn(sw, MUSLIN); sw.textContent = "✂"; }, () => { brush = -1; });
+}
+buildSwatches();
+$("fabricTgl").checked = settings.fabric;
+$("fabricTgl").onchange = e => { settings.fabric = e.target.checked; save(); buildSwatches(); if (game) render(); };
+window.addEventListener("resize", () => { if (game) render(); });
+
+let press = null;
+const board = $("board");
+board.addEventListener("pointerdown", e => {
+  if (!game || game.won || busy) return;
+  const i = G.cellAt(e.clientX, e.clientY); if (i < 0) return;
+  e.preventDefault();
+  try { board.setPointerCapture(e.pointerId); } catch (_) {}
+  press = {start: game.reg[i], last: game.reg[i], drag: false, before: game.col.slice()};
+});
+board.addEventListener("pointermove", e => {
+  if (!press) return;
+  const i = G.cellAt(e.clientX, e.clientY); if (i < 0) return;
+  const g = game.reg[i];
+  if (g === press.last) return;
+  if (!press.drag) { press.drag = true; paint(press.start, false); }
+  press.last = g; paint(g, false); render();
+});
+function endPress() {
+  if (!press) return;
+  const p = press; press = null;
+  if (!p.drag) paint(p.start, true);
+  if (p.before.join() !== game.col.join()) { game.history.push(p.before); if (game.history.length > 300) game.history.shift(); }
+  render(); save(); checkWin();
+}
+board.addEventListener("pointerup", endPress);
+board.addEventListener("pointercancel", () => { if (press) { game.col = press.before; press = null; render(); } });
+
+$("newBtn").onclick = newPuzzle;
+$("size").onchange = e => { settings.size = +e.target.value; save(); newPuzzle(); };
+$("undoBtn").onclick = undo;
+$("clearBtn").onclick = clearAll;
+
+/* ---------- how to play ---------- */
+// A small finished quilt: five patches in four fabrics, two of them with buttons.
+function exampleQuilt() {
+  const reg = [0,0,1,1, 0,2,2,1, 3,2,4,4, 3,3,4,4], fab = [0, 1, 2, 3, 0], pins = [3, 12];
+  const q = document.createElement("div"); q.className = "board mini"; q.setAttribute("aria-hidden", "true");
+  const step = (170 - 16) / 4;
+  reg.forEach((g, i) => {
+    const r = Math.floor(i / 4), c = i % 4, el = document.createElement("div");
+    el.className = "cell";
+    if (r === 0) el.classList.add("r0"); else if (reg[i - 4] !== g) el.classList.add("bt");
+    if (c === 0) el.classList.add("c0"); else if (reg[i - 1] !== g) el.classList.add("bl");
+    if (pins.includes(i)) el.classList.add("pin");
+    fabricOn(el, look()[fab[g]], c * step, r * step);
+    q.append(el);
+  });
+  return q;
+}
+function showHelp() {
+  const media = document.createElement("div");
+  media.append(exampleQuilt());
+  const ol = document.createElement("ol"); ol.className = "steps";
+  for (const t of ["Give every patch one of the four fabrics.",
+                   "Patches that share a seam can't match. Patches may touch at a corner.",
+                   "Patches with a button are already sewn and cannot be changed or moved."]) {
+    const li = document.createElement("li"); li.textContent = t; ol.append(li);
+  }
+  const tip = document.createElement("p"); tip.className = "tip";
+  tip.textContent = "Pick a fabric, then tap or drag across patches. Tap a patch again, or use Unpick, to take it off.";
+  media.append(ol, tip);
+  G.openCard("How to play", "", [["Let's play", () => { G.closeCard(); settings.seenHelp = true; save(); }, true]], media);
+}
+// First visit only: show the directions once the first puzzle is on the board.
+function helpOnFirstVisit() { if (!settings.seenHelp && game && !game.won) showHelp(); }
+$("helpBtn").onclick = () => { if (!busy) showHelp(); };
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); } });
+
+G.nav("patches");
+$("size").value = settings.size;
+if (game && game.reg) { buildBoard(); render(); if (game.won) G.winCard(`The quilt is finished: ${game.R} patches, and no matching fabrics side by side. Perfect for a nap.`, newPuzzle); build.prefetch(game.N); helpOnFirstVisit(); }
+else newPuzzle().then(helpOnFirstVisit);
+</script>
+</body>
+</html>
