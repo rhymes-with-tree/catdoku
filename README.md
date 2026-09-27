@@ -16,13 +16,9 @@ Open `index.html` in any modern browser. No build step or dependencies.
 - Progress saved in `localStorage`
 - Cat photos, facts, and breeds from public cat APIs (all optional; the game works offline)
 
-## More games
+## Yarn
 
-Linked from the top of every page, and sharing Catdoku's look and home-screen app:
-
-- **Yarn** (`yarn/`): lead one strand through balls of yarn from lightest to darkest, filling every square.
-- **Shikaku** (`shikaku/`): split the board into rectangles; each holds one number equal to its area.
-- **Four Colors** (`four-colors/`): color a map with four colors so no two neighboring regions match.
-
+A second puzzle in `yarn/`, linked from the top of every page and sharing Catdoku's look and home-screen app.
+Lead one strand through balls of yarn from lightest to darkest, passing through every square once.
 Every puzzle is generated in the browser and checked to have exactly one solution.
 Shared styling and helpers live in `games.css` and `games.js`.
