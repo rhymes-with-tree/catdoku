@@ -15,8 +15,8 @@
 /* The board is a quilt: a stitched binding round the edge, dashed seams between patches. */
 .board{background:#F3EEDF;border:8px solid #7A4A6E;border-radius:12px;outline:2px dashed rgba(255,244,230,.85);outline-offset:-5px}
 .cell{position:relative;cursor:pointer;background-origin:border-box}  /* patterns line up across seams */
-.cell.bt{border-top:2.5px dashed rgba(42,37,48,.72)}.cell.bl{border-left:2.5px dashed rgba(42,37,48,.72)}
-.cell.r0{border-top:none}.cell.c0{border-left:none}
+.board{position:relative}
+.seams{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:2}
 /* a sewn-on button marks patches that come already sewn */
 .cell.pin::before{content:"";position:absolute;left:50%;top:50%;width:36%;height:36%;transform:translate(-50%,-50%);border-radius:50%;
   border:2px solid #2A2530;box-shadow:0 1px 2px rgba(42,37,48,.35);
@@ -29,17 +29,17 @@
 .paint .swatch{width:44px;height:44px;border-radius:50%;border:3px solid var(--ink);display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--ink)}
 .paint[aria-pressed="true"] .swatch{outline:4px solid var(--ink);outline-offset:3px}
 .paint[aria-pressed="true"]{color:var(--ink);background:none}
-/* Cats: a tabby napping over the quilt's top-right corner, a calico stretching across its bottom-left corner. */
+/* Cats: a tabby napping over the quilt's top-right corner, a calico stretching across its bottom-left corner, facing right. */
 main{--nw:min(calc(var(--board) * .4), 210px);--sw:min(calc(var(--board) * .5), 260px)}
 /* the patch count and fabrics sit just above the quilt, to the left of the tabby */
 .status,.paints{box-sizing:border-box;padding-right:calc(var(--nw) * .9)}
 .paints{min-height:calc(var(--nw) * .56 - 58px);
   align-content:flex-end;justify-content:flex-start;margin-bottom:-6px}
 .wrap{margin:0 0 calc(var(--sw) * .43)}
-@media (max-width:480px){.paints{gap:4px 6px}.paint{font-size:12px}.paint .swatch{width:38px;height:38px;font-size:17px}}
+@media (max-width:480px){.paints{gap:4px 8px}.paint{font-size:11px;padding:2px 0}.paint .swatch{width:38px;height:38px;font-size:17px}}
 .cat{position:absolute;height:auto;pointer-events:none;user-select:none;z-index:3}
 .cat.nap{width:var(--nw);right:-2%;bottom:calc(100% - var(--nw) * .22)}
-.cat.stretch{width:var(--sw);left:max(-16%, calc((var(--board) - 100vw) / 2));top:calc(100% - var(--sw) * .24)}
+.cat.stretch{width:var(--sw);transform:scaleX(-1);left:max(-16%, calc((var(--board) - 100vw) / 2));top:calc(100% - var(--sw) * .24)}
 /* How to play card */
 .board.mini{width:170px;height:170px;margin:0 auto 12px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(4,minmax(0,1fr))}
 .board.mini .cell{cursor:default}
@@ -94,7 +94,7 @@ main{--nw:min(calc(var(--board) * .4), 210px);--sw:min(calc(var(--board) * .5), 
 
   <div class="help">
     <p>Sew a quilt: give every patch one of four fabrics so no two patches that share a seam match. Patches may touch at a corner.</p>
-    <p>Patches with a button are already sewn and cannot be changed or moved. Pick a fabric, then tap or drag across patches. Turn off Fabric patterns for plain colors. Tap a patch again, or use Unpick, to take it off. Matching patches side by side get red hatching.</p>
+    <p>Patches with a button are already sewn and cannot be changed or moved. Pick a fabric, then tap or drag across patches. Turn off Fabric patterns for plain colors. Tap a patch again to take it off. Matching patches side by side get red hatching.</p>
   </div>
 </main>
 
@@ -216,7 +216,7 @@ function clearAll() { if (game.won) return; snapshot(); game.col = game.given.sl
 // Paint a region. On a tap, painting a region its own color clears it.
 function paint(g, isTap) {
   if (game.given[g] >= 0) { if (isTap) G.note("Patches with a button are already sewn and can't be changed."); return false; }
-  const c = brush < 0 || (isTap && game.col[g] === brush) ? -1 : brush;
+  const c = isTap && game.col[g] === brush ? -1 : brush;
   if (game.col[g] === c) return false;
   game.col[g] = c; return true;
 }
@@ -240,9 +240,28 @@ async function newPuzzle() {
   build.prefetch(N);
 }
 
+// Seams between patches, drawn as stitching: one SVG over the board, with runs joined so the dashes flow.
+function drawSeams(b, reg, N, W) {
+  const s = W / N, runs = [];
+  for (let r = 1; r < N; r++) for (let c = 0; c < N; c++) if (reg[r * N + c] !== reg[(r - 1) * N + c]) {
+    const last = runs[runs.length - 1];
+    if (last && last.h && last.y === r && last.x2 === c) last.x2 = c + 1; else runs.push({h: 1, y: r, x1: c, x2: c + 1});
+  }
+  for (let c = 1; c < N; c++) for (let r = 0; r < N; r++) if (reg[r * N + c] !== reg[r * N + c - 1]) {
+    const last = runs[runs.length - 1];
+    if (last && !last.h && last.x === c && last.y2 === r) last.y2 = r + 1; else runs.push({h: 0, x: c, y1: r, y2: r + 1});
+  }
+  const d = runs.map(q => q.h ? `M${q.x1 * s} ${q.y * s}H${q.x2 * s}` : `M${q.x * s} ${q.y1 * s}V${q.y2 * s}`).join("");
+  let svg = b.querySelector(".seams");
+  if (!svg) { b.insertAdjacentHTML("beforeend", '<svg class="seams" aria-hidden="true"></svg>'); svg = b.querySelector(".seams"); }
+  svg.setAttribute("viewBox", `0 0 ${W} ${W}`);
+  svg.innerHTML = `<path d="${d}" fill="none" stroke="rgba(255,249,238,.6)" stroke-width="4.5"/>` +
+    `<path d="${d}" fill="none" stroke="#2A2530" stroke-opacity=".85" stroke-width="2.5" stroke-dasharray="6 4" stroke-linecap="round"/>`;
+}
+
 function buildBoard() {
   const N = game.N, b = $("board"), reg = game.reg;
-  b.innerHTML = "";
+  b.innerHTML = ""; render.w = 0;
   b.style.gridTemplateColumns = b.style.gridTemplateRows = `repeat(${N}, minmax(0, 1fr))`;
   // a dot in the most central cell of each pre-painted region
   const pins = new Set();
@@ -253,10 +272,8 @@ function buildBoard() {
     pins.add(cells.reduce((b, i) => (Math.floor(i / N) - cy) ** 2 + (i % N - cx) ** 2 < (Math.floor(b / N) - cy) ** 2 + (b % N - cx) ** 2 ? i : b));
   }
   for (let i = 0; i < N * N; i++) {
-    const r = Math.floor(i / N), c = i % N, el = document.createElement("div");
+    const el = document.createElement("div");
     el.className = "cell";
-    if (r === 0) el.classList.add("r0"); else if (reg[i - N] !== reg[i]) el.classList.add("bt");
-    if (c === 0) el.classList.add("c0"); else if (reg[i - 1] !== reg[i]) el.classList.add("bl");
     if (pins.has(i)) el.classList.add("pin");
     el.dataset.i = i; el.setAttribute("role", "gridcell");
     b.append(el);
@@ -265,8 +282,9 @@ function buildBoard() {
 }
 
 function render() {
-  const bad = clashes(), kids = $("board").children, N = game.N, step = $("board").clientWidth / N || 40;
-  for (let i = 0; i < kids.length; i++) {
+  const bad = clashes(), kids = $("board").children, N = game.N, W = $("board").clientWidth, step = W / N || 40;
+  if (W && W !== render.w) { drawSeams($("board"), game.reg, N, W); render.w = W; }
+  for (let i = 0; i < N * N; i++) {
     const g = game.reg[i], c = game.col[g];
     fabricOn(kids[i], c >= 0 ? look()[c] : MUSLIN, (i % N) * step, Math.floor(i / N) * step);
     kids[i].classList.toggle("clash", bad.has(g));
@@ -277,11 +295,11 @@ function render() {
   if (bad.size) G.note(`${bad.size} patches match a neighbor.`, 0); else if ($("msg").textContent.includes("match a neighbor")) G.note("");
   $("undoBtn").disabled = !game.history.length || game.won;
   $("clearBtn").disabled = game.won || game.col.every((c, g) => c === game.given[g]);
-  [...$("paints").children].forEach((b, k) => b.setAttribute("aria-pressed", k === brush || (k === 4 && brush < 0)));
+  [...$("paints").children].forEach((b, k) => b.setAttribute("aria-pressed", k === brush));
 }
 
 /* ---------- input ---------- */
-// Fabric swatches, then Unpick (the seam ripper) to take a patch off.
+// Fabric swatches; tapping a patch again takes its fabric off.
 function swatchButton(label, dress, onPick) {
   const b = document.createElement("button"), sw = document.createElement("span"), tx = document.createElement("span");
   b.className = "paint"; sw.className = "swatch"; dress(sw); tx.textContent = label;
@@ -291,7 +309,6 @@ function swatchButton(label, dress, onPick) {
 function buildSwatches() {
   $("paints").innerHTML = "";
   look().forEach((f, k) => swatchButton(f.name, sw => fabricOn(sw, f), () => { brush = k; }));
-  swatchButton("Unpick", sw => { fabricOn(sw, MUSLIN); sw.textContent = "✂"; }, () => { brush = -1; });
 }
 buildSwatches();
 $("fabricTgl").checked = settings.fabric;
@@ -339,12 +356,11 @@ function exampleQuilt() {
   reg.forEach((g, i) => {
     const r = Math.floor(i / 4), c = i % 4, el = document.createElement("div");
     el.className = "cell";
-    if (r === 0) el.classList.add("r0"); else if (reg[i - 4] !== g) el.classList.add("bt");
-    if (c === 0) el.classList.add("c0"); else if (reg[i - 1] !== g) el.classList.add("bl");
     if (pins.includes(i)) el.classList.add("pin");
     fabricOn(el, look()[fab[g]], c * step, r * step);
     q.append(el);
   });
+  drawSeams(q, reg, 4, 170 - 16);
   return q;
 }
 function showHelp() {
@@ -357,7 +373,7 @@ function showHelp() {
     const li = document.createElement("li"); li.textContent = t; ol.append(li);
   }
   const tip = document.createElement("p"); tip.className = "tip";
-  tip.textContent = "Pick a fabric, then tap or drag across patches. Tap a patch again, or use Unpick, to take it off.";
+  tip.textContent = "Pick a fabric, then tap or drag across patches. Tap a patch again to take it off.";
   media.append(ol, tip);
   G.openCard("How to play", "", [["Let's play", () => { G.closeCard(); settings.seenHelp = true; save(); }, true]], media);
 }
