@@ -133,6 +133,7 @@ button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
     <button id="restartBtn">Restart board</button>
     <button id="auditBtn">Audit (costs 1 ♥)</button>
     <button id="completeBtn" class="primary">Complete</button>
+    <button id="shareBtn">Share</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
   </div>
@@ -774,6 +775,30 @@ load();
 G.checkClock(game);
 G.setupTimer({name: "catdoku", game: () => game, playing: g => g.status === "playing", save});
 $("bestBtn").onclick = () => G.showBests("Best times", game ? game.N : settings.size);
+
+/* ---------- sharing ---------- */
+$("shareBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Catdoku", won: game.status === "won",
+  puzzle: () => ({g: "catdoku", N: game.N, reg: game.reg, sol: game.sol, colors: game.colors}),
+  progress: () => ({cats: game.cells.flatMap((c, k) => c.cat ? [k] : []), paws: game.cells.flatMap((c, k) => c.manual ? [k] : [])})}); };
+// A puzzle from a share link, with its cats and paw marks so far if they were sent (that isn't timed).
+function openShared(d) {
+  const N = d.N;
+  game = {N, reg: d.reg, sol: d.sol, colors: d.colors || assignColors(d.reg, N), cells: blankCells(N),
+          hearts: HEARTS, livesUsed: HEARTS, status: "playing", history: [], wrong: [], ...G.freshClock()};
+  if (d.p) {
+    game.timed = false;
+    for (const k of d.p.paws) game.cells[k].manual = true;
+    for (const k of d.p.cats) {
+      game.cells[k].cat = true;
+      if (settings.autoExclude) for (const j of peers(k)) if (!game.cells[j].src.includes(k)) game.cells[j].src.push(k);
+    }
+  }
+  settings.size = N; $("size").value = N; buildBoard(); render(); save(); note(""); prefetch(N);
+  // A finished board shared back (say, by a helper) shows as solved.
+  const cats = game.cells.flatMap((c, k) => c.cat ? [k] : []);
+  if (cats.length === N && cats.every(isSolution)) { game.status = "won"; G.finishClock(game); save(); render(); setTimeout(showWon, 1200); }
+}
+const shared = G.readShare("catdoku");
 renderStreak();
 $("size").value = settings.size;
 if (game) {
@@ -783,7 +808,11 @@ if (game) {
   else if (game.status === "lost") showLost();
   else helpOnFirstVisit();
   prefetch(settings.size);
-} else newPuzzle().then(helpOnFirstVisit);
+} else if (!shared) newPuzzle().then(helpOnFirstVisit);
+const shareOpts = () => ({name: "Catdoku", inProgress: !!(game && game.status === "playing" && game.history.length), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, shareOpts());
+// A share link opened while this page is already showing only changes the address, so watch for it.
+window.addEventListener("hashchange", () => { const d = G.readShare("catdoku"); if (d) G.offerShare(d, shareOpts()); });
 </script>
 <!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
 <script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>

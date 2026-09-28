@@ -205,6 +205,58 @@ const G = (() => {
     openCard(title, "", [["Close", closeCard, true]], media);
   }
 
+
+  /* ---------- sharing a puzzle by link ---------- */
+  // The whole puzzle (and, if wanted, the moves so far) is packed into the link after "#share=",
+  // so no server is involved and nothing about the player is included.
+  const toB64 = str => btoa(unescape(encodeURIComponent(str))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const fromB64 = str => decodeURIComponent(escape(atob(str.replace(/-/g, "+").replace(/_/g, "/"))));
+  const shareUrl = data => location.origin + location.pathname + "#share=" + toB64(JSON.stringify(data));
+
+  // A share link this page was opened with, or null. The link is then tidied off the address.
+  function readShare(slug) {
+    const m = location.hash.match(/^#share=([\w-]+)/);
+    if (!m) return null;
+    history.replaceState(null, "", location.pathname + location.search);
+    try { const d = JSON.parse(fromB64(m[1])); if (d && d.g === slug && d.N) return d; } catch (e) {}
+    setTimeout(() => note("That share link didn't work. It may have been cut off.", 6000), 0);
+    return null;
+  }
+  // Open a shared puzzle, checking first if it would replace a puzzle in progress.
+  function offerShare(d, o) {
+    const go = () => {
+      closeCard(); o.open(d); track(`${o.name} shared puzzle opened`);
+      note(d.p ? "Here's the shared puzzle, with its progress so far. It isn't timed." : "Here's the shared puzzle. Good luck!", 6000);
+      if (o.after) o.after();
+    };
+    if (o.inProgress) openCard("Open the shared puzzle?", "Your puzzle in progress will be replaced.", [["Open it", go, true], ["Keep mine", closeCard]]);
+    else go();
+  }
+  // The Share card: a fresh copy of the puzzle, or the puzzle with the moves so far.
+  function shareCard(o) {
+    const send = async (data, what) => {
+      const url = shareUrl(data);
+      track(`${o.name} shared${what ? " " + what : ""}`);
+      if (navigator.share) {
+        const text = !data.p ? `Try this ${o.name} puzzle!` : o.won ? `Here's my finished ${o.name} puzzle!` : `Can you help me with this ${o.name} puzzle?`;
+        try { await navigator.share({title: o.name, text, url}); closeCard(); return; }
+        catch (e) { if (e.name === "AbortError") return; }
+      }
+      try { await navigator.clipboard.writeText(url); closeCard(); note("Link copied. Paste it into a message.", 5000); return; } catch (e) {}
+      // No share sheet and no clipboard: show the link to copy by hand.
+      const box = document.createElement("textarea"); box.value = url; box.readOnly = true; box.rows = 4;
+      box.style.cssText = "width:100%;font:inherit;font-size:13px;margin:0 0 14px;border:2px solid var(--line);border-radius:8px;padding:6px";
+      openCard("Copy this link", "Select the link and copy it into a message.", [["Done", closeCard, true]], box);
+      box.focus(); box.select();
+    };
+    const won = o.won;
+    openCard("Share this puzzle", "Send a link so someone else can play this exact puzzle.", [
+      ["Share this puzzle", () => send(o.puzzle(), ""), true],
+      [won ? "Share my solved board" : "Share with my progress", () => send(Object.assign(o.puzzle(), {p: o.progress()}), "with progress")],
+      ["Cancel", closeCard],
+    ]);
+  }
+
   let msgTimer = null;
   function note(text, ms) {
     clearTimeout(msgTimer);
@@ -219,5 +271,5 @@ const G = (() => {
   }
 
   return {$, nav, load, save, builder, openCard, closeCard, winCard, note, cellAt, track,
-          setupTimer, freshClock, checkClock, finishClock, timeLineEl, showBests};
+          setupTimer, freshClock, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard};
 })();
