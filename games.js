@@ -94,6 +94,17 @@ const G = (() => {
     openCard("Solved!", "", [["New puzzle", onNext, true], [admire, () => { closeCard(); note(ADMIRE_NOTE, 0); }]], media);
   }
 
+  // Count a moment in the game (a puzzle started or solved) on the GoatCounter dashboard.
+  // Nothing about the player is sent. Waits a few seconds for the counter script to load.
+  function track(name) {
+    let tries = 0;
+    (function send() {
+      const gc = window.goatcounter;
+      if (gc && gc.count) gc.count({path: name, title: name, event: true});
+      else if (tries++ < 20) setTimeout(send, 500);
+    })();
+  }
+
   let msgTimer = null;
   function note(text, ms) {
     clearTimeout(msgTimer);
@@ -107,5 +118,5 @@ const G = (() => {
     return c ? +c.dataset.i : -1;
   }
 
-  return {$, nav, load, save, builder, openCard, closeCard, winCard, note, cellAt};
+  return {$, nav, load, save, builder, openCard, closeCard, winCard, note, cellAt, track};
 })();
