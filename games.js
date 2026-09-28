@@ -82,14 +82,16 @@ const G = (() => {
       .then(r => r.json()).then(d => { img.src = d[0].url; }).catch(() => { img.src = backup; });
     return img;
   }
-  // "Solved!" card: message, cat photo, cat name, then the next-puzzle button.
-  function winCard(text, onNext) {
+  // "Solved!" card: message, cat photo, cat name, then the next-puzzle button and a button
+  // that closes the card to leave the finished board on screen.
+  const ADMIRE_NOTE = "Solved! Tap New puzzle when you're ready for another.";
+  function winCard(text, onNext, admire = "Admire my board") {
     const media = document.createElement("div");
     const p = document.createElement("p"); p.textContent = text;
     const name = document.createElement("p"); name.className = "catname";
     name.textContent = `Meet ${NAMES[Math.floor(Math.random() * NAMES.length)]}!`;
     media.append(p, catPhoto(), name);
-    openCard("Solved!", "", [["New puzzle", onNext, true]], media);
+    openCard("Solved!", "", [["New puzzle", onNext, true], [admire, () => { closeCard(); note(ADMIRE_NOTE, 0); }]], media);
   }
 
   let msgTimer = null;
