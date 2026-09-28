@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sunbeams</title>
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css">
+<style>
+/* A wooden floor in the shade; sunbeams are patches of window light, each with a cat stretched out in it. */
+.board{border-color:#5C3A22;border-radius:12px;position:relative;z-index:2}
+.cell{cursor:pointer}
+.scene{position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);pointer-events:none;z-index:1;border-radius:9px}
+.board.mini{width:170px;height:170px;margin:0 auto 12px;display:block;border:3px solid #5C3A22;border-radius:10px;overflow:hidden}
+.board.mini svg{display:block;width:100%;height:100%}
+.card ol.steps{text-align:left;margin:0 0 14px;padding-left:24px;color:var(--ink);font-size:16px;line-height:1.35}
+.card ol.steps li{margin:0 0 8px}
+.card .tip{font-size:14px;margin:0 0 14px}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Sunbeams</h1><div class="stripe"></div><p class="tagline">Every cat gets a warm spot</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="bar">
+    <label>Floor Size
+      <select id="size" aria-label="Floor size">
+        <option value="5">5 × 5</option><option value="6">6 × 6</option><option value="7">7 × 7</option>
+        <option value="8">8 × 8</option><option value="9">9 × 9</option><option value="10">10 × 10</option>
+        <option value="11">11 × 11</option><option value="12">12 × 12</option>
+      </select>
+    </label>
+    <button id="newBtn" class="primary">New puzzle</button>
+  </div>
+
+  <div class="status"><span id="count"></span><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap">
+    <svg class="scene" id="scene" aria-hidden="true"></svg>
+    <div class="board" id="board" role="grid" aria-label="Floor"></div>
+    <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+  </div>
+
+  <div class="actions">
+    <button id="undoBtn">Undo</button>
+    <button id="clearBtn">Clear</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+
+  <div class="help">
+    <p>Every number is a cat. Give each cat a rectangle of sunlight with exactly that many squares, one cat per sunbeam, until the whole floor is sunny.</p>
+    <p>Drag from corner to corner to let the light in. Tap a sunbeam to take it away. Drawing over sunbeams replaces them.</p>
+  </div>
+</main>
+
+<script src="../games.js"></script>
+<script>
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+// Split the grid into random rectangles, scanning for the first uncovered cell each time.
+function randomRects(N,maxA){
+  const own=new Int16Array(N*N).fill(-1),rects=[];
+  for(let i=0;i<N*N;i++){
+    if(own[i]>=0)continue;
+    const r0=Math.floor(i/N),c0=i%N,opts=[];
+    for(let h=1;r0+h<=N;h++){
+      let wMax=0;while(c0+wMax<N&&own[r0*N+c0+wMax]<0)wMax++;
+      for(let w=1;w<=wMax;w++){
+        let free=true;for(let r=r0;r<r0+h&&free;r++)for(let c=c0;c<c0+w;c++)if(own[r*N+c]>=0){free=false;break;}
+        if(!free)break;
+        const a=w*h;if(a>maxA)break;
+        // favour mid-sized pieces; singles rarely; long thin strips less
+        const wt=a===1?0.15:(Math.max(w,h)>4*Math.min(w,h)?0.3:1);
+        opts.push({r:r0,c:c0,w,h,wt});
+      }
+    }
+    let t=Math.random()*opts.reduce((s,o)=>s+o.wt,0),pick=opts[0];
+    for(const o of opts){t-=o.wt;if(t<=0){pick=o;break;}}
+    for(let r=pick.r;r<pick.r+pick.h;r++)for(let c=pick.c;c<pick.c+pick.w;c++)own[r*N+c]=rects.length;
+    rects.push({r:pick.r,c:pick.c,w:pick.w,h:pick.h});
+  }
+  return rects;
+}
+// Every rectangle of the right area that holds this clue and no other.
+function candidates(N,clue,cell){
+  const a=clue[cell],r0=Math.floor(cell/N),c0=cell%N,out=[];
+  for(let h=1;h<=a;h++){if(a%h)continue;const w=a/h;if(w>N||h>N)continue;
+    for(let r=r0-h+1;r<=r0;r++)for(let c=c0-w+1;c<=c0;c++){
+      if(r<0||c<0||r+h>N||c+w>N)continue;
+      let ok=true;for(let y=r;y<r+h&&ok;y++)for(let x=c;x<c+w;x++){const k=y*N+x;if(k!==cell&&clue[k]){ok=false;break;}}
+      if(ok)out.push({r,c,w,h});
+    }}
+  return out;
+}
+function solveShikaku(N,clue,limit){
+  const M=N*N,cells=[];for(let i=0;i<M;i++)if(clue[i])cells.push(i);
+  const cand=cells.map(k=>candidates(N,clue,k).map(R=>{const s=[];for(let y=R.r;y<R.r+R.h;y++)for(let x=R.c;x<R.c+R.w;x++)s.push(y*N+x);return {R,s};}));
+  const cov=new Uint8Array(M),used=new Uint8Array(cells.length),pick=new Array(cells.length),sols=[];
+  (function go(left){
+    if(!left){sols.push(pick.map(p=>p.R));return sols.length>=limit;}
+    let best=-1,bestOpts=null;
+    for(let j=0;j<cells.length;j++){if(used[j])continue;
+      const o=cand[j].filter(x=>x.s.every(k=>!cov[k]));
+      if(!bestOpts||o.length<bestOpts.length){best=j;bestOpts=o;if(o.length<=1)break;}}
+    if(!bestOpts.length)return false;
+    used[best]=1;
+    for(const o of bestOpts){for(const k of o.s)cov[k]=1;pick[best]=o;
+      const stop=go(left-1);for(const k of o.s)cov[k]=0;if(stop){used[best]=0;return true;}}
+    used[best]=0;return false;
+  })(cells.length);
+  return sols;
+}
+function makeShikaku(N){
+  const maxA=Math.max(4,Math.round(N*1.5));
+  for(let attempt=0;attempt<200;attempt++){
+    const rects=randomRects(N,maxA);
+    for(let tries=0;tries<8;tries++){
+      const clue=new Array(N*N).fill(0);
+      for(const R of rects){const y=R.r+Math.floor(Math.random()*R.h),x=R.c+Math.floor(Math.random()*R.w);clue[y*N+x]=R.w*R.h;}
+      if(solveShikaku(N,clue,2).length===1)return {N,clue,rects};
+    }
+  }
+  return null;
+}
+
+
+/* ---------- drawing ---------- */
+const U = 100, NS = "http://www.w3.org/2000/svg";
+// Your cats, seen from above and laid lengthwise: [file, length ÷ width, size].
+// Size is the real cat: 1 small short-hairs, 2 the fluffy tuxedo, 3 Maine Coons, ragdoll and spotted cat.
+const SLEEPERS = [
+  ["c14-36",1.1,1], ["c16-5",1.11,2], ["c14-34",1.14,1], ["c15-6",1.17,3], ["c14-35",1.19,1], ["c15-5",1.28,3],
+  ["c16-3",1.31,2], ["c16-4",1.44,2], ["c15-4",1.64,3], ["c15-2",1.65,3], ["c14-33",1.86,1], ["c14-29",1.87,1],
+  ["c16-2",1.92,2], ["c14-28",2.1,1], ["c14-30",2.11,1], ["c14-31",2.11,1], ["c14-32",2.27,1], ["c15-3",2.55,3],
+  ["c15-36",2.96,3], ["c16-16",3.0,2], ["c16-14",3.36,2], ["c15-33",3.72,3], ["c15-32",3.78,3], ["c15-35",3.78,3],
+  ["c16-13",3.82,2], ["c16-15",3.93,2], ["c14-53",4.12,1], ["c16-1",4.2,2], ["c14-52",4.29,1], ["c15-37",4.33,3],
+  ["c14-55",4.57,1], ["c14-59",4.62,1], ["c14-57",4.67,1], ["c15-1",5.06,3], ["c14-58",5.32,1], ["c15-34",5.38,3]];
+const CAT_DIR = "../cats/";
+// A steady pseudo-random number for a square, so each cat keeps its look between redraws.
+function hash(x) { x = Math.imul(x ^ (x >>> 16), 0x45d9f3b); x = Math.imul(x ^ (x >>> 16), 0x45d9f3b); return (x ^ (x >>> 16)) >>> 0; }
+
+function el(parent, tag, attrs, text) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (text != null) e.textContent = text;
+  parent.append(e); return e;
+}
+// The size tag: a round collar tag with the number.
+function sizeTag(g, x, y, n, dim) {
+  el(g, "circle", {cx:x, cy:y, r:25, fill: dim ? "#EFE5CB" : "#F4C84A", stroke:"#2A2530", "stroke-width":4});
+  el(g, "text", {x, y:y + 11, "text-anchor":"middle", "font-family":"Baloo 2, system-ui, sans-serif", "font-weight":800, "font-size":33, fill:"#2A2530"}, n);
+}
+function catImage(g, name, w, h, tf) {
+  const k = el(g, "g", {transform:tf});
+  el(k, "image", {href:CAT_DIR + name + ".webp", x:-w / 2, y:-h / 2, width:w, height:h, preserveAspectRatio:"none"});
+}
+// All the poses of one cat count as the same cat when spreading them round the floor.
+const catOf = name => name.startsWith("c16-") ? "fluffy tuxedo" : name;
+// The cat for a sunbeam: a cat of the right size for the sunbeam, then the one whose shape best
+// matches it, stretched a little to fill it, passing over cats already on the floor. Cats are stored lying lengthwise, so a tall
+// sunbeam gets its cat turned on its side.
+const sizeFor = area => area <= 3 ? 1 : area <= 7 ? 2 : 3;
+function sleepingCat(g, x, y, w, h, k, seed, used) {
+  const size = sizeFor(Math.round(w * h / (U * U))), pad = Math.min(w, h) * .06, L = Math.max(w, h) - 2 * pad, T = Math.min(w, h) - 2 * pad, want = L / T;
+  const fit = SLEEPERS.map(c => [.45 * Math.abs(c[2] - size) + Math.abs(Math.log(c[1] / want)) + .25 * (used.get(catOf(c[0])) || 0), c]).sort((p, q) => p[0] - q[0]);
+  const near = fit.filter(p => p[0] <= fit[0][0] + .15).slice(0, 5), r = hash(k * 131 + seed);
+  const [name, ratio] = near[r % near.length][1];
+  used.set(catOf(name), (used.get(catOf(name)) || 0) + 1);
+  const rr = Math.min(Math.max(want, ratio / 1.12), ratio * 1.12);   // stretch at most 12%
+  const cw = Math.min(L, T * rr), ch = cw / rr;
+  catImage(g, name, cw, ch, `translate(${x + w / 2} ${y + h / 2}) rotate(${h > w ? 90 : 0}) scale(${r & 2 ? -1 : 1} ${r & 4 ? -1 : 1})`);
+}
+// Floorboards: one plank per row, joints only on square edges, in the shade.
+function drawFloor(g, N) {
+  const W = N * U;
+  for (let r = 0; r < N; r++) {
+    el(g, "rect", {x:0, y:r * U, width:W, height:U, fill: r % 2 ? "#A9744A" : "#B37D51"});
+    el(g, "path", {d:`M${(r * 137) % (W - 160) + 30} ${r * U + 38} q60 -8 120 0 M${(r * 211 + 90) % (W - 140) + 20} ${r * U + 70} q50 6 100 0`, stroke:"#8F603D", "stroke-width":2.5, fill:"none", opacity:.55});
+    for (let c = 1; c < N; c++) {
+      const joint = (r * 5 + c * 3) % 7 === 0;
+      el(g, "line", {x1:c * U, y1:r * U, x2:c * U, y2:(r + 1) * U, stroke:"#6E4528", "stroke-width": joint ? 4 : 2, opacity: joint ? .9 : .45});
+    }
+    if (r) el(g, "line", {x1:0, y1:r * U, x2:W, y2:r * U, stroke:"#6E4528", "stroke-width":4});
+  }
+  el(g, "rect", {x:0, y:0, width:W, height:W, fill:"#2B1A10", opacity:.36});
+}
+function sceneDefs(svg) {
+  const d = el(svg, "defs", {});
+  const f = el(d, "filter", {id:"soft", x:"-10%", y:"-10%", width:"120%", height:"120%"}); el(f, "feGaussianBlur", {stdDeviation:3});
+  const lg = el(d, "linearGradient", {id:"light", x1:0, y1:0, x2:1, y2:1});
+  el(lg, "stop", {offset:0, "stop-color":"#FFF4C8", "stop-opacity":.96}); el(lg, "stop", {offset:1, "stop-color":"#FFD877", "stop-opacity":.84});
+}
+// Everything on the floor: sunbeams with their cats, numbers still waiting, and the one being dragged.
+function drawScene(g, N, clue, rects, isValid, draft, seed) {
+  g.innerHTML = "";
+  const housed = new Set(), used = new Map();
+  for (const R of rects) {
+    const x = R.c * U, y = R.r * U, w = R.w * U, h = R.h * U;
+    if (isValid(R)) {
+      const k = cellsIn(N, R).find(i => clue[i]); housed.add(k);
+      el(g, "rect", {x:x + 9, y:y + 9, width:w - 18, height:h - 18, rx:8, fill:"url(#light)", filter:"url(#soft)"});
+      el(g, "path", {d:`M${x + w / 2} ${y + 12} V${y + h - 12} M${x + 12} ${y + h / 2} H${x + w - 12}`, stroke:"#8A5A34", "stroke-width":7, opacity:.22, filter:"url(#soft)"});
+      sleepingCat(g, x, y, w, h, k, seed, used);
+      sizeTag(g, (k % N) * U + 72, Math.floor(k / N) * U + 72, clue[k]);
+    } else {
+      el(g, "rect", {x:x + 9, y:y + 9, width:w - 18, height:h - 18, rx:8, fill:"#FFE9A6", "fill-opacity":.16, stroke:"#FFE9A6", "stroke-width":4, "stroke-dasharray":"14 10"});
+    }
+  }
+  for (let k = 0; k < N * N; k++) if (clue[k] && !housed.has(k)) {
+    const cx = (k % N) * U + 50, cy = Math.floor(k / N) * U + 50;
+    sizeTag(g, cx, cy, clue[k], true);   // just the number until its cat has a sunbeam
+  }
+  for (const R of rects) if (!isValid(R)) sizeChip(g, R, `${R.w * R.h}?`);
+  if (draft) {
+    el(g, "rect", {x:draft.c * U + 9, y:draft.r * U + 9, width:draft.w * U - 18, height:draft.h * U - 18, rx:8, fill:"#FFE9A6", "fill-opacity":.25, stroke:"#FFF4C8", "stroke-width":5, "stroke-dasharray":"14 10"});
+    sizeChip(g, draft, `${draft.w} × ${draft.h} = ${draft.w * draft.h}`);
+  }
+}
+function sizeChip(g, R, text) {
+  const w = 22 * text.length + 26, x = Math.max(4, (R.c + R.w) * U - w - 14), y = R.r * U + 16;
+  el(g, "rect", {x, y, width:w, height:46, rx:23, fill:"#2A2530"});
+  el(g, "text", {x:x + w / 2, y:y + 33, "text-anchor":"middle", "font-family":"Baloo 2, system-ui, sans-serif", "font-weight":800, "font-size":30, fill:"#F8F7F2"}, text);
+}
+function cellsIn(N, R) { const out = []; for (let y = R.r; y < R.r + R.h; y++) for (let x = R.c; x < R.c + R.w; x++) out.push(y * N + x); return out; }
+
+/* ---------- game ---------- */
+const STORE = "catdoku.sunbeams.v1";
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({size: 7}, state.settings);
+let game = state.game || null, busy = false;
+const build = G.builder([shuffle, randomRects, candidates, solveShikaku, makeShikaku], "makeShikaku");
+const save = () => G.save(STORE, {settings, game});
+
+const overlaps = (A, B) => A.r < B.r + B.h && B.r < A.r + A.h && A.c < B.c + B.w && B.c < A.c + A.w;
+const rectFrom = (a, b) => { const N = game.N, r1 = Math.floor(a / N), c1 = a % N, r2 = Math.floor(b / N), c2 = b % N;
+  return {r: Math.min(r1, r2), c: Math.min(c1, c2), h: Math.abs(r1 - r2) + 1, w: Math.abs(c1 - c2) + 1}; };
+function valid(R) {
+  const nums = cellsIn(game.N, R).map(k => game.clue[k]).filter(Boolean);
+  return nums.length === 1 && nums[0] === R.w * R.h;
+}
+
+function snapshot() { game.history.push(JSON.stringify(game.rects)); if (game.history.length > 300) game.history.shift(); }
+function undo() { if (!game.history.length || game.won) return; game.rects = JSON.parse(game.history.pop()); render(); save(); }
+function clearAll() { if (game.won || !game.rects.length) return; snapshot(); game.rects = []; render(); save(); }
+
+function place(R) {
+  snapshot();
+  game.rects = game.rects.filter(X => !overlaps(X, R));
+  game.rects.push(R);
+}
+function removeAt(k) {
+  const N = game.N, r = Math.floor(k / N), c = k % N;
+  const i = game.rects.findIndex(R => r >= R.r && r < R.r + R.h && c >= R.c && c < R.c + R.w);
+  if (i < 0) return false;
+  snapshot(); game.rects.splice(i, 1); return true;
+}
+
+const winText = () => `The whole floor is sunny, and all ${game.rects.length} cats are stretched out in their own sunbeams.`;
+function checkWin() {
+  const covered = game.rects.reduce((s, R) => s + R.w * R.h, 0);
+  if (covered === game.N * game.N && game.rects.every(valid)) {
+    game.won = true; save(); render();
+    const done = game;   // let the finished floor show for a moment first
+    setTimeout(() => { if (game === done) G.winCard(winText(), newPuzzle, "Admire the sleeping cats"); }, 1400);
+  }
+}
+
+async function newPuzzle() {
+  if (busy) return;
+  busy = true;
+  const N = settings.size;
+  G.openCard("Opening the curtains…", "", []);
+  const p = await build.take(N);
+  game = {N, clue: p.clue, rects: [], history: [], won: false, seed: Math.floor(Math.random() * 1e6)};
+  busy = false;
+  G.closeCard(); buildBoard(); render(); save(); G.note("");
+  build.prefetch(N);
+}
+
+function buildBoard() {
+  const N = game.N, b = $("board"), svg = $("scene");
+  b.innerHTML = "";
+  b.style.gridTemplateColumns = b.style.gridTemplateRows = `repeat(${N}, minmax(0, 1fr))`;
+  for (let i = 0; i < N * N; i++) {
+    const el = document.createElement("div");
+    el.className = "cell"; el.dataset.i = i; el.setAttribute("role", "gridcell");
+    b.append(el);
+  }
+  svg.innerHTML = ""; svg.setAttribute("viewBox", `0 0 ${N * U} ${N * U}`); svg.setAttribute("preserveAspectRatio", "none");
+  sceneDefs(svg); drawFloor(el(svg, "g", {}), N); el(svg, "g", {id:"beams"});
+  $("size").value = N;
+}
+
+function render() {
+  const N = game.N;
+  drawScene($("beams"), N, game.clue, game.rects, valid, press && press.draft, game.seed || 0);
+  const kids = $("board").children, lit = new Set(game.rects.filter(valid).flatMap(R => cellsIn(N, R)));
+  for (let i = 0; i < N * N; i++) kids[i].setAttribute("aria-label",
+    `Row ${Math.floor(i / N) + 1}, column ${i % N + 1}${game.clue[i] ? ", cat " + game.clue[i] : ""}${lit.has(i) ? ", sunny" : ""}`);
+  const covered = game.rects.reduce((s, R) => s + R.w * R.h, 0);
+  $("count").textContent = `☀️ ${covered} / ${N * N} squares sunny`;
+  const bad = game.rects.filter(R => !valid(R)).length;
+  if (bad) G.note(bad === 1 ? "One sunbeam doesn't fit its cat." : `${bad} sunbeams don't fit their cats.`, 0);
+  else if ($("msg").textContent.includes("fit")) G.note("");
+  $("undoBtn").disabled = !game.history.length || game.won;
+  $("clearBtn").disabled = !game.rects.length || game.won;
+}
+
+/* ---------- input ---------- */
+let press = null;
+const board = $("board");
+board.addEventListener("pointerdown", e => {
+  if (!game || game.won || busy) return;
+  const i = G.cellAt(e.clientX, e.clientY); if (i < 0) return;
+  e.preventDefault();
+  try { board.setPointerCapture(e.pointerId); } catch (_) {}
+  press = {start: i, last: i, draft: null};
+});
+board.addEventListener("pointermove", e => {
+  if (!press) return;
+  const i = G.cellAt(e.clientX, e.clientY);
+  if (i < 0 || i === press.last) return;
+  press.last = i; press.draft = rectFrom(press.start, i);
+  render();
+});
+function endPress() {
+  if (!press) return;
+  const p = press; press = null;
+  if (p.draft) place(p.draft);                                   // a drag lets the light in
+  else if (!removeAt(p.start)) place(rectFrom(p.start, p.start)); // a tap takes a sunbeam away, or lights one square
+  render(); save(); checkWin();
+}
+board.addEventListener("pointerup", endPress);
+board.addEventListener("pointercancel", () => { press = null; render(); });
+
+$("newBtn").onclick = newPuzzle;
+$("size").onchange = e => { settings.size = +e.target.value; save(); newPuzzle(); };
+$("undoBtn").onclick = undo;
+$("clearBtn").onclick = clearAll;
+$("helpBtn").onclick = showHelp;
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); } });
+
+/* ---------- how to play ---------- */
+// A small finished floor: four sunbeams, each with its cat.
+function exampleFloor() {
+  const N = 4, clue = new Array(16).fill(0), rects = [{r:0,c:0,h:2,w:2}, {r:0,c:2,h:1,w:2}, {r:1,c:2,h:3,w:2}, {r:2,c:0,h:2,w:2}];
+  clue[5] = 4; clue[3] = 2; clue[10] = 6; clue[12] = 4;
+  const box = document.createElement("div"); box.className = "board mini"; box.setAttribute("aria-hidden", "true");
+  const svg = document.createElementNS(NS, "svg"); svg.setAttribute("viewBox", "0 0 400 400"); box.append(svg);
+  sceneDefs(svg); drawFloor(el(svg, "g", {}), N);
+  const ok = R => { const n = cellsIn(N, R).map(k => clue[k]).filter(Boolean); return n.length === 1 && n[0] === R.w * R.h; };
+  drawScene(el(svg, "g", {}), N, clue, rects, ok, null, 5);
+  return box;
+}
+function showHelp() {
+  const media = document.createElement("div");
+  media.append(exampleFloor());
+  const ol = document.createElement("ol"); ol.className = "steps";
+  for (const t of ["Every number is a cat. Give each cat a sunbeam with exactly that many squares.",
+                   "Sunbeams are rectangles, and each one holds just one cat.",
+                   "Fill the whole floor with sunshine."]) {
+    const li = document.createElement("li"); li.textContent = t; ol.append(li);
+  }
+  const tip = document.createElement("p"); tip.className = "tip";
+  tip.textContent = "Drag from corner to corner to let the light in. Tap a sunbeam to take it away.";
+  media.append(ol, tip);
+  G.openCard("How to play", "", [["Let's play", () => { G.closeCard(); settings.seenHelp = true; save(); }, true]], media);
+}
+// First visit only: show the directions once the first puzzle is on the board.
+function helpOnFirstVisit() { if (!settings.seenHelp && game && !game.won) showHelp(); }
+
+G.nav("sunbeams");
+$("size").value = settings.size;
+if (game && game.clue) { buildBoard(); render(); if (game.won) G.winCard(winText(), newPuzzle, "Admire the sleeping cats"); build.prefetch(game.N); helpOnFirstVisit(); }
+else newPuzzle().then(helpOnFirstVisit);
+</script>
+</body>
+</html>
