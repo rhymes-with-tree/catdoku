@@ -270,6 +270,24 @@ const G = (() => {
     return c ? +c.dataset.i : -1;
   }
 
-  return {$, nav, load, save, builder, openCard, closeCard, winCard, note, cellAt, track,
+  // If something breaks, say what on the page and count it on the dashboard, so it can be fixed.
+  function reportError(msg, where) {
+    track(`Error: ${msg}${where ? ` (${where})` : ""}`);
+    const m = $("msg"); if (m) m.textContent = `Something went wrong: ${msg}`;
+  }
+  window.addEventListener("error", e => reportError(e.message, `${(e.filename || "").split("/").slice(-2).join("/")}:${e.lineno}`));
+  window.addEventListener("unhandledrejection", e => reportError(String((e.reason && e.reason.message) || e.reason)));
+  // Reopen a saved puzzle. If that fails, report why and start a fresh puzzle instead of
+  // leaving an empty board.
+  function reopen(fn, fresh) {
+    try { fn(); }
+    catch (e) {
+      const why = `${e.message}${e.stack ? ` (${e.stack.split("\n")[0]})` : ""}`;
+      track(`Error: couldn't reopen saved puzzle: ${why}`);
+      fresh(`Your saved puzzle couldn't be reopened, so here's a new one. (${e.message})`);
+    }
+  }
+
+  return {$, nav, load, save, builder, openCard, closeCard, winCard, note, cellAt, track, reopen,
           setupTimer, freshClock, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard};
 })();
