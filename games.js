@@ -85,11 +85,12 @@ const G = (() => {
   // "Solved!" card: message, cat photo, cat name, then the next-puzzle button and a button
   // that closes the card to leave the finished board on screen.
   const ADMIRE_NOTE = "Solved! Tap New puzzle when you're ready for another.";
-  function winCard(text, onNext, admire = "Admire my board") {
+  function winCard(text, onNext, admire = "Admire my board", result) {
     const media = document.createElement("div");
     const p = document.createElement("p"); p.textContent = text;
     const name = document.createElement("p"); name.className = "catname";
     name.textContent = `Meet ${NAMES[Math.floor(Math.random() * NAMES.length)]}!`;
+    const tl = timeLineEl(result); if (tl) media.append(tl);
     media.append(p, catPhoto(), name);
     openCard("Solved!", "", [["New puzzle", onNext, true], [admire, () => { closeCard(); note(ADMIRE_NOTE, 0); }]], media);
   }
@@ -105,6 +106,105 @@ const G = (() => {
     })();
   }
 
+
+  /* ---------- timer and personal best times ---------- */
+  // Times and bests stay on this device. The clock starts on the first move, runs only
+  // while the page is showing with no card over the board, and stops when the puzzle is solved.
+  const BESTS = "catdoku.bests.v1", PREFS = "catdoku.prefs.v1", KEEP = 10;
+  const clock = ms => {
+    const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, ss = String(s % 60).padStart(2, "0");
+    return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
+  };
+  const style = document.createElement("style");
+  style.textContent = `
+    .timer{background:none;border:none;border-radius:8px;padding:0 6px;font:inherit;font-weight:600;color:var(--ink-soft);font-variant-numeric:tabular-nums;cursor:pointer;white-space:nowrap}
+    .timer:hover{background:none;color:var(--ink)}
+    .card .timeline{font-weight:800;color:var(--ink);margin:0 0 12px}
+    .bests{width:100%;border-collapse:collapse;margin:0 0 14px;font-variant-numeric:tabular-nums;color:var(--ink)}
+    .bests th,.bests td{padding:4px 6px;text-align:left;border-bottom:1px solid var(--line)}
+    .bests th{font-size:13px;color:var(--ink-soft);font-weight:600}
+    .bests td.num,.bests th.num{text-align:right}
+    .bests tr.now td{font-weight:800}
+    .card h3{margin:4px 0 6px;font-size:18px}`;
+  document.head.append(style);
+
+  let T = null;   // {name, game(), playing(game), save()}
+  function setupTimer(opts) {
+    T = opts;
+    const board = $("board"), start = () => { const g = T.game(); if (g && g.timed && T.playing(g) && !$("overlay").classList.contains("show")) g.started = true; };
+    board.addEventListener("pointerdown", start, true);
+    board.addEventListener("keydown", start, true);
+    const btn = $("timer");
+    btn.onclick = () => { const p = load(PREFS); p.hideTimer = !p.hideTimer; save(PREFS, p); showTime(); };
+    let last = Date.now();
+    setInterval(() => {
+      const now = Date.now(), g = T.game(), dt = Math.min(now - last, 1500); last = now;
+      if (g && g.timed && g.started && T.playing(g) && !document.hidden && !$("overlay").classList.contains("show")) g.ms = (g.ms || 0) + dt;
+      showTime();
+    }, 500);
+    document.addEventListener("visibilitychange", () => { if (document.hidden) T.save(); });
+    showTime();
+  }
+  function showTime() {
+    const g = T && T.game(), btn = $("timer"); if (!btn) return;
+    if (!g || !g.timed) { btn.textContent = ""; btn.hidden = true; return; }
+    btn.hidden = false;
+    const hide = load(PREFS).hideTimer;
+    btn.textContent = hide ? "⏱ –:––" : "⏱ " + clock(g.ms || 0);
+    btn.setAttribute("aria-label", hide ? "Timer hidden. Tap to show the time." : `Time ${clock(g.ms || 0)}. Tap to hide the time.`);
+  }
+  // Fields a new puzzle starts with.
+  const freshClock = () => ({ms: 0, timed: true, started: false});
+  // A puzzle saved before the timer existed can't set a best time.
+  function checkClock(g) { if (g && g.timed === undefined) g.timed = false; }
+
+  // Call once when a puzzle is solved: records the time and returns what the card shows.
+  function finishClock(g) {
+    if (!g.timed) return (g.result = {ms: null});
+    const all = load(BESTS), mine = (all[T.name] = all[T.name] || {}), row = (mine[g.N] = mine[g.N] || {solves: 0, times: []});
+    const before = row.times.length ? row.times[0].ms : null;
+    row.solves++;
+    row.times.push({ms: g.ms, d: new Date().toISOString().slice(0, 10)});
+    row.times.sort((a, b) => a.ms - b.ms); row.times = row.times.slice(0, KEEP);
+    save(BESTS, all);
+    return (g.result = {ms: g.ms, best: before, isBest: before === null || g.ms < before});
+  }
+  function timeLine(r) {
+    if (!r || r.ms == null) return "";
+    if (r.isBest && r.best !== null) return `Time ${clock(r.ms)}. New personal best! (was ${clock(r.best)})`;
+    if (r.isBest) return `Time ${clock(r.ms)}. Your first time at this size.`;
+    return `Time ${clock(r.ms)}. Your best is ${clock(r.best)}.`;
+  }
+  function timeLineEl(r) { const t = timeLine(r); if (!t) return null; const p = document.createElement("p"); p.className = "timeline"; p.textContent = t; return p; }
+
+  // The "Best times" card: every size played, then the top times at the current size.
+  function showBests(title, N) {
+    const mine = load(BESTS)[T.name] || {}, sizes = Object.keys(mine).map(Number).sort((a, b) => a - b);
+    const media = document.createElement("div");
+    if (!sizes.length) {
+      const p = document.createElement("p"); p.textContent = "Solve a puzzle and your times will show up here. They're kept on this device only."; media.append(p);
+    } else {
+      const t = document.createElement("table"); t.className = "bests";
+      t.innerHTML = '<tr><th>Size</th><th class="num">Best</th><th class="num">Solved</th></tr>';
+      for (const n of sizes) {
+        const r = t.insertRow(); if (n === N) r.className = "now";
+        r.insertCell().textContent = `${n} × ${n}`;
+        const b = r.insertCell(); b.className = "num"; b.textContent = mine[n].times.length ? clock(mine[n].times[0].ms) : "–";
+        const c = r.insertCell(); c.className = "num"; c.textContent = mine[n].solves;
+      }
+      media.append(t);
+      const top = (mine[N] || {times: []}).times;
+      if (top.length) {
+        const h = document.createElement("h3"); h.textContent = `Fastest at ${N} × ${N}`; media.append(h);
+        const t2 = document.createElement("table"); t2.className = "bests";
+        top.forEach((x, i) => { const r = t2.insertRow(); r.insertCell().textContent = `${i + 1}.`; const c = r.insertCell(); c.className = "num"; c.textContent = clock(x.ms); r.insertCell().textContent = x.d; });
+        media.append(t2);
+      }
+      const p = document.createElement("p"); p.textContent = "Times are kept on this device only."; media.append(p);
+    }
+    openCard(title, "", [["Close", closeCard, true]], media);
+  }
+
   let msgTimer = null;
   function note(text, ms) {
     clearTimeout(msgTimer);
@@ -118,5 +218,6 @@ const G = (() => {
     return c ? +c.dataset.i : -1;
   }
 
-  return {$, nav, load, save, builder, openCard, closeCard, winCard, note, cellAt, track};
+  return {$, nav, load, save, builder, openCard, closeCard, winCard, note, cellAt, track,
+          setupTimer, freshClock, checkClock, finishClock, timeLineEl, showBests};
 })();

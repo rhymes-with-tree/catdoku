@@ -23,6 +23,9 @@ Lead one strand through balls of yarn from lightest to darkest, passing through 
 Every puzzle is generated in the browser and checked to have exactly one solution.
 Shared styling and helpers live in `games.css` and `games.js`.
 
+Every game has a timer that starts on your first move and pauses while the page is in the background or a card is open. Tap it to hide the time.
+Your fastest times for each game and size are kept on your device and shown under Best times.
+
 ## Patches
 
 A third puzzle in `patches/`: sew a quilt by giving every patch one of four fabrics so no two patches that share a seam match.
