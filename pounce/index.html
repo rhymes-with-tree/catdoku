@@ -235,13 +235,14 @@ const KINDS = [
   {c: "#5E5866", looks: [["mouse", "mice"]]},
   {c: "#E16A4A", looks: [["felt-rainbow", "rainbow balls"], ["ribbon-tail", "ribbon balls"], ["spiky-rainbow", "spiky balls"]]},
 ];
+// Level 0 is zen: six kinds of toy, nothing to catch and no move limit.
 function makeLevel(n, rnd = Math.random) {
-  const p = params(n), all = KINDS.map((_, i) => i);
+  const p = n ? params(n) : {K: 6, goals: 0, need: 0, moves: null}, all = KINDS.map((_, i) => i);
   for (let i = all.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [all[i], all[j]] = [all[j], all[i]]; }
   const kinds = all.slice(0, p.K).sort((a, b) => a - b);
   const look = KINDS.map(k => Math.floor(rnd() * k.looks.length));
   const goals = kinds.slice().sort(() => rnd() - 0.5).slice(0, p.goals).map(k => ({k, need: p.need, got: 0}));
-  return {kinds, look, goals, moves: p.moves, grid: newMat(kinds, rnd).map(t => [t.k, t.sp]), helped: false, extra: 0};
+  return {kinds, look, goals, moves: p.moves, grid: newMat(kinds, rnd).map(t => [t.k, t.sp]), helped: false, extra: 0, caught: 0};
 }
 
 /* ---------- pictures ---------- */
@@ -259,36 +260,41 @@ const lookOf = k => KINDS[k].looks[(S && S.d.look[k]) || 0] || KINDS[k].looks[0]
 /* ---------- playing ---------- */
 const U = 50, W = N * U;     // drawing units per square; the canvas is scaled to fit
 const STORE = "catdoku.pounce.v1";
+let climb = 1;   // the level to go back to after zen
 let busy = false, picked = -1, cursor = -1, now = 0, effects = [], hintAt = 0, hint = null;
-const save = () => { if (S && !S.over) { S.d.grid = S.g.map(t => [t.k, t.sp]); S.d.ms = S.ms; G.save(STORE, {level: S.level, d: S.d}); } };
+const save = () => { if (S && !S.over) { S.d.grid = S.g.map(t => [t.k, t.sp]); S.d.ms = S.ms; G.save(STORE, {level: S.level, d: S.d, climb}); } };
 
 function start(level, d) {
   if (d.kinds.some(k => !KINDS[k]) || d.grid.length !== N * N) throw new Error("the saved level is from another version of the game");
   const g = d.grid.map(([k, sp]) => piece(k, sp));
   g.forEach((t, i) => { t.x = i % N; t.y = Math.floor(i / N); });
   S = {level, N: level, ...G.freshClock(), d, g, over: false};
+  if (level) climb = level; else S.timed = false;   // zen isn't timed
   if (d.ms) { S.ms = d.ms; S.started = true; }
   busy = false; picked = -1; effects = []; hint = null; hintAt = now + 6;
   $("levelSel").value = level;
-  G.save(STORE, {level, d}); hud(true); G.note("");
-  if (!d.moves) outOfMoves();   // saved after the last move ran out
+  G.save(STORE, {level, d, climb}); hud(true);
+  $("restartBtn").textContent = level ? "Restart level" : "New board";
+  G.note(level ? "" : `Zen: no goals and no move limit. Pick level ${climb} to carry on with the levels.`, level ? 3500 : 8000);
+  if (level && !d.moves) outOfMoves();   // saved after the last move ran out
 }
 function startLevel(level) {
-  level = Math.min(MAX_LEVEL, Math.max(1, level));
-  G.track(`Pounce level ${level} started`);
+  level = level === 0 ? 0 : Math.min(MAX_LEVEL, Math.max(1, level));
+  G.track(level ? `Pounce level ${level} started` : "Pounce zen started");
   start(level, makeLevel(level));
 }
 for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(n === MAX_LEVEL ? `${n} (hardest)` : String(n), n));
+$("levelSel").append(new Option("Zen (no goals)", 0));
 $("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
-$("restartBtn").onclick = () => { if (S) { G.closeCard(); start(S.level, Object.assign(makeLevel(S.level), {helped: S.d.helped})); } };
+$("restartBtn").onclick = () => { if (S) { G.closeCard(); start(S.level, Object.assign(makeLevel(S.level), {helped: S.d.helped, caught: S.level ? 0 : S.d.caught})); } };
 
 const left = gl => Math.max(0, gl.need - gl.got);
 const toyName = (n, k) => { const many = lookOf(k)[1]; return `${n} ${n !== 1 ? many : {mice: "mouse", fish: "fish"}[many] || many.replace(/s$/, "")}`; };
 function hud(rebuild) {
-  const m = $("moves"), n = S.d.moves;
-  m.textContent = `🐾 ${n} ${n === 1 ? "move" : "moves"}`;
-  m.classList.toggle("low", n > 0 && n <= 3); m.classList.toggle("out", n === 0);
-  const box = $("goals");
+  const m = $("moves"), n = S.d.moves, zen = !S.level, c = S.d.caught || 0;
+  m.textContent = zen ? `✨ ${c} ${c === 1 ? "toy" : "toys"} caught` : `🐾 ${n} ${n === 1 ? "move" : "moves"}`;
+  m.classList.toggle("low", !zen && n > 0 && n <= 3); m.classList.toggle("out", !zen && n === 0);
+  const box = $("goals"); box.hidden = zen;
   if (rebuild || box.children.length !== S.d.goals.length) {
     box.innerHTML = "";
     for (const gl of S.d.goals) box.append(goalChip(gl.k));
@@ -329,7 +335,8 @@ async function trySwap(a, b) {
     G.note("That swap doesn't line up three.", 2000);
     busy = false; hintAt = now + 4; return;
   }
-  S.d.moves--; hud();
+  if (S.level) S.d.moves--;
+  hud();
   if (!await settle(plan)) return;
   busy = false; hintAt = now + 6;
   afterMove();
@@ -347,6 +354,7 @@ async function settle(plan) {
     for (const i of plan.clear) {
       const t = g[i];
       for (const gl of S.d.goals) if (gl.k === t.k && gl.got < gl.need) gl.got++;
+      if (t.k >= 0) S.d.caught = (S.d.caught || 0) + 1;
       effects.push({type: "pop", k: t.k, sp: t.sp, x: t.x, y: t.y, t0: now + (t.sp ? 0 : 0.02 * (i % 5)), dur: 0.32});
       g[i] = null;
     }
@@ -370,8 +378,8 @@ async function settle(plan) {
 }
 function afterMove() {
   save();
-  if (S.d.goals.every(gl => !left(gl))) return win();
-  if (!S.d.moves) return outOfMoves();
+  if (S.level && S.d.goals.every(gl => !left(gl))) return win();
+  if (S.level && !S.d.moves) return outOfMoves();
   if (!findMove(S.g)) {
     G.note("No swaps left, so the toys get a shake.", 3000);
     S.g = remix(S.g, S.d.kinds);
@@ -385,7 +393,7 @@ function win() {
   const result = G.finishClock(S), spare = S.d.moves;
   // A level won without extra moves moves you up; otherwise you play this level again.
   const helped = S.d.helped, next = helped ? S.level : Math.min(MAX_LEVEL, S.level + 1);
-  G.save(STORE, {level: next});
+  climb = next; G.save(STORE, {level: next, climb});
   const spareText = spare ? ` with ${spare} ${spare === 1 ? "move" : "moves"} to spare` : " on the very last move";
   const text = helped ? `Level ${S.level} done. You had some extra moves, so next up is level ${next} again with new toys.`
     : next > S.level ? `Level ${S.level} done${spareText}. Next up: level ${next}.`
@@ -608,12 +616,13 @@ $("helpBtn").onclick = helpCard;
 G.setupTimer({name: "pounce", game: () => S, playing: g => !g.over, save,
   label: n => `Level ${n}`, noun: "level",
   emptyText: "Finish a level and your times will show up here. They're kept on this device only."});
-$("bestBtn").onclick = () => G.showBests("Best times", S ? S.level : 1);
+$("bestBtn").onclick = () => G.showBests("Best times", S && S.level ? S.level : climb);
 
-const saved = G.load(STORE);
-G.reopen(() => { if (saved.d && saved.level <= MAX_LEVEL) start(saved.level, saved.d); else startLevel(saved.level || 1); },
-  why => { startLevel(saved.level || 1); G.note(why, 0); });
-if (!saved.level) helpCard();
+const saved = G.load(STORE), first = saved.level ?? 1;
+climb = saved.climb || saved.level || 1;
+G.reopen(() => { if (saved.d && first <= MAX_LEVEL) start(first, saved.d); else startLevel(first); },
+  why => { startLevel(first); G.note(why, 0); });
+if (saved.level === undefined) helpCard();
 requestAnimationFrame(loop);
 </script>
 <!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
