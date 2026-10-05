@@ -224,12 +224,16 @@ function modelTap(M, i, other) {
 }
 
 /* ---------- levels ---------- */
-// More kinds of toy and more hidden toys as levels go on, while the track holds fewer.
-// `hide` is the chance a basket starts with hidden toys; `split` is how many matching pairs get broken up.
+// Levels get harder until about level 21: more kinds of toy (all nine from level 13), a shorter track
+// (down to five spaces), more hidden toys (`hide`: chance a basket hides some; `deep`: chance it hides
+// all it can), and more matching pairs broken up when dealt (`split`).
 function params(n) {
-  const k = Math.min(8, 3 + ((n - 1) >> 1));
-  return {k, B: k + (n <= 2 ? 2 : 1), C: Math.max(8, 17 - n),
-    hide: n <= 2 ? 0 : Math.min(0.85, (n - 2) * 0.12), split: n <= 3 ? 0 : Math.min(0.5, (n - 3) * 0.07)};
+  const k = Math.min(9, 3 + ((n - 1) >> 1));
+  const C = n <= 9 ? 17 - n : Math.max(5, 8 - ((n - 9) >> 2));
+  return {k, B: k + (n <= 2 ? 2 : 1), C,
+    hide: n <= 2 ? 0 : Math.min(1, (n - 2) * 0.12),
+    deep: n <= 10 ? 0 : Math.min(0.8, (n - 10) * 0.07),
+    split: n <= 3 ? 0 : Math.min(0.8, n <= 10 ? (n - 3) * 0.07 : 0.5 + (n - 10) * 0.03)};
 }
 function cloneModel(M) {
   return {C: M.C, home: M.home.map(t => ({kind: t.kind, hidden: false})),
@@ -283,8 +287,8 @@ function solveModel(M, limit) {
 function makeLevel(n) {
   const P = params(n);
   for (let tries = 0; tries < 300; tries++) {
-    const B = P.B + (tries >= 150 ? 1 : 0);
-    const kinds = shuffle([0, 1, 2, 3, 4, 5, 6, 7, 8]).slice(0, P.k);  // nine kinds, up to eight per level
+    const B = Math.min(10, P.B + (tries >= 150 ? 1 : 0));  // ten basket spots around the track
+    const kinds = shuffle([0, 1, 2, 3, 4, 5, 6, 7, 8]).slice(0, P.k);
     const pairs = shuffle(kinds.flatMap(k => [k, k, k, k]));
     const rows = Array(B).fill(4);
     for (let free = 4 * (B - P.k); free > 0;) { const i = Math.floor(Math.random() * B); if (rows[i] > 2) { rows[i]--; free--; } }
@@ -301,7 +305,7 @@ function makeLevel(n) {
     for (let t = 0; t < 30; t++) {
       hid = toys.map(b => {
         const r = b.length >> 1;  // the front row always shows
-        const h = r >= 2 && Math.random() < P.hide ? 1 + Math.floor(Math.random() * (r - 1)) : 0;
+        const h = r >= 2 && Math.random() < P.hide ? (Math.random() < P.deep ? r - 1 : 1 + Math.floor(Math.random() * (r - 1))) : 0;
         return b.map((_, j) => (j >> 1) < h);
       });
       const kinds = toys.flatMap((b, i) => b.filter((_, j) => hid[i][j]));
