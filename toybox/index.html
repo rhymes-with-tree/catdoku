@@ -156,7 +156,7 @@ function modelClaim(M, b, kind) {
   M.home.splice(M.home.indexOf(t), 1); b.items.push(t);
   return assignHomes(M, M.home.map(x => [x, null]));
 }
-// Find baskets for toys, in order. Each entry is [toy, basket it just left (it won't go straight back)].
+// Find matching baskets for toys, in order. Each entry is [toy, a basket it may not use, or null].
 function assignHomes(M, list) {
   const moved = []; let pend = list, changed = true;
   while (changed && pend.length) {
@@ -177,7 +177,7 @@ function modelTap(M, b) {
   const m = Math.min(runOf(b), M.C - M.home.length); if (!m) return null;
   const released = []; for (let i = 0; i < m; i++) released.push(b.items.pop());
   const revealed = []; revealFront(b, revealed);
-  const moved = assignHomes(M, [...M.home.map(t => [t, null]), ...released.map(t => [t, b])]);
+  const moved = assignHomes(M, [...M.home.map(t => [t, null]), ...released.map(t => [t, null])]);
   return {released, revealed, moved};
 }
 
@@ -338,7 +338,9 @@ function update(dt) {
     for (const b of S.baskets) {
       if (b.gone || mod(b.s - prev, L) >= delta) continue;
       const t = S.slots[j];
-      if (t && t.dest === b) {
+      // A toy dropped in just before its own basket's mouth rolls once round before it can go back in.
+      if (t && t.skip === b) t.skip = null;
+      else if (t && t.dest === b) {
         // Toys promised to a basket are all the same kind, so whichever lands first takes the next cell.
         glide(t, {t: "b", b}, 0.2, () => {
           S.slots[j] = null;
@@ -346,14 +348,11 @@ function update(dt) {
           if (k >= 0 && k < i) { b.items.splice(i, 1); b.items.splice(k, 0, t); }
         });
         t.dest = null; hud();
-      } else if (t && !t.dest) {
-        // A toy with no basket claims the first empty one it rolls past (but not the one it just left).
-        if (t.skip === b) t.skip = null;
-        else if (claimable(b)) {
-          S.home.splice(S.home.indexOf(t), 1); b.items.push(t);
-          glide(t, {t: "b", b}, 0.2, () => { S.slots[j] = null; });
-          rehome(); hud();
-        }
+      } else if (t && !t.dest && claimable(b)) {
+        // A toy with no basket claims the first empty one it rolls past.
+        S.home.splice(S.home.indexOf(t), 1); b.items.push(t);
+        glide(t, {t: "b", b}, 0.2, () => { S.slots[j] = null; });
+        rehome(); hud();
       }
       if (!S.slots[j] && b.queue.length) { const q = b.queue[0]; glide(q, {t: "s", j}, 0.12, () => { b.queue.shift(); S.slots[j] = q; }); }
     }
