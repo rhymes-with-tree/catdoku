@@ -55,7 +55,7 @@
   </div>
 
   <div class="help">
-    <p>Tap a basket to tip its front toys onto the ball track. Toys roll around the track and hop into the first basket whose front toy matches, or into an empty basket.</p>
+    <p>Tap a basket to tip its front toys onto the ball track. Each toy rolls to a basket whose front toy matches, or to an empty basket if none match. Every level can be won.</p>
     <p>Fill a basket with eight of one toy and the basket is carried off, toys and all. If the track fills up and no toy has anywhere to go, the track jams.</p>
   </div>
 </main>
@@ -69,7 +69,7 @@ G.nav("toybox");
 const W = 400, H = 600;          // drawing units; the canvas is scaled to fit
 const R = 14, CELL = 32;         // toy radius and basket cell
 const ROWS = 4, CAP = ROWS * 2;  // a basket holds four rows of two
-const SPEED = 250;               // track speed, units per second
+const SPEED = 420;               // track speed, units per second
 const HELPERS = {shuffle: 1, rainbow: 1, basket: 1};
 const KINDS = [
   {name: "Yarn balls", c: "#D9483B"}, {name: "Jingle balls", c: "#E3A91F"}, {name: "Wiffle balls", c: "#3D8FD6"},
@@ -78,8 +78,6 @@ const KINDS = [
 ];
 const mod = (a, n) => ((a % n) + n) % n;
 const ease = u => 1 - Math.pow(1 - u, 3);
-function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
-  t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 function shuffle(a, rnd = Math.random) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 
 // The track: a rounded loop, travelled clockwise. Positions along it are distances from the top-left.
@@ -117,12 +115,64 @@ const SPOTS = {
 const ORDER = ["T1", "B1", "T0", "T2", "B0", "B2", "IL0", "IR0", "IL1", "IR1"];
 function makeBasket(id) {
   const [x, y, dx, dy] = SPOTS[id];
-  return {id, mx: x, my: y, dx, dy, px: -dy, py: dx, s: nearestS(x, y), items: [], queue: [], clearing: false, clearAt: 0, shakeT: -9};
+  return {id, mx: x, my: y, dx, dy, px: -dy, py: dx, s: nearestS(x, y), items: [], queue: [], done: false, gone: false, clearAt: 0, shakeT: -9};
 }
 const frame = (b, dist, off) => ({x: b.mx + b.dx * dist + b.px * off, y: b.my + b.dy * dist + b.py * off});
 // Toys fill a basket from the back; row 0 is the back row.
 const cellPos = (b, i) => frame(b, 48 + CELL * (ROWS - 1 - (i >> 1)), ((i & 1) - 0.5) * CELL);
 const queuePos = (b, q) => frame(b, 30 - (q >> 1) * 3, ((q & 1) - 0.5) * CELL);
+
+/* ---------- the rules ---------- */
+// The rules are plain functions on {C, baskets, home}, shared by the game and by the solver that
+// checks every level can be won. `home` lists toys on the track with no basket to go to yet.
+// When a toy comes onto the track it is promised a basket straight away: the fullest basket whose
+// front toy matches, or else an empty basket. Toys with neither keep rolling until one opens up.
+function runOf(b) {
+  const it = b.items, n = it.length; if (!n || b.done) return 0;
+  const k = it[n - 1].kind; let r = 0;
+  while (r < n && !it[n - 1 - r].hidden && it[n - 1 - r].kind === k) r++;
+  return r;
+}
+// The front row of a basket is always face up.
+function revealFront(b, out) {
+  const n = b.items.length; if (!n) return;
+  const fr = (n - 1) >> 1;
+  for (const i of [fr * 2, fr * 2 + 1]) if (i < n && b.items[i].hidden) { b.items[i].hidden = false; if (out) out.push(b.items[i]); }
+}
+function bestFor(baskets, kind, skip) {
+  let best = null;
+  for (const b of baskets) {
+    const n = b.items.length;
+    if (!b.done && b !== skip && n && n < 8 && b.items[n - 1].kind === kind && (!best || n > best.items.length)) best = b;
+  }
+  if (best) return best;
+  for (const b of baskets) if (!b.done && b !== skip && !b.items.length) return b;
+  return null;
+}
+// Find baskets for toys, in order. Each entry is [toy, basket it just left (it won't go straight back)].
+function assignHomes(M, list) {
+  const moved = []; let pend = list, changed = true;
+  while (changed && pend.length) {
+    changed = false; const rest = [];
+    for (const e of pend) {
+      const b = bestFor(M.baskets, e[0].kind, e[1]);
+      if (!b) { rest.push(e); continue; }
+      b.items.push(e[0]); moved.push([e[0], b]); changed = true;
+      if (b.items.length === 8 && b.items.every(t => t.kind === b.items[0].kind)) { b.done = true; b.items.forEach(t => { t.hidden = false; }); }
+    }
+    pend = rest;
+  }
+  M.home = pend.map(e => e[0]);
+  return moved;
+}
+// Tap a basket: its front run of matching toys goes onto the track, as many as there's room for.
+function modelTap(M, b) {
+  const m = Math.min(runOf(b), M.C - M.home.length); if (!m) return null;
+  const released = []; for (let i = 0; i < m; i++) released.push(b.items.pop());
+  const revealed = []; revealFront(b, revealed);
+  const moved = assignHomes(M, [...M.home.map(t => [t, null]), ...released.map(t => [t, b])]);
+  return {released, revealed, moved};
+}
 
 /* ---------- levels ---------- */
 // More kinds of toy and more hidden toys as levels go on, while the track holds fewer.
@@ -130,25 +180,63 @@ function params(n) {
   const k = Math.min(8, 3 + ((n - 1) >> 1));
   return {k, B: k + (n <= 2 ? 2 : 1), C: Math.max(8, 17 - n), hide: n <= 2 ? 0 : Math.min(0.6, (n - 2) * 0.08)};
 }
-// Toys are dealt in matching pairs, one pair per row, leaving some rows empty.
-function deal(n, seed) {
-  const rnd = mulberry(seed), P = params(n);
-  for (let tries = 0; ; tries++) {
-    const kinds = shuffle([0, 1, 2, 3, 4, 5, 6, 7], rnd).slice(0, P.k);
-    const pairs = shuffle(kinds.flatMap(k => [k, k, k, k]), rnd);
-    const rows = Array(P.B).fill(ROWS);
-    for (let free = ROWS * (P.B - P.k); free > 0;) { const i = Math.floor(rnd() * P.B); if (rows[i] > 2) { rows[i]--; free--; } }
+function cloneModel(M) {
+  return {C: M.C, home: M.home.map(t => ({kind: t.kind, hidden: false})),
+    baskets: M.baskets.map(b => ({done: b.done, items: b.items.map(t => ({kind: t.kind, hidden: t.hidden}))}))};
+}
+// Search for a way to win, knowing what the hidden toys are. Returns the baskets to tap, in order.
+function solveModel(M, limit) {
+  const seen = new Set(), path = []; let nodes = 0;
+  const key = M => M.baskets.map(b => b.done ? "x" : b.items.map(t => (t.hidden ? "?" : "") + t.kind).join("")).join("|") + "/" + M.home.map(t => t.kind).join("");
+  function dfs(M) {
+    if (!M.home.length && M.baskets.every(b => b.done || !b.items.length)) return true;
+    if (M.home.length >= M.C || ++nodes > limit) return false;
+    const k0 = key(M); if (seen.has(k0)) return false; seen.add(k0);
+    const opts = [];
+    M.baskets.forEach((b, i) => {
+      if (!runOf(b)) return;
+      const k = b.items[b.items.length - 1].kind, uni = b.items.every(t => !t.hidden && t.kind === k), to = bestFor(M.baskets, k, b);
+      if (uni && !(to && to.items.length)) return;  // moving a tidy basket into an empty one changes nothing
+      opts.push([to && to.items.length ? 3 + to.items.length / 8 : to ? 1 : -2, i]);
+    });
+    opts.sort((a, b) => b[0] - a[0]);
+    for (const [, i] of opts) {
+      const N = cloneModel(M);
+      if (!modelTap(N, N.baskets[i])) continue;
+      path.push(i); if (dfs(N)) return true; path.pop();
+    }
+    return false;
+  }
+  return dfs(M) ? path.slice() : null;
+}
+// Deal toys in matching pairs, one pair per row, leaving some rows empty, and keep the deal only if it can be won.
+function makeLevel(n) {
+  const P = params(n);
+  for (let tries = 0; tries < 300; tries++) {
+    const B = P.B + (tries >= 150 ? 1 : 0);
+    const kinds = shuffle([0, 1, 2, 3, 4, 5, 6, 7]).slice(0, P.k);
+    const pairs = shuffle(kinds.flatMap(k => [k, k, k, k]));
+    const rows = Array(B).fill(4);
+    for (let free = 4 * (B - P.k); free > 0;) { const i = Math.floor(Math.random() * B); if (rows[i] > 2) { rows[i]--; free--; } }
     let p = 0;
     const out = rows.map(r => pairs.slice(p, p += r));
-    if (tries < 50 && out.some(b => b.length === ROWS && b.every(x => x === b[0]))) continue;
-    const hid = out.map(b => b.map((_, r) => r < b.length - 1 && rnd() < P.hide));
-    return {P, out, hid};
+    if (out.some(b => b.length === 4 && b.every(x => x === b[0]))) continue;
+    const hid = out.map(b => b.map((_, r) => r < b.length - 1 && Math.random() < P.hide));
+    const M = {C: P.C, home: [], baskets: out.map((rs, i) => {
+      const b = {done: false, items: []};
+      rs.forEach((k, r) => { b.items.push({kind: k, hidden: hid[i][r]}, {kind: k, hidden: hid[i][r]}); });
+      revealFront(b); return b;
+    })};
+    const moves = solveModel(M, 30000);
+    if (moves) return {n, C: P.C, k: P.k, rows: out, hid, moves};
   }
+  return null;
 }
+const build = G.builder([shuffle, runOf, revealFront, bestFor, assignHomes, modelTap, params, cloneModel, solveModel, makeLevel], "makeLevel");
 
 /* ---------- game state ---------- */
 let S = null, effects = [], leaving = [], now = 0;
-const toy = (kind, hidden) => ({kind, hidden, where: null, from: null, t0: 0, dur: 0, spin: Math.random() * 2 * PI, revealT: -9, x: 0, y: 0});
+const toy = (kind, hidden) => ({kind, hidden, where: null, dest: null, from: null, t0: 0, dur: 0, spin: Math.random() * 2 * PI, revealT: -9, x: 0, y: 0});
 const slotS = j => mod(S.offset + j * L / S.C, L);
 function target(t) {
   const w = t.where;
@@ -166,109 +254,116 @@ const settled = t => !t.from || now - t.t0 >= t.dur;
 // Glide a toy from where it's drawn now to its new place. `change` moves it between lists.
 function glide(t, where, dur, change) { const p = renderPos(t); change(); t.from = p; t.t0 = now; t.dur = dur; t.where = where; }
 const inTrack = () => S.slots.filter(Boolean).length + S.baskets.reduce((n, b) => n + b.queue.length, 0);
-const accepts = (b, kind) => !b.clearing && !b.queue.length && b.items.length < CAP && (!b.items.length || b.items[b.items.length - 1].kind === kind);
-// The front row of a basket is always face up.
-function reveal(b) {
-  const n = b.items.length; if (!n) return;
-  const fr = (n - 1) >> 1;
-  for (const i of [fr * 2, fr * 2 + 1]) if (i < n && b.items[i].hidden) { b.items[i].hidden = false; b.items[i].revealT = now; }
+const landed = b => b.items.every(t => t.where.t === "b");
+const live = () => S.baskets.filter(b => !b.gone);
+// After the rules move toys, start them on their way and flip any toys that came face up.
+function settleMoves(res) {
+  for (const [t, b] of res.moved) t.dest = b;
+  for (const t of res.revealed || []) t.revealT = now;
+  // A finished basket shows all its toys, with a flip for any that were still hidden.
+  for (const b of S.baskets) if (b.done && !b.flipped) { b.flipped = true; b.items.forEach(t => { if (t.wasHidden && t.revealT < 0) t.revealT = now; }); }
 }
-function checkFull(b) { if (b.items.length === CAP && b.items.every(t => !t.hidden && t.kind === b.items[0].kind)) b.clearing = true; }
 
-function start(level, seed) {
-  const {P, out, hid} = deal(level, seed);
-  S = {level, seed, C: P.C, k: P.k, baskets: [], slots: Array(P.C).fill(null), offset: 0, sets: 0, helpers: {...HELPERS}, over: false, stuck: 0};
-  out.forEach((rows, bi) => {
+function start(level, d) {
+  S = {level, d, C: d.C, k: d.k, baskets: [], home: [], slots: Array(d.C).fill(null), offset: 0, sets: 0, helpers: {...HELPERS}, over: false, stuck: 0};
+  d.rows.forEach((rows, bi) => {
     const b = makeBasket(ORDER[bi]);
-    rows.forEach((kind, r) => { for (let c = 0; c < 2; c++) { const t = toy(kind, hid[bi][r]); t.where = {t: "b", b}; b.items.push(t); } });
-    reveal(b); S.baskets.push(b);
+    rows.forEach((kind, r) => { for (let c = 0; c < 2; c++) { const t = toy(kind, d.hid[bi][r]); t.wasHidden = t.hidden; t.where = {t: "b", b}; b.items.push(t); } });
+    revealFront(b); S.baskets.push(b);
   });
-  for (const b of S.baskets) for (const t of b.items) { const p = target(t); t.x = p.x; t.y = p.y; t.revealT = -9; }
+  for (const b of S.baskets) for (const t of b.items) { const p = target(t); t.x = p.x; t.y = p.y; }
   effects = []; leaving = [];
-  G.save("toybox.v1", {level, seed});
-  buildBg(); hud();
+  G.save("toybox.v2", {level, d});
+  buildBg(); hud(); G.note("");
+  build.prefetch(level + 1);
 }
-const newSeed = () => Math.floor(Math.random() * 2 ** 31);
+let loading = false;
+function startLevel(level) {
+  loading = true; G.note("Setting out the toys…", 0);
+  return build.take(level).then(d => { loading = false; start(level, d); });
+}
 
 /* ---------- moves ---------- */
 function tap(b) {
-  if (S.over || b.clearing || !b.items.length) return;
-  const n = b.items.length, top = b.items[n - 1];
-  let run = 0;
-  while (run < n && !b.items[n - 1 - run].hidden && b.items[n - 1 - run].kind === top.kind) run++;
-  const m = Math.min(run, S.C - inTrack());
-  if (!m) { b.shakeT = now; G.note("The track is full. Wait for a toy to find a basket."); return; }
-  for (let i = 0; i < m; i++) { const t = b.items[b.items.length - 1]; glide(t, {t: "q", b}, 0.18, () => { b.items.pop(); b.queue.push(t); }); }
-  reveal(b); hud();
+  if (S.over || b.done || b.gone || !b.items.length) return;
+  const nope = msg => { b.shakeT = now; G.note(msg); };
+  if (!landed(b)) return nope("Wait for the toys to land.");
+  const m = Math.min(runOf(b), S.C - S.home.length);
+  if (!m) return nope("The track is full. No toy has a basket to go to.");
+  if (S.C - inTrack() < m) return nope("Hold on, the track is busy.");
+  const from = new Map(b.items.map(t => [t, renderPos(t)]));
+  const res = modelTap(S, b);
+  for (const t of res.released) { b.queue.push(t); t.from = from.get(t); t.t0 = now; t.dur = 0.14; t.where = {t: "q", b}; }
+  settleMoves(res); hud();
 }
 function update(dt) {
   const delta = SPEED * dt;
   S.offset = mod(S.offset + delta, L);
-  // A toy passing a basket's mouth hops in if it fits; a waiting toy hops onto an empty spot as it passes.
+  // A toy passing the basket it was promised hops in; a waiting toy hops onto an empty spot as it passes.
   for (let j = 0; j < S.C; j++) {
     const prev = slotS(j) - delta;
     for (const b of S.baskets) {
-      if (mod(b.s - prev, L) >= delta) continue;
+      if (b.gone || mod(b.s - prev, L) >= delta) continue;
       const t = S.slots[j];
-      if (t && accepts(b, t.kind)) { glide(t, {t: "b", b}, 0.26, () => { S.slots[j] = null; b.items.push(t); }); reveal(b); checkFull(b); hud(); }
-      if (!S.slots[j] && b.queue.length) { const q = b.queue[0]; glide(q, {t: "s", j}, 0.16, () => { b.queue.shift(); S.slots[j] = q; }); }
+      if (t && t.dest === b) { glide(t, {t: "b", b}, 0.2, () => { S.slots[j] = null; }); t.dest = null; hud(); }
+      if (!S.slots[j] && b.queue.length) { const q = b.queue[0]; glide(q, {t: "s", j}, 0.12, () => { b.queue.shift(); S.slots[j] = q; }); }
     }
   }
   // A full basket of one toy waits for its last toy to land, then is carried off with its toys,
   // so finishing a basket never leaves a spare empty one behind.
-  for (const b of [...S.baskets]) {
-    if (!b.clearing) continue;
-    if (!b.clearAt && b.items.every(settled)) b.clearAt = now + 0.25;
+  for (const b of S.baskets) {
+    if (!b.done || b.gone) continue;
+    if (!b.clearAt && landed(b) && b.items.every(settled)) b.clearAt = now + 0.3;
     if (b.clearAt && now >= b.clearAt) {
-      S.baskets.splice(S.baskets.indexOf(b), 1); S.sets++;
+      b.gone = true; S.sets++;
       leaving.push({b, t0: now});
       G.note(`${KINDS[b.items[0].kind].name} all tidied!`); buildBg(); hud();
     }
   }
   if (S.over) return;
-  const left = S.baskets.some(b => b.items.length || b.queue.length) || S.slots.some(Boolean);
+  const left = live().some(b => b.items.length && !b.done || b.queue.length) || S.slots.some(Boolean) || S.baskets.some(b => b.done && !b.gone);
   if (!left && !effects.length && !leaving.length) return win();
-  const jammed = inTrack() >= S.C && S.baskets.every(b => !b.queue.length && !b.clearing) &&
-    S.slots.every(t => t && !S.baskets.some(b => accepts(b, t.kind)));
-  S.stuck = jammed ? S.stuck + dt : 0;
-  if (S.stuck > 0.8) lose();
+  S.stuck = S.home.length >= S.C ? S.stuck + dt : 0;
+  if (S.stuck > 1) lose();
 }
 function pop(t, p, delay) { effects.push({kind: t.kind, x: p.x, y: p.y, spin: t.spin, t0: now + delay, dur: 0.45}); }
 
 function win() {
   S.over = true;
-  const next = S.level + 1, seed = newSeed();
-  G.save("toybox.v1", {level: next, seed});
+  const next = S.level + 1;
+  G.save("toybox.v2", {level: next});
   G.openCard("All tidy!", `Level ${S.level} done. Next up: ${params(next).C} spaces on the track.`,
-    [["Next level", () => { G.closeCard(); start(next, seed); }, true]]);
+    [["Next level", () => { G.closeCard(); startLevel(next); }, true]]);
 }
 function lose() {
   S.over = true;
   const btns = [];
   if (S.helpers.basket && freeSpot()) btns.push([`Add a basket (${S.helpers.basket} left)`, () => { G.closeCard(); addBasket(); }, true]);
   if (S.helpers.rainbow) btns.push([`Use a rainbow (${S.helpers.rainbow} left)`, () => { G.closeCard(); rainbowCard(); }, !btns.length]);
-  btns.push(["Try again", () => { G.closeCard(); start(S.level, S.seed); }, !btns.length]);
+  btns.push(["Try again", () => { G.closeCard(); start(S.level, S.d); }, !btns.length]);
   G.openCard("The track jammed!", "Every space on the track is full and no toy has a basket to go to.", btns);
 }
 const resume = () => { S.over = false; S.stuck = 0; };
+const rehome = () => settleMoves({moved: assignHomes(S, S.home.map(t => [t, null]))});
 
 /* ---------- helpers ---------- */
-const freeSpot = () => ORDER.find(id => !S.baskets.some(b => b.id === id));
+const freeSpot = () => ORDER.find(id => !live().some(b => b.id === id));
 function addBasket() {
   if (!S.helpers.basket) return G.note("No baskets left this level.");
   const id = freeSpot(); if (!id) return G.note("There's no room for another basket.");
-  S.baskets.push(makeBasket(id)); S.helpers.basket--; resume(); buildBg(); hud();
+  S.baskets.push(makeBasket(id)); S.helpers.basket--; rehome(); resume(); buildBg(); hud();
 }
 function doShuffle() {
   if (!S.helpers.shuffle) return G.note("No shuffles left this level.");
-  const bs = S.baskets.filter(b => !b.clearing), pool = shuffle(bs.flatMap(b => b.items.map(t => t.kind)));
+  const bs = live().filter(b => !b.done && landed(b)), pool = shuffle(bs.flatMap(b => b.items.map(t => t.kind)));
   let i = 0;
   for (const b of bs) for (const t of b.items) { t.kind = pool[i++]; if (!t.hidden) t.revealT = now; }
-  bs.forEach(checkFull); S.helpers.shuffle--; hud();
+  for (const b of bs) if (b.items.length === CAP && b.items.every(t => t.kind === b.items[0].kind)) { b.done = true; b.items.forEach(t => { t.hidden = false; }); }
+  S.helpers.shuffle--; rehome(); hud();
 }
 function rainbowCard() {
   if (!S.helpers.rainbow) return G.note("No rainbows left this level.");
-  const all = [...S.baskets.flatMap(b => [...b.items, ...b.queue]), ...S.slots.filter(Boolean)];
+  const all = [...live().filter(b => !b.done).flatMap(b => b.items), ...S.home];
   const kinds = [...new Set(all.map(t => t.kind))].sort((a, b) => a - b);
   const box = document.createElement("div"); box.className = "colors";
   for (const k of kinds) {
@@ -277,20 +372,23 @@ function rainbowCard() {
   }
   G.openCard("Rainbow", "Pick a toy to take away everywhere.", [["Cancel", () => { G.closeCard(); if (S.over && S.stuck) lose(); }]], box);
 }
+// Every toy of one kind goes, except in baskets already finished.
 function rainbow(kind) {
+  const gone = t => t.kind === kind && !(t.dest && t.dest.done) && !(t.where.t === "b" && t.where.b.done);
   const old = new Map();
   for (const b of S.baskets) for (const t of [...b.items, ...b.queue]) old.set(t, renderPos(t));
   S.slots.forEach(t => t && old.set(t, renderPos(t)));
-  for (const [t, p] of old) if (t.kind === kind) pop(t, p, Math.random() * 0.15);
+  for (const [t, p] of old) if (gone(t)) pop(t, p, Math.random() * 0.15);
   for (const b of S.baskets) {
-    b.items = b.items.filter(t => t.kind !== kind); b.queue = b.queue.filter(t => t.kind !== kind);
-    if (b.items.length < CAP) { b.clearing = false; b.clearAt = 0; }
-    reveal(b);
+    if (b.done) continue;
+    b.items = b.items.filter(t => !gone(t)); b.queue = b.queue.filter(t => !gone(t));
+    revealFront(b, null);
   }
-  S.slots = S.slots.map(t => t && t.kind === kind ? null : t);
+  S.home = S.home.filter(t => !gone(t));
+  S.slots = S.slots.map(t => t && gone(t) ? null : t);
   // Toys behind the ones taken away slide forward.
-  for (const [t, p] of old) if (t.kind !== kind) { const g = target(t); if (Math.hypot(g.x - p.x, g.y - p.y) > 1) { t.from = p; t.t0 = now; t.dur = 0.3; } }
-  S.helpers.rainbow--; resume(); hud();
+  for (const [t, p] of old) if (!gone(t)) { const g = target(t); if (Math.hypot(g.x - p.x, g.y - p.y) > 1) { t.from = p; t.t0 = now; t.dur = 0.3; } }
+  S.helpers.rainbow--; rehome(); resume(); hud();
 }
 
 function hud() {
@@ -404,7 +502,7 @@ function buildBg() {
   tracePath(g); g.strokeStyle = "#DED8CC"; g.lineWidth = 32; g.stroke();
   tracePath(g); g.strokeStyle = "#D3CCBE"; g.lineWidth = 22; g.stroke();
   // baskets, each with a little chute onto the track
-  for (const b of S.baskets) drawBasket(g, b);
+  for (const b of live()) drawBasket(g, b);
 }
 function drawBasket(g, b) {
     g.save(); g.translate(b.mx, b.my); g.rotate(Math.atan2(b.dy, b.dx));
@@ -425,7 +523,7 @@ function drawBasket(g, b) {
 function drawRibs() {
   ctx.lineCap = "round";
   for (let s = 24; s < L; s += 58) {
-    if (S.baskets.some(b => Math.abs(mod(s - b.s + L / 2, L) - L / 2) < 42)) continue;
+    if (live().some(b => Math.abs(mod(s - b.s + L / 2, L) - L / 2) < 42)) continue;
     const p = at(s), nx = -Math.sin(p.a), ny = Math.cos(p.a);
     ctx.strokeStyle = "rgba(0,0,0,.14)"; ctx.lineWidth = 6;
     ctx.beginPath(); ctx.moveTo(p.x - nx * 17 + 1, p.y - ny * 17 + 2); ctx.lineTo(p.x + nx * 17 + 1, p.y + ny * 17 + 2); ctx.stroke();
@@ -438,11 +536,11 @@ function draw() {
   if (bg) ctx.drawImage(bg, 0, 0);
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
   const toys = [];
-  for (const b of S.baskets) {
+  for (const b of live()) {
     const age = now - b.shakeT, shake = age < 0.35 ? Math.sin(age * 45) * 3 * (1 - age / 0.35) : 0;
-    for (const t of b.items) toys.push([t, b.px * shake, b.py * shake]);
+    for (const t of b.items) if (t.where.t === "b") toys.push([t, b.px * shake, b.py * shake]);
     for (const t of b.queue) toys.push([t, 0, 0]);
-    if (b.clearing) {
+    if (b.done) {
       ctx.save(); ctx.translate(b.mx, b.my); ctx.rotate(Math.atan2(b.dy, b.dx));
       ctx.strokeStyle = `rgba(255,220,90,${0.6 + 0.4 * Math.sin(now * 12)})`; ctx.lineWidth = 4;
       ctx.beginPath(); ctx.roundRect(24, -40, 144, 80, 12); ctx.stroke(); ctx.restore();
@@ -491,7 +589,8 @@ new ResizeObserver(resize).observe(canvas);
 
 canvas.addEventListener("pointerdown", e => {
   const r = canvas.getBoundingClientRect(), x = (e.clientX - r.left) * W / r.width, y = (e.clientY - r.top) * H / r.height;
-  for (const b of S.baskets) {
+  if (!S) return;
+  for (const b of live()) {
     const u = (x - b.mx) * b.dx + (y - b.my) * b.dy, v = (x - b.mx) * b.px + (y - b.my) * b.py;
     if (u > 8 && u < 172 && Math.abs(v) < 44) return tap(b);
   }
@@ -505,22 +604,24 @@ function loop(t) {
 }
 
 /* ---------- buttons and start ---------- */
-$("shuffleBtn").onclick = () => !S.over && doShuffle();
-$("rainbowBtn").onclick = () => !S.over && rainbowCard();
-$("basketBtn").onclick = () => !S.over && addBasket();
-$("restartBtn").onclick = () => start(S.level, S.seed);
+const ready = () => S && !S.over && !loading;
+$("shuffleBtn").onclick = () => ready() && doShuffle();
+$("rainbowBtn").onclick = () => ready() && rainbowCard();
+$("basketBtn").onclick = () => ready() && addBasket();
+$("restartBtn").onclick = () => S && !loading && start(S.level, S.d);
 function helpCard() {
   G.openCard("How to play", "", [["Let's play", G.closeCard, true]], Object.assign(document.createElement("div"), {innerHTML:
     "<p>Tap a basket to tip its front toys onto the ball track.</p>" +
-    "<p>Toys roll around the track and hop into the first basket whose front toy matches them, or into an empty basket.</p>" +
+    "<p>Each toy rolls round to a basket whose front toy matches it, the fullest one if there's a choice. If no basket matches, it takes an empty basket. If there's none of those either, it keeps rolling until a basket opens up.</p>" +
     "<p>Fill a basket with eight of the same toy and the basket is carried off, toys and all. Tidy every toy to finish the level.</p>" +
+    "<p>Every level can be won.</p>" +
     "<p>The track only holds so many toys, and it gets shorter as levels go on. If it fills up and no toy can find a basket, the track jams.</p>" +
     "<p>Hidden toys (?) turn face up when they reach the front of their basket.</p>"}));
 }
 $("helpBtn").onclick = helpCard;
 
-const saved = G.load("toybox.v1");
-G.reopen(() => start(saved.level || 1, saved.seed || newSeed()), why => { start(1, newSeed()); G.note(why, 0); });
+const saved = G.load("toybox.v2");
+G.reopen(() => { if (saved.d) start(saved.level, saved.d); else startLevel(saved.level || 1); }, why => { startLevel(1).then(() => G.note(why, 0)); });
 if (!saved.level) helpCard();
 requestAnimationFrame(loop);
 </script>

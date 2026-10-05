@@ -39,8 +39,8 @@ Each sunbeam gets a sleeping cat of the right size and shape, stretched out to f
 
 ## Toy Box (prototype)
 
-A sorting game in `toybox/`, not linked from the other pages yet. Tap a wicker basket to tip its front toys onto a winding ball track; the toys roll around and hop into the first basket whose front toy matches, or into an empty one. Fill a basket with eight of one toy and it's carried off, basket and all, so there are fewer baskets to work with as you go.
-The track holds fewer toys as levels go on, and more toys start hidden. If the track fills and nothing can find a basket, it jams. Each level has one shuffle, one rainbow (takes away every toy of one kind) and one extra basket.
+A sorting game in `toybox/`, not linked from the other pages yet. Tap a wicker basket to tip its front toys onto a winding ball track; each toy rolls to a basket whose front toy matches (the fullest, if there's a choice), or to an empty basket if none match. Fill a basket with eight of one toy and it's carried off, basket and all, so there are fewer baskets to work with as you go.
+The track holds fewer toys as levels go on, and more toys start hidden. If the track fills and nothing can find a basket, it jams. Every level is checked by a solver in a background Web Worker before it's dealt, so it can always be won. Each level has one shuffle, one rainbow (takes away every toy of one kind) and one extra basket.
 
 ## License
 
