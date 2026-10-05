@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Toy Box</title>
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css">
+<style>
+/* A living room floor: a winding ball track on the rug, with wicker baskets of toys around it. */
+.wrap.room{height:auto;aspect-ratio:2/3;max-width:calc((100svh - 40px) * 2 / 3)}
+.wrap.room canvas{display:block;width:100%;height:100%;border:3px solid #5C3A22;border-radius:12px;touch-action:manipulation;
+  user-select:none;-webkit-user-select:none;cursor:pointer}
+.status .info{display:flex;align-items:center;gap:10px}
+.meter{position:relative;display:inline-flex;align-items:center;min-width:92px;height:26px;padding:0 10px;border:2px solid var(--ink);
+  border-radius:999px;background:var(--panel);overflow:hidden;font-variant-numeric:tabular-nums}
+.meter .fill{position:absolute;inset:0 auto 0 0;width:0;background:#B3D9A0;transition:width .25s,background .25s}
+.meter.warn .fill{background:#F2C14E}
+.meter.full .fill{background:#E88A7A}
+.meter span{position:relative}
+.helpers button{display:inline-flex;align-items:center;gap:6px}
+.helpers b{display:inline-block;min-width:22px;padding:0 6px;border-radius:999px;background:var(--ink);color:var(--paper);font-size:14px}
+.card .colors{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 14px}
+.card .colors button{color:#fff;border-color:rgba(0,0,0,.35);text-shadow:0 1px 2px rgba(0,0,0,.4);padding:6px 8px}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Toy Box</h1><div class="stripe"></div><p class="tagline">Put every toy back in its basket</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status">
+    <span class="info"><span id="level"></span><span class="meter" id="meter" title="Toys on the track"><span class="fill" id="fill"></span><span id="ctext"></span></span></span>
+    <span class="msg" id="msg" aria-live="polite"></span>
+  </div>
+
+  <div class="wrap room">
+    <canvas id="board" aria-label="Living room with a ball track and baskets of toys. Tap a basket to send its front toys onto the track."></canvas>
+    <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+  </div>
+
+  <div class="actions helpers">
+    <button id="shuffleBtn" title="Mix up the toys in every basket">🔀 Shuffle <b id="shuffleN"></b></button>
+    <button id="rainbowBtn" title="Take away every toy of one kind">🌈 Rainbow <b id="rainbowN"></b></button>
+    <button id="basketBtn" title="Add an empty basket">🧺 Basket <b id="basketN"></b></button>
+  </div>
+  <div class="actions">
+    <button id="restartBtn">Restart level</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+
+  <div class="help">
+    <p>Tap a basket to tip its front toys onto the ball track. Toys roll around the track and hop into the first basket whose front toy matches, or into an empty basket.</p>
+    <p>Fill a basket with eight of one toy to tidy it away. If the track fills up and no toy has anywhere to go, the track jams.</p>
+  </div>
+</main>
+
+<script src="../games.js"></script>
+<script>
+const $ = G.$;
+G.nav("toybox");
+
+/* ---------- sizes and the room ---------- */
+const W = 400, H = 600;          // drawing units; the canvas is scaled to fit
+const R = 14, CELL = 32;         // toy radius and basket cell
+const ROWS = 4, CAP = ROWS * 2;  // a basket holds four rows of two
+const SPEED = 170;               // track speed, units per second
+const HELPERS = {shuffle: 1, rainbow: 1, basket: 1};
+const KINDS = [
+  {name: "Yarn balls", c: "#D9483B"}, {name: "Jingle balls", c: "#E3A91F"}, {name: "Wiffle balls", c: "#3D8FD6"},
+  {name: "Pom-poms", c: "#E765A8"}, {name: "Crinkle balls", c: "#9AA3B2"}, {name: "Catnip balls", c: "#5DB04B"},
+  {name: "Striped balls", c: "#F08A2C"}, {name: "Spotty balls", c: "#8E5AC8"},
+];
+const mod = (a, n) => ((a % n) + n) % n;
+const ease = u => 1 - Math.pow(1 - u, 3);
+function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
+  t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function shuffle(a, rnd = Math.random) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+
+// The track: a rounded loop, travelled clockwise. Positions along it are distances from the top-left.
+const X0 = 30, X1 = 370, Y0 = 190, Y1 = 420, RAD = 40;
+const SEGS = []; let L = 0;
+function line(x0, y0, x1, y1) { const len = Math.hypot(x1 - x0, y1 - y0); SEGS.push({arc: false, x0, y0, x1, y1, len, s: L}); L += len; }
+function arc(cx, cy, a0, a1) { const len = Math.abs(a1 - a0) * RAD; SEGS.push({arc: true, cx, cy, a0, a1, len, s: L}); L += len; }
+const PI = Math.PI;
+line(X0 + RAD, Y0, X1 - RAD, Y0); arc(X1 - RAD, Y0 + RAD, -PI / 2, 0);
+line(X1, Y0 + RAD, X1, Y1 - RAD); arc(X1 - RAD, Y1 - RAD, 0, PI / 2);
+line(X1 - RAD, Y1, X0 + RAD, Y1); arc(X0 + RAD, Y1 - RAD, PI / 2, PI);
+line(X0, Y1 - RAD, X0, Y0 + RAD); arc(X0 + RAD, Y0 + RAD, PI, 3 * PI / 2);
+function at(s) {
+  s = mod(s, L);
+  let g = SEGS[SEGS.length - 1];
+  for (const q of SEGS) if (s < q.s + q.len) { g = q; break; }
+  const u = (s - g.s) / g.len;
+  if (!g.arc) return {x: g.x0 + (g.x1 - g.x0) * u, y: g.y0 + (g.y1 - g.y0) * u, a: Math.atan2(g.y1 - g.y0, g.x1 - g.x0)};
+  const an = g.a0 + (g.a1 - g.a0) * u;
+  return {x: g.cx + RAD * Math.cos(an), y: g.cy + RAD * Math.sin(an), a: an + PI / 2};
+}
+function tracePath(c) {
+  c.beginPath();
+  for (const g of SEGS) { if (g.arc) c.arc(g.cx, g.cy, RAD, g.a0, g.a1); else c.lineTo(g.x1, g.y1); }
+  c.closePath();
+}
+function nearestS(x, y) { let best = 0, bd = 1e9; for (let s = 0; s < L; s += 1) { const p = at(s), d = Math.hypot(p.x - x, p.y - y); if (d < bd) { bd = d; best = s; } } return best; }
+
+// Basket spots: where the basket's mouth meets the track, and which way the basket points from there.
+const SPOTS = {
+  T0: [80, Y0, 0, -1], T1: [200, Y0, 0, -1], T2: [320, Y0, 0, -1],
+  B0: [80, Y1, 0, 1], B1: [200, Y1, 0, 1], B2: [320, Y1, 0, 1],
+  IL0: [X0, 263, 1, 0], IL1: [X0, 354, 1, 0], IR0: [X1, 263, -1, 0], IR1: [X1, 354, -1, 0],
+};
+const ORDER = ["T1", "B1", "T0", "T2", "B0", "B2", "IL0", "IR0", "IL1", "IR1"];
+function makeBasket(id) {
+  const [x, y, dx, dy] = SPOTS[id];
+  return {id, mx: x, my: y, dx, dy, px: -dy, py: dx, s: nearestS(x, y), items: [], queue: [], clearing: false, clearAt: 0, shakeT: -9};
+}
+const frame = (b, dist, off) => ({x: b.mx + b.dx * dist + b.px * off, y: b.my + b.dy * dist + b.py * off});
+// Toys fill a basket from the back; row 0 is the back row.
+const cellPos = (b, i) => frame(b, 48 + CELL * (ROWS - 1 - (i >> 1)), ((i & 1) - 0.5) * CELL);
+const queuePos = (b, q) => frame(b, 30 - (q >> 1) * 3, ((q & 1) - 0.5) * CELL);
+
+/* ---------- levels ---------- */
+// More kinds of toy and more hidden toys as levels go on, while the track holds fewer.
+function params(n) {
+  const k = Math.min(8, 3 + ((n - 1) >> 1));
+  return {k, B: k + (n <= 2 ? 2 : 1), C: Math.max(8, 17 - n), hide: n <= 2 ? 0 : Math.min(0.6, (n - 2) * 0.08)};
+}
+// Toys are dealt in matching pairs, one pair per row, leaving some rows empty.
+function deal(n, seed) {
+  const rnd = mulberry(seed), P = params(n);
+  for (let tries = 0; ; tries++) {
+    const kinds = shuffle([0, 1, 2, 3, 4, 5, 6, 7], rnd).slice(0, P.k);
+    const pairs = shuffle(kinds.flatMap(k => [k, k, k, k]), rnd);
+    const rows = Array(P.B).fill(ROWS);
+    for (let free = ROWS * (P.B - P.k); free > 0;) { const i = Math.floor(rnd() * P.B); if (rows[i] > 2) { rows[i]--; free--; } }
+    let p = 0;
+    const out = rows.map(r => pairs.slice(p, p += r));
+    if (tries < 50 && out.some(b => b.length === ROWS && b.every(x => x === b[0]))) continue;
+    const hid = out.map(b => b.map((_, r) => r < b.length - 1 && rnd() < P.hide));
+    return {P, out, hid};
+  }
+}
+
+/* ---------- game state ---------- */
+let S = null, effects = [], now = 0;
+const toy = (kind, hidden) => ({kind, hidden, where: null, from: null, t0: 0, dur: 0, spin: Math.random() * 2 * PI, revealT: -9, x: 0, y: 0});
+const slotS = j => mod(S.offset + j * L / S.C, L);
+function target(t) {
+  const w = t.where;
+  if (w.t === "b") return cellPos(w.b, w.b.items.indexOf(t));
+  if (w.t === "q") return queuePos(w.b, w.b.queue.indexOf(t));
+  return at(slotS(w.j));
+}
+function renderPos(t) {
+  const g = target(t);
+  if (!t.from || now - t.t0 >= t.dur) return g;
+  const e = ease((now - t.t0) / t.dur);
+  return {x: t.from.x + (g.x - t.from.x) * e, y: t.from.y + (g.y - t.from.y) * e};
+}
+const settled = t => !t.from || now - t.t0 >= t.dur;
+// Glide a toy from where it's drawn now to its new place. `change` moves it between lists.
+function glide(t, where, dur, change) { const p = renderPos(t); change(); t.from = p; t.t0 = now; t.dur = dur; t.where = where; }
+const inTrack = () => S.slots.filter(Boolean).length + S.baskets.reduce((n, b) => n + b.queue.length, 0);
+const accepts = (b, kind) => !b.clearing && !b.queue.length && b.items.length < CAP && (!b.items.length || b.items[b.items.length - 1].kind === kind);
+// The front row of a basket is always face up.
+function reveal(b) {
+  const n = b.items.length; if (!n) return;
+  const fr = (n - 1) >> 1;
+  for (const i of [fr * 2, fr * 2 + 1]) if (i < n && b.items[i].hidden) { b.items[i].hidden = false; b.items[i].revealT = now; }
+}
+function checkFull(b) { if (b.items.length === CAP && b.items.every(t => !t.hidden && t.kind === b.items[0].kind)) b.clearing = true; }
+
+function start(level, seed) {
+  const {P, out, hid} = deal(level, seed);
+  S = {level, seed, C: P.C, k: P.k, baskets: [], slots: Array(P.C).fill(null), offset: 0, sets: 0, helpers: {...HELPERS}, over: false, stuck: 0};
+  out.forEach((rows, bi) => {
+    const b = makeBasket(ORDER[bi]);
+    rows.forEach((kind, r) => { for (let c = 0; c < 2; c++) { const t = toy(kind, hid[bi][r]); t.where = {t: "b", b}; b.items.push(t); } });
+    reveal(b); S.baskets.push(b);
+  });
+  for (const b of S.baskets) for (const t of b.items) { const p = target(t); t.x = p.x; t.y = p.y; t.revealT = -9; }
+  effects = [];
+  G.save("toybox.v1", {level, seed});
+  buildBg(); hud();
+}
+const newSeed = () => Math.floor(Math.random() * 2 ** 31);
+
+/* ---------- moves ---------- */
+function tap(b) {
+  if (S.over || b.clearing || !b.items.length) return;
+  const n = b.items.length, top = b.items[n - 1];
+  let run = 0;
+  while (run < n && !b.items[n - 1 - run].hidden && b.items[n - 1 - run].kind === top.kind) run++;
+  const m = Math.min(run, S.C - inTrack());
+  if (!m) { b.shakeT = now; G.note("The track is full. Wait for a toy to find a basket."); return; }
+  for (let i = 0; i < m; i++) { const t = b.items[b.items.length - 1]; glide(t, {t: "q", b}, 0.22, () => { b.items.pop(); b.queue.push(t); }); }
+  reveal(b); hud();
+}
+function update(dt) {
+  const delta = SPEED * dt;
+  S.offset = mod(S.offset + delta, L);
+  // A toy passing a basket's mouth hops in if it fits; a waiting toy hops onto an empty spot as it passes.
+  for (let j = 0; j < S.C; j++) {
+    const prev = slotS(j) - delta;
+    for (const b of S.baskets) {
+      if (mod(b.s - prev, L) >= delta) continue;
+      const t = S.slots[j];
+      if (t && accepts(b, t.kind)) { glide(t, {t: "b", b}, 0.32, () => { S.slots[j] = null; b.items.push(t); }); reveal(b); checkFull(b); hud(); }
+      if (!S.slots[j] && b.queue.length) { const q = b.queue[0]; glide(q, {t: "s", j}, 0.2, () => { b.queue.shift(); S.slots[j] = q; }); }
+    }
+  }
+  // A full basket of one toy waits for its last toy to land, then is tidied away.
+  for (const b of S.baskets) {
+    if (!b.clearing) continue;
+    if (!b.clearAt && b.items.every(settled)) b.clearAt = now + 0.25;
+    if (b.clearAt && now >= b.clearAt) {
+      const kind = b.items[0].kind;
+      b.items.forEach((t, i) => pop(t, renderPos(t), i * 0.04));
+      b.items = []; b.clearing = false; b.clearAt = 0; S.sets++;
+      G.note(`${KINDS[kind].name} all tidied!`); hud();
+    }
+  }
+  if (S.over) return;
+  const left = S.baskets.some(b => b.items.length || b.queue.length) || S.slots.some(Boolean);
+  if (!left && !effects.length) return win();
+  const jammed = inTrack() >= S.C && S.baskets.every(b => !b.queue.length && !b.clearing) &&
+    S.slots.every(t => t && !S.baskets.some(b => accepts(b, t.kind)));
+  S.stuck = jammed ? S.stuck + dt : 0;
+  if (S.stuck > 0.8) lose();
+}
+function pop(t, p, delay) { effects.push({kind: t.kind, x: p.x, y: p.y, spin: t.spin, t0: now + delay, dur: 0.45}); }
+
+function win() {
+  S.over = true;
+  const next = S.level + 1, seed = newSeed();
+  G.save("toybox.v1", {level: next, seed});
+  G.openCard("All tidy!", `Level ${S.level} done. Next up: ${params(next).C} spaces on the track.`,
+    [["Next level", () => { G.closeCard(); start(next, seed); }, true]]);
+}
+function lose() {
+  S.over = true;
+  const btns = [];
+  if (S.helpers.basket && freeSpot()) btns.push([`Add a basket (${S.helpers.basket} left)`, () => { G.closeCard(); addBasket(); }, true]);
+  if (S.helpers.rainbow) btns.push([`Use a rainbow (${S.helpers.rainbow} left)`, () => { G.closeCard(); rainbowCard(); }, !btns.length]);
+  btns.push(["Try again", () => { G.closeCard(); start(S.level, S.seed); }, !btns.length]);
+  G.openCard("The track jammed!", "Every space on the track is full and no toy has a basket to go to.", btns);
+}
+const resume = () => { S.over = false; S.stuck = 0; };
+
+/* ---------- helpers ---------- */
+const freeSpot = () => ORDER.find(id => !S.baskets.some(b => b.id === id));
+function addBasket() {
+  if (!S.helpers.basket) return G.note("No baskets left this level.");
+  const id = freeSpot(); if (!id) return G.note("There's no room for another basket.");
+  S.baskets.push(makeBasket(id)); S.helpers.basket--; resume(); buildBg(); hud();
+}
+function doShuffle() {
+  if (!S.helpers.shuffle) return G.note("No shuffles left this level.");
+  const bs = S.baskets.filter(b => !b.clearing), pool = shuffle(bs.flatMap(b => b.items.map(t => t.kind)));
+  let i = 0;
+  for (const b of bs) for (const t of b.items) { t.kind = pool[i++]; if (!t.hidden) t.revealT = now; }
+  bs.forEach(checkFull); S.helpers.shuffle--; hud();
+}
+function rainbowCard() {
+  if (!S.helpers.rainbow) return G.note("No rainbows left this level.");
+  const all = [...S.baskets.flatMap(b => [...b.items, ...b.queue]), ...S.slots.filter(Boolean)];
+  const kinds = [...new Set(all.map(t => t.kind))].sort((a, b) => a - b);
+  const box = document.createElement("div"); box.className = "colors";
+  for (const k of kinds) {
+    const btn = document.createElement("button"); btn.textContent = KINDS[k].name; btn.style.background = KINDS[k].c;
+    btn.onclick = () => { G.closeCard(); rainbow(k); }; box.append(btn);
+  }
+  G.openCard("Rainbow", "Pick a toy to take away everywhere.", [["Cancel", () => { G.closeCard(); if (S.over && S.stuck) lose(); }]], box);
+}
+function rainbow(kind) {
+  const old = new Map();
+  for (const b of S.baskets) for (const t of [...b.items, ...b.queue]) old.set(t, renderPos(t));
+  S.slots.forEach(t => t && old.set(t, renderPos(t)));
+  for (const [t, p] of old) if (t.kind === kind) pop(t, p, Math.random() * 0.15);
+  for (const b of S.baskets) {
+    b.items = b.items.filter(t => t.kind !== kind); b.queue = b.queue.filter(t => t.kind !== kind);
+    if (b.items.length < CAP) { b.clearing = false; b.clearAt = 0; }
+    reveal(b);
+  }
+  S.slots = S.slots.map(t => t && t.kind === kind ? null : t);
+  // Toys behind the ones taken away slide forward.
+  for (const [t, p] of old) if (t.kind !== kind) { const g = target(t); if (Math.hypot(g.x - p.x, g.y - p.y) > 1) { t.from = p; t.t0 = now; t.dur = 0.3; } }
+  S.helpers.rainbow--; resume(); hud();
+}
+
+function hud() {
+  $("level").textContent = `Level ${S.level} · ${S.sets}/${S.k} tidy`;
+  const n = inTrack(), m = $("meter");
+  $("ctext").textContent = `🧶 ${n}/${S.C}`;
+  $("fill").style.width = `${100 * n / S.C}%`;
+  m.classList.toggle("warn", n >= S.C * 0.75 && n < S.C); m.classList.toggle("full", n >= S.C);
+  for (const k of ["shuffle", "rainbow", "basket"]) { $(k + "N").textContent = S.helpers[k]; $(k + "Btn").disabled = !S.helpers[k]; }
+  if (!freeSpot()) $("basketBtn").disabled = true;
+}
+
+/* ---------- drawing ---------- */
+const canvas = $("board"), ctx = canvas.getContext("2d");
+let scale = 1, bg = null, sprites = [], hiddenSprite = null, shadeSprite = null;
+const SZ = 2 * R + 6;
+function spriteCanvas(draw) {
+  const c = document.createElement("canvas"); c.width = c.height = Math.ceil(SZ * scale);
+  const g = c.getContext("2d"); g.setTransform(scale, 0, 0, scale, c.width / 2, c.height / 2); draw(g); return c;
+}
+const circle = (g, x, y, r) => { g.beginPath(); g.arc(x, y, r, 0, 2 * PI); };
+// Each toy has its own pattern, so toys can be told apart by more than colour.
+const PATTERNS = [
+  g => { // yarn ball: wound strands
+    g.lineWidth = 1.6;
+    for (let i = 0; i < 5; i++) { g.strokeStyle = "rgba(255,255,255,.4)"; g.beginPath(); g.ellipse(0, 0, R * 0.95, R * (0.2 + i * 0.17), 0.5, 0, 2 * PI); g.stroke(); }
+    for (let i = 0; i < 3; i++) { g.strokeStyle = "rgba(90,10,0,.4)"; g.beginPath(); g.ellipse(0, 0, R * 0.95, R * (0.3 + i * 0.25), 2.1, 0, 2 * PI); g.stroke(); }
+  },
+  g => { // jingle ball: bell slot
+    g.fillStyle = "#7A5A10"; g.beginPath(); g.roundRect(-R * 0.75, -1.6, R * 1.5, 3.2, 1.6); g.fill();
+    circle(g, 0, R * 0.48, 2.4); g.fill(); circle(g, 0, -R * 0.5, 1.8); g.fill();
+  },
+  g => { // wiffle ball: holes
+    g.fillStyle = "rgba(10,40,90,.55)";
+    for (const [x, y] of [[0, 0], [7.5, 0], [-7.5, 0], [3.8, 6.5], [-3.8, 6.5], [3.8, -6.5], [-3.8, -6.5]]) { circle(g, x, y, 2.6); g.fill(); }
+  },
+  g => { // pom-pom: fluffy swirls
+    g.strokeStyle = "rgba(255,255,255,.45)"; g.lineWidth = 1.4;
+    for (let i = 0; i < 8; i++) { const a = i * PI / 4; g.beginPath(); g.arc(Math.cos(a) * 6, Math.sin(a) * 6, 4, a, a + 2.2); g.stroke(); }
+  },
+  g => { // crinkle ball: foil folds
+    g.lineWidth = 1.3;
+    const pts = [[-12, -4], [-5, -9], [2, -3], [9, -9], [12, 2], [4, 5], [-2, 12], [-9, 6]];
+    g.strokeStyle = "rgba(255,255,255,.85)"; g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath(); g.stroke();
+    g.strokeStyle = "rgba(60,70,90,.45)"; g.beginPath();
+    for (const [x, y] of pts) { g.moveTo(0, 0); g.lineTo(x, y); } g.stroke();
+  },
+  g => { // catnip ball: leaves
+    for (const [a, x, y] of [[0.6, -3, -2], [-0.9, 4, 3]]) {
+      g.save(); g.translate(x, y); g.rotate(a);
+      g.fillStyle = "#2F7A2A"; g.beginPath(); g.ellipse(0, 0, 8, 3.8, 0, 0, 2 * PI); g.fill();
+      g.strokeStyle = "rgba(220,255,200,.7)"; g.lineWidth = 1; g.beginPath(); g.moveTo(-7, 0); g.lineTo(7, 0); g.stroke(); g.restore();
+    }
+  },
+  g => { // striped ball
+    g.fillStyle = "#FFF3E0"; g.fillRect(-R, -7, 2 * R, 4); g.fillRect(-R, 3, 2 * R, 4);
+  },
+  g => { // spotty ball
+    g.fillStyle = "rgba(255,255,255,.9)";
+    for (const [x, y, r] of [[0, 0, 3], [7, -5, 2.2], [-7, -5, 2.2], [7, 6, 2.2], [-6, 7, 2.2], [0, -10, 1.8], [-11, 1, 1.8], [11, 1, 1.8]]) { circle(g, x, y, r); g.fill(); }
+  },
+];
+function buildSprites() {
+  sprites = KINDS.map((k, i) => spriteCanvas(g => {
+    if (i === 3) { // pom-poms are fuzzy all round
+      g.fillStyle = k.c; for (let a = 0; a < 2 * PI; a += PI / 9) { circle(g, Math.cos(a) * (R - 2), Math.sin(a) * (R - 2), 3.4); g.fill(); }
+    }
+    circle(g, 0, 0, R); g.fillStyle = k.c; g.fill();
+    g.save(); circle(g, 0, 0, R); g.clip(); PATTERNS[i](g); g.restore();
+  }));
+  hiddenSprite = spriteCanvas(g => { circle(g, 0, 0, R); g.fillStyle = "#3B3442"; g.fill(); });
+  shadeSprite = spriteCanvas(g => {
+    const gr = g.createRadialGradient(-R * 0.35, -R * 0.4, 1, 0, 0, R);
+    gr.addColorStop(0, "rgba(255,255,255,.5)"); gr.addColorStop(0.45, "rgba(255,255,255,0)"); gr.addColorStop(1, "rgba(0,0,0,.2)");
+    circle(g, 0, 0, R); g.fillStyle = gr; g.fill(); g.strokeStyle = "rgba(0,0,0,.28)"; g.lineWidth = 1; g.stroke();
+  });
+}
+function drawToy(kind, hidden, x, y, spin, revealT, size = 1) {
+  let sx = 1, showHidden = hidden;
+  if (now - revealT < 0.3) { const u = (now - revealT) / 0.3; sx = Math.abs(Math.cos(u * PI)); showHidden = u < 0.5; }
+  ctx.save(); ctx.translate(x, y);
+  ctx.fillStyle = "rgba(40,20,0,.18)"; ctx.beginPath(); ctx.ellipse(1.5 * size, 3 * size, R * size, R * 0.9 * size, 0, 0, 2 * PI); ctx.fill();
+  ctx.scale(Math.max(sx, 0.05) * size, size);
+  ctx.rotate(showHidden ? 0 : spin);
+  ctx.drawImage(showHidden ? hiddenSprite : sprites[kind], -SZ / 2, -SZ / 2, SZ, SZ);
+  ctx.rotate(showHidden ? 0 : -spin);
+  ctx.drawImage(shadeSprite, -SZ / 2, -SZ / 2, SZ, SZ);
+  if (showHidden) { ctx.fillStyle = "#fff"; ctx.font = "800 17px 'Baloo 2', system-ui, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("?", 0, 1); }
+  ctx.restore();
+}
+
+// The floor, rug, track and baskets only change when a basket is added, so they're drawn once.
+function buildBg() {
+  if (!S) return;
+  bg = document.createElement("canvas"); bg.width = canvas.width; bg.height = canvas.height;
+  const g = bg.getContext("2d"); g.setTransform(scale, 0, 0, scale, 0, 0);
+  // wooden floor
+  g.fillStyle = "#C9A27A"; g.fillRect(0, 0, W, H);
+  g.strokeStyle = "rgba(90,55,25,.22)"; g.lineWidth = 1.5;
+  for (let y = 0, row = 0; y < H; y += 34, row++) {
+    g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke();
+    for (let x = (row * 137) % 210; x < W; x += 210) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 34); g.stroke(); }
+  }
+  // rug
+  g.fillStyle = "#86ABA6"; g.beginPath(); g.roundRect(4, 150, W - 8, 306, 28); g.fill();
+  g.strokeStyle = "#EADFC8"; g.lineWidth = 3; g.setLineDash([7, 6]); g.beginPath(); g.roundRect(14, 160, W - 28, 286, 20); g.stroke(); g.setLineDash([]);
+  // ball track
+  g.lineJoin = "round";
+  g.save(); g.translate(0, 3); tracePath(g); g.strokeStyle = "rgba(0,0,0,.18)"; g.lineWidth = 46; g.stroke(); g.restore();
+  tracePath(g); g.strokeStyle = "#F6F3EC"; g.lineWidth = 44; g.stroke();
+  tracePath(g); g.strokeStyle = "#DED8CC"; g.lineWidth = 32; g.stroke();
+  tracePath(g); g.strokeStyle = "#D3CCBE"; g.lineWidth = 22; g.stroke();
+  // baskets, each with a little chute onto the track
+  for (const b of S.baskets) {
+    g.save(); g.translate(b.mx, b.my); g.rotate(Math.atan2(b.dy, b.dx));
+    g.fillStyle = "#DED8CC"; g.fillRect(14, -33, 18, 66);
+    g.fillStyle = "#C9C1B3"; g.fillRect(14, -33, 18, 3); g.fillRect(14, 30, 18, 3);
+    g.fillStyle = "rgba(0,0,0,.18)"; g.beginPath(); g.roundRect(27, -36, 142, 78, 10); g.fill();
+    g.fillStyle = "#C68C52"; g.beginPath(); g.roundRect(26, -38, 140, 76, 10); g.fill();
+    g.strokeStyle = "rgba(90,50,15,.45)"; g.lineWidth = 1.2;
+    for (let x = 30; x < 164; x += 6) { g.beginPath(); g.moveTo(x, -37); g.lineTo(x + 3, -33); g.moveTo(x, 37); g.lineTo(x + 3, 33); g.stroke(); }
+    for (let y = -30; y < 32; y += 6) { g.beginPath(); g.moveTo(161, y); g.lineTo(165, y + 3); g.stroke(); }
+    g.fillStyle = "#9C6837"; g.beginPath(); g.roundRect(26, -32, 134, 64, [0, 6, 6, 0]); g.fill();
+    g.strokeStyle = "rgba(255,230,190,.15)"; g.lineWidth = 1;
+    for (let k = 1; k < ROWS; k++) { g.beginPath(); g.moveTo(32 + CELL * k, -30); g.lineTo(32 + CELL * k, 30); g.stroke(); }
+    g.strokeStyle = "#7E5129"; g.lineWidth = 2.5; g.beginPath(); g.roundRect(26, -38, 140, 76, 10); g.stroke();
+    g.restore();
+  }
+}
+// Ribs over the track, skipping basket mouths, so toys look like they roll inside it.
+function drawRibs() {
+  ctx.lineCap = "round";
+  for (let s = 24; s < L; s += 58) {
+    if (S.baskets.some(b => Math.abs(mod(s - b.s + L / 2, L) - L / 2) < 42)) continue;
+    const p = at(s), nx = -Math.sin(p.a), ny = Math.cos(p.a);
+    ctx.strokeStyle = "rgba(0,0,0,.14)"; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(p.x - nx * 17 + 1, p.y - ny * 17 + 2); ctx.lineTo(p.x + nx * 17 + 1, p.y + ny * 17 + 2); ctx.stroke();
+    ctx.strokeStyle = "#FAF8F3"; ctx.lineWidth = 4.5;
+    ctx.beginPath(); ctx.moveTo(p.x - nx * 17, p.y - ny * 17); ctx.lineTo(p.x + nx * 17, p.y + ny * 17); ctx.stroke();
+  }
+}
+function draw() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  if (bg) ctx.drawImage(bg, 0, 0);
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  const toys = [];
+  for (const b of S.baskets) {
+    const age = now - b.shakeT, shake = age < 0.35 ? Math.sin(age * 45) * 3 * (1 - age / 0.35) : 0;
+    for (const t of b.items) toys.push([t, b.px * shake, b.py * shake]);
+    for (const t of b.queue) toys.push([t, 0, 0]);
+    if (b.clearing) {
+      ctx.save(); ctx.translate(b.mx, b.my); ctx.rotate(Math.atan2(b.dy, b.dx));
+      ctx.strokeStyle = `rgba(255,220,90,${0.6 + 0.4 * Math.sin(now * 12)})`; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.roundRect(24, -40, 144, 80, 12); ctx.stroke(); ctx.restore();
+    }
+  }
+  S.slots.forEach(t => t && toys.push([t, 0, 0]));
+  for (const [t, ox, oy] of toys) {
+    const p = renderPos(t), d = Math.hypot(p.x - t.x, p.y - t.y);
+    t.spin += d / R; t.x = p.x; t.y = p.y;
+    drawToy(t.kind, t.hidden, p.x + ox, p.y + oy, t.spin, t.revealT);
+  }
+  drawRibs();
+  effects = effects.filter(e => now < e.t0 + e.dur);
+  for (const e of effects) {
+    if (now < e.t0) { drawToy(e.kind, false, e.x, e.y, e.spin, -9); continue; }
+    const u = (now - e.t0) / e.dur, size = u < 0.3 ? 1 + u : 1.3 * (1 - (u - 0.3) / 0.7);
+    if (size > 0.02) drawToy(e.kind, false, e.x, e.y - u * 10, e.spin + u * 4, -9, size);
+    ctx.fillStyle = KINDS[e.kind].c; ctx.globalAlpha = 1 - u;
+    for (let i = 0; i < 6; i++) { const a = i * PI / 3 + e.spin; circle(ctx, e.x + Math.cos(a) * (10 + u * 22), e.y + Math.sin(a) * (10 + u * 22), 2.5); ctx.fill(); }
+    ctx.globalAlpha = 1;
+  }
+}
+
+function resize() {
+  const r = canvas.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  if (!r.width) return;
+  canvas.width = Math.round(r.width * dpr); canvas.height = Math.round(r.width * 1.5 * dpr);
+  scale = canvas.width / W;
+  buildSprites(); buildBg();
+}
+new ResizeObserver(resize).observe(canvas);
+
+canvas.addEventListener("pointerdown", e => {
+  const r = canvas.getBoundingClientRect(), x = (e.clientX - r.left) * W / r.width, y = (e.clientY - r.top) * H / r.height;
+  for (const b of S.baskets) {
+    const u = (x - b.mx) * b.dx + (y - b.my) * b.dy, v = (x - b.mx) * b.px + (y - b.my) * b.py;
+    if (u > 8 && u < 172 && Math.abs(v) < 44) return tap(b);
+  }
+});
+
+let last = performance.now();
+function loop(t) {
+  const dt = Math.min(0.05, (t - last) / 1000); last = t; now += dt;
+  if (S && sprites.length) { update(dt); draw(); }
+  requestAnimationFrame(loop);
+}
+
+/* ---------- buttons and start ---------- */
+$("shuffleBtn").onclick = () => !S.over && doShuffle();
+$("rainbowBtn").onclick = () => !S.over && rainbowCard();
+$("basketBtn").onclick = () => !S.over && addBasket();
+$("restartBtn").onclick = () => start(S.level, S.seed);
+function helpCard() {
+  G.openCard("How to play", "", [["Let's play", G.closeCard, true]], Object.assign(document.createElement("div"), {innerHTML:
+    "<p>Tap a basket to tip its front toys onto the ball track.</p>" +
+    "<p>Toys roll around the track and hop into the first basket whose front toy matches them, or into an empty basket.</p>" +
+    "<p>Fill a basket with eight of the same toy and it's tidied away. Tidy every toy to finish the level.</p>" +
+    "<p>The track only holds so many toys, and it gets shorter as levels go on. If it fills up and no toy can find a basket, the track jams.</p>" +
+    "<p>Hidden toys (?) turn face up when they reach the front of their basket.</p>"}));
+}
+$("helpBtn").onclick = helpCard;
+
+const saved = G.load("toybox.v1");
+G.reopen(() => start(saved.level || 1, saved.seed || newSeed()), why => { start(1, newSeed()); G.note(why, 0); });
+if (!saved.level) helpCard();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

@@ -37,6 +37,11 @@ Patches with a button come already sewn. Every quilt is generated in the browser
 A fourth puzzle in `sunbeams/`, a cat-themed Shikaku: every number is a cat, and each cat needs a rectangle of sunlight with exactly that many squares, until the whole floor is sunny.
 Each sunbeam gets a sleeping cat of the right size and shape, stretched out to fill it. The cat pictures live in `cats/` so any game can use them.
 
+## Toy Box (prototype)
+
+A sorting game in `toybox/`, not linked from the other pages yet. Tap a wicker basket to tip its front toys onto a winding ball track; the toys roll around and hop into the first basket whose front toy matches, or into an empty one. Fill a basket with eight of one toy to tidy it away.
+The track holds fewer toys as levels go on, and more toys start hidden. If the track fills and nothing can find a basket, it jams. Each level has one shuffle, one rainbow (takes away every toy of one kind) and one extra basket.
+
 ## License
 
 The code is under the [MIT License](LICENSE), so you're welcome to learn from it and reuse it.
