@@ -72,11 +72,27 @@ const R = 14, CELL = 32;         // toy radius and basket cell
 const ROWS = 4, CAP = ROWS * 2;  // a basket holds four rows of two
 const SPEED = 420;               // track speed, units per second
 const HELPERS = {shake: 1, shuffle: 1, rainbow: 1, basket: 1};
+// Eight kinds of toy, one per colour so they're easy to tell apart. Some colours have more than one
+// toy picture; each level picks one of them. Pictures live in toys/, cut out on a clear background.
 const KINDS = [
-  {name: "Yarn balls", c: "#D9483B"}, {name: "Jingle balls", c: "#E3A91F"}, {name: "Wiffle balls", c: "#3D8FD6"},
-  {name: "Pom-poms", c: "#E765A8"}, {name: "Crinkle balls", c: "#9AA3B2"}, {name: "Catnip balls", c: "#5DB04B"},
-  {name: "Striped balls", c: "#F08A2C"}, {name: "Spotty balls", c: "#8E5AC8"},
+  {c: "#D9483B", looks: [["wiffle", "Wiffle balls"], ["tinsel", "Tinsel balls"]]},
+  {c: "#E765A8", looks: [["knit", "Knitted balls"]]},
+  {c: "#8E5AC8", looks: [["pompom", "Pom-poms"]]},
+  {c: "#5DB04B", looks: [["lattice", "Lattice balls"]]},
+  {c: "#3D8FD6", looks: [["spring", "Spring balls"], ["cage", "Cage balls"]]},
+  {c: "#6E8CC4", looks: [["swirl", "Swirl balls"]]},
+  {c: "#8A8590", looks: [["paw", "Paw balls"], ["mouse", "Mice"]]},
+  {c: "#E08A2C", bg: "linear-gradient(90deg,#E5484D,#F2A33A,#5DB04B,#3D8FD6,#8E5AC8)", looks: [["feather", "Feather balls"], ["spiky", "Spiky balls"], ["pastel", "Rainbow balls"]]},
 ];
+const TOY_SRC = {};  // filled with embedded pictures when the page is bundled into one file
+const toyImgs = {};
+for (const k of KINDS) for (const [f] of k.looks) {
+  const img = new Image();
+  img.onload = () => { toyImgs[f] = img; if (sprites.length) buildSprites(); };
+  img.src = TOY_SRC[f] || `toys/${f}.png`;
+}
+const lookOf = kind => KINDS[kind].looks[(S && S.d.look ? S.d.look[kind] : 0) || 0];
+const nameOf = kind => lookOf(kind)[1];
 const mod = (a, n) => ((a % n) + n) % n;
 const ease = u => 1 - Math.pow(1 - u, 3);
 function shuffle(a, rnd = Math.random) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
@@ -289,6 +305,7 @@ function settleMoves(res) {
 }
 
 function start(level, d) {
+  if (!d.look) d.look = KINDS.map(k => Math.floor(Math.random() * k.looks.length));
   S = {level, d, C: d.C, k: d.k, baskets: [], home: [], slots: Array(d.C).fill(null), offset: 0, sets: 0, helpers: {...HELPERS}, over: false, stuck: 0};
   d.rows.forEach((rows, bi) => {
     const b = makeBasket(ORDER[bi]);
@@ -370,7 +387,7 @@ function update(dt) {
     if (b.clearAt && now >= b.clearAt) {
       b.gone = true; S.sets++;
       leaving.push({b, t0: now});
-      G.note(`${KINDS[b.items[0].kind].name} all tidied!`); buildBg(); hud();
+      G.note(`${nameOf(b.items[0].kind)} all tidied!`); buildBg(); hud();
     }
   }
   if (S.over) return;
@@ -438,7 +455,7 @@ function rainbowCard() {
   const kinds = [...new Set(all.map(t => t.kind))].sort((a, b) => a - b);
   const box = document.createElement("div"); box.className = "colors";
   for (const k of kinds) {
-    const btn = document.createElement("button"); btn.textContent = KINDS[k].name; btn.style.background = KINDS[k].c;
+    const btn = document.createElement("button"); btn.textContent = nameOf(k); btn.style.background = KINDS[k].bg || KINDS[k].c;
     btn.onclick = () => { G.closeCard(); rainbow(k); }; box.append(btn);
   }
   G.openCard("Rainbow", "Pick a toy to take away everywhere.", [["Cancel", () => { G.closeCard(); if (S.over && S.stuck) lose(); }]], box);
@@ -474,7 +491,7 @@ function hud() {
 
 /* ---------- drawing ---------- */
 const canvas = $("board"), ctx = canvas.getContext("2d");
-let scale = 1, bg = null, sprites = [], hiddenSprite = null, shadeSprite = null;
+let scale = 1, bg = null, sprites = [], imgSprites = {}, hiddenSprite = null, shadeSprite = null;
 const SZ = 2 * R + 6;
 function spriteCanvas(draw) {
   const c = document.createElement("canvas"); c.width = c.height = Math.ceil(SZ * scale);
@@ -530,6 +547,8 @@ function buildSprites() {
     circle(g, 0, 0, R); g.fillStyle = k.c; g.fill();
     g.save(); circle(g, 0, 0, R); g.clip(); PATTERNS[i](g); g.restore();
   }));
+  // Pictures fill a little more than the ball's circle, since each one has a small clear margin.
+  for (const f in toyImgs) imgSprites[f] = spriteCanvas(g => g.drawImage(toyImgs[f], -SZ / 2, -SZ / 2, SZ, SZ));
   hiddenSprite = spriteCanvas(g => { circle(g, 0, 0, R); g.fillStyle = "#3B3442"; g.fill(); });
   shadeSprite = spriteCanvas(g => {
     const gr = g.createRadialGradient(-R * 0.35, -R * 0.4, 1, 0, 0, R);
@@ -544,9 +563,10 @@ function drawToy(kind, hidden, x, y, spin, revealT, size = 1) {
   ctx.fillStyle = "rgba(40,20,0,.18)"; ctx.beginPath(); ctx.ellipse(1.5 * size, 3 * size, R * size, R * 0.9 * size, 0, 0, 2 * PI); ctx.fill();
   ctx.scale(Math.max(sx, 0.05) * size, size);
   ctx.rotate(showHidden ? 0 : spin);
-  ctx.drawImage(showHidden ? hiddenSprite : sprites[kind], -SZ / 2, -SZ / 2, SZ, SZ);
+  const pic = !showHidden && imgSprites[lookOf(kind)[0]];
+  ctx.drawImage(showHidden ? hiddenSprite : pic || sprites[kind], -SZ / 2, -SZ / 2, SZ, SZ);
   ctx.rotate(showHidden ? 0 : -spin);
-  ctx.drawImage(shadeSprite, -SZ / 2, -SZ / 2, SZ, SZ);
+  if (!pic) ctx.drawImage(shadeSprite, -SZ / 2, -SZ / 2, SZ, SZ);  // photos bring their own light
   if (showHidden) { ctx.fillStyle = "#fff"; ctx.font = "800 17px 'Baloo 2', system-ui, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("?", 0, 1); }
   ctx.restore();
 }
