@@ -48,7 +48,7 @@
     <button id="shakeBtn" aria-pressed="false" title="Shake one basket to rearrange its toys">🫨 Shake <b id="shakeN"></b></button>
     <button id="shuffleBtn" title="Mix up the toys in every basket">🔀 Shuffle <b id="shuffleN"></b></button>
     <button id="rainbowBtn" title="Take away every toy of one kind">🌈 Rainbow <b id="rainbowN"></b></button>
-    <button id="basketBtn" title="Add an empty basket">🧺 Basket <b id="basketN"></b></button>
+    <button id="basketBtn" title="Add a small basket that holds two toys">🧺 Small basket <b id="basketN"></b></button>
   </div>
   <div class="actions">
     <button id="restartBtn">Restart level</button>
@@ -114,13 +114,15 @@ const SPOTS = {
   IL0: [X0, 263, 1, 0], IL1: [X0, 354, 1, 0], IR0: [X1, 263, -1, 0], IR1: [X1, 354, -1, 0],
 };
 const ORDER = ["T1", "B1", "T0", "T2", "B0", "B2", "IL0", "IR0", "IL1", "IR1"];
-function makeBasket(id) {
+// A full basket holds four rows of two; the small helper basket holds one row.
+function makeBasket(id, rows = ROWS) {
   const [x, y, dx, dy] = SPOTS[id];
-  return {id, mx: x, my: y, dx, dy, px: -dy, py: dx, s: nearestS(x, y), items: [], queue: [], done: false, gone: false, clearAt: 0, shakeT: -9};
+  return {id, rows, cap: rows * 2, mx: x, my: y, dx, dy, px: -dy, py: dx, s: nearestS(x, y), items: [], queue: [], done: false, gone: false, clearAt: 0, shakeT: -9};
 }
+const basketEnd = b => 38 + CELL * b.rows;  // how far the basket reaches from the track
 const frame = (b, dist, off) => ({x: b.mx + b.dx * dist + b.px * off, y: b.my + b.dy * dist + b.py * off});
 // Toys fill a basket from the back; row 0 is the back row.
-const cellPos = (b, i) => frame(b, 48 + CELL * (ROWS - 1 - (i >> 1)), ((i & 1) - 0.5) * CELL);
+const cellPos = (b, i) => frame(b, 48 + CELL * (b.rows - 1 - (i >> 1)), ((i & 1) - 0.5) * CELL);
 const queuePos = (b, q) => frame(b, 30 - (q >> 1) * 3, ((q & 1) - 0.5) * CELL);
 
 /* ---------- the rules ---------- */
@@ -141,11 +143,14 @@ function revealFront(b, out) {
   const fr = (n - 1) >> 1;
   for (const i of [fr * 2, fr * 2 + 1]) if (i < n && b.items[i].hidden) { b.items[i].hidden = false; if (out) out.push(b.items[i]); }
 }
+// Full-size baskets come first (the fullest of them), then a small basket.
 function bestFor(baskets, kind, skip) {
   let best = null;
+  const cap = b => b.cap || 8;
   for (const b of baskets) {
     const n = b.items.length;
-    if (!b.done && b !== skip && n && n < 8 && b.items[n - 1].kind === kind && (!best || n > best.items.length)) best = b;
+    if (b.done || b === skip || !n || n >= cap(b) || b.items[n - 1].kind !== kind) continue;
+    if (!best || cap(b) > cap(best) || cap(b) === cap(best) && n > best.items.length) best = b;
   }
   return best;
 }
@@ -371,7 +376,7 @@ function update(dt) {
   if (S.over) return;
   const left = live().some(b => b.items.length && !b.done || b.queue.length) || S.slots.some(Boolean) || S.baskets.some(b => b.done && !b.gone);
   if (!left && !effects.length && !leaving.length) return win();
-  S.stuck = S.home.length >= S.C && !live().some(claimable) ? S.stuck + dt : 0;
+  S.stuck = S.home.length >= S.C && !live().some(claimable) && !picking && !$("overlay").classList.contains("show") ? S.stuck + dt : 0;
   if (S.stuck > 1) lose();
 }
 function pop(t, p, delay) { effects.push({kind: t.kind, x: p.x, y: p.y, spin: t.spin, t0: now + delay, dur: 0.45}); }
@@ -385,9 +390,12 @@ function win() {
 }
 function lose() {
   S.over = true;
-  const btns = [];
-  if (S.helpers.basket && freeSpot()) btns.push([`Add a basket (${S.helpers.basket} left)`, () => { G.closeCard(); addBasket(); }, true]);
-  if (S.helpers.rainbow) btns.push([`Use a rainbow (${S.helpers.rainbow} left)`, () => { G.closeCard(); rainbowCard(); }, !btns.length]);
+  const btns = [], h = S.helpers, use = fn => () => { G.closeCard(); resume(); fn(); };
+  if (h.shake) btns.push([`🫨 Shake a basket (${h.shake} left)`, use(() => pickShake(true))]);
+  if (h.shuffle) btns.push([`🔀 Shuffle (${h.shuffle} left)`, use(doShuffle)]);
+  if (h.rainbow) btns.push([`🌈 Rainbow (${h.rainbow} left)`, use(rainbowCard)]);
+  if (h.basket && freeSpot()) btns.push([`🧺 Small basket (${h.basket} left)`, use(addBasket)]);
+  if (btns.length) btns[0][2] = true;
   btns.push(["Try again", () => { G.closeCard(); start(S.level, S.d); }, !btns.length]);
   G.openCard("The track jammed!", "Every space on the track is full and no toy has a basket to go to.", btns);
 }
@@ -396,10 +404,11 @@ const rehome = () => settleMoves({moved: assignHomes(S, S.home.map(t => [t, null
 
 /* ---------- helpers ---------- */
 const freeSpot = () => ORDER.find(id => !live().some(b => b.id === id));
+// A small basket for one pair of toys: somewhere to park them, though it's never tidied away itself.
 function addBasket() {
-  if (!S.helpers.basket) return G.note("No baskets left this level.");
+  if (!S.helpers.basket) return G.note("No small baskets left this level.");
   const id = freeSpot(); if (!id) return G.note("There's no room for another basket.");
-  S.baskets.push(makeBasket(id)); S.helpers.basket--; rehome(); resume(); buildBg(); hud();
+  S.baskets.push(makeBasket(id, 1)); S.helpers.basket--; rehome(); resume(); buildBg(); hud();
 }
 function doShuffle() {
   if (!S.helpers.shuffle) return G.note("No shuffles left this level.");
@@ -407,7 +416,7 @@ function doShuffle() {
   let i = 0;
   for (const b of bs) for (const t of b.items) { t.kind = pool[i++]; if (!t.hidden) t.revealT = now; }
   for (const b of bs) if (b.items.length === CAP && b.items.every(t => t.kind === b.items[0].kind)) { b.done = true; b.items.forEach(t => { t.hidden = false; }); }
-  S.helpers.shuffle--; rehome(); hud();
+  S.helpers.shuffle--; rehome(); resume(); hud();
 }
 // Shake: pick a basket and its toys tumble into a new order.
 let picking = false;
@@ -567,18 +576,19 @@ function buildBg() {
   for (const b of live()) drawBasket(g, b);
 }
 function drawBasket(g, b) {
+    const e = basketEnd(b);
     g.save(); g.translate(b.mx, b.my); g.rotate(Math.atan2(b.dy, b.dx));
     g.fillStyle = "#DED8CC"; g.fillRect(14, -33, 18, 66);
     g.fillStyle = "#C9C1B3"; g.fillRect(14, -33, 18, 3); g.fillRect(14, 30, 18, 3);
-    g.fillStyle = "rgba(0,0,0,.18)"; g.beginPath(); g.roundRect(27, -36, 142, 78, 10); g.fill();
-    g.fillStyle = "#C68C52"; g.beginPath(); g.roundRect(26, -38, 140, 76, 10); g.fill();
+    g.fillStyle = "rgba(0,0,0,.18)"; g.beginPath(); g.roundRect(27, -36, e - 24, 78, 10); g.fill();
+    g.fillStyle = "#C68C52"; g.beginPath(); g.roundRect(26, -38, e - 26, 76, 10); g.fill();
     g.strokeStyle = "rgba(90,50,15,.45)"; g.lineWidth = 1.2;
-    for (let x = 30; x < 164; x += 6) { g.beginPath(); g.moveTo(x, -37); g.lineTo(x + 3, -33); g.moveTo(x, 37); g.lineTo(x + 3, 33); g.stroke(); }
-    for (let y = -30; y < 32; y += 6) { g.beginPath(); g.moveTo(161, y); g.lineTo(165, y + 3); g.stroke(); }
-    g.fillStyle = "#9C6837"; g.beginPath(); g.roundRect(26, -32, 134, 64, [0, 6, 6, 0]); g.fill();
+    for (let x = 30; x < e - 2; x += 6) { g.beginPath(); g.moveTo(x, -37); g.lineTo(x + 3, -33); g.moveTo(x, 37); g.lineTo(x + 3, 33); g.stroke(); }
+    for (let y = -30; y < 32; y += 6) { g.beginPath(); g.moveTo(e - 5, y); g.lineTo(e - 1, y + 3); g.stroke(); }
+    g.fillStyle = "#9C6837"; g.beginPath(); g.roundRect(26, -32, e - 32, 64, [0, 6, 6, 0]); g.fill();
     g.strokeStyle = "rgba(255,230,190,.15)"; g.lineWidth = 1;
-    for (let k = 1; k < ROWS; k++) { g.beginPath(); g.moveTo(32 + CELL * k, -30); g.lineTo(32 + CELL * k, 30); g.stroke(); }
-    g.strokeStyle = "#7E5129"; g.lineWidth = 2.5; g.beginPath(); g.roundRect(26, -38, 140, 76, 10); g.stroke();
+    for (let k = 1; k < b.rows; k++) { g.beginPath(); g.moveTo(32 + CELL * k, -30); g.lineTo(32 + CELL * k, 30); g.stroke(); }
+    g.strokeStyle = "#7E5129"; g.lineWidth = 2.5; g.beginPath(); g.roundRect(26, -38, e - 26, 76, 10); g.stroke();
     g.restore();
 }
 // Ribs over the track, skipping basket mouths, so toys look like they roll inside it.
@@ -605,7 +615,7 @@ function draw() {
     if (b.done) {
       ctx.save(); ctx.translate(b.mx, b.my); ctx.rotate(Math.atan2(b.dy, b.dx));
       ctx.strokeStyle = `rgba(255,220,90,${0.6 + 0.4 * Math.sin(now * 12)})`; ctx.lineWidth = 4;
-      ctx.beginPath(); ctx.roundRect(24, -40, 144, 80, 12); ctx.stroke(); ctx.restore();
+      ctx.beginPath(); ctx.roundRect(24, -40, basketEnd(b) - 22, 80, 12); ctx.stroke(); ctx.restore();
     }
   }
   S.slots.forEach(t => t && toys.push([t, 0, 0]));
@@ -617,7 +627,7 @@ function draw() {
   drawRibs();
   leaving = leaving.filter(l => now < l.t0 + 0.55);
   for (const {b, t0} of leaving) {
-    const u = (now - t0) / 0.55, sc = u < 0.25 ? 1 + u * 0.3 : 1.075 * (1 - ease((u - 0.25) / 0.75)), c = frame(b, 96, 0);
+    const u = (now - t0) / 0.55, sc = u < 0.25 ? 1 + u * 0.3 : 1.075 * (1 - ease((u - 0.25) / 0.75)), c = frame(b, 32 + CELL * b.rows / 2, 0);
     ctx.save(); ctx.globalAlpha = Math.min(1, 2 * (1 - u));
     ctx.translate(c.x, c.y - u * 24); ctx.scale(sc, sc); ctx.translate(-c.x, -c.y);
     drawBasket(ctx, b);
@@ -654,7 +664,7 @@ canvas.addEventListener("pointerdown", e => {
   if (!S) return;
   for (const b of live()) {
     const u = (x - b.mx) * b.dx + (y - b.my) * b.dy, v = (x - b.mx) * b.px + (y - b.my) * b.py;
-    if (u > 8 && u < 172 && Math.abs(v) < 44) return picking ? shakeBasket(b) : tap(b);
+    if (u > 8 && u < basketEnd(b) + 6 && Math.abs(v) < 44) return picking ? shakeBasket(b) : tap(b);
   }
 });
 
@@ -684,7 +694,7 @@ function helpCard() {
     "<p>Every level can be won if you time it right.</p>" +
     "<p>The track only holds so many toys, and it gets shorter as levels go on. If it fills up and no toy can find a basket, the track jams.</p>" +
     "<p>Hidden toys (?) turn face up when they reach the front of their basket.</p>" +
-    "<p>Helpers: Shake rearranges the toys in one basket you pick. Shuffle mixes up every basket. Rainbow takes away every toy of one kind. Basket adds an empty basket.</p>"}));
+    "<p>Helpers: Shake rearranges the toys in one basket you pick. Shuffle mixes up every basket. Rainbow takes away every toy of one kind. Small basket adds a little basket that holds two toys.</p>"}));
 }
 $("helpBtn").onclick = helpCard;
 
