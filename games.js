@@ -277,6 +277,39 @@ const G = (() => {
     ]);
   }
 
+  /* ---------- choosing toys ---------- */
+  // The toy pictures a game uses, in colour order (each colour is one kind of toy). Tap one to leave it
+  // out. o: {kinds (each {looks: [[picture, name]…]}), off (picture names left out), min (colours that
+  // must keep a picture), src(picture) for its address, save(off)}.
+  function toyPicker(o) {
+    const off = new Set(o.off), media = document.createElement("div"), grid = document.createElement("div");
+    const tip = document.createElement("p"); tip.className = "tip"; tip.textContent = "Tap a toy to leave it out.";
+    grid.className = "toypick";
+    for (const k of o.kinds) for (const [f, name] of k.looks) {
+      const b = document.createElement("button"), img = document.createElement("img");
+      img.src = o.src(f); img.alt = "";
+      b.append(img); b.title = name[0].toUpperCase() + name.slice(1);
+      b.setAttribute("aria-label", b.title); b.setAttribute("aria-pressed", String(!off.has(f)));
+      b.onclick = () => { off.has(f) ? off.delete(f) : off.add(f); b.setAttribute("aria-pressed", String(!off.has(f))); check(); };
+      grid.append(b);
+    }
+    const count = document.createElement("p"); count.className = "pickNote"; count.setAttribute("aria-live", "polite");
+    media.append(tip, grid, count);
+    openCard("Your toys", "", [["Save", () => { closeCard(); o.save(off); }, true], ["Cancel", closeCard]], media);
+    const save = $("card").querySelector(".btns button");
+    function check() {
+      const n = o.kinds.filter(k => k.looks.some(([f]) => !off.has(f))).length, short = n < o.min;
+      save.disabled = short; count.classList.toggle("bad", short);
+      count.textContent = short ? `Keep toys in at least ${o.min} colours (${n} now).` : `${n} of ${o.kinds.length} colours in play.`;
+    }
+    check();
+  }
+  // Which of a kind's pictures to show, picked from those not left out (any, if all are).
+  function pickLook(k, off) {
+    const ok = k.looks.map((_, j) => j).filter(j => !off.has(k.looks[j][0])), from = ok.length ? ok : k.looks.map((_, j) => j);
+    return from[Math.floor(Math.random() * from.length)];
+  }
+
   let msgTimer = null;
   function note(text, ms) {
     clearTimeout(msgTimer);
@@ -309,5 +342,5 @@ const G = (() => {
   }
 
   return {$, nav, load, save, builder, openCard, closeCard, winCard, sizeUp, otherSize, note, cellAt, track, reopen,
-          setupTimer, freshClock, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard};
+          setupTimer, freshClock, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, toyPicker, pickLook};
 })();

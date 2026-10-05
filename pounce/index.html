@@ -44,14 +44,6 @@
 .card ol.steps li{margin:0 0 8px}
 .card .tip{font-size:14px;margin:0 0 14px}
 .card .goals{width:auto;margin:0 0 16px}
-.toypick{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin:0 0 12px}
-.toypick button{padding:2px;border:2px solid var(--line);border-radius:10px;background:#fff;width:46px;height:46px}
-.toypick button img{display:block;width:100%;height:100%;transition:opacity .15s,filter .15s}
-.toypick button[aria-pressed="false"]{border-color:var(--line);border-style:dashed;background:none;color:inherit}
-.toypick button[aria-pressed="false"] img{opacity:.22;filter:grayscale(1)}
-.toypick button[aria-pressed="true"]{background:#fff;color:inherit}
-.card .pickNote{font-size:14px;margin:0 0 14px;font-weight:600}
-.card .pickNote.bad{color:#B23A28}
 </style>
 </head>
 <body>
@@ -82,7 +74,7 @@
   </div>
 
   <div class="help">
-    <p>Swap two toys next to each other to line up three or more of a kind. Catch the toys shown above before your moves run out.</p>
+    <p>Swap two toys next to each other to line up three or more of a kind.<span id="goalHelp"> Catch the toys shown above before your moves run out.</span></p>
   </div>
 </main>
 
@@ -292,6 +284,7 @@ function start(level, d) {
   $("levelSel").value = level;
   G.save(STORE, {level, d, climb}); hud(true);
   $("restartBtn").textContent = level ? "Restart level" : "New board";
+  $("goalHelp").hidden = !level;   // zen has no toys to catch
   G.note(level ? "" : `Zen: no goals and no move limit. Pick level ${climb} to carry on with the levels.`, level ? 3500 : 8000);
   if (level && !d.moves) outOfMoves();   // saved after the last move ran out
 }
@@ -634,42 +627,11 @@ function helpCard() {
 $("helpBtn").onclick = helpCard;
 
 /* ---------- choosing toys ---------- */
-// Every toy picture, in colour order (each colour is one kind of toy). Tap one to leave it out.
-function toysCard() {
-  const off = new Set(offToys), media = document.createElement("div"), grid = document.createElement("div");
-  const tip = document.createElement("p"); tip.className = "tip";
-  tip.textContent = "Tap a toy to leave it out.";
-  grid.className = "toypick";
-  for (const k of KINDS) {   // in colour order
-    for (const [f, name] of k.looks) {
-      const b = document.createElement("button"), img = document.createElement("img");
-      img.src = toySrc(f); img.alt = "";
-      b.append(img); b.title = name[0].toUpperCase() + name.slice(1);
-      b.setAttribute("aria-pressed", String(!off.has(f)));
-      b.setAttribute("aria-label", b.title);
-      b.onclick = () => { off.has(f) ? off.delete(f) : off.add(f); b.setAttribute("aria-pressed", String(!off.has(f))); check(); };
-      grid.append(b);
-    }
-  }
-  const note = document.createElement("p"); note.className = "pickNote"; note.setAttribute("aria-live", "polite");
-  media.append(tip, grid, note);
-  const apply = () => {
-    offToys = off; G.save(TOYS_PREF, {off: [...off]}); G.closeCard();
-    const uses = S && S.d.kinds.some(k => off.has(lookOf(k)[0]));
-    if (uses && !S.over) { newBoard(); G.note("Here's a new board with your toys.", 4000); }
-    else G.note("Saved. Your toys are used from the next board.", 4000);
-  };
-  G.openCard("Your toys", "", [["Save", apply, true], ["Cancel", G.closeCard]], media);
-  const save = $("card").querySelector(".btns button");
-  function check() {
-    const n = KINDS.filter(k => k.looks.some(([f]) => !off.has(f))).length;
-    save.disabled = n < MIN_COLOURS;
-    note.classList.toggle("bad", n < MIN_COLOURS);
-    note.textContent = n < MIN_COLOURS ? `Keep toys in at least ${MIN_COLOURS} colours (${n} now).` : `${n} of ${KINDS.length} colours in play.`;
-  }
-  check();
-}
-$("toysBtn").onclick = toysCard;
+$("toysBtn").onclick = () => G.toyPicker({kinds: KINDS, off: offToys, min: MIN_COLOURS, src: toySrc, save: off => {
+  offToys = off; G.save(TOYS_PREF, {off: [...off]});
+  if (S && !S.over && S.d.kinds.some(k => off.has(lookOf(k)[0]))) { newBoard(); G.note("Here's a new board with your toys.", 4000); }
+  else G.note("Saved. Your toys are used from the next board.", 4000);
+}});
 G.setupTimer({name: "pounce", game: () => S, playing: g => !g.over, save,
   label: n => `Level ${n}`, noun: "level",
   emptyText: "Finish a level and your times will show up here. They're kept on this device only."});

@@ -72,6 +72,7 @@
     <button id="basketBtn" title="Add a little basket that holds two toys">🧺 Add a small basket <b id="basketN"></b></button>
   </div>
   <div class="actions">
+    <button id="toysBtn">Toys</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
   </div>
@@ -382,7 +383,7 @@ function flipDone(b) { if (b.done && !b.flipped) { b.flipped = true; b.items.for
 function start(level, d) {
   // A level saved by another version of this page may use kinds this one doesn't have.
   if (d.toys && d.toys.some(b => b.some(k => !KINDS[k]))) throw new Error("the saved level is from another version of the game");
-  if (!d.look) d.look = KINDS.map(k => Math.floor(Math.random() * k.looks.length));
+  if (!d.look) d.look = KINDS.map(k => G.pickLook(k, offToys));
   S = {level, N: level, ...G.freshClock(), d, C: d.C, k: d.k, baskets: [], slots: Array(d.C).fill(null), offset: 0, sets: 0, helpers: {...HELPERS}, over: false, stuck: 0};
   if (!d.toys) {  // levels saved before toys were dealt one at a time listed rows of pairs
     d.toys = d.rows.map(rs => rs.flatMap(k => [k, k])); d.hid = d.hid.map(hs => hs.flatMap(h => [h, h])); delete d.rows;
@@ -410,7 +411,7 @@ function startLevel(level) {
   level = Math.min(MAX_LEVEL, Math.max(1, level));
   loading = true; G.note("Setting out the toys…", 0);
   G.track(`Toy Box level ${level} started`);
-  return build.take(level).then(d => { loading = false; start(level, d); });
+  return build.take(level).then(d => { loading = false; start(level, fitToys(d)); });
 }
 
 /* ---------- moves ---------- */
@@ -870,6 +871,30 @@ function helpCard() {
   G.openCard("How to play", "", [["Let's play", G.closeCard, true]], media);
 }
 $("helpBtn").onclick = helpCard;
+
+/* ---------- choosing toys ---------- */
+// Toy pictures the player has left out, kept on this device. The bigger levels use nine of the ten
+// colours, so at most one whole colour can go.
+const TOYS_PREF = "catdoku.toybox.toys.v1", MIN_COLOURS = 9;
+let offToys = new Set(G.load(TOYS_PREF).off || []);
+// Fit a dealt level to the player's toys: a colour left out swaps with a kept colour the level doesn't
+// use (to the solver kinds are only labels, so it can still be won), and each colour shows a kept picture.
+function fitToys(d) {
+  const keep = KINDS.map((_, k) => k).filter(k => KINDS[k].looks.some(([f]) => !offToys.has(f)));
+  const used = [...new Set(d.toys.flat())], spare = keep.filter(k => !used.includes(k)), map = {};
+  for (const k of used) if (!keep.includes(k) && spare.length) map[k] = spare.shift();
+  d.toys = d.toys.map(b => b.map(k => map[k] ?? k));
+  if (d.moves) d.moves = d.moves.map(m => Array.isArray(m) && typeof m[1] === "number" ? [m[0], map[m[1]] ?? m[1]] : m);
+  d.look = KINDS.map(k => G.pickLook(k, offToys));
+  return d;
+}
+$("toysBtn").onclick = () => G.toyPicker({kinds: KINDS, off: offToys, min: MIN_COLOURS,
+  src: f => TOY_SRC[f] || `../toys/${f}.webp?v=${window.SITE_BUILD || ""}`, save: off => {
+  offToys = off; G.save(TOYS_PREF, {off: [...off]});
+  const uses = S && [...new Set(S.d.toys.flat())].some(k => off.has(lookOf(k)[0]));
+  if (uses && !loading && !S.over) { pickShake(false); start(S.level, fitToys(S.d)); G.note("The level starts again with your toys.", 4000); }
+  else G.note("Saved. Your toys are used from the next level.", 4000);
+}});
 G.setupTimer({name: "toybox", game: () => S, playing: g => !g.over && !loading, save: () => {},
   label: n => `Level ${n}`, noun: "level",
   emptyText: "Finish a level and your times will show up here. They're kept on this device only."});
