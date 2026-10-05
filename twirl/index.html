@@ -24,13 +24,17 @@
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../games.css?v=2026-10-05.6">
 <style>
-/* A play mat strewn with ribbons; each one slides off the way its arrow points, along its own path. */
+/* A play mat covered in satin ribbons; each one slides off the way its pointed end points, along its own path.
+   Big mats zoom, and scroll inside their frame. */
 .wrap.mat{height:auto}
-.wrap.mat canvas{display:block;width:100%;height:100%;border:3px solid var(--ink);border-radius:12px;touch-action:manipulation;
-  user-select:none;-webkit-user-select:none;cursor:pointer;background:var(--panel)}
+.scroller{overflow:auto;border:3px solid var(--ink);border-radius:12px;background:var(--panel);touch-action:none;
+  user-select:none;-webkit-user-select:none;overscroll-behavior:contain}
+.scroller canvas{display:block;margin:0 auto;cursor:pointer}
 .status .info{display:flex;align-items:center;gap:10px}
 .hearts{font-size:20px;letter-spacing:1px;color:var(--fuchsia-plum)}
 .hearts .lost{color:var(--line)}
+.zoom{display:flex;gap:6px;align-items:center}
+.zoom button{padding:2px 12px;min-width:40px}
 .card ol.steps{text-align:left;margin:0 0 14px;padding-left:24px;color:var(--ink);font-size:16px;line-height:1.35}
 .card ol.steps li{margin:0 0 8px}
 </style>
@@ -42,11 +46,7 @@
 
   <div class="bar">
     <label>Level <select id="levelSel" aria-label="Level"></select></label>
-    <label>Colors
-      <select id="shades" aria-label="How close the ribbon colors are">
-        <option value="wide">Wide range</option><option value="medium">Medium</option><option value="veryclose">Very close</option>
-      </select>
-    </label>
+    <span class="zoom" aria-label="Zoom"><button id="zoomOut" aria-label="Zoom out">−</button><button id="zoomFit">Fit</button><button id="zoomIn" aria-label="Zoom in">+</button></span>
   </div>
 
   <div class="status">
@@ -55,7 +55,9 @@
   </div>
 
   <div class="wrap mat" id="wrap">
-    <canvas id="board" aria-label="Ribbons on a play mat. Tap a ribbon to pull it off the way its arrow points."></canvas>
+    <div class="scroller" id="scroller">
+      <canvas id="board" aria-label="Ribbons covering a play mat. Tap a ribbon to pull it off the way its pointed end points."></canvas>
+    </div>
     <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
   </div>
 
@@ -66,7 +68,8 @@
   </div>
 
   <div class="help">
-    <p>Tap a ribbon to pull it off the mat the way its arrow points. It only comes off if nothing is in the way of its arrow. A blocked tap costs a life.</p>
+    <p>Tap a ribbon to pull it off the mat the way its pointed end points. It only comes off if nothing is in the way. A blocked tap costs a life.</p>
+    <p>Pinch or use − and + to zoom; drag to look around.</p>
   </div>
 </main>
 
@@ -77,114 +80,171 @@ const $ = G.$;
 G.nav("twirl");
 
 /* ---------- levels (plain functions, also run in a background worker) ---------- */
-// Levels get bigger mats, longer ribbons and fuller mats as they go, up to level 20: from 8 × 13 squares
-// to 16 × 26.
+// Levels run from an 18 × 27 mat of shorter, tidier ribbons to a 28 × 42 mat of long, winding ones that
+// mostly point the long way across, so few can move at once.
 function params(n) {
-  const W = 7 + Math.ceil(n * 9 / 20);
-  return {W, H: Math.round(W * 1.6), maxLen: 6 + (n >> 1), fill: Math.min(0.92, 0.8 + n * 0.006)};
+  const t = (n - 1) / 19, W = Math.round(18 + 10 * t);
+  return {W, H: Math.round(W * 1.5), shapes: 0.35 - 0.1 * t, minLen: Math.round(4 + 6 * t), maxLen: Math.round(14 + 26 * t),
+          straight: 0.5 - 0.3 * t, ease: 0.6 * (1 - t)};
 }
-// The free run from (x, y) in direction d to the edge of the mat: true if no ribbon is in the way.
-function laneFree(W, H, occ, x, y, d) {
-  const dx = [0, 1, 0, -1][d], dy = [-1, 0, 1, 0][d];
-  for (x += dx, y += dy; x >= 0 && y >= 0 && x < W && y < H; x += dx, y += dy) if (occ[y * W + x] >= 0) return false;
-  return true;
-}
-// Ribbons are laid one at a time, each only where it could slide out past the ones already there. Taking
-// them out in the opposite order always works, so every mat can be cleared. New ribbons are laid across
-// the way out of ribbons that are still free where they can be, so most toys start out blocked. A ribbon
-// is its squares from tail to handle; the handle points the way it last went.
+// 1. Cover the whole mat with ribbons: shapes first (coils, spirals, staircases, zigzags), then winding
+//    paths that hug what's already there, so nothing is left bare.
+// 2. Point each ribbon, then play the board through, taking off any ribbon whose way out is clear. If
+//    nothing can move, turn one ribbon round (or, as a last resort, cut one in two) so that something
+//    can, picking the one whose way out opened up latest so the board stays tight from the start. The
+//    playthrough is a solution, so every board can be cleared; it's played through again to be sure.
+// A ribbon is its squares from tail to tip, and `dir` is the way its tip points (0 up, 1 right, 2 down, 3 left).
 function makeTwirl(n) {
-  const {W, H, maxLen, fill} = params(n);
-  const nb = i => { const x = i % W, y = (i / W) | 0, out = [];
-    if (y > 0) out.push(i - W); if (x < W - 1) out.push(i + 1); if (y < H - 1) out.push(i + W); if (x > 0) out.push(i - 1); return out; };
+  const o = params(n), {W, H} = o, N = W * H, DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
+  const rand = k => Math.floor(Math.random() * k);
+  const nb = i => { const x = i % W, y = (i / W) | 0, r = []; if (y > 0) r.push(i - W); if (x < W - 1) r.push(i + 1); if (y < H - 1) r.push(i + W); if (x > 0) r.push(i - 1); return r; };
   const dirOf = (a, b) => b === a - W ? 0 : b === a + 1 ? 1 : b === a + W ? 2 : 3;
-  const lane = (occ, h, d) => { const out = [], dx = [0, 1, 0, -1][d], dy = [-1, 0, 1, 0][d];
-    for (let x = h % W + dx, y = ((h / W) | 0) + dy; x >= 0 && y >= 0 && x < W && y < H; x += dx, y += dy) out.push(y * W + x); return out; };
-  let best = null;
-  for (let attempt = 0; attempt < 6; attempt++) {
-    const occ = new Int16Array(W * H).fill(-1), dead = new Uint8Array(W * H), ribbons = [], free = i => occ[i] < 0;
-    let filled = 0;
-    for (let fails = 0; fails < 300 && filled < fill * W * H;) {
-      // squares in the way out of ribbons that can still leave
-      const inLane = new Uint8Array(W * H);
-      for (const r of ribbons) { const h = r[r.length - 1], ln = lane(occ, h, dirOf(r[r.length - 2], h)); if (ln.every(free)) ln.forEach(i => inLane[i] = 1); }
-      let low = 99, starts = [];
-      for (let i = 0; i < W * H; i++) if (free(i) && !dead[i]) {
-        const k = nb(i).filter(free).length; if (!k) continue;
-        const score = k + (inLane[i] ? 0 : 2);
-        if (score < low) { low = score; starts = [i]; } else if (score === low) starts.push(i);
+  const SHAPES = [
+    () => { const a = 3 + rand(6), k = 2 + rand(4), m = []; for (let i = 0; i < k; i++) { for (let j = 0; j < a; j++) m.push(i % 2 ? 3 : 1); if (i < k - 1) m.push(2); } return m; },     // coil
+    () => { const a = 3 + rand(4), m = []; for (let len = a, leg = 0; len > 0; leg++) { const d = [1, 2, 3, 0][leg % 4]; for (let j = 0; j < len; j++) m.push(d); if (leg >= 2 && leg % 2 === 0) len--; } return m; },   // spiral
+    () => { const s = 1 + rand(2), k = 3 + rand(5), m = []; for (let i = 0; i < k; i++) { for (let j = 0; j < s; j++) m.push(1); m.push(2); } return m; },     // staircase
+    () => { const k = 3 + rand(5), m = []; for (let i = 0; i < k; i++) m.push(1, i % 2 ? 2 : 0); return m; },     // zigzag
+  ];
+  function cover() {
+    const own = new Int32Array(N).fill(-1), paths = [], bare = i => own[i] < 0, bareN = i => nb(i).filter(bare).length;
+    for (let shapeCells = 0, t = 0; shapeCells < o.shapes * N && t < 600; t++) {
+      const moves = SHAPES[rand(4)](), rot = rand(4), flip = Math.random() < 0.5;
+      let p = [rand(N)]; if (!bare(p[0])) continue;
+      for (const m0 of moves) {
+        const m = ((flip && (m0 === 1 || m0 === 3) ? 4 - m0 : m0) + rot) % 4, h = p[p.length - 1];
+        const x = h % W + DX[m], y = ((h / W) | 0) + DY[m], j = y * W + x;
+        if (x < 0 || y < 0 || x >= W || y >= H || !bare(j) || p.includes(j)) { p = null; break; }
+        p.push(j);
       }
-      if (!starts.length) break;
-      const start = starts[Math.floor(Math.random() * starts.length)];
-      let placed = false;
-      for (let tries = 0; tries < 12 && !placed; tries++) {
-        const want = 2 + Math.floor(Math.random() * (maxLen - 1)), path = [start];
-        let d = -1;
-        while (path.length < want) {
-          const here = path[path.length - 1], opts = nb(here).filter(j => free(j) && !path.includes(j));
-          if (!opts.length) break;
-          const straight = opts.find(j => dirOf(here, j) === d);
-          const next = straight !== undefined && Math.random() < 0.45 ? straight : opts[Math.floor(Math.random() * opts.length)];
-          d = dirOf(here, next); path.push(next);
-        }
-        if (path.length < 2) break;
-        for (const i of path) occ[i] = ribbons.length;
-        // the handle goes on whichever end can get out, mostly the one facing across the mat, since a
-        // long way out is more likely to be crossed by ribbons laid later
-        const far = p => { const h = p[p.length - 1]; return lane(occ, h, dirOf(p[p.length - 2], h)).length + Math.random() * 4; };
-        const ends = [path, path.slice().reverse()].sort((p, q) => far(q) - far(p));
-        const ok = ends.find(p => { const h = p[p.length - 1]; return lane(occ, h, dirOf(p[p.length - 2], h)).every(free); });
-        if (ok) { ribbons.push(ok); filled += ok.length; placed = true; }
-        else for (const i of path) occ[i] = -1;
-      }
-      if (!placed) { dead[start] = 1; fails++; }
+      if (!p) continue;
+      p.forEach(i => own[i] = paths.length); paths.push(p); shapeCells += p.length;
     }
-    if (!best || filled > best.filled) best = {filled, ribbons};
-    if (filled >= fill * W * H * 0.97) break;
+    for (;;) {   // winding paths, moving on to the square with the fewest bare neighbours
+      let low = 9, starts = [];
+      for (let i = 0; i < N; i++) if (bare(i)) { const k = bareN(i); if (k < low) { low = k; starts = [i]; } else if (k === low) starts.push(i); }
+      if (!starts.length) break;
+      const p = [starts[rand(starts.length)]], want = o.minLen + rand(o.maxLen - o.minLen + 1);
+      own[p[0]] = paths.length;
+      let d = -1;
+      while (p.length < want) {
+        const h = p[p.length - 1], opts = nb(h).filter(bare);
+        if (!opts.length) break;
+        opts.sort((a, b) => bareN(a) - bareN(b) + (Math.random() - 0.5) * 1.5);
+        const straight = opts.find(j => d >= 0 && dirOf(h, j) === d);
+        const next = straight !== undefined && Math.random() < o.straight ? straight : opts[0];
+        d = dirOf(h, next); own[next] = paths.length; p.push(next);
+      }
+      paths.push(p);
+    }
+    for (let k = 0; k < paths.length; k++) {   // a lone square joins a ribbon ending next to it, where it can
+      if (paths[k].length > 1) continue;
+      const i = paths[k][0], host = paths.findIndex((q, h) => h !== k && q.length > 1 && (nb(i).includes(q[0]) || nb(i).includes(q[q.length - 1])));
+      if (host < 0) continue;
+      const q = paths[host]; if (nb(i).includes(q[0])) q.unshift(i); else q.push(i);
+      paths.splice(k, 1); k--;
+    }
+    return paths;
   }
-  return {n, W, H, ribbons: best.ribbons};
+  function settle(paths) {
+    const occ = new Int32Array(N).fill(-1), clearedAt = new Int32Array(N).fill(-1);
+    const rb = paths.map((cells, k) => { cells.forEach(i => occ[i] = k); return {cells, dir: cells.length > 1 ? dirOf(cells[cells.length - 2], cells[cells.length - 1]) : rand(4)}; });
+    const walk = (h, d, f) => { for (let x = h % W + DX[d], y = ((h / W) | 0) + DY[d]; x >= 0 && y >= 0 && x < W && y < H; x += DX[d], y += DY[d]) if (f(y * W + x) === false) return false; return true; };
+    const laneLen = (h, d) => { let k = 0; walk(h, d, () => { k++; }); return k; };
+    const clear = (h, d) => walk(h, d, i => occ[i] < 0);
+    const late = (h, d) => { let m = -1; walk(h, d, i => { m = Math.max(m, clearedAt[i]); }); return m; };
+    const head = r => r.cells[r.cells.length - 1];
+    const turn = r => { r.cells.reverse(); r.dir = dirOf(r.cells[r.cells.length - 2], head(r)); };
+    for (const r of rb) {   // point each ribbon: hard boards the long way across, easy ones often toward the nearer edge
+      if (r.cells.length === 1) continue;
+      const now = laneLen(head(r), r.dir), back = laneLen(r.cells[0], dirOf(r.cells[1], r.cells[0])), near = Math.random() < o.ease;
+      if ((near && back < now) || (!near && back > now)) turn(r);
+    }
+    const gone = new Set(); let step = 0;
+    while (gone.size < rb.length) {
+      const live = []; for (let k = 0; k < rb.length; k++) if (!gone.has(k)) live.push(k);
+      const free = live.filter(k => clear(head(rb[k]), rb[k].dir));
+      if (free.length) {
+        const k = free[rand(free.length)]; gone.add(k); step++;
+        rb[k].cells.forEach(i => { occ[i] = -1; clearedAt[i] = step; });
+        continue;
+      }
+      // stuck: of every way to turn a ribbon round or cut one in two so an end can get out, take the one
+      // whose way out opened latest. Cutting is a last resort, and never leaves a one-square scrap if it can help it.
+      let best = null;
+      const offer = (score, fn) => { score += Math.random() * 0.5; if (!best || score > best.score) best = {score, fn}; };
+      const cutCost = (a, b) => 3 + (a.length < 2 || b.length < 2 ? 40 : a.length < 4 || b.length < 4 ? 6 : 0);
+      for (const k of live) {
+        const r = rb[k], c = r.cells;
+        if (c.length === 1) { for (let d = 0; d < 4; d++) if (clear(c[0], d)) offer(late(c[0], d), () => { r.dir = d; }); continue; }
+        const bd = dirOf(c[1], c[0]);
+        if (clear(c[0], bd)) offer(late(c[0], bd), () => turn(r));
+        for (let i = 0; i < c.length - 1; i++) {
+          const a = c.slice(0, i + 1), b = c.slice(i + 1);
+          if (a.length > 1) { const d = dirOf(a[a.length - 2], a[a.length - 1]); if (clear(a[a.length - 1], d)) offer(late(a[a.length - 1], d) - cutCost(a, b), () => {
+            rb[k] = {cells: b, dir: r.dir}; rb.push({cells: a, dir: d}); a.forEach(j => occ[j] = rb.length - 1); }); }
+          if (b.length > 1) { const d = dirOf(b[1], b[0]); if (clear(b[0], d)) offer(late(b[0], d) - cutCost(a, b), () => {
+            const back = b.slice().reverse();
+            rb[k] = {cells: a, dir: a.length > 1 ? dirOf(a[a.length - 2], a[a.length - 1]) : r.dir};
+            rb.push({cells: back, dir: d}); back.forEach(j => occ[j] = rb.length - 1); }); }
+        }
+      }
+      if (!best) return null;
+      best.fn();
+    }
+    return rb;
+  }
+  function solvable(rb) {   // play it through once more, from scratch, as the player would
+    const occ = new Int32Array(N).fill(-1), gone = new Set();
+    rb.forEach((r, k) => r.cells.forEach(i => occ[i] = k));
+    const free = r => { const h = r.cells[r.cells.length - 1]; for (let x = h % W + DX[r.dir], y = ((h / W) | 0) + DY[r.dir]; x >= 0 && y >= 0 && x < W && y < H; x += DX[r.dir], y += DY[r.dir]) if (occ[y * W + x] >= 0) return false; return true; };
+    for (let moved = true; moved;) {
+      moved = false;
+      rb.forEach((r, k) => { if (!gone.has(k) && free(r)) { gone.add(k); r.cells.forEach(i => occ[i] = -1); moved = true; } });
+    }
+    return gone.size === rb.length;
+  }
+  for (;;) { const rb = settle(cover()); if (rb && solvable(rb)) return {n, W, H, ribbons: rb}; }
 }
-const build = G.builder([params, laneFree, makeTwirl], "makeTwirl");
+const build = G.builder([params, makeTwirl], "makeTwirl");
 
-/* ---------- colors ---------- */
-// Ribbons take shades from one of Yarn's colorways. Ribbons that touch get shades far apart on it, so
-// on Very close, side-by-side ribbons are what makes it hard.
-const SETS = {wide: VARIEGATED, medium: BLENDS, veryclose: COLORWAYS}, SHADES_N = 7;
-function dye(d, shades, name) {
-  const ramps = SETS[shades] || SETS.wide, names = Object.keys(ramps);
-  d.colorway = ramps[name] ? name : names[Math.floor(Math.random() * names.length)];
-  if (!d.shade) {   // which shade each ribbon wears stays the same when the colors change
-    const {W} = d, owner = new Map(); d.ribbons.forEach((r, k) => r.forEach(i => owner.set(i, k)));
-    const touch = d.ribbons.map((r, k) => new Set(r.flatMap(i => [i - W, i + W, i % W ? i - 1 : -1, (i + 1) % W ? i + 1 : -1])
-      .map(j => owner.get(j)).filter(o => o !== undefined && o !== k)));
-    d.shade = [];
-    d.ribbons.forEach((_, k) => {
-      const near = [...touch[k]].filter(o => d.shade[o] !== undefined).map(o => d.shade[o]);
-      // the shade furthest from every touching ribbon's, with a little chance in it
-      const score = Array.from({length: SHADES_N}, (_, s) => (near.length ? Math.min(...near.map(o => Math.abs(o - s))) : 0) + Math.random() * 0.9);
-      d.shade[k] = score.indexOf(Math.max(...score));
-    });
-  }
-  const ramp = ramps[d.colorway];
-  d.colors = Array.from({length: SHADES_N}, (_, s) => rampAt(ramp, s / (SHADES_N - 1)));
+/* ---------- how each ribbon looks ---------- */
+// Every ribbon wears its own colourway, as different as can be from the ribbons it touches. As levels go
+// on, more ribbons shade through their colourway along their length (ombré) and fewer are twisty, so
+// they get harder to follow and to tell apart.
+const RAMPS = [...Object.values(VARIEGATED), ...Object.values(BLENDS), ...Object.values(COLORWAYS)];
+const clamp01 = v => Math.max(0, Math.min(1, v));
+const labDist = (a, b) => { const p = hexLab(a), q = hexLab(b); return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]); };
+function dress(d) {
+  const {W, ribbons} = d, owner = new Map(), ombre = clamp01((d.n - 4) / 12), twisty = 0.45 * (1 - clamp01((d.n - 2) / 14));
+  ribbons.forEach((r, k) => r.cells.forEach(i => owner.set(i, k)));
+  d.looks = [];
+  ribbons.forEach((r, k) => {
+    const near = new Set(r.cells.flatMap(i => [i - W, i + W, i % W ? i - 1 : -1, (i + 1) % W ? i + 1 : -1]).map(j => owner.get(j)).filter(o => o !== undefined && o < k));
+    let best = null, bestD = -1;
+    for (let t = 0; t < 10; t++) {
+      const ramp = Math.floor(Math.random() * RAMPS.length), at = 0.35 + Math.random() * 0.5, solid = rampAt(RAMPS[ramp], at);
+      const dist = Math.min(9, ...[...near].map(o => labDist(solid, d.looks[o].solid)));
+      if (dist > bestD) { bestD = dist; best = {ramp, solid}; }
+    }
+    d.looks[k] = {...best, ombre: Math.random() < ombre, twist: Math.random() < twisty, phase: Math.random() * 6};
+  });
 }
-const mixHex = (a, b, f) => labHex(hexLab(a).map((v, k) => v + (hexLab(b)[k] - v) * f));
 
 /* ---------- playing ---------- */
-const STORE = "catdoku.twirl.v1", MAX_LEVEL = 20, HEARTS = 3, MAX_LIVES = 9;
-let saved = G.load(STORE), settings = Object.assign({shades: "wide"}, saved.settings);
+const STORE = "catdoku.twirl.v2", MAX_LEVEL = 20, HEARTS = 3, MAX_LIVES = 9;
+let saved = G.load(STORE);
 let S = null, loading = false, now = 0, moving = [], tugs = [];
-const save = () => { if (S) { S.d.ms = S.ms; G.save(STORE, {settings, level: S.level, d: S.d}); } };
+const save = () => { if (S) { S.d.ms = S.ms; G.save(STORE, {level: S.level, d: S.d}); } };
 
 function start(level, d) {
-  if (!d.ribbons || !d.W) throw new Error("the saved level is from another version of the game");
+  if (!d.ribbons || !d.W || (d.ribbons[0] && !d.ribbons[0].cells)) throw new Error("the saved level is from another version of the game");
   if (!d.gone) Object.assign(d, {gone: [], hearts: HEARTS, livesUsed: HEARTS, helped: false});
-  if (!d.colors) dye(d, settings.shades);
+  if (!d.looks) dress(d);
   S = {level, N: level, ...G.freshClock(), d, over: false};
   if (d.ms) { S.ms = d.ms; S.started = true; }
-  moving = []; tugs = [];
+  moving = []; tugs = []; zoom = 1;
   $("levelSel").value = level;
-  resize(); save(); hud(); G.note("");
+  layout(); save(); hud(); G.note("");
   if (d.hearts <= 0) lost();
 }
 function startLevel(level) {
@@ -195,8 +255,6 @@ function startLevel(level) {
 }
 for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(n === MAX_LEVEL ? `${n} (hardest)` : String(n), n));
 $("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
-$("shades").value = settings.shades;
-$("shades").onchange = e => { settings.shades = e.target.value; if (S) { dye(S.d, settings.shades); save(); } else G.save(STORE, {settings}); };
 // Restarting puts every ribbon back. It only refills lives after running out (which already keeps you
 // at this level), so it isn't a way round them.
 $("restartBtn").onclick = () => { if (!S || loading) return; G.closeCard(); restart(); };
@@ -214,26 +272,26 @@ function hud() {
   $("count").textContent = `🎀 ${left()} left`;
 }
 
-// What's on each square right now (ribbons already pulled out are gone at once, even mid-flight).
+// What's on each square right now (ribbons already pulled off are gone at once, even mid-flight).
 function occupancy() {
   const d = S.d, occ = new Int16Array(d.W * d.H).fill(-1), gone = new Set(d.gone);
-  d.ribbons.forEach((r, k) => { if (!gone.has(k)) for (const i of r) occ[i] = k; });
+  d.ribbons.forEach((r, k) => { if (!gone.has(k)) for (const i of r.cells) occ[i] = k; });
   return occ;
 }
-const headDir = r => { const a = r[r.length - 2], b = r[r.length - 1], W = S.d.W; return b === a - W ? 0 : b === a + 1 ? 1 : b === a + W ? 2 : 3; };
 function tap(k) {
-  const d = S.d, r = d.ribbons[k], dir = headDir(r), occ = occupancy(), h = r[r.length - 1];
-  const dx = [0, 1, 0, -1][dir], dy = [-1, 0, 1, 0][dir];
+  const d = S.d, r = d.ribbons[k], occ = occupancy(), h = r.cells[r.cells.length - 1];
+  const dx = [0, 1, 0, -1][r.dir], dy = [-1, 0, 1, 0][r.dir];
   let x = h % d.W, y = (h / d.W) | 0, run = 0, blocker = -1;
   for (x += dx, y += dy; x >= 0 && y >= 0 && x < d.W && y < d.H; x += dx, y += dy, run++) if (occ[y * d.W + x] >= 0) { blocker = occ[y * d.W + x]; break; }
   if (blocker < 0) {   // free: off it goes
-    d.gone.push(k); moving.push({k, t0: now, out: run + r.length + 2});
-    hud(); save();
+    d.gone.push(k); moving.push({k, t0: now, out: run + r.cells.length + 2});
+    unpaint(k); hud(); save();
     if (!left()) win();
     return;
   }
   // blocked: it tugs forward to whatever's in the way and springs back, and a life is lost
   tugs.push({k, t0: now, dist: Math.max(0.15, run - 0.3), blocker});
+  unpaint(k);
   d.hearts--; hud(); save();
   if (d.hearts <= 0) { S.over = true; setTimeout(lost, 450); }
   else G.note(d.hearts === 1 ? "Blocked. 1 life left." : `Blocked. ${d.hearts} lives left.`, 2500);
@@ -244,7 +302,7 @@ function win() {
   const result = G.finishClock(S);
   // A level finished on the first three lives without restarting moves you up; otherwise it comes round again.
   const helped = S.d.helped || S.d.livesUsed > HEARTS, next = helped ? S.level : Math.min(MAX_LEVEL, S.level + 1);
-  G.save(STORE, {settings, level: next});
+  G.save(STORE, {level: next});
   build.prefetch(next);
   const text = helped ? `Level ${S.level} done. You needed another go, so next up is level ${next} again with new ribbons.`
     : next > S.level ? `Level ${S.level} done. Next up: level ${next}.` : `Level ${S.level} done. That's the hardest level; next up is another one.`;
@@ -271,100 +329,216 @@ function revive() {
 }
 
 /* ---------- drawing ---------- */
-const canvas = $("board"), ctx = canvas.getContext("2d"), U = 40;   // drawing units per square
-const PAD = 0.5;   // a margin round the mat, in squares, so handles at the edge show whole
-let scale = 1;
-// The ribbon's center line, from tail to handle, in drawing units; `extra` carries it on past the
-// handle and off the mat, for sliding out.
+const canvas = $("board"), ctx = canvas.getContext("2d"), scroller = $("scroller");
+const U = 24, PAD = 0.6;   // drawing units per square, and a margin round the mat in squares
+const DIRS = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+let scale = 1, zoom = 1;
+const mix = (a, b, f) => labHex(hexLab(a).map((v, k) => v + (hexLab(b)[k] - v) * f));
+// A ribbon's center line, from tail to tip, in drawing units; `extra` carries it on past the tip and off
+// the mat, for sliding out. A one-square ribbon is a short stub pointing its way.
 function line(r, extra = 0) {
-  const W = S.d.W, pts = r.map(i => [(i % W + 0.5) * U, (((i / W) | 0) + 0.5) * U]);
-  if (extra) { const [ax, ay] = pts[pts.length - 2], [bx, by] = pts[pts.length - 1]; pts.push([bx + (bx - ax) * extra, by + (by - ay) * extra]); }
+  const W = S.d.W, [dx, dy] = DIRS[r.dir];
+  let pts = r.cells.map(i => [(i % W + 0.5) * U, (((i / W) | 0) + 0.5) * U]);
+  if (pts.length === 1) { const [x, y] = pts[0]; pts = [[x - dx * U * 0.35, y - dy * U * 0.35], [x + dx * U * 0.1, y + dy * U * 0.1]]; }
+  if (extra) { const [bx, by] = pts[pts.length - 1]; pts.push([bx + dx * U * extra, by + dy * U * extra]); }
   return pts;
 }
+const lengthOf = pts => pts.reduce((a, p, i) => i ? a + Math.hypot(p[0] - pts[i - 1][0], p[1] - pts[i - 1][1]) : 0, 0);
 // The stretch of a line from distance a to b along it.
 function slice(pts, a, b) {
   const out = []; let s = 0;
   for (let i = 1; i < pts.length; i++) {
     const [x0, y0] = pts[i - 1], [x1, y1] = pts[i], len = Math.hypot(x1 - x0, y1 - y0);
     const at = t => [x0 + (x1 - x0) * (t - s) / len, y0 + (y1 - y0) * (t - s) / len];
-    if (s + len >= a && s <= b) {
-      if (!out.length) out.push(at(Math.max(a, s)));
-      out.push(at(Math.min(b, s + len)));
-    }
+    if (s + len >= a && s <= b) { if (!out.length) out.push(at(Math.max(a, s))); out.push(at(Math.min(b, s + len))); }
     s += len;
   }
   return out;
 }
-function trace(g, pts) {   // rounded corners
-  g.beginPath(); g.moveTo(...pts[0]);
-  for (let i = 1; i < pts.length - 1; i++) g.arcTo(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], U * 0.45);
-  g.lineTo(...pts[pts.length - 1]);
+// The center line with rounded corners, sampled every `step` units.
+function samples(pts, step) {
+  const R = U * 0.48, curve = [pts[0]], n = pts.length;
+  for (let i = 1; i < n - 1; i++) {
+    const [ax, ay] = pts[i - 1], [bx, by] = pts[i], [cx, cy] = pts[i + 1];
+    const l1 = Math.hypot(bx - ax, by - ay), l2 = Math.hypot(cx - bx, cy - by);
+    if (!l1 || !l2 || Math.abs((bx - ax) * (cy - by) - (by - ay) * (cx - bx)) < 1e-6) { curve.push(pts[i]); continue; }
+    const r1 = Math.min(R, i === 1 ? l1 : l1 / 2), r2 = Math.min(R, i === n - 2 ? l2 : l2 / 2);
+    const p = [bx - (bx - ax) / l1 * r1, by - (by - ay) / l1 * r1], q = [bx + (cx - bx) / l2 * r2, by + (cy - by) / l2 * r2];
+    for (let k = 0; k <= 8; k++) { const t = k / 8, u = 1 - t; curve.push([u * u * p[0] + 2 * u * t * bx + t * t * q[0], u * u * p[1] + 2 * u * t * by + t * t * q[1]]); }
+  }
+  curve.push(pts[n - 1]);
+  const out = [curve[0]]; let need = step;
+  for (let i = 1; i < curve.length; i++) {
+    let [x0, y0] = curve[i - 1]; const [x1, y1] = curve[i]; let len = Math.hypot(x1 - x0, y1 - y0);
+    while (len >= need) { x0 += (x1 - x0) * need / len; y0 += (y1 - y0) * need / len; out.push([x0, y0]); len -= need; need = step; }
+    need -= len;
+  }
+  const end = curve[curve.length - 1], last = out[out.length - 1];
+  if (Math.hypot(end[0] - last[0], end[1] - last[1]) > 0.2) out.push(end);
+  return out;
 }
-// One ribbon: a thin line with rounded corners and an arrowhead at the front, pointing the way it goes.
-function drawRibbon(g, pts, col, flash) {
+// A satin ribbon: a sheen along it and a darker edge, cut to a point at its tip. Ombré ribbons shade
+// through their colourway along their length; twisty ribbons turn over as they go, showing their edge.
+function drawRibbon(g, pts, look, flash) {
   if (pts.length < 2) return;
-  if (flash) col = mixHex(col, "#FFFFFF", 0.55);
-  g.lineJoin = "round"; g.lineCap = "round";
-  trace(g, pts); g.strokeStyle = col; g.lineWidth = U * 0.17; g.stroke();
-  const [hx, hy] = pts[pts.length - 1], [qx, qy] = pts[pts.length - 2], l = Math.hypot(hx - qx, hy - qy) || 1, fx = (hx - qx) / l, fy = (hy - qy) / l;
-  const tip = [hx + fx * U * 0.22, hy + fy * U * 0.22], base = [hx - fx * U * 0.2, hy - fy * U * 0.2], half = U * 0.22;
-  g.beginPath(); g.moveTo(...tip); g.lineTo(base[0] - fy * half, base[1] + fx * half); g.lineTo(base[0] + fy * half, base[1] - fx * half); g.closePath();
-  g.fillStyle = col; g.fill(); g.strokeStyle = col; g.lineWidth = U * 0.06; g.stroke();
+  const w = U * 0.4, P = samples(pts, look.twist || look.ombre ? 1.5 : 3), n = P.length, ramp = RAMPS[look.ramp];
+  let colAt = i => look.ombre ? rampAt(ramp, 0.12 + 0.85 * i / Math.max(1, n - 1)) : look.solid;
+  if (flash) { const base = colAt; colAt = i => mix(base(i), "#FFFFFF", 0.55); }
+  g.lineJoin = "round";
+  if (!look.twist) {   // flat ribbon: an edge and a sheen drawn in one go, and the colour in short overlapping runs
+    const whole = (width, colour, alpha) => {
+      g.beginPath(); g.moveTo(...P[0]); for (let i = 1; i < n; i++) g.lineTo(...P[i]);
+      g.lineCap = "butt"; g.lineWidth = width; g.strokeStyle = colour; g.globalAlpha = alpha; g.stroke(); g.globalAlpha = 1;
+    };
+    const mid = colAt(Math.floor(n / 2));
+    whole(w + 1.6, mix(mid, "#2A2530", 0.45), 1);
+    if (look.ombre) {
+      g.lineCap = "butt"; g.lineWidth = w;
+      for (let i = 0; i < n - 1; i++) {   // each short piece in its own shade, overlapping the last so no seam shows
+        g.beginPath(); g.moveTo(...P[Math.max(0, i - 1)]); g.lineTo(...P[i]); g.lineTo(...P[i + 1]);
+        g.strokeStyle = colAt(i); g.stroke();
+      }
+    } else whole(w, mid, 1);
+    g.save(); g.translate(-w * 0.12, -w * 0.12); whole(w * 0.22, mix(mid, "#FFFFFF", 0.6), 0.4); g.restore();
+  } else {   // twisty ribbon, piece by piece
+    const Lf = [], Rt = [], tone = [];
+    P.forEach(([x, y], i) => {
+      const [ax, ay] = P[Math.max(0, i - 1)], [bx, by] = P[Math.min(n - 1, i + 1)], l = Math.hypot(bx - ax, by - ay) || 1;
+      const nx = -(by - ay) / l, ny = (bx - ax) / l, ph = look.phase + i * 1.5 / (U * 1.5) * Math.PI;
+      const cx = x + nx * Math.sin(ph) * U * 0.05, cy = y + ny * Math.sin(ph) * U * 0.05, hw = w * 0.6 * (0.3 + 0.7 * Math.abs(Math.cos(ph)));
+      Lf.push([cx + nx * hw, cy + ny * hw]); Rt.push([cx - nx * hw, cy - ny * hw]); tone.push(Math.cos(ph) >= 0);
+    });
+    for (let i = 0; i < n - 1; i++) {
+      const c = colAt(i), body = tone[i] ? c : mix(c, "#2A2530", 0.22);
+      g.beginPath(); g.moveTo(...Lf[i]); g.lineTo(...Lf[i + 1]); g.lineTo(...Rt[i + 1]); g.lineTo(...Rt[i]); g.closePath();
+      g.fillStyle = body; g.fill(); g.strokeStyle = body; g.lineWidth = 0.5; g.stroke();
+    }
+    g.lineWidth = 1; g.globalAlpha = 0.55;
+    for (const side of [Lf, Rt]) for (let i = 0; i < n - 1; i++) { g.beginPath(); g.moveTo(...side[i]); g.lineTo(...side[i + 1]); g.strokeStyle = mix(colAt(i), "#2A2530", 0.5); g.stroke(); }
+    g.globalAlpha = 1;
+  }
+  // the tip, cut to a point
+  const [hx, hy] = P[n - 1], [qx, qy] = P[Math.max(0, n - 3)], l = Math.hypot(hx - qx, hy - qy) || 1, fx = (hx - qx) / l, fy = (hy - qy) / l, half = w / 2;
+  const col = colAt(n - 1);
+  g.beginPath(); g.moveTo(hx - fy * half, hy + fx * half); g.lineTo(hx + fx * w * 1.3, hy + fy * w * 1.3); g.lineTo(hx + fy * half, hy - fx * half); g.closePath();
+  g.fillStyle = col; g.fill(); g.strokeStyle = mix(col, "#2A2530", 0.45); g.lineWidth = 1; g.stroke();
 }
-// The ribbons lying still are drawn once onto a layer, and only redrawn when something changes.
-let still = null, stillKey = "";
+// Ribbons lying still are drawn once onto a layer. A ribbon that leaves is wiped off it square by square
+// (ribbons stay inside their own squares), and only a zoom redraws the lot.
+let still = null, stillCtx = null;
+function paintStill() {
+  if (!S) return;
+  still = document.createElement("canvas"); still.width = canvas.width; still.height = canvas.height;
+  stillCtx = still.getContext("2d"); stillCtx.setTransform(scale, 0, 0, scale, PAD * U * scale, PAD * U * scale);
+  const gone = new Set(S.d.gone), tugging = new Set(tugs.map(t => t.k));
+  S.d.ribbons.forEach((r, k) => { if (!gone.has(k) && !tugging.has(k)) drawRibbon(stillCtx, line(r), S.d.looks[k]); });
+}
+function unpaint(k) {
+  if (!stillCtx) return;
+  const W = S.d.W;
+  for (const i of S.d.ribbons[k].cells) stillCtx.clearRect((i % W) * U - 0.5, ((i / W) | 0) * U - 0.5, U + 1, U + 1);
+}
 function draw() {
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (!S) return;
   const d = S.d, gone = new Set(d.gone);
+  // a blocked ribbon goes back on the layer once it has sprung back
+  for (const t of tugs) if (now >= t.t0 + 0.4 && stillCtx && !gone.has(t.k)) drawRibbon(stillCtx, line(d.ribbons[t.k]), d.looks[t.k]);
   tugs = tugs.filter(t => now < t.t0 + 0.4);
-  const tugOf = new Map(tugs.map(t => [t.k, t])), flashing = new Set(tugs.map(t => t.blocker));
-  const key = [canvas.width, canvas.height, d.colorway, d.colors.join(), d.gone.join(), [...tugOf.keys()].join()].join("|");
-  if (key !== stillKey || !still) {
-    stillKey = key; still = document.createElement("canvas"); still.width = canvas.width; still.height = canvas.height;
-    const g = still.getContext("2d"); g.setTransform(scale, 0, 0, scale, PAD * U * scale, PAD * U * scale);
-    g.fillStyle = "rgba(42,37,48,.13)";
-    for (let y = 0; y < d.H; y++) for (let x = 0; x < d.W; x++) { g.beginPath(); g.arc((x + 0.5) * U, (y + 0.5) * U, 1.6, 0, 2 * Math.PI); g.fill(); }
-    d.ribbons.forEach((r, k) => { if (!gone.has(k) && !tugOf.has(k)) drawRibbon(g, line(r), d.colors[d.shade[k]]); });
-  }
-  ctx.drawImage(still, 0, 0);
+  if (still) ctx.drawImage(still, 0, 0);
   ctx.setTransform(scale, 0, 0, scale, PAD * U * scale, PAD * U * scale);
-  // a ribbon that got in the way flashes
-  for (const k of flashing) if (!gone.has(k) && !tugOf.has(k) && Math.floor(now * 12) % 2 === 0) drawRibbon(ctx, line(d.ribbons[k]), d.colors[d.shade[k]], true);
-  for (const t of tugs) {   // a blocked ribbon tugs forward and springs back
+  for (const t of tugs) {   // it tugs forward and springs back, and whatever is in the way flashes
     const r = d.ribbons[t.k], u = (now - t.t0) / 0.4, s = t.dist * U * (u < 0.45 ? Math.sin(u / 0.45 * Math.PI / 2) : Math.cos((u - 0.45) / 0.55 * Math.PI / 2));
-    drawRibbon(ctx, slice(line(r, t.dist + 1), s, s + (r.length - 1) * U), d.colors[d.shade[t.k]]);
+    const pts = line(r, t.dist + 1);
+    drawRibbon(ctx, slice(pts, s, s + lengthOf(pts) - (t.dist + 1) * U), d.looks[t.k]);
+    if (!gone.has(t.blocker) && Math.floor(now * 12) % 2 === 0) drawRibbon(ctx, line(d.ribbons[t.blocker]), d.looks[t.blocker], true);
   }
   // ribbons on their way out, on top, speeding up as they go
-  moving = moving.filter(m => now < m.t0 + 2);
+  moving = moving.filter(m => now < m.t0 + 2.5);
   for (const m of moving) {
-    const r = d.ribbons[m.k], u = now - m.t0, s = (6 * u + 30 * u * u) * U, L = (r.length - 1) * U, total = (r.length - 1 + m.out) * U;
+    const pts = line(d.ribbons[m.k], m.out), total = lengthOf(pts), len = total - m.out * U, u = now - m.t0, s = (6 * u + 30 * u * u) * U;
     if (s >= total - 2) continue;
-    drawRibbon(ctx, slice(line(r, m.out), s, Math.min(total, s + L)), d.colors[d.shade[m.k]]);
+    drawRibbon(ctx, slice(pts, s, Math.min(total, s + len)), d.looks[m.k]);
   }
 }
-function resize() {
-  if (!S) return;
-  const d = S.d, wrap = $("wrap");
-  // tall mats fit the screen height too
-  const w = d.W + 2 * PAD, h = d.H + 2 * PAD;
-  wrap.style.width = `min(var(--board), calc((100svh - 60px) * ${w / h}))`;
-  wrap.style.aspectRatio = `${w} / ${h}`;
-  const r = canvas.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
-  if (!r.width) return;
-  canvas.width = Math.round(r.width * dpr); canvas.height = Math.round(r.width * h / w * dpr);
-  scale = canvas.width / (w * U);
-}
-new ResizeObserver(resize).observe(canvas);
 
-canvas.addEventListener("pointerdown", e => {
+/* ---------- size and zoom ---------- */
+// At "Fit" the whole mat shows; zooming makes it bigger inside its frame, which scrolls.
+const matW = () => S.d.W + 2 * PAD, matH = () => S.d.H + 2 * PAD;
+function fitWidth() {
+  const avail = scroller.parentElement.clientWidth - 6, maxH = window.innerHeight * 0.78 - 6;
+  return Math.min(avail, maxH * matW() / matH());
+}
+function layout(keep) {
+  if (!S) return;
+  const fw = fitWidth(), cssW = fw * zoom, cssH = cssW * matH() / matW();
+  const before = keep && canvas.clientWidth && {fx: (scroller.scrollLeft + keep.x) / canvas.clientWidth, fy: (scroller.scrollTop + keep.y) / canvas.clientHeight};
+  scroller.style.height = `${Math.min(cssH, window.innerHeight * 0.78 - 6) + 6}px`;
+  canvas.style.width = `${cssW}px`; canvas.style.height = `${cssH}px`;
+  const dpr = Math.min(window.devicePixelRatio || 1, 4096 / Math.max(cssW, cssH));
+  canvas.width = Math.round(cssW * dpr); canvas.height = Math.round(cssH * dpr);
+  scale = canvas.width / (matW() * U);
+  if (before) { scroller.scrollLeft = before.fx * cssW - keep.x; scroller.scrollTop = before.fy * cssH - keep.y; }
+  paintStill();
+  $("zoomOut").disabled = zoom <= 1; $("zoomIn").disabled = zoom >= 4; $("zoomFit").disabled = zoom === 1;
+}
+function setZoom(z, at) {
+  z = Math.max(1, Math.min(4, z));
+  if (!S || Math.abs(z - zoom) < 0.01) return;
+  zoom = z; layout(at || {x: scroller.clientWidth / 2, y: scroller.clientHeight / 2});
+}
+$("zoomIn").onclick = () => setZoom(zoom * 1.5);
+$("zoomOut").onclick = () => setZoom(zoom / 1.5);
+$("zoomFit").onclick = () => setZoom(1);
+let resizeTimer = null;
+window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => layout(), 150); });
+scroller.addEventListener("wheel", e => {   // ctrl/⌘ + scroll (and trackpad pinches) zoom
+  if (!e.ctrlKey && !e.metaKey) return;
+  e.preventDefault(); const r = scroller.getBoundingClientRect();
+  setZoom(zoom * Math.exp(-e.deltaY * 0.01), {x: e.clientX - r.left, y: e.clientY - r.top});
+}, {passive: false});
+
+/* ---------- touch: tap a ribbon, drag to look around, pinch to zoom ---------- */
+const pointers = new Map();
+let pan = null, pinch = null;
+scroller.addEventListener("pointerdown", e => {
+  pointers.set(e.pointerId, {x: e.clientX, y: e.clientY});
+  try { scroller.setPointerCapture(e.pointerId); } catch (_) {}
+  if (pointers.size === 1) pan = {x: e.clientX, y: e.clientY, sl: scroller.scrollLeft, st: scroller.scrollTop, moved: false};
+  if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()], r = scroller.getBoundingClientRect();
+    pinch = {dist: Math.hypot(a.x - b.x, a.y - b.y) || 1, zoom, at: {x: (a.x + b.x) / 2 - r.left, y: (a.y + b.y) / 2 - r.top}};
+    if (pan) pan.moved = true;
+  }
+});
+scroller.addEventListener("pointermove", e => {
+  if (!pointers.has(e.pointerId)) return;
+  pointers.set(e.pointerId, {x: e.clientX, y: e.clientY});
+  if (pinch && pointers.size >= 2) {
+    const [a, b] = [...pointers.values()];
+    setZoom(pinch.zoom * Math.hypot(a.x - b.x, a.y - b.y) / pinch.dist, pinch.at);
+  } else if (pan) {
+    const dx = e.clientX - pan.x, dy = e.clientY - pan.y;
+    if (Math.hypot(dx, dy) > 8) pan.moved = true;
+    if (pan.moved) { scroller.scrollLeft = pan.sl - dx; scroller.scrollTop = pan.st - dy; }
+  }
+});
+function release(e, tapIt) {
+  if (!pointers.has(e.pointerId)) return;
+  pointers.delete(e.pointerId);
+  if (pointers.size < 2) pinch = null;
+  if (pointers.size === 0) { const p = pan; pan = null; if (tapIt && p && !p.moved) tapAt(e.clientX, e.clientY); }
+}
+scroller.addEventListener("pointerup", e => release(e, true));
+scroller.addEventListener("pointercancel", e => release(e, false));
+function tapAt(cx, cy) {
   if (!S || S.over || loading) return;
   const r = canvas.getBoundingClientRect(), d = S.d;
-  const x = Math.floor((e.clientX - r.left) / r.width * (d.W + 2 * PAD) - PAD), y = Math.floor((e.clientY - r.top) / r.height * (d.H + 2 * PAD) - PAD);
+  const x = Math.floor((cx - r.left) / r.width * matW() - PAD), y = Math.floor((cy - r.top) / r.height * matH() - PAD);
   if (x < 0 || y < 0 || x >= d.W || y >= d.H) return;
   const k = occupancy()[y * d.W + x];
   if (k >= 0 && !tugs.some(t => t.k === k)) tap(k);
-});
+}
 
 let last = performance.now();
 function loop(t) { now += Math.min(0.05, (t - last) / 1000); last = t; draw(); requestAnimationFrame(loop); }
@@ -372,8 +546,8 @@ function loop(t) { now += Math.min(0.05, (t - last) / 1000); last = t; draw(); r
 /* ---------- how to play ---------- */
 function helpCard() {
   const media = document.createElement("div"), ol = document.createElement("ol"); ol.className = "steps";
-  for (const t of ["Tap a ribbon to pull it off the way its arrow points.",
-                   "It only comes off if nothing is in the way of its arrow.",
+  for (const t of ["Tap a ribbon to pull it off the way its pointed end points.",
+                   "It only comes off if nothing is in the way.",
                    "A blocked tap costs a life. Clear every ribbon to finish the level."]) {
     const li = document.createElement("li"); li.textContent = t; ol.append(li);
   }
