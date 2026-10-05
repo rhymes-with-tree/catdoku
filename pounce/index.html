@@ -44,6 +44,15 @@
 .card ol.steps li{margin:0 0 8px}
 .card .tip{font-size:14px;margin:0 0 14px}
 .card .goals{width:auto;margin:0 0 16px}
+.toypick{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:0 0 12px}
+.toypick .colour{display:inline-flex;gap:2px;padding:3px;border:2px solid var(--line);border-radius:12px;background:#fff}
+.toypick button{padding:0;border:2px solid transparent;border-radius:9px;background:none;width:44px;height:44px}
+.toypick button img{display:block;width:100%;height:100%;transition:opacity .15s,filter .15s}
+.toypick button[aria-pressed="false"]{border-color:var(--line);border-style:dashed;background:none;color:inherit}
+.toypick button[aria-pressed="false"] img{opacity:.22;filter:grayscale(1)}
+.toypick button[aria-pressed="true"]{background:none;color:inherit}
+.card .pickNote{font-size:14px;margin:0 0 14px;font-weight:600}
+.card .pickNote.bad{color:#B23A28}
 </style>
 </head>
 <body>
@@ -68,6 +77,7 @@
   </div>
 
   <div class="actions">
+    <button id="toysBtn">Toys</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
   </div>
@@ -236,11 +246,15 @@ const KINDS = [
   {c: "#E16A4A", looks: [["felt-rainbow", "rainbow balls"], ["ribbon-tail", "ribbon balls"], ["spiky-rainbow", "spiky balls"]]},
 ];
 // Level 0 is zen: six kinds of toy, nothing to catch and no move limit.
-function makeLevel(n, rnd = Math.random) {
-  const p = n ? params(n) : {K: 6, goals: 0, need: 0, moves: null}, all = KINDS.map((_, i) => i);
+// `off` holds the toy pictures the player has left out; a colour with none left isn't dealt.
+const lookIdx = (k, off) => { const ok = KINDS[k].looks.map((_, j) => j).filter(j => !off.has(KINDS[k].looks[j][0])); return ok.length ? ok : KINDS[k].looks.map((_, j) => j); };
+function makeLevel(n, rnd = Math.random, off = new Set()) {
+  const p = n ? params(n) : {K: 6, goals: 0, need: 0, moves: null};
+  let all = KINDS.map((_, i) => i).filter(k => KINDS[k].looks.some(([f]) => !off.has(f)));
+  if (all.length < p.K) all = KINDS.map((_, i) => i);
   for (let i = all.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [all[i], all[j]] = [all[j], all[i]]; }
   const kinds = all.slice(0, p.K).sort((a, b) => a - b);
-  const look = KINDS.map(k => Math.floor(rnd() * k.looks.length));
+  const look = KINDS.map((_, k) => { const ok = lookIdx(k, off); return ok[Math.floor(rnd() * ok.length)]; });
   const goals = kinds.slice().sort(() => rnd() - 0.5).slice(0, p.goals).map(k => ({k, need: p.need, got: 0}));
   return {kinds, look, goals, moves: p.moves, grid: newMat(kinds, rnd).map(t => [t.k, t.sp]), helped: false, extra: 0, caught: 0};
 }
@@ -261,6 +275,10 @@ const lookOf = k => KINDS[k].looks[(S && S.d.look[k]) || 0] || KINDS[k].looks[0]
 const U = 50, W = N * U;     // drawing units per square; the canvas is scaled to fit
 const STORE = "catdoku.pounce.v1";
 let climb = 1;   // the level to go back to after zen
+// Toy pictures the player has chosen to leave out, kept on this device.
+const TOYS_PREF = "catdoku.pounce.toys.v1", MIN_COLOURS = 6;
+let offToys = new Set(G.load(TOYS_PREF).off || []);
+const deal = n => makeLevel(n, Math.random, offToys);
 let busy = false, picked = -1, cursor = -1, now = 0, effects = [], hintAt = 0, hint = null;
 const save = () => { if (S && !S.over) { S.d.grid = S.g.map(t => [t.k, t.sp]); S.d.ms = S.ms; G.save(STORE, {level: S.level, d: S.d, climb}); } };
 
@@ -281,12 +299,14 @@ function start(level, d) {
 function startLevel(level) {
   level = level === 0 ? 0 : Math.min(MAX_LEVEL, Math.max(1, level));
   G.track(level ? `Pounce level ${level} started` : "Pounce zen started");
-  start(level, makeLevel(level));
+  start(level, deal(level));
 }
 for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(n === MAX_LEVEL ? `${n} (hardest)` : String(n), n));
 $("levelSel").append(new Option("Zen (no goals)", 0));
 $("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
-$("restartBtn").onclick = () => { if (S) { G.closeCard(); start(S.level, Object.assign(makeLevel(S.level), {helped: S.d.helped, caught: S.level ? 0 : S.d.caught})); } };
+// A fresh board at this level (zen keeps its count of toys caught).
+const newBoard = () => start(S.level, Object.assign(deal(S.level), {helped: S.d.helped, caught: S.level ? 0 : S.d.caught}));
+$("restartBtn").onclick = () => { if (S) { G.closeCard(); newBoard(); } };
 
 const left = gl => Math.max(0, gl.need - gl.got);
 const toyName = (n, k) => { const many = lookOf(k)[1]; return `${n} ${n !== 1 ? many : {mice: "mouse", fish: "fish"}[many] || many.replace(/s$/, "")}`; };
@@ -410,7 +430,7 @@ function outOfMoves() {
   if (S.d.extra < 1) btns.push(["5 more moves", () => {
     G.closeCard(); S.d.extra++; S.d.helped = true; S.d.moves += 5; S.over = false; hud(); save(); hintAt = now + 3;
   }, true]);
-  btns.push(["Try again", () => { G.closeCard(); start(S.level, Object.assign(makeLevel(S.level), {helped: S.d.helped})); }, !btns.length]);
+  btns.push(["Try again", () => { G.closeCard(); start(S.level, Object.assign(deal(S.level), {helped: S.d.helped})); }, !btns.length]);
   G.openCard("Out of moves!", `Still to catch: ${list}.`, btns, null,
     G.otherSize($("levelSel"), S.level, startLevel, "Or play a different level:"));
 }
@@ -613,6 +633,46 @@ function helpCard() {
   G.openCard("How to play", "", [["Let's play", G.closeCard, true]], media);
 }
 $("helpBtn").onclick = helpCard;
+
+/* ---------- choosing toys ---------- */
+// Every toy picture, grouped by colour (each colour is one kind of toy). Tap one to leave it out.
+function toysCard() {
+  const off = new Set(offToys), media = document.createElement("div"), grid = document.createElement("div");
+  const tip = document.createElement("p"); tip.className = "tip";
+  tip.textContent = "Tap a toy to leave it out. Each box is one colour, and a colour with no toys left isn't used.";
+  grid.className = "toypick";
+  for (const k of KINDS) {
+    const box = document.createElement("span"); box.className = "colour";
+    for (const [f, name] of k.looks) {
+      const b = document.createElement("button"), img = document.createElement("img");
+      img.src = toySrc(f); img.alt = "";
+      b.append(img); b.title = name[0].toUpperCase() + name.slice(1);
+      b.setAttribute("aria-pressed", String(!off.has(f)));
+      b.setAttribute("aria-label", b.title);
+      b.onclick = () => { off.has(f) ? off.delete(f) : off.add(f); b.setAttribute("aria-pressed", String(!off.has(f))); check(); };
+      box.append(b);
+    }
+    grid.append(box);
+  }
+  const note = document.createElement("p"); note.className = "pickNote"; note.setAttribute("aria-live", "polite");
+  media.append(tip, grid, note);
+  const apply = () => {
+    offToys = off; G.save(TOYS_PREF, {off: [...off]}); G.closeCard();
+    const uses = S && S.d.kinds.some(k => off.has(lookOf(k)[0]));
+    if (uses && !S.over) { newBoard(); G.note("Here's a new board with your toys.", 4000); }
+    else G.note("Saved. Your toys are used from the next board.", 4000);
+  };
+  G.openCard("Your toys", "", [["Save", apply, true], ["Cancel", G.closeCard]], media);
+  const save = $("card").querySelector(".btns button");
+  function check() {
+    const n = KINDS.filter(k => k.looks.some(([f]) => !off.has(f))).length;
+    save.disabled = n < MIN_COLOURS;
+    note.classList.toggle("bad", n < MIN_COLOURS);
+    note.textContent = n < MIN_COLOURS ? `Keep toys in at least ${MIN_COLOURS} colours (${n} now).` : `${n} of ${KINDS.length} colours in play.`;
+  }
+  check();
+}
+$("toysBtn").onclick = toysCard;
 G.setupTimer({name: "pounce", game: () => S, playing: g => !g.over, save,
   label: n => `Level ${n}`, noun: "level",
   emptyText: "Finish a level and your times will show up here. They're kept on this device only."});
