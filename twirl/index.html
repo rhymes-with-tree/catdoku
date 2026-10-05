@@ -24,7 +24,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../games.css?v=2026-10-05.6">
 <style>
-/* A play mat strewn with ribbon wands; each one slides out handle first along its own ribbon. */
+/* A play mat strewn with ribbons; each one slides off the way its arrow points, along its own path. */
 .wrap.mat{height:auto}
 .wrap.mat canvas{display:block;width:100%;height:100%;border:3px solid var(--ink);border-radius:12px;touch-action:manipulation;
   user-select:none;-webkit-user-select:none;cursor:pointer;background:var(--panel)}
@@ -37,7 +37,7 @@
 </head>
 <body>
 <main>
-  <header><h1>Twirl</h1><div class="stripe"></div><p class="tagline">Pull every ribbon toy out by its handle</p></header>
+  <header><h1>Twirl</h1><div class="stripe"></div><p class="tagline">Pull every ribbon off the mat</p></header>
   <nav class="games" id="games" aria-label="Games"></nav>
 
   <div class="bar">
@@ -55,7 +55,7 @@
   </div>
 
   <div class="wrap mat" id="wrap">
-    <canvas id="board" aria-label="Ribbon toys on a play mat. Tap a toy to pull it out by its handle."></canvas>
+    <canvas id="board" aria-label="Ribbons on a play mat. Tap a ribbon to pull it off the way its arrow points."></canvas>
     <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
   </div>
 
@@ -66,7 +66,7 @@
   </div>
 
   <div class="help">
-    <p>Tap a ribbon toy to pull it out by its handle. It only comes out if nothing is in the way of its handle. A blocked tap costs a life.</p>
+    <p>Tap a ribbon to pull it off the mat the way its arrow points. It only comes off if nothing is in the way of its arrow. A blocked tap costs a life.</p>
   </div>
 </main>
 
@@ -77,10 +77,11 @@ const $ = G.$;
 G.nav("twirl");
 
 /* ---------- levels (plain functions, also run in a background worker) ---------- */
-// Levels get bigger mats, longer ribbons and fuller mats as they go, up to level 20.
+// Levels get bigger mats, longer ribbons and fuller mats as they go, up to level 20: from 8 × 13 squares
+// to 16 × 26.
 function params(n) {
-  const W = Math.min(12, 5 + Math.ceil(n / 3));
-  return {W, H: Math.round(W * 1.45), maxLen: Math.min(14, 4 + (n >> 1)), fill: Math.min(0.9, 0.7 + n * 0.012)};
+  const W = 7 + Math.ceil(n * 9 / 20);
+  return {W, H: Math.round(W * 1.6), maxLen: 6 + (n >> 1), fill: Math.min(0.92, 0.8 + n * 0.006)};
 }
 // The free run from (x, y) in direction d to the edge of the mat: true if no ribbon is in the way.
 function laneFree(W, H, occ, x, y, d) {
@@ -294,72 +295,21 @@ function slice(pts, a, b) {
   }
   return out;
 }
-// The center line with its corners rounded off, sampled every two units.
-function samples(pts) {
-  const R = U * 0.42, curve = [pts[0]], n = pts.length;
-  for (let i = 1; i < n - 1; i++) {
-    const [ax, ay] = pts[i - 1], [bx, by] = pts[i], [cx, cy] = pts[i + 1];
-    const l1 = Math.hypot(bx - ax, by - ay), l2 = Math.hypot(cx - bx, cy - by);
-    if (!l1 || !l2 || Math.abs((bx - ax) * (cy - by) - (by - ay) * (cx - bx)) < 1e-6) { curve.push(pts[i]); continue; }
-    const r1 = Math.min(R, i === 1 ? l1 : l1 / 2), r2 = Math.min(R, i === n - 2 ? l2 : l2 / 2);
-    const p = [bx - (bx - ax) / l1 * r1, by - (by - ay) / l1 * r1], q = [bx + (cx - bx) / l2 * r2, by + (cy - by) / l2 * r2];
-    for (let k = 0; k <= 8; k++) { const t = k / 8, u = 1 - t; curve.push([u * u * p[0] + 2 * u * t * bx + t * t * q[0], u * u * p[1] + 2 * u * t * by + t * t * q[1]]); }
-  }
-  curve.push(pts[n - 1]);
-  const out = [curve[0]]; let need = 2;
-  for (let i = 1; i < curve.length; i++) {
-    let [x0, y0] = curve[i - 1]; const [x1, y1] = curve[i]; let len = Math.hypot(x1 - x0, y1 - y0);
-    while (len >= need) { x0 += (x1 - x0) * need / len; y0 += (y1 - y0) * need / len; out.push([x0, y0]); len -= need; need = 2; }
-    need -= len;
-  }
-  const end = curve[curve.length - 1], lastOut = out[out.length - 1];
-  if (Math.hypot(end[0] - lastOut[0], end[1] - lastOut[1]) > 0.3) out.push(end);
-  return out;
+function trace(g, pts) {   // rounded corners
+  g.beginPath(); g.moveTo(...pts[0]);
+  for (let i = 1; i < pts.length - 1; i++) g.arcTo(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], U * 0.45);
+  g.lineTo(...pts[pts.length - 1]);
 }
-// One ribbon toy: a satin ribbon that twists over as it goes (showing its slightly darker back), with a
-// forked tail, tied with a knot to a wooden wand with a bead on the end. The twists belong to the ribbon,
-// so they travel with it when it slides out.
-const TWIST = U * 1.7;
+// One ribbon: a thin line with rounded corners and an arrowhead at the front, pointing the way it goes.
 function drawRibbon(g, pts, col, flash) {
-  const P = samples(pts); if (P.length < 2) return;
-  if (flash) col = mixHex(col, "#FFFFFF", 0.5);
-  const w = U * 0.4, back = mixHex(col, "#2A2530", 0.18), edge = mixHex(col, "#2A2530", 0.55), sheen = mixHex(col, "#FFFFFF", 0.55);
-  const left = [], right = [], face = [], norm = [];
-  P.forEach(([x, y], i) => {
-    const [ax, ay] = P[Math.max(0, i - 1)], [bx, by] = P[Math.min(P.length - 1, i + 1)], l = Math.hypot(bx - ax, by - ay) || 1;
-    const nx = -(by - ay) / l, ny = (bx - ax) / l, c = Math.cos(Math.PI * i * 2 / TWIST + 0.9), hw = w / 2 * (0.16 + 0.84 * Math.abs(c));
-    left.push([x + nx * hw, y + ny * hw]); right.push([x - nx * hw, y - ny * hw]); face.push(c >= 0); norm.push([nx * hw, ny * hw]);
-  });
-  const fronts = new Path2D(), backs = new Path2D(), shine = new Path2D();
-  for (let i = 0; i < P.length - 1; i++) {
-    const path = face[i] ? fronts : backs;
-    path.moveTo(...left[i]); path.lineTo(...left[i + 1]); path.lineTo(...right[i + 1]); path.lineTo(...right[i]); path.closePath();
-    if (face[i]) {   // a soft shine on the front face, toward one edge
-      const at = (j, f) => [P[j][0] + norm[j][0] * f, P[j][1] + norm[j][1] * f];
-      shine.moveTo(...at(i, 0.15)); shine.lineTo(...at(i + 1, 0.15)); shine.lineTo(...at(i + 1, 0.55)); shine.lineTo(...at(i, 0.55)); shine.closePath();
-    }
-  }
+  if (pts.length < 2) return;
+  if (flash) col = mixHex(col, "#FFFFFF", 0.55);
   g.lineJoin = "round"; g.lineCap = "round";
-  // forked tail
-  const [tx, ty] = P[0], [nx, ny] = P[1], L0 = Math.hypot(nx - tx, ny - ty) || 1, bx = (tx - nx) / L0 * U * 0.3, by = (ty - ny) / L0 * U * 0.3;
-  g.beginPath(); g.moveTo(...left[0]); g.lineTo(left[0][0] + bx, left[0][1] + by); g.lineTo(tx + bx * 0.4, ty + by * 0.4);
-  g.lineTo(right[0][0] + bx, right[0][1] + by); g.lineTo(...right[0]); g.closePath();
-  g.fillStyle = face[0] ? col : back; g.fill(); g.strokeStyle = edge; g.lineWidth = 1; g.stroke();
-  g.fillStyle = back; g.fill(backs);
-  g.strokeStyle = back; g.lineWidth = 0.6; g.stroke(backs);   // close the hairline gaps between pieces
-  g.fillStyle = col; g.fill(fronts); g.strokeStyle = col; g.stroke(fronts);
-  g.globalAlpha = 0.45; g.fillStyle = sheen; g.fill(shine); g.globalAlpha = 1;
-  g.strokeStyle = edge; g.lineWidth = 1; g.globalAlpha = 0.7;
-  for (const side of [left, right]) { g.beginPath(); side.forEach((q, i) => i ? g.lineTo(...q) : g.moveTo(...q)); g.stroke(); }
-  g.globalAlpha = 1;
-  // the wand: a slim dowel out past the knot, with a bead on the end
-  const [hx, hy] = P[P.length - 1], [qx, qy] = P[Math.max(0, P.length - 3)], L1 = Math.hypot(hx - qx, hy - qy) || 1, fx = (hx - qx) / L1, fy = (hy - qy) / L1;
-  const ex = hx + fx * U * 0.42, ey = hy + fy * U * 0.42;
-  g.beginPath(); g.moveTo(hx - fx * U * 0.05, hy - fy * U * 0.05); g.lineTo(ex, ey); g.strokeStyle = "#5C3A22"; g.lineWidth = U * 0.14; g.stroke();
-  g.beginPath(); g.moveTo(hx - fx * U * 0.05, hy - fy * U * 0.05); g.lineTo(ex, ey); g.strokeStyle = "#D2A774"; g.lineWidth = U * 0.08; g.stroke();
-  g.beginPath(); g.arc(hx, hy, U * 0.1, 0, 2 * Math.PI); g.fillStyle = back; g.fill(); g.strokeStyle = edge; g.lineWidth = 1; g.stroke();   // the knot
-  g.beginPath(); g.arc(ex, ey, U * 0.12, 0, 2 * Math.PI); g.fillStyle = edge; g.fill();
-  g.beginPath(); g.arc(ex - U * 0.035, ey - U * 0.035, U * 0.04, 0, 2 * Math.PI); g.fillStyle = "rgba(255,255,255,.6)"; g.fill();
+  trace(g, pts); g.strokeStyle = col; g.lineWidth = U * 0.17; g.stroke();
+  const [hx, hy] = pts[pts.length - 1], [qx, qy] = pts[pts.length - 2], l = Math.hypot(hx - qx, hy - qy) || 1, fx = (hx - qx) / l, fy = (hy - qy) / l;
+  const tip = [hx + fx * U * 0.22, hy + fy * U * 0.22], base = [hx - fx * U * 0.2, hy - fy * U * 0.2], half = U * 0.22;
+  g.beginPath(); g.moveTo(...tip); g.lineTo(base[0] - fy * half, base[1] + fx * half); g.lineTo(base[0] + fy * half, base[1] - fx * half); g.closePath();
+  g.fillStyle = col; g.fill(); g.strokeStyle = col; g.lineWidth = U * 0.06; g.stroke();
 }
 // The ribbons lying still are drawn once onto a layer, and only redrawn when something changes.
 let still = null, stillKey = "";
@@ -422,9 +372,9 @@ function loop(t) { now += Math.min(0.05, (t - last) / 1000); last = t; draw(); r
 /* ---------- how to play ---------- */
 function helpCard() {
   const media = document.createElement("div"), ol = document.createElement("ol"); ol.className = "steps";
-  for (const t of ["Tap a ribbon toy to pull it out by its handle.",
-                   "It only comes out if nothing is in the way of its handle.",
-                   "A blocked tap costs a life. Clear every toy to finish the level."]) {
+  for (const t of ["Tap a ribbon to pull it off the way its arrow points.",
+                   "It only comes off if nothing is in the way of its arrow.",
+                   "A blocked tap costs a life. Clear every ribbon to finish the level."]) {
     const li = document.createElement("li"); li.textContent = t; ol.append(li);
   }
   media.append(ol);

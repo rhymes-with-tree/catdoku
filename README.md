@@ -51,7 +51,7 @@ There are 20 levels with more kinds of toy, more kinds to catch and more of each
 
 ## Twirl
 
-A seventh game in `twirl/`. The mat is covered in ribbon toys; tap one to pull it out by its handle, and it slides off the mat along its own ribbon, but only if nothing is in the way of its handle. A blocked tap costs a life, as in Catdoku: three lives, and running out offers a restart, new ribbons, or three more lives (up to nine). There are 20 levels with bigger mats and longer ribbons; a level finished on the first three lives moves you up. Mats are laid one ribbon at a time, each only where it could get out past the ones already there, so every mat can be cleared. Ribbons take their colors from Yarn's colorways (shared in `colorways.js`); ribbons that touch get shades far apart, so Very close is the hard setting.
+A seventh game in `twirl/`. The mat is covered in thin ribbons, each with an arrow at one end; tap one and it slides off the mat the way its arrow points, following its own path, but only if nothing is in the way of its arrow. A blocked tap costs a life, as in Catdoku: three lives, and running out offers a restart, new ribbons, or three more lives (up to nine). There are 20 levels with bigger mats (8 × 13 squares up to 16 × 26) and longer ribbons; a level finished on the first three lives moves you up. Mats are laid one ribbon at a time, each only where it could get out past the ones already there, so every mat can be cleared. Ribbons take their colors from Yarn's colorways (shared in `colorways.js`); ribbons that touch get shades far apart, so Very close is the hard setting.
 
 ## Toy library
 
