@@ -253,8 +253,9 @@ function solveModel(M, limit) {
   return dfs(M) ? path.slice() : null;
 }
 // Deal toys in matching pairs, one pair per row, leaving some rows empty. On later levels some pairs are
-// broken up by swapping single toys between rows. Hidden toys come in blocks of at least two rows (four
-// toys) at the back of a basket. Keep the deal only if it can be won.
+// broken up by swapping single toys between rows. Hidden toys sit in the back rows of a basket; a level
+// hides none, or at least four toys of at least two kinds, so they're a real mystery.
+// Keep the deal only if it can be won.
 function makeLevel(n) {
   const P = params(n);
   for (let tries = 0; tries < 300; tries++) {
@@ -272,11 +273,17 @@ function makeLevel(n) {
       [toys[a[0]][a[1]], toys[b[0]][b[1]]] = [toys[b[0]][b[1]], toys[a[0]][a[1]]];
     }
     if (toys.some(b => b.length === 8 && b.every(x => x === b[0]))) continue;
-    const hid = toys.map(b => {
-      const r = b.length >> 1;  // the front row always shows, so a hidden block needs three rows or more
-      const h = r >= 3 && Math.random() < P.hide ? 2 + Math.floor(Math.random() * (r - 2)) : 0;
-      return b.map((_, j) => (j >> 1) < h);
-    });
+    let hid;
+    for (let t = 0; t < 30; t++) {
+      hid = toys.map(b => {
+        const r = b.length >> 1;  // the front row always shows
+        const h = r >= 2 && Math.random() < P.hide ? 1 + Math.floor(Math.random() * (r - 1)) : 0;
+        return b.map((_, j) => (j >> 1) < h);
+      });
+      const kinds = toys.flatMap((b, i) => b.filter((_, j) => hid[i][j]));
+      if (!kinds.length || kinds.length >= 4 && new Set(kinds).size >= 2) break;
+      hid = toys.map(b => b.map(() => false));
+    }
     const M = {C: P.C, home: [], baskets: toys.map((ks, i) => {
       const b = {done: false, items: ks.map((k, j) => ({kind: k, hidden: hid[i][j]}))};
       revealFront(b); return b;
@@ -444,11 +451,22 @@ function addBasket() {
   const id = freeSpot(); if (!id) return G.note("There's no room for another basket.");
   S.baskets.push(makeBasket(id, 1)); S.helpers.basket--; rehome(); resume(); buildBg(); hud();
 }
+// Shuffle mixes the toys in every basket, trying many mixes and keeping the one that gives the most
+// rolling toys a basket to go to, then leaves the most matching toys at the front.
 function doShuffle() {
   if (!S.helpers.shuffle) return G.note("No shuffles left this level.");
-  const bs = live().filter(b => !b.done && landed(b)), pool = shuffle(bs.flatMap(b => b.items.map(t => t.kind)));
+  const bs = live().filter(b => !b.done && landed(b)), kinds = bs.flatMap(b => b.items.map(t => t.kind));
+  let best = null, bestScore = -1e9;
+  for (let tries = 0; tries < 60; tries++) {
+    const pool = shuffle(kinds.slice()); let i = 0;
+    const M = {C: S.C, home: S.home.map(t => ({kind: t.kind})), baskets: live().map(b => ({done: b.done, cap: b.cap,
+      items: b.items.map(t => ({kind: bs.includes(b) ? pool[i++] : t.kind, hidden: t.hidden}))}))};
+    assignHomes(M, M.home.map(t => [t, null]));
+    const score = -10 * M.home.length + M.baskets.reduce((n, b) => n + runOf(b), 0);
+    if (score > bestScore) { bestScore = score; best = pool; }
+  }
   let i = 0;
-  for (const b of bs) for (const t of b.items) { t.kind = pool[i++]; if (!t.hidden) t.revealT = now; }
+  for (const b of bs) for (const t of b.items) { t.kind = best[i++]; if (!t.hidden) t.revealT = now; }
   for (const b of bs) if (b.items.length === CAP && b.items.every(t => t.kind === b.items[0].kind)) { b.done = true; b.items.forEach(t => { t.hidden = false; }); }
   S.helpers.shuffle--; rehome(); resume(); hud();
 }
@@ -731,7 +749,7 @@ function helpCard() {
     "<p>Every level can be won if you time it right.</p>" +
     "<p>The track only holds so many toys, and it gets shorter as levels go on. If it fills up and no toy can find a basket, the track jams.</p>" +
     "<p>Hidden toys (?) turn face up when they reach the front of their basket.</p>" +
-    "<p>Helpers: Shake rearranges the toys in one basket you pick. Shuffle mixes up every basket. Rainbow takes away every toy of one kind. Small basket adds a little basket that holds two toys.</p>"}));
+    "<p>Helpers: Shake rearranges the toys in one basket you pick. Shuffle mixes up every basket, giving as many rolling toys as it can somewhere to go. Rainbow takes away every toy of one kind. Small basket adds a little basket that holds two toys.</p>"}));
 }
 $("helpBtn").onclick = helpCard;
 
