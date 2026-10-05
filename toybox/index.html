@@ -205,9 +205,11 @@ function modelTap(M, b) {
 
 /* ---------- levels ---------- */
 // More kinds of toy and more hidden toys as levels go on, while the track holds fewer.
+// `hide` is the chance a basket starts with hidden toys; `split` is how many matching pairs get broken up.
 function params(n) {
   const k = Math.min(8, 3 + ((n - 1) >> 1));
-  return {k, B: k + (n <= 2 ? 2 : 1), C: Math.max(8, 17 - n), hide: n <= 2 ? 0 : Math.min(0.6, (n - 2) * 0.08)};
+  return {k, B: k + (n <= 2 ? 2 : 1), C: Math.max(8, 17 - n),
+    hide: n <= 2 ? 0 : Math.min(0.85, (n - 2) * 0.12), split: n <= 3 ? 0 : Math.min(0.5, (n - 3) * 0.07)};
 }
 function cloneModel(M) {
   return {C: M.C, home: M.home.map(t => ({kind: t.kind, hidden: false})),
@@ -250,7 +252,9 @@ function solveModel(M, limit) {
   }
   return dfs(M) ? path.slice() : null;
 }
-// Deal toys in matching pairs, one pair per row, leaving some rows empty, and keep the deal only if it can be won.
+// Deal toys in matching pairs, one pair per row, leaving some rows empty. On later levels some pairs are
+// broken up by swapping single toys between rows. Hidden toys come in blocks of at least two rows (four
+// toys) at the back of a basket. Keep the deal only if it can be won.
 function makeLevel(n) {
   const P = params(n);
   for (let tries = 0; tries < 300; tries++) {
@@ -260,16 +264,25 @@ function makeLevel(n) {
     const rows = Array(B).fill(4);
     for (let free = 4 * (B - P.k); free > 0;) { const i = Math.floor(Math.random() * B); if (rows[i] > 2) { rows[i]--; free--; } }
     let p = 0;
-    const out = rows.map(r => pairs.slice(p, p += r));
-    if (out.some(b => b.length === 4 && b.every(x => x === b[0]))) continue;
-    const hid = out.map(b => b.map((_, r) => r < b.length - 1 && Math.random() < P.hide));
-    const M = {C: P.C, home: [], baskets: out.map((rs, i) => {
-      const b = {done: false, items: []};
-      rs.forEach((k, r) => { b.items.push({kind: k, hidden: hid[i][r]}, {kind: k, hidden: hid[i][r]}); });
+    const toys = rows.map(r => pairs.slice(p, p += r).flatMap(k => [k, k]));
+    const spots = toys.flatMap((b, i) => b.map((_, j) => [i, j]));
+    for (let swaps = Math.round(P.split * spots.length / 2); swaps > 0; swaps--) {
+      const [a, b] = [spots[Math.floor(Math.random() * spots.length)], spots[Math.floor(Math.random() * spots.length)]];
+      if ((a[1] >> 1) === (b[1] >> 1) && a[0] === b[0]) continue;
+      [toys[a[0]][a[1]], toys[b[0]][b[1]]] = [toys[b[0]][b[1]], toys[a[0]][a[1]]];
+    }
+    if (toys.some(b => b.length === 8 && b.every(x => x === b[0]))) continue;
+    const hid = toys.map(b => {
+      const r = b.length >> 1;  // the front row always shows, so a hidden block needs three rows or more
+      const h = r >= 3 && Math.random() < P.hide ? 2 + Math.floor(Math.random() * (r - 2)) : 0;
+      return b.map((_, j) => (j >> 1) < h);
+    });
+    const M = {C: P.C, home: [], baskets: toys.map((ks, i) => {
+      const b = {done: false, items: ks.map((k, j) => ({kind: k, hidden: hid[i][j]}))};
       revealFront(b); return b;
     })};
     const moves = solveModel(M, 30000);
-    if (moves) return {n, C: P.C, k: P.k, rows: out, hid, moves};
+    if (moves) return {n, C: P.C, k: P.k, toys, hid, moves};
   }
   return null;
 }
@@ -308,9 +321,12 @@ function settleMoves(res) {
 function start(level, d) {
   if (!d.look) d.look = KINDS.map(k => Math.floor(Math.random() * k.looks.length));
   S = {level, d, C: d.C, k: d.k, baskets: [], home: [], slots: Array(d.C).fill(null), offset: 0, sets: 0, helpers: {...HELPERS}, over: false, stuck: 0};
-  d.rows.forEach((rows, bi) => {
+  if (!d.toys) {  // levels saved before toys were dealt one at a time listed rows of pairs
+    d.toys = d.rows.map(rs => rs.flatMap(k => [k, k])); d.hid = d.hid.map(hs => hs.flatMap(h => [h, h])); delete d.rows;
+  }
+  d.toys.forEach((kinds, bi) => {
     const b = makeBasket(ORDER[bi]);
-    rows.forEach((kind, r) => { for (let c = 0; c < 2; c++) { const t = toy(kind, d.hid[bi][r]); t.wasHidden = t.hidden; t.where = {t: "b", b}; b.items.push(t); } });
+    kinds.forEach((kind, j) => { const t = toy(kind, d.hid[bi][j]); t.wasHidden = t.hidden; t.where = {t: "b", b}; b.items.push(t); });
     revealFront(b); S.baskets.push(b);
   });
   for (const b of S.baskets) for (const t of b.items) { const p = target(t); t.x = p.x; t.y = p.y; }
