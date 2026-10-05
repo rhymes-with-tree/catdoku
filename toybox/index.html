@@ -45,6 +45,7 @@
   </div>
 
   <div class="actions helpers">
+    <button id="shakeBtn" aria-pressed="false" title="Shake one basket to rearrange its toys">🫨 Shake <b id="shakeN"></b></button>
     <button id="shuffleBtn" title="Mix up the toys in every basket">🔀 Shuffle <b id="shuffleN"></b></button>
     <button id="rainbowBtn" title="Take away every toy of one kind">🌈 Rainbow <b id="rainbowN"></b></button>
     <button id="basketBtn" title="Add an empty basket">🧺 Basket <b id="basketN"></b></button>
@@ -70,7 +71,7 @@ const W = 400, H = 600;          // drawing units; the canvas is scaled to fit
 const R = 14, CELL = 32;         // toy radius and basket cell
 const ROWS = 4, CAP = ROWS * 2;  // a basket holds four rows of two
 const SPEED = 420;               // track speed, units per second
-const HELPERS = {shuffle: 1, rainbow: 1, basket: 1};
+const HELPERS = {shake: 1, shuffle: 1, rainbow: 1, basket: 1};
 const KINDS = [
   {name: "Yarn balls", c: "#D9483B"}, {name: "Jingle balls", c: "#E3A91F"}, {name: "Wiffle balls", c: "#3D8FD6"},
   {name: "Pom-poms", c: "#E765A8"}, {name: "Crinkle balls", c: "#9AA3B2"}, {name: "Catnip balls", c: "#5DB04B"},
@@ -247,7 +248,7 @@ function target(t) {
 function renderPos(t) {
   const g = target(t);
   if (!t.from || now - t.t0 >= t.dur) return g;
-  const e = ease((now - t.t0) / t.dur);
+  const e = ease(Math.max(0, (now - t.t0) / t.dur));
   return {x: t.from.x + (g.x - t.from.x) * e, y: t.from.y + (g.y - t.from.y) * e};
 }
 const settled = t => !t.from || now - t.t0 >= t.dur;
@@ -293,8 +294,22 @@ function tap(b) {
   if (S.C - inTrack() < m) return nope("Hold on, the track is busy.");
   const from = new Map(b.items.map(t => [t, renderPos(t)]));
   const res = modelTap(S, b);
-  for (const t of res.released) { b.queue.push(t); t.from = from.get(t); t.t0 = now; t.dur = 0.14; t.where = {t: "q", b}; }
+  // Each toy hops into the nearest gap at the basket's mouth, so tapping as a gap rolls by puts it there.
+  // With no gap close by, it waits at the mouth for the next one.
+  const sp = L / S.C;
+  for (const t of res.released) {
+    let j = -1, bd = 1e9;
+    for (let i = 0; i < S.C; i++) {
+      if (S.slots[i]) continue;
+      const d = mod(slotS(i) - b.s + L / 2, L) - L / 2;  // above 0: already past the mouth
+      if (d <= sp * 0.6 && d >= -sp * 1.2 && Math.abs(d) < bd) { bd = Math.abs(d); j = i; }
+    }
+    t.from = from.get(t); t.t0 = now;
+    if (j >= 0) { S.slots[j] = t; t.dur = 0.16; t.where = {t: "s", j}; }
+    else { b.queue.push(t); t.dur = 0.14; t.where = {t: "q", b}; }
+  }
   settleMoves(res); hud();
+  return res;
 }
 function update(dt) {
   const delta = SPEED * dt;
@@ -305,7 +320,15 @@ function update(dt) {
     for (const b of S.baskets) {
       if (b.gone || mod(b.s - prev, L) >= delta) continue;
       const t = S.slots[j];
-      if (t && t.dest === b) { glide(t, {t: "b", b}, 0.2, () => { S.slots[j] = null; }); t.dest = null; hud(); }
+      if (t && t.dest === b) {
+        // Toys promised to a basket are all the same kind, so whichever lands first takes the next cell.
+        glide(t, {t: "b", b}, 0.2, () => {
+          S.slots[j] = null;
+          const i = b.items.indexOf(t), k = b.items.findIndex(x => x.where.t !== "b");
+          if (k >= 0 && k < i) { b.items.splice(i, 1); b.items.splice(k, 0, t); }
+        });
+        t.dest = null; hud();
+      }
       if (!S.slots[j] && b.queue.length) { const q = b.queue[0]; glide(q, {t: "s", j}, 0.12, () => { b.queue.shift(); S.slots[j] = q; }); }
     }
   }
@@ -361,6 +384,20 @@ function doShuffle() {
   for (const b of bs) if (b.items.length === CAP && b.items.every(t => t.kind === b.items[0].kind)) { b.done = true; b.items.forEach(t => { t.hidden = false; }); }
   S.helpers.shuffle--; rehome(); hud();
 }
+// Shake: pick a basket and its toys tumble into a new order.
+let picking = false;
+function pickShake(on) {
+  picking = on; $("shakeBtn").setAttribute("aria-pressed", String(on));
+  G.note(on ? "Tap a basket to shake it. Tap Shake again to cancel." : "", on ? 0 : undefined);
+}
+function shakeBasket(b) {
+  if (b.done || !landed(b) || b.queue.length || b.items.length < 2) return G.note("Pick a basket with a few toys in it. Tap Shake again to cancel.", 0);
+  const from = new Map(b.items.map(t => [t, renderPos(t)])), before = b.items.map(t => t.kind).join();
+  for (let tries = 0; tries < 10; tries++) { shuffle(b.items); if (b.items.map(t => t.kind).join() !== before) break; }
+  for (const t of b.items) { t.from = from.get(t); t.t0 = now + Math.random() * 0.08; t.dur = 0.4; }
+  const revealed = []; revealFront(b, revealed); revealed.forEach(t => { t.revealT = now + 0.3; });
+  b.shakeT = now; S.helpers.shake--; pickShake(false); rehome(); hud();
+}
 function rainbowCard() {
   if (!S.helpers.rainbow) return G.note("No rainbows left this level.");
   const all = [...live().filter(b => !b.done).flatMap(b => b.items), ...S.home];
@@ -397,7 +434,7 @@ function hud() {
   $("ctext").textContent = `🧶 ${n}/${S.C}`;
   $("fill").style.width = `${100 * n / S.C}%`;
   m.classList.toggle("warn", n >= S.C * 0.75 && n < S.C); m.classList.toggle("full", n >= S.C);
-  for (const k of ["shuffle", "rainbow", "basket"]) { $(k + "N").textContent = S.helpers[k]; $(k + "Btn").disabled = !S.helpers[k]; }
+  for (const k of ["shake", "shuffle", "rainbow", "basket"]) { $(k + "N").textContent = S.helpers[k]; $(k + "Btn").disabled = !S.helpers[k]; }
   if (!freeSpot()) $("basketBtn").disabled = true;
 }
 
@@ -592,7 +629,7 @@ canvas.addEventListener("pointerdown", e => {
   if (!S) return;
   for (const b of live()) {
     const u = (x - b.mx) * b.dx + (y - b.my) * b.dy, v = (x - b.mx) * b.px + (y - b.my) * b.py;
-    if (u > 8 && u < 172 && Math.abs(v) < 44) return tap(b);
+    if (u > 8 && u < 172 && Math.abs(v) < 44) return picking ? shakeBasket(b) : tap(b);
   }
 });
 
@@ -605,10 +642,15 @@ function loop(t) {
 
 /* ---------- buttons and start ---------- */
 const ready = () => S && !S.over && !loading;
-$("shuffleBtn").onclick = () => ready() && doShuffle();
+$("shuffleBtn").onclick = () => ready() && (pickShake(false), doShuffle());
+$("shakeBtn").onclick = () => {
+  if (!ready()) return;
+  if (!S.helpers.shake) return G.note("No shakes left this level.");
+  pickShake(!picking);
+};
 $("rainbowBtn").onclick = () => ready() && rainbowCard();
 $("basketBtn").onclick = () => ready() && addBasket();
-$("restartBtn").onclick = () => S && !loading && start(S.level, S.d);
+$("restartBtn").onclick = () => S && !loading && (pickShake(false), start(S.level, S.d));
 function helpCard() {
   G.openCard("How to play", "", [["Let's play", G.closeCard, true]], Object.assign(document.createElement("div"), {innerHTML:
     "<p>Tap a basket to tip its front toys onto the ball track.</p>" +
@@ -616,7 +658,8 @@ function helpCard() {
     "<p>Fill a basket with eight of the same toy and the basket is carried off, toys and all. Tidy every toy to finish the level.</p>" +
     "<p>Every level can be won.</p>" +
     "<p>The track only holds so many toys, and it gets shorter as levels go on. If it fills up and no toy can find a basket, the track jams.</p>" +
-    "<p>Hidden toys (?) turn face up when they reach the front of their basket.</p>"}));
+    "<p>Hidden toys (?) turn face up when they reach the front of their basket.</p>" +
+    "<p>Helpers: Shake rearranges the toys in one basket you pick. Shuffle mixes up every basket. Rainbow takes away every toy of one kind. Basket adds an empty basket.</p>"}));
 }
 $("helpBtn").onclick = helpCard;
 
