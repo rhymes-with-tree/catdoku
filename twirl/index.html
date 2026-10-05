@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Twirl</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-05.6"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-05.6">
+<style>
+/* A play mat strewn with ribbon wands; each one slides out handle first along its own ribbon. */
+.wrap.mat{height:auto}
+.wrap.mat canvas{display:block;width:100%;height:100%;border:3px solid var(--ink);border-radius:12px;touch-action:manipulation;
+  user-select:none;-webkit-user-select:none;cursor:pointer;background:var(--panel)}
+.status .info{display:flex;align-items:center;gap:10px}
+.hearts{font-size:20px;letter-spacing:1px;color:var(--fuchsia-plum)}
+.hearts .lost{color:var(--line)}
+.card ol.steps{text-align:left;margin:0 0 14px;padding-left:24px;color:var(--ink);font-size:16px;line-height:1.35}
+.card ol.steps li{margin:0 0 8px}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Twirl</h1><div class="stripe"></div><p class="tagline">Pull every ribbon toy out by its handle</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <label>Colors
+      <select id="shades" aria-label="How close the ribbon colors are">
+        <option value="wide">Wide range</option><option value="medium">Medium</option><option value="veryclose">Very close</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="status">
+    <span class="info"><span class="hearts" id="hearts" aria-label="Lives left"></span><span id="count"></span><button class="timer" id="timer" hidden></button></span>
+    <span class="msg" id="msg" aria-live="polite"></span>
+  </div>
+
+  <div class="wrap mat" id="wrap">
+    <canvas id="board" aria-label="Ribbon toys on a play mat. Tap a toy to pull it out by its handle."></canvas>
+    <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+  </div>
+
+  <div class="actions">
+    <button id="restartBtn">Restart level</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+
+  <div class="help">
+    <p>Tap a ribbon toy to pull it out by its handle. It only comes out if nothing is in the way of its handle. A blocked tap costs a life.</p>
+  </div>
+</main>
+
+<script src="../games.js?v=2026-10-05.6"></script>
+<script src="../colorways.js?v=2026-10-05.6"></script>
+<script>
+const $ = G.$;
+G.nav("twirl");
+
+/* ---------- levels (plain functions, also run in a background worker) ---------- */
+// Levels get bigger mats, longer ribbons and fuller mats as they go, up to level 20.
+function params(n) {
+  const W = Math.min(12, 5 + Math.ceil(n / 3));
+  return {W, H: Math.round(W * 1.45), maxLen: Math.min(14, 4 + (n >> 1)), fill: Math.min(0.9, 0.7 + n * 0.012)};
+}
+// The free run from (x, y) in direction d to the edge of the mat: true if no ribbon is in the way.
+function laneFree(W, H, occ, x, y, d) {
+  const dx = [0, 1, 0, -1][d], dy = [-1, 0, 1, 0][d];
+  for (x += dx, y += dy; x >= 0 && y >= 0 && x < W && y < H; x += dx, y += dy) if (occ[y * W + x] >= 0) return false;
+  return true;
+}
+// Ribbons are laid one at a time, each only where it could slide out past the ones already there. Taking
+// them out in the opposite order always works, so every mat can be cleared. New ribbons are laid across
+// the way out of ribbons that are still free where they can be, so most toys start out blocked. A ribbon
+// is its squares from tail to handle; the handle points the way it last went.
+function makeTwirl(n) {
+  const {W, H, maxLen, fill} = params(n);
+  const nb = i => { const x = i % W, y = (i / W) | 0, out = [];
+    if (y > 0) out.push(i - W); if (x < W - 1) out.push(i + 1); if (y < H - 1) out.push(i + W); if (x > 0) out.push(i - 1); return out; };
+  const dirOf = (a, b) => b === a - W ? 0 : b === a + 1 ? 1 : b === a + W ? 2 : 3;
+  const lane = (occ, h, d) => { const out = [], dx = [0, 1, 0, -1][d], dy = [-1, 0, 1, 0][d];
+    for (let x = h % W + dx, y = ((h / W) | 0) + dy; x >= 0 && y >= 0 && x < W && y < H; x += dx, y += dy) out.push(y * W + x); return out; };
+  let best = null;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const occ = new Int16Array(W * H).fill(-1), dead = new Uint8Array(W * H), ribbons = [], free = i => occ[i] < 0;
+    let filled = 0;
+    for (let fails = 0; fails < 300 && filled < fill * W * H;) {
+      // squares in the way out of ribbons that can still leave
+      const inLane = new Uint8Array(W * H);
+      for (const r of ribbons) { const h = r[r.length - 1], ln = lane(occ, h, dirOf(r[r.length - 2], h)); if (ln.every(free)) ln.forEach(i => inLane[i] = 1); }
+      let low = 99, starts = [];
+      for (let i = 0; i < W * H; i++) if (free(i) && !dead[i]) {
+        const k = nb(i).filter(free).length; if (!k) continue;
+        const score = k + (inLane[i] ? 0 : 2);
+        if (score < low) { low = score; starts = [i]; } else if (score === low) starts.push(i);
+      }
+      if (!starts.length) break;
+      const start = starts[Math.floor(Math.random() * starts.length)];
+      let placed = false;
+      for (let tries = 0; tries < 12 && !placed; tries++) {
+        const want = 2 + Math.floor(Math.random() * (maxLen - 1)), path = [start];
+        let d = -1;
+        while (path.length < want) {
+          const here = path[path.length - 1], opts = nb(here).filter(j => free(j) && !path.includes(j));
+          if (!opts.length) break;
+          const straight = opts.find(j => dirOf(here, j) === d);
+          const next = straight !== undefined && Math.random() < 0.45 ? straight : opts[Math.floor(Math.random() * opts.length)];
+          d = dirOf(here, next); path.push(next);
+        }
+        if (path.length < 2) break;
+        for (const i of path) occ[i] = ribbons.length;
+        // the handle goes on whichever end can get out, mostly the one facing across the mat, since a
+        // long way out is more likely to be crossed by ribbons laid later
+        const far = p => { const h = p[p.length - 1]; return lane(occ, h, dirOf(p[p.length - 2], h)).length + Math.random() * 4; };
+        const ends = [path, path.slice().reverse()].sort((p, q) => far(q) - far(p));
+        const ok = ends.find(p => { const h = p[p.length - 1]; return lane(occ, h, dirOf(p[p.length - 2], h)).every(free); });
+        if (ok) { ribbons.push(ok); filled += ok.length; placed = true; }
+        else for (const i of path) occ[i] = -1;
+      }
+      if (!placed) { dead[start] = 1; fails++; }
+    }
+    if (!best || filled > best.filled) best = {filled, ribbons};
+    if (filled >= fill * W * H * 0.97) break;
+  }
+  return {n, W, H, ribbons: best.ribbons};
+}
+const build = G.builder([params, laneFree, makeTwirl], "makeTwirl");
+
+/* ---------- colors ---------- */
+// Ribbons take shades from one of Yarn's colorways. Ribbons that touch get shades far apart on it, so
+// on Very close, side-by-side ribbons are what makes it hard.
+const SETS = {wide: VARIEGATED, medium: BLENDS, veryclose: COLORWAYS}, SHADES_N = 7;
+function dye(d, shades, name) {
+  const ramps = SETS[shades] || SETS.wide, names = Object.keys(ramps);
+  d.colorway = ramps[name] ? name : names[Math.floor(Math.random() * names.length)];
+  if (!d.shade) {   // which shade each ribbon wears stays the same when the colors change
+    const {W} = d, owner = new Map(); d.ribbons.forEach((r, k) => r.forEach(i => owner.set(i, k)));
+    const touch = d.ribbons.map((r, k) => new Set(r.flatMap(i => [i - W, i + W, i % W ? i - 1 : -1, (i + 1) % W ? i + 1 : -1])
+      .map(j => owner.get(j)).filter(o => o !== undefined && o !== k)));
+    d.shade = [];
+    d.ribbons.forEach((_, k) => {
+      const near = [...touch[k]].filter(o => d.shade[o] !== undefined).map(o => d.shade[o]);
+      // the shade furthest from every touching ribbon's, with a little chance in it
+      const score = Array.from({length: SHADES_N}, (_, s) => (near.length ? Math.min(...near.map(o => Math.abs(o - s))) : 0) + Math.random() * 0.9);
+      d.shade[k] = score.indexOf(Math.max(...score));
+    });
+  }
+  const ramp = ramps[d.colorway];
+  d.colors = Array.from({length: SHADES_N}, (_, s) => rampAt(ramp, s / (SHADES_N - 1)));
+}
+const mixHex = (a, b, f) => labHex(hexLab(a).map((v, k) => v + (hexLab(b)[k] - v) * f));
+
+/* ---------- playing ---------- */
+const STORE = "catdoku.twirl.v1", MAX_LEVEL = 20, HEARTS = 3, MAX_LIVES = 9;
+let saved = G.load(STORE), settings = Object.assign({shades: "wide"}, saved.settings);
+let S = null, loading = false, now = 0, moving = [], tugs = [];
+const save = () => { if (S) { S.d.ms = S.ms; G.save(STORE, {settings, level: S.level, d: S.d}); } };
+
+function start(level, d) {
+  if (!d.ribbons || !d.W) throw new Error("the saved level is from another version of the game");
+  if (!d.gone) Object.assign(d, {gone: [], hearts: HEARTS, livesUsed: HEARTS, helped: false});
+  if (!d.colors) dye(d, settings.shades);
+  S = {level, N: level, ...G.freshClock(), d, over: false};
+  if (d.ms) { S.ms = d.ms; S.started = true; }
+  moving = []; tugs = [];
+  $("levelSel").value = level;
+  resize(); save(); hud(); G.note("");
+  if (d.hearts <= 0) lost();
+}
+function startLevel(level) {
+  level = Math.min(MAX_LEVEL, Math.max(1, level));
+  loading = true; G.note("Laying out the ribbons…", 0);
+  G.track(`Twirl level ${level} started`);
+  return build.take(level).then(d => { loading = false; start(level, d); build.prefetch(Math.min(MAX_LEVEL, level + 1)); });
+}
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(n === MAX_LEVEL ? `${n} (hardest)` : String(n), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("shades").value = settings.shades;
+$("shades").onchange = e => { settings.shades = e.target.value; if (S) { dye(S.d, settings.shades); save(); } else G.save(STORE, {settings}); };
+// Restarting puts every ribbon back. It only refills lives after running out (which already keeps you
+// at this level), so it isn't a way round them.
+$("restartBtn").onclick = () => { if (!S || loading) return; G.closeCard(); restart(); };
+function restart() {
+  const d = S.d; d.gone = []; d.ms = S.ms;
+  if (d.hearts <= 0) { d.hearts = HEARTS; d.livesUsed = Math.max(d.livesUsed, HEARTS); }
+  start(S.level, d);
+}
+
+const left = () => S.d.ribbons.length - S.d.gone.length;
+function hud() {
+  const d = S.d;
+  $("hearts").innerHTML = Array.from({length: Math.max(HEARTS, d.livesUsed)}, (_, k) => k < d.hearts ? "♥" : '<span class="lost">♥</span>').join("");
+  $("hearts").setAttribute("aria-label", `${d.hearts} ${d.hearts === 1 ? "life" : "lives"} left`);
+  $("count").textContent = `🎀 ${left()} left`;
+}
+
+// What's on each square right now (ribbons already pulled out are gone at once, even mid-flight).
+function occupancy() {
+  const d = S.d, occ = new Int16Array(d.W * d.H).fill(-1), gone = new Set(d.gone);
+  d.ribbons.forEach((r, k) => { if (!gone.has(k)) for (const i of r) occ[i] = k; });
+  return occ;
+}
+const headDir = r => { const a = r[r.length - 2], b = r[r.length - 1], W = S.d.W; return b === a - W ? 0 : b === a + 1 ? 1 : b === a + W ? 2 : 3; };
+function tap(k) {
+  const d = S.d, r = d.ribbons[k], dir = headDir(r), occ = occupancy(), h = r[r.length - 1];
+  const dx = [0, 1, 0, -1][dir], dy = [-1, 0, 1, 0][dir];
+  let x = h % d.W, y = (h / d.W) | 0, run = 0, blocker = -1;
+  for (x += dx, y += dy; x >= 0 && y >= 0 && x < d.W && y < d.H; x += dx, y += dy, run++) if (occ[y * d.W + x] >= 0) { blocker = occ[y * d.W + x]; break; }
+  if (blocker < 0) {   // free: off it goes
+    d.gone.push(k); moving.push({k, t0: now, out: run + r.length + 2});
+    hud(); save();
+    if (!left()) win();
+    return;
+  }
+  // blocked: it tugs forward to whatever's in the way and springs back, and a life is lost
+  tugs.push({k, t0: now, dist: Math.max(0.15, run - 0.3), blocker});
+  d.hearts--; hud(); save();
+  if (d.hearts <= 0) { S.over = true; setTimeout(lost, 450); }
+  else G.note(d.hearts === 1 ? "Blocked. 1 life left." : `Blocked. ${d.hearts} lives left.`, 2500);
+}
+function win() {
+  S.over = true;
+  G.track(`Twirl level ${S.level} done`);
+  const result = G.finishClock(S);
+  // A level finished on the first three lives without restarting moves you up; otherwise it comes round again.
+  const helped = S.d.helped || S.d.livesUsed > HEARTS, next = helped ? S.level : Math.min(MAX_LEVEL, S.level + 1);
+  G.save(STORE, {settings, level: next});
+  build.prefetch(next);
+  const text = helped ? `Level ${S.level} done. You needed another go, so next up is level ${next} again with new ribbons.`
+    : next > S.level ? `Level ${S.level} done. Next up: level ${next}.` : `Level ${S.level} done. That's the hardest level; next up is another one.`;
+  const game = S;
+  setTimeout(() => S === game && G.winCard(text, () => { G.closeCard(); startLevel(next); }, null, result, {title: "Twirled!", next: `Next: level ${next}`,
+    after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")}), 900);
+}
+// Out of lives, as in Catdoku: start the level again, deal a new one, or come back with three more lives
+// (up to nine in all). Any of these keeps you at this level.
+function lost() {
+  S.over = true; S.d.helped = true; save();
+  const btns = [["Restart level", () => { G.closeCard(); restart(); }, true], ["New ribbons", () => { G.closeCard(); startLevel(S.level); }]];
+  let text = "Pick how you want to keep going.";
+  if (S.d.livesUsed < MAX_LIVES) btns.push(["Wait, I'm only mostly dead! Mostly dead is slightly alive, folks!", revive]);
+  else text = `All ${MAX_LIVES} lives on this level are used up.`;
+  G.openCard("Out of lives", text, btns, null, G.otherSize($("levelSel"), S.level, startLevel, "Or play a different level:"));
+}
+function revive() {
+  const d = S.d, added = Math.min(HEARTS, MAX_LIVES - d.livesUsed);
+  d.livesUsed += added; d.hearts = added; S.over = false; hud(); save();
+  const more = Math.ceil((MAX_LIVES - d.livesUsed) / HEARTS);
+  G.openCard("Slightly alive!", `Back with ${added} more ${added === 1 ? "life" : "lives"}. ${more ? `${more} ${more === 1 ? "revive" : "revives"} left on this level.` : "No revives left on this level."}`,
+    [["Keep playing", G.closeCard, true]]);
+}
+
+/* ---------- drawing ---------- */
+const canvas = $("board"), ctx = canvas.getContext("2d"), U = 40;   // drawing units per square
+const PAD = 0.5;   // a margin round the mat, in squares, so handles at the edge show whole
+let scale = 1;
+// The ribbon's center line, from tail to handle, in drawing units; `extra` carries it on past the
+// handle and off the mat, for sliding out.
+function line(r, extra = 0) {
+  const W = S.d.W, pts = r.map(i => [(i % W + 0.5) * U, (((i / W) | 0) + 0.5) * U]);
+  if (extra) { const [ax, ay] = pts[pts.length - 2], [bx, by] = pts[pts.length - 1]; pts.push([bx + (bx - ax) * extra, by + (by - ay) * extra]); }
+  return pts;
+}
+// The stretch of a line from distance a to b along it.
+function slice(pts, a, b) {
+  const out = []; let s = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const [x0, y0] = pts[i - 1], [x1, y1] = pts[i], len = Math.hypot(x1 - x0, y1 - y0);
+    const at = t => [x0 + (x1 - x0) * (t - s) / len, y0 + (y1 - y0) * (t - s) / len];
+    if (s + len >= a && s <= b) {
+      if (!out.length) out.push(at(Math.max(a, s)));
+      out.push(at(Math.min(b, s + len)));
+    }
+    s += len;
+  }
+  return out;
+}
+function trace(pts) {   // rounded corners, like a ribbon laid in loops
+  ctx.beginPath(); ctx.moveTo(...pts[0]);
+  for (let i = 1; i < pts.length - 1; i++) ctx.arcTo(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], U * 0.42);
+  ctx.lineTo(...pts[pts.length - 1]);
+}
+// One ribbon toy: a satin ribbon with a forked tail, and a wooden handle with a bead at the front.
+function drawRibbon(pts, col, flash) {
+  if (pts.length < 2) return;
+  const w = U * 0.38, dark = mixHex(col, "#2A2530", 0.45), sheen = mixHex(col, "#FFFFFF", 0.45);
+  ctx.lineJoin = "round"; ctx.lineCap = "butt";
+  trace(pts); ctx.strokeStyle = dark; ctx.lineWidth = w + 3; ctx.stroke();
+  trace(pts); ctx.strokeStyle = flash ? mixHex(col, "#FFFFFF", 0.5) : col; ctx.lineWidth = w; ctx.stroke();
+  ctx.save(); ctx.translate(-w * 0.16, -w * 0.16); trace(pts); ctx.strokeStyle = sheen; ctx.globalAlpha = 0.55; ctx.lineWidth = w * 0.22; ctx.stroke(); ctx.restore();
+  // forked tail
+  const [tx, ty] = pts[0], [nx, ny] = pts[1], L0 = Math.hypot(nx - tx, ny - ty) || 1, bx = (tx - nx) / L0, by = (ty - ny) / L0, px = -by, py = bx;
+  const tail = [[tx + px * w / 2, ty + py * w / 2], [tx + bx * U * 0.3 + px * w / 2, ty + by * U * 0.3 + py * w / 2], [tx + bx * U * 0.12, ty + by * U * 0.12],
+    [tx + bx * U * 0.3 - px * w / 2, ty + by * U * 0.3 - py * w / 2], [tx - px * w / 2, ty - py * w / 2]];
+  ctx.beginPath(); tail.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath();
+  ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = dark; ctx.lineWidth = 1.5; ctx.stroke();
+  // handle
+  const [hx, hy] = pts[pts.length - 1], [qx, qy] = pts[pts.length - 2], L1 = Math.hypot(hx - qx, hy - qy) || 1, fx = (hx - qx) / L1, fy = (hy - qy) / L1;
+  const ex = hx + fx * U * 0.36, ey = hy + fy * U * 0.36;
+  ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(hx - fx * U * 0.1, hy - fy * U * 0.1); ctx.lineTo(ex, ey); ctx.strokeStyle = "#5C3A22"; ctx.lineWidth = w * 0.62; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(hx - fx * U * 0.1, hy - fy * U * 0.1); ctx.lineTo(ex, ey); ctx.strokeStyle = "#C99A62"; ctx.lineWidth = w * 0.4; ctx.stroke();
+  ctx.beginPath(); ctx.arc(ex, ey, w * 0.42, 0, 2 * Math.PI); ctx.fillStyle = dark; ctx.fill();
+  ctx.beginPath(); ctx.arc(ex - w * 0.12, ey - w * 0.12, w * 0.14, 0, 2 * Math.PI); ctx.fillStyle = "rgba(255,255,255,.55)"; ctx.fill();
+}
+function draw() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!S) return;
+  ctx.setTransform(scale, 0, 0, scale, PAD * U * scale, PAD * U * scale);
+  const d = S.d, gone = new Set(d.gone);
+  ctx.fillStyle = "rgba(42,37,48,.13)";
+  for (let y = 0; y < d.H; y++) for (let x = 0; x < d.W; x++) { ctx.beginPath(); ctx.arc((x + 0.5) * U, (y + 0.5) * U, 1.6, 0, 2 * Math.PI); ctx.fill(); }
+  tugs = tugs.filter(t => now < t.t0 + 0.4);
+  const tugOf = new Map(tugs.map(t => [t.k, t])), flashing = new Set(tugs.map(t => t.blocker));
+  d.ribbons.forEach((r, k) => {
+    if (gone.has(k)) return;
+    const col = d.colors[d.shade[k]], t = tugOf.get(k);
+    if (!t) return drawRibbon(line(r), col, flashing.has(k) && Math.floor((now - 0) * 12) % 2 === 0);
+    const u = (now - t.t0) / 0.4, s = t.dist * U * (u < 0.45 ? Math.sin(u / 0.45 * Math.PI / 2) : Math.cos((u - 0.45) / 0.55 * Math.PI / 2));
+    const L = (r.length - 1) * U, pts = line(r, t.dist + 1);
+    drawRibbon(slice(pts, s, s + L), col);
+  });
+  // ribbons on their way out, on top, speeding up as they go
+  moving = moving.filter(m => now < m.t0 + 2);
+  for (const m of moving) {
+    const r = d.ribbons[m.k], u = now - m.t0, s = (6 * u + 30 * u * u) * U, L = (r.length - 1) * U, pts = line(r, m.out);
+    const total = (r.length - 1 + m.out) * U;
+    if (s >= total - 2) continue;
+    drawRibbon(slice(pts, s, Math.min(total, s + L)), d.colors[d.shade[m.k]]);
+  }
+}
+function resize() {
+  if (!S) return;
+  const d = S.d, wrap = $("wrap");
+  // tall mats fit the screen height too
+  const w = d.W + 2 * PAD, h = d.H + 2 * PAD;
+  wrap.style.width = `min(var(--board), calc((100svh - 60px) * ${w / h}))`;
+  wrap.style.aspectRatio = `${w} / ${h}`;
+  const r = canvas.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  if (!r.width) return;
+  canvas.width = Math.round(r.width * dpr); canvas.height = Math.round(r.width * h / w * dpr);
+  scale = canvas.width / (w * U);
+}
+new ResizeObserver(resize).observe(canvas);
+
+canvas.addEventListener("pointerdown", e => {
+  if (!S || S.over || loading) return;
+  const r = canvas.getBoundingClientRect(), d = S.d;
+  const x = Math.floor((e.clientX - r.left) / r.width * (d.W + 2 * PAD) - PAD), y = Math.floor((e.clientY - r.top) / r.height * (d.H + 2 * PAD) - PAD);
+  if (x < 0 || y < 0 || x >= d.W || y >= d.H) return;
+  const k = occupancy()[y * d.W + x];
+  if (k >= 0 && !tugs.some(t => t.k === k)) tap(k);
+});
+
+let last = performance.now();
+function loop(t) { now += Math.min(0.05, (t - last) / 1000); last = t; draw(); requestAnimationFrame(loop); }
+
+/* ---------- how to play ---------- */
+function helpCard() {
+  const media = document.createElement("div"), ol = document.createElement("ol"); ol.className = "steps";
+  for (const t of ["Tap a ribbon toy to pull it out by its handle.",
+                   "It only comes out if nothing is in the way of its handle.",
+                   "A blocked tap costs a life. Clear every toy to finish the level."]) {
+    const li = document.createElement("li"); li.textContent = t; ol.append(li);
+  }
+  media.append(ol);
+  G.openCard("How to play", "", [["Let's play", G.closeCard, true]], media);
+}
+$("helpBtn").onclick = helpCard;
+G.setupTimer({name: "twirl", game: () => S, playing: g => !g.over && !loading, save,
+  label: n => `Level ${n}`, noun: "level",
+  emptyText: "Finish a level and your times will show up here. They're kept on this device only."});
+$("bestBtn").onclick = () => G.showBests("Best times", S ? S.level : saved.level || 1);
+
+G.reopen(() => { if (saved.d && saved.level <= MAX_LEVEL) start(saved.level, saved.d); else startLevel(saved.level || 1); },
+  why => { startLevel(saved.level || 1).then(() => G.note(why, 0)); });
+if (!saved.level) helpCard();
+requestAnimationFrame(loop);
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
