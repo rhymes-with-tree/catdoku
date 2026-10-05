@@ -439,7 +439,7 @@ function restart() {
 function audit() {
   if (game.status !== "playing" || settings.autoGrade) return;
   const N = game.N;
-  game.hearts--;
+  game.hearts--; game.helped = true;   // a clue: this puzzle won't move you up a size
   game.wrong = game.cells.map((c, k) => {
     const isSol = game.sol[Math.floor(k / N)] === k % N, s = show(c);
     return (s === "cat" && !isSol) || (s === "paw" && isSol) ? k : -1;
@@ -456,10 +456,14 @@ function setNextSize(n) {
   prefetch(settings.size);
 }
 
+// Running out of lives keeps you at this size (it doesn't drop you down); the card offers any other size.
+// "Or play a different size" for the end-of-puzzle cards.
+const otherSize = () => G.otherSize($("size"), settings.size, n => { setNextSize(n); save(); newPuzzle(); });
+
 function showLost() {
-  game.status = "lost";
+  game.status = "lost"; game.helped = true;
   note("");
-  setNextSize(game.N - 1);
+  setNextSize(game.N);
   save();
   const btns = [["Restart board", restart, true], [`New puzzle (${settings.size} × ${settings.size})`, newPuzzle]];
   let text = "Pick how you want to keep going.";
@@ -467,6 +471,7 @@ function showLost() {
   else text = `All ${MAX_LIVES} lives on this run are used up.`;
   openCard("Out of lives", text, btns,
     catImg("https://cataas.com/cat/gif?" + bust(), "A cat GIF", "https://cataas.com/cat?width=500&" + bust()));
+  $("card").append(otherSize());
 }
 
 function revive() {
@@ -509,8 +514,9 @@ function win() {
   G.finishClock(game);
   track(`Catdoku solved ${game.N}x${game.N}`);
   stats.streak++; stats.best = Math.max(stats.best, stats.streak);
-  // A win on the first three lives moves up a size; a win that needed a revive stays put.
-  setNextSize(game.livesUsed <= HEARTS ? game.N + 1 : game.N);
+  // A win on the first three lives with no Audit moves up a size; a win that needed a clue, a revive
+  // or a restart after running out of lives stays put.
+  setNextSize(game.livesUsed <= HEARTS && !game.helped ? game.N + 1 : game.N);
   save();
   const done = game;   // let the finished board show for a moment first
   setTimeout(() => { if (game === done) showWon(); }, 1200);
@@ -526,8 +532,9 @@ function showWon() {
   if (stats.streak > 1) {
     const s = document.createElement("p"); s.textContent = `🔥 ${stats.streak} wins in a row`; media.append(s);
   }
-  openCard("Solved!", "", [[`New puzzle (${settings.size} × ${settings.size})`, newPuzzle, true],
+  openCard("Solved!", "", [[`Next puzzle (${settings.size} × ${settings.size})`, newPuzzle, true],
     ["Admire my board", () => { closeCard(); note("Solved! Tap New puzzle when you're ready for another.", 0); }]], media);
+  $("card").append(otherSize());
   renderStreak();
 }
 

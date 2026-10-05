@@ -35,6 +35,11 @@
   <header><h1>Toy Box</h1><div class="stripe"></div><p class="tagline">Put every toy back in its basket</p></header>
   <nav class="games" id="games" aria-label="Games"></nav>
 
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="restartBtn">Restart level</button>
+  </div>
+
   <div class="status">
     <span class="info"><span id="level"></span><button class="timer" id="timer" hidden></button><span class="meter" id="meter" title="Toys on the track"><span class="fill" id="fill"></span><span id="ctext"></span></span></span>
     <span class="msg" id="msg" aria-live="polite"></span>
@@ -52,7 +57,6 @@
     <button id="basketBtn" title="Add a little basket that holds two toys">🧺 Add a small basket <b id="basketN"></b></button>
   </div>
   <div class="actions">
-    <button id="restartBtn">Restart level</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
   </div>
@@ -367,12 +371,20 @@ function start(level, d) {
   });
   for (const b of S.baskets) for (const t of b.items) { const p = target(t); t.x = p.x; t.y = p.y; }
   effects = []; leaving = [];
-  G.save("toybox.v2", {level, d});
+  G.save("toybox.v2", {level, d}); $("levelSel").value = level;
   buildBg(); hud(); G.note("");
   build.prefetch(level + 1);
 }
 let loading = false;
+// Levels 1 to 21; difficulty stops rising at 21.
+const MAX_LEVEL = 21;
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(n === MAX_LEVEL ? `${n} (hardest)` : String(n), n));
+$("levelSel").onchange = e => { pickShake(false); G.closeCard(); startLevel(+e.target.value); };
+// Using a helper or jamming means the next level is this one again. It's kept with the level, so
+// restarting or trying again doesn't clear it.
+function markHelped() { if (!S.d.helped) { S.d.helped = true; G.save("toybox.v2", {level: S.level, d: S.d}); } }
 function startLevel(level) {
+  level = Math.min(MAX_LEVEL, Math.max(1, level));
   loading = true; G.note("Setting out the toys…", 0);
   G.track(`Toy Box level ${level} started`);
   return build.take(level).then(d => { loading = false; start(level, d); });
@@ -453,14 +465,18 @@ function win() {
   S.over = true;
   G.track(`Toy Box level ${S.level} done`);
   const result = G.finishClock(S);
-  const next = S.level + 1;
+  // A level finished without helpers or a jam moves you up; otherwise you play this level again.
+  const helped = !!S.d.helped, next = helped ? S.level : Math.min(MAX_LEVEL, S.level + 1);
   G.save("toybox.v2", {level: next});
+  const text = helped ? `Level ${S.level} done. You had some help, so next up is level ${next} again with new toys.`
+    : next > S.level ? `Level ${S.level} done. Next up: level ${next}, with ${params(next).C} spaces on the track.`
+    : `Level ${S.level} done. That's the hardest level; next up is another one.`;
   // The finishing card from the other games: time, a cat photo and a name for the cat.
-  G.winCard(`Level ${S.level} done. Next up: ${params(next).C} spaces on the track.`,
-    () => { G.closeCard(); startLevel(next); }, null, result, {title: "All tidy!", next: "Next level"});
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, null, result, {title: "All tidy!", next: `Next: level ${next}`,
+    after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
 }
 function lose() {
-  S.over = true;
+  S.over = true; markHelped();
   const btns = [], h = S.helpers, use = fn => () => { G.closeCard(); resume(); fn(); };
   if (h.shake) btns.push([`🫨 Shake a basket (${h.shake} left)`, use(() => pickShake(true))]);
   if (h.shuffle) btns.push([`🔀 Shuffle all baskets (${h.shuffle} left)`, use(doShuffle)]);
@@ -468,7 +484,8 @@ function lose() {
   if (h.basket && freeSpot()) btns.push([`🧺 Add a small basket (${h.basket} left)`, use(addBasket)]);
   if (btns.length) btns[0][2] = true;
   btns.push(["Try again", () => { G.closeCard(); start(S.level, S.d); }, !btns.length]);
-  G.openCard("The track jammed!", "Every space on the track is full and no toy has a basket to go to.", btns);
+  G.openCard("The track jammed!", "Every space on the track is full and no toy has a basket to go to.", btns, null,
+    G.otherSize($("levelSel"), S.level, startLevel, "Or play a different level:"));
 }
 const resume = () => { S.over = false; S.stuck = 0; };
 
@@ -478,7 +495,7 @@ const freeSpot = () => ORDER.find(id => !live().some(b => b.id === id));
 function addBasket() {
   if (!S.helpers.basket) return G.note("You've used Add a small basket on this level.");
   const id = freeSpot(); if (!id) return G.note("There's no room for another basket.");
-  S.baskets.push(makeBasket(id, 1)); S.helpers.basket--; resume(); buildBg(); hud();
+  S.baskets.push(makeBasket(id, 1)); markHelped(); S.helpers.basket--; resume(); buildBg(); hud();
 }
 // Shuffle mixes the toys in every basket, trying many mixes and keeping the one that gives the most
 // rolling toys a basket to go to, then leaves the most matching toys at the front.
@@ -497,7 +514,7 @@ function doShuffle() {
   let i = 0;
   for (const b of bs) for (const t of b.items) { t.kind = best[i++]; if (!t.hidden) t.revealT = now; }
   for (const b of bs) if (b.items.length === CAP && b.items.every(t => t.kind === b.items[0].kind)) { b.done = true; b.items.forEach(t => { t.hidden = false; }); }
-  bs.forEach(flipDone); S.helpers.shuffle--; resume(); hud();
+  bs.forEach(flipDone); markHelped(); S.helpers.shuffle--; resume(); hud();
 }
 // Shake: pick a basket and its toys tumble into a new order.
 let picking = false;
@@ -512,7 +529,7 @@ function shakeBasket(b) {
   for (let tries = 0; tries < 10; tries++) { shuffle(b.items); if (b.items.map(t => t.kind).join() !== before) break; }
   for (const t of b.items) { t.from = from.get(t); t.t0 = now + Math.random() * 0.08; t.dur = 0.4; }
   const revealed = []; revealFront(b, revealed); revealed.forEach(t => { t.revealT = now + 0.3; });
-  b.shakeT = now; S.helpers.shake--; pickShake(false); hud();
+  b.shakeT = now; markHelped(); S.helpers.shake--; pickShake(false); hud();
 }
 function rainbowCard() {
   if (!S.helpers.rainbow) return G.note("You've used Lose a color on this level.");
@@ -540,7 +557,7 @@ function rainbow(kind) {
   S.slots = S.slots.map(t => t && gone(t) ? null : t);
   // Toys behind the ones taken away slide forward.
   for (const [t, p] of old) if (!gone(t)) { const g = target(t); if (Math.hypot(g.x - p.x, g.y - p.y) > 1) { t.from = p; t.t0 = now; t.dur = 0.3; } }
-  S.helpers.rainbow--; resume(); hud();
+  markHelped(); S.helpers.rainbow--; resume(); hud();
 }
 
 /* ---------- tips ---------- */
@@ -572,7 +589,7 @@ function checkTips() {
 
 function hud() {
   checkTips();
-  $("level").textContent = `Level ${S.level} · ${S.sets}/${S.k} tidy`;
+  $("level").textContent = `${S.sets}/${S.k} tidy`;
   const n = inTrack(), m = $("meter");
   $("ctext").textContent = `🧶 ${n}/${S.C}`;
   $("fill").style.width = `${100 * n / S.C}%`;
@@ -808,6 +825,7 @@ function helpCard() {
     "<p>Each toy drops into the first basket it reaches whose front toy matches it, or the first empty basket it passes. Time your taps so the right toy gets there first. Toys go once round the track before they can go back into the basket they came from.</p>" +
     "<p>Fill a basket with eight of the same toy and the basket is carried off, toys and all. Tidy every toy to finish the level.</p>" +
     "<p>Every level can be won if you time it right.</p>" +
+    "<p>Finish a level without helpers and you move up a level. If you use a helper or the track jams, you play that level again with new toys. You can pick any level from the list at the top.</p>" +
     "<p>The track only holds so many toys, and it gets shorter as levels go on. If it fills up and no toy can find a basket, the track jams.</p>" +
     "<p>A toy can only leave once the whole row in front of it has gone. A matching toy right behind goes along with the one in front.</p>" +
     "<p>Hidden toys (?) turn face up when they reach the front of their basket.</p>" +
@@ -820,7 +838,7 @@ G.setupTimer({name: "toybox", game: () => S, playing: g => !g.over && !loading, 
 $("bestBtn").onclick = () => G.showBests("Best times", S ? S.level : 1);
 
 const saved = G.load("toybox.v2");
-G.reopen(() => { if (saved.d) start(saved.level, saved.d); else startLevel(saved.level || 1); }, why => { startLevel(1).then(() => G.note(why, 0)); });
+G.reopen(() => { if (saved.d && saved.level <= MAX_LEVEL) start(saved.level, saved.d); else startLevel(saved.level || 1); }, why => { startLevel(1).then(() => G.note(why, 0)); });
 if (!saved.level) helpCard();
 requestAnimationFrame(loop);
 </script>
