@@ -182,13 +182,17 @@ function revealFront(b, out) {
   const fr = (n - 1) >> 1;
   for (const i of [fr * 2, fr * 2 + 1]) if (i < n && b.items[i].hidden) { b.items[i].hidden = false; if (out) out.push(b.items[i]); }
 }
+// Both toys in a full front row are at the front, so a toy matching either one can join.
 function takes(b, kind) {
-  const n = b.items.length;
-  return !b.done && !b.gone && n < (b.cap || 8) && (!n || b.items[n - 1].kind === kind);
+  const it = b.items, n = it.length;
+  if (b.done || b.gone || n >= (b.cap || 8)) return false;
+  return !n || it[n - 1].kind === kind || n % 2 === 0 && it[n - 2].kind === kind;
 }
 function claimable(b) { return !b.gone && !b.done && !b.items.length; }
-// Put a toy in a basket; eight of one kind finishes it.
+// Put a toy in a basket, on top of the front toy it matches; eight of one kind finishes it.
 function placeToy(b, t) {
+  const it = b.items, n = it.length;
+  if (n && it[n - 1].kind !== t.kind) [it[n - 1], it[n - 2]] = [it[n - 2], it[n - 1]];
   b.items.push(t);
   if ((b.cap || 8) === 8 && b.items.length === 8 && b.items.every(x => x.kind === b.items[0].kind)) { b.done = true; b.items.forEach(x => { x.hidden = false; }); }
 }
@@ -434,7 +438,15 @@ function update(dt) {
       const t = S.slots[j];
       if (t) {
         const own = t.skip === b; if (own) t.skip = null;
-        if (!own && takes(b, t.kind)) { glide(t, {t: "b", b}, 0.2, () => { S.slots[j] = null; placeToy(b, t); flipDone(b); }); hud(); }
+        if (!own && takes(b, t.kind)) {
+          glide(t, {t: "b", b}, 0.2, () => {
+            S.slots[j] = null;
+            const it = b.items, n = it.length;  // matching the other front toy: keep both on their sides
+            if (n && it[n - 1].kind !== t.kind) it[n - 1].pin = sides(b)[n - 1];
+            placeToy(b, t); flipDone(b);
+          });
+          hud();
+        }
       }
       const q = !S.slots[j] && b.queue[0];
       if (q) glide(q, {t: "s", j}, 0.12, () => { b.queue.shift(); S.slots[j] = q; });
