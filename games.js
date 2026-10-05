@@ -2,7 +2,7 @@
    saved progress, background puzzle building, and the win card. */
 const G = (() => {
   const GAMES = [
-    ["Catdoku", "catdoku"], ["Yarn", "yarn"], ["Patches", "patches"], ["Sunbeams", "sunbeams"],
+    ["Catdoku", "catdoku"], ["Yarn", "yarn"], ["Patches", "patches"], ["Sunbeams", "sunbeams"], ["Toy Box", "toybox"],
   ];
   const $ = id => document.getElementById(id);
 
@@ -49,7 +49,7 @@ const G = (() => {
     };
   }
 
-  function openCard(title, text, btns, media) {
+  function openCard(title, text, btns, media, after) {
     const card = $("card"); card.innerHTML = "";
     const h = document.createElement("h2"); h.textContent = title; card.append(h);
     const s = document.createElement("div"); s.className = "stripe"; card.append(s);
@@ -60,10 +60,23 @@ const G = (() => {
       const b = document.createElement("button"); b.textContent = label; if (primary) b.className = "primary";
       b.onclick = fn; row.append(b);
     }
-    card.append(row); $("overlay").classList.add("show");
+    card.append(row); if (after) card.append(after);
+    $("overlay").classList.add("show");
     const first = row.querySelector("button"); if (first) first.focus();
   }
   function closeCard() { $("overlay").classList.remove("show"); }
+
+  // Moving up: after a clean win the next puzzle is one size bigger, up to the largest the page's size
+  // list offers. The finishing cards also offer every other size, so players can always choose.
+  const sizeUp = (N, sel) => Math.min(Math.max(...[...sel.options].map(o => +o.value)), N + 1);
+  function otherSize(sel, current, choose, text = "Or play a different size:") {
+    const wrap = document.createElement("label"); wrap.className = "pick";
+    const pick = document.createElement("select"); pick.setAttribute("aria-label", text);
+    for (const o of sel.options) { const c = new Option(o.textContent, o.value); c.selected = +o.value === current; pick.append(c); }
+    pick.onchange = () => { closeCard(); choose(+pick.value); };
+    wrap.append(text, pick);
+    return wrap;
+  }
 
   const NAMES = ["Biscuit", "Mochi", "Pickles", "Noodle", "Sprocket", "Whiskerdoodle", "Pounce", "Kerfuffle",
     "Sir Pounce-a-Lot", "Lady Marmalade", "Duke Fluffington", "Captain Mittens", "Professor Paws", "Count Catula",
@@ -83,16 +96,20 @@ const G = (() => {
     return img;
   }
   // "Solved!" card: message, cat photo, cat name, then the next-puzzle button and a button
-  // that closes the card to leave the finished board on screen.
+  // that closes the card to leave the finished board on screen. `o` can change the title and
+  // next button and add something below the buttons (`after`); passing admire as null leaves out
+  // the admire button.
   const ADMIRE_NOTE = "Solved! Tap New puzzle when you're ready for another.";
-  function winCard(text, onNext, admire = "Admire my board", result) {
+  function winCard(text, onNext, admire = "Admire my board", result, o = {}) {
     const media = document.createElement("div");
     const p = document.createElement("p"); p.textContent = text;
     const name = document.createElement("p"); name.className = "catname";
     name.textContent = `Meet ${NAMES[Math.floor(Math.random() * NAMES.length)]}!`;
     const tl = timeLineEl(result); if (tl) media.append(tl);
     media.append(p, catPhoto(), name);
-    openCard("Solved!", "", [["New puzzle", onNext, true], [admire, () => { closeCard(); note(ADMIRE_NOTE, 0); }]], media);
+    const btns = [[o.next || "New puzzle", onNext, true]];
+    if (admire !== null) btns.push([admire, () => { closeCard(); note(ADMIRE_NOTE, 0); }]);
+    openCard(o.title || "Solved!", "", btns, media, o.after);
   }
 
   // Count a moment in the game (a puzzle started or solved) on the GoatCounter dashboard.
@@ -128,7 +145,10 @@ const G = (() => {
     .card h3{margin:4px 0 6px;font-size:18px}`;
   document.head.append(style);
 
-  let T = null;   // {name, game(), playing(game), save()}
+  // {name, game(), playing(game), save(), and optionally label(n) and noun for what bests are kept by,
+  //  and emptyText for the Best times card before anything is finished}
+  let T = null;
+  const label = n => T.label ? T.label(n) : `${n} × ${n}`, noun = () => T.noun || "size";
   function setupTimer(opts) {
     T = opts;
     const board = $("board"), start = () => { const g = T.game(); if (g && g.timed && T.playing(g) && !$("overlay").classList.contains("show")) g.started = true; };
@@ -172,7 +192,7 @@ const G = (() => {
   function timeLine(r) {
     if (!r || r.ms == null) return "";
     if (r.isBest && r.best !== null) return `Time ${clock(r.ms)}. New personal best! (was ${clock(r.best)})`;
-    if (r.isBest) return `Time ${clock(r.ms)}. Your first time at this size.`;
+    if (r.isBest) return `Time ${clock(r.ms)}. Your first time at this ${noun()}.`;
     return `Time ${clock(r.ms)}. Your best is ${clock(r.best)}.`;
   }
   function timeLineEl(r) { const t = timeLine(r); if (!t) return null; const p = document.createElement("p"); p.className = "timeline"; p.textContent = t; return p; }
@@ -182,20 +202,20 @@ const G = (() => {
     const mine = load(BESTS)[T.name] || {}, sizes = Object.keys(mine).map(Number).sort((a, b) => a - b);
     const media = document.createElement("div");
     if (!sizes.length) {
-      const p = document.createElement("p"); p.textContent = "Solve a puzzle and your times will show up here. They're kept on this device only."; media.append(p);
+      const p = document.createElement("p"); p.textContent = T.emptyText || "Solve a puzzle and your times will show up here. They're kept on this device only."; media.append(p);
     } else {
       const t = document.createElement("table"); t.className = "bests";
-      t.innerHTML = '<tr><th>Size</th><th class="num">Best</th><th class="num">Solved</th></tr>';
+      t.innerHTML = `<tr><th>${noun()[0].toUpperCase() + noun().slice(1)}</th><th class="num">Best</th><th class="num">Solved</th></tr>`;
       for (const n of sizes) {
         const r = t.insertRow(); if (n === N) r.className = "now";
-        r.insertCell().textContent = `${n} × ${n}`;
+        r.insertCell().textContent = label(n);
         const b = r.insertCell(); b.className = "num"; b.textContent = mine[n].times.length ? clock(mine[n].times[0].ms) : "–";
         const c = r.insertCell(); c.className = "num"; c.textContent = mine[n].solves;
       }
       media.append(t);
       const top = (mine[N] || {times: []}).times;
       if (top.length) {
-        const h = document.createElement("h3"); h.textContent = `Fastest at ${N} × ${N}`; media.append(h);
+        const h = document.createElement("h3"); h.textContent = `Fastest at ${label(N)}`; media.append(h);
         const t2 = document.createElement("table"); t2.className = "bests";
         top.forEach((x, i) => { const r = t2.insertRow(); r.insertCell().textContent = `${i + 1}.`; const c = r.insertCell(); c.className = "num"; c.textContent = clock(x.ms); r.insertCell().textContent = x.d; });
         media.append(t2);
@@ -288,6 +308,6 @@ const G = (() => {
     }
   }
 
-  return {$, nav, load, save, builder, openCard, closeCard, winCard, note, cellAt, track, reopen,
+  return {$, nav, load, save, builder, openCard, closeCard, winCard, sizeUp, otherSize, note, cellAt, track, reopen,
           setupTimer, freshClock, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard};
 })();

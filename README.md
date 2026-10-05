@@ -13,6 +13,7 @@ Open `index.html` in any modern browser. No build step or dependencies.
 - Auto grade and auto exclude toggles
 - Paw marks (🐾) by tapping or dragging, with an erase mode
 - Undo, restart, audit, and lives with revives
+- Wins move you up a size; a win that needed Audit or a revive, or running out of lives, keeps you at the same size
 - Progress saved in `localStorage`
 - Cat photos, facts, and breeds from public cat APIs (all optional; the game works offline)
 
@@ -26,6 +27,7 @@ Shared styling and helpers live in `games.css` and `games.js`.
 Every game has a timer that starts on your first move and pauses while the page is in the background or a card is open. Tap it to hide the time.
 Your fastest times for each game and size are kept on your device and shown under Best times.
 Share sends a link to the exact puzzle, either fresh or with your moves so far (to ask for help). The puzzle travels inside the link, so no server is involved.
+Every game moves you up as you win: the next puzzle is a size bigger (or, in Toy Box, the next level). If you needed help (in Catdoku, Audit or running out of lives; in Toy Box, a helper or a jam), you stay at the same size or level. The finishing card, and Catdoku's out-of-lives and Toy Box's jam cards, always let you pick a different size or level instead.
 
 ## Patches
 
@@ -36,6 +38,11 @@ Patches with a button come already sewn. Every quilt is generated in the browser
 
 A fourth puzzle in `sunbeams/`, a cat-themed Shikaku: every number is a cat, and each cat needs a rectangle of sunlight with exactly that many squares, until the whole floor is sunny.
 Each sunbeam gets a sleeping cat of the right size and shape, stretched out to fill it. The cat pictures live in `cats/` so any game can use them.
+
+## Toy Box
+
+A fifth game in `toybox/`, a cat-toy sorting game. Tap a wicker basket to tip its front toys onto a winding ball track; each toy drops into the first basket it reaches whose front toy matches, or the first empty basket, so timing a tap decides where toys go. Toys go once round before they can return to their own basket. If the two front toys differ, the one you tap is the one sent, and a toy can only leave once the whole row in front of it has gone. A toy alone in its row sits in the middle, so it reads as the front of the basket. Short tips pop up the first time two different front toys appear and the first time the track is nearly full. Fill a basket with eight of one toy and it's carried off, basket and all, so there are fewer baskets to work with as you go.
+There are 21 levels, picked from a list at the top; they get harder up to level 21: up to all nine kinds of toy, a track that shrinks from 16 spaces to 5, more hidden toys and more split pairs. The track holds fewer toys as levels go on, and more toys start hidden in the back rows of baskets (a level hides none, or at least four toys of at least two kinds). From level 4 some matching pairs are dealt split up, so toys aren't always side by side with their match. If the track fills and nothing can find a basket, it jams. Every level is checked by a solver in a background Web Worker before it's dealt, so it can always be won with the right timing (the solver follows the same first-basket rule, and treats which rolling toy reaches an empty basket first as the player's choice). Toys are pictures in `toybox/toys/` (256 × 256 WebP with a clear background, nine kinds, one per colour; some colours have more than one picture and each level picks one), with drawn stand-ins if a picture is missing. Each level has one of each helper: Shake a basket (rearranges one basket you pick), Shuffle all baskets (picks the mix that gives the most rolling toys somewhere to go), Lose a color (takes away every toy of one color) and Add a small basket (holds two toys). When the track jams, any helpers left are offered. There's a timer with best times for each level, and a cat photo when you finish a level. There's no share link for Toy Box.
 
 ## License
 
