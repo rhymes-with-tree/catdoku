@@ -139,7 +139,19 @@ function makeBasket(id, rows = ROWS) {
 const basketEnd = b => 38 + CELL * b.rows;  // how far the basket reaches from the track
 const frame = (b, dist, off) => ({x: b.mx + b.dx * dist + b.px * off, y: b.my + b.dy * dist + b.py * off});
 // Toys fill a basket from the back; row 0 is the back row.
-const cellPos = (b, i) => frame(b, 48 + CELL * (b.rows - 1 - (i >> 1)), ((i & 1) - 0.5) * CELL);
+// Which side of its row each toy sits on. A toy starting a row sits above a toy of its own kind in the row
+// below if there is one, so matching toys stack up visibly; the next toy in that row takes the other side.
+function sides(b) {
+  const it = b.items, side = [];
+  for (let i = 0; i < it.length; i += 2) {
+    const below = i ? [it[i - 2], it[i - 1]] : [];
+    const under = c => below[side[i - 2] === c ? 0 : 1];
+    side[i] = i && under(1).kind === it[i].kind && under(0).kind !== it[i].kind ? 1 : 0;
+    side[i + 1] = 1 - side[i];
+  }
+  return side;
+}
+const cellPos = (b, i) => frame(b, 48 + CELL * (b.rows - 1 - (i >> 1)), (sides(b)[i] - 0.5) * CELL);
 const queuePos = (b, q) => frame(b, 30 - (q >> 1) * 3, ((q & 1) - 0.5) * CELL);
 
 /* ---------- the rules ---------- */
@@ -358,10 +370,12 @@ function tap(b) {
   if (S.C - inTrack() < m) return nope("Hold on, the track is busy.");
   const from = new Map(b.items.map(t => [t, renderPos(t)]));
   const res = modelTap(S, b);
+  settleMoves(res);
   // Each toy hops into the nearest gap at the basket's mouth, so tapping as a gap rolls by puts it there.
   // With no gap close by, it waits at the mouth for the next one.
   const sp = L / S.C;
   for (const t of res.released) {
+    if (t.dest === b) { b.queue.push(t); t.from = from.get(t); t.t0 = now; t.dur = 0.14; t.where = {t: "q", b}; continue; }  // hops back in
     let j = -1, bd = 1e9;
     for (let i = 0; i < S.C; i++) {
       if (S.slots[i]) continue;
@@ -372,11 +386,22 @@ function tap(b) {
     if (j >= 0) { S.slots[j] = t; t.dur = 0.16; t.where = {t: "s", j}; t.skip = mod(slotS(j) - b.s + L / 2, L) < L / 2 ? b : null; }
     else { b.queue.push(t); t.dur = 0.14; t.where = {t: "q", b}; }
   }
-  settleMoves(res); hud();
+  hud();
   return res;
+}
+// Toys promised to a basket are all the same kind, so whichever lands first takes the next cell.
+function land(t, b, leave) {
+  glide(t, {t: "b", b}, 0.2, () => {
+    leave();
+    const i = b.items.indexOf(t), k = b.items.findIndex(x => x.where.t !== "b" && x !== t);
+    if (k >= 0 && k < i) { b.items.splice(i, 1); b.items.splice(k, 0, t); }
+  });
+  t.dest = null; hud();
 }
 function update(dt) {
   const delta = SPEED * dt;
+  // A toy waiting at a basket's mouth that has been promised that same basket hops straight back in.
+  for (const b of S.baskets) for (const q of [...b.queue]) if (q.dest === b && settled(q)) land(q, b, () => b.queue.splice(b.queue.indexOf(q), 1));
   S.offset = mod(S.offset + delta, L);
   // A toy passing the basket it was promised hops in; a waiting toy hops onto an empty spot as it passes.
   for (let j = 0; j < S.C; j++) {
@@ -384,23 +409,18 @@ function update(dt) {
     for (const b of S.baskets) {
       if (b.gone || mod(b.s - prev, L) >= delta) continue;
       const t = S.slots[j];
-      // A toy dropped in just before its own basket's mouth rolls once round before it can go back in.
-      if (t && t.skip === b) t.skip = null;
-      else if (t && t.dest === b) {
-        // Toys promised to a basket are all the same kind, so whichever lands first takes the next cell.
-        glide(t, {t: "b", b}, 0.2, () => {
-          S.slots[j] = null;
-          const i = b.items.indexOf(t), k = b.items.findIndex(x => x.where.t !== "b");
-          if (k >= 0 && k < i) { b.items.splice(i, 1); b.items.splice(k, 0, t); }
-        });
-        t.dest = null; hud();
-      } else if (t && !t.dest && claimable(b)) {
+      // A toy that has just emptied its basket can't claim it straight back, so emptying a basket
+      // leaves it for another kind; it can once it has been round. Promised toys always go in.
+      const own = t && t.skip === b; if (own) t.skip = null;
+      if (t && t.dest === b) land(t, b, () => { S.slots[j] = null; });
+      else if (t && !t.dest && !own && claimable(b)) {
         // A toy with no basket claims the first empty one it rolls past.
         S.home.splice(S.home.indexOf(t), 1); b.items.push(t);
         glide(t, {t: "b", b}, 0.2, () => { S.slots[j] = null; });
         rehome(); hud();
       }
-      if (!S.slots[j] && b.queue.length) { const q = b.queue[0]; glide(q, {t: "s", j}, 0.12, () => { b.queue.shift(); S.slots[j] = q; }); }
+      const q = !S.slots[j] && b.queue.find(x => x.dest !== b);
+      if (q) glide(q, {t: "s", j}, 0.12, () => { b.queue.splice(b.queue.indexOf(q), 1); S.slots[j] = q; });
     }
   }
   // A full basket of one toy waits for its last toy to land, then is carried off with its toys,
