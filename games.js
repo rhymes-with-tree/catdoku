@@ -2,7 +2,7 @@
    saved progress, background puzzle building, and the win card. */
 const G = (() => {
   const GAMES = [
-    ["Catdoku", "catdoku"], ["Yarn", "yarn"], ["Patches", "patches"], ["Sunbeams", "sunbeams"], ["Toy Box", "toybox"], ["Pounce", "pounce"],
+    ["Catdoku", "catdoku"], ["Yarn", "yarn"], ["Patches", "patches"], ["Sunbeams", "sunbeams"], ["Toy Box", "toybox"], ["Pounce", "pounce"], ["Twirl", "twirl"],
   ];
   const $ = id => document.getElementById(id);
 
