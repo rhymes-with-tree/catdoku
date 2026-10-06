@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hide &amp; Seek</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-06.8";
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&family=Permanent+Marker&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-06.8">
+<style>
+/* A wooden floor covered in cardboard boxes. Checked boxes get a number written on them in marker, like a
+   labelled box; marked ones get a cat doodled on; a startled cat's box gets HISS scrawled across it. */
+:root{--marker:"Permanent Marker","Marker Felt","Comic Sans MS",cursive}
+.wrap{width:var(--board);overflow-x:auto}
+.floor{display:grid;background:repeating-linear-gradient(0deg,#C99A6B 0 22px,#B4855A 22px 24px);border:4px solid #7A4E2C;border-radius:10px;
+  user-select:none;-webkit-user-select:none;touch-action:manipulation;margin:0 auto}
+.sq{position:relative;aspect-ratio:1;display:flex;align-items:center;justify-content:center;line-height:1;cursor:pointer}
+.sq svg{position:absolute;inset:0;width:100%;height:100%}
+.sq.open{cursor:default}
+.sq .n{position:relative;font-family:var(--marker);font-size:1.2em;transform:rotate(-6deg) translateY(4%);animation:label .2s ease-out}
+@keyframes label{from{opacity:0;transform:rotate(-6deg) scale(1.4)}}
+.n0{color:#8E8794}.n1{color:#3C5BA8}.n2{color:#2F7D3F}.n3{color:#B23A28}.n4{color:#5B3F8C}.n5{color:#8A3A1E}.n6{color:#2E7F80}.n7{color:#2A2530}.n8{color:#5E5866}
+.sq svg.doodle{animation:label .2s ease-out}
+.sq .hissed{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--marker);color:#B23A28;font-size:.72em;transform:rotate(-12deg);z-index:1}
+.sq img.sleeper{position:absolute;inset:14%;width:72%;height:72%;object-fit:contain;filter:drop-shadow(0 2px 2px rgba(60,30,10,.35))}
+.sq.hiss{animation:shake .4s}
+@keyframes shake{25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+.sq.hintme{animation:glow .6s ease-in-out 4 alternate}
+@keyframes glow{to{filter:brightness(1.25) drop-shadow(0 0 4px #FFE07A)}}
+.bighiss{position:fixed;left:0;top:0;z-index:20;pointer-events:none;font-family:var(--marker);color:#B23A28;font-size:min(30vw,170px);line-height:1;white-space:nowrap;text-shadow:3px 3px 0 #fff}
+.hearts{letter-spacing:2px}
+.left{display:flex;gap:10px;align-items:center}
+.card ol.steps{text-align:left;margin:0 0 14px;padding-left:24px;color:var(--ink);font-size:16px;line-height:1.35}
+.card ol.steps li{margin:0 0 8px}
+.card .tip{font-size:14px;margin:0 0 14px}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Hide &amp; Seek</h1><div class="stripe"></div><p class="tagline">Find every cat hiding in the boxes</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="bar">
+    <label>Size <select id="size" aria-label="Floor size"></select></label>
+    <button id="newBtn" class="primary">New floor</button>
+  </div>
+
+  <div class="status"><span class="left"><span id="count"></span><span class="hearts" id="hearts"></span></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap"><div class="floor" id="board" role="grid" aria-label="Floor covered in boxes"></div></div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="markBtn" aria-pressed="false">🐱 Mark</button>
+    <button id="hintBtn">Hint</button>
+    <button id="shareBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+
+  <div class="help">
+    <p>Tap a box to check it. It gets labelled with how many cats are hiding in the boxes around it, diagonals too. A box labelled 0 checks its neighbours for you.</p>
+    <p>Mark a box you're sure hides a cat: switch on Mark, or press and hold the box. Do the same again to take the mark off. Tap a labelled box whose cats are all marked to check the rest around it.</p>
+    <p>Checking a box with a sleeping cat in it startles the cat and costs a life. Your first box is always safe, and every floor can be cleared by thinking it through, with no guessing.</p>
+  </div>
+</main>
+
+<script src="../games.js?v=2026-10-06.8"></script>
+<script>
+/* ---------- sizes ---------- */
+// Width, height and cats, from Minesweeper's beginner board up to its expert one stood on end (16 across, 30 down),
+// with the share of boxes hiding a cat creeping up from 12% to 21%.
+const SIZES = [[9, 9, 10], [10, 10, 14], [12, 12, 22], [14, 14, 31], [16, 16, 40], [16, 20, 56], [16, 25, 76], [16, 30, 99]];
+const sizeLabel = n => `${SIZES[n][0]} × ${SIZES[n][1]}`;
+
+/* ---------- pictures ---------- */
+const BOX = `<svg class="boxart" viewBox="0 0 100 100" aria-hidden="true">
+  <rect x="5" y="5" width="90" height="90" rx="6" fill="#D9A86C" stroke="#7A4E2C" stroke-width="4"/>
+  <path d="M5 50 H95" stroke="#B98549" stroke-width="4"/><path d="M50 5 V95" stroke="#B98549" stroke-width="3" opacity=".6"/>
+  <rect x="40" y="5" width="20" height="90" fill="#E9C08A" opacity=".55"/><path d="M12 14 L30 14" stroke="#F3D7AE" stroke-width="4" stroke-linecap="round"/></svg>`;
+// An opened box, flaps folded out: where the sleeping cats are shown once the floor is cleared.
+const OPENBOX = `<svg viewBox="0 0 100 100" aria-hidden="true">
+  <path d="M6 6 L94 6 L80 20 L20 20 Z" fill="#E9C08A" stroke="#7A4E2C" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M6 94 L94 94 L80 80 L20 80 Z" fill="#E9C08A" stroke="#7A4E2C" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M6 6 L20 20 L20 80 L6 94 Z" fill="#DDB27A" stroke="#7A4E2C" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M94 6 L80 20 L80 80 L94 94 Z" fill="#DDB27A" stroke="#7A4E2C" stroke-width="3" stroke-linejoin="round"/>
+  <rect x="20" y="20" width="60" height="60" fill="#E3C394"/><path d="M20 20 L80 20 L80 27 L20 27 Z" fill="#C9A06C" opacity=".7"/></svg>`;
+// A cat face doodled on a box in marker: the mark for "a cat is in here".
+const DOODLE = `<svg class="doodle" viewBox="0 0 100 100" aria-hidden="true"><g fill="none" stroke="#2A2530" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" transform="rotate(-6 50 50)">
+  <path d="M27 44 L31 22 L44 35 C48 34 53 34 57 35 L70 22 L73 44 C78 52 76 66 67 72 C58 78 42 78 33 72 C24 66 22 52 27 44 Z"/>
+  <path d="M40 51 L40 53 M60 51 L60 53" stroke-width="6"/><path d="M47 60 L50 63 L53 60"/>
+  <path d="M30 59 L16 56 M30 64 L17 66 M70 59 L84 56 M70 64 L83 66" stroke-width="3.5"/></g></svg>`;
+// The curled-up cats from Sunbeams (../cats/), nearly round, so each fits one box. Each box picks one,
+// turned and flipped its own way, so a floor full of cats doesn't look like one cat repeated.
+const CURLED = ["c14-36", "c16-5", "c14-34", "c15-6", "c14-35", "c15-5", "c16-3"];
+function hash(x) { x = Math.imul(x ^ (x >>> 16), 0x45d9f3b); x = Math.imul(x ^ (x >>> 16), 0x45d9f3b); return (x ^ (x >>> 16)) >>> 0; }
+function sleeper(i) {
+  const h = hash(i * 977 + game.seed), turn = (h >> 3) % 4 * 90, flip = h & 4 ? -1 : 1;
+  return `<img class="sleeper" src="../cats/${CURLED[h % CURLED.length]}.webp" alt="" style="transform:rotate(${turn}deg) scaleX(${flip})">`;
+}
+
+/* ---------- hiding the cats ---------- */
+let W = 9, H = 9;
+const nbrs = i => { const x = i % W, y = (i / W) | 0, out = [];
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (dx || dy) { const a = x + dx, b = y + dy; if (a >= 0 && b >= 0 && a < W && b < H) out.push(b * W + a); }
+  return out; };
+// What can be worked out from what's known, without guessing: boxes that must be safe and boxes that must hide
+// a cat. `known` gives each checked box's label (-1 if unchecked); `sure` marks boxes known to hide a cat. Steps through the rules
+// (one label on its own, one label's boxes inside another's, and the number of cats left) and calls `safe(i)`
+// for each safe box found; that returns the label it turns out to have, or -1 to stop.
+function deduce(known, sure, cats, safe) {
+  const N = W * H, mk = Uint8Array.from(sure), lab = known;   // labels found on the way are written into `known`
+  const learn = i => { if (lab[i] >= 0) return true; const v = safe(i); if (v < 0) return false; lab[i] = v; return true; };
+  for (let changed = true; changed;) {
+    changed = false;
+    const cons = [];
+    for (let i = 0; i < N; i++) if (lab[i] >= 0) {
+      const u = nbrs(i).filter(j => lab[j] < 0 && !mk[j]); if (!u.length) continue;
+      const need = lab[i] - nbrs(i).filter(j => mk[j]).length;
+      if (need === 0) { for (const j of u) if (!learn(j)) return; changed = true; }
+      else if (need === u.length) { u.forEach(j => { mk[j] = 1; }); changed = true; }
+      else cons.push([u, need]);
+    }
+    if (changed) continue;
+    outer: for (const [a, na] of cons) for (const [b, nb] of cons) {
+      if (a === b || a.length >= b.length || !a.every(j => b.includes(j))) continue;
+      const rest = b.filter(j => !a.includes(j)), need = nb - na;
+      if (need === 0) { for (const j of rest) if (!learn(j)) return; changed = true; break outer; }
+      if (need === rest.length) { rest.forEach(j => { mk[j] = 1; }); changed = true; break outer; }
+    }
+    if (!changed) {
+      const unk = []; for (let i = 0; i < N; i++) if (lab[i] < 0 && !mk[i]) unk.push(i);
+      const left = cats - mk.reduce((s, v) => s + v, 0);
+      if (unk.length && left === 0) { for (const j of unk) if (!learn(j)) return; changed = true; }
+      else if (unk.length && left === unk.length) { unk.forEach(j => { mk[j] = 1; }); changed = true; }
+    }
+  }
+}
+// Hide the cats so the first box and its neighbours are empty and the whole floor can be cleared by thinking.
+function hideCats(first, C) {
+  const N = W * H, keep = new Set([first, ...nbrs(first)]);
+  for (let tries = 0; tries < 5000; tries++) {
+    const cat = new Uint8Array(N), free = [];
+    for (let i = 0; i < N; i++) if (!keep.has(i)) free.push(i);
+    for (let k = 0; k < C; k++) { const r = k + Math.floor(Math.random() * (free.length - k)); [free[k], free[r]] = [free[r], free[k]]; cat[free[k]] = 1; }
+    const label = i => nbrs(i).reduce((s, j) => s + cat[j], 0), known = new Int8Array(N).fill(-1);
+    // checking the first box (and every 0 it spreads to), then everything that can be worked out
+    const spread = s => { const st = [s]; while (st.length) { const i = st.pop(); if (known[i] >= 0) continue; known[i] = label(i); if (!known[i]) st.push(...nbrs(i).filter(j => known[j] < 0)); } };
+    spread(first);
+    deduce(known, new Uint8Array(N), C, i => { spread(i); return known[i]; });
+    let cleared = true; for (let i = 0; i < N; i++) if (!cat[i] && known[i] < 0) { cleared = false; break; }
+    if (cleared) return [...cat.keys()].filter(i => cat[i]);
+  }
+  return null;
+}
+
+/* ---------- game ---------- */
+const STORE = "catdoku.hideseek.v1";
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({size: 0}, state.settings);
+let game = state.game || null, markMode = false, cat = null;
+const save = () => G.save(STORE, {settings, game});
+const setOf = a => new Set(a || []);
+let open, mark, caught;
+const label = i => nbrs(i).reduce((s, j) => s + cat[j], 0);
+
+function load() {   // the working copies of the saved game
+  [W, H] = [game.W, game.H];
+  cat = new Uint8Array(W * H); (game.cats || []).forEach(i => { cat[i] = 1; });
+  open = setOf(game.open); mark = setOf(game.mark); caught = setOf(game.caught);
+}
+function store() { game.open = [...open]; game.mark = [...mark]; game.caught = [...caught]; save(); }
+const playing = () => game && !game.won && !game.lost;
+
+function newFloor() {
+  const N = settings.size, [w, h, c] = SIZES[N];
+  game = {N, W: w, H: h, C: c, cats: null, first: -1, open: [], mark: [], caught: [], lives: 3, won: false, lost: false, hinted: false,
+          seed: Math.floor(Math.random() * 1e6), ...G.freshClock()};
+  load(); layout(); save(); G.note("");
+  G.track(`Hide & Seek new floor ${sizeLabel(N)}`);
+}
+function startLevel(n) { settings.size = n; $("size").value = n; save(); G.closeCard(); newFloor(); }
+
+// Check boxes from s, spreading out from every 0.
+function spread(s) {
+  const st = [s];
+  while (st.length) { const i = st.pop(); if (open.has(i) || mark.has(i) || caught.has(i)) continue; open.add(i); if (!label(i)) st.push(...nbrs(i).filter(j => !open.has(j))); }
+}
+function check(i) {
+  if (!playing() || open.has(i) || mark.has(i) || caught.has(i)) return;
+  if (!game.cats) {   // the first box: hide the cats now, around it
+    const cats = hideCats(i, game.C);
+    if (!cats) { G.note("Couldn't hide the cats fairly. Try New floor.", 0); return; }
+    game.cats = cats; game.first = i; game.started = true; load();
+  }
+  if (cat[i]) {   // a startled cat: it costs a life, and that box is known from now on
+    caught.add(i); game.lives--; store();
+    const sq = $("board").children[i];
+    G.note(game.lives ? "Hiss! A cat was in there." : "", 0);
+    draw(); sq.style.visibility = "hidden";
+    bigHiss(sq, () => { sq.style.visibility = ""; sq.classList.add("hiss"); if (!game.lives) outOfLives(); });
+    return;
+  }
+  spread(i); store(); draw(); checkWin();
+}
+// HISS fills the screen, holds for a moment, then shrinks down onto the box it came from.
+function bigHiss(sq, done) {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) { done(); return; }
+  const big = document.createElement("div"); big.className = "bighiss"; big.textContent = "HISS"; document.body.append(big);
+  const bw = big.offsetWidth, bh = big.offsetHeight, r = sq.getBoundingClientRect();
+  const cx = innerWidth / 2 - bw / 2, cy = innerHeight / 2 - bh / 2, tx = r.left + r.width / 2 - bw / 2, ty = r.top + r.height / 2 - bh / 2;
+  const a = big.animate([
+    {transform: `translate(${cx}px, ${cy}px) rotate(-12deg) scale(.2)`, opacity: 0},
+    {transform: `translate(${cx}px, ${cy}px) rotate(-12deg) scale(1.08)`, opacity: 1, offset: .18},
+    {transform: `translate(${cx}px, ${cy}px) rotate(-12deg) scale(1)`, opacity: 1, offset: .55},
+    {transform: `translate(${tx}px, ${ty}px) rotate(-12deg) scale(${r.width * .72 / bw})`, opacity: 1}
+  ], {duration: 1100, easing: "ease-in-out"});
+  a.onfinish = () => { big.remove(); done(); };
+}
+function toggleMark(i) {
+  if (!playing() || !game.cats || open.has(i) || caught.has(i)) return;
+  mark.has(i) ? mark.delete(i) : mark.add(i); store(); draw();
+}
+// Tapping a labelled box whose cats are all marked (or found) checks the rest around it.
+function chord(i) {
+  const around = nbrs(i);
+  if (around.filter(j => mark.has(j) || caught.has(j)).length !== label(i)) return;
+  for (const j of around) if (!open.has(j) && !mark.has(j) && !caught.has(j)) { check(j); if (!playing() || caught.has(j)) return; }
+}
+
+/* ---------- endings ---------- */
+const clean = () => game.lives === 3 && !game.hinted;
+function checkWin() {
+  for (let i = 0; i < W * H; i++) if (!cat[i] && !open.has(i)) return;
+  game.won = true; G.finishClock(game);
+  settings.size = clean() ? G.sizeUp(game.N, $("size")) : game.N; $("size").value = settings.size;
+  save(); draw();
+  G.track(`Hide & Seek cleared ${sizeLabel(game.N)}`);
+  const done = game;   // two seconds to see the sleepy cats first
+  setTimeout(() => { if (game === done) winCard(); }, 2000);
+}
+function winCard() {
+  const next = settings.size, startled = 3 - game.lives;
+  let text = `All ${game.C} cats found${startled ? `, with ${startled} startled` : ""}.`;
+  text += next > game.N ? ` Next up: ${sizeLabel(next)}.` : clean() ? " That's the biggest floor; here's another." : ` ${game.hinted ? "You had a hint" : "A cat was startled"}, so next up is another ${sizeLabel(next)}.`;
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the sleepy cats", game.result,
+    {title: "Found them all!", next: `Next: ${sizeLabel(next)}`, after: G.otherSize($("size"), next, startLevel)});
+}
+function outOfLives() {
+  game.lost = true; save(); draw();
+  G.track(`Hide & Seek out of lives ${sizeLabel(game.N)}`);
+  setTimeout(() => G.openCard("Out of lives", "Three cats were startled awake. Try this floor again, or have a new one.", [
+    ["Try this floor again", tryAgain, true], ["New floor", () => { G.closeCard(); newFloor(); }]],
+    null, G.otherSize($("size"), game.N, startLevel)), 500);
+}
+// The same cats, back to the first box checked, with three new lives.
+function tryAgain() {
+  G.closeCard();
+  Object.assign(game, {open: [], mark: [], caught: [], lives: 3, lost: false, hinted: true, ...G.freshClock()});
+  load(); spread(game.first); store(); draw(); G.note("Same floor, three new lives.", 3000);
+}
+
+/* ---------- hints ---------- */
+// Glow a box that can be worked out to be safe from what's on the floor now (marks aren't trusted).
+function hint() {
+  if (!playing()) return;
+  if (!game.cats) { G.note("Tap any box to start. The first one is always safe.", 4000); return; }
+  const known = new Int8Array(W * H).fill(-1); open.forEach(i => { known[i] = label(i); });
+  const sure = new Uint8Array(W * H); caught.forEach(i => { sure[i] = 1; });
+  let found = -1;
+  deduce(known, sure, game.C, i => { if (!open.has(i)) { found = i; return -1; } return label(i); });
+  if (found < 0) { for (let i = 0; i < W * H; i++) if (!cat[i] && !open.has(i)) { found = i; break; } }
+  if (found < 0) return;
+  if (!game.hinted) { game.hinted = true; save(); }
+  const sq = $("board").children[found]; sq.classList.add("hintme"); setTimeout(() => sq.classList.remove("hintme"), 2500);
+  if (mark.has(found)) G.note("That box is marked, but it's safe to check.", 4000);
+  else G.note("That box is safe to check.", 3000);
+}
+
+/* ---------- drawing ---------- */
+function layout() {
+  const f = $("board"), cell = Math.max(20, Math.min(56, Math.floor((f.parentElement.clientWidth - 8) / W)));
+  f.style.gridTemplateColumns = `repeat(${W}, ${cell}px)`; f.style.width = `${W * cell + 8}px`; f.style.fontSize = Math.round(cell * .55) + "px";
+  f.innerHTML = "";
+  for (let i = 0; i < W * H; i++) { const d = document.createElement("div"); d.className = "sq"; d.dataset.i = i; d.setAttribute("role", "gridcell"); f.append(d); }
+  $("size").value = game.N;
+  draw();
+}
+function draw() {
+  const kids = $("board").children, reveal = game.won || game.lost;
+  $("count").textContent = game.won ? `🐱 all ${game.C} found` : `🐱 ${game.C - mark.size - caught.size} left`;
+  $("hearts").textContent = "❤️".repeat(game.lives) + "🤍".repeat(3 - game.lives);
+  $("hearts").setAttribute("aria-label", `${game.lives} lives left`);
+  for (let i = 0; i < W * H; i++) {
+    const sq = kids[i], n = open.has(i) ? label(i) : 0;
+    const want = open.has(i) ? "n" + n : caught.has(i) ? "hiss" : reveal && cat[i] ? "cat" : mark.has(i) ? "mark" : "box";
+    if (sq.dataset.v === want) continue;
+    sq.dataset.v = want; sq.classList.toggle("open", open.has(i));
+    if (want[0] === "n") { sq.innerHTML = BOX + `<span class="n n${n}">${n}</span>`; sq.setAttribute("aria-label", `${n} cats nearby`); }
+    else if (want === "hiss") { sq.innerHTML = BOX + `<span class="hissed">HISS</span>`; sq.setAttribute("aria-label", "A startled cat hissed from this box"); }
+    else if (want === "cat") { sq.innerHTML = OPENBOX + sleeper(i); sq.setAttribute("aria-label", "A sleeping cat"); }
+    else if (want === "mark") { sq.innerHTML = BOX + DOODLE; sq.setAttribute("aria-label", "Marked: a cat is in here"); }
+    else { sq.innerHTML = BOX; sq.setAttribute("aria-label", "Box"); }
+  }
+  $("hintBtn").disabled = !playing();
+}
+addEventListener("resize", () => { if (game) layout(); });
+
+/* ---------- input: tap, press and hold, Mark mode ---------- */
+let hold = null;
+const board = $("board");
+board.addEventListener("contextmenu", e => e.preventDefault());
+board.addEventListener("pointerdown", e => {
+  const sq = e.target.closest(".sq"); if (!sq || !playing()) return;
+  const i = +sq.dataset.i;
+  hold = {i, x: e.clientX, y: e.clientY, t: setTimeout(() => { if (hold) { hold.done = true; if (!open.has(i)) toggleMark(i); } }, 420)};
+});
+board.addEventListener("pointermove", e => { if (hold && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > 12) { clearTimeout(hold.t); hold = null; } });
+board.addEventListener("pointerup", () => {
+  if (!hold) return; clearTimeout(hold.t);
+  const {i, done} = hold; hold = null;
+  if (done) return;
+  if (open.has(i)) chord(i); else if (markMode) toggleMark(i); else check(i);
+});
+board.addEventListener("pointercancel", () => { if (hold) { clearTimeout(hold.t); hold = null; } });
+$("markBtn").onclick = () => { markMode = !markMode; $("markBtn").setAttribute("aria-pressed", String(markMode)); G.note(markMode ? "Mark is on: tap a box to doodle a cat on it." : "", 3000); };
+$("hintBtn").onclick = hint;
+$("newBtn").onclick = () => { G.closeCard(); newFloor(); };
+SIZES.forEach(([w, h, c], n) => $("size").append(new Option(`${w} × ${h} · ${c} cats`, n)));
+$("size").onchange = e => startLevel(+e.target.value);
+$("helpBtn").onclick = showHelp;
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  const media = document.createElement("div");
+  const ol = document.createElement("ol"); ol.className = "steps";
+  for (const t of ["Tap a box to check it. It gets labelled with how many cats are hiding in the boxes around it, diagonals too.",
+                   "Press and hold a box (or switch on Mark) to doodle a cat on it when you're sure one's inside.",
+                   "Check every box without a cat. Checking one with a cat startles it and costs a life."]) {
+    const li = document.createElement("li"); li.textContent = t; ol.append(li);
+  }
+  const tip = document.createElement("p"); tip.className = "tip";
+  tip.textContent = "Your first box is always safe, and every floor can be cleared by thinking it through, with no guessing.";
+  media.append(ol, tip);
+  G.openCard("How to play", "", [["Let's play", () => { G.closeCard(); settings.seenHelp = true; save(); }, true]], media);
+}
+function helpOnFirstVisit() { if (!settings.seenHelp && game && playing()) showHelp(); }
+
+G.nav("hideseek");
+G.checkClock(game);
+G.setupTimer({name: "hideseek", game: () => game, playing: g => !g.won && !g.lost, save, label: sizeLabel,
+  emptyText: "Clear a floor and your times will show up here. They're kept on this device only."});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.N : settings.size);
+
+/* ---------- sharing ---------- */
+$("shareBtn").onclick = () => {
+  if (!game) return;
+  if (!game.cats) { G.note("Check a box first, then share the floor.", 4000); return; }
+  G.shareCard({name: "Hide & Seek", won: game.won,
+    puzzle: () => ({g: "hideseek", N: game.N, cats: game.cats, first: game.first}),
+    progress: () => ({open: game.open, mark: game.mark, caught: game.caught, lives: game.lives})});
+};
+// A floor from a share link: the same cats, with the first box already checked (and the progress, if sent).
+function openShared(d) {
+  const [w, h, c] = SIZES[d.N] || [], ok = a => Array.isArray(a) && a.every(i => Number.isInteger(i) && i >= 0 && i < w * h);
+  if (!w || !ok(d.cats) || d.cats.length !== c || !Number.isInteger(d.first) || d.first < 0 || d.first >= w * h || d.cats.includes(d.first)) {
+    G.note("That share link didn't work. It may have been cut off.", 6000); return;
+  }
+  game = {N: d.N, W: w, H: h, C: c, cats: d.cats, first: d.first, open: [], mark: [], caught: [], lives: 3, won: false, lost: false, hinted: false,
+          seed: Math.floor(Math.random() * 1e6), ...G.freshClock()};
+  const p = d.p;
+  if (p && ok(p.open) && ok(p.mark) && ok(p.caught)) Object.assign(game, {open: p.open, mark: p.mark, caught: p.caught, lives: Math.max(1, Math.min(3, p.lives | 0)), timed: false});
+  settings.size = d.N; load();
+  if (!open.size) spread(game.first);
+  store(); layout();
+  for (let i = 0; i < W * H; i++) if (!cat[i] && !open.has(i)) return;
+  game.won = true; draw();
+}
+const shared = G.readShare("hideseek");
+if (game && game.W) G.reopen(() => { load(); layout(); if (game.won) winCard(); else if (game.lost) outOfLives(); helpOnFirstVisit(); },
+  why => { newFloor(); G.note(why, 0); });
+else if (!shared) { newFloor(); helpOnFirstVisit(); }
+const shareOpts = () => ({name: "Hide & Seek", inProgress: !!(game && playing() && game.open.length), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, shareOpts());
+// A share link opened while this page is already showing only changes the address, so watch for it.
+addEventListener("hashchange", () => { const d = G.readShare("hideseek"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
