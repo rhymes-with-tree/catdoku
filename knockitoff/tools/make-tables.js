@@ -6,7 +6,7 @@
    can't leave, or a candle beside books), and keeps the tables with the most traps. They're written to
    ../tables/NN.json, which the game loads so a table is ready at once.
 
-   node knockitoff/tools/make-tables.js                 every level, 1000 tables each
+   node knockitoff/tools/make-tables.js                 every level, 300 tables each
    node knockitoff/tools/make-tables.js 7 8 --keep 200  just levels 7 and 8, 200 tables each
 
    Levels run in parallel, one per processor. Run it again after changing the rules or the level list. */
@@ -45,7 +45,7 @@ function traps(t) {
     const r = E.kioMove(b, {cat: p, items: t.items, fire: 0}, d);
     if (!r || r.moved < 0) continue;
     if (r.broke) { count++; continue; }
-    const f = E.kioClear(r.items, r.fire) ? 0 : E.kioFewest(b, {cat: r.cat, items: E.kioCodes(r.items), fire: r.fire}, 3000);
+    const f = E.kioClear(r.items, r.fire) ? 0 : E.kioFewest(b, {cat: r.cat, items: E.kioCodes(r.items), fire: r.fire}, 1500);
     if (f === -1) count++;
   }
   return count;
@@ -75,7 +75,7 @@ if (process.argv[2] === "--child") {
   process.send({n, done: makeLevel(n, keep)});
 } else {
   const args = process.argv.slice(2), ki = args.indexOf("--keep");
-  const keep = ki >= 0 ? +args.splice(ki, 2)[1] : 1000;
+  const keep = ki >= 0 ? +args.splice(ki, 2)[1] : 300;
   const levels = args.length ? args.map(Number) : Array.from({length: 20}, (_, i) => i + 1);
   fs.mkdirSync(OUT, {recursive: true});
   // hardest first, so the slow levels start early
