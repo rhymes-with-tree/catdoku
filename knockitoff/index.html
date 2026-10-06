@@ -44,6 +44,9 @@
 .hintArrow{animation:nudge .5s ease-in-out 3 alternate}
 @keyframes nudge{to{opacity:.35}}
 .still .thing,.still .thing .art,.still .cat .face{transition:none}
+.flame{transform-box:fill-box;transform-origin:50% 100%;animation:flicker .35s ease-in-out infinite alternate}
+@keyframes flicker{from{transform:scale(1,1)}to{transform:scale(.92,1.08)}}
+.key .keynote{margin:0;font-size:14px;color:var(--ink-soft);text-align:center}
 
 .card .goldpaw{width:84px;height:84px;margin:0 auto 10px;display:block}
 .card ol.steps{text-align:left;margin:0 0 14px;padding-left:24px;color:var(--ink);font-size:16px;line-height:1.35}
@@ -80,6 +83,7 @@
   <div class="help">
     <p>Walk into things to push them. Push them past the edge and they fall off. You can only push, never pull, and only one thing at a time.</p>
     <p>Lamps and piles of books won't budge. Yarn and pencils roll until they hit something. Grey walls stop things falling. Keep your food bowl on the table.</p>
+    <p>Keep the candle away from books. If it falls, knock off a glass of water or a vase within 6 moves to put out the fire.</p>
     <p>Swipe or use the arrow keys to step, or tap a square to walk there. Clear the table in the fewest moves possible for a gold paw.</p>
   </div>
 </main>
@@ -89,63 +93,86 @@
 /* ---------- tables ---------- */
 // Directions are numbered 0 up, 1 down, 2 left, 3 right. Walls are a bitmask of sides: 1 top, 2 bottom, 4 left, 8 right.
 // Each level: [width, height, things that push, things that roll, things that won't budge, walled sides,
-// food bowls, odd-shaped table (0 or 1), fewest moves a table must need]. (A function, so the worker gets it too.)
+// food bowls, odd-shaped table (0 or 1), fewest moves a table must need, candles]. (A function, so the worker gets it too.)
 function kioLevels(n) {
   return [null,
-    [5, 5, 3, 0, 0, 0, 0, 0, 8], [5, 5, 3, 0, 1, 0, 0, 0, 10], [6, 5, 3, 1, 1, 0, 0, 0, 12], [6, 6, 3, 1, 2, 1, 0, 0, 14],
-    [6, 6, 3, 1, 2, 1, 1, 0, 15], [6, 6, 3, 1, 2, 1, 1, 1, 15], [7, 6, 4, 1, 3, 1, 1, 0, 18], [7, 6, 4, 2, 3, 1, 1, 1, 18],
-    [7, 7, 4, 1, 4, 2, 1, 0, 20], [7, 7, 4, 2, 4, 1, 1, 1, 21], [7, 7, 5, 1, 4, 1, 1, 0, 22], [7, 7, 4, 2, 5, 2, 1, 1, 22],
-    [8, 7, 4, 1, 5, 1, 1, 0, 23], [8, 7, 4, 2, 5, 2, 1, 1, 23], [8, 7, 5, 1, 5, 1, 1, 1, 24], [7, 7, 4, 2, 5, 2, 1, 1, 24],
-    [8, 7, 4, 2, 6, 2, 1, 1, 24], [8, 8, 4, 2, 7, 2, 1, 1, 25], [8, 8, 5, 1, 7, 2, 1, 1, 25], [8, 8, 4, 2, 8, 2, 1, 1, 26]][n];
+    [5, 5, 3, 0, 0, 0, 0, 0, 8, 0], [5, 5, 3, 0, 1, 0, 0, 0, 10, 0], [6, 5, 3, 1, 1, 0, 0, 0, 12, 0], [6, 6, 3, 1, 2, 1, 0, 0, 14, 0],
+    [6, 6, 3, 1, 2, 1, 1, 0, 15, 0], [6, 6, 3, 1, 2, 1, 1, 1, 15, 0], [7, 6, 3, 1, 3, 1, 1, 0, 18, 1], [7, 6, 4, 2, 3, 1, 1, 1, 18, 0],
+    [7, 7, 3, 1, 4, 2, 1, 0, 20, 1], [7, 7, 4, 2, 4, 1, 1, 1, 21, 0], [7, 7, 3, 1, 4, 1, 1, 0, 21, 1], [7, 7, 4, 2, 5, 2, 1, 1, 22, 0],
+    [8, 7, 3, 1, 5, 1, 1, 0, 23, 1], [8, 7, 4, 2, 5, 2, 1, 1, 23, 0], [8, 7, 4, 1, 5, 1, 1, 1, 24, 1], [7, 7, 4, 2, 5, 2, 1, 1, 24, 0],
+    [8, 7, 3, 2, 6, 2, 1, 1, 24, 1], [8, 8, 4, 2, 7, 2, 1, 1, 25, 0], [8, 8, 3, 1, 7, 2, 1, 1, 24, 1], [8, 8, 3, 2, 8, 2, 1, 1, 25, 1]][n];
 }
-// What each kind of thing does: 0 pushes one square, 1 rolls, 2 must stay on the table, 3 won't budge.
-function kioCls(k) { return "mgsvh".includes(k) ? 0 : "yi".includes(k) ? 1 : k === "f" ? 2 : 3; }
+// What each kind of thing does: 0 pushes one square, 1 rolls, 2 must stay on the table, 3 won't budge,
+// 4 the candle (pushes one square, never next to books, and starts a fire when it falls), 5 water (pushes one
+// square, and puts the fire out when it falls).
+function kioCls(k) { return "msh".includes(k) ? 0 : "gv".includes(k) ? 5 : "yi".includes(k) ? 1 : k === "f" ? 2 : k === "c" ? 4 : 3; }
+// Moves you have to knock water off after the candle falls.
+function kioFireMoves() { return 6; }
 
 // The table ready for moving about on: nxt[c * 4 + d] is the square next to c in direction d,
-// -1 if that's off the table and -2 if a wall is in the way. Squares with lamps or books are marked in `fixed`.
+// -1 if that's off the table and -2 if a wall is in the way. Squares with lamps or books are marked in `fixed`,
+// and the squares beside books (where the candle would set them alight) in `bookAdj`.
 function kioBoard(t) {
   const {W, H, on, walls} = t, nxt = new Int16Array(W * H * 4), D = [[0, -1], [0, 1], [-1, 0], [1, 0]], WB = [1, 2, 4, 8];
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) for (let d = 0; d < 4; d++) {
     const nx = x + D[d][0], ny = y + D[d][1], c = y * W + x, edge = nx < 0 || ny < 0 || nx >= W || ny >= H;
     nxt[c * 4 + d] = edge && (walls & WB[d]) ? -2 : edge || !on[ny * W + nx] ? -1 : ny * W + nx;
   }
-  const fixed = new Uint8Array(W * H);
-  for (const it of t.items) if (kioCls(it.k) === 3) fixed[it.c] = 1;
-  return {W, H, on, walls, nxt, fixed};
+  const fixed = new Uint8Array(W * H), bookAdj = new Uint8Array(W * H);
+  for (const it of t.items) if (kioCls(it.k) === 3) {
+    fixed[it.c] = 1;
+    if (it.k === "b") for (let d = 0; d < 4; d++) { const n = nxt[it.c * 4 + d]; if (n >= 0) bookAdj[n] = 1; }
+  }
+  return {W, H, on, walls, nxt, fixed, bookAdj};
 }
-// One step of the cat in direction d, or null if it can't go. s: {cat, items: [{id, k, c}]}.
-// Returns the new cat and items, which thing moved and the squares it passed, and whether it fell off (and broke a rule).
+// One step of the cat in direction d, or null if it can't go. s: {cat, items: [{id, k, c}], fire: moves left to put
+// out a fire (0 for none)}. Returns the new cat, items and fire, which thing moved and the squares it passed, whether
+// it fell off, and `why` when the step loses the table ("bowl", "books" or "fire").
 function kioMove(b, s, d) {
   const t = b.nxt[s.cat * 4 + d];
   if (t < 0) return null;
+  let fire = s.fire || 0, why = "", doused = false;
   const hit = s.items.find(it => it.c === t);
-  if (!hit) return {cat: t, items: s.items, moved: -1, trail: [], fell: false, broke: false};
-  const m = kioCls(hit.k);
-  if (m === 3) return null;
-  let c = t, fell = false; const trail = [];
-  for (;;) {
-    const n = b.nxt[c * 4 + d];
-    if (n === -2) break;
-    if (n === -1) { fell = true; break; }
-    if (s.items.some(o => o.c === n)) break;
-    c = n; trail.push(c);
-    if (m !== 1) break;
+  let res = {cat: t, items: s.items, moved: -1, trail: [], fell: false};
+  if (hit) {
+    const m = kioCls(hit.k);
+    if (m === 3) return null;
+    let c = t, fell = false; const trail = [];
+    for (;;) {
+      const n = b.nxt[c * 4 + d];
+      if (n === -2) break;
+      if (n === -1) { fell = true; break; }
+      if (s.items.some(o => o.c === n)) break;
+      c = n; trail.push(c);
+      if (m !== 1) break;
+    }
+    if (!fell && c === t) return null;
+    const items = fell ? s.items.filter(o => o !== hit) : s.items.map(o => o === hit ? {...o, c} : o);
+    res = {cat: t, items, moved: hit.id, trail, last: c, fell, kind: hit.k};
+    if (fell && m === 2) why = "bowl";
+    if (!fell && m === 4 && b.bookAdj[c]) why = "books";
+    if (fell && m === 5 && fire > 0) { fire = 0; doused = true; }
+    if (fell && m === 4) { res.fire = kioFireMoves(); res.lit = true; }
   }
-  if (!fell && c === t) return null;
-  const items = fell ? s.items.filter(o => o !== hit) : s.items.map(o => o === hit ? {...o, c} : o);
-  return {cat: t, items, moved: hit.id, trail, last: c, fell, broke: fell && m === 2};
+  if (!res.lit) {
+    if (fire > 0 && !doused) { fire--; if (fire === 0) why = why || "fire"; }
+    res.fire = fire; res.doused = doused;
+  }
+  res.why = why; res.broke = !!why;
+  return res;
 }
-function kioClear(items) { return items.every(it => kioCls(it.k) >= 2); }
+function kioClear(items, fire) { return !fire && items.every(it => kioCls(it.k) === 2 || kioCls(it.k) === 3); }
 
 // Fewest pushes a thing on each square needs to go over the edge, with nothing else in the way (255: never).
-function kioPushDist(b) {
-  const N = b.W * b.H, OPP = [1, 0, 3, 2], pd = new Uint8Array(N).fill(255);
+// `avoid` marks squares the thing mustn't stop on (the candle beside books).
+function kioPushDist(b, avoid) {
+  const N = b.W * b.H, OPP = [1, 0, 3, 2], pd = new Uint8Array(N).fill(255), no = c => b.fixed[c] || (avoid && avoid[c]);
   for (let changed = true; changed;) {
     changed = false;
-    for (let c = 0; c < N; c++) if (b.on[c] && !b.fixed[c]) for (let d = 0; d < 4; d++) {
+    for (let c = 0; c < N; c++) if (b.on[c] && !no(c)) for (let d = 0; d < 4; d++) {
       const p = b.nxt[c * 4 + OPP[d]];
       if (p < 0 || b.fixed[p]) continue;
-      const n = b.nxt[c * 4 + d], v = n === -1 ? 1 : n >= 0 && !b.fixed[n] && pd[n] < 255 ? pd[n] + 1 : 255;
+      const n = b.nxt[c * 4 + d], v = n === -1 ? 1 : n >= 0 && !no(n) && pd[n] < 255 ? pd[n] + 1 : 255;
       if (v < pd[c]) { pd[c] = v; changed = true; }
     }
   }
@@ -155,32 +182,36 @@ function kioPushDist(b) {
 // so a push costs the walk to the square behind the thing plus one. It looks first where the moves so far
 // plus the fewest pushes still needed is smallest. Returns the moves, -1 if the table can't be cleared, or -2
 // if finding out would mean looking at more than `limit` positions.
-// s: {cat, items: [code]} with code = square * 4 + what it does (0 pushes, 1 rolls, 2 stays on), lamps and books left out.
+// s: {cat, items: [code], fire} with code = square * 8 + what it does (kioCls), lamps and books left out.
 function kioFewest(b, s, limit) {
-  const N = b.W * b.H, OPP = [1, 0, 3, 2], pd = b.pd || (b.pd = kioPushDist(b));
-  const need = items => { let h = 0; for (const code of items) { const m = code & 3; if (m === 0) h += pd[code >> 2]; else if (m === 1) h += 1; } return h; };
-  const done = items => items.every(code => (code & 3) === 2);
-  if (done(s.items)) return 0;
-  const key = (cat, items) => String.fromCharCode(cat, ...items);
+  const N = b.W * b.H, OPP = [1, 0, 3, 2], FIRE = kioFireMoves();
+  const pd = b.pd || (b.pd = kioPushDist(b)), pdC = b.pdC || (b.pdC = kioPushDist(b, b.bookAdj));
+  const need = items => { let h = 0; for (const code of items) { const m = code & 7; if (m === 0 || m === 5) h += pd[code >> 3]; else if (m === 4) h += pdC[code >> 3]; else if (m === 1) h += 1; } return h; };
+  const has = (items, m) => items.some(code => (code & 7) === m);
+  const done = (items, r) => !r && items.every(code => (code & 7) === 2);
+  const r0 = s.fire || 0;
+  if (done(s.items, r0)) return 0;
+  if ((has(s.items, 4) || r0) && !has(s.items, 5)) return -1;   // a fire with no water left to put it out
+  const key = (cat, r, items) => String.fromCharCode(cat, r, ...items);
   const h0 = need(s.items); if (h0 >= 255) return -1;
-  const best = new Map([[key(s.cat, s.items), 0]]), buckets = [];
-  buckets[h0] = [{cat: s.cat, items: s.items, g: 0}];
+  const best = new Map([[key(s.cat, r0, s.items), 0]]), buckets = [];
+  buckets[h0] = [{cat: s.cat, items: s.items, r: r0, g: 0}];
   const occ = new Int16Array(N), dist = new Int16Array(N), queue = new Int16Array(N);
   let goal = Infinity, expanded = 0;
   for (let f = h0; f < buckets.length && f < goal; f++) {
     const bucket = buckets[f]; if (!bucket) continue;
     for (let bi = 0; bi < bucket.length; bi++) {
       const st = bucket[bi], g = st.g;
-      if (best.get(key(st.cat, st.items)) < g) continue;
+      if (best.get(key(st.cat, st.r, st.items)) < g) continue;
       if (++expanded > limit) return -2;
-      occ.fill(-1); st.items.forEach((code, i) => { occ[code >> 2] = i; });
+      occ.fill(-1); st.items.forEach((code, i) => { occ[code >> 3] = i; });
       dist.fill(-1); dist[st.cat] = 0; queue[0] = st.cat;
       for (let hh = 0, t = 1; hh < t; hh++) {
         const c = queue[hh];
         for (let d = 0; d < 4; d++) { const n = b.nxt[c * 4 + d]; if (n >= 0 && dist[n] < 0 && !b.fixed[n] && occ[n] < 0) { dist[n] = dist[c] + 1; queue[t++] = n; } }
       }
       for (let i = 0; i < st.items.length; i++) {
-        const code = st.items[i], c = code >> 2, m = code & 3;
+        const code = st.items[i], c = code >> 3, m = code & 7;
         for (let d = 0; d < 4; d++) {
           const p = b.nxt[c * 4 + OPP[d]];
           if (p < 0 || dist[p] < 0) continue;
@@ -195,29 +226,37 @@ function kioFewest(b, s, limit) {
           }
           if (!fall && cc === c) continue;
           if (fall && m === 2) continue;
-          if (!fall && m !== 2 && pd[cc] === 255) continue;   // stuck for good
+          if (!fall && m === 4 && (b.bookAdj[cc] || pdC[cc] === 255)) continue;   // books alight, or stuck for good
+          if (!fall && (m === 0 || m === 5) && pd[cc] === 255) continue;          // stuck for good
+          const step = dist[p] + 1;
+          let r = 0;
+          if (st.r) {   // a fire is burning: water must go over within the moves left
+            if (fall && m === 5) { if (step > st.r) continue; }
+            else { if (step >= st.r) continue; r = st.r - step; }
+          } else if (fall && m === 4) r = FIRE;
           const items = st.items.slice();
-          if (fall) items.splice(i, 1); else { items[i] = cc * 4 + m; items.sort((x, y) => x - y); }
-          const cost = g + dist[p] + 1, k = key(c, items);
+          if (fall) items.splice(i, 1); else { items[i] = cc * 8 + m; items.sort((x, y) => x - y); }
+          if ((r || has(items, 4)) && !has(items, 5)) continue;
+          const cost = g + step, k = key(c, r, items);
           if (cost >= goal) continue;
           const prev = best.get(k);
           if (prev !== undefined && prev <= cost) continue;
           best.set(k, cost);
-          if (done(items)) { goal = cost; continue; }
+          if (done(items, r)) { goal = cost; continue; }
           const fn = cost + need(items);
           if (fn >= goal) continue;
-          (buckets[fn] || (buckets[fn] = [])).push({cat: c, items, g: cost});
+          (buckets[fn] || (buckets[fn] = [])).push({cat: c, items, r, g: cost});
         }
       }
     }
   }
   return goal === Infinity ? -1 : goal;
 }
-function kioCodes(items) { return items.filter(it => kioCls(it.k) < 3).map(it => it.c * 4 + kioCls(it.k)).sort((x, y) => x - y); }
+function kioCodes(items) { return items.filter(it => kioCls(it.k) !== 3).map(it => it.c * 8 + kioCls(it.k)).sort((x, y) => x - y); }
 
 // Deal a table for level n: random things on a random table, kept only if it can be cleared and needs enough moves.
 function makeKnockItOff(n) {
-  const [W, H, np, nr, nf, nw, nb, odd, minSteps] = kioLevels(n), rnd = () => Math.random();
+  const [W, H, np, nr, nf, nw, nb, odd, minSteps, nc] = kioLevels(n), rnd = () => Math.random();
   const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   for (let tries = 0; tries < 300; tries++) {
     const on = new Array(W * H).fill(1);
@@ -230,27 +269,30 @@ function makeKnockItOff(n) {
     for (let i = 0; i < nw; i++) walls |= sides[i];
     const cells = shuffle([...Array(W * H).keys()].filter(c => on[c]));
     const pushes = shuffle("mgsvh".split("")), rolls = shuffle("yi".split("")), still = shuffle("Lb".split(""));
+    // a candle needs some water on the table
+    if (nc && !pushes.slice(0, np).some(k => "gv".includes(k))) { const w = pushes.indexOf("g"); [pushes[0], pushes[w]] = [pushes[w], pushes[0]]; }
     const items = []; let i = 0;
-    for (let j = 0; j < nf; j++) items.push({id: items.length, k: still[j % 2], c: cells[i++]});
+    for (let j = 0; j < nf; j++) items.push({id: items.length, k: nc && j === 0 ? "b" : still[j % 2], c: cells[i++]});
     for (let j = 0; j < np; j++) items.push({id: items.length, k: pushes[j % 5], c: cells[i++]});
     for (let j = 0; j < nr; j++) items.push({id: items.length, k: rolls[j % 2], c: cells[i++]});
     for (let j = 0; j < nb; j++) items.push({id: items.length, k: "f", c: cells[i++]});
+    for (let j = 0; j < nc; j++) items.push({id: items.length, k: "c", c: cells[i++]});
     const cat = cells[i], t = {N: n, W, H, on, walls, cat, items};
-    const b = kioBoard(t); b.pd = kioPushDist(b);
-    if (items.some(it => kioCls(it.k) < 2 && b.pd[it.c] === 255)) continue;
-    const best = kioFewest(b, {cat, items: kioCodes(items)}, 25000);
+    const b = kioBoard(t); b.pd = kioPushDist(b); b.pdC = kioPushDist(b, b.bookAdj);
+    if (items.some(it => { const m = kioCls(it.k); return ((m === 0 || m === 1 || m === 5) && b.pd[it.c] === 255) || (m === 4 && b.pdC[it.c] === 255); })) continue;
+    const best = kioFewest(b, {cat, items: kioCodes(items), fire: 0}, 25000);
     if (best >= minSteps) return Object.assign(t, {best});
   }
   return null;
 }
 // For a table in play: the fewest moves left, and (with q.first) a first step on one way to do it.
 function kioAdvice(q) {
-  const b = kioBoard(q), fewest = kioFewest(b, {cat: q.cat, items: kioCodes(q.items)}, q.limit);
+  const b = kioBoard(q), fewest = kioFewest(b, {cat: q.cat, items: kioCodes(q.items), fire: q.fire || 0}, q.limit);
   if (!q.first || fewest <= 0) return {fewest, first: -1};
   for (let d = 0; d < 4; d++) {
     const r = kioMove(b, q, d);
     if (!r || r.broke) continue;
-    const f = kioClear(r.items) ? 0 : kioFewest(b, {cat: r.cat, items: kioCodes(r.items)}, q.limit);
+    const f = kioClear(r.items, r.fire) ? 0 : kioFewest(b, {cat: r.cat, items: kioCodes(r.items), fire: r.fire}, q.limit);
     if (f >= 0 && f + 1 === fewest) return {fewest, first: d};
   }
   return {fewest, first: -1};
@@ -297,9 +339,15 @@ const CAT = `<g class="face"><path d="M50 78 C50 92 66 96 76 88" fill="none" str
   <path d="M35 27 L36 10 L47 19 Z M65 27 L64 10 L53 19 Z" fill="#E9A15B" ${INK} stroke-linejoin="round"/>
   <circle cx="50" cy="30" r="16" fill="#E9A15B" ${INK}/>
   <path d="M44 22 L46 28 M50 20 L50 27 M56 22 L54 28" stroke="#C7793A" stroke-width="2.5" stroke-linecap="round"/></g>`;
+ART.c = `${SHADOW(22)}<ellipse cx="50" cy="80" rx="24" ry="6" fill="#ECA818" ${INK}/><rect x="38" y="40" width="24" height="40" rx="3" fill="#F7F1E1" ${INK}/>
+  <path d="M39 47 q4 6 7 0 q4 9 7 0" fill="none" stroke="#E5DCC8" stroke-width="3"/><ellipse cx="50" cy="40" rx="12" ry="3" fill="#EFE6D2" ${INK}/>
+  <line x1="50" y1="40" x2="50" y2="33" stroke="#2A2530" stroke-width="2"/>
+  <path d="M50 12 C58 22 58 32 50 34 C42 32 42 22 50 12 Z" fill="#ECA818" stroke="#E16A4A" stroke-width="2"/><path d="M50 21 C54 27 54 31 50 32 C46 31 46 27 50 21 Z" fill="#FFE07A"/>`;
+const FLAME = `<g class="flame"><path d="M50 10 C70 34 78 52 66 74 C60 84 40 84 34 74 C22 52 30 34 50 10 Z" fill="#E16A4A" stroke="#2A2530" stroke-width="2.5"/>
+  <path d="M50 34 C60 48 62 60 56 70 C52 76 48 76 44 70 C38 60 40 48 50 34 Z" fill="#ECA818"/><path d="M50 52 C55 60 55 66 50 70 C45 66 45 60 50 52 Z" fill="#FFE07A"/></g>`;
 const KINDS = {
   m: "Coffee mug", g: "Glass of water", s: "Succulent", v: "Vase", h: "Phone", y: "Ball of yarn", i: "Pencil",
-  f: "Your food bowl", L: "Lamp", b: "Pile of books",
+  f: "Your food bowl", L: "Lamp", b: "Pile of books", c: "Candle",
 };
 const PAD = "M100 6 C126 6 141 28 153 46 C172 50 197 70 195 101 C193 133 166 147 140 141 C125 138 112 131 100 131 C88 131 75 138 60 141 C34 147 7 133 5 101 C3 70 28 50 47 46 C59 28 74 6 100 6Z";
 function goldPaw() {
@@ -318,7 +366,7 @@ const DIRS = ["up", "down", "left", "right"], ANGLE = [0, 180, 270, 90], STEP = 
 let state = G.load(STORE);
 let settings = Object.assign({level: 1}, state.settings);
 let game = state.game || null, busy = false, board = null, els = new Map(), catEl = null, ask = 0;
-const fns = [kioLevels, kioCls, kioBoard, kioMove, kioClear, kioPushDist, kioFewest, kioCodes];
+const fns = [kioLevels, kioCls, kioFireMoves, kioBoard, kioMove, kioClear, kioPushDist, kioFewest, kioCodes];
 const build = G.builder([...fns, makeKnockItOff], "makeKnockItOff");
 const advice = G.builder([...fns, kioAdvice], "kioAdvice");
 const save = () => G.save(STORE, {settings, game});
@@ -373,7 +421,8 @@ function drawKey() {
   const kinds = [...new Set(game.items.map(it => it.k))];
   const group = (title, ks) => !ks.length ? "" : `<div class="group"><h3>${title}</h3><div class="row">${ks.map(k =>
     `<span><svg viewBox="0 0 100 100" aria-hidden="true">${ART[k]}</svg>${KINDS[k]}</span>`).join("")}</div></div>`;
-  $("key").innerHTML = group("Knock it Off!", kinds.filter(k => kioCls(k) < 2)) +
+  const note = kinds.includes("c") ? `<p class="keynote">Keep the candle away from books. If it falls, knock off a glass of water or a vase within ${kioFireMoves()} moves to put out the fire.</p>` : "";
+  $("key").innerHTML = group("Knock it Off!", kinds.filter(k => kioCls(k) !== 2 && kioCls(k) !== 3)) + note +
     group("Protect", kinds.filter(k => kioCls(k) === 2)) + group("Won't budge", kinds.filter(k => kioCls(k) === 3));
 }
 function thingEl(it) {
@@ -390,10 +439,24 @@ function sync(still) {
   catEl.style.transform = tr(...xy(game.cur.cat));
   catEl.querySelector(".face").style.transform = `rotate(${ANGLE[game.cur.face]}deg)`;
   if (still) { wrap.getBoundingClientRect(); wrap.classList.remove("still"); }
-  status();
+  drawFire(); status();
+}
+// Flames: on the floor where the candle fell while the fire burns (or after it spread), and on books the candle reached.
+function drawFire() {
+  const fx = $("fx");
+  fx.querySelectorAll(".fire").forEach(e => e.remove());
+  const at = (x, y, sc) => el(fx, "g", {class: "fire", transform: `translate(${x * U + 50 * (1 - sc)} ${y * U + 50 * (1 - sc)}) scale(${sc})`}, FLAME);
+  if (game.cur.fireAt && (game.cur.fire > 0 || game.broke === "fire")) at(...game.cur.fireAt, game.broke === "fire" ? 1.1 : .7);
+  if (game.broke === "books") {
+    const candle = game.cur.items.find(it => it.k === "c");
+    if (candle) for (const it of game.cur.items) if (it.k === "b") {
+      const [x, y] = xy(it.c), [cx, cy] = xy(candle.c);
+      if (Math.abs(x - cx) + Math.abs(y - cy) === 1) at(x, y, 1);
+    }
+  }
 }
 function status() {
-  $("count").textContent = `Moves ${game.cur.moves} · fewest ${game.best}`;
+  $("count").textContent = `Moves ${game.cur.moves} · fewest ${game.best}` + (game.cur.fire > 0 ? ` · 🔥 ${game.cur.fire} left` : "");
   $("undoBtn").disabled = !game.history.length || game.won;
   $("restartBtn").disabled = !game.history.length || game.won;
   $("hintBtn").disabled = game.won || game.broke;
@@ -408,7 +471,8 @@ function move(d) {
   if (game.timed && !game.started) game.started = true;
   game.history.push(JSON.stringify(game.cur));
   if (game.history.length > 400) game.history.shift();
-  game.cur = {cat: r.cat, items: r.items, face: d, moves: game.cur.moves + 1};
+  const fireAt = game.cur.fireAt;
+  game.cur = {cat: r.cat, items: r.items, face: d, moves: game.cur.moves + 1, fire: r.fire, fireAt: r.fire > 0 || r.why === "fire" ? fireAt : null};
   catEl.style.transform = tr(...xy(r.cat));
   face.style.transform = `rotate(${ANGLE[d]}deg)`;
   let wait = 130;
@@ -422,13 +486,25 @@ function move(d) {
       els.delete(r.moved);
       setTimeout(() => { e.classList.add("falling"); crash(...end); setTimeout(() => e.remove(), 500); }, roll);
       wait = roll + 350;
+      // the candle starts a fire where it lands, a little over the edge
+      if (r.lit) game.cur.fireAt = [lx + STEP[d][0] * .6, ly + STEP[d][1] * .6];
     }
   }
+  if (r.broke) game.broke = r.why;
+  const g = game;
+  setTimeout(() => { if (game === g) { drawFire(); if (r.doused) steam(...fireAt); } }, wait - 100);
+  if (r.lit) G.note(`The candle fell! Knock off a glass of water or a vase within ${kioFireMoves()} moves.`, 0);
+  else if (r.doused) G.note("Phew! The fire's out.", 3000);
   status();
-  if (r.broke) { game.broke = true; save(); busy = true; setTimeout(() => { busy = false; brokeCard(); }, wait + 200); }
-  else if (kioClear(game.cur.items)) { busy = true; setTimeout(() => { busy = false; win(); }, wait + 250); }
+  if (r.broke) { save(); busy = true; setTimeout(() => { busy = false; brokeCard(); }, wait + 200); }
+  else if (kioClear(game.cur.items, game.cur.fire)) { busy = true; setTimeout(() => { busy = false; win(); }, wait + 250); }
   else save();
   return wait;
+}
+function steam(x, y) {
+  const g = el($("fx"), "g", {class: "crash", transform: `translate(${x * U} ${y * U})`},
+    `<g fill="#F7F8F3" stroke="#8E8794" stroke-width="2.5"><circle cx="38" cy="58" r="16"/><circle cx="58" cy="50" r="18"/><circle cx="50" cy="34" r="14"/></g>`);
+  setTimeout(() => g.remove(), 800);
 }
 function crash(x, y) {
   const g = el($("fx"), "g", {class: "crash", transform: `translate(${x * U} ${y * U})`},
@@ -454,7 +530,7 @@ function walk(dirs) {
   busy = true;
   const w = move(dirs[0]);
   if (w < 0) { busy = false; return; }
-  if (game.won || game.broke || kioClear(game.cur.items)) return;
+  if (game.won || game.broke || kioClear(game.cur.items, game.cur.fire)) return;
   setTimeout(() => walk(dirs.slice(1)), w);
 }
 function tryStep(d) {
@@ -466,9 +542,10 @@ function tryStep(d) {
 function afterMove() {
   if (!playing()) return;
   const mine = ++ask;
-  advice.take({...tableOf(game), cat: game.cur.cat, items: game.cur.items, limit: 60000}).then(r => {
+  advice.take({...tableOf(game), cat: game.cur.cat, items: game.cur.items, fire: game.cur.fire || 0, limit: 60000}).then(r => {
     if (mine !== ask || !playing()) return;
-    G.note(r.fewest === -1 ? "Something's stuck now. Undo or Restart." : "", 0);
+    if (r.fewest === -1) G.note(game.cur.fire > 0 ? "There's no water left near enough to put the fire out. Undo or Restart." : "Something's stuck now. Undo or Restart.", 0);
+    else if (!game.cur.fire && /stuck|water left/.test($("msg").textContent)) G.note("");
   });
 }
 function undo() {
@@ -479,14 +556,14 @@ function undo() {
 function restart() {
   if (!game || busy || game.won || !game.history.length) return;
   ask++; game.history.push(JSON.stringify(game.cur));
-  game.cur = {cat: game.cat, items: game.items, face: 0, moves: 0}; game.broke = false;
+  game.cur = {cat: game.cat, items: game.items, face: 0, moves: 0, fire: 0}; game.broke = false;
   G.closeCard(); sync(true); save(); G.note("Back to the start. Undo brings your moves back.", 4000);
 }
 function hint() {
   if (!playing()) return;
   const mine = ++ask, g = game;
   G.note("Thinking…", 0); $("hintBtn").disabled = true;
-  advice.take({...tableOf(game), cat: game.cur.cat, items: game.cur.items, limit: 400000, first: true}).then(r => {
+  advice.take({...tableOf(game), cat: game.cur.cat, items: game.cur.items, fire: game.cur.fire || 0, limit: 400000, first: true}).then(r => {
     if (game !== g) return;
     status();
     if (mine !== ask) return;
@@ -520,8 +597,10 @@ function finishCard() {
   if (game.gold) $("card").querySelector(".stripe").after(goldPaw());
 }
 function brokeCard() {
-  G.openCard("Not that one!", "That was your dinner! Undo to catch it, or start the table again.",
-    [["Undo", undo, true], ["Restart", restart]]);
+  const [title, text] = game.broke === "books" ? ["Fire!", "The candle got too close to the books. Undo to save them, or start the table again."]
+    : game.broke === "fire" ? ["The fire spread!", `Knock off a glass of water or a vase within ${kioFireMoves()} moves of the candle falling. Undo, or start the table again.`]
+    : ["Not that one!", "That was your dinner! Undo to catch it, or start the table again."];
+  G.openCard(title, text, [["Undo", undo, true], ["Restart", restart]]);
 }
 
 /* ---------- new tables ---------- */
@@ -533,7 +612,7 @@ async function newTable() {
   G.openCard("Setting the table…", "", []);
   const t = await build.take(N);
   game = {N, W: t.W, H: t.H, on: t.on, walls: t.walls, cat: t.cat, items: t.items, best: t.best,
-          cur: {cat: t.cat, items: t.items, face: 0, moves: 0}, history: [], hinted: false, won: false, broke: false, ...G.freshClock()};
+          cur: {cat: t.cat, items: t.items, face: 0, moves: 0, fire: 0}, history: [], hinted: false, won: false, broke: false, ...G.freshClock()};
   busy = false;
   G.closeCard(); drawTable(); save(); G.note("");
   G.track(`Knock It Off new table level ${N}`);
@@ -579,7 +658,8 @@ function showHelp() {
   const ol = document.createElement("ol"); ol.className = "steps";
   for (const t of ["Walk into things to push them. Push them past the edge and they fall off.",
                    "You can only push, never pull, and only one thing at a time.",
-                   "Knock everything off the table, but keep your food bowl on it."]) {
+                   "Knock everything off the table, but keep your food bowl on it.",
+                   "Keep the candle away from books. If it falls, knock off a glass of water or a vase within 6 moves to put out the fire."]) {
     const li = document.createElement("li"); li.textContent = t; ol.append(li);
   }
   const tip = document.createElement("p"); tip.className = "tip";
@@ -605,13 +685,14 @@ function openShared(d) {
   const okItems = a => Array.isArray(a) && a.every(it => it && Number.isInteger(it.id) && KINDS[it.k] && okCell(it.c));
   if (!(d.N >= 1 && d.N <= MAX_LEVEL) || !(d.W >= 3 && d.W <= 12 && d.H >= 3 && d.H <= 12) || !Array.isArray(d.on) || d.on.length !== d.W * d.H ||
       !okCell(d.cat) || !okItems(d.items) || !Number.isInteger(d.best)) { G.note("That share link didn't work. It may have been cut off.", 6000); return; }
-  const cur = d.p && d.p.cur && okCell(d.p.cur.cat) && okItems(d.p.cur.items) ? d.p.cur : {cat: d.cat, items: d.items, face: 0, moves: 0};
+  const cur = d.p && d.p.cur && okCell(d.p.cur.cat) && okItems(d.p.cur.items) ? d.p.cur : {cat: d.cat, items: d.items, face: 0, moves: 0, fire: 0};
+  const fire = Math.max(0, Math.min(kioFireMoves(), cur.fire | 0)), fireAt = fire && Array.isArray(cur.fireAt) && cur.fireAt.length === 2 && cur.fireAt.every(Number.isFinite) ? cur.fireAt : null;
   game = {N: d.N, W: d.W, H: d.H, on: d.on, walls: d.walls | 0, cat: d.cat, items: d.items, best: d.best,
-          cur: {cat: cur.cat, items: cur.items, face: cur.face | 0, moves: cur.moves | 0}, history: [], hinted: false, won: false, broke: false, ...G.freshClock()};
+          cur: {cat: cur.cat, items: cur.items, face: cur.face | 0, moves: cur.moves | 0, fire: fireAt ? fire : 0, fireAt}, history: [], hinted: false, won: false, broke: false, ...G.freshClock()};
   if (d.p) game.timed = false;
   settings.level = d.N; $("levelSel").value = d.N;
   drawTable(); save(); build.prefetch(d.N);
-  if (kioClear(game.cur.items)) { game.won = true; status(); }
+  if (kioClear(game.cur.items, game.cur.fire)) { game.won = true; status(); }
 }
 const shared = G.readShare("knockitoff");
 $("levelSel").value = settings.level;
