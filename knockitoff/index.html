@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Knock It Off</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-06.2";
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-06.2">
+<style>
+/* A wooden tabletop seen from above, the cat on it, and things (drawn from the side) to push off the edge. */
+:root{--board:min(94vw,520px); --gold:#E0A526}
+.tabletop{width:var(--board);touch-action:none;user-select:none;-webkit-user-select:none;cursor:pointer}
+.tabletop svg{display:block;width:100%;height:auto}
+.key{width:var(--board);display:flex;flex-direction:column;gap:8px}
+.key h3{margin:0;font-size:16px;font-weight:800;text-align:center}
+.key .row{display:flex;flex-wrap:wrap;justify-content:center;gap:2px 14px;font-size:14px;font-weight:600}
+.key span{display:flex;align-items:center;gap:2px;white-space:nowrap}
+.key svg{width:34px;height:34px}
+
+.thing{transition:transform .12s linear}
+.thing .art{transform-box:fill-box;transform-origin:center;transition:transform .45s ease-in,opacity .45s ease-in}
+.thing.falling .art{transform:scale(.25) rotate(40deg);opacity:0}
+.cat .face{transform-box:fill-box;transform-origin:center;transition:transform .12s}
+.crash{animation:crash .7s ease-out forwards;transform-box:fill-box;transform-origin:center}
+@keyframes crash{0%{opacity:0;transform:scale(.4)}25%{opacity:1;transform:scale(1.1)}100%{opacity:0;transform:scale(1.3)}}
+.hintArrow{animation:nudge .5s ease-in-out 3 alternate}
+@keyframes nudge{to{opacity:.35}}
+.still .thing,.still .thing .art,.still .cat .face{transition:none}
+
+.card .goldpaw{width:84px;height:84px;margin:0 auto 10px;display:block}
+.card ol.steps{text-align:left;margin:0 0 14px;padding-left:24px;color:var(--ink);font-size:16px;line-height:1.35}
+.card ol.steps li{margin:0 0 8px}
+.card .tip{font-size:14px;margin:0 0 14px}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Knock It Off</h1><div class="stripe"></div><p class="tagline">Push everything off the table</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New table</button>
+  </div>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="tabletop" id="board" aria-label="Tabletop. Use the arrow keys, swipe, or tap a square to move the cat."><svg id="svg"></svg></div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="key" id="key" aria-label="On this table"></div>
+
+  <div class="actions">
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="hintBtn">Hint</button>
+    <button id="shareBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+
+  <div class="help">
+    <p>Walk into things to push them. Push them past the edge and they fall off. You can only push, never pull, and only one thing at a time.</p>
+    <p>Lamps and piles of books won't budge. Yarn and pencils roll until they hit something. Grey walls stop things falling. Keep your food bowl on the table.</p>
+    <p>Swipe or use the arrow keys to step, or tap a square to walk there. Clear the table in the fewest moves possible for a gold paw.</p>
+  </div>
+</main>
+
+<script src="../games.js?v=2026-10-06.2"></script>
+<script>
+/* ---------- tables ---------- */
+// Directions are numbered 0 up, 1 down, 2 left, 3 right. Walls are a bitmask of sides: 1 top, 2 bottom, 4 left, 8 right.
+// Each level: [width, height, things that push, things that roll, things that won't budge, walled sides,
+// food bowls, odd-shaped table (0 or 1), fewest moves a table must need]. (A function, so the worker gets it too.)
+function kioLevels(n) {
+  return [null,
+    [5, 5, 3, 0, 0, 0, 0, 0, 8], [5, 5, 4, 0, 0, 0, 0, 0, 10], [5, 5, 4, 0, 0, 0, 0, 0, 13], [5, 5, 4, 0, 1, 0, 0, 0, 13],
+    [6, 5, 4, 0, 2, 0, 0, 0, 14], [6, 6, 5, 0, 2, 0, 0, 0, 16], [6, 6, 4, 1, 2, 0, 0, 0, 16], [6, 6, 4, 2, 2, 0, 0, 0, 17],
+    [7, 6, 4, 2, 3, 0, 0, 0, 18], [7, 6, 4, 1, 3, 1, 0, 0, 19], [7, 7, 4, 2, 3, 1, 0, 0, 20], [7, 7, 5, 1, 4, 1, 0, 0, 21],
+    [7, 7, 4, 1, 4, 1, 1, 0, 21], [7, 7, 4, 2, 4, 1, 1, 0, 22], [8, 7, 4, 1, 5, 2, 1, 0, 23], [7, 7, 4, 2, 4, 1, 1, 1, 22],
+    [8, 7, 4, 1, 5, 1, 1, 1, 23], [7, 7, 4, 2, 5, 2, 1, 1, 23], [8, 7, 4, 2, 6, 2, 1, 1, 24], [8, 8, 4, 2, 8, 2, 1, 1, 25]][n];
+}
+// What each kind of thing does: 0 pushes one square, 1 rolls, 2 must stay on the table, 3 won't budge.
+function kioCls(k) { return "mgsvh".includes(k) ? 0 : "yi".includes(k) ? 1 : k === "f" ? 2 : 3; }
+
+// The table ready for moving about on: nxt[c * 4 + d] is the square next to c in direction d,
+// -1 if that's off the table and -2 if a wall is in the way. Squares with lamps or books are marked in `fixed`.
+function kioBoard(t) {
+  const {W, H, on, walls} = t, nxt = new Int16Array(W * H * 4), D = [[0, -1], [0, 1], [-1, 0], [1, 0]], WB = [1, 2, 4, 8];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) for (let d = 0; d < 4; d++) {
+    const nx = x + D[d][0], ny = y + D[d][1], c = y * W + x, edge = nx < 0 || ny < 0 || nx >= W || ny >= H;
+    nxt[c * 4 + d] = edge && (walls & WB[d]) ? -2 : edge || !on[ny * W + nx] ? -1 : ny * W + nx;
+  }
+  const fixed = new Uint8Array(W * H);
+  for (const it of t.items) if (kioCls(it.k) === 3) fixed[it.c] = 1;
+  return {W, H, on, walls, nxt, fixed};
+}
+// One step of the cat in direction d, or null if it can't go. s: {cat, items: [{id, k, c}]}.
+// Returns the new cat and items, which thing moved and the squares it passed, and whether it fell off (and broke a rule).
+function kioMove(b, s, d) {
+  const t = b.nxt[s.cat * 4 + d];
+  if (t < 0) return null;
+  const hit = s.items.find(it => it.c === t);
+  if (!hit) return {cat: t, items: s.items, moved: -1, trail: [], fell: false, broke: false};
+  const m = kioCls(hit.k);
+  if (m === 3) return null;
+  let c = t, fell = false; const trail = [];
+  for (;;) {
+    const n = b.nxt[c * 4 + d];
+    if (n === -2) break;
+    if (n === -1) { fell = true; break; }
+    if (s.items.some(o => o.c === n)) break;
+    c = n; trail.push(c);
+    if (m !== 1) break;
+  }
+  if (!fell && c === t) return null;
+  const items = fell ? s.items.filter(o => o !== hit) : s.items.map(o => o === hit ? {...o, c} : o);
+  return {cat: t, items, moved: hit.id, trail, last: c, fell, broke: fell && m === 2};
+}
+function kioClear(items) { return items.every(it => kioCls(it.k) >= 2); }
+
+// Fewest pushes a thing on each square needs to go over the edge, with nothing else in the way (255: never).
+function kioPushDist(b) {
+  const N = b.W * b.H, OPP = [1, 0, 3, 2], pd = new Uint8Array(N).fill(255);
+  for (let changed = true; changed;) {
+    changed = false;
+    for (let c = 0; c < N; c++) if (b.on[c] && !b.fixed[c]) for (let d = 0; d < 4; d++) {
+      const p = b.nxt[c * 4 + OPP[d]];
+      if (p < 0 || b.fixed[p]) continue;
+      const n = b.nxt[c * 4 + d], v = n === -1 ? 1 : n >= 0 && !b.fixed[n] && pd[n] < 255 ? pd[n] + 1 : 255;
+      if (v < pd[c]) { pd[c] = v; changed = true; }
+    }
+  }
+  return pd;
+}
+// Fewest moves to clear the table. It searches push by push: between pushes the cat walks the shortest way,
+// so a push costs the walk to the square behind the thing plus one. It looks first where the moves so far
+// plus the fewest pushes still needed is smallest. Returns the moves, -1 if the table can't be cleared, or -2
+// if finding out would mean looking at more than `limit` positions.
+// s: {cat, items: [code]} with code = square * 4 + what it does (0 pushes, 1 rolls, 2 stays on), lamps and books left out.
+function kioFewest(b, s, limit) {
+  const N = b.W * b.H, OPP = [1, 0, 3, 2], pd = b.pd || (b.pd = kioPushDist(b));
+  const need = items => { let h = 0; for (const code of items) { const m = code & 3; if (m === 0) h += pd[code >> 2]; else if (m === 1) h += 1; } return h; };
+  const done = items => items.every(code => (code & 3) === 2);
+  if (done(s.items)) return 0;
+  const key = (cat, items) => String.fromCharCode(cat, ...items);
+  const h0 = need(s.items); if (h0 >= 255) return -1;
+  const best = new Map([[key(s.cat, s.items), 0]]), buckets = [];
+  buckets[h0] = [{cat: s.cat, items: s.items, g: 0}];
+  const occ = new Int16Array(N), dist = new Int16Array(N), queue = new Int16Array(N);
+  let goal = Infinity, expanded = 0;
+  for (let f = h0; f < buckets.length && f < goal; f++) {
+    const bucket = buckets[f]; if (!bucket) continue;
+    for (let bi = 0; bi < bucket.length; bi++) {
+      const st = bucket[bi], g = st.g;
+      if (best.get(key(st.cat, st.items)) < g) continue;
+      if (++expanded > limit) return -2;
+      occ.fill(-1); st.items.forEach((code, i) => { occ[code >> 2] = i; });
+      dist.fill(-1); dist[st.cat] = 0; queue[0] = st.cat;
+      for (let hh = 0, t = 1; hh < t; hh++) {
+        const c = queue[hh];
+        for (let d = 0; d < 4; d++) { const n = b.nxt[c * 4 + d]; if (n >= 0 && dist[n] < 0 && !b.fixed[n] && occ[n] < 0) { dist[n] = dist[c] + 1; queue[t++] = n; } }
+      }
+      for (let i = 0; i < st.items.length; i++) {
+        const code = st.items[i], c = code >> 2, m = code & 3;
+        for (let d = 0; d < 4; d++) {
+          const p = b.nxt[c * 4 + OPP[d]];
+          if (p < 0 || dist[p] < 0) continue;
+          let cc = c, fall = false;
+          for (;;) {
+            const n = b.nxt[cc * 4 + d];
+            if (n === -2) break;
+            if (n === -1) { fall = true; break; }
+            if (b.fixed[n] || occ[n] >= 0) break;
+            cc = n;
+            if (m !== 1) break;
+          }
+          if (!fall && cc === c) continue;
+          if (fall && m === 2) continue;
+          if (!fall && m !== 2 && pd[cc] === 255) continue;   // stuck for good
+          const items = st.items.slice();
+          if (fall) items.splice(i, 1); else { items[i] = cc * 4 + m; items.sort((x, y) => x - y); }
+          const cost = g + dist[p] + 1, k = key(c, items);
+          if (cost >= goal) continue;
+          const prev = best.get(k);
+          if (prev !== undefined && prev <= cost) continue;
+          best.set(k, cost);
+          if (done(items)) { goal = cost; continue; }
+          const fn = cost + need(items);
+          if (fn >= goal) continue;
+          (buckets[fn] || (buckets[fn] = [])).push({cat: c, items, g: cost});
+        }
+      }
+    }
+  }
+  return goal === Infinity ? -1 : goal;
+}
+function kioCodes(items) { return items.filter(it => kioCls(it.k) < 3).map(it => it.c * 4 + kioCls(it.k)).sort((x, y) => x - y); }
+
+// Deal a table for level n: random things on a random table, kept only if it can be cleared and needs enough moves.
+function makeKnockItOff(n) {
+  const [W, H, np, nr, nf, nw, nb, odd, minSteps] = kioLevels(n), rnd = () => Math.random();
+  const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  for (let tries = 0; tries < 300; tries++) {
+    const on = new Array(W * H).fill(1);
+    if (odd) {   // cut a block from a corner (an L) or from the middle of a side (a U)
+      const cw = 2 + Math.floor(rnd() * (W / 2 - 1)), ch = 2 + Math.floor(rnd() * (H / 2 - 1));
+      const x0 = rnd() < .6 ? (rnd() < .5 ? 0 : W - cw) : Math.floor((W - cw) / 2), y0 = rnd() < .5 ? 0 : H - ch;
+      for (let y = y0; y < y0 + ch; y++) for (let x = x0; x < x0 + cw; x++) on[y * W + x] = 0;
+    }
+    let walls = 0; const sides = shuffle([1, 2, 4, 8]);
+    for (let i = 0; i < nw; i++) walls |= sides[i];
+    const cells = shuffle([...Array(W * H).keys()].filter(c => on[c]));
+    const pushes = shuffle("mgsvh".split("")), rolls = shuffle("yi".split("")), still = shuffle("Lb".split(""));
+    const items = []; let i = 0;
+    for (let j = 0; j < nf; j++) items.push({id: items.length, k: still[j % 2], c: cells[i++]});
+    for (let j = 0; j < np; j++) items.push({id: items.length, k: pushes[j % 5], c: cells[i++]});
+    for (let j = 0; j < nr; j++) items.push({id: items.length, k: rolls[j % 2], c: cells[i++]});
+    for (let j = 0; j < nb; j++) items.push({id: items.length, k: "f", c: cells[i++]});
+    const cat = cells[i], t = {N: n, W, H, on, walls, cat, items};
+    const b = kioBoard(t); b.pd = kioPushDist(b);
+    if (items.some(it => kioCls(it.k) < 2 && b.pd[it.c] === 255)) continue;
+    const best = kioFewest(b, {cat, items: kioCodes(items)}, 25000);
+    if (best >= minSteps) return Object.assign(t, {best});
+  }
+  return null;
+}
+// For a table in play: the fewest moves left, and (with q.first) a first step on one way to do it.
+function kioAdvice(q) {
+  const b = kioBoard(q), fewest = kioFewest(b, {cat: q.cat, items: kioCodes(q.items)}, q.limit);
+  if (!q.first || fewest <= 0) return {fewest, first: -1};
+  for (let d = 0; d < 4; d++) {
+    const r = kioMove(b, q, d);
+    if (!r || r.broke) continue;
+    const f = kioClear(r.items) ? 0 : kioFewest(b, {cat: r.cat, items: kioCodes(r.items)}, q.limit);
+    if (f >= 0 && f + 1 === fewest) return {fewest, first: d};
+  }
+  return {fewest, first: -1};
+}
+
+/* ---------- pictures (each drawn in a 100 × 100 square) ---------- */
+const INK = 'stroke="#2A2530" stroke-width="2.5"';
+const SHADOW = (rx = 26) => `<ellipse cx="50" cy="84" rx="${rx}" ry="7" fill="rgba(70,35,10,.28)"/>`;
+const HEART = `<path d="M76 14 C76 9 83 9 83 14 C83 9 90 9 90 14 C90 20 83 24 83 26 C83 24 76 20 76 14Z" fill="#D9534F" stroke="#fff" stroke-width="2"/>`;
+const ART = {
+  m: `${SHADOW(24)}<path d="M64 46 C80 46 80 68 64 68" fill="none" stroke="#2A2530" stroke-width="8"/><path d="M64 46 C80 46 80 68 64 68" fill="none" stroke="#fff" stroke-width="3.5"/>
+      <rect x="28" y="34" width="38" height="48" rx="6" fill="#fff" ${INK}/><rect x="29.5" y="52" width="35" height="9" fill="#B94588"/>
+      <ellipse cx="47" cy="35" rx="18" ry="4.5" fill="#6B4A3B" ${INK}/><path d="M40 26 q-4 -6 0 -12 M50 26 q-4 -6 0 -12" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".85"/>`,
+  g: `${SHADOW(20)}<path d="M33.5 42 L66.5 42 L63 82 L37 82 Z" fill="#8EC5E8"/><ellipse cx="50" cy="42" rx="16.5" ry="3" fill="#BFE0F5"/>
+      <path d="M31 20 L69 20 L63 82 L37 82 Z" fill="rgba(235,245,250,.35)" ${INK} stroke-linejoin="round"/><path d="M38 26 L41 74" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".8"/>`,
+  s: `${SHADOW(22)}<g fill="#6AA673" stroke="#2A2530" stroke-width="2">${[-62, -32, 32, 62, 0].map(a => `<ellipse cx="50" cy="34" rx="7.5" ry="17" transform="rotate(${a} 50 50)"/>`).join("")}</g>
+      <path d="M33 60 L67 60 L62 84 L38 84 Z" fill="#D07A4E" ${INK} stroke-linejoin="round"/><rect x="29" y="53" width="42" height="10" rx="3" fill="#E08F62" ${INK}/>`,
+  v: `${SHADOW(22)}<path d="M50 30 L37 12 M50 30 L50 7 M50 30 L63 13" stroke="#3C8681" stroke-width="3"/>
+      <g stroke="#2A2530" stroke-width="2"><circle cx="37" cy="12" r="6" fill="#F2AEBB"/><circle cx="50" cy="7" r="6" fill="#ECA818"/><circle cx="63" cy="13" r="6" fill="#F2AEBB"/></g>
+      <path d="M42 30 C42 40 28 46 28 62 C28 76 38 84 50 84 C62 84 72 76 72 62 C72 46 58 40 58 30 Z" fill="#7885BA" ${INK}/>
+      <path d="M30 60 Q50 68 70 60" fill="none" stroke="#C9CCEA" stroke-width="4"/><rect x="40" y="26" width="20" height="6" rx="2" fill="#4E577D" ${INK}/>`,
+  h: `${SHADOW(22)}<g transform="rotate(-14 50 50)"><rect x="31" y="14" width="38" height="70" rx="8" fill="#2A2530"/><rect x="35" y="21" width="30" height="54" rx="3" fill="#73A7AE"/>
+      <g fill="#fff" opacity=".85"><rect x="39" y="26" width="8" height="8" rx="2"/><rect x="53" y="26" width="8" height="8" rx="2"/><rect x="39" y="40" width="8" height="8" rx="2"/><rect x="53" y="40" width="8" height="8" rx="2"/></g></g>`,
+  y: `${SHADOW(24)}<circle cx="50" cy="56" r="26" fill="#E79AAE" ${INK}/>
+      <g fill="none" stroke="#C9677F" stroke-width="2.5"><path d="M27 50 Q50 34 75 52"/><path d="M26 61 Q50 46 76 63"/><path d="M31 72 Q52 58 72 73"/><path d="M41 32 Q32 56 44 81"/></g>
+      <path d="M70 72 C80 74 78 86 90 86" fill="none" stroke="#C9677F" stroke-width="3" stroke-linecap="round"/>`,
+  i: `${SHADOW(30)}<g transform="rotate(-22 50 58)"><rect x="18" y="51" width="54" height="14" fill="#F2C230" ${INK}/><line x1="18" y1="58" x2="72" y2="58" stroke="#D9A41C" stroke-width="2"/>
+      <rect x="8" y="51" width="11" height="14" rx="3" fill="#E79AAE" ${INK}/><rect x="17" y="51" width="5" height="14" fill="#C9CCDA" ${INK}/>
+      <path d="M72 51 L90 58 L72 65 Z" fill="#EDD3AE" ${INK} stroke-linejoin="round"/><path d="M84 55.7 L90 58 L84 60.3 Z" fill="#2A2530"/></g>`,
+  f: `${SHADOW(30)}<path d="M26 58 C30 42 70 42 74 58 Z" fill="#B9805F" ${INK}/>
+      <g fill="#8A5A34"><circle cx="40" cy="52" r="3"/><circle cx="50" cy="48" r="3"/><circle cx="60" cy="52" r="3"/><circle cx="47" cy="55" r="3"/><circle cx="56" cy="56" r="3"/></g>
+      <path d="M20 58 L80 58 L71 82 L29 82 Z" fill="#B94588" ${INK} stroke-linejoin="round"/>
+      <path d="M41 70 C45 65 54 65 58 70 C54 75 45 75 41 70 Z M57 70 L63 65.5 L63 74.5 Z" fill="#fff"/>${HEART}`,
+  L: `${SHADOW(30)}<ellipse cx="50" cy="82" rx="18" ry="5" fill="#4E577D" ${INK}/><rect x="46.5" y="42" width="7" height="40" fill="#4E577D" ${INK}/>
+      <path d="M28 46 L72 46 L62 12 L38 12 Z" fill="#F6E7B8" ${INK} stroke-linejoin="round"/><path d="M32 40 L68 40" stroke="#E5CF8C" stroke-width="3"/>`,
+  b: `${SHADOW(34)}<rect x="18" y="66" width="62" height="16" rx="2" fill="#BD5538" ${INK}/><rect x="70" y="68.5" width="8" height="11" fill="#F7F1E1"/>
+      <rect x="25" y="50" width="54" height="16" rx="2" fill="#4E577D" ${INK}/><rect x="69" y="52.5" width="8" height="11" fill="#F7F1E1"/>
+      <rect x="16" y="34" width="58" height="16" rx="2" fill="#6AA673" ${INK}/><rect x="64" y="36.5" width="8" height="11" fill="#F7F1E1"/>
+      <rect x="22" y="38" width="20" height="3" fill="#fff" opacity=".7"/>`,
+};
+const CAT = `<g class="face"><path d="M50 78 C50 92 66 96 76 88" fill="none" stroke="#2A2530" stroke-width="11" stroke-linecap="round"/><path d="M50 78 C50 92 66 96 76 88" fill="none" stroke="#E9A15B" stroke-width="6" stroke-linecap="round"/>
+  <ellipse cx="50" cy="60" rx="22" ry="26" fill="#E9A15B" ${INK}/>
+  <path d="M38 56 Q50 52 62 56 M36 66 Q50 62 64 66 M40 75 Q50 72 60 75" fill="none" stroke="#C7793A" stroke-width="3" stroke-linecap="round"/>
+  <path d="M35 27 L36 10 L47 19 Z M65 27 L64 10 L53 19 Z" fill="#E9A15B" ${INK} stroke-linejoin="round"/>
+  <circle cx="50" cy="30" r="16" fill="#E9A15B" ${INK}/>
+  <path d="M44 22 L46 28 M50 20 L50 27 M56 22 L54 28" stroke="#C7793A" stroke-width="2.5" stroke-linecap="round"/></g>`;
+const KINDS = {
+  m: "Coffee mug", g: "Glass of water", s: "Succulent", v: "Vase", h: "Phone", y: "Ball of yarn", i: "Pencil",
+  f: "Your food bowl", L: "Lamp", b: "Pile of books",
+};
+const PAD = "M100 6 C126 6 141 28 153 46 C172 50 197 70 195 101 C193 133 166 147 140 141 C125 138 112 131 100 131 C88 131 75 138 60 141 C34 147 7 133 5 101 C3 70 28 50 47 46 C59 28 74 6 100 6Z";
+function goldPaw() {
+  const box = document.createElement("div");
+  box.innerHTML = `<svg class="goldpaw" viewBox="-3 -3 106 92" aria-hidden="true"><g fill="var(--gold)" stroke="#2A2530" stroke-width="2.5">
+    ${[[16.5, 30.5, -24], [38.5, 15, -8], [61.5, 15, 8], [83.5, 30.5, 24]].map(([x, y, r]) => `<ellipse cx="${x}" cy="${y}" rx="9.5" ry="10.75" transform="rotate(${r} ${x} ${y})" vector-effect="non-scaling-stroke"/>`).join("")}
+    <path d="${PAD}" transform="translate(19 35.3) scale(.31 .298)" vector-effect="non-scaling-stroke"/></g></svg>`;
+  return box.firstChild;
+}
+
+/* ---------- game ---------- */
+const STORE = "catdoku.knockitoff.v1", MAX_LEVEL = 20;
+const $ = G.$;
+const U = 100, M = 50, NS = "http://www.w3.org/2000/svg";
+const DIRS = ["up", "down", "left", "right"], ANGLE = [0, 180, 270, 90], STEP = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+let state = G.load(STORE);
+let settings = Object.assign({level: 1}, state.settings);
+let game = state.game || null, busy = false, board = null, els = new Map(), catEl = null, ask = 0;
+const fns = [kioLevels, kioCls, kioBoard, kioMove, kioClear, kioPushDist, kioFewest, kioCodes];
+const build = G.builder([...fns, makeKnockItOff], "makeKnockItOff");
+const advice = G.builder([...fns, kioAdvice], "kioAdvice");
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !game.broke && !busy && !$("overlay").classList.contains("show");
+const xy = c => [c % game.W, Math.floor(c / game.W)];
+const tr = (x, y) => `translate(${x * U}px, ${y * U}px)`;
+const tableOf = g => ({W: g.W, H: g.H, on: g.on, walls: g.walls, items: g.items});
+
+/* ---------- drawing ---------- */
+function el(parent, tag, attrs, html) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (html) e.innerHTML = html;
+  parent.append(e); return e;
+}
+function drawTable() {
+  const svg = $("svg"), {W, H} = game, on = (x, y) => x >= 0 && y >= 0 && x < W && y < H && game.on[y * W + x];
+  svg.setAttribute("viewBox", `${-M} ${-M} ${W * U + 2 * M} ${H * U + 2 * M}`);
+  svg.innerHTML = `<defs><pattern id="grain" width="100" height="24" patternUnits="userSpaceOnUse"><rect width="100" height="24" fill="#D6A777"/>
+    <path d="M0 6 Q25 3 50 7 T100 5 M0 17 Q30 20 60 16 T100 18" fill="none" stroke="#C4915F" stroke-width="2"/></pattern></defs>`;
+  const g = el(svg, "g", {});
+  // walls first, so the table edge sits on top of them; a wall only runs beside squares of table
+  const ww = 26, wall = (x, y, w, h) => el(g, "rect", {x, y, width: w, height: h, fill: "#A7A39C"});
+  let wallEdge = "", seams = "", edge = "";
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (on(x, y)) {
+    const X = x * U, Y = y * U;
+    if (y === 0 && game.walls & 1) { wall(X - 1, -ww, U + 2, ww); wallEdge += `M${X} ${-ww} h${U}`; }
+    if (y === H - 1 && game.walls & 2) { wall(X - 1, H * U, U + 2, ww); wallEdge += `M${X} ${H * U + ww} h${U}`; }
+    if (x === 0 && game.walls & 4) { wall(-ww, Y - 1, ww, U + 2); wallEdge += `M${-ww} ${Y} v${U}`; }
+    if (x === W - 1 && game.walls & 8) { wall(W * U, Y - 1, ww, U + 2); wallEdge += `M${W * U + ww} ${Y} v${U}`; }
+  }
+  el(g, "path", {d: wallEdge, stroke: "#2A2530", "stroke-width": 3, fill: "none"});
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (on(x, y)) {
+    const X = x * U, Y = y * U;
+    el(g, "rect", {x: X, y: Y, width: U, height: U, fill: "url(#grain)"});
+    if (on(x + 1, y)) seams += `M${X + U} ${Y} v${U}`; else edge += `M${X + U} ${Y} v${U}`;
+    if (on(x, y + 1)) seams += `M${X} ${Y + U} h${U}`; else edge += `M${X} ${Y + U} h${U}`;
+    if (!on(x - 1, y)) edge += `M${X} ${Y} v${U}`;
+    if (!on(x, y - 1)) edge += `M${X} ${Y} h${U}`;
+  }
+  el(g, "path", {d: seams, stroke: "rgba(90,55,25,.18)", "stroke-width": 2, fill: "none"});
+  el(g, "path", {d: edge, stroke: "#8A5A34", "stroke-width": 7, fill: "none", "stroke-linecap": "square"});
+  el(svg, "g", {id: "fx"});
+  el(svg, "g", {id: "things"});
+  els = new Map();
+  catEl = el($("things"), "g", {class: "thing cat"}, CAT);
+  board = kioBoard(game);
+  drawKey(); sync(true);
+}
+// What's on this table: what to knock off, what to protect, and what won't budge.
+function drawKey() {
+  const kinds = [...new Set(game.items.map(it => it.k))];
+  const group = (title, ks) => !ks.length ? "" : `<div class="group"><h3>${title}</h3><div class="row">${ks.map(k =>
+    `<span><svg viewBox="0 0 100 100" aria-hidden="true">${ART[k]}</svg>${KINDS[k]}</span>`).join("")}</div></div>`;
+  $("key").innerHTML = group("Knock it Off!", kinds.filter(k => kioCls(k) < 2)) +
+    group("Protect", kinds.filter(k => kioCls(k) === 2)) + group("Won't budge", kinds.filter(k => kioCls(k) === 3));
+}
+function thingEl(it) {
+  const t = el($("things"), "g", {class: "thing"}, `<g class="art">${ART[it.k]}</g>`);
+  $("things").insertBefore(t, catEl);
+  els.set(it.id, t); return t;
+}
+// Put every picture where the game says, without animating if `still`.
+function sync(still) {
+  const wrap = $("board");
+  if (still) wrap.classList.add("still");
+  for (const [id, e] of els) if (!game.cur.items.some(it => it.id === id)) { e.remove(); els.delete(id); }
+  for (const it of game.cur.items) { const e = els.get(it.id) || thingEl(it); e.classList.remove("falling"); e.style.transform = tr(...xy(it.c)); e.style.transitionDuration = ""; }
+  catEl.style.transform = tr(...xy(game.cur.cat));
+  catEl.querySelector(".face").style.transform = `rotate(${ANGLE[game.cur.face]}deg)`;
+  if (still) { wrap.getBoundingClientRect(); wrap.classList.remove("still"); }
+  status();
+}
+function status() {
+  $("count").textContent = `Moves ${game.cur.moves} · fewest ${game.best}`;
+  $("undoBtn").disabled = !game.history.length || game.won;
+  $("restartBtn").disabled = !game.history.length || game.won;
+  $("hintBtn").disabled = game.won || game.broke;
+}
+
+/* ---------- moving ---------- */
+// One step of the cat, with its animation. Returns how long the animation runs, or -1 if the cat couldn't move.
+function move(d) {
+  const r = kioMove(board, game.cur, d);
+  const face = catEl.querySelector(".face");
+  if (!r) { game.cur.face = d; face.style.transform = `rotate(${ANGLE[d]}deg)`; return -1; }
+  if (game.timed && !game.started) game.started = true;
+  game.history.push(JSON.stringify(game.cur));
+  if (game.history.length > 400) game.history.shift();
+  game.cur = {cat: r.cat, items: r.items, face: d, moves: game.cur.moves + 1};
+  catEl.style.transform = tr(...xy(r.cat));
+  face.style.transform = `rotate(${ANGLE[d]}deg)`;
+  let wait = 130;
+  if (r.moved >= 0) {
+    const e = els.get(r.moved), [lx, ly] = xy(r.last), dist = r.trail.length + (r.fell ? 1 : 0);
+    const end = r.fell ? [lx + STEP[d][0], ly + STEP[d][1]] : [lx, ly], roll = Math.max(1, dist) * 90;
+    e.style.transitionDuration = roll + "ms";
+    e.style.transform = tr(...end);
+    wait = Math.max(wait, roll);
+    if (r.fell) {
+      els.delete(r.moved);
+      setTimeout(() => { e.classList.add("falling"); crash(...end); setTimeout(() => e.remove(), 500); }, roll);
+      wait = roll + 350;
+    }
+  }
+  status();
+  if (r.broke) { game.broke = true; save(); busy = true; setTimeout(() => { busy = false; brokeCard(); }, wait + 200); }
+  else if (kioClear(game.cur.items)) { busy = true; setTimeout(() => { busy = false; win(); }, wait + 250); }
+  else save();
+  return wait;
+}
+function crash(x, y) {
+  const g = el($("fx"), "g", {class: "crash", transform: `translate(${x * U} ${y * U})`},
+    `<path d="M50 18 L57 38 L78 30 L65 48 L84 58 L62 61 L66 82 L50 68 L34 82 L38 61 L16 58 L35 48 L22 30 L43 38 Z" fill="#FFE07A" stroke="#2A2530" stroke-width="2.5"/>`);
+  setTimeout(() => g.remove(), 800);
+}
+// The shortest walk to a square, round everything on the table, as a list of directions (or null).
+function pathTo(target) {
+  const occ = new Set(game.cur.items.map(it => it.c)), prev = new Map([[game.cur.cat, null]]), q = [game.cur.cat];
+  for (let h = 0; h < q.length; h++) {
+    const c = q[h];
+    if (c === target) { const out = []; let k = c; while (prev.get(k)) { out.unshift(prev.get(k)[0]); k = prev.get(k)[1]; } return out; }
+    for (let d = 0; d < 4; d++) {
+      const n = board.nxt[c * 4 + d];
+      if (n < 0 || occ.has(n) || prev.has(n)) continue;
+      prev.set(n, [d, c]); q.push(n);
+    }
+  }
+  return null;
+}
+function walk(dirs) {
+  if (!dirs.length || !game || game.won || game.broke) { busy = false; afterMove(); return; }
+  busy = true;
+  const w = move(dirs[0]);
+  if (w < 0) { busy = false; return; }
+  if (game.won || game.broke || kioClear(game.cur.items)) return;
+  setTimeout(() => walk(dirs.slice(1)), w);
+}
+function tryStep(d) {
+  if (!playing()) return;
+  const w = move(d);
+  if (w >= 0 && !busy) { busy = true; setTimeout(() => { busy = false; afterMove(); }, w); }
+}
+// After a move, check in the background that the table can still be cleared.
+function afterMove() {
+  if (!playing()) return;
+  const mine = ++ask;
+  advice.take({...tableOf(game), cat: game.cur.cat, items: game.cur.items, limit: 60000}).then(r => {
+    if (mine !== ask || !playing()) return;
+    G.note(r.fewest === -1 ? "Something's stuck now. Undo or Restart." : "", 0);
+  });
+}
+function undo() {
+  if (!game || busy || !game.history.length || game.won) return;
+  ask++; game.cur = JSON.parse(game.history.pop()); game.broke = false;
+  G.closeCard(); sync(true); save(); G.note("");
+}
+function restart() {
+  if (!game || busy || game.won || !game.history.length) return;
+  ask++; game.history.push(JSON.stringify(game.cur));
+  game.cur = {cat: game.cat, items: game.items, face: 0, moves: 0}; game.broke = false;
+  G.closeCard(); sync(true); save(); G.note("Back to the start. Undo brings your moves back.", 4000);
+}
+function hint() {
+  if (!playing()) return;
+  const mine = ++ask, g = game;
+  G.note("Thinking…", 0); $("hintBtn").disabled = true;
+  advice.take({...tableOf(game), cat: game.cur.cat, items: game.cur.items, limit: 400000, first: true}).then(r => {
+    if (game !== g) return;
+    status();
+    if (mine !== ask) return;
+    if (r.first < 0) { G.note(r.fewest === -1 ? "No way to clear the table from here. Undo or Restart." : "That's too tricky to work out from here. Try Undo.", 0); return; }
+    if (!game.hinted) { game.hinted = true; save(); }
+    const [x, y] = xy(game.cur.cat), [dx, dy] = STEP[r.first];
+    const a = el($("fx"), "g", {class: "hintArrow", transform: `translate(${(x + dx * .62) * U} ${(y + dy * .62) * U}) rotate(${ANGLE[r.first]} 50 50)`},
+      `<path d="M50 22 L72 50 L59 50 L59 76 L41 76 L41 50 L28 50 Z" fill="#B94588" stroke="#fff" stroke-width="3"/>`);
+    setTimeout(() => a.remove(), 1600);
+    G.note(`Try going ${DIRS[r.first]}.`, 4000);
+  });
+}
+
+/* ---------- endings ---------- */
+function win() {
+  game.won = true; game.gold = game.cur.moves === game.best && !game.hinted;
+  G.finishClock(game);
+  const next = game.hinted ? game.N : Math.min(MAX_LEVEL, game.N + 1);
+  settings.level = next; $("levelSel").value = next; save(); status();
+  G.track(`Knock It Off cleared level ${game.N}${game.gold ? " (gold paw)" : ""}`);
+  build.prefetch(next);
+  finishCard();
+}
+function finishCard() {
+  const next = settings.level, N = game.N, moves = game.cur.moves;
+  let text = game.gold ? `You cleared the table in ${moves} moves, the fewest possible.` : `You cleared the table in ${moves} moves. The fewest possible is ${game.best}.`;
+  text += game.hinted ? ` You had a hint, so next up is another level ${N}.` : N === MAX_LEVEL ? " That's the hardest level; next up is another one." : ` Next up: level ${next}.`;
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the empty table", game.result,
+    {title: game.gold ? "Gold paw!" : "Table cleared!", next: `Next: level ${next}`,
+     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+  if (game.gold) $("card").querySelector(".stripe").after(goldPaw());
+}
+function brokeCard() {
+  G.openCard("Not that one!", "That was your dinner! Undo to catch it, or start the table again.",
+    [["Undo", undo, true], ["Restart", restart]]);
+}
+
+/* ---------- new tables ---------- */
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newTable(); }
+async function newTable() {
+  if (busy) return;
+  busy = true; ask++;
+  const N = settings.level;
+  G.openCard("Setting the table…", "", []);
+  const t = await build.take(N);
+  game = {N, W: t.W, H: t.H, on: t.on, walls: t.walls, cat: t.cat, items: t.items, best: t.best,
+          cur: {cat: t.cat, items: t.items, face: 0, moves: 0}, history: [], hinted: false, won: false, broke: false, ...G.freshClock()};
+  busy = false;
+  G.closeCard(); drawTable(); save(); G.note("");
+  G.track(`Knock It Off new table level ${N}`);
+  build.prefetch(N);
+}
+
+/* ---------- input ---------- */
+const KEYS = {ArrowUp: 0, ArrowDown: 1, ArrowLeft: 2, ArrowRight: 3, w: 0, s: 1, a: 2, d: 3};
+document.addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); return; }
+  if (e.ctrlKey || e.metaKey || e.altKey || /SELECT|INPUT|TEXTAREA/.test(e.target.tagName)) return;
+  const d = KEYS[e.key]; if (d !== undefined && game) { e.preventDefault(); tryStep(d); }
+});
+let press = null;
+$("board").addEventListener("pointerdown", e => { press = {x: e.clientX, y: e.clientY}; });
+$("board").addEventListener("pointerup", e => {
+  const p0 = press; press = null;
+  if (!p0 || !playing()) return;
+  const dx = e.clientX - p0.x, dy = e.clientY - p0.y;
+  if (Math.hypot(dx, dy) > 24) return tryStep(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 3 : 2) : (dy > 0 ? 1 : 0));
+  // a tap: walk to that square (or step, if it's next to the cat)
+  const svg = $("svg"), pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+  const p = pt.matrixTransform(svg.getScreenCTM().inverse()), x = Math.floor(p.x / U), y = Math.floor(p.y / U);
+  const [cx, cy] = xy(game.cur.cat);
+  if (Math.abs(x - cx) + Math.abs(y - cy) === 1) return tryStep(x > cx ? 3 : x < cx ? 2 : y > cy ? 1 : 0);
+  if (x < 0 || y < 0 || x >= game.W || y >= game.H || !game.on[y * game.W + x]) return;
+  const path = pathTo(y * game.W + x);
+  if (path && path.length) walk(path);
+  else if (!path) G.note("The cat can't get there.", 2500);
+});
+
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(n === MAX_LEVEL ? `${n} (hardest)` : String(n), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = newTable;
+$("undoBtn").onclick = undo;
+$("restartBtn").onclick = restart;
+$("hintBtn").onclick = hint;
+$("helpBtn").onclick = showHelp;
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  const media = document.createElement("div");
+  const ol = document.createElement("ol"); ol.className = "steps";
+  for (const t of ["Walk into things to push them. Push them past the edge and they fall off.",
+                   "You can only push, never pull, and only one thing at a time.",
+                   "Knock everything off the table, but keep your food bowl on it."]) {
+    const li = document.createElement("li"); li.textContent = t; ol.append(li);
+  }
+  const tip = document.createElement("p"); tip.className = "tip";
+  tip.textContent = "Swipe or use the arrow keys to step, or tap a square to walk there. Use the fewest moves possible for a gold paw.";
+  media.append(ol, tip);
+  G.openCard("How to play", "", [["Let's play", () => { G.closeCard(); settings.seenHelp = true; save(); }, true]], media);
+}
+function helpOnFirstVisit() { if (!settings.seenHelp && game && !game.won) showHelp(); }
+
+G.nav("knockitoff");
+G.checkClock(game);
+G.setupTimer({name: "knockitoff", game: () => game, playing: g => !g.won, save,
+  label: n => `Level ${n}`, noun: "level", emptyText: "Clear a table and your times will show up here. They're kept on this device only."});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.N : settings.level);
+
+/* ---------- sharing ---------- */
+$("shareBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Knock It Off", won: game.won,
+  puzzle: () => ({g: "knockitoff", N: game.N, W: game.W, H: game.H, on: game.on, walls: game.walls, cat: game.cat, items: game.items, best: game.best}),
+  progress: () => ({cur: game.cur})}); };
+// A table from a share link, with the moves so far if they were sent (that isn't timed).
+function openShared(d) {
+  const okCell = c => Number.isInteger(c) && c >= 0 && c < d.W * d.H && d.on[c];
+  const okItems = a => Array.isArray(a) && a.every(it => it && Number.isInteger(it.id) && KINDS[it.k] && okCell(it.c));
+  if (!(d.N >= 1 && d.N <= MAX_LEVEL) || !(d.W >= 3 && d.W <= 12 && d.H >= 3 && d.H <= 12) || !Array.isArray(d.on) || d.on.length !== d.W * d.H ||
+      !okCell(d.cat) || !okItems(d.items) || !Number.isInteger(d.best)) { G.note("That share link didn't work. It may have been cut off.", 6000); return; }
+  const cur = d.p && d.p.cur && okCell(d.p.cur.cat) && okItems(d.p.cur.items) ? d.p.cur : {cat: d.cat, items: d.items, face: 0, moves: 0};
+  game = {N: d.N, W: d.W, H: d.H, on: d.on, walls: d.walls | 0, cat: d.cat, items: d.items, best: d.best,
+          cur: {cat: cur.cat, items: cur.items, face: cur.face | 0, moves: cur.moves | 0}, history: [], hinted: false, won: false, broke: false, ...G.freshClock()};
+  if (d.p) game.timed = false;
+  settings.level = d.N; $("levelSel").value = d.N;
+  drawTable(); save(); build.prefetch(d.N);
+  if (kioClear(game.cur.items)) { game.won = true; status(); }
+}
+const shared = G.readShare("knockitoff");
+$("levelSel").value = settings.level;
+if (game && game.cur) G.reopen(() => {
+    drawTable();
+    if (game.won) finishCard(); else if (game.broke) brokeCard();
+    build.prefetch(settings.level); helpOnFirstVisit();
+  }, why => { game = null; busy = false; newTable().then(() => G.note(why, 0)); });
+else if (!shared) newTable().then(helpOnFirstVisit);
+const shareOpts = () => ({name: "Knock It Off", inProgress: !!(game && !game.won && game.history.length), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, shareOpts());
+// A share link opened while this page is already showing only changes the address, so watch for it.
+window.addEventListener("hashchange", () => { const d = G.readShare("knockitoff"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
