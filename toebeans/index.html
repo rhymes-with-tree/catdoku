@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Toe Beans</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-06.1";
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-06.1">
+<style>
+/* Six number tiles up top, then one outlined paw: its four toe beans are + − × ÷ and its main pad holds the goal.
+   On a win every pad fills at once, in a paw pad colour picked for that game (--pc, with --pt for text on it). */
+:root{--board:min(94vw,420px); --plum:#B94588; --tint:rgba(185,69,136,.10); --pc:#F2AEBB; --pt:#2A2530}
+.play{width:var(--board);display:flex;flex-direction:column;gap:22px;user-select:none;-webkit-user-select:none}
+.recent{display:flex;gap:6px}
+.recent svg{width:26px;height:26px}
+
+.beans{display:grid;grid-template-columns:repeat(3,1fr);gap:14px 18px;padding:0 4%}
+.paw{position:relative;width:100%;aspect-ratio:1/0.86}
+.toe,.pad,.num{position:absolute;border:3px solid var(--ink);display:flex;align-items:center;justify-content:center;
+  font-weight:800;color:var(--ink);padding:0;transition:background .2s,color .2s,transform .15s}
+.toe{width:19%;height:25%;border-radius:50%;background:none;font-size:clamp(26px,8vw,38px);line-height:1;transform:rotate(var(--r))}
+.toe span{display:block;transform:rotate(calc(-1 * var(--r))) translateY(-2px)}
+.toe:where(:not(:disabled)):hover,.num:where(:not(.empty,.dim)):hover{background:var(--tint)}
+.toe[aria-pressed="true"],.num[aria-pressed="true"]{background:var(--plum);color:#fff}
+.toe:disabled{opacity:1;background:none;color:rgba(42,37,48,.3);cursor:default}
+.pad{left:19%;top:41%;width:62%;height:52%;border:none;background:none;flex-direction:column;cursor:default}
+.pad svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.pad path{fill:none;transition:fill .2s}
+.pad .goal{position:relative;font-size:clamp(44px,15vw,72px);line-height:1;font-variant-numeric:tabular-nums;transition:color .2s}
+.pad .label{position:relative;font-size:13px;font-weight:600;color:var(--ink-soft);letter-spacing:.06em;text-transform:uppercase;margin-top:-2px}
+.paw.won .toe,.paw.won .toe:disabled{background:var(--pc);color:var(--pt)}
+.paw.won .pad path{fill:var(--pc)}
+.paw.won .pad .goal,.paw.won .pad .label{color:var(--pt)}
+
+.num{position:relative;aspect-ratio:1.3/1;border-radius:14px;background:var(--panel);
+  font-size:clamp(22px,7vw,32px);font-variant-numeric:tabular-nums;cursor:pointer}
+.num.small{font-size:clamp(17px,5vw,24px)}
+.num.empty{background:none;border-style:dashed;border-color:var(--line);color:transparent;cursor:default}
+.num.dim{opacity:.35;cursor:default}
+.num.hit{background:var(--pc);color:var(--pt)}
+.num.pop{animation:pop .3s}
+@keyframes pop{50%{transform:scale(1.12)}}
+
+.card ol.steps{text-align:left;margin:0 0 14px;padding-left:24px;color:var(--ink);font-size:16px;line-height:1.35}
+.card ol.steps li{margin:0 0 8px}
+.card .tip{font-size:14px;margin:0 0 14px}
+.card .way{font-weight:600;color:var(--ink);margin:0 0 16px;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Toe Beans</h1><div class="stripe"></div><p class="tagline">Make the number on the big pad</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New puzzle</button>
+  </div>
+
+  <div class="status"><div class="recent" id="recent" role="img"></div><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="play" id="board">
+    <div class="beans" id="beans" aria-label="Numbers"></div>
+    <div class="paw" id="paw">
+      <button class="toe" data-op="+" style="left:7%;top:23%;--r:-24deg" aria-label="Add"><span>+</span></button>
+      <button class="toe" data-op="-" style="left:29%;top:5%;--r:-8deg" aria-label="Subtract"><span>−</span></button>
+      <button class="toe" data-op="*" style="left:52%;top:5%;--r:8deg" aria-label="Multiply"><span>×</span></button>
+      <button class="toe" data-op="/" style="left:74%;top:23%;--r:24deg" aria-label="Divide"><span>÷</span></button>
+      <div class="pad" id="pad">
+        <svg viewBox="0 0 200 150" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M100 6 C126 6 141 28 153 46 C172 50 197 70 195 101 C193 133 166 147 140 141 C125 138 112 131 100 131 C88 131 75 138 60 141 C34 147 7 133 5 101 C3 70 28 50 47 46 C59 28 74 6 100 6Z"
+            stroke="var(--ink)" stroke-width="3" vector-effect="non-scaling-stroke"/>
+        </svg>
+        <span class="goal" id="goal" aria-live="polite"></span>
+        <span class="label" id="goalLabel">Goal</span>
+      </div>
+    </div>
+  </div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="undoBtn">Undo</button>
+    <button id="finishBtn">Finish here</button>
+    <button id="shareBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+
+  <div class="help">
+    <p>Tap a number, a toe bean, then another number. The two numbers combine and the answer takes the place of the second number. Make the number on the big pad.</p>
+    <p>You don't have to use every number. Hit it exactly to move up a level. Finish within 10 to stay on your level; further off moves you back one.</p>
+  </div>
+</main>
+
+<script src="../games.js?v=2026-10-06.1"></script>
+<script>
+/* ---------- puzzles ---------- */
+// Each level: [fewest steps the goal needs, lowest goal, highest goal, the big numbers that can be dealt].
+// Four small numbers (1 to 9, all different) and two big ones are dealt, and the goal is picked from
+// everything they can make that needs exactly that many steps. (A function, so the puzzle worker gets it too.)
+function levelInfo(n) { return [null,
+  [2, 10, 60, [10, 11, 12, 15, 20]], [2, 20, 99, [10, 11, 12, 15, 20, 25]], [3, 30, 150, [10, 11, 12, 13, 15, 20, 25]],
+  [3, 60, 220, [10, 11, 12, 13, 15, 20, 25]], [3, 100, 320, [11, 12, 13, 15, 17, 20, 25]], [4, 100, 400, [11, 12, 13, 15, 17, 20, 25]],
+  [4, 150, 550, [11, 12, 13, 15, 17, 19, 20, 25]], [4, 200, 750, [11, 12, 13, 15, 17, 19, 20, 25]],
+  [5, 200, 850, [11, 12, 13, 15, 17, 19, 20, 25]], [5, 300, 999, [11, 12, 13, 14, 15, 17, 19, 20, 23, 25]]][n]; }
+const MAX_LEVEL = 10;
+
+// a op b, or null when the answer would be zero, negative or a fraction.
+function opResult(a, op, b) {
+  if (op === "+") return a + b;
+  if (op === "-") return a - b > 0 ? a - b : null;
+  if (op === "*") return a * b;
+  return b !== 0 && a % b === 0 ? a / b : null;
+}
+// Every value the numbers can make, with the fewest steps each one needs.
+function reachable(nums) {
+  const best = new Map(), seen = new Map();
+  (function walk(arr, steps) {
+    const key = arr.slice().sort((x, y) => x - y).join(",");
+    if (seen.has(key) && seen.get(key) <= steps) return;
+    seen.set(key, steps);
+    for (const v of arr) if (!best.has(v) || best.get(v) > steps) best.set(v, steps);
+    for (let i = 0; i < arr.length; i++) for (let j = i + 1; j < arr.length; j++) {
+      const a = Math.max(arr[i], arr[j]), b = Math.min(arr[i], arr[j]), rest = arr.filter((_, k) => k !== i && k !== j);
+      for (const op of "+-*/") { const r = opResult(a, op, b); if (r !== null && r !== a && r !== b) walk(rest.concat(r), steps + 1); }
+    }
+  })(nums, 0);
+  return best;
+}
+function makeToeBeans(level) {
+  const [steps, lo, hi, bigPool] = levelInfo(level);
+  for (let tries = 0; tries < 200; tries++) {
+    const small = new Set(); while (small.size < 4) small.add(1 + Math.floor(Math.random() * 9));
+    const big = new Set(); while (big.size < 2) big.add(bigPool[Math.floor(Math.random() * bigPool.length)]);
+    const nums = [...small, ...big].sort((x, y) => x - y), best = reachable(nums);
+    const fits = [...best].filter(([v, s]) => s === steps && v >= lo && v <= hi).map(([v]) => v);
+    if (fits.length) return {nums, goal: fits[Math.floor(Math.random() * fits.length)]};
+  }
+  return null;
+}
+// One shortest way to make the goal, as steps [a, op, b, answer], to show after a game that missed it.
+function oneWay(nums, goal) {
+  for (let limit = 1; limit < nums.length; limit++) {
+    const failed = new Set();
+    const found = (function go(arr, left) {
+      if (arr.includes(goal)) return [];
+      if (!left) return null;
+      const key = arr.slice().sort((x, y) => x - y).join(",");
+      if (failed.has(key)) return null;
+      for (let i = 0; i < arr.length; i++) for (let j = i + 1; j < arr.length; j++) {
+        const a = Math.max(arr[i], arr[j]), b = Math.min(arr[i], arr[j]), rest = arr.filter((_, k) => k !== i && k !== j);
+        for (const op of "+-*/") {
+          const r = opResult(a, op, b); if (r === null) continue;
+          const more = go(rest.concat(r), left - 1);
+          if (more) return [[a, op, b, r], ...more];
+        }
+      }
+      failed.add(key); return null;
+    })(nums, limit);
+    if (found) return found;
+  }
+  return null;
+}
+
+/* ---------- game ---------- */
+const STORE = "catdoku.toebeans.v1";
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1, recent: []}, state.settings);
+let game = state.game || null, busy = false, pick = null, op = null, popped = -1;
+const build = G.builder([levelInfo, opResult, reachable, makeToeBeans], "makeToeBeans");
+const save = () => G.save(STORE, {settings, game});
+
+// Real paw pad colours, each with the text colour that reads on it. Each game gets one, never the same twice running.
+const PADS = [["#F2AEBB", "#2A2530"], ["#C9677F", "#fff"], ["#B9805F", "#fff"], ["#6B4A3B", "#fff"], ["#8E8794", "#fff"], ["#2A2530", "#fff"]];
+function newPads(last) { const from = PADS.filter(p => !last || p[0] !== last[0]); return from[Math.floor(Math.random() * from.length)]; }
+
+const SIGN = {"+": "+", "-": "−", "*": "×", "/": "÷"};
+const playing = () => game && !game.won && !game.over && !busy;
+function closest() {
+  let c = null;
+  for (const v of game.beans) if (v !== null && (c === null || Math.abs(v - game.goal) < Math.abs(c - game.goal))) c = v;
+  return c;
+}
+
+function tapBean(i) {
+  if (!playing() || game.beans[i] === null) return;
+  if (pick === null || op === null) pick = pick === i ? null : i;
+  else if (pick === i) { pick = null; op = null; }
+  else {
+    const r = opResult(game.beans[pick], op, game.beans[i]);
+    if (r === null) return;
+    game.history.push(game.beans.slice());
+    game.beans[i] = r; game.beans[pick] = null; pick = null; op = null; popped = i;
+    save();
+    if (r === game.goal) return win();
+  }
+  render();
+}
+function tapToe(o) { if (!playing() || pick === null) return; op = op === o ? null : o; render(); }
+function undo() { if (!playing() || !game.history.length) return; game.beans = game.history.pop(); pick = null; op = null; render(); save(); }
+
+function remember(score) {
+  settings.recent = settings.recent.concat({c: game.pads[0], s: score}).slice(-5);
+}
+
+/* ---------- finishing ---------- */
+const levelPick = (current, text) => G.otherSize($("levelSel"), current, startLevel, text || "Or play a different level:");
+function win() {
+  game.won = true; G.finishClock(game); remember(2);
+  const next = Math.min(MAX_LEVEL, game.N + 1);
+  settings.level = next; $("levelSel").value = next; save(); render();
+  G.track(`Toe Beans solved level ${game.N}`);
+  build.prefetch(next);
+  const done = game;   // let the coloured paw show for a moment first
+  setTimeout(() => { if (game === done) finishCard(); }, 1200);
+}
+function finishCard() {
+  const next = settings.level, top = game.N === MAX_LEVEL;
+  const text = top ? `${game.goal} exactly. That's the hardest level, so the next one is level ${MAX_LEVEL} again.`
+    : `${game.goal} exactly. Level ${game.N} done; next up is level ${next}.`;
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my paw", game.result,
+    {title: "Got it!", next: `Next: level ${next}`, after: levelPick(next)});
+}
+
+// Finishing without the goal: within 10 keeps your level, further off moves you back one.
+const nearEnough = d => d <= 10;
+function finishHere() {
+  if (!playing()) return;
+  const c = closest(), d = Math.abs(c - game.goal), back = Math.max(1, game.N - 1);
+  const result = nearEnough(d) ? `That's close enough to stay on level ${game.N}.`
+    : game.N === 1 ? "You'll stay on level 1." : `Finishing now moves you back to level ${back}.`;
+  G.openCard("Finish here?", `Your closest is ${c}, ${d} away from ${game.goal}. ${result}`,
+    [["Finish", () => { G.closeCard(); giveUp(); }, true], ["Keep trying", G.closeCard]]);
+}
+function giveUp() {
+  const c = closest(), d = Math.abs(c - game.goal);
+  game.over = true; game.closest = c; remember(nearEnough(d) ? 1 : 0);
+  settings.level = nearEnough(d) ? game.N : Math.max(1, game.N - 1);
+  $("levelSel").value = settings.level; pick = null; op = null;
+  save(); render();
+  G.track(`Toe Beans finished level ${game.N} ${d} away`);
+  build.prefetch(settings.level);
+  overCard();
+}
+function overCard() {
+  const d = Math.abs(game.closest - game.goal), next = settings.level;
+  const media = document.createElement("div");
+  const p = document.createElement("p");
+  p.textContent = `You got to ${game.closest}, ${d} away from ${game.goal}. ` +
+    (next === game.N ? `Next up is another level ${next}.` : `Next up is level ${next}.`);
+  media.append(p);
+  const way = oneWay(game.nums, game.goal);
+  if (way) {
+    const w = document.createElement("p"); w.className = "way";
+    w.textContent = "One way: " + way.map(([a, o, b, r]) => `${a} ${SIGN[o]} ${b} = ${r}`).join(", then ");
+    media.append(w);
+  }
+  G.openCard(nearEnough(d) ? "So close!" : "Not this time", "", [[`Next: level ${next}`, () => { G.closeCard(); startLevel(next); }, true],
+    ["Look at my numbers", () => { G.closeCard(); G.note("Tap New puzzle when you're ready for another.", 0); }]], media, levelPick(next));
+}
+
+/* ---------- new puzzles ---------- */
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
+async function newPuzzle() {
+  if (busy) return;
+  busy = true;
+  const N = settings.level;
+  G.openCard("Dealing the numbers…", "", []);
+  const p = await build.take(N);
+  game = {N, nums: p.nums, goal: p.goal, beans: p.nums.slice(), history: [], won: false, over: false,
+          pads: newPads(game && game.pads), ...G.freshClock()};
+  busy = false; pick = null; op = null;
+  G.closeCard(); render(); save(); G.note("");
+  G.track(`Toe Beans new puzzle level ${N}`);
+  build.prefetch(N);
+}
+
+/* ---------- drawing ---------- */
+// The little paws are the big paw shrunk down: the same toe positions and tilts, and the same pad outline.
+const TOES = [[16.5, 30.5, -24], [38.5, 15, -8], [61.5, 15, 8], [83.5, 30.5, 24]];
+const PAD = $("pad").querySelector("path").getAttribute("d");
+const littlePaw = (fill, opacity) => `<svg viewBox="-3 -3 106 92" aria-hidden="true"><g fill="${fill}" stroke="var(--ink)" stroke-width="1.6" opacity="${opacity}">
+  ${TOES.map(([x, y, r]) => `<ellipse cx="${x}" cy="${y}" rx="9.5" ry="10.75" transform="rotate(${r} ${x} ${y})" vector-effect="non-scaling-stroke"/>`).join("")}
+  <path d="${PAD}" transform="translate(19 35.3) scale(.31 .298)" vector-effect="non-scaling-stroke"/></g></svg>`;
+// Your last five games: filled in that game's pad colour when you hit the goal, faint when you finished
+// within 10, an outline when further off, and pale outlines for games not played yet.
+function drawRecent() {
+  const r = settings.recent, out = [];
+  for (let i = 0; i < 5; i++) {
+    const x = r[i - (5 - r.length)];
+    out.push(!x ? littlePaw("none", .25) : x.s === 2 ? littlePaw(x.c, 1) : x.s === 1 ? littlePaw(x.c, .4) : littlePaw("none", .6));
+  }
+  $("recent").innerHTML = out.join("");
+  const hits = r.filter(x => x.s === 2).length;
+  $("recent").setAttribute("aria-label", r.length ? `Your last ${r.length} games: ${hits} hit exactly` : "No games finished yet");
+}
+
+function render() {
+  if (!game) return;
+  const paw = $("paw"), beans = $("beans");
+  for (const el of [paw, beans]) { el.style.setProperty("--pc", game.pads[0]); el.style.setProperty("--pt", game.pads[1]); }
+  paw.classList.toggle("won", game.won);
+  $("goal").textContent = game.goal;
+  $("goalLabel").textContent = game.won ? "Got it!" : `Level ${game.N}`;
+  document.querySelectorAll(".toe").forEach(t => {
+    t.disabled = !playing() || pick === null;
+    t.setAttribute("aria-pressed", String(op === t.dataset.op));
+  });
+  beans.innerHTML = "";
+  game.beans.forEach((v, i) => {
+    const b = document.createElement("button");
+    b.className = "num";
+    b.textContent = v === null ? "" : v;
+    if (v === null) { b.classList.add("empty"); b.setAttribute("aria-label", "Used"); b.tabIndex = -1; }
+    else {
+      if (String(v).length >= 4) b.classList.add("small");
+      if (game.won && v === game.goal) b.classList.add("hit");
+      if (pick !== null && op !== null && i !== pick && opResult(game.beans[pick], op, v) === null) b.classList.add("dim");
+    }
+    if (i === popped) b.classList.add("pop");
+    b.setAttribute("aria-pressed", String(i === pick));
+    b.onclick = () => tapBean(i);
+    beans.append(b);
+  });
+  popped = -1;
+  $("undoBtn").disabled = !playing() || !game.history.length;
+  $("finishBtn").disabled = !playing();
+  drawRecent();
+  if (game.won) G.note("Exactly right!", 0);
+  else if (game.over) G.note(`Finished ${Math.abs(game.closest - game.goal)} away.`, 0);
+  else if (pick !== null && op === null) G.note("Now tap a toe bean", 0);
+  else if (op !== null) G.note("Now tap another number", 0);
+  else { const d = Math.abs(closest() - game.goal); G.note(game.history.length && d <= 10 ? `${d} away` : "", 0); }
+}
+
+/* ---------- controls ---------- */
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(n === MAX_LEVEL ? `${n} (hardest)` : String(n), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+document.querySelectorAll(".toe").forEach(t => t.onclick = () => tapToe(t.dataset.op));
+$("newBtn").onclick = newPuzzle;
+$("undoBtn").onclick = undo;
+$("finishBtn").onclick = finishHere;
+$("helpBtn").onclick = showHelp;
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); } });
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  const media = document.createElement("div");
+  const ol = document.createElement("ol"); ol.className = "steps";
+  for (const t of ["Tap a number, then a toe bean, then another number.",
+                   "The two numbers combine, and the answer takes the second number's place.",
+                   "Make the number on the big pad. You don't have to use every number."]) {
+    const li = document.createElement("li"); li.textContent = t; ol.append(li);
+  }
+  const tip = document.createElement("p"); tip.className = "tip";
+  tip.textContent = "Hit it exactly to move up a level. If you're stuck, Finish here: within 10 keeps your level, further off moves you back one.";
+  media.append(ol, tip);
+  G.openCard("How to play", "", [["Let's play", () => { G.closeCard(); settings.seenHelp = true; save(); }, true]], media);
+}
+// First visit only: show the directions once the first puzzle is dealt.
+function helpOnFirstVisit() { if (!settings.seenHelp && game && playing()) showHelp(); }
+
+G.nav("toebeans");
+G.checkClock(game);
+G.setupTimer({name: "toebeans", game: () => game, playing: g => !g.won && !g.over, save,
+  label: n => `Level ${n}`, noun: "level", emptyText: "Hit a goal and your times will show up here. They're kept on this device only."});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.N : settings.level);
+
+/* ---------- sharing ---------- */
+$("shareBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Toe Beans", won: game.won,
+  puzzle: () => ({g: "toebeans", N: game.N, nums: game.nums, goal: game.goal}),
+  progress: () => ({beans: game.beans})}); };
+// A puzzle from a share link, with its numbers so far if they were sent (that isn't timed).
+function openShared(d) {
+  const ok = a => Array.isArray(a) && a.length === 6 && a.every(v => v === null || (Number.isInteger(v) && v > 0));
+  if (!ok(d.nums) || d.nums.includes(null) || !Number.isInteger(d.goal) || !(d.N >= 1 && d.N <= MAX_LEVEL)) {
+    G.note("That share link didn't work. It may have been cut off.", 6000); return;
+  }
+  const beans = d.p && ok(d.p.beans) ? d.p.beans : d.nums.slice();
+  game = {N: d.N, nums: d.nums, goal: d.goal, beans, history: [], won: beans.includes(d.goal), over: false,
+          pads: newPads(game && game.pads), ...G.freshClock()};
+  if (d.p) game.timed = false;
+  pick = null; op = null; settings.level = d.N; $("levelSel").value = d.N;
+  render(); save(); build.prefetch(d.N);
+}
+const shared = G.readShare("toebeans");
+$("levelSel").value = settings.level;
+if (game && game.nums) G.reopen(() => {
+    render();
+    if (game.won) finishCard(); else if (game.over) overCard();
+    build.prefetch(settings.level); helpOnFirstVisit();
+  }, why => { game = null; busy = false; newPuzzle().then(() => G.note(why, 0)); });
+else if (!shared) newPuzzle().then(helpOnFirstVisit);
+const shareOpts = () => ({name: "Toe Beans", inProgress: !!(game && playing() && game.history.length), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, shareOpts());
+// A share link opened while this page is already showing only changes the address, so watch for it.
+window.addEventListener("hashchange", () => { const d = G.readShare("toebeans"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>

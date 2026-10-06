@@ -55,6 +55,11 @@ A seventh game in `twirl/`. Satin ribbons cover the whole mat; tap one and it sl
 Every ribbon wears its own colourway from `colorways.js` (shared with Yarn), chosen to stand apart from the ribbons it touches. Early levels have solid ribbons in a mix of flat and twisty textures, which makes them easy to tell apart; later levels shade each ribbon through its colourway (ombré) and use one flat texture, so you follow ribbons by shape. Ribbons come as coils, spirals, staircases, zigzags and winding paths.
 Mats are made by covering every square with ribbons, then pointing each one and playing the board through: when nothing can move, a ribbon is turned round (or, as a last resort, cut in two) so something can, choosing the one that opens up latest so few moves are open at once. The playthrough is a solution, and the board is played through again to be sure, so every mat can be cleared.
 
+## Toe Beans
+
+An eighth game in `toebeans/`, a numbers puzzle on a cat's paw. Six numbers sit in tiles above the paw; the paw's four toe beans are + − × ÷ and its big pad shows the goal. Tap a number, a toe bean, then another number: the two combine and the answer takes the second number's place. Make the goal exactly (you don't have to use every number) and every pad on the paw fills at once, in a real paw pad colour (pink, rose, cinnamon, chocolate, grey or black) picked for that game.
+There are 10 levels; higher ones have bigger goals that need more steps (two at level 1, five at level 10). Hitting the goal moves you up a level. If you're stuck, Finish here ends the game with your closest number: within 10 keeps your level, further off moves you back one, and the card shows one way it could have been made. Undo is free. Little paws at the top show your last five games. Every goal is checked in a background Web Worker to need exactly the level's number of steps. There's a timer with best times for each level, a share link, and a cat photo when you hit the goal.
+
 ## Toy library
 
 `toys/` holds 32 cat toy pictures for any game to use: 256 × 256 WebP with a clear background, named by what they are (`wiffle-red`, `fish`, `cork-paw`…). The ones in `toys/` are recoloured to the games' palette; `toys/original/` has the same toys in their first colours, and `toys/earlier/` an earlier set.
