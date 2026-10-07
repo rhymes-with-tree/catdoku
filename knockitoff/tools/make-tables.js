@@ -17,7 +17,8 @@ const OUT = path.join(__dirname, "..", "tables");
 
 // ---------- the table format ----------
 // A table is a short string-heavy object: squares are written as two base-36 digits, and things as their
-// letter followed by their square, in order (that order gives each thing its id).
+// letter followed by their square, in order (that order gives each thing its id). A roll of paper towel's
+// direction (the way its loose end points) is `r`.
 const sq = c => c.toString(36).padStart(2, "0");
 function pack(t) {
   const off = []; t.on.forEach((v, c) => { if (!v) off.push(c); });
@@ -26,6 +27,7 @@ function pack(t) {
   if (off.length) o.o = off.map(sq).join("");
   if (t.nip && t.nip.length) o.n = t.nip.map(sq).join("");
   if (t.tape && t.tape.length) o.t = t.tape.map(sq).join("");
+  const roll = t.items.find(it => it.k === "p"); if (roll) o.r = roll.u;
   return o;
 }
 
@@ -45,7 +47,7 @@ function traps(t) {
     const r = E.kioMove(b, {cat: p, items: t.items, fire: 0}, d);
     if (!r || r.moved < 0) continue;
     if (r.broke) { count++; continue; }
-    const f = E.kioClear(r.items, r.fire) ? 0 : E.kioFewest(b, {cat: r.cat, items: E.kioCodes(r.items), fire: r.fire}, 1500);
+    const f = E.kioClear(r.items, r.fire) ? 0 : E.kioFewest(b, {cat: r.cat, items: E.kioCodes(r.items), fire: r.fire, paper: r.paper, tail: r.tail}, 1500);
     if (f === -1) count++;
   }
   return count;
