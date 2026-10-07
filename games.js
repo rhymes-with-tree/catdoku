@@ -99,7 +99,8 @@ const G = (() => {
   // that closes the card to leave the finished board on screen. `o` can change the title and
   // next button and add something below the buttons (`after`); passing admire as null leaves out
   // the admire button.
-  const ADMIRE_NOTE = "Solved! Tap New puzzle when you're ready for another.";
+  // After admiring, point to the page's own new-puzzle button (New floor, New table…), or the level list.
+  const admireNote = () => $("newBtn") ? `Done! Tap ${$("newBtn").textContent.trim()} when you're ready for another.` : "Done! Pick a level when you're ready for another.";
   function winCard(text, onNext, admire = "Admire my board", result, o = {}) {
     const media = document.createElement("div");
     const p = document.createElement("p"); p.textContent = text;
@@ -108,7 +109,7 @@ const G = (() => {
     const tl = timeLineEl(result); if (tl) media.append(tl);
     media.append(p, catPhoto(), name);
     const btns = [[o.next || "New puzzle", onNext, true]];
-    if (admire !== null) btns.push([admire, () => { closeCard(); note(ADMIRE_NOTE, 0); }]);
+    if (admire !== null) btns.push([admire, () => { closeCard(); note(admireNote(), 0); }]);
     openCard(o.title || "Solved!", "", btns, media, o.after);
   }
 
