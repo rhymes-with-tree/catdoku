@@ -1,22 +1,49 @@
 /* Shared helpers for the Catdoku family of games: links between games,
    saved progress, background puzzle building, and the win card. */
 const G = (() => {
+  // Every game: name, folder, one line about it, and its colour in the games menu.
   const GAMES = [
-    ["Catdoku", "catdoku"], ["Yarn", "yarn"], ["Patches", "patches"], ["Sunbeams", "sunbeams"], ["Toy Box", "toybox"], ["Pounce", "pounce"], ["Twirl", "twirl"], ["Toe Beans", "toebeans"], ["Knock It Off", "knockitoff"], ["Hide & Seek", "hideseek"], ["Nip Trip", "niptrip"], ["Tangle", "tangle"],
+    ["Catdoku", "catdoku", "One cat in every row, column and region", "#BD5538"],
+    ["Yarn", "yarn", "Lead one strand through every ball", "#E16A4A"],
+    ["Patches", "patches", "Sew a four-fabric quilt", "#73A7AE"],
+    ["Sunbeams", "sunbeams", "Every cat gets a warm spot", "#ECA818"],
+    ["Toy Box", "toybox", "Put every toy back in its basket", "#B3B94B"],
+    ["Pounce", "pounce", "Swap toys and line up three of a kind", "#6AA673"],
+    ["Twirl", "twirl", "Pull every ribbon off the mat", "#B94588"],
+    ["Toe Beans", "toebeans", "Make the number on the big pad", "#DD9DAD"],
+    ["Knock It Off", "knockitoff", "Push everything off the table", "#7885BA"],
+    ["Hide & Seek", "hideseek", "Find every cat hiding in the boxes", "#C9A26B"],
+    ["Nip Trip", "niptrip", "Zen out and play with colour", "#9874CA"],
+    ["Tangle", "tangle", "Untangle the yarn the cat got into", "#3C8681"],
   ];
   const $ = id => document.getElementById(id);
 
-  // Link row; pages sit one folder below the Catdoku root.
-  function nav(current) {
-    const el = $("games");
-    for (const [name, slug] of GAMES) {
+  // The games menu: an "All games" button that opens a grid of every game, with this one marked.
+  // Game pages sit one folder below the Catdoku root, so links start with ../ unless `base` says otherwise.
+  function nav(current, base = "../") {
+    const el = $("games"); el.innerHTML = "";
+    const btn = document.createElement("button");
+    btn.className = "gamesBtn"; btn.type = "button";
+    btn.setAttribute("aria-expanded", "false"); btn.setAttribute("aria-controls", "gamesPanel");
+    btn.innerHTML = `<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>All ${GAMES.length} games<span class="caret" aria-hidden="true">▾</span>`;
+    const panel = document.createElement("div");
+    panel.className = "gamesPanel"; panel.id = "gamesPanel"; panel.hidden = true;
+    for (const [name, slug, blurb, color] of GAMES) {
       const a = document.createElement("a");
-      a.textContent = name;
-      a.href = slug === "catdoku" ? "../" : `../${slug}/`;
+      a.className = "gameTile"; a.style.setProperty("--tile", color);
+      a.href = slug === "catdoku" ? base || "./" : `${base}${slug}/`;
       if (slug === current) a.setAttribute("aria-current", "page");
-      el.append(a);
+      const b = document.createElement("b"); b.textContent = name;
+      const sm = document.createElement("small"); sm.textContent = slug === current ? "You're here" : blurb;
+      a.append(b, sm); panel.append(a);
     }
+    const show = open => { panel.hidden = !open; btn.setAttribute("aria-expanded", String(open)); };
+    btn.onclick = e => { e.stopPropagation(); show(panel.hidden); };
+    document.addEventListener("click", e => { if (!panel.hidden && !el.contains(e.target)) show(false); });
+    document.addEventListener("keydown", e => { if (e.key === "Escape" && !panel.hidden) { show(false); btn.focus(); } });
+    el.append(btn, panel);
   }
+
 
   function load(key) { try { return JSON.parse(localStorage.getItem(key)) || {}; } catch (e) { return {}; } }
   function save(key, data) { try { localStorage.setItem(key, JSON.stringify(data)); } catch (e) {} }
