@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tangle</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-07.6";
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-07.6">
+<style>
+/* Strands of yarn knotted through balls of yarn on a felt mat. Drag the balls until no two strands cross. */
+.mat{width:var(--board);aspect-ratio:1;background:#F3E3C7;border:3px solid #B98C5E;border-radius:18px;position:relative;overflow:hidden;
+  box-shadow:inset 0 0 0 6px #EBD5B0;touch-action:none;user-select:none;-webkit-user-select:none}
+.mat svg{width:100%;height:100%;display:block}
+.ball{cursor:grab}
+.ball.drag{cursor:grabbing}
+.won .hop{animation:hop .6s ease-out}
+@keyframes hop{40%{transform:translateY(-.5px)}}
+@media (prefers-reduced-motion:reduce){.won .hop{animation:none}}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Tangle</h1><div class="stripe"></div><p class="tagline">The cat got into the yarn. Untangle it!</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New tangle</button>
+  </div>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="mat" id="board" aria-label="Balls of yarn knotted together by strands"><svg id="svg" viewBox="0 0 1000 1000"></svg></div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+
+  <div class="help">
+    <p>Each strand of yarn is knotted through several balls. Drag the balls around until no two strands cross. Little dots show where strands still cross, and every tangle can be undone.</p>
+    <p>On ombré levels each strand shades through many colours, so follow the strands, not the colours.</p>
+    <p>Once it's untangled, keep moving the yarn about to make any shape you like.</p>
+  </div>
+</main>
+
+<script src="../games.js?v=2026-10-07.6"></script>
+<script src="../colorways.js?v=2026-10-07.6"></script>
+<script>
+/* ---------- levels ---------- */
+// Strands per level, and whether the yarn is ombré. Every two strands meet at one ball, so 4 strands make 6 balls,
+// 5 make 10 and so on up to 45. Each size comes first with every strand its own colour, then again with every
+// strand shading through a colourway, so colour no longer tells strands apart.
+const LEVELS = [[4, 0], [5, 0], [5, 1], [6, 0], [6, 1], [7, 0], [7, 1], [8, 0], [8, 1], [9, 0], [9, 1], [10, 0], [10, 1]];
+const MAX_LEVEL = LEVELS.length;
+const ballsOf = n => { const k = LEVELS[n - 1][0]; return k * (k - 1) / 2; };
+const levelName = n => `Level ${n} · ${ballsOf(n)} balls${LEVELS[n - 1][1] ? ", ombré" : ""}`;
+
+/* ---------- making a tangle ---------- */
+// Draw some straight strands across the plane; every place two of them meet becomes a ball, and each strand
+// runs through its balls in order. Laid out like that nothing crosses, so it can always be untangled.
+// Then the balls are scattered round a circle, in a random order, to tangle it.
+const SOLID = ["#E16251", "#30A6B3", "#ECA818", "#9874CA", "#6AA673", "#EC814D", "#B94588", "#7885BA", "#3C8681", "#BD5538", "#B3B94B"];
+function makeTangle(N) {
+  const [lines, ombre] = LEVELS[N - 1];
+  for (;;) {
+    const L = [];
+    for (let i = 0; i < lines; i++) { const a = Math.random() * Math.PI; L.push({a, dx: Math.cos(a), dy: Math.sin(a), px: Math.random(), py: Math.random()}); }
+    // keep strands from running nearly side by side, so every pair meets at a clear point
+    let ok = true;
+    for (let i = 0; i < lines && ok; i++) for (let j = 0; j < i; j++) if (Math.abs(Math.sin(L[i].a - L[j].a)) < .12) { ok = false; break; }
+    if (!ok) continue;
+    const balls = [], on = L.map(() => []);
+    for (let i = 0; i < lines; i++) for (let j = 0; j < i; j++) {
+      const A = L[i], B = L[j], den = A.dx * B.dy - A.dy * B.dx;
+      const t = ((B.px - A.px) * B.dy - (B.py - A.py) * B.dx) / den, s = ((B.px - A.px) * A.dy - (B.py - A.py) * A.dx) / den;
+      const id = balls.length; balls.push({});
+      on[i].push([t, id]); on[j].push([s, id]);
+    }
+    const edges = [];
+    on.forEach((list, k) => { list.sort((p, q) => p[0] - q[0]); for (let m = 1; m < list.length; m++) edges.push({a: list[m - 1][1], b: list[m][1], k}); });
+    const order = balls.map((_, i) => i).sort(() => Math.random() - .5);
+    order.forEach((id, n) => { const ang = n / order.length * Math.PI * 2 - Math.PI / 2; balls[id].x = 500 + 420 * Math.cos(ang); balls[id].y = 500 + 420 * Math.sin(ang); });
+    // each strand's colour: solid, or for ombré a slice of a variegated colourway (no two strands on the same one)
+    const solid = SOLID.slice().sort(() => Math.random() - .5), ways = Object.values(VARIEGATED).sort(() => Math.random() - .5);
+    const paint = on.map((_, k) => {
+      if (!ombre) return () => solid[k % solid.length];
+      const way = ways[k % ways.length], t0 = Math.random() * .25, t1 = .75 + Math.random() * .25, flip = Math.random() < .5;
+      return t => rampAt(way, flip ? t1 - t * (t1 - t0) : t0 + t * (t1 - t0));
+    });
+    // a ball takes the colour of the first strand through it, at that point along the strand
+    on.forEach((list, k) => list.forEach(([, id], m) => { if (!balls[id].color) balls[id].color = paint[k](m / (list.length - 1)); }));
+    edges.forEach(e => { const la = on[e.k], n = la.length - 1;
+      e.ca = paint[e.k](la.findIndex(x => x[1] === e.a) / n); e.cb = paint[e.k](la.findIndex(x => x[1] === e.b) / n); });
+    if (crossings(balls, edges).length >= Math.max(3, balls.length / 2)) return {balls, edges};
+  }
+}
+// Where strands cross (strands that share a ball don't count as crossing there).
+function crossings(B, E) {
+  const out = [];
+  for (let i = 0; i < E.length; i++) for (let j = 0; j < i; j++) {
+    const e = E[i], f = E[j];
+    if (e.a === f.a || e.a === f.b || e.b === f.a || e.b === f.b) continue;
+    const p = B[e.a], q = B[e.b], r = B[f.a], s = B[f.b];
+    const d = (q.x - p.x) * (s.y - r.y) - (q.y - p.y) * (s.x - r.x);
+    if (Math.abs(d) < 1e-9) continue;
+    const t = ((r.x - p.x) * (s.y - r.y) - (r.y - p.y) * (s.x - r.x)) / d, u = ((r.x - p.x) * (q.y - p.y) - (r.y - p.y) * (q.x - p.x)) / d;
+    if (t > 0 && t < 1 && u > 0 && u < 1) out.push([p.x + t * (q.x - p.x), p.y + t * (q.y - p.y)]);
+  }
+  return out;
+}
+
+/* ---------- balls of yarn (drawn as in Yarn) ---------- */
+const WRAPS = [{rot: 18, ry: [.1, .3, .5, .7, .88]}, {rot: 108, ry: [.2, .45, .7]}, {rot: -40, ry: [.35, .62]}];
+// A darker strand shade: lower lightness (less for pale balls), same hue; yellows lean gold instead of going olive.
+function strandShade(color) {
+  const [L, a, b] = hexLab(color), C = Math.hypot(a, b) * 1.15;
+  let h = Math.atan2(b, a) * 180 / Math.PI;
+  if (h > 75 && h < 102) h -= 22;
+  return labHex([L - Math.min(.3, L * .4), C * Math.cos(h * Math.PI / 180), C * Math.sin(h * Math.PI / 180)]);
+}
+const BALL_DEFS = `<clipPath id="ballClip"><circle r=".96"/></clipPath>
+  <radialGradient id="ballLit" cx=".32" cy=".28" r=".75"><stop offset="0" stop-color="#fff" stop-opacity=".38"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/></radialGradient>
+  <radialGradient id="ballDim" cx=".32" cy=".28" r=".95"><stop offset=".55" stop-color="#2A2530" stop-opacity="0"/><stop offset="1" stop-color="#2A2530" stop-opacity=".35"/></radialGradient>`;
+const ballCache = new Map();
+function yarnBall(color) {
+  if (ballCache.has(color)) return ballCache.get(color);
+  const dark = strandShade(color), light = rampAt([color, "#FFFFFF"], .5);
+  let w = "";
+  for (const {rot, ry} of WRAPS) for (const k of ry)
+    w += `<ellipse rx="1" ry="${k}" fill="none" stroke-width=".05" stroke="${light}" stroke-opacity=".8" transform="rotate(${rot}) translate(0 -.045)"/><ellipse rx="1" ry="${k}" fill="none" stroke-width=".05" stroke="${dark}" transform="rotate(${rot})"/>`;
+  // a bigger, invisible patch around each ball makes it easy to grab
+  const svg = `<circle r="1.7" fill="transparent"/><ellipse cx=".04" cy=".97" rx=".7" ry=".12" fill="#2A2530" fill-opacity=".13"/><circle r="1" fill="${color}"/>
+    <g clip-path="url(#ballClip)">${w}</g><circle r="1" fill="url(#ballDim)"/><circle r="1" fill="url(#ballLit)"/><circle r="1" fill="none" stroke="${dark}" stroke-width=".07"/>`;
+  ballCache.set(color, svg); return svg;
+}
+
+/* ---------- game ---------- */
+const STORE = "catdoku.tangle.v1";
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1}, state.settings);
+let game = state.game || null, drag = null;
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !$("overlay").classList.contains("show");
+// Balls and strands get smaller as there are more of them.
+const sizeOf = n => Math.max(22, Math.min(40, 46 - n * .55));
+
+function draw() {
+  const B = game.balls, X = crossings(B, game.edges), r = sizeOf(B.length), w = r * .5;
+  let grads = "", s = "";
+  // each strand: a darker underside, the yarn colour (shading from ball to ball on ombré levels), and a twist of lighter dashes
+  game.edges.forEach((e, i) => {
+    const p = B[e.a], q = B[e.b], d = `M${p.x.toFixed(1)} ${p.y.toFixed(1)} L${q.x.toFixed(1)} ${q.y.toFixed(1)}`;
+    let c = e.ca;
+    if (e.ca !== e.cb) {
+      grads += `<linearGradient id="s${i}" gradientUnits="userSpaceOnUse" x1="${p.x}" y1="${p.y}" x2="${q.x}" y2="${q.y}"><stop offset="0" stop-color="${e.ca}"/><stop offset="1" stop-color="${e.cb}"/></linearGradient>`;
+      c = `url(#s${i})`;
+    }
+    s += `<path d="${d}" stroke="rgba(42,37,48,.35)" stroke-width="${w + 5}" stroke-linecap="round"/><path d="${d}" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/>
+      <path d="${d}" stroke="rgba(255,255,255,.35)" stroke-width="${w * .45}" stroke-dasharray="${w * .6} ${w * .9}" stroke-linecap="round"/>`;
+  });
+  for (const [x, y] of X) s += `<circle cx="${x}" cy="${y}" r="${w * .38}" fill="#fff" stroke="#2A2530" stroke-width="2"/>`;
+  B.forEach((b, id) => {
+    const held = drag && drag.id === id;
+    s += `<g class="ball${held ? " drag" : ""}" data-id="${id}" transform="translate(${b.x.toFixed(1)} ${b.y.toFixed(1)}) scale(${held ? r * 1.2 : r})"><g class="hop">${yarnBall(b.color)}</g></g>`;
+  });
+  $("svg").innerHTML = `<defs>${BALL_DEFS}${grads}</defs>` + s;
+  $("count").textContent = game.won ? `Untangled in ${game.moves} move${game.moves === 1 ? "" : "s"}` : `${X.length} crossing${X.length === 1 ? "" : "s"} left`;
+  return X.length;
+}
+
+/* ---------- dragging ---------- */
+const at = e => { const pt = $("svg").createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; return pt.matrixTransform($("svg").getScreenCTM().inverse()); };
+$("svg").addEventListener("pointerdown", e => {
+  if (!game || $("overlay").classList.contains("show")) return;
+  const el = e.target.closest(".ball"); if (!el) return;
+  const id = +el.dataset.id, b = game.balls[id], p = at(e);
+  drag = {id, ox: b.x - p.x, oy: b.y - p.y, moved: false};
+  $("svg").setPointerCapture(e.pointerId); draw();
+});
+$("svg").addEventListener("pointermove", e => {
+  if (!drag) return;
+  const p = at(e), b = game.balls[drag.id], m = sizeOf(game.balls.length) + 6;
+  b.x = Math.max(m, Math.min(1000 - m, p.x + drag.ox)); b.y = Math.max(m, Math.min(1000 - m, p.y + drag.oy)); drag.moved = true;
+  draw();
+});
+function drop() {
+  if (!drag) return;
+  const moved = drag.moved; drag = null;
+  if (moved && !game.won) game.moves++;
+  // once it's untangled it stays won: the yarn can keep being moved about to make other shapes
+  if (draw() === 0 && !game.won) win(); else save();
+}
+$("svg").addEventListener("pointerup", drop);
+$("svg").addEventListener("pointercancel", drop);
+
+/* ---------- endings ---------- */
+function win() {
+  game.won = true; G.finishClock(game);
+  const next = Math.min(MAX_LEVEL, game.N + 1);
+  settings.level = next; $("levelSel").value = next; save(); draw();
+  G.track(`Tangle untangled level ${game.N}`);
+  $("board").classList.remove("won"); $("board").getBoundingClientRect(); $("board").classList.add("won");
+  const g = game;
+  setTimeout(() => { if (game === g) finishCard(); }, 900);   // a moment to see the yarn hop
+}
+function finishCard() {
+  const next = settings.level, N = game.N;
+  let text = `You untangled ${game.balls.length} balls of yarn in ${game.moves} move${game.moves === 1 ? "" : "s"}, and the cat pounced on it.`;
+  text += N === MAX_LEVEL ? " That's the hardest level; next up is another one." : ` Next up: level ${next}.`;
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my yarn", game.result,
+    {title: "Untangled!", next: `Next: level ${next}`, after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- new tangles ---------- */
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newTangle(); }
+function newTangle() {
+  const N = settings.level, t = makeTangle(N);
+  game = {N, balls: t.balls, edges: t.edges, moves: 0, won: false, ...G.freshClock()};
+  $("board").classList.remove("won"); G.closeCard(); G.note("");
+  draw(); save();
+  G.track(`Tangle new tangle level ${N}`);
+}
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  const media = document.createElement("div");
+  const ol = document.createElement("ol"); ol.className = "steps";
+  for (const t of ["Each strand of yarn is knotted through several balls of yarn.",
+                   "Drag the balls around until no two strands cross. Little dots show where they still do.",
+                   "On ombré levels each strand shades through many colours, so follow the strands, not the colours."]) {
+    const li = document.createElement("li"); li.textContent = t; ol.append(li);
+  }
+  const tip = document.createElement("p"); tip.className = "tip";
+  tip.textContent = "Every tangle can be undone. Once it is, keep moving the yarn about to make any shape you like.";
+  media.append(ol, tip);
+  G.openCard("How to play", "", [["Let's play", () => { G.closeCard(); settings.seenHelp = true; save(); }, true]], media);
+}
+function helpOnFirstVisit() { if (!settings.seenHelp && game && playing()) showHelp(); }
+
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", ""), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = () => { G.closeCard(); newTangle(); };
+$("helpBtn").onclick = showHelp;
+
+G.nav("tangle");
+G.checkClock(game);
+G.setupTimer({name: "tangle", game: () => game, playing: g => !g.won, save,
+  label: levelName, noun: "level", emptyText: "Untangle some yarn and your times will show up here. They're kept on this device only."});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.N : settings.level);
+
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+if (game && Array.isArray(game.balls) && Array.isArray(game.edges)) G.reopen(() => {
+    if (!(game.N >= 1 && game.N <= MAX_LEVEL)) throw new Error("unknown level");
+    draw();
+    if (game.won) finishCard();
+    helpOnFirstVisit();
+  }, why => { game = null; newTangle(); G.note(why, 0); });
+else { newTangle(); helpOnFirstVisit(); }
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
