@@ -86,7 +86,20 @@ details.menu[open] summary{margin-bottom:10px}
 .rules ul{margin:0;padding-left:18px;font-size:14px;color:var(--ink-soft)}
 .rules li{margin:0 0 4px}
 .rules b{color:var(--ink)}
-@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}#haze{opacity:.4}}
+/* the cat napping on the corner of the tray: it breathes with the haze, purrs after a row clears or a pat,
+   and drifts off into zZz when nobody's played for a while */
+.boardwrap{position:relative;width:var(--board);margin-top:60px}
+.napper{position:absolute;right:4px;top:0;width:88px;transform:translateY(-86%);z-index:4;cursor:pointer;border:0;padding:0;background:none}
+.napper:hover{background:none}
+.napper img{display:block;width:100%;transform-origin:50% 90%;animation:snooze 7s ease-in-out infinite;filter:drop-shadow(0 4px 4px rgba(42,37,48,.18))}
+@keyframes snooze{0%,100%{transform:scale(.97,.95)}50%{transform:scale(1.03,1.05)}}
+.napper.purr{animation:purr .09s linear 12}
+@keyframes purr{0%,100%{translate:0 0}25%{translate:-1.2px .6px}75%{translate:1.2px -.6px}}
+.float{position:absolute;left:30%;top:-4px;font-weight:800;color:var(--ink-soft);pointer-events:none;white-space:nowrap;animation:rise 2.4s ease-out forwards}
+.float.z{left:62%;font-size:15px}
+.float.prr{font-size:15px;color:#B94588}
+@keyframes rise{0%{opacity:0;transform:translateY(6px) scale(.8)}20%{opacity:1}100%{opacity:0;transform:translate(14px,-46px) scale(1.15)}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}#haze{opacity:.4}.float{display:none}}
 </style>
 </head>
 <body>
@@ -98,7 +111,10 @@ details.menu[open] summary{margin-bottom:10px}
   </header>
   <nav class="games" id="games" aria-label="Games"></nav>
   <div class="status"><span class="tally" id="score"></span><span class="msg" id="msg" aria-live="polite"></span></div>
-  <div class="board" id="board" role="grid" aria-label="Colour blocks"></div>
+  <div class="boardwrap">
+    <button class="napper" id="napper" aria-label="The cat. Give it a pat"><img id="napImg" alt=""></button>
+    <div class="board" id="board" role="grid" aria-label="Colour blocks"></div>
+  </div>
   <div class="rules" aria-label="How colours mix">
     <svg id="wheel" viewBox="-60 -60 120 120" aria-hidden="true"></svg>
     <ul>
@@ -179,6 +195,29 @@ const rowSame = r => { const c = grid[r * W]; for (let x = 1; x < W; x++) if (gr
 
 const LEAF = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22 V10" stroke="#6AA673" stroke-width="2" stroke-linecap="round"/><path d="M12 13 C4 13 3 6 5 2 C9 3 13 6 12 13 Z M12 11 C18 11 21 6 19 2 C15 3 11 5 12 11 Z" fill="#6AA673"/></svg>`;
 const KEY = "niptrip";
+
+/* ---------- the napping cat ---------- */
+// One of the curled-up Sunbeams cats, kept for this device so it's always your cat.
+const NAPPERS = ["c14-36", "c16-5", "c14-34", "c15-6", "c14-35", "c15-5", "c16-3"];
+let napper = G.load("niptrip.cat").cat;
+if (!NAPPERS.includes(napper)) { napper = NAPPERS[Math.floor(Math.random() * NAPPERS.length)]; G.save("niptrip.cat", {cat: napper}); }
+$("napImg").src = `../cats/${napper}.webp`;
+function float(cls, text) {
+  const f = document.createElement("span"); f.className = "float " + cls; f.textContent = text;
+  $("napper").append(f); setTimeout(() => f.remove(), 2500);
+}
+// A purr: a little rumble, a "prrr", and a soft buzz on phones that have one.
+function purr() {
+  const n = $("napper"); n.classList.remove("purr"); void n.offsetWidth; n.classList.add("purr");
+  setTimeout(() => n.classList.remove("purr"), 1100);
+  float("prr", "prrr ♥");
+  try { if (!matchMedia("(prefers-reduced-motion: reduce)").matches && navigator.vibrate) navigator.vibrate([12, 60, 12, 60, 12]); } catch (e) {}
+}
+// After half a minute with no play the cat dozes off, and a z drifts up every few seconds until you play again.
+let lastPlay = Date.now();
+const played = () => { lastPlay = Date.now(); };
+setInterval(() => { if (Date.now() - lastPlay > 30000 && !document.hidden) float("z", Math.random() < .5 ? "z" : "Z"); }, 2600);
+$("napper").onclick = () => { played(); purr(); };
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify({W, palette, grid, cleared, haze: lastColour})); } catch (e) {}
 }
@@ -236,6 +275,7 @@ function dropInto(i, flags) {
   grid[x] = spawn(); flags[x] = "drop";
 }
 function tap(i) {
+  played();
   if (busy) return;
   if (sel < 0 || sel === i) { sel = sel === i ? -1 : i; note(""); draw(); return; }
   if (!adjacent(sel, i)) { sel = i; draw(); return; }
@@ -284,7 +324,7 @@ function clearRows() {
   setTimeout(() => {
     const drop = {};
     for (const r of full) for (let x = 0; x < W; x++) dropInto(r * W + x, drop);
-    cleared += full.length;
+    cleared += full.length; purr();
     draw(drop); save();
     setTimeout(() => { busy = false; clearRows(); }, 500);
   }, 800);
