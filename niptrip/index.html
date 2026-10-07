@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nip Trip</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-07.1";
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-07.1">
+<style>
+/* Nip Trip: rounded colour tiles in a soft tray, over a catnip haze that breathes and takes on the last
+   colour made. Blocks are the Catdoku palette, each with a symbol built from the primaries' marks. */
+:root{--board:min(94vw,440px)}
+body{min-height:100vh}
+.rules{width:var(--board)}
+details.menu .bar{width:auto}
+.board{width:var(--board);display:grid;gap:6px;padding:8px;background:rgba(247,248,243,.55);border:2px solid var(--line);border-radius:16px;
+  user-select:none;-webkit-user-select:none;touch-action:manipulation}
+/* each block sits apart as its own little tile, so two of them sliding together reads as a merge */
+.cell{position:relative;aspect-ratio:1;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:9px;
+  box-shadow:0 3px 0 rgba(42,37,48,.22),0 4px 8px rgba(42,37,48,.12),inset 0 1px 0 rgba(255,255,255,.25);transition:background .15s,transform .15s}
+.cell.slide{z-index:3;transition:transform .24s cubic-bezier(.5,0,.7,.4)}
+.cell svg{width:46%;height:46%;opacity:.9}
+.cell.sel{box-shadow:0 0 0 3px #fff,0 0 0 6px var(--ink),0 8px 14px rgba(42,37,48,.25);transform:translateY(-3px);z-index:1}
+.cell.blend{transition:background .6s ease-in-out}
+.cell.blend svg{animation:fadein .6s ease-in-out}
+@keyframes fadein{from{opacity:0;transform:scale(.6) rotate(-45deg)}}
+.cell.pop{animation:swell .6s ease-in-out}
+@keyframes swell{50%{transform:scale(1.08)}}
+.cell.drop{animation:drift .5s cubic-bezier(.3,.7,.4,1)}
+@keyframes drift{from{transform:translateY(-70%);opacity:0}}
+/* a full row glows, then dissolves upward like a puff of coloured smoke */
+.cell.clear{animation:puff .8s ease-in forwards;z-index:2}
+@keyframes puff{
+  0%{filter:none}
+  35%{filter:brightness(1.18);box-shadow:0 0 18px 6px rgba(255,255,255,.75)}
+  100%{filter:brightness(1.25) blur(8px);transform:translateY(-40%) scale(1.25);opacity:0}}
+.cell.no{animation:wobble .5s ease-in-out}
+@keyframes wobble{20%{transform:rotate(-5deg)}50%{transform:rotate(4deg)}80%{transform:rotate(-2deg)}}
+.cell.swirl{animation:swirl .7s ease-in-out}
+@keyframes swirl{0%{opacity:0;transform:scale(.5) rotate(-90deg)}}
+/* the catnip haze: a soft glow behind everything that slowly breathes and takes on the last colour made */
+@property --haze{syntax:"<color>";inherits:true;initial-value:#9874CA}
+#haze{position:fixed;inset:-20%;z-index:-1;pointer-events:none;--haze:#9874CA;transition:--haze 4s ease-in-out;
+  background:radial-gradient(circle at 50% 45%,var(--haze) 0%,transparent 70%);
+  animation:breathe 7s ease-in-out infinite}
+@keyframes breathe{0%,100%{opacity:.25;transform:scale(.8)}50%{opacity:.95;transform:scale(1.18)}}
+.tally{display:flex;align-items:center;gap:6px;color:var(--ink-soft)}
+.tally svg{width:20px;height:20px}
+details.menu{width:var(--board)}
+details.menu summary{cursor:pointer;color:var(--ink-soft);font-weight:600;list-style:none;text-align:center}
+details.menu summary::-webkit-details-marker{display:none}
+details.menu[open] summary{margin-bottom:10px}
+.rules{display:flex;gap:14px;align-items:center;background:var(--panel);border:2px solid var(--line);border-radius:12px;padding:10px 12px}
+.rules svg{width:120px;height:120px;flex:none}
+.rules ul{margin:0;padding-left:18px;font-size:14px;color:var(--ink-soft)}
+.rules li{margin:0 0 4px}
+.rules b{color:var(--ink)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}#haze{opacity:.4}}
+</style>
+</head>
+<body>
+<div id="haze" aria-hidden="true"></div>
+<main>
+  <header>
+    <h1>Nip Trip</h1><div class="stripe"></div>
+    <p class="tagline">Zen out and play with colour</p>
+  </header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+  <div class="status"><span class="tally" id="score"></span><span class="msg" id="msg" aria-live="polite"></span></div>
+  <div class="board" id="board" role="grid" aria-label="Colour blocks"></div>
+  <div class="rules" aria-label="How colours mix">
+    <svg id="wheel" viewBox="-60 -60 120 120" aria-hidden="true"></svg>
+    <ul>
+      <li>Two colours <b>two steps apart</b> mix into the one <b>between</b> them.</li>
+      <li><b>Opposites</b> make <b>mud</b>, which never mixes.</li>
+      <li>Two of the <b>same colour</b> join into one, and <b>two muds</b> vanish.</li>
+      <li><b>Next-door</b> colours don't mix.</li>
+    </ul>
+  </div>
+  <div class="actions"><button id="undoBtn">Undo</button></div>
+  <details class="menu">
+    <summary>Board settings</summary>
+    <div class="bar">
+      <label>Width <select id="widthSel"><option>4</option><option selected>5</option><option>6</option><option>7</option></select></label>
+      <label>Colours <select id="spawnSel"><option value="3" selected>Red, yellow, blue</option><option value="6">All six</option></select></label>
+      <button id="newBtn" class="primary">New board</button>
+    </div>
+  </details>
+  <div class="help">
+    <p>Tap a block, then a block next to it (up, down or sideways). If they mix, the new colour lands on the second block, and the blocks above the first one drop down, with a new block falling in at the top.</p>
+    <p>When a whole row is one colour it clears, and everything above drops. A row of mud clears too. There's no timer and no goal. If no blocks can mix, they swirl into a new order. Your board is kept for next time.</p>
+  </div>
+</main>
+
+<script src="../games.js?v=2026-10-07.1"></script>
+<script>
+// The paint wheel, in order: red, orange, yellow, green, blue, purple. Mud (6) comes from opposites.
+// Each colour also has its own symbol, so colours can be told apart without seeing the hue: the primaries are
+// a vertical line (red), a horizontal line (yellow) and a dot (blue), and a mix wears both its colours' marks.
+const COLOURS = [
+  {name: "red", hex: "#E16251", shape: `<rect x="9.75" y="2" width="4.5" height="20" rx="2"/>`},
+  {name: "orange", hex: "#EC814D", shape: `<rect x="9.75" y="2" width="4.5" height="20" rx="2"/><rect x="2" y="9.75" width="20" height="4.5" rx="2"/>`},
+  {name: "yellow", hex: "#ECA818", shape: `<rect x="2" y="9.75" width="20" height="4.5" rx="2"/>`},
+  {name: "green", hex: "#6AA673", shape: `<rect x="2" y="9.75" width="20" height="4.5" rx="2"/><circle cx="12" cy="12" r="6"/>`},
+  {name: "blue", hex: "#30A6B3", shape: `<circle cx="12" cy="12" r="6"/>`},
+  {name: "purple", hex: "#9874CA", shape: `<rect x="9.75" y="2" width="4.5" height="20" rx="2"/><circle cx="12" cy="12" r="6"/>`},
+  {name: "mud", hex: "#3B2A22", shape: `<rect x="9.75" y="2" width="4.5" height="20" rx="2"/><rect x="2" y="9.75" width="20" height="4.5" rx="2"/><circle cx="12" cy="12" r="6"/>`},
+];
+const MUD = 6;
+// What two colours make, or -1 if they don't mix.
+function mix(a, b) {
+  if (a === b) return a;
+  if (a === MUD || b === MUD) return -1;
+  const d = Math.min((a - b + 6) % 6, (b - a + 6) % 6);
+  if (d === 1) return -1;
+  if (d === 3) return MUD;
+  return (a + 2) % 6 === b ? (a + 1) % 6 : (b + 1) % 6;
+}
+
+const $ = G.$;
+let W = 5, H = 8, grid, sel = -1, cleared = 0, palette = 6, history = [], busy = false;
+const spawn = () => palette === 3 ? [0, 2, 4][Math.floor(Math.random() * 3)] : Math.floor(Math.random() * 6);
+const rowSame = r => { const c = grid[r * W]; for (let x = 1; x < W; x++) if (grid[r * W + x] !== c) return false; return true; };
+
+const LEAF = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22 V10" stroke="#6AA673" stroke-width="2" stroke-linecap="round"/><path d="M12 13 C4 13 3 6 5 2 C9 3 13 6 12 13 Z M12 11 C18 11 21 6 19 2 C15 3 11 5 12 11 Z" fill="#6AA673"/></svg>`;
+const KEY = "niptrip";
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify({W, palette, grid, cleared, haze: lastColour})); } catch (e) {}
+}
+function restore() {
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY));
+    if (!s || !Array.isArray(s.grid) || s.grid.length !== s.W * (s.W + 3)) return false;
+    W = s.W; H = W + 3; palette = s.palette; grid = s.grid; cleared = s.cleared || 0;
+    $("widthSel").value = W; $("spawnSel").value = palette;
+    if (s.haze >= 0) setHaze(s.haze);
+    return true;
+  } catch (e) { return false; }
+}
+let lastColour = -1;
+function setHaze(c) { lastColour = c; $("haze").style.setProperty("--haze", COLOURS[c].hex); }
+function newBoard(fromSave) {
+  if (!(fromSave === true && restore())) {
+    if (fromSave !== true) G.track(`Nip Trip new board ${$("widthSel").value} wide`);
+    W = +$("widthSel").value; palette = +$("spawnSel").value; H = W + 3;
+    grid = Array.from({length: W * H}, spawn);
+    // start without any finished rows
+    for (let r = 0; r < H; r++) while (rowSame(r)) grid[r * W] = spawn();
+    cleared = 0;
+  }
+  sel = -1; history = []; busy = false; note("");
+  $("board").style.gridTemplateColumns = `repeat(${W}, 1fr)`;
+  $("board").innerHTML = "";
+  for (let i = 0; i < W * H; i++) { const d = document.createElement("div"); d.className = "cell"; d.dataset.i = i; d.setAttribute("role", "gridcell"); $("board").append(d); }
+  draw(); save(); checkStuck();
+}
+function draw(flags = {}, blends = {}) {
+  const kids = $("board").children;
+  for (let i = 0; i < W * H; i++) {
+    const c = COLOURS[grid[i]], el = kids[i];
+    if (i in blends) {
+      // start from the old colour, then let it run into the new one
+      el.classList.add("blend"); el.style.transition = "none"; el.style.background = blends[i];
+      void el.offsetWidth; el.style.transition = ""; el.style.background = c.hex;
+    } else { el.classList.remove("blend"); el.style.background = c.hex; }
+    el.innerHTML = `<svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true">${c.shape}</svg>`;
+    el.setAttribute("aria-label", c.name);
+    el.classList.toggle("sel", i === sel);
+    el.classList.remove("pop", "drop", "clear", "no", "swirl");
+    if (flags[i]) { void el.offsetWidth; el.classList.add(flags[i]); }
+  }
+  $("score").innerHTML = cleared ? `${LEAF}${cleared}` : "";
+  $("undoBtn").disabled = !history.length;
+}
+const adjacent = (a, b) => (Math.abs(a - b) === 1 && Math.floor(a / W) === Math.floor(b / W)) || Math.abs(a - b) === W;
+
+// Remove the block at i: the blocks above it in its column drop one, and a new block falls in at the top.
+function dropInto(i, flags) {
+  const x = i % W;
+  for (let y = Math.floor(i / W); y > 0; y--) { grid[y * W + x] = grid[(y - 1) * W + x]; flags[y * W + x] = "drop"; }
+  grid[x] = spawn(); flags[x] = "drop";
+}
+function tap(i) {
+  if (busy) return;
+  if (sel < 0 || sel === i) { sel = sel === i ? -1 : i; note(""); draw(); return; }
+  if (!adjacent(sel, i)) { sel = i; draw(); return; }
+  const r = mix(grid[sel], grid[i]);
+  if (r < 0) { const f = {}; f[i] = f[sel] = "no"; sel = -1; draw(f); return; }
+  history.push({grid: grid.slice(), cleared});
+  if (history.length > 50) history.shift();
+  const from = sel; sel = -1; busy = true; note("");
+  // the first block slides over onto the second, then they merge
+  const kids = $("board").children, a = kids[from], b = kids[i];
+  a.classList.remove("sel");
+  a.classList.add("slide");
+  a.style.transform = `translate(${b.offsetLeft - a.offsetLeft}px, ${b.offsetTop - a.offsetTop}px) scale(.85)`;
+  setTimeout(() => { a.classList.remove("slide"); a.style.transform = ""; merge(from, i, r); }, 240);
+}
+function merge(from, i, r) {
+  const flags = {}, blends = {};
+  if (grid[from] === MUD && grid[i] === MUD) {
+    // two muds vanish: both puff away and their columns drop
+    const f = {}; f[from] = f[i] = "clear"; draw(f);
+    setTimeout(() => {
+      dropInto(Math.min(from, i), flags); dropInto(Math.max(from, i), flags);
+      draw(flags); save();
+      setTimeout(() => { busy = false; clearRows(); }, 500);
+    }, 650);
+    return;
+  }
+  const was = COLOURS[grid[i]].hex;
+  grid[i] = r;
+  dropInto(from, flags);
+  // the mixed colour lands on the second block; if that was above the first one, it drops a square with its column
+  const at = from % W === i % W && from > i ? i + W : i;
+  flags[at] = "pop"; blends[at] = was;
+  setHaze(r);
+  draw(flags, blends); save();
+  setTimeout(() => { busy = false; clearRows(); }, 600);
+}
+// Clear every row that's all one colour, let the rest fall, and keep going while new rows complete.
+function clearRows() {
+  const full = []; for (let r = 0; r < H; r++) if (rowSame(r)) full.push(r);
+  if (!full.length) { checkStuck(); return; }
+  busy = true;
+  const flags = {}; full.forEach(r => { for (let x = 0; x < W; x++) flags[r * W + x] = "clear"; });
+  setHaze(grid[full[0] * W]);
+  draw(flags);
+  setTimeout(() => {
+    const drop = {};
+    for (const r of full) for (let x = 0; x < W; x++) dropInto(r * W + x, drop);
+    cleared += full.length;
+    draw(drop); save();
+    setTimeout(() => { busy = false; clearRows(); }, 500);
+  }, 800);
+}
+const canMix = () => { for (let i = 0; i < W * H; i++) for (const j of [i + 1, i + W]) if (j < W * H && adjacent(i, j) && mix(grid[i], grid[j]) >= 0) return true; return false; };
+// When no two blocks next to each other can mix, the same blocks swirl into a new order that has a mix.
+function checkStuck() {
+  if (canMix()) return;
+  busy = true;
+  setTimeout(() => {
+    const keep = grid.slice();
+    for (let t = 0; t < 200; t++) {
+      grid = keep.slice();
+      for (let k = grid.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [grid[k], grid[j]] = [grid[j], grid[k]]; }
+      let full = false; for (let r = 0; r < H; r++) if (rowSame(r)) full = true;
+      if (canMix() && !full) break;
+    }
+    // a board made of only mud and lone colours might never mix again; then bring in a few fresh blocks
+    if (!canMix()) for (let k = 0; k < W; k++) grid[Math.floor(Math.random() * grid.length)] = spawn();
+    const f = {}; for (let i = 0; i < W * H; i++) f[i] = "swirl";
+    history = []; note("A fresh swirl."); draw(f); save();
+    setTimeout(() => { busy = false; note(""); checkStuck(); }, 1400);
+  }, 500);
+}
+function undo() {
+  if (busy || !history.length) return;
+  const h = history.pop(); grid = h.grid; cleared = h.cleared; sel = -1; note(""); draw(); save();
+}
+const note = t => G.note(t, 2500);
+// The rules wheel: six colours round a circle, with mud in the middle.
+(function wheel() {
+  let s = "";
+  for (let k = 0; k < 6; k++) {
+    const a0 = (k * 60 - 120) * Math.PI / 180, a1 = ((k + 1) * 60 - 120) * Math.PI / 180, R = 56, r = 26;
+    const p = (rad, ang) => `${(rad * Math.cos(ang)).toFixed(1)} ${(rad * Math.sin(ang)).toFixed(1)}`;
+    s += `<path d="M${p(r, a0)} L${p(R, a0)} A${R} ${R} 0 0 1 ${p(R, a1)} L${p(r, a1)} A${r} ${r} 0 0 0 ${p(r, a0)} Z" fill="${COLOURS[k].hex}" stroke="#F7F8F3" stroke-width="2"/>`;
+    const am = (a0 + a1) / 2, cx = 41 * Math.cos(am), cy = 41 * Math.sin(am);
+    s += `<g transform="translate(${(cx - 6).toFixed(1)} ${(cy - 6).toFixed(1)}) scale(.5)" fill="#fff">${COLOURS[k].shape}</g>`;
+  }
+  s += `<circle r="22" fill="${COLOURS[MUD].hex}" stroke="#F7F8F3" stroke-width="2"/><g transform="translate(-6 -6) scale(.5)" fill="#fff">${COLOURS[MUD].shape}</g>`;
+  $("wheel").innerHTML = s;
+})();
+
+$("board").addEventListener("click", e => { const c = e.target.closest(".cell"); if (c) tap(+c.dataset.i); });
+$("newBtn").onclick = () => newBoard();
+$("widthSel").onchange = () => newBoard();
+$("spawnSel").onchange = () => newBoard();
+$("undoBtn").onclick = undo;
+G.nav("niptrip");
+newBoard(true);
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
