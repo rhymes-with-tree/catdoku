@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-07.1";
+  var BUILD = "2026-10-07.2";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-07.1">
+<link rel="stylesheet" href="../games.css?v=2026-10-07.2">
 <style>
 /* Nip Trip: rounded colour tiles in a soft tray, over a catnip haze that breathes and takes on the last
    colour made. Blocks are the Catdoku palette, each with a symbol built from the primaries' marks. */
@@ -65,6 +65,19 @@ details.menu .bar{width:auto}
 .tally{display:flex;align-items:center;gap:6px;color:var(--ink-soft)}
 .tally svg{width:20px;height:20px}
 details.menu{width:var(--board)}
+/* the colour picker: one column per colour on the wheel, plus mud; the board above shows each pick at once */
+.picker{width:var(--board);background:var(--panel);border:2px solid var(--line);border-radius:12px;padding:12px}
+.picker h2{margin:0 0 4px;font-size:20px;text-align:center}
+.picker p{margin:0 0 10px;font-size:14px;color:var(--ink-soft);text-align:center}
+.pcols{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.pcol h3{margin:0 0 4px;font-size:12px;text-align:center;text-transform:capitalize;font-weight:600}
+.sw{display:block;width:100%;aspect-ratio:1;border:0;border-radius:7px;padding:0;margin:0 0 5px;cursor:pointer;position:relative}
+.sw:hover{background:inherit}
+.sw.on{box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--ink)}
+.sw.on::after{content:"✓";position:absolute;inset:0;display:grid;place-items:center;font-weight:800;color:var(--tick,#fff)}
+.sw.custom{background:conic-gradient(#E16251,#ECA818,#6AA673,#30A6B3,#9874CA,#E16251)!important;overflow:hidden}
+.sw.custom input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0}
+.picker .btns{display:flex;gap:10px;justify-content:center;margin-top:8px}
 details.menu summary{cursor:pointer;color:var(--ink-soft);font-weight:600;list-style:none;text-align:center}
 details.menu summary::-webkit-details-marker{display:none}
 details.menu[open] summary{margin-bottom:10px}
@@ -95,7 +108,13 @@ details.menu[open] summary{margin-bottom:10px}
       <li><b>Next-door</b> colours don't mix.</li>
     </ul>
   </div>
-  <div class="actions"><button id="undoBtn">Undo</button></div>
+  <div class="actions"><button id="undoBtn">Undo</button><button id="colBtn" aria-expanded="false">Colours</button></div>
+  <div class="picker" id="picker" hidden>
+    <h2>Pick your colours</h2>
+    <p>Tap one in each column, or the rainbow square for any colour you like. The board changes as you go, and your colours are kept on this device.</p>
+    <div class="pcols" id="pcols"></div>
+    <div class="btns"><button id="resetCol">Back to the usual</button><button id="doneCol" class="primary">Done</button></div>
+  </div>
   <details class="menu">
     <summary>Board settings</summary>
     <div class="bar">
@@ -110,7 +129,7 @@ details.menu[open] summary{margin-bottom:10px}
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-07.1"></script>
+<script src="../games.js?v=2026-10-07.2"></script>
 <script>
 // The paint wheel, in order: red, orange, yellow, green, blue, purple. Mud (6) comes from opposites.
 // Each colour also has its own symbol, so colours can be told apart without seeing the hue: the primaries are
@@ -125,6 +144,24 @@ const COLOURS = [
   {name: "mud", hex: "#3B2A22", shape: `<rect x="9.75" y="2" width="4.5" height="20" rx="2"/><rect x="2" y="9.75" width="20" height="4.5" rx="2"/><circle cx="12" cy="12" r="6"/>`},
 ];
 const MUD = 6;
+// The colours anyone can pick from: Catdoku's palette and Yarn's colourways, round the wheel, plus darks for mud.
+const DEFAULT_HEX = COLOURS.map(c => c.hex);
+const CHOICES = [
+  ["#E16251", "#BD5538", "#CB5D4A", "#B34D3E", "#AA4833", "#DE775D", "#D25488", "#874539"],
+  ["#EC814D", "#E16A4A", "#EB8663", "#DA7854", "#D16C4D", "#F0AB44", "#EFB75D", "#FFB0A2"],
+  ["#ECA818", "#E8AB4F", "#FAC366", "#FACE55", "#FFD178", "#C1C670", "#B3B94B", "#CAD578"],
+  ["#6AA673", "#6EB46B", "#80CB7E", "#51A366", "#78CE99", "#398042", "#54765C", "#86D29B"],
+  ["#30A6B3", "#73A7AE", "#3C8681", "#1EABBE", "#5AC7E0", "#7885BA", "#5C7ACB", "#4867AD"],
+  ["#9874CA", "#AA81CF", "#AD8EC2", "#8D78AD", "#7C5AAA", "#B94588", "#C2508B", "#9A387C"],
+  ["#3B2A22", "#2A2530", "#4B3A30", "#5B2919", "#3D1429", "#212D4B", "#204A29", "#44256F"],
+];
+const COLOUR_KEY = "niptrip.colours";
+// White symbols on most colours; dark ones on a colour light enough to wash them out.
+function inkFor(hex) {
+  const n = parseInt(hex.slice(1), 16), lin = v => (v /= 255) <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4;
+  const L = .2126 * lin(n >> 16) + .7152 * lin(n >> 8 & 255) + .0722 * lin(n & 255);
+  return L > .45 ? "#2A2530" : "#fff";
+}
 // What two colours make, or -1 if they don't mix.
 function mix(a, b) {
   if (a === b) return a;
@@ -181,7 +218,7 @@ function draw(flags = {}, blends = {}) {
       el.classList.add("blend"); el.style.transition = "none"; el.style.background = blends[i];
       void el.offsetWidth; el.style.transition = ""; el.style.background = c.hex;
     } else { el.classList.remove("blend"); el.style.background = c.hex; }
-    el.innerHTML = `<svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true">${c.shape}</svg>`;
+    el.innerHTML = `<svg viewBox="0 0 24 24" fill="${inkFor(c.hex)}" aria-hidden="true">${c.shape}</svg>`;
     el.setAttribute("aria-label", c.name);
     el.classList.toggle("sel", i === sel);
     el.classList.remove("pop", "drop", "clear", "no", "swirl");
@@ -278,18 +315,49 @@ function undo() {
 }
 const note = t => G.note(t, 2500);
 // The rules wheel: six colours round a circle, with mud in the middle.
-(function wheel() {
+function drawWheel() {
   let s = "";
   for (let k = 0; k < 6; k++) {
     const a0 = (k * 60 - 120) * Math.PI / 180, a1 = ((k + 1) * 60 - 120) * Math.PI / 180, R = 56, r = 26;
     const p = (rad, ang) => `${(rad * Math.cos(ang)).toFixed(1)} ${(rad * Math.sin(ang)).toFixed(1)}`;
     s += `<path d="M${p(r, a0)} L${p(R, a0)} A${R} ${R} 0 0 1 ${p(R, a1)} L${p(r, a1)} A${r} ${r} 0 0 0 ${p(r, a0)} Z" fill="${COLOURS[k].hex}" stroke="#F7F8F3" stroke-width="2"/>`;
     const am = (a0 + a1) / 2, cx = 41 * Math.cos(am), cy = 41 * Math.sin(am);
-    s += `<g transform="translate(${(cx - 6).toFixed(1)} ${(cy - 6).toFixed(1)}) scale(.5)" fill="#fff">${COLOURS[k].shape}</g>`;
+    s += `<g transform="translate(${(cx - 6).toFixed(1)} ${(cy - 6).toFixed(1)}) scale(.5)" fill="${inkFor(COLOURS[k].hex)}">${COLOURS[k].shape}</g>`;
   }
-  s += `<circle r="22" fill="${COLOURS[MUD].hex}" stroke="#F7F8F3" stroke-width="2"/><g transform="translate(-6 -6) scale(.5)" fill="#fff">${COLOURS[MUD].shape}</g>`;
+  s += `<circle r="22" fill="${COLOURS[MUD].hex}" stroke="#F7F8F3" stroke-width="2"/><g transform="translate(-6 -6) scale(.5)" fill="${inkFor(COLOURS[MUD].hex)}">${COLOURS[MUD].shape}</g>`;
   $("wheel").innerHTML = s;
-})();
+}
+
+/* ---------- picking colours ---------- */
+function setColours(hexes) {
+  hexes.forEach((h, k) => { COLOURS[k].hex = h; });
+  drawWheel(); draw();
+  if (lastColour >= 0) setHaze(lastColour);
+}
+function drawPicker() {
+  $("pcols").innerHTML = COLOURS.map((c, k) => {
+    const list = CHOICES[k].includes(c.hex) ? CHOICES[k] : CHOICES[k].concat(c.hex);
+    return `<div class="pcol"><h3>${c.name}</h3>${list.map(h =>
+      `<button class="sw${h === c.hex ? " on" : ""}" style="background:${h};--tick:${inkFor(h)}" data-k="${k}" data-h="${h}" aria-label="${c.name} ${h}" aria-pressed="${h === c.hex}"></button>`).join("")}
+      <label class="sw custom" title="Any colour"><input type="color" data-k="${k}" value="${c.hex}" aria-label="Any colour for ${c.name}"></label></div>`;
+  }).join("");
+}
+function pickColour(k, h) {
+  const hexes = COLOURS.map(c => c.hex); hexes[k] = h.toUpperCase();
+  setColours(hexes); drawPicker();
+  G.save(COLOUR_KEY, {hexes});
+}
+$("pcols").addEventListener("click", e => { const b = e.target.closest("button.sw"); if (b) pickColour(+b.dataset.k, b.dataset.h); });
+$("pcols").addEventListener("change", e => { if (e.target.type === "color") pickColour(+e.target.dataset.k, e.target.value); });
+const showPicker = on => { $("picker").hidden = !on; $("colBtn").setAttribute("aria-expanded", String(on)); if (on) drawPicker(); };
+$("colBtn").onclick = () => showPicker($("picker").hidden);
+$("doneCol").onclick = () => showPicker(false);
+$("resetCol").onclick = () => { setColours(DEFAULT_HEX); drawPicker(); G.save(COLOUR_KEY, {}); };
+{
+  const saved = G.load(COLOUR_KEY).hexes;
+  if (Array.isArray(saved) && saved.length === COLOURS.length && saved.every(h => /^#[0-9A-F]{6}$/i.test(h))) saved.forEach((h, k) => { COLOURS[k].hex = h.toUpperCase(); });
+}
+drawWheel();
 
 $("board").addEventListener("click", e => { const c = e.target.closest(".cell"); if (c) tap(+c.dataset.i); });
 $("newBtn").onclick = () => newBoard();
