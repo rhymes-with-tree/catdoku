@@ -30,12 +30,13 @@
 .wall svg{width:100%;height:100%;display:block}
 .isle{cursor:pointer}
 .isle text{font-weight:800;pointer-events:none}
-.isle circle.top{transform-box:fill-box;transform-origin:center}
-.won .isle circle.top{animation:glow 1s ease-out}
+.isle .cat{transform-box:fill-box;transform-origin:50% 90%;animation:settle .35s ease-out}
+@keyframes settle{from{transform:scale(.4);opacity:0}}
+.won .isle .cat{animation:glow 1s ease-out}
 @keyframes glow{40%{transform:scale(1.15)}}
 .no{animation:no .4s}
 @keyframes no{25%{transform:translateX(-10px)}75%{transform:translateX(10px)}}
-@media (prefers-reduced-motion:reduce){.won .isle circle.top,.no{animation:none}}
+@media (prefers-reduced-motion:reduce){.isle .cat,.won .isle .cat,.no{animation:none}}
 </style>
 </head>
 <body>
@@ -209,6 +210,34 @@ function joinedBy(N, lanes, v) {
   return seen.size === N;
 }
 
+/* ---------- cat-tower pieces ---------- */
+// Each perch is a real cat-tower part, picked from where it sits so it stays the same: a round carpeted platform,
+// a cubby box with a hole, or a hammock, in one of a few carpet colours, with one of the curled-up Sunbeams cats.
+const CATS = "../cats/", NAPPERS = ["c14-36", "c16-5", "c14-34", "c15-6", "c14-35", "c15-5", "c16-3"];
+const CARPETS = ["#D8C3A5", "#C9B9D6", "#E3B9A9", "#B7C8BC", "#E8D9B8", "#BFC7D8"];
+function pieceOf(p) {
+  const h = (p.x * 73856093) ^ (p.y * 19349663);
+  return {kind: ["platform", "cubby", "hammock"][Math.abs(h) % 3], color: CARPETS[Math.abs(h >> 3) % CARPETS.length], cat: NAPPERS[Math.abs(h >> 5) % NAPPERS.length]};
+}
+const shade = c => `color-mix(in srgb, ${c} 72%, #2A2530)`;
+const PIECES = {
+  // a round platform, carpet on top and a sisal-wrapped rim
+  platform: (x, y, c) => `<ellipse cx="${x}" cy="${y + 8}" rx="40" ry="32" fill="rgba(42,37,48,.25)"/>
+    <ellipse cx="${x}" cy="${y + 4}" rx="39" ry="31" fill="${shade(c)}" stroke="#2A2530" stroke-width="3.5"/>
+    <ellipse cx="${x}" cy="${y - 2}" rx="39" ry="31" fill="${c}" stroke="#2A2530" stroke-width="3.5"/>
+    <ellipse cx="${x}" cy="${y - 2}" rx="31" ry="24" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="3" stroke-dasharray="3 5"/>`,
+  // a carpeted cubby box with a round hole in the front
+  cubby: (x, y, c) => `<rect x="${x - 38}" y="${y - 30}" width="76" height="70" rx="9" fill="rgba(42,37,48,.25)" transform="translate(3 5)"/>
+    <path d="M${x - 38} ${y - 30} l10 -10 h56 l10 10 Z" fill="${shade(c)}" stroke="#2A2530" stroke-width="3.5" stroke-linejoin="round"/>
+    <rect x="${x - 38}" y="${y - 30}" width="76" height="68" rx="8" fill="${c}" stroke="#2A2530" stroke-width="3.5"/>
+    <circle cx="${x}" cy="${y + 6}" r="19" fill="#3B2A22" stroke="#2A2530" stroke-width="3"/><path d="M${x - 15} ${y - 2} a19 19 0 0 1 30 0" fill="none" stroke="${shade(c)}" stroke-width="4"/>`,
+  // a fabric hammock slung from a little frame
+  hammock: (x, y, c) => `<ellipse cx="${x}" cy="${y + 30}" rx="36" ry="7" fill="rgba(42,37,48,.22)"/>
+    <path d="M${x - 40} ${y - 26} V${y + 26} M${x + 40} ${y - 26} V${y + 26}" stroke="#5A3D25" stroke-width="7" stroke-linecap="round"/>
+    <path d="M${x - 40} ${y - 22} Q${x} ${y + 44} ${x + 40} ${y - 22} Q${x} ${y + 4} ${x - 40} ${y - 22} Z" fill="${c}" stroke="#2A2530" stroke-width="3.5" stroke-linejoin="round"/>
+    <path d="M${x - 26} ${y - 6} Q${x} ${y + 26} ${x + 26} ${y - 6}" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="3" stroke-dasharray="4 5"/>`,
+};
+
 /* ---------- game ---------- */
 const STORE = "catdoku.catwalk.v1", U = 100;
 const $ = G.$;
@@ -229,22 +258,24 @@ function draw(flash) {
   for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) s += `<circle cx="${x * U + U / 2}" cy="${y * U + U / 2}" r="3" fill="#CDB89F"/>`;
   lanes.forEach((l, k) => {
     const A = isles[l.a], B = isles[l.b], x1 = A.x * U + U / 2, y1 = A.y * U + U / 2, x2 = B.x * U + U / 2, y2 = B.y * U + U / 2;
-    const v = val[k], d = Math.hypot(x2 - x1, y2 - y1), off = [-(y2 - y1) / d * 12, (x2 - x1) / d * 12];
-    // a catwalk: a plank wrapped in sisal rope
-    const plank = (ox, oy) => `<path d="M${x1 + ox} ${y1 + oy} L${x2 + ox} ${y2 + oy}" stroke="#6B4A2E" stroke-width="15"/><path d="M${x1 + ox} ${y1 + oy} L${x2 + ox} ${y2 + oy}" stroke="#D9B98A" stroke-width="10"/>
-      <path d="M${x1 + ox} ${y1 + oy} L${x2 + ox} ${y2 + oy}" stroke="#B8915E" stroke-width="10" stroke-dasharray="2.5 4"/>`;
-    let g = v === 1 ? plank(0, 0) : v === 2 ? plank(-off[0], -off[1]) + plank(off[0], off[1]) : "";
+    const v = val[k], d = Math.hypot(x2 - x1, y2 - y1), off = [-(y2 - y1) / d * 13, (x2 - x1) / d * 13];
+    // a catwalk: a chunky post wrapped in sisal rope
+    const post = (ox, oy) => { const m = `M${x1 + ox} ${y1 + oy} L${x2 + ox} ${y2 + oy}`;
+      return `<path d="${m}" stroke="#5A3D25" stroke-width="21"/><path d="${m}" stroke="#D9BC8C" stroke-width="16"/>
+        <path d="${m}" stroke="#A9824F" stroke-width="16" stroke-dasharray="2.5 3.5"/><path d="${m}" stroke="#F1DFBC" stroke-width="3" stroke-dasharray="2.5 3.5" transform="translate(${-off[0] * .25} ${-off[1] * .25})"/>`; };
+    let g = v === 1 ? post(0, 0) : v === 2 ? post(-off[0], -off[1]) + post(off[0], off[1]) : "";
     s += `<g class="lane${flash === k ? " no" : ""}">${g}</g>`;
   });
   isles.forEach((p, i) => {
-    const cx = p.x * U + U / 2, cy = p.y * U + U / 2, done = have[i] === p.n, over = have[i] > p.n;
-    // a carpeted perch: plain carpet, sage when it has all its catwalks, red if it has too many
-    const fill = over ? "#E16251" : done ? "#6AA673" : "#E9DCC6", ink = over || done ? "#fff" : "#2A2530";
-    s += `<g class="isle" data-i="${i}" role="button" aria-label="Perch needing ${p.n}, has ${have[i]}"><circle cx="${cx}" cy="${cy}" r="${r * 1.45}" fill="transparent"/>
-      ${i === sel ? `<circle cx="${cx}" cy="${cy}" r="${r + 10}" fill="none" stroke="#B94588" stroke-width="6"/>` : ""}
-      <circle cx="${cx}" cy="${cy + 5}" r="${r}" fill="rgba(42,37,48,.28)"/><circle class="top" cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" stroke="#2A2530" stroke-width="4"/>
-      <circle cx="${cx}" cy="${cy}" r="${r * .78}" fill="none" stroke="${over || done ? "rgba(255,255,255,.35)" : "#D2C0A2"}" stroke-width="3" stroke-dasharray="3 5"/>
-      <text x="${cx}" y="${cy + r * .42}" text-anchor="middle" font-size="${r * 1.25}" fill="${ink}" font-family="Baloo 2, sans-serif">${p.n}</text></g>`;
+    const cx = p.x * U + U / 2, cy = p.y * U + U / 2, done = have[i] === p.n, over = have[i] > p.n, look = pieceOf(p);
+    // the perch itself, a cat settled on it once it has all its catwalks, and its number on a badge
+    const badge = over ? "#E16251" : done ? "#6AA673" : "#fff", ink = over || done ? "#fff" : "#2A2530";
+    s += `<g class="isle" data-i="${i}" role="button" aria-label="Perch needing ${p.n}, has ${have[i]}"><circle cx="${cx}" cy="${cy}" r="${U * .6}" fill="transparent"/>
+      ${i === sel ? `<circle cx="${cx}" cy="${cy}" r="${U * .52}" fill="rgba(185,69,136,.15)" stroke="#B94588" stroke-width="6"/>` : ""}
+      ${PIECES[look.kind](cx, cy, look.color)}
+      ${done ? `<image class="cat" href="${CATS}${look.cat}.webp" x="${cx - 34}" y="${cy - 40}" width="68" height="62" preserveAspectRatio="xMidYMid meet"/>` : ""}
+      <circle cx="${cx + 24}" cy="${cy - 24}" r="27" fill="${badge}" stroke="#2A2530" stroke-width="4"/>
+      <text x="${cx + 24}" y="${cy - 12}" text-anchor="middle" font-size="${p.n > 9 ? 29 : 36}" fill="${ink}" font-family="Baloo 2, sans-serif">${p.n}</text></g>`;
   });
   svg.innerHTML = s;
   const left = isles.filter((p, i) => have[i] !== p.n).length;
