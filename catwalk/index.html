@@ -62,7 +62,7 @@
 
   <div class="help">
     <p>Each perch needs exactly as many catwalks as its number. Tap a perch, then another perch straight across or up and down from it, to build a catwalk between them. Do the same again for a second catwalk, and a third time to take them away.</p>
-    <p>Catwalks never cross each other, and at most two join the same pair of perches. When you're done, the cats must be able to reach every perch: it all has to join into one tower. Every tower has exactly one answer.</p>
+    <p>Build wherever you like while you work it out. In the finished tower no catwalks cross, at most two join the same pair of perches, and the cats can reach every perch: it all joins into one tower. Every tower has exactly one answer.</p>
   </div>
 </main>
 
@@ -192,8 +192,6 @@ function draw(flash) {
     const plank = (ox, oy) => `<path d="M${x1 + ox} ${y1 + oy} L${x2 + ox} ${y2 + oy}" stroke="#6B4A2E" stroke-width="15"/><path d="M${x1 + ox} ${y1 + oy} L${x2 + ox} ${y2 + oy}" stroke="#D9B98A" stroke-width="10"/>
       <path d="M${x1 + ox} ${y1 + oy} L${x2 + ox} ${y2 + oy}" stroke="#B8915E" stroke-width="10" stroke-dasharray="2.5 4"/>`;
     let g = v === 1 ? plank(0, 0) : v === 2 ? plank(-off[0], -off[1]) + plank(off[0], off[1]) : "";
-    // with a perch picked, dashes show where a catwalk could go from it
-    if (sel >= 0 && (l.a === sel || l.b === sel) && !game.won) g += `<path d="M${x1} ${y1} L${x2} ${y2}" stroke="#B94588" stroke-width="4" stroke-dasharray="8 10" opacity=".7"/>`;
     s += `<g class="lane${flash === k ? " no" : ""}">${g}</g>`;
   });
   isles.forEach((p, i) => {
@@ -211,13 +209,15 @@ function draw(flash) {
   $("count").textContent = game.won ? "Tower built!" : `${left} perch${left === 1 ? "" : "es"} to go`;
   $("undoBtn").disabled = !game.history.length || game.won; $("restartBtn").disabled = !game.history.length || game.won;
 }
-function solved() {
-  const have = totals(), N = game.isles.length;
-  if (game.isles.some((p, i) => have[i] !== p.n)) return false;
+// Built: every perch has its number of catwalks, none cross, and they all join into one tower.
+const crossing = () => lanes.some((l, k) => game.val[k] && l.cross.some(q => game.val[q]));
+function joined() {
+  const N = game.isles.length;
   const seen = new Set([0]), stack = [0];
   while (stack.length) { const i = stack.pop(); lanes.forEach((l, k) => { if (!game.val[k]) return; const j = l.a === i ? l.b : l.b === i ? l.a : -1; if (j >= 0 && !seen.has(j)) { seen.add(j); stack.push(j); } }); }
   return seen.size === N;
 }
+function solved() { const have = totals(); return game.isles.every((p, i) => have[i] === p.n) && !crossing() && joined(); }
 
 /* ---------- building catwalks ---------- */
 // Tap a perch to pick it, then a perch in line with it to add a catwalk between them (a third time takes them away).
@@ -229,10 +229,12 @@ $("svg").addEventListener("click", e => {
   if (sel < 0 || sel === i) { sel = sel === i ? -1 : i; G.note(""); draw(); return; }
   const k = lanes.findIndex(l => (l.a === sel && l.b === i) || (l.b === sel && l.a === i));
   if (k < 0) { sel = i; G.note(""); draw(); return; }   // not in line: pick this one instead
-  const next = (game.val[k] + 1) % 3;
-  if (next > 0 && lanes[k].cross.some(q => game.val[q] > 0)) { G.note("Catwalks can't cross.", 2500); sel = -1; draw(k); return; }
-  game.history.push(game.val.slice()); game.val[k] = next; sel = -1; G.note("");
-  if (solved()) win(); else { draw(); save(); }
+  // build freely, crossings included; it only counts once nothing crosses
+  game.history.push(game.val.slice()); game.val[k] = (game.val[k] + 1) % 3; sel = -1; G.note("");
+  if (solved()) { win(); return; }
+  draw(); save();
+  const have = totals();
+  if (game.isles.every((p, i) => have[i] === p.n)) G.note(crossing() ? "Every perch is right, but catwalks can't cross." : "Every perch is right, but the tower is in pieces.", 0);
 });
 $("undoBtn").onclick = () => { if (playing() && game.history.length) { game.val = game.history.pop(); sel = -1; draw(); save(); } };
 $("restartBtn").onclick = () => { if (playing() && game.history.length) { game.history.push(game.val.slice()); game.val = game.val.map(() => 0); sel = -1; draw(); save(); G.note("Back to bare perches. Undo brings your catwalks back.", 3500); } };
@@ -272,7 +274,7 @@ function showHelp() {
   const ol = document.createElement("ol"); ol.className = "steps";
   for (const t of ["Each perch needs exactly as many catwalks as its number.",
                    "Tap a perch, then another straight across or up and down from it, to build a catwalk. Again for a second; a third time takes them away.",
-                   "Catwalks can't cross, and at most two join the same pair of perches.",
+                   "In the finished tower catwalks don't cross, and at most two join the same pair of perches.",
                    "When you're done, every perch has to join into one tower."]) {
     const li = document.createElement("li"); li.textContent = t; ol.append(li);
   }
