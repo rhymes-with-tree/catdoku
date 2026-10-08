@@ -15,6 +15,7 @@ const G = (() => {
     ["Hide & Seek", "hideseek", "Find every cat hiding in the boxes", "#C9A26B"],
     ["Nip Trip", "niptrip", "Zen out and play with colour", "#9874CA"],
     ["Tangle", "tangle", "Untangle the yarn the cat got into", "#3C8681"],
+    ["Catwalk", "catwalk", "Link the perches of a giant cat tower", "#A98663"],
   ];
   const $ = id => document.getElementById(id);
 
