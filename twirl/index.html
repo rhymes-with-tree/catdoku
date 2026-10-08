@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-07.8"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-08.1"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -22,7 +22,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-07.8">
+<link rel="stylesheet" href="../games.css?v=2026-10-08.1">
 <style>
 /* A play mat covered in satin ribbons; each one slides off the way its pointed end points, along its own path.
    Big mats zoom, and scroll inside their frame. */
@@ -35,6 +35,13 @@
 .hearts .lost{color:var(--line)}
 .zoom{display:flex;gap:6px;align-items:center}
 .zoom button{padding:2px 12px;min-width:40px}
+.toggle{display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;user-select:none;white-space:nowrap}
+.toggle input{position:absolute;opacity:0;width:1px;height:1px}
+.sw{flex:none;width:42px;height:24px;border-radius:12px;background:var(--line);position:relative;transition:background .15s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s}
+.toggle input:checked + .sw{background:var(--sage-green)}
+.toggle input:checked + .sw::after{left:21px}
+.toggle input:focus-visible + .sw{outline:3px solid var(--pacific-blue);outline-offset:2px}
 .card ol.steps{text-align:left;margin:0 0 14px;padding-left:24px;color:var(--ink);font-size:16px;line-height:1.35}
 .card ol.steps li{margin:0 0 8px}
 </style>
@@ -47,6 +54,7 @@
   <div class="bar">
     <label>Level <select id="levelSel" aria-label="Level"></select></label>
     <span class="zoom" aria-label="Zoom"><button id="zoomOut" aria-label="Zoom out">−</button><button id="zoomFit">Fit</button><button id="zoomIn" aria-label="Zoom in">+</button></span>
+    <label class="toggle"><input type="checkbox" id="twistTgl"><span class="sw"></span>Twisty ribbons</label>
   </div>
 
   <div class="status">
@@ -69,12 +77,12 @@
 
   <div class="help">
     <p>Tap a ribbon to pull it off the mat the way its pointed end points. It only comes off if nothing is in the way. A blocked tap costs a life.</p>
-    <p>Pinch or use − and + to zoom; drag to look around.</p>
+    <p>Pinch or use − and + to zoom; drag to look around. Turn off Twisty ribbons if you'd rather every ribbon lay flat.</p>
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-07.8"></script>
-<script src="../colorways.js?v=2026-10-07.8"></script>
+<script src="../games.js?v=2026-10-08.1"></script>
+<script src="../colorways.js?v=2026-10-08.1"></script>
 <script>
 const $ = G.$;
 G.nav("twirl");
@@ -209,13 +217,15 @@ const build = G.builder([params, makeTwirl], "makeTwirl");
 
 /* ---------- how each ribbon looks ---------- */
 // Every ribbon wears its own colourway, as different as can be from the ribbons it touches. As levels go
-// on, more ribbons shade through their colourway along their length (ombré) and fewer are twisty, so
-// they get harder to follow and to tell apart.
+// on, more ribbons shade through their colourway along their length (ombré), so they get harder to follow.
+// Texture is a clue too: each board picks a main texture at random, flat or twisty, and on early levels
+// a fair share of ribbons wear the other one, which makes neighbours easier to tell apart. That mix fades,
+// so from level 13 every board is all twisty or all flat.
 const RAMPS = [...Object.values(VARIEGATED), ...Object.values(BLENDS), ...Object.values(COLORWAYS)];
 const clamp01 = v => Math.max(0, Math.min(1, v));
 const labDist = (a, b) => { const p = hexLab(a), q = hexLab(b); return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]); };
 function dress(d) {
-  const {W, ribbons} = d, owner = new Map(), ombre = clamp01((d.n - 4) / 12), twisty = 0.45 * (1 - clamp01((d.n - 2) / 14));
+  const {W, ribbons} = d, owner = new Map(), ombre = clamp01((d.n - 4) / 12), other = 0.45 * (1 - clamp01((d.n - 1) / 12)), mainTwist = Math.random() < 0.5;
   ribbons.forEach((r, k) => r.cells.forEach(i => owner.set(i, k)));
   d.looks = [];
   ribbons.forEach((r, k) => {
@@ -226,12 +236,16 @@ function dress(d) {
       const dist = Math.min(9, ...[...near].map(o => labDist(solid, d.looks[o].solid)));
       if (dist > bestD) { bestD = dist; best = {ramp, solid}; }
     }
-    d.looks[k] = {...best, ombre: Math.random() < ombre, twist: Math.random() < twisty, phase: Math.random() * 6};
+    d.looks[k] = {...best, ombre: Math.random() < ombre, twist: Math.random() < other ? !mainTwist : mainTwist, phase: Math.random() * 6};
   });
 }
 
 /* ---------- playing ---------- */
 const STORE = "catdoku.twirl.v2", MAX_LEVEL = 20, HEARTS = 3, MAX_LIVES = 9;
+// Turning off Twisty ribbons draws every ribbon flat, on every level. It's kept on this device.
+const PREFS = "catdoku.twirl.prefs.v1", prefs = Object.assign({twisty: true}, G.load(PREFS));
+$("twistTgl").checked = prefs.twisty;
+$("twistTgl").onchange = e => { prefs.twisty = e.target.checked; G.save(PREFS, prefs); paintStill(); };
 let saved = G.load(STORE);
 let S = null, loading = false, now = 0, moving = [], tugs = [];
 const save = () => { if (S) { S.d.ms = S.ms; G.save(STORE, {level: S.level, d: S.d}); } };
@@ -381,6 +395,7 @@ function samples(pts, step) {
 // through their colourway along their length; twisty ribbons turn over as they go, showing their edge.
 function drawRibbon(g, pts, look, flash) {
   if (pts.length < 2) return;
+  if (look.twist && !prefs.twisty) look = {...look, twist: false};
   const w = U * 0.4, P = samples(pts, look.twist || look.ombre ? 1.5 : 3), n = P.length, ramp = RAMPS[look.ramp];
   let colAt = i => look.ombre ? rampAt(ramp, 0.12 + 0.85 * i / Math.max(1, n - 1)) : look.solid;
   if (flash) { const base = colAt; colAt = i => mix(base(i), "#FFFFFF", 0.55); }
