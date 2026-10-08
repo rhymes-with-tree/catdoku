@@ -36,6 +36,9 @@
 @keyframes glow{40%{transform:scale(1.15)}}
 .no{animation:no .4s}
 @keyframes no{25%{transform:translateX(-10px)}75%{transform:translateX(10px)}}
+.ways{display:flex;justify-content:center;gap:18px;flex-wrap:wrap;margin:4px 0 8px}
+.ways figure{margin:0;text-align:center;font-size:14px;color:var(--ink-soft)}
+.ways svg{width:120px;height:120px;display:block;margin:0 auto 2px}
 @media (prefers-reduced-motion:reduce){.isle .cat,.won .isle .cat,.no{animation:none}}
 </style>
 </head>
@@ -62,49 +65,25 @@
   </div>
 
   <div class="help">
-    <p>Each perch needs exactly as many catwalks as its number. Tap a perch, then any other perch, to build a catwalk between them, at any angle. Do the same again for a second catwalk, and a third time to take them away.</p>
-    <p>A catwalk can't go through another perch. Build wherever you like and make mistakes while you work it out; in the finished tower no catwalks cross, at most two join the same pair of perches, and the cats can reach every perch: it all joins into one tower. Every tower has exactly one answer, using catwalks straight across, up and down, or at 45°.</p>
+    <p>Each perch needs exactly as many catwalks as its number. Tap a perch, then another perch, to build a catwalk between them. Do the same again for a second catwalk, and a third time to take them away.</p>
+    <div class="ways" id="ways"></div>
+    <p>A catwalk joins a perch to the nearest perch straight across or up and down (and on towers from 10 × 10, also at 45°), never through another perch. Catwalks can't cross, at most two join the same pair of perches, and when you're done the cats must be able to reach every perch: it all joins into one tower. Every tower has exactly one answer.</p>
   </div>
 </main>
 
 <script src="../games.js?v=2026-10-07.8"></script>
 <script>
 /* ---------- the puzzle ---------- */
-// A perch: {x, y, n}. A catwalk can join any two perches, at any angle, as long as the straight line between them
-// doesn't pass through another perch. Each of these lanes holds 0, 1 or 2 catwalks; two lanes cross if their
-// lines cut through each other. Every tower's one answer only uses catwalks straight across, up and down, or at
-// 45° (see answerLanes); the rest are there to make mistakes with.
-const RADIUS = .42;   // a perch's size, in grid squares
-function lanesOf(isles) {
-  const lanes = [];
-  for (let a = 0; a < isles.length; a++) for (let b = a + 1; b < isles.length; b++) {
-    const A = isles[a], B = isles[b], dx = B.x - A.x, dy = B.y - A.y, L2 = dx * dx + dy * dy;
-    let clear = true;
-    for (let k = 0; k < isles.length && clear; k++) {
-      if (k === a || k === b) continue;
-      const C = isles[k], t = ((C.x - A.x) * dx + (C.y - A.y) * dy) / L2;
-      if (t <= 0 || t >= 1) continue;
-      const px = A.x + t * dx - C.x, py = A.y + t * dy - C.y;
-      if (px * px + py * py < (RADIUS + .08) ** 2) clear = false;
-    }
-    if (clear) lanes.push({a, b, cross: []});
-  }
-  const side = (p, q, r) => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
-  for (let i = 0; i < lanes.length; i++) for (let j = 0; j < i; j++) {
-    const e = lanes[i], f = lanes[j];
-    if (e.a === f.a || e.a === f.b || e.b === f.a || e.b === f.b) continue;
-    const P = isles[e.a], Q = isles[e.b], S = isles[f.a], T = isles[f.b];
-    if (side(P, Q, S) * side(P, Q, T) < 0 && side(S, T, P) * side(S, T, Q) < 0) { e.cross.push(j); f.cross.push(i); }
-  }
-  return lanes;
-}
+// A perch: {x, y, n}. Catwalks run from a perch to the nearest perch straight across or up and down (and on the
+// bigger towers also at 45°), with nothing between; each of these lanes holds 0, 1 or 2 catwalks. Two lanes
+// cross if their lines cut through each other.
 const side = (p, q, r) => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
 const cut = (P, Q, S, T) => side(P, Q, S) * side(P, Q, T) < 0 && side(S, T, P) * side(S, T, Q) < 0;
-// The lanes an answer can use: from each perch to the nearest perch in each of the 8 directions.
-function answerLanes(isles, W) {
+// The lanes: from each perch to the nearest perch in each direction (8 of them on towers with 45° catwalks).
+function lanesOf(isles, W, diag) {
   const at = new Map(isles.map((s, i) => [s.y * W + s.x, i])), lanes = [];
   isles.forEach((s, i) => {
-    for (const [dx, dy] of [[1, 0], [0, 1], [1, 1], [1, -1]]) for (let x = s.x + dx, y = s.y + dy; x >= 0 && y >= 0 && x < W && y < W; x += dx, y += dy) {
+    for (const [dx, dy] of diag ? [[1, 0], [0, 1], [1, 1], [1, -1]] : [[1, 0], [0, 1]]) for (let x = s.x + dx, y = s.y + dy; x >= 0 && y >= 0 && x < W && y < W; x += dx, y += dy) {
       const j = at.get(y * W + x); if (j !== undefined) { lanes.push({a: i, b: j, cross: []}); break; }
     }
   });
@@ -158,16 +137,17 @@ function countSolutions(isles, lanes, limit = 2, budget = 200000) {
   return steps > budget ? -1 : found;
 }
 
-// Grow a tower: perches spread out from one, each new one joined by a straight or 45° catwalk to one already
+// Grow a tower: perches spread out from one, each new one joined by a straight (or 45°) catwalk to one already
 // placed, plus a few more catwalks between perches that can see each other; number each perch by its catwalks.
 // While the solver finds a second answer, change one of our catwalks where the two answers differ (keeping ours
 // valid) and look again, until the tower has exactly one answer.
-const SIZES = [null, [7, 9], [8, 13], [9, 17], [10, 22], [12, 30], [13, 34]];   // by size number: grid size and how many perches
+// By size number: grid size, how many perches, and whether catwalks can also run at 45°.
+const SIZES = [null, [7, 9, false], [8, 13, false], [9, 17, false], [10, 22, true], [12, 30, true], [13, 34, true]];
 const D8 = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]];
-function growTower(W, want) {
+function growTower(W, want, diag) {
   const isles = [{x: Math.floor(Math.random() * W), y: Math.floor(Math.random() * W)}], used = new Set([isles[0].y * W + isles[0].x]), segs = [];
   for (let stuck = 0; isles.length < want && stuck < 400;) {
-    const s = isles[Math.floor(Math.random() * isles.length)], [dx, dy] = D8[Math.floor(Math.random() * 8)], len = 2 + Math.floor(Math.random() * Math.max(1, W / 2 - 1));
+    const s = isles[Math.floor(Math.random() * isles.length)], [dx, dy] = D8[Math.floor(Math.random() * (diag ? 8 : 4))], len = 2 + Math.floor(Math.random() * Math.max(1, W / 2 - 1));
     const nx = s.x + dx * len, ny = s.y + dy * len, N = {x: nx, y: ny};
     let ok = nx >= 0 && ny >= 0 && nx < W && ny < W && !used.has(ny * W + nx);
     for (let t = 1; ok && t < len; t++) if (used.has((s.y + dy * t) * W + s.x + dx * t)) ok = false;
@@ -178,7 +158,7 @@ function growTower(W, want) {
     isles.push(N); used.add(ny * W + nx); segs.push([s, N, Math.random() < .5 ? 2 : 1]); stuck = 0;
   }
   if (isles.length < want) return null;
-  const lanes = answerLanes(isles, W), key = (a, b) => a < b ? a + "," + b : b + "," + a;
+  const lanes = lanesOf(isles, W, diag), key = (a, b) => a < b ? a + "," + b : b + "," + a;
   const idx = new Map(isles.map((p, i) => [p, i])), have = new Map(segs.map(([P, Q, c]) => [key(idx.get(P), idx.get(Q)), c]));
   if ([...have.keys()].some(k => !lanes.some(l => key(l.a, l.b) === k))) return null;
   const built = new Set(lanes.map((l, k) => have.has(key(l.a, l.b)) ? k : -1).filter(k => k >= 0));
@@ -186,9 +166,9 @@ function growTower(W, want) {
   if ([...built].some(k => lanes[k].cross.some(q => built.has(q)))) return null;
   return {isles, lanes, answer: lanes.map(l => have.get(key(l.a, l.b)) || 0)};
 }
-function makePuzzle(W, want) {
+function makePuzzle(W, want, diag) {
   for (let tries = 0; tries < 200; tries++) {
-    const t = growTower(W, want); if (!t) continue;
+    const t = growTower(W, want, diag); if (!t) continue;
     const {isles, lanes, answer} = t, number = () => { isles.forEach(p => { p.n = 0; }); lanes.forEach((l, k) => { isles[l.a].n += answer[k]; isles[l.b].n += answer[k]; }); };
     number();
     let c = countSolutions(isles, lanes, 2, 200000);
@@ -208,6 +188,24 @@ function joinedBy(N, lanes, v) {
   const seen = new Set([0]), stack = [0];
   while (stack.length) { const i = stack.pop(); lanes.forEach((l, k) => { if (!v[k]) return; const j = l.a === i ? l.b : l.b === i ? l.a : -1; if (j >= 0 && !seen.has(j)) { seen.add(j); stack.push(j); } }); }
   return seen.size === N;
+}
+
+/* ---------- rope bridges ---------- */
+// A catwalk: a little rope bridge that sags in the middle, two ropes with wooden slats across them. `side` moves
+// it sideways, for the second of a pair.
+function ropeBridge(x1, y1, x2, y2, side) {
+  const L = Math.hypot(x2 - x1, y2 - y1), ux = (x2 - x1) / L, uy = (y2 - y1) / L;
+  let nx = -uy, ny = ux; if (ny < 0 || (ny === 0 && nx < 0)) { nx = -nx; ny = -ny; }   // the side it sags to: down, or to the right if it's upright
+  const ax = x1 + nx * side, ay = y1 + ny * side, bx = x2 + nx * side, by = y2 + ny * side;
+  const sag = Math.min(20, L * .1) * (.25 + .75 * Math.abs(ux)), qx = (ax + bx) / 2 + nx * sag * 2, qy = (ay + by) / 2 + ny * sag * 2;
+  const at = t => [(1 - t) * (1 - t) * ax + 2 * (1 - t) * t * qx + t * t * bx, (1 - t) * (1 - t) * ay + 2 * (1 - t) * t * qy + t * t * by];
+  const rope = o => `<path d="M${ax + nx * o} ${ay + ny * o} Q${qx + nx * o} ${qy + ny * o} ${bx + nx * o} ${by + ny * o}" fill="none" stroke="#5A3D25" stroke-width="3.5"/>`;
+  let slats = "";
+  for (let n = Math.max(3, Math.floor(L / 15)), j = 1; j < n; j++) {
+    const [px, py] = at(j / n);
+    slats += `<path d="M${px - nx * 9} ${py - ny * 9} L${px + nx * 9} ${py + ny * 9}" stroke="#5A3D25" stroke-width="8" stroke-linecap="round"/><path d="M${px - nx * 8} ${py - ny * 8} L${px + nx * 8} ${py + ny * 8}" stroke="#C99A62" stroke-width="5" stroke-linecap="round"/>`;
+  }
+  return slats + rope(-8) + rope(8);
 }
 
 /* ---------- cat-tower pieces ---------- */
@@ -239,7 +237,7 @@ const PIECES = {
 };
 
 /* ---------- game ---------- */
-const STORE = "catdoku.catwalk.v1", U = 100;
+const STORE = "catdoku.catwalk.v2", U = 100;
 const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({size: 1}, state.settings);
@@ -258,12 +256,8 @@ function draw(flash) {
   for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) s += `<circle cx="${x * U + U / 2}" cy="${y * U + U / 2}" r="3" fill="#CDB89F"/>`;
   lanes.forEach((l, k) => {
     const A = isles[l.a], B = isles[l.b], x1 = A.x * U + U / 2, y1 = A.y * U + U / 2, x2 = B.x * U + U / 2, y2 = B.y * U + U / 2;
-    const v = val[k], d = Math.hypot(x2 - x1, y2 - y1), off = [-(y2 - y1) / d * 13, (x2 - x1) / d * 13];
-    // a catwalk: a chunky post wrapped in sisal rope
-    const post = (ox, oy) => { const m = `M${x1 + ox} ${y1 + oy} L${x2 + ox} ${y2 + oy}`;
-      return `<path d="${m}" stroke="#5A3D25" stroke-width="21"/><path d="${m}" stroke="#D9BC8C" stroke-width="16"/>
-        <path d="${m}" stroke="#A9824F" stroke-width="16" stroke-dasharray="2.5 3.5"/><path d="${m}" stroke="#F1DFBC" stroke-width="3" stroke-dasharray="2.5 3.5" transform="translate(${-off[0] * .25} ${-off[1] * .25})"/>`; };
-    let g = v === 1 ? post(0, 0) : v === 2 ? post(-off[0], -off[1]) + post(off[0], off[1]) : "";
+    const v = val[k];
+    let g = v === 1 ? ropeBridge(x1, y1, x2, y2, 0) : v === 2 ? ropeBridge(x1, y1, x2, y2, -13) + ropeBridge(x1, y1, x2, y2, 13) : "";
     s += `<g class="lane${flash === k ? " no" : ""}">${g}</g>`;
   });
   isles.forEach((p, i) => {
@@ -273,9 +267,9 @@ function draw(flash) {
     s += `<g class="isle" data-i="${i}" role="button" aria-label="Perch needing ${p.n}, has ${have[i]}"><circle cx="${cx}" cy="${cy}" r="${U * .6}" fill="transparent"/>
       ${i === sel ? `<circle cx="${cx}" cy="${cy}" r="${U * .52}" fill="rgba(185,69,136,.15)" stroke="#B94588" stroke-width="6"/>` : ""}
       ${PIECES[look.kind](cx, cy, look.color)}
-      ${done ? `<image class="cat" href="${CATS}${look.cat}.webp" x="${cx - 34}" y="${cy - 40}" width="68" height="62" preserveAspectRatio="xMidYMid meet"/>` : ""}
-      <circle cx="${cx + 24}" cy="${cy - 24}" r="27" fill="${badge}" stroke="#2A2530" stroke-width="4"/>
-      <text x="${cx + 24}" y="${cy - 12}" text-anchor="middle" font-size="${p.n > 9 ? 29 : 36}" fill="${ink}" font-family="Baloo 2, sans-serif">${p.n}</text></g>`;
+      ${done ? `<image class="cat" href="${CATS}${look.cat}.webp" x="${cx - 46}" y="${cy - 34}" width="62" height="56" preserveAspectRatio="xMidYMid meet"/>` : ""}
+      <circle cx="${cx + 30}" cy="${cy - 26}" r="25" fill="${badge}" stroke="#2A2530" stroke-width="4"/>
+      <text x="${cx + 30}" y="${cy - 15}" text-anchor="middle" font-size="${p.n > 9 ? 27 : 34}" fill="${ink}" font-family="Baloo 2, sans-serif">${p.n}</text></g>`;
   });
   svg.innerHTML = s;
   const left = isles.filter((p, i) => have[i] !== p.n).length;
@@ -305,16 +299,19 @@ $("svg").addEventListener("click", e => {
   const i = +g.dataset.i;
   if (sel < 0 || sel === i) { sel = sel === i ? -1 : i; G.note(""); draw(); return; }
   const k = lanes.findIndex(l => (l.a === sel && l.b === i) || (l.b === sel && l.a === i));
-  if (k < 0) {   // a perch in the way: say so, and let go
-    G.note("There's a perch in the way.", 2500);
+  if (k < 0) {   // no catwalk can join these two: say why, and let go
+    const A = game.isles[sel], B = game.isles[i], dx = Math.abs(A.x - B.x), dy = Math.abs(A.y - B.y), diag = SIZES[game.N][2];
+    const inLine = !dx || !dy || (diag && dx === dy);
+    G.note(inLine ? "There's a perch in the way." : diag ? "Catwalks run straight across, up and down, or at 45°." : "Catwalks only run straight across or up and down.", 2500);
     const was = sel; sel = -1; draw(); shake(was, i); return;
   }
-  // build freely, crossings included; it only counts once nothing crosses
-  game.history.push(game.val.slice()); game.val[k] = (game.val[k] + 1) % 3; sel = -1; G.note("");
+  const next = (game.val[k] + 1) % 3;
+  if (next && lanes[k].cross.some(q => game.val[q])) { G.note("Catwalks can't cross.", 2500); sel = -1; draw(k); return; }
+  game.history.push(game.val.slice()); game.val[k] = next; sel = -1; G.note("");
   if (solved()) { win(); return; }
   draw(); save();
   const have = totals();
-  if (game.isles.every((p, i) => have[i] === p.n)) G.note(crossing() ? "Every perch is right, but catwalks can't cross." : "Every perch is right, but the tower is in pieces.", 0);
+  if (game.isles.every((p, i) => have[i] === p.n)) G.note("Every perch is right, but the tower is in pieces.", 0);
 });
 $("undoBtn").onclick = () => { if (playing() && game.history.length) { game.val = game.history.pop(); sel = -1; draw(); save(); } };
 $("restartBtn").onclick = () => { if (playing() && game.history.length) { game.history.push(game.val.slice()); game.val = game.val.map(() => 0); sel = -1; draw(); save(); G.note("Back to bare perches. Undo brings your catwalks back.", 3500); } };
@@ -339,28 +336,42 @@ function finishCard() {
 /* ---------- new towers ---------- */
 function startSize(n) { settings.size = n; $("size").value = n; save(); newTower(); }
 function newTower() {
-  const N = settings.size, [W, want] = SIZES[N];
-  let p = null; while (!p) p = makePuzzle(W, want);
+  const N = settings.size, [W, want, diag] = SIZES[N];
+  let p = null; while (!p) p = makePuzzle(W, want, diag);
   game = {N, W, isles: p.isles.map(({x, y, n}) => ({x, y, n})), history: [], won: false, ...G.freshClock()};
-  lanes = lanesOf(game.isles); game.val = lanes.map(() => 0); sel = -1;
+  lanes = lanesOf(game.isles, W, diag); game.val = lanes.map(() => 0); sel = -1;
   $("board").classList.remove("won"); G.closeCard(); G.note("");
   draw(); save();
   G.track(`Catwalk new tower ${sizeLabel(N)}`);
 }
 
 /* ---------- how to play ---------- */
+// A little picture of which ways a catwalk can go from a perch: green arrows yes, red crosses no.
+function waysPicture(diag, caption) {
+  const ok = (dx, dy) => !dx || !dy || diag, P = (x, y) => `${60 + x * 44} ${60 + y * 44}`;
+  let s = `<svg viewBox="0 0 120 120" aria-hidden="true"><rect width="120" height="120" rx="12" fill="#EBDDCB"/>`;
+  for (const [dx, dy] of D8) {
+    if (ok(dx, dy)) s += `<path d="M${P(dx * .3, dy * .3)} L${P(dx * .9, dy * .9)}" stroke="#6AA673" stroke-width="7" stroke-linecap="round"/><circle cx="${60 + dx * 44}" cy="${60 + dy * 44}" r="7" fill="#6AA673"/>`;
+    else { const [x, y] = [60 + dx * 40, 60 + dy * 40]; s += `<path d="M${P(dx * .3, dy * .3)} L${P(dx * .78, dy * .78)}" stroke="#E16251" stroke-width="5" stroke-dasharray="5 5"/><path d="M${x - 8} ${y - 8} L${x + 8} ${y + 8} M${x + 8} ${y - 8} L${x - 8} ${y + 8}" stroke="#E16251" stroke-width="5" stroke-linecap="round"/>`; }
+  }
+  s += `<circle cx="60" cy="60" r="15" fill="#E9DCC6" stroke="#2A2530" stroke-width="3"/></svg>`;
+  return `<figure>${s}<figcaption>${caption}</figcaption></figure>`;
+}
+const WAYS = waysPicture(false, "Up to 9 × 9") + waysPicture(true, "From 10 × 10");
+$("ways").innerHTML = WAYS;
 function showHelp() {
   const media = document.createElement("div");
   const ol = document.createElement("ol"); ol.className = "steps";
   for (const t of ["Each perch needs exactly as many catwalks as its number.",
-                   "Tap a perch, then any other perch, to build a catwalk between them, at any angle. Again for a second; a third time takes them away.",
-                   "A catwalk can't go through another perch. In the finished tower catwalks don't cross, and at most two join the same pair of perches.",
+                   "Tap a perch, then another, to build a catwalk between them. Again for a second; a third time takes them away.",
+                   "Catwalks run straight across or up and down to the nearest perch; from 10 × 10 they can go at 45° too. They can't cross, and at most two join the same pair of perches.",
                    "When you're done, every perch has to join into one tower."]) {
     const li = document.createElement("li"); li.textContent = t; ol.append(li);
   }
   const tip = document.createElement("p"); tip.className = "tip";
-  tip.textContent = "A perch turns green when it has all its catwalks, and red if it has too many. Every tower has exactly one answer, using catwalks straight across, up and down, or at 45°.";
-  media.append(ol, tip);
+  tip.textContent = "A perch's number turns green when it has all its catwalks (and a cat settles on it), and red if it has too many. Every tower has exactly one answer.";
+  const ways = document.createElement("div"); ways.className = "ways"; ways.innerHTML = WAYS;
+  media.append(ways, ol, tip);
   G.openCard("How to play", "", [["Let's play", () => { G.closeCard(); settings.seenHelp = true; save(); }, true]], media);
 }
 function helpOnFirstVisit() { if (!settings.seenHelp && game && playing()) showHelp(); }
@@ -380,7 +391,7 @@ if (!(settings.size >= 1 && settings.size < SIZES.length)) settings.size = 1;
 $("size").value = settings.size;
 if (game && Array.isArray(game.isles) && Array.isArray(game.val)) G.reopen(() => {
     if (!SIZES[game.N]) throw new Error("unknown size");
-    lanes = lanesOf(game.isles);
+    lanes = lanesOf(game.isles, game.W, SIZES[game.N][2]);
     if (lanes.length !== game.val.length) throw new Error("the saved tower doesn't match its catwalks");
     draw();
     if (game.won) finishCard();
