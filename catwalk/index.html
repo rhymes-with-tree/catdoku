@@ -62,7 +62,7 @@
 
   <div class="help">
     <p>Each perch needs exactly as many catwalks as its number. Tap a perch, then any other perch, to build a catwalk between them, at any angle. Do the same again for a second catwalk, and a third time to take them away.</p>
-    <p>A catwalk can't go through another perch. Build wherever you like while you work it out; in the finished tower no catwalks cross, at most two join the same pair of perches, and the cats can reach every perch: it all joins into one tower.</p>
+    <p>A catwalk can't go through another perch. Build wherever you like and make mistakes while you work it out; in the finished tower no catwalks cross, at most two join the same pair of perches, and the cats can reach every perch: it all joins into one tower. Every tower has exactly one answer, using catwalks straight across, up and down, or at 45°.</p>
   </div>
 </main>
 
@@ -71,7 +71,8 @@
 /* ---------- the puzzle ---------- */
 // A perch: {x, y, n}. A catwalk can join any two perches, at any angle, as long as the straight line between them
 // doesn't pass through another perch. Each of these lanes holds 0, 1 or 2 catwalks; two lanes cross if their
-// lines cut through each other.
+// lines cut through each other. Every tower's one answer only uses catwalks straight across, up and down, or at
+// 45° (see answerLanes); the rest are there to make mistakes with.
 const RADIUS = .42;   // a perch's size, in grid squares
 function lanesOf(isles) {
   const lanes = [];
@@ -96,12 +97,29 @@ function lanesOf(isles) {
   }
   return lanes;
 }
+const side = (p, q, r) => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+const cut = (P, Q, S, T) => side(P, Q, S) * side(P, Q, T) < 0 && side(S, T, P) * side(S, T, Q) < 0;
+// The lanes an answer can use: from each perch to the nearest perch in each of the 8 directions.
+function answerLanes(isles, W) {
+  const at = new Map(isles.map((s, i) => [s.y * W + s.x, i])), lanes = [];
+  isles.forEach((s, i) => {
+    for (const [dx, dy] of [[1, 0], [0, 1], [1, 1], [1, -1]]) for (let x = s.x + dx, y = s.y + dy; x >= 0 && y >= 0 && x < W && y < W; x += dx, y += dy) {
+      const j = at.get(y * W + x); if (j !== undefined) { lanes.push({a: i, b: j, cross: []}); break; }
+    }
+  });
+  for (let i = 0; i < lanes.length; i++) for (let j = 0; j < i; j++) {
+    const e = lanes[i], f = lanes[j];
+    if (e.a === f.a || e.a === f.b || e.b === f.a || e.b === f.b) continue;
+    if (cut(isles[e.a], isles[e.b], isles[f.a], isles[f.b])) { e.cross.push(j); f.cross.push(i); }
+  }
+  return lanes;
+}
 
 // Count solutions (stopping at 2) by trying lanes one at a time, keeping every island's possible total in reach.
 function countSolutions(isles, lanes, limit = 2, budget = 200000) {
   const N = isles.length, L = lanes.length, lo = new Array(L).fill(0), hi = new Array(L).fill(2), byIsle = isles.map(() => []);
   lanes.forEach((l, k) => { byIsle[l.a].push(k); byIsle[l.b].push(k); });
-  let found = 0, steps = 0;
+  let found = 0, steps = 0; const sols = [];
   function propagate(lo, hi) {
     for (let changed = true; changed;) {
       changed = false;
@@ -131,50 +149,64 @@ function countSolutions(isles, lanes, limit = 2, budget = 200000) {
     if (!propagate(lo, hi) || !linked(lo, hi, false)) return;
     let pick = -1;
     for (let k = 0; k < L; k++) if (lo[k] !== hi[k]) { pick = k; break; }
-    if (pick < 0) { if (linked(lo, hi, true)) found++; return; }
+    if (pick < 0) { if (linked(lo, hi, true)) { found++; sols.push(lo.slice()); } return; }
     for (let v = hi[pick]; v >= lo[pick]; v--) { const l2 = lo.slice(), h2 = hi.slice(); l2[pick] = h2[pick] = v; go(l2, h2); }
   }
   go(lo, hi);
+  countSolutions.sols = sols;
   return steps > budget ? -1 : found;
 }
 
-// Make a tower: scatter the perches, link them all with short catwalks that don't cross (some doubled), add a
-// few more, and number each perch by its catwalks. That answer always works. With catwalks at any angle there's
-// usually more than one answer, so make several towers and keep the one with the fewest.
-const SIZES = [null, [7, 9], [8, 13], [9, 17], [10, 22], [12, 30], [13, 38]];   // by size number: grid size and how many perches
-function makeTower(W, want) {
-  for (;;) {
-    const isles = [], used = new Set();
-    while (isles.length < want) {
-      const x = Math.floor(Math.random() * W), y = Math.floor(Math.random() * W);
-      // perches mostly keep a square apart
-      if (used.has(y * W + x) || isles.some(p => Math.abs(p.x - x) <= 1 && Math.abs(p.y - y) <= 1 && Math.random() < .7)) continue;
-      used.add(y * W + x); isles.push({x, y});
-    }
-    const lanes = lanesOf(isles), len = l => Math.hypot(isles[l.a].x - isles[l.b].x, isles[l.a].y - isles[l.b].y);
-    const order = lanes.map((_, k) => k).filter(k => len(lanes[k]) <= 3).sort((p, q) => len(lanes[p]) - len(lanes[q]) + (Math.random() - .5) * 2);
-    const parent = isles.map((_, i) => i), find = i => parent[i] === i ? i : (parent[i] = find(parent[i]));
-    const answer = new Array(lanes.length).fill(0), built = new Set();
-    for (const k of order) {
-      const l = lanes[k];
-      if (find(l.a) === find(l.b) || l.cross.some(q => built.has(q))) continue;
-      parent[find(l.a)] = find(l.b); built.add(k); answer[k] = Math.random() < .35 ? 2 : 1;
-    }
-    if (new Set(isles.map((_, i) => find(i))).size > 1) continue;
-    for (const k of order) if (!built.has(k) && Math.random() < .15 && !lanes[k].cross.some(q => built.has(q))) { built.add(k); answer[k] = Math.random() < .3 ? 2 : 1; }
-    isles.forEach(p => { p.n = 0; });
-    lanes.forEach((l, k) => { isles[l.a].n += answer[k]; isles[l.b].n += answer[k]; });
-    return {isles, lanes, answer};
+// Grow a tower: perches spread out from one, each new one joined by a straight or 45° catwalk to one already
+// placed, plus a few more catwalks between perches that can see each other; number each perch by its catwalks.
+// While the solver finds a second answer, change one of our catwalks where the two answers differ (keeping ours
+// valid) and look again, until the tower has exactly one answer.
+const SIZES = [null, [7, 9], [8, 13], [9, 17], [10, 22], [12, 30], [13, 34]];   // by size number: grid size and how many perches
+const D8 = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]];
+function growTower(W, want) {
+  const isles = [{x: Math.floor(Math.random() * W), y: Math.floor(Math.random() * W)}], used = new Set([isles[0].y * W + isles[0].x]), segs = [];
+  for (let stuck = 0; isles.length < want && stuck < 400;) {
+    const s = isles[Math.floor(Math.random() * isles.length)], [dx, dy] = D8[Math.floor(Math.random() * 8)], len = 2 + Math.floor(Math.random() * Math.max(1, W / 2 - 1));
+    const nx = s.x + dx * len, ny = s.y + dy * len, N = {x: nx, y: ny};
+    let ok = nx >= 0 && ny >= 0 && nx < W && ny < W && !used.has(ny * W + nx);
+    for (let t = 1; ok && t < len; t++) if (used.has((s.y + dy * t) * W + s.x + dx * t)) ok = false;
+    // not right beside another perch, not across a catwalk already there, and not sitting on one
+    if (ok && D8.slice(0, 4).some(([ax, ay]) => nx + ax >= 0 && nx + ax < W && used.has((ny + ay) * W + nx + ax) && !(nx + ax === s.x && ny + ay === s.y))) ok = false;
+    if (ok && segs.some(([P, Q]) => cut(P, Q, s, N) || (Math.abs(side(P, Q, N)) < 1e-9 && Math.min(P.x, Q.x) <= nx && nx <= Math.max(P.x, Q.x) && Math.min(P.y, Q.y) <= ny && ny <= Math.max(P.y, Q.y)))) ok = false;
+    if (!ok) { stuck++; continue; }
+    isles.push(N); used.add(ny * W + nx); segs.push([s, N, Math.random() < .5 ? 2 : 1]); stuck = 0;
   }
+  if (isles.length < want) return null;
+  const lanes = answerLanes(isles, W), key = (a, b) => a < b ? a + "," + b : b + "," + a;
+  const idx = new Map(isles.map((p, i) => [p, i])), have = new Map(segs.map(([P, Q, c]) => [key(idx.get(P), idx.get(Q)), c]));
+  if ([...have.keys()].some(k => !lanes.some(l => key(l.a, l.b) === k))) return null;
+  const built = new Set(lanes.map((l, k) => have.has(key(l.a, l.b)) ? k : -1).filter(k => k >= 0));
+  for (const [k, l] of lanes.entries()) if (!built.has(k) && Math.random() < .8 && !l.cross.some(q => built.has(q))) { built.add(k); have.set(key(l.a, l.b), Math.random() < .5 ? 2 : 1); }
+  if ([...built].some(k => lanes[k].cross.some(q => built.has(q)))) return null;
+  return {isles, lanes, answer: lanes.map(l => have.get(key(l.a, l.b)) || 0)};
 }
 function makePuzzle(W, want) {
-  let best = null, bestCount = Infinity;
-  for (let t = 0; t < 12 && bestCount > 1; t++) {
-    const p = makeTower(W, want), c = countSolutions(p.isles, p.lanes, 50, 4000);
-    const n = c < 0 ? 50 : c;   // ran out of time counting: plenty of answers
-    if (n < bestCount) { best = p; bestCount = n; }
+  for (let tries = 0; tries < 200; tries++) {
+    const t = growTower(W, want); if (!t) continue;
+    const {isles, lanes, answer} = t, number = () => { isles.forEach(p => { p.n = 0; }); lanes.forEach((l, k) => { isles[l.a].n += answer[k]; isles[l.b].n += answer[k]; }); };
+    number();
+    let c = countSolutions(isles, lanes, 2, 200000);
+    for (let fix = 0; c === 2 && fix < 60; fix++) {
+      const [s1, s2] = countSolutions.sols, other = s1.every((v, k) => v === answer[k]) ? s2 : s1;
+      const diff = answer.map((v, k) => v !== other[k] ? k : -1).filter(k => k >= 0);
+      const k = diff[Math.floor(Math.random() * diff.length)], was = answer[k];
+      answer[k] = was === 0 ? (Math.random() < .5 ? 1 : 2) : was === 2 ? 1 : (Math.random() < .5 ? 0 : 2);
+      if (answer.some((v, q) => v && lanes[q].cross.some(r => answer[r])) || !joinedBy(isles.length, lanes, answer)) { answer[k] = was; continue; }
+      number(); c = countSolutions(isles, lanes, 2, 200000);
+    }
+    if (c === 1) return {isles, answer};
   }
-  return best;
+  return null;
+}
+function joinedBy(N, lanes, v) {
+  const seen = new Set([0]), stack = [0];
+  while (stack.length) { const i = stack.pop(); lanes.forEach((l, k) => { if (!v[k]) return; const j = l.a === i ? l.b : l.b === i ? l.a : -1; if (j >= 0 && !seen.has(j)) { seen.add(j); stack.push(j); } }); }
+  return seen.size === N;
 }
 
 /* ---------- game ---------- */
@@ -278,8 +310,8 @@ function startSize(n) { settings.size = n; $("size").value = n; save(); newTower
 function newTower() {
   const N = settings.size, [W, want] = SIZES[N];
   let p = null; while (!p) p = makePuzzle(W, want);
-  game = {N, W, isles: p.isles.map(({x, y, n}) => ({x, y, n})), val: p.lanes.map(() => 0), history: [], won: false, ...G.freshClock()};
-  lanes = p.lanes; sel = -1;
+  game = {N, W, isles: p.isles.map(({x, y, n}) => ({x, y, n})), history: [], won: false, ...G.freshClock()};
+  lanes = lanesOf(game.isles); game.val = lanes.map(() => 0); sel = -1;
   $("board").classList.remove("won"); G.closeCard(); G.note("");
   draw(); save();
   G.track(`Catwalk new tower ${sizeLabel(N)}`);
@@ -296,7 +328,7 @@ function showHelp() {
     const li = document.createElement("li"); li.textContent = t; ol.append(li);
   }
   const tip = document.createElement("p"); tip.className = "tip";
-  tip.textContent = "A perch turns green when it has all its catwalks, and red if it has too many.";
+  tip.textContent = "A perch turns green when it has all its catwalks, and red if it has too many. Every tower has exactly one answer, using catwalks straight across, up and down, or at 45°.";
   media.append(ol, tip);
   G.openCard("How to play", "", [["Let's play", () => { G.closeCard(); settings.seenHelp = true; save(); }, true]], media);
 }
