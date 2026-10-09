@@ -57,7 +57,7 @@ Mats are made by covering every square with ribbons, then pointing each one and 
 
 ## Toe Beans
 
-An eighth game in `toebeans/`, a numbers puzzle on a cat's paw. Six numbers sit in tiles above the paw; the paw's four toe beans are + − × ÷ and its big pad shows the goal. Tap a number, a toe bean, then another number: the two combine and the answer takes the second number's place. Make the goal exactly (you don't have to use every number) and every pad on the paw fills at once, in a real paw pad colour (pink, rose, cinnamon, chocolate, grey or black) picked for that game.
+An eighth game in `toebeans/`, a numbers puzzle on a cat's paw. Six numbers sit in tiles above the paw; the paw's four toe beans are + − × ÷ and its big pad shows the goal. Tap a number, a toe bean, then another number: the two combine and the answer takes the second number's place. Make the goal exactly (you don't have to use every number) and every pad on the paw fills at once in gold: a golden paw. Each game also has a real paw pad colour (pink, rose, cinnamon, chocolate, grey or black), which shows faintly in the little paws when you finish within 10.
 There are 10 levels; higher ones have bigger goals that need more steps (two at level 1, five at level 10). Hitting the goal moves you up a level. If you're stuck, Finish here ends the game with your closest number: within 10 keeps your level, further off moves you back one, and the card shows one way it could have been made. Undo is free. Little paws at the top show your last five games. Every goal is checked in a background Web Worker to need exactly the level's number of steps. There's a timer with best times for each level, a share link, and a cat photo when you hit the goal.
 
 ## Knock It Off

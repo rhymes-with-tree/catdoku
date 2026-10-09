@@ -26,7 +26,8 @@
 <link rel="stylesheet" href="../games.css?v=2026-10-09.3">
 <style>
 /* Six number tiles up top, then one outlined paw: its four toe beans are + − × ÷ and its main pad holds the goal.
-   On a win every pad fills at once, in a paw pad colour picked for that game (--pc, with --pt for text on it). */
+   An exact hit fills every pad at once in gold; the paw's own pad colour (--pc, with --pt for text on it) is
+   kept for a finish within 10, shown faintly in the little paws. */
 :root{--board:min(94vw,420px); --plum:#B94588; --tint:rgba(185,69,136,.10); --pc:#F2AEBB; --pt:#2A2530}
 .play{width:var(--board);display:flex;flex-direction:column;gap:22px;user-select:none;-webkit-user-select:none}
 .recent{display:flex;gap:6px}
@@ -191,6 +192,7 @@ const save = () => G.save(STORE, {settings, game});
 
 // Real paw pad colours, each with the text colour that reads on it. Each game gets one, never the same twice running.
 const PADS = [["#F2AEBB", "#2A2530"], ["#C9677F", "#fff"], ["#B9805F", "#fff"], ["#6B4A3B", "#fff"], ["#8E8794", "#fff"], ["#2A2530", "#fff"]];
+const GOLD = ["#E8B422", "#2A2530"];   // a golden paw: the goal hit exactly
 function newPads(last) { const from = PADS.filter(p => !last || p[0] !== last[0]); return from[Math.floor(Math.random() * from.length)]; }
 
 const SIGN = {"+": "+", "-": "−", "*": "×", "/": "÷"};
@@ -301,13 +303,13 @@ const PAD = $("pad").querySelector("path").getAttribute("d");
 const littlePaw = (fill, opacity) => `<svg viewBox="-3 -3 106 92" aria-hidden="true"><g fill="${fill}" stroke="var(--ink)" stroke-width="1.6" opacity="${opacity}">
   ${TOES.map(([x, y, r]) => `<ellipse cx="${x}" cy="${y}" rx="9.5" ry="10.75" transform="rotate(${r} ${x} ${y})" vector-effect="non-scaling-stroke"/>`).join("")}
   <path d="${PAD}" transform="translate(19 35.3) scale(.31 .298)" vector-effect="non-scaling-stroke"/></g></svg>`;
-// Your last five games: filled in that game's pad colour when you hit the goal, faint when you finished
+// Your last five games: golden when you hit the goal, faint in that game's pad colour when you finished
 // within 10, an outline when further off, and pale outlines for games not played yet.
 function drawRecent() {
   const r = settings.recent, out = [];
   for (let i = 0; i < 5; i++) {
     const x = r[i - (5 - r.length)];
-    out.push(!x ? littlePaw("none", .25) : x.s === 2 ? littlePaw(x.c, 1) : x.s === 1 ? littlePaw(x.c, .4) : littlePaw("none", .6));
+    out.push(!x ? littlePaw("none", .25) : x.s === 2 ? littlePaw(GOLD[0], 1) : x.s === 1 ? littlePaw(x.c, .4) : littlePaw("none", .6));
   }
   $("recent").innerHTML = out.join("");
   const hits = r.filter(x => x.s === 2).length;
@@ -317,7 +319,8 @@ function drawRecent() {
 function render() {
   if (!game) return;
   const paw = $("paw"), beans = $("beans");
-  for (const el of [paw, beans]) { el.style.setProperty("--pc", game.pads[0]); el.style.setProperty("--pt", game.pads[1]); }
+  const [pc, pt] = game.won || paw.classList.contains("gold") ? GOLD : game.pads;
+  for (const el of [paw, beans]) { el.style.setProperty("--pc", pc); el.style.setProperty("--pt", pt); }
   paw.classList.toggle("won", game.won);
   $("goal").textContent = game.goal;
   $("goalLabel").textContent = game.won ? "Got it!" : `Level ${game.N}`;
@@ -387,7 +390,7 @@ function helpOnFirstVisit() {
   const set = (p, o) => ({enter: () => { pick = p; op = o; render(); }, leave: () => { pick = op = null; render(); }});
   let was;
   // the paw filled in, as when the goal is hit, just while the last step is up
-  const fill = {enter: () => $("paw").classList.add("won"), leave: () => render()};
+  const fill = {enter: () => { $("paw").classList.add("won", "gold"); render(); $("paw").classList.add("won"); }, leave: () => { $("paw").classList.remove("gold"); render(); }};
   const steps = [
     {say: "Your goal is on the big paw pad", els: [$("pad")]},
     {say: "Use the numbers and the + − × ÷ signs", els: [all, toes]},
@@ -399,7 +402,7 @@ function helpOnFirstVisit() {
      leave: () => { game.beans = was; render(); }},
     {say: "Press Finish here when you're done", els: [$("finishBtn")]},
     {say: "If you finish within 10, you win the board", els: [$("recent")]},
-    {say: "If you hit the number exactly, the paw fills in and you move up a level", els: [$("paw")], ...fill},
+    {say: "If you hit the number exactly, you get a golden paw and move up a level", els: [$("paw")], ...fill},
   ];
   G.spotlight({grid: $("beans"), w: 1, h: 1, steps, done: () => { settings.seenHelp = true; save(); render(); }});
 }
