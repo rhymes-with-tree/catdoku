@@ -180,6 +180,9 @@ const G = (() => {
     .spot .dim{fill:rgba(42,37,48,.66)}
     .spot .edge{fill:none;stroke:#E23B3B;stroke-linecap:round}
     .spot .edge.ok{stroke:#4FB35F}
+    .spot .arrowLine{fill:none;stroke:#FFF4D2;stroke-linecap:round}
+    .spot .arrowLine.back{stroke:var(--ink)}
+    .spot .arrowHead{fill:#FFF4D2;stroke:var(--ink);stroke-linejoin:round;paint-order:stroke fill}
     .spot .say{position:absolute;left:4%;right:4%;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;pointer-events:none}
     .spot .say b{font-size:clamp(24px,7vw,36px);font-weight:800;line-height:1.1;color:#FFF4D2;-webkit-text-stroke:6px var(--ink);paint-order:stroke fill;text-wrap:balance}
     .spot .say small{font-size:15px;font-weight:600;color:#FFF4D2;-webkit-text-stroke:3px var(--ink);paint-order:stroke fill;opacity:.9;animation:spotTap 1.6s ease-in-out infinite}
@@ -364,7 +367,8 @@ const G = (() => {
   // put marks on squares (a 🐱, ❌…; a list of marks takes turns), and says one line over the board.
   // A tap or Space shows the next step; after the last, "Let's Play!" shows and `done` runs.
   // `grid` is the element the squares fill, `w` × `h` squares; each step is
-  // {say, lit: [[x, y]…], outline (default: lit), tone ("ok" outlines green, not red), marks: [[x, y, mark]…],
+  // {say, lit: [[x, y]…], outline (default: lit), tone ("ok" outlines green, not red), marks: [[x, y, mark, size]…],
+  // arrows: [{to: [x, y] (a corner between squares), from: [dx, dy] (the way the arrow comes in)}],
   // els: [element or [elements]…], lines: [{edges: [[x1, y1, x2, y2]…], tone}], enter() and leave() to show
   // something on the board just while the step is up}.
   // It covers the screen, so taps on it never reach the game (or start its timer).
@@ -413,10 +417,17 @@ const G = (() => {
         const e = ln.edges.map(([x1, y1, x2, y2]) => `M${X(x1)} ${Y(y1)}L${X(x2)} ${Y(y2)}`).join("");
         svg.append(svgEl("path", {d: e, class: "edge" + (ln.tone === "ok" ? " ok" : ""), "stroke-width": sw * 1.4}));
       }
-      for (const [x, y, m] of st.marks || []) {
+      for (const [x, y, m, size] of st.marks || []) {   // x, y can fall between squares; size is in squares
         const t = svgEl("text", {x: X(x + 0.5), y: Y(y + 0.56), "text-anchor": "middle", "dominant-baseline": "middle",
-          "font-size": cw * (m === "❌" ? 0.42 : 0.56)});
+          "font-size": cw * (size || (m === "❌" ? 0.42 : 0.56))});
         t.textContent = Array.isArray(m) ? m[frame % m.length] : m; svg.append(t);
+      }
+      for (const {to: [gx, gy], from: [dx, dy]} of st.arrows || []) {   // bold arrows pointing at a point between squares
+        const n = Math.hypot(dx, dy), ux = dx / n, uy = dy / n, tx = X(gx) + ux * 3, ty = Y(gy) + uy * 3, len = Math.max(34, cw * 0.95), hd = Math.max(13, cw * 0.32);
+        const tail = [tx + ux * len, ty + uy * len], base = [tx + ux * hd, ty + uy * hd], px = -uy * hd * 0.62, py = ux * hd * 0.62;
+        const shaft = `M${tail[0]} ${tail[1]}L${base[0]} ${base[1]}`, head = `M${tx} ${ty}L${base[0] + px} ${base[1] + py}L${base[0] - px} ${base[1] - py}Z`;
+        for (const [cls, w] of [["arrowLine back", Math.max(10, cw * 0.2)], ["arrowLine", Math.max(5, cw * 0.1)]]) svg.append(svgEl("path", {d: shaft, class: cls, "stroke-width": w}));
+        svg.append(svgEl("path", {d: head, class: "arrowHead", "stroke-width": Math.max(3, cw * 0.06)}));
       }
       layer.append(svg);
       const say = document.createElement("div"); say.className = "say";
@@ -427,11 +438,17 @@ const G = (() => {
       // The words go over the board where they cover the least of the lit squares (and, among those,
       // nearest the middle), so they never sit on what the step is pointing at if they can help it.
       const sh = say.offsetHeight, l = say.offsetLeft, r = l + say.offsetWidth;
+      // things to keep clear of: the lit squares, and any arrows
+      const keep = lit.map(([x, y]) => [X(x), Y(y), X(x + 1), Y(y + 1)]);
+      for (const {to: [gx, gy], from: [dx, dy]} of st.arrows || []) {
+        const n = Math.hypot(dx, dy), len = Math.max(34, cw * 0.95) + 8, ax = X(gx), ay = Y(gy), bx = ax + dx / n * len, by = ay + dy / n * len;
+        keep.push([Math.min(ax, bx) - 8, Math.min(ay, by) - 8, Math.max(ax, bx) + 8, Math.max(ay, by) + 8]);
+      }
       let best = b.top + b.height / 2 - sh / 2, bestCost = Infinity;
       for (let t = b.top + 4; t <= b.bottom - sh - 4; t += 4) {
         let cover = 0;
-        for (const [x, y] of lit) {
-          const w = Math.min(r, X(x + 1)) - Math.max(l, X(x)), h = Math.min(t + sh, Y(y + 1)) - Math.max(t, Y(y));
+        for (const [x1, y1, x2, y2] of keep) {
+          const w = Math.min(r, x2) - Math.max(l, x1), h = Math.min(t + sh, y2) - Math.max(t, y1);
           if (w > 0 && h > 0) cover += w * h;
         }
         const cost = cover * 1000 + Math.abs(t + sh / 2 - (b.top + b.height / 2));
