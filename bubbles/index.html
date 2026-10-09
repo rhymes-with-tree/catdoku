@@ -82,7 +82,7 @@
   </div>
 
   <div class="help">
-    <p>Aim at the bubbles and let go to bat one up. When three or more bubbles with the same toy touch, they pop, and anything left hanging falls.</p>
+    <p>Touch the board and drag up to aim, then let go to bat a bubble up. When three or more bubbles with the same toy touch, they pop, and anything left hanging falls.</p>
   </div>
 </main>
 
@@ -370,7 +370,7 @@ let climb = 1;     // the level to go back to after zen
 const TOYS_PREF = "catdoku.bubbles.toys.v1", MIN_COLOURS = 6;
 let offToys = new Set(G.load(TOYS_PREF).off || []);
 const deal = n => makeLevel(n, Math.random, offToys);
-let busy = false, now = 0, aim = Math.PI / 2, aiming = false, effects = [], wob = new Map(), fly = null, shelf = 0, shelfFrom = 0, shelfT0 = -9;
+let batted = false, busy = false, now = 0, aim = Math.PI / 2, aiming = false, effects = [], wob = new Map(), fly = null, shelf = 0, shelfFrom = 0, shelfT0 = -9;
 const save = () => { if (S && !S.over) { S.d.ms = S.ms; G.save(STORE, {level: S.level, d: S.d, climb}); } };
 $("wrap").style.aspectRatio = `${COLS} / ${HT}`;
 
@@ -679,6 +679,11 @@ function draw() {
     ctx.fillText("next", 1.25 * U, (SY - 0.32) * U);
     ctx.fillText("⇄", 2.05 * U, (SY + 0.32) * U);
   }
+  if (!batted && !fly) {   // until the first bat, say how
+    ctx.font = "600 17px 'Baloo 2', system-ui, sans-serif"; ctx.fillStyle = "#2A2530"; ctx.textAlign = "center";
+    ctx.globalAlpha = 0.6 + 0.4 * Math.sin(now * 3);
+    ctx.fillText("Drag up to aim, let go to bat", COLS / 2 * U, (LINE - 0.35) * U); ctx.globalAlpha = 1;
+  }
   if (fly) {
     let dist = (now - fly.t0) * SPEED, p = fly.path, i = 1;
     for (; i < p.length - 1; i++) { const seg = Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]); if (dist <= seg) break; dist -= seg; }
@@ -741,7 +746,8 @@ function loop(t) {
 }
 
 /* ---------- input ---------- */
-// Point at where to bat the bubble (drag to fine-tune) and let go. Tap the next bubble to swap.
+// Touch anywhere (the bubble on the wand is a natural place to start), drag to aim and let go to bat.
+// Letting go on the floor below the wand doesn't bat, so a drag can be called off. Tap the next bubble to swap.
 const MIN_AIM = 0.14;
 const toUnits = e => { const r = canvas.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * COLS, (e.clientY - r.top) / r.width * COLS]; };
 function aimAt(x, y) { if (y < SY - 0.2) aim = Math.min(PI - MIN_AIM, Math.max(MIN_AIM, Math.atan2(SY - y, x - SX))); }
@@ -755,7 +761,6 @@ canvas.addEventListener("pointerdown", e => {
   e.preventDefault();
   const [x, y] = toUnits(e);
   if (onNext(x, y)) return swap();
-  if (y > LINE) return;
   try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
   aiming = true; aimAt(x, y);
 });
@@ -767,7 +772,7 @@ canvas.addEventListener("pointerup", e => {
   if (!aiming) return;
   aiming = false;
   const [x, y] = toUnits(e);
-  if (y < LINE) { aimAt(x, y); bat(); }
+  if (y < SY - 0.2) { aimAt(x, y); batted = true; bat(); }
 });
 canvas.addEventListener("pointercancel", () => { aiming = false; });
 canvas.addEventListener("keydown", e => {
@@ -775,14 +780,14 @@ canvas.addEventListener("keydown", e => {
   const step = e.shiftKey ? 0.005 : 0.03;
   if (e.key === "ArrowLeft") { e.preventDefault(); aim = Math.min(PI - MIN_AIM, aim + step); }
   else if (e.key === "ArrowRight") { e.preventDefault(); aim = Math.max(MIN_AIM, aim - step); }
-  else if (e.key === " " || e.key === "Enter" || e.key === "ArrowUp") { e.preventDefault(); bat(); }
+  else if (e.key === " " || e.key === "Enter" || e.key === "ArrowUp") { e.preventDefault(); batted = true; bat(); }
   else if (e.key === "ArrowDown") { e.preventDefault(); swap(); }
 });
 
 /* ---------- how to play ---------- */
 function helpCard() {
   const media = document.createElement("div"), ol = document.createElement("ol"); ol.className = "steps";
-  for (const t of ["Point where you want the bubble to go and let go to bat it up. It bounces off the sides.",
+  for (const t of ["Touch the board and drag up to aim: the dotted line shows the way. Let go to bat the bubble up. It bounces off the sides.",
                    "When three or more bubbles with the same toy touch, they pop. Anything left hanging falls.",
                    "Each level asks you to pop every bubble, catch some toys, or free the kittens: kittens come down when nothing holds them up.",
                    "Every few bats the shelf comes down a row. Don't let the bubbles reach the cat!",
