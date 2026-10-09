@@ -110,10 +110,11 @@ const DOODLE = `<svg class="doodle" viewBox="0 0 100 100" aria-hidden="true"><g 
 // The curled-up cats from Sunbeams (../cats/), nearly round, so each fits one box. Each box picks one,
 // turned and flipped its own way, so a floor full of cats doesn't look like one cat repeated.
 const CURLED = ["c14-36", "c16-5", "c14-34", "c15-6", "c14-35", "c15-5", "c16-3"];
+const CAT_SRC = {};  // filled with embedded pictures when the page is bundled into one file
 function hash(x) { x = Math.imul(x ^ (x >>> 16), 0x45d9f3b); x = Math.imul(x ^ (x >>> 16), 0x45d9f3b); return (x ^ (x >>> 16)) >>> 0; }
 function sleeper(i) {
   const h = hash(i * 977 + game.seed), turn = (h >> 3) % 4 * 90, flip = h & 4 ? -1 : 1;
-  return `<img class="sleeper" src="../cats/${CURLED[h % CURLED.length]}.webp" alt="" style="transform:rotate(${turn}deg) scaleX(${flip})">`;
+  return `<img class="sleeper" src="${CAT_SRC[CURLED[h % CURLED.length]] || `../cats/${CURLED[h % CURLED.length]}.webp`}" alt="" style="transform:rotate(${turn}deg) scaleX(${flip})">`;
 }
 
 /* ---------- hiding the cats ---------- */
@@ -367,9 +368,27 @@ function showHelp() {
   const tip = document.createElement("p"); tip.className = "tip";
   tip.textContent = "Your first box is always safe, and every floor can be cleared by thinking it through, with no guessing.";
   media.append(ol, tip);
-  G.openCard("How to play", "", [["Let's play", () => { G.closeCard(); settings.seenHelp = true; save(); }, true]], media);
+  G.openCard("How to play", "", [["Show me on the board", () => { G.closeCard(); settings.seenHelp = false; helpOnFirstVisit(); }, true],
+    ["Got it", () => { G.closeCard(); settings.seenHelp = true; save(); }]], media);
 }
-function helpOnFirstVisit() { if (!settings.seenHelp && game && playing()) showHelp(); }
+// First visit only: walk through the floor before the first box is checked. The cats aren't hidden
+// until then, so the label and cats in step 3 are only an example drawn over the boxes.
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || !playing() || document.querySelector(".spot")) return;
+  const {W, H} = game, all = [], mid = [W >> 1, H >> 1];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) all.push([x, y]);
+  const around = []; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) around.push([1 + dx, 1 + dy]);
+  const steps = [
+    {say: "Cats are hiding in some of these boxes", lit: all},
+    {say: "Tap a box to check it. Your first box is always safe.", lit: [mid]},
+    {say: "A checked box shows how many cats are in the boxes around it, diagonals too", lit: around,
+     marks: [[1, 1, "2"], [0, 0, "🐱", 0.5], [2, 1, "🐱", 0.5]]},
+    {say: "When you're sure a cat is in a box, press and hold it, or turn on Mark, to doodle a cat on it", els: [$("markBtn")]},
+    {say: "Checking a box with a cat in it costs a life", els: [$("hearts")]},
+    {say: "Stuck? Hint shows a safe box", els: [$("hintBtn")]},
+  ];
+  G.spotlight({grid: $("board"), w: W, h: H, steps, done: () => { settings.seenHelp = true; save(); }});
+}
 
 G.nav("hideseek");
 G.checkClock(game);
