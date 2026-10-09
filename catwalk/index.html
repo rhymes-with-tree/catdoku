@@ -55,6 +55,7 @@
   <div class="actions">
     <button id="undoBtn">Undo</button>
     <button id="restartBtn">Restart</button>
+    <button id="shareBtn">Share</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
   </div>
@@ -341,6 +342,23 @@ function newTower() {
   G.track(`Catwalk new tower ${sizeLabel(N)}`);
 }
 
+/* ---------- sharing ---------- */
+$("shareBtn").onclick = () => { if (game) G.shareCard({name: "Catwalk", won: game.won,
+  puzzle: () => ({g: "catwalk", N: game.N, isles: game.isles.map(({x, y, n}) => [x, y, n])}),
+  progress: () => ({val: game.val.slice()})}); };
+// A tower from a share link, with its catwalks so far if they were sent (that isn't timed).
+function openShared(d) {
+  if (!SIZES[d.N] || !Array.isArray(d.isles)) { G.note("That share link didn't work.", 5000); return; }
+  const W = SIZES[d.N][0];
+  game = {N: d.N, W, isles: d.isles.map(([x, y, n]) => ({x, y, n})), history: [], won: false, ...G.freshClock()};
+  lanes = lanesOf(game.isles, W, SIZES[d.N][2]);
+  game.val = d.p && Array.isArray(d.p.val) && d.p.val.length === lanes.length ? d.p.val.slice() : lanes.map(() => 0);
+  if (d.p) game.timed = false;
+  settings.size = d.N; $("size").value = d.N; sel = -1;
+  $("board").classList.remove("won"); draw(); save();
+  if (d.p && solved()) win();
+}
+
 /* ---------- how to play ---------- */
 // A little picture of which ways a catwalk can go from a perch: green arrows yes, red crosses no.
 function waysPicture(diag, caption) {
@@ -485,6 +503,7 @@ if (!(settings.size >= 1 && settings.size < SIZES.length)) settings.size = 1;
 $("size").value = settings.size;
 // Players already past the first tower with diagonals know about them.
 if (settings.seenHelp && settings.size > 4 && settings.seenDiag === undefined) settings.seenDiag = true;
+const shared = G.readShare("catwalk");
 if (game && Array.isArray(game.isles) && Array.isArray(game.val)) G.reopen(() => {
     if (!SIZES[game.N]) throw new Error("unknown size");
     lanes = lanesOf(game.isles, game.W, SIZES[game.N][2]);
@@ -493,7 +512,11 @@ if (game && Array.isArray(game.isles) && Array.isArray(game.val)) G.reopen(() =>
     if (game.won) finishCard();
     helpOnFirstVisit(); diagonals();
   }, why => { game = null; newTower(); G.note(why, 0); });
-else { newTower(); helpOnFirstVisit(); }
+else if (!shared) { newTower(); helpOnFirstVisit(); }
+const shareOpts = () => ({name: "Catwalk", inProgress: !!(game && !game.won && game.history.length), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, shareOpts());
+// A share link opened while this page is already showing only changes the address, so watch for it.
+window.addEventListener("hashchange", () => { const d = G.readShare("catwalk"); if (d) G.offerShare(d, shareOpts()); });
 </script>
 <!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
 <script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>

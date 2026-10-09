@@ -71,6 +71,7 @@
   <div class="actions">
     <button id="undoBtn">Undo</button>
     <button id="clearBtn">Clear</button>
+    <button id="shareBtn">Share</button>
     <button id="markBtn" aria-pressed="false">Mark = ×</button>
     <button id="toysBtn">Toys</button>
     <button id="bestBtn">Best times</button>
@@ -349,6 +350,24 @@ async function newPuzzle() {
   G.track(`Fair Play new puzzle level ${n}`);
 }
 
+/* ---------- sharing ---------- */
+$("shareBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Fair Play", won: game.won,
+  puzzle: () => ({g: "tango", N: game.level, givens: game.givens, signs: game.signs.map(s => [s.a, s.b, s.same ? 1 : 0]), toys: game.toys}),
+  progress: () => ({grid: game.grid, notes: game.notes || []})}); };
+// A puzzle from a share link, with its toys so far if they were sent (that isn't timed).
+function openShared(d) {
+  const lv = levelOf(d.N);
+  if (!lv || !Array.isArray(d.givens) || d.givens.length !== lv[0] * lv[0]) { G.note("That share link didn't work.", 5000); return; }
+  const ok = f => KINDS.some(k => k.looks.some(([g]) => g === f));
+  game = {level: d.N, N: lv[0], givens: d.givens, signs: (d.signs || []).map(([a, b, same]) => ({a, b, same: !!same})),
+          grid: d.p && Array.isArray(d.p.grid) ? d.p.grid : d.givens.slice(), notes: d.p ? d.p.notes || [] : [],
+          toys: Array.isArray(d.toys) && d.toys.length === 2 && d.toys.every(ok) ? d.toys : pickToys(), history: [], won: false, ...G.freshClock()};
+  if (d.p) game.timed = false;
+  settings.level = d.N; $("levelSel").value = d.N;
+  $("board").classList.remove("won"); draw(); save(); build.prefetch(d.N);
+  if (d.p && !game.grid.includes(-1) && !problems().bad.size) win();
+}
+
 /* ---------- how to play ---------- */
 function rulesPicture(t) {
   const sq = (v, sign) => `<span>${v < 0 ? "" : `<img src="${toySrc(t[v])}" alt="">`}${sign ? `<b>${sign}</b>` : ""}</span>`;
@@ -452,13 +471,25 @@ $("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : setti
 
 if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
 $("levelSel").value = settings.level;
+// Bests used to be kept by board size by mistake. Each size's times move to its level without a head start.
+if (!G.load("catdoku.tango.bests.v1").fixed) {
+  const all = G.load("catdoku.bests.v1"), old = all.tango || {}, fixed = {};
+  for (const [size, row] of Object.entries(old)) fixed[{6: 2, 8: 4, 10: 6}[size] || size] = row;
+  if (all.tango) { all.tango = fixed; G.save("catdoku.bests.v1", all); }
+  G.save("catdoku.tango.bests.v1", {fixed: true});
+}
+const shared = G.readShare("tango");
 if (game && Array.isArray(game.grid) && Array.isArray(game.signs)) G.reopen(() => {
     if (!levelOf(game.level) || game.grid.length !== game.N * game.N) throw new Error("the saved puzzle doesn't fit its level");
     draw();
     if (game.won) finishCard();
     build.prefetch(settings.level); helpOnFirstVisit();
   }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
-else newPuzzle().then(helpOnFirstVisit);
+else if (!shared) newPuzzle().then(helpOnFirstVisit);
+const shareOpts = () => ({name: "Fair Play", inProgress: !!(game && !game.won && game.history.length), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, shareOpts());
+// A share link opened while this page is already showing only changes the address, so watch for it.
+window.addEventListener("hashchange", () => { const d = G.readShare("tango"); if (d) G.offerShare(d, shareOpts()); });
 </script>
 <!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
 <script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
