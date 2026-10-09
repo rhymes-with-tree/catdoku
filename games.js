@@ -9,7 +9,7 @@ const G = (() => {
     ["Sunbeams", "sunbeams", "Every cat gets a warm spot", "#ECA818"],
     ["Toy Box", "toybox", "Put every toy back in its basket", "#B3B94B"],
     ["Pounce", "pounce", "Swap toys and line up three of a kind", "#6AA673"],
-    ["Twirl", "twirl", "Pull every ribbon off the mat", "#B94588"],
+    ["Twirl", "twirl", "Send every ribbon off the mat", "#B94588"],
     ["Toe Beans", "toebeans", "Make the number on the big pad", "#DD9DAD"],
     ["Knock It Off", "knockitoff", "Push everything off the table", "#7885BA"],
     ["Hide & Seek", "hideseek", "Find every cat hiding in the boxes", "#C9A26B"],
@@ -368,10 +368,11 @@ const G = (() => {
   // A tap or Space shows the next step; after the last, "Let's Play!" shows and `done` runs.
   // `grid` is the element the squares fill, `w` × `h` squares; each step is
   // {say, lit: [[x, y]…], outline (default: lit), tone ("ok" outlines green, not red), marks: [[x, y, mark, size]…],
-  // arrows: [{to: [x, y] (a corner between squares), from: [dx, dy] (the way the arrow comes in)}],
+  // arrows: [{to: [x, y] (a corner between squares), from: [dx, dy] (the way the arrow comes in), size}],
   // els: [element or [elements]…], lines: [{edges: [[x1, y1, x2, y2]…], tone}], enter() and leave() to show
   // something on the board just while the step is up}.
   // shapes: [{poly}|{path, width}|{arrow, from}] in page pixels, or a function returning them (see show).
+  // map: () => ({ox, oy, cw, ch}) in page pixels, when the squares don't simply fill `grid`.
   // finish: false leaves out "Let's Play!" (for a one-off tip in the middle of a game).
   // It covers the screen, so taps on it never reach the game (or start its timer), and the timer waits.
   function spotlight(o) {
@@ -388,7 +389,10 @@ const G = (() => {
     }
     function show() {
       const st = o.steps[k], g = o.grid.getBoundingClientRect(), b = wrap.getBoundingClientRect(), W = innerWidth, H = innerHeight;
-      const cw = o.grid.clientWidth / o.w, ch = o.grid.clientHeight / o.h, ox = g.left + o.grid.clientLeft, oy = g.top + o.grid.clientTop;
+      // where the squares are: worked out from the grid element, or given by the game (o.map) when its
+      // squares don't fill the element (a margin round the mat, zoom…)
+      const m = o.map ? o.map() : {ox: g.left + o.grid.clientLeft, oy: g.top + o.grid.clientTop, cw: o.grid.clientWidth / o.w, ch: o.grid.clientHeight / o.h};
+      const {cw, ch, ox, oy} = m;
       const X = x => ox + x * cw, Y = y => oy + y * ch, lit = st.lit || [];
       // each thing to light is an element, or a list of elements lit together as one box
       const els = (st.els || []).map(e => {
@@ -444,7 +448,7 @@ const G = (() => {
         for (const [cls, w] of [["arrowLine back", Math.max(10, size * 0.2)], ["arrowLine", Math.max(5, size * 0.1)]]) svg.append(svgEl("path", {d: shaft, class: cls, "stroke-width": w}));
         svg.append(svgEl("path", {d: head, class: "arrowHead", "stroke-width": Math.max(3, size * 0.06)}));
       };
-      for (const {to: [gx, gy], from: [dx, dy]} of st.arrows || []) arrow(X(gx), Y(gy), dx, dy, cw);   // pointing at a point between squares
+      for (const {to: [gx, gy], from: [dx, dy], size} of st.arrows || []) arrow(X(gx), Y(gy), dx, dy, (size || 1) * cw);   // pointing at a point between squares; size in squares
       for (const sh of shapes) {
         if (sh.poly) svg.append(svgEl("path", {d: ptsOf(sh.poly) + "Z", class: "edge" + (st.tone === "ok" ? " ok" : ""), "stroke-width": 3.5, "stroke-linejoin": "round"}));
         if (sh.arrow) arrow(sh.arrow[0], sh.arrow[1], sh.from[0], sh.from[1], sh.size || 40);
@@ -464,7 +468,7 @@ const G = (() => {
         const n = Math.hypot(dx, dy), len = Math.max(34, size * 0.95) + 8, bx = ax + dx / n * len, by = ay + dy / n * len;
         keep.push([Math.min(ax, bx) - 8, Math.min(ay, by) - 8, Math.max(ax, bx) + 8, Math.max(ay, by) + 8]);
       };
-      for (const {to: [gx, gy], from: [dx, dy]} of st.arrows || []) arrowBox(X(gx), Y(gy), dx, dy, cw);
+      for (const {to: [gx, gy], from: [dx, dy], size} of st.arrows || []) arrowBox(X(gx), Y(gy), dx, dy, (size || 1) * cw);
       for (const sh of shapes) {
         if (sh.arrow) arrowBox(sh.arrow[0], sh.arrow[1], sh.from[0], sh.from[1], sh.size || 40);
         if (sh.poly) { const xs = sh.poly.map(p => p[0]), ys = sh.poly.map(p => p[1]); keep.push([Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]); }
