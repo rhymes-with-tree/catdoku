@@ -22,7 +22,7 @@ const G = (() => {
   const $ = id => document.getElementById(id);
 
   // The games menu: an "All games" button that opens a grid of every game, with this one marked.
-  // Game pages sit one folder below the Catdoku root, so links start with ../ unless `base` says otherwise.
+  // Game pages sit one folder below the front page, so links start with ../ unless `base` says otherwise.
   function nav(current, base = "../") {
     const el = $("games"); el.innerHTML = "";
     const btn = document.createElement("button");
@@ -31,10 +31,14 @@ const G = (() => {
     btn.innerHTML = `<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>All ${GAMES.length} games<span class="caret" aria-hidden="true">▾</span>`;
     const panel = document.createElement("div");
     panel.className = "gamesPanel"; panel.id = "gamesPanel"; panel.hidden = true;
+    const home = document.createElement("a");
+    home.className = "gameTile home"; home.href = base || "./";
+    home.innerHTML = "<b>Front page</b><small>Every game at a glance</small>";
+    panel.append(home);
     for (const [name, slug, blurb, color] of GAMES) {
       const a = document.createElement("a");
       a.className = "gameTile"; a.style.setProperty("--tile", color);
-      a.href = slug === "catdoku" ? base || "./" : `${base}${slug}/`;
+      a.href = `${base}${slug}/`;
       if (slug === current) a.setAttribute("aria-current", "page");
       const b = document.createElement("b"); b.textContent = name;
       const sm = document.createElement("small"); sm.textContent = slug === current ? "You're here" : blurb;
@@ -622,6 +626,6 @@ const G = (() => {
     }
   }
 
-  return {$, nav, load, save, builder, openCard, closeCard, winCard, sizeUp, otherSize, note, cellAt, track, reopen,
+  return {GAMES, $, nav, load, save, builder, openCard, closeCard, winCard, sizeUp, otherSize, note, cellAt, track, reopen,
           setupTimer, freshClock, spotlight, toysOff, saveToys, needToys, goldPaw, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, toyPicker, pickLook};
 })();

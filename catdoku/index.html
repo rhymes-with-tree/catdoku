@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Catdoku</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-09.3";
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<meta name="apple-mobile-web-app-title" content="🐾 Catdoku">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --rosy-copper:#BD5538; --burnt-peach:#E16A4A; --pacific-blue:#73A7AE; --amber-honey:#ECA818;
+  --lime-moss:#B3B94B; --sage-green:#6AA673; --fuchsia-plum:#B94588;
+  --periwinkle:#7885BA; --spring-blue:#4E577D; --lavender:#8D78AD;   /* blues and a purple: Toy Box's blue toys, the spring toy, periwinkle + plum */
+  --paper:#ECEEE7; --panel:#F7F8F3; --ink:#2A2530; --ink-soft:#5E5866; --line:rgba(42,37,48,.22);
+  --gradient:linear-gradient(90deg,#BD5538,#E16A4A,#73A7AE,#ECA818,#B3B94B,#6AA673,#B94588);
+  --board:min(94vw,560px);
+  --font:"Baloo 2",ui-rounded,"Segoe UI",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--paper);color:var(--ink);font-family:var(--font);font-size:17px;line-height:1.4;
+  padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px);-webkit-tap-highlight-color:transparent}
+main{max-width:600px;margin:0 auto;padding:18px 3vw 40px;display:flex;flex-direction:column;align-items:center;gap:14px}
+h1{margin:0;font-size:44px;font-weight:800;letter-spacing:-.5px;line-height:1}
+.stripe{height:7px;width:150px;border-radius:4px;background:var(--gradient);margin-top:6px}
+header{display:flex;flex-direction:column;align-items:center}
+.bar{width:var(--board);display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+select,button{font:inherit;color:var(--ink)}
+select{background:var(--panel);border:2px solid var(--ink);border-radius:10px;padding:4px 10px;font-weight:600}
+button{background:var(--panel);border:2px solid var(--ink);border-radius:10px;padding:6px 16px;font-weight:600;cursor:pointer}
+button:hover{background:#fff}
+button:active{transform:translateY(1px)}
+button:disabled{opacity:.4;cursor:default}
+button.primary{background:var(--ink);color:var(--paper)}
+:focus-visible{outline:3px solid var(--pacific-blue);outline-offset:2px}
+.toggles{display:flex;gap:12px;flex-wrap:nowrap;align-items:flex-start}
+.toggle{display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;user-select:none;white-space:nowrap}
+.toggle input{position:absolute;opacity:0;width:1px;height:1px}
+.sw{flex:none;width:42px;height:24px;border-radius:12px;background:var(--line);position:relative;transition:background .15s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s}
+.toggle input:checked + .sw{background:var(--sage-green)}
+.toggle input:checked + .sw::after{left:21px}
+.toggle input:focus-visible + .sw{outline:3px solid var(--pacific-blue);outline-offset:2px}
+.status{width:var(--board);min-height:30px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:2px 12px;font-weight:600}
+.hearts{font-size:20px;letter-spacing:1px;color:var(--fuchsia-plum)}
+.hearts .lost{color:var(--line)}
+.msg{flex:1 1 150px;text-align:right;color:var(--ink-soft);line-height:1.25}
+.msg:empty{display:none}
+.opt{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:2px}
+.hint{font-size:14px;line-height:1.25;color:var(--ink-soft)}
+.streak{margin:6px 0 0;font-size:15px;font-weight:600;color:var(--ink-soft)}
+.games{display:flex;flex-direction:column;align-items:center;gap:10px;width:var(--board);margin-top:-4px}
+.gamesBtn{display:inline-flex;align-items:center;gap:7px;font:inherit;font-weight:600;font-size:15px;color:var(--ink);background:var(--panel);border:2px solid var(--ink);border-radius:999px;padding:3px 14px;cursor:pointer}
+.gamesBtn svg{width:15px;height:15px;fill:currentColor}
+.gamesBtn .caret{font-size:12px;transition:transform .2s}
+.gamesBtn[aria-expanded="true"] .caret{transform:rotate(180deg)}
+.gamesPanel{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;width:100%}
+.gamesPanel[hidden]{display:none}
+.gameTile{display:flex;flex-direction:column;gap:1px;padding:8px 10px 8px 14px;border-radius:12px;background:var(--panel);border:2px solid var(--line);text-decoration:none;color:var(--ink);position:relative;overflow:hidden;line-height:1.2}
+.gameTile::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--tile)}
+.gameTile b{font-size:16px}
+.gameTile small{font-size:13px;color:var(--ink-soft)}
+.gameTile.home{--tile:var(--gradient)}
+.gameTile:hover{border-color:var(--tile)}
+.gameTile[aria-current="page"]{border-color:var(--ink)}
+.gameTile[aria-current="page"] small{color:var(--ink);font-weight:600}
+.wrap{position:relative;width:var(--board);height:var(--board)}
+#board{width:100%;height:100%;display:grid;border:3px solid var(--ink);border-radius:6px;overflow:hidden;
+  touch-action:none;user-select:none;-webkit-user-select:none;background:var(--ink)}
+.cell{position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer;min-width:0;min-height:0;overflow:hidden;
+  border-top:1px solid var(--line);border-left:1px solid var(--line);
+  font-size:calc(var(--board) / var(--n) * .56);line-height:1}
+.cell.bt{border-top:3px solid var(--ink)} .cell.bl{border-left:3px solid var(--ink)}
+.cell.r0{border-top:none} .cell.c0{border-left:none}
+.cell .paw{font-size:.62em;opacity:.8}
+.cell.bad{animation:shake .35s}
+.cell.bad::after{content:"";position:absolute;inset:0;background:rgba(42,37,48,.45)}
+.cell.wrong::after{content:"";position:absolute;inset:3px;border:3px dashed var(--ink);border-radius:4px;background:rgba(255,255,255,.35)}
+@keyframes shake{0%,100%{transform:none}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+.overlay{position:fixed;inset:0;z-index:10;display:none;align-items:flex-start;justify-content:center;background:rgba(236,238,231,.85);padding:20px;overflow:auto}
+.catpic{display:block;width:100%;max-height:190px;object-fit:cover;border-radius:10px;border:2px solid var(--ink);margin:0 0 14px;background:var(--line);aspect-ratio:4/3}
+.card .fact{font-size:15px;color:var(--ink);background:var(--paper);border-radius:10px;padding:10px 12px;margin:0 0 4px;text-align:left}
+.card .catname{font-size:24px;font-weight:800;color:var(--ink);line-height:1.2;margin:0 0 16px}
+.breed{width:var(--board);margin:0;font-size:15px;color:var(--ink-soft)}
+.breed b{color:var(--ink)}
+.overlay.show{display:flex}
+.card{margin:auto 0;background:var(--panel);border:3px solid var(--ink);border-radius:14px;padding:22px 26px;text-align:center;max-width:360px}
+.card .btns{flex-direction:column;align-items:stretch}
+.status .left{display:flex;align-items:center;gap:14px}
+.found{font-weight:700;white-space:nowrap}
+button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.card h2{margin:0 0 6px;font-size:30px;line-height:1.1}
+.card p{margin:0 0 16px;color:var(--ink-soft)}
+.card .stripe{margin:0 auto 14px}
+.card .btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.actions{width:var(--board);display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.help{width:var(--board);color:var(--ink-soft);font-size:15px;margin:4px 0 0}
+.help p{margin:0 0 4px}
+/* How to play card */
+.howto{display:block;width:100%;max-width:200px;margin:0 auto 12px}
+.card ol.steps{text-align:left;margin:0 0 14px;padding-left:24px;color:var(--ink);font-size:16px;line-height:1.35}
+.card ol.steps li{margin:0 0 8px}
+.card .tip{font-size:14px;margin:0 0 14px}
+@media (prefers-reduced-motion:reduce){.cell.bad{animation:none}.sw,.sw::after{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Catdoku</h1><div class="stripe"></div><p class="streak" id="streak" hidden></p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span class="left"><span class="hearts" id="hearts" aria-label="Lives left"></span><span class="found" id="found"></span><button class="timer" id="timer" hidden></button></span><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap">
+    <div id="board" role="grid" aria-label="Puzzle board"></div>
+    <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+  </div>
+
+  <p class="breed" id="breed" hidden></p>
+
+  <div class="actions">
+    <button id="undoBtn">Undo</button>
+    <button id="eraseBtn" aria-pressed="false">Erase 🐾</button>
+    <button id="restartBtn">Restart board</button>
+    <button id="auditBtn">Audit (costs 1 ♥)</button>
+    <button id="completeBtn" class="primary">Complete</button>
+    <button id="shareBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Board
+      <select id="size" aria-label="Board size">
+        <option value="5">5 × 5</option><option value="6">6 × 6</option><option value="7">7 × 7</option>
+        <option value="8">8 × 8</option><option value="9">9 × 9</option><option value="10">10 × 10</option>
+        <option value="11">11 × 11</option><option value="12">12 × 12</option><option value="13">13 × 13</option><option value="14">14 × 14</option>
+      </select>
+    </label>
+    <button id="newBtn" class="primary">New puzzle</button>
+  </div>
+  <div class="bar toggles">
+    <div class="opt"><label class="toggle"><input type="checkbox" id="gradeTgl"><span class="sw"></span>Auto grade</label><span class="hint">Auto grade makes it harder</span></div>
+    <div class="opt"><label class="toggle"><input type="checkbox" id="exclTgl"><span class="sw"></span>Auto exclude</label><span class="hint">Auto exclude makes it easier</span></div>
+  </div>
+
+</main>
+
+<script src="../games.js?v=2026-10-09.3"></script>
+<script>G.nav("catdoku");</script>
+<script>
+const PALETTE = ["#BD5538","#73A7AE","#ECA818","#6AA673","#B94588","#B3B94B",
+                 "#7885BA","#E16A4A","#AD8EC2","#3C8681","#DFC49A","#DD9DAD",
+                 "#9FC7DB","#825840"];
+const MAX_LIVES = 9;
+const CAT_NAMES = {
+  classic: ["Oliver","Luna","Milo","Chloe","Leo","Bella","Simon","Tilly","Felix","Daisy","Oscar","Pearl","Jasper","Hazel","Gus","Mabel","Otis","Rosie","Arlo","Winnie",
+            "Walter","Ruby","Frank","Ivy","Theo","June","Murray","Poppy","Edith","Patches"],
+  // every name from T. S. Eliot's "The Naming of Cats"
+  eliot: ["Peter","Augustus","Alonzo","James","Victor","Jonathan","George","Bill Bailey","Plato","Admetus","Electra","Demeter",
+          "Munkustrap","Quaxo","Coricopat","Bombalurina","Jellylorum"],
+  food: ["Biscuit","Mochi","Pickles","Nacho","Waffles","Dumpling","Pepper","Olive","Nutmeg","Muffin","Tofu","Pumpkin","Clementine","Toast","Paprika","Gnocchi","Butterbean","Cannoli","Pretzel","Sesame",
+         "Crouton","Bagel"],
+  whimsical: ["Pounce","Sprocket","Doodle","Noodle","Wiggles","Zigzag","Bumble","Pipsqueak","Fidget","Scooter","Ruckus","Jellybean","Tumble","Skedaddle","Kerfuffle","Snickerdoodle","Hullabaloo","Flapjack","Whiskerdoodle","Rascal",
+              "Bamboozle","Shenanigans"],
+  fancy: ["Sir Pounce-a-Lot","Lady Marmalade","Duke Fluffington","Baroness Von Whiskers","Captain Mittens","Professor Paws","Dame Purrington","Lord Nibbleton","Countess Crumpet","Admiral Snuggles","Madame Meow","Sir Reginald Floof","Princess Pudding","General Tso","Major Tom","Judge Biscuit","Doctor Snooze","Reverend Tuna","Count Catula","Mayor McWhiskers",
+          "Captain Whiskerbottom"],
+  nature: ["Willow","Juniper","Basil","Clover","Maple","Sage","Fern","Pebble","Aspen","Thistle","Moss","Hickory","Briar","Rain","Ember","Cedar","Birch","Marigold","Acorn","Sparrow",
+           "Wren","Laurel","Heather"],
+  literary: ["Merlin","Ophelia","Pip","Hermes","Juno","Atticus","Beatrix","Figaro","Gatsby","Ramona","Puck","Minerva","Sherlock","Matilda","Loki","Persephone","Watson","Hamlet","Freya","Tolstoy",
+             "Ishmael","Portia","Dorian","Brontë","Galahad","Hermia","Ovid"],
+  puns: ["Catrick Swayze","Cat Benatar","Chairman Meow","Purrlock Holmes","Meowzart","Leonardo DiCatprio","Santa Claws","Fuzz Aldrin","Kitty Purry","Cleocatra","Catniss Everdeen","Pablo Picatso","Pawl McCatney","Sir Isaac Mewton","Albert Meowstein","Bob Meowley","Salvador Catli","William Shakespaw","Jennifur Aniston","Furrdinand Magellan",
+         "Meowrilyn Monroe","Brad Kitt","Clawdia Schiffer","Ernest Hemingpaw","Catsanova","Purrcy Bysshe Shelley","Vincent van Meow","Frida Catlo","Andy Furhol","Paw Revere","Winston Purrchill","Napawleon","Catalina Wine Mixer","Meowly Ringwald","Dolly Purrton","Elvis Pawsley","Mister Meowgi","Katharine Hepburrn","Amelia Furhart","Jane Pawsten"]
+};
+// Whimsical, fancy, and pun names come up twice as often as the rest.
+const NAME_POOL = [...Object.values(CAT_NAMES).flat(), ...CAT_NAMES.whimsical, ...CAT_NAMES.fancy, ...CAT_NAMES.puns];
+const randomCatName = () => NAME_POOL[Math.floor(Math.random() * NAME_POOL.length)];
+const HEARTS = 3;          // lives per start, and per revive
+const MIN_N = 5, MAX_N = 14;
+const STORE = "catdoku.v1";
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function randomPlacement(N){
+  const cols=new Array(N),used=new Array(N).fill(false);
+  (function bt(r){if(r===N)return true;
+    for(const c of shuffle([...Array(N).keys()])){
+      if(used[c])continue; if(r>0&&Math.abs(c-cols[r-1])<=1)continue;
+      used[c]=true;cols[r]=c;if(bt(r+1))return true;used[c]=false;}
+    return false;})(0);
+  return cols;
+}
+function neighbors4(i,N){const r=Math.floor(i/N),c=i%N,o=[];
+  if(r>0)o.push(i-N);if(r<N-1)o.push(i+N);if(c>0)o.push(i-1);if(c<N-1)o.push(i+1);return o;}
+function growRegions(N,cols){
+  const reg=new Array(N*N).fill(-1);
+  for(let r=0;r<N;r++)reg[r*N+cols[r]]=r;
+  let left=N*N-N;
+  while(left>0){
+    const cand=[];
+    for(let i=0;i<N*N;i++){if(reg[i]!==-1)continue;
+      for(const j of neighbors4(i,N))if(reg[j]!==-1)cand.push([i,reg[j]]);}
+    const [i,g]=cand[Math.floor(Math.random()*cand.length)];
+    reg[i]=g;left--;
+  }
+  return reg;
+}
+function solve(reg,N,limit){
+  const M=N*N,units=[];
+  for(let r=0;r<N;r++){const u=[];for(let c=0;c<N;c++)u.push(r*N+c);units.push(u);}
+  for(let c=0;c<N;c++){const u=[];for(let r=0;r<N;r++)u.push(r*N+c);units.push(u);}
+  for(let g=0;g<N;g++)units.push([]);
+  for(let i=0;i<M;i++)units[2*N+reg[i]].push(i);
+  const cellUnits=[];for(let i=0;i<M;i++)cellUnits.push([Math.floor(i/N),N+i%N,2*N+reg[i]]);
+  const kill=[];
+  for(let i=0;i<M;i++){const s=new Set();const r=Math.floor(i/N),c=i%N;
+    for(const u of cellUnits[i])for(const j of units[u])s.add(j);
+    for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){const rr=r+dr,cc=c+dc;if(rr>=0&&rr<N&&cc>=0&&cc<N)s.add(rr*N+cc);}
+    kill.push([...s]);}
+  const blocked=new Int16Array(M),done=new Uint8Array(3*N),sols=[],cur=[];
+  (function bt(placed){
+    if(placed===N){const s=new Array(N);for(const i of cur)s[Math.floor(i/N)]=i%N;sols.push(s);return sols.length>=limit;}
+    let best=-1,bestCnt=1e9;
+    for(let u=0;u<3*N;u++){if(done[u])continue;let cnt=0;
+      for(const i of units[u])if(!blocked[i])cnt++;
+      if(cnt<bestCnt){bestCnt=cnt;best=u;if(cnt<=1)break;}}
+    if(bestCnt===0)return false;
+    for(const i of units[best]){if(blocked[i])continue;
+      for(const j of kill[i])blocked[j]++;
+      for(const u of cellUnits[i])done[u]=1;
+      cur.push(i);
+      const stop=bt(placed+1);
+      cur.pop();
+      for(const u of cellUnits[i])done[u]=0;
+      for(const j of kill[i])blocked[j]--;
+      if(stop)return true;}
+    return false;
+  })(0);
+  return sols;
+}
+function regionConnected(reg,N,g,start){
+  let total=0;for(let i=0;i<N*N;i++)if(reg[i]===g)total++;
+  const seen=new Set([start]),q=[start];
+  while(q.length){const i=q.pop();for(const j of neighbors4(i,N))if(reg[j]===g&&!seen.has(j)){seen.add(j);q.push(j);}}
+  return seen.size===total?null:seen;
+}
+function makePuzzle(N){
+  for(let attempt=0;attempt<100;attempt++){
+    const sol=randomPlacement(N),reg=growRegions(N,sol);
+    const seedOf=g=>g*N+sol[g];
+    let ok=false;
+    for(let it=0;it<N*N;it++){
+      const sols=solve(reg,N,2);
+      if(sols.length===1){ok=true;break;}
+      const tally=new Map();
+      for(const s of sols)s.forEach((c,r)=>{if(c!==sol[r]){const k=r*N+c;tally.set(k,(tally.get(k)||0)+1);}});
+      const cells=shuffle([...tally.keys()]).sort((x,y)=>tally.get(y)-tally.get(x)).slice(0,12);
+      let moved=false,fallback=null;
+      for(const cell of cells){
+        const g=reg[cell];
+        for(const g2 of shuffle([...new Set(neighbors4(cell,N).map(j=>reg[j]).filter(x=>x!==g))])){
+          reg[cell]=g2;
+          const keep=regionConnected(reg,N,g,seedOf(g));
+          if(!keep){moved=true;break;}
+          let cut=0;for(let i=0;i<N*N;i++)if(reg[i]===g&&!keep.has(i))cut++;
+          if(!fallback||cut<fallback.cut)fallback={cell,g,g2,cut};
+          reg[cell]=g;
+        }
+        if(moved)break;
+      }
+      if(!moved&&fallback){
+        const {cell,g,g2}=fallback;reg[cell]=g2;
+        const keep=regionConnected(reg,N,g,seedOf(g));
+        for(let i=0;i<N*N;i++)if(reg[i]===g&&!keep.has(i))reg[i]=g2;
+        moved=true;
+      }
+      if(!moved)break;
+    }
+    if(ok)return {N,sol,reg};
+  }
+  return null;
+}
+
+/* ---------- background generation ---------- */
+let worker = null, reqId = 0;
+const pending = new Map();
+try {
+  const src = [shuffle, randomPlacement, neighbors4, growRegions, solve, regionConnected, makePuzzle]
+    .map(f => f.toString()).join("\n") +
+    "\nonmessage = e => postMessage({id: e.data.id, p: makePuzzle(e.data.N)});";
+  worker = new Worker(URL.createObjectURL(new Blob([src], {type: "text/javascript"})));
+  worker.onmessage = e => { const r = pending.get(e.data.id); pending.delete(e.data.id); r && r(e.data.p); };
+  worker.onerror = () => { worker = null; };
+} catch (e) { worker = null; }
+
+function generate(N) {
+  return new Promise(resolve => {
+    if (worker) { const id = ++reqId; pending.set(id, resolve); worker.postMessage({id, N}); }
+    else setTimeout(() => resolve(makePuzzle(N)), 30);
+  }).then(p => p || generate(N));
+}
+let spare = null; // {N, promise}
+function takePuzzle(N) {
+  const p = (spare && spare.N === N) ? spare.promise : generate(N);
+  spare = null;
+  return p;
+}
+function prefetch(N) { if (!spare || spare.N !== N) spare = {N, promise: generate(N)}; }
+
+/* ---------- colors ---------- */
+function rgb(hex) { const n = parseInt(hex.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; }
+function assignColors(reg, N) {
+  const pairs = [], seen = new Set();
+  for (let i = 0; i < N * N; i++) {
+    const r = Math.floor(i / N), c = i % N;
+    for (const j of [c < N - 1 ? i + 1 : -1, r < N - 1 ? i + N : -1]) {
+      if (j < 0 || reg[i] === reg[j]) continue;
+      const a = Math.min(reg[i], reg[j]), b = Math.max(reg[i], reg[j]), k = a * 32 + b;
+      if (!seen.has(k)) { seen.add(k); pairs.push([a, b]); }
+    }
+  }
+  const cols = PALETTE.slice(0, N).map(rgb);
+  const d = (x, y) => Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]);
+  const cost = p => pairs.reduce((s, [a, b]) => s + Math.max(0, 170 - d(cols[p[a]], cols[p[b]])) ** 2, 0);
+  let perm = shuffle([...Array(N).keys()]), best = cost(perm);
+  for (let it = 0; it < 3000 && best > 0; it++) {
+    const a = Math.floor(Math.random() * N), b = Math.floor(Math.random() * N);
+    if (a === b) continue;
+    [perm[a], perm[b]] = [perm[b], perm[a]];
+    const c = cost(perm);
+    if (c <= best) best = c; else [perm[a], perm[b]] = [perm[b], perm[a]];
+  }
+  return perm.map(k => PALETTE[k]);
+}
+
+/* ---------- state ---------- */
+const $ = id => document.getElementById(id);
+let settings = {autoGrade: false, autoExclude: true, size: 8};
+let stats = {streak: 0, best: 0};
+let game = null, busy = false, msgTimer = null, erasing = false;
+
+function blankCells(N) { return Array.from({length: N * N}, () => ({cat: false, manual: false, src: []})); }
+function show(c) { return c.cat ? "cat" : (c.manual || c.src.length) ? "paw" : "empty"; }
+function save() { try { localStorage.setItem(STORE, JSON.stringify({settings, game, stats})); } catch (e) {} }
+function load() {
+  try {
+    const d = JSON.parse(localStorage.getItem(STORE));
+    if (d && d.settings) settings = Object.assign(settings, d.settings);
+    if (d && d.stats) stats = Object.assign(stats, d.stats);
+    if (d && d.game && d.game.cells) { game = d.game; if (game.livesUsed == null) game.livesUsed = HEARTS; }
+  } catch (e) {}
+}
+
+function peers(i) {
+  const N = game.N, r = Math.floor(i / N), c = i % N, g = game.reg[i], out = [];
+  for (let j = 0; j < N * N; j++) {
+    if (j === i) continue;
+    const jr = Math.floor(j / N), jc = j % N;
+    if (jr === r || jc === c || game.reg[j] === g ||
+        (Math.abs(jr - r) <= 1 && Math.abs(jc - c) <= 1)) out.push(j);
+  }
+  return out;
+}
+// Wrong-cat marks stay until that cat is removed; other marks clear on the next move.
+function keepCatMarks(except) { game.wrong = game.wrong.filter(k => k !== except && game.cells[k].cat); }
+function catsOnBoard() { return game.cells.map((c, k) => c.cat ? k : -1).filter(k => k >= 0); }
+function isSolution(k) { return game.sol[Math.floor(k / game.N)] === k % game.N; }
+function loseLives(n) {
+  game.hearts = Math.max(0, game.hearts - n);
+  if (game.hearts <= 0) showLost();
+  return game.hearts;
+}
+const livesLeft = h => `${h} ${h === 1 ? "life" : "lives"} left.`;
+
+function snapshot() {
+  game.history.push(JSON.stringify(game.cells));
+  if (game.history.length > 500) game.history.shift();
+}
+
+/* ---------- actions ---------- */
+function tap(i) {
+  const cell = game.cells[i];
+  keepCatMarks(i);
+  const s = show(cell);
+  if (erasing) { if (s === "paw") { snapshot(); erasePaw(i); } render(); save(); return; }
+  if (s === "empty") { snapshot(); cell.manual = true; }
+  else if (s === "paw") placeCat(i);
+  else { snapshot(); removeCat(i); }
+  render(); save();
+}
+
+function placeCat(i) {
+  const N = game.N, cell = game.cells[i];
+  if (settings.autoGrade && game.sol[Math.floor(i / N)] !== i % N) {
+    game.hearts--;
+    flashBad(i);
+    if (game.hearts <= 0) showLost();
+    else note(game.hearts === 1 ? "Not there. 1 life left." : `Not there. ${game.hearts} lives left.`);
+    return;
+  }
+  snapshot();
+  cell.cat = true; cell.manual = false;
+  if (settings.autoExclude) for (const j of peers(i)) if (!game.cells[j].src.includes(i)) game.cells[j].src.push(i);
+  if (settings.autoGrade) {
+    const cats = game.cells.map((c, k) => c.cat ? k : -1).filter(k => k >= 0);
+    if (cats.length === N && cats.every(k => game.sol[Math.floor(k / N)] === k % N)) win();
+  }
+}
+
+function removeCat(i) {
+  game.cells[i].cat = false; game.cells[i].manual = false;
+  for (const c of game.cells) { const k = c.src.indexOf(i); if (k >= 0) c.src.splice(k, 1); }
+}
+
+function erasePaw(i) { const c = game.cells[i]; c.manual = false; c.src = []; }
+function paintPaw(i, press) {
+  if (erasing) {
+    if (show(game.cells[i]) !== "paw") return;
+    if (!press.snap) { snapshot(); press.snap = true; }
+    erasePaw(i); return;
+  }
+  const c = game.cells[i];
+  if (show(c) !== "empty") return;
+  if (!press.snap) { snapshot(); press.snap = true; }
+  c.manual = true;
+}
+
+function undo() {
+  if (!game.history.length || game.status !== "playing") return;
+  game.cells = JSON.parse(game.history.pop());
+  game.wrong = [];
+  render(); save();
+}
+
+function restart() {
+  if (game.status === "lost") breakStreak();
+  setNextSize(game.N);
+  game.cells = blankCells(game.N); game.history = []; game.wrong = [];
+  game.hearts = HEARTS; game.livesUsed = HEARTS; game.status = "playing";
+  closeCard(); render(); save(); note("");
+}
+
+function audit() {
+  if (game.status !== "playing" || settings.autoGrade) return;
+  const N = game.N;
+  game.hearts--; game.helped = true;   // a clue: this puzzle won't move you up a size
+  game.wrong = game.cells.map((c, k) => {
+    const isSol = game.sol[Math.floor(k / N)] === k % N, s = show(c);
+    return (s === "cat" && !isSol) || (s === "paw" && isSol) ? k : -1;
+  }).filter(k => k >= 0);
+  const n = game.wrong.length;
+  if (game.hearts <= 0) showLost();
+  else note(n ? `${n} ${n === 1 ? "square is" : "squares are"} marked wrong.` : "Nothing is marked wrong so far.", 6000);
+  render(); save();
+}
+
+function setNextSize(n) {
+  settings.size = Math.min(MAX_N, Math.max(MIN_N, n));
+  $("size").value = settings.size;
+  prefetch(settings.size);
+}
+
+// Running out of lives keeps you at this size (it doesn't drop you down); the card offers any other size.
+// "Or play a different size" for the end-of-puzzle cards.
+const otherSize = () => G.otherSize($("size"), settings.size, n => { setNextSize(n); save(); newPuzzle(); });
+
+function showLost() {
+  game.status = "lost"; game.helped = true;
+  note("");
+  setNextSize(game.N);
+  save();
+  const btns = [["Restart board", restart, true], [`New puzzle (${settings.size} × ${settings.size})`, newPuzzle]];
+  let text = "Pick how you want to keep going.";
+  if (game.livesUsed < MAX_LIVES) btns.push(["Wait, I'm only mostly dead! Mostly dead is slightly alive, folks!", revive]);
+  else text = `All ${MAX_LIVES} lives on this run are used up.`;
+  openCard("Out of lives", text, btns,
+    catImg("https://cataas.com/cat/gif?" + bust(), "A cat GIF", "https://cataas.com/cat?width=500&" + bust()));
+  $("card").append(otherSize());
+}
+
+function revive() {
+  if (game.livesUsed >= MAX_LIVES) return;
+  const added = Math.min(HEARTS, MAX_LIVES - game.livesUsed);
+  game.livesUsed += added; game.hearts = added; game.status = "playing";
+  setNextSize(game.N);
+  render(); save();
+  const left = Math.ceil((MAX_LIVES - game.livesUsed) / HEARTS);
+  const words = left ? `${left} ${left === 1 ? "revive" : "revives"} left` : "Last lives";
+  const says = "https://cataas.com/cat/says/" + encodeURIComponent(words) + "?fontSize=48&fontColor=white&" + bust();
+  openCard("Slightly alive!", `Back with ${added} more ${added === 1 ? "life" : "lives"}. ${left ? words + " on this run." : "No revives left on this run."}`,
+    [["Keep playing", closeCard, true]], catImg(says, `A cat saying ${words}`, "https://cataas.com/cat?width=500&" + bust()));
+}
+
+function complete() {
+  if (game.status !== "playing") return;
+  const cats = catsOnBoard();
+  if (cats.length === game.N && cats.every(isSolution)) { win(); render(); save(); return; }
+  // Deliberately says nothing about what's wrong: that's what Audit is for.
+  const h = loseLives(1);
+  if (h > 0) note(`Not solved yet. ${livesLeft(h)}`, 6000);
+  render(); save();
+}
+
+// Turning Auto grade on mid-game grades the board as it stands: each wrong cat is marked and costs a life.
+function gradeNow() {
+  if (!game || game.status !== "playing") return;
+  const cats = catsOnBoard(), wrong = cats.filter(k => !isSolution(k));
+  game.wrong = wrong;
+  if (wrong.length) {
+    flashBad(wrong[0]);
+    const h = loseLives(wrong.length);
+    if (h > 0) note(`${wrong.length} ${wrong.length === 1 ? "cat was" : "cats were"} in the wrong spot. ${livesLeft(h)}`, 6000);
+  } else if (cats.length === game.N) win();
+}
+
+function win() {
+  game.status = "won";
+  G.finishClock(game);
+  track(`Catdoku solved ${game.N}x${game.N}`);
+  stats.streak++; stats.best = Math.max(stats.best, stats.streak);
+  // A win on the first three lives with no Audit moves up a size; a win that needed a clue, a revive
+  // or a restart after running out of lives stays put.
+  setNextSize(game.livesUsed <= HEARTS && !game.helped ? game.N + 1 : game.N);
+  game.gold = game.livesUsed <= HEARTS && game.hearts === HEARTS && !game.helped;   // not a life lost: a gold paw
+  save();
+  const done = game;   // let the finished board show for a moment first
+  setTimeout(() => { if (game === done) showWon(); }, 1200);
+}
+
+function showWon() {
+  const media = document.createElement("div");
+  const text = document.createElement("p");
+  text.textContent = `Every cat on the ${game.N} × ${game.N} board has its own territory.`;
+  const name = document.createElement("p"); name.className = "catname"; name.textContent = `Meet ${randomCatName()}!`;
+  if (game.gold) media.append(G.goldPaw());
+  const tl = G.timeLineEl(game.result); if (tl) media.append(tl);
+  media.append(text);
+  if (!game.gold) { const g = document.createElement("p"); g.className = "goldtip"; g.textContent = "Solve one without losing a life for a gold paw."; media.append(g); }
+  media.append(randomCatPhoto(), name);
+  if (stats.streak > 1) {
+    const s = document.createElement("p"); s.textContent = `🔥 ${stats.streak} wins in a row`; media.append(s);
+  }
+  openCard(game.gold ? "Gold paw!" : "Solved!", "", [[`Next puzzle (${settings.size} × ${settings.size})`, newPuzzle, true],
+    ["Admire my board", () => { closeCard(); note("Solved! Tap New puzzle when you're ready for another.", 0); }],
+    ["Share my result", () => G.shareResult(game.result, game.gold)]], media);
+  $("card").append(otherSize());
+  renderStreak();
+}
+
+function breakStreak() { stats.streak = 0; renderStreak(); }
+function renderStreak() {
+  const el = $("streak");
+  el.hidden = !stats.best;
+  el.textContent = `🔥 Win streak ${stats.streak} · Best ${stats.best}`;
+}
+
+async function newPuzzle() {
+  if (busy) return;
+  if (game && (game.status === "lost" || (game.status === "playing" && game.history.length))) breakStreak();
+  busy = true;
+  const N = settings.size;
+  openCard("Shuffling cats…", N >= 11 ? "Big boards can take several seconds to build." : "", []);
+  addCatFact(cardCount);
+  const p = await takePuzzle(N);
+  game = {N, reg: p.reg, sol: p.sol, colors: assignColors(p.reg, N), cells: blankCells(N),
+          hearts: HEARTS, livesUsed: HEARTS, status: "playing", history: [], wrong: [], ...G.freshClock()};
+  busy = false;
+  closeCard(); buildBoard(); render(); save(); note("");
+  track(`Catdoku new puzzle ${N}x${N}`);
+  prefetch(N);
+}
+
+/* ---------- UI ---------- */
+// Count a moment in the game (a puzzle started or solved) on the GoatCounter dashboard.
+// Nothing about the player is sent. Waits a few seconds for the counter script to load.
+function track(name) {
+  let tries = 0;
+  (function send() {
+    const gc = window.goatcounter;
+    if (gc && gc.count) gc.count({path: name, title: name, event: true});
+    else if (tries++ < 20) setTimeout(send, 500);
+  })();
+}
+function note(t, ms) {
+  clearTimeout(msgTimer);
+  $("msg").textContent = t || (settings.autoGrade ? "" : "Press Complete to check your board.");
+  if (t && ms !== 0) msgTimer = setTimeout(() => note(""), ms || 3500);
+}
+/* ---------- cat APIs (no key; everything falls back quietly) ---------- */
+async function getJSON(url, ms = 5000) {
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), ms);
+  try { const r = await fetch(url, {signal: ctl.signal}); if (!r.ok) throw new Error(r.status); return await r.json(); }
+  finally { clearTimeout(t); }
+}
+function catImg(src, alt, backup) {
+  const img = document.createElement("img");
+  img.className = "catpic"; img.alt = alt;
+  img.onerror = () => { if (backup && img.src !== backup) img.src = backup; else img.remove(); };
+  if (src) img.src = src;
+  return img;
+}
+const bust = () => "t=" + Date.now();
+function randomCatPhoto() {
+  const backup = "https://cataas.com/cat?width=500&" + bust();
+  const img = catImg(null, "A random cat", backup);
+  getJSON("https://api.thecatapi.com/v1/images/search")
+    .then(d => { img.src = d[0].url; })
+    .catch(() => { img.src = backup; });
+  return img;
+}
+function addCatFact(cardNo) {
+  getJSON("https://catfact.ninja/fact?max_length=160").then(d => {
+    if (cardNo !== cardCount || !$("overlay").classList.contains("show") || !d.fact) return;
+    const p = document.createElement("p"); p.className = "fact"; p.textContent = "🐱 " + d.fact;
+    $("card").append(p);
+  }).catch(() => {});
+}
+let breeds = null;
+function showBreed() {
+  const el = $("breed");
+  const put = () => {
+    if (!breeds || !breeds.length || !game) { el.hidden = true; return; }
+    const b = breeds[(game.N * 11) % breeds.length];
+    el.innerHTML = "";
+    const lead = document.createElement("b"); lead.textContent = `${game.N} × ${game.N} breed: ${b.name}`;
+    el.append(lead, document.createTextNode(`${b.origin ? ", from " + b.origin : ""}.${b.temperament ? " " + b.temperament + "." : ""}`));
+    el.hidden = false;
+  };
+  if (breeds) return put();
+  getJSON("https://api.thecatapi.com/v1/breeds")
+    .then(d => { breeds = d.filter(b => b.name).sort((x, y) => x.name.localeCompare(y.name)); put(); })
+    .catch(() => { el.hidden = true; });
+}
+
+let cardCount = 0;
+function openCard(title, text, btns, media) {
+  cardCount++;
+  const card = $("card"); card.innerHTML = "";
+  const h = document.createElement("h2"); h.textContent = title; card.append(h);
+  const s = document.createElement("div"); s.className = "stripe"; card.append(s);
+  if (media) card.append(media);
+  if (text) { const p = document.createElement("p"); p.textContent = text; card.append(p); }
+  const row = document.createElement("div"); row.className = "btns";
+  for (const [label, fn, primary] of btns) {
+    const b = document.createElement("button"); b.textContent = label; if (primary) b.className = "primary";
+    b.onclick = fn; row.append(b);
+  }
+  card.append(row); $("overlay").classList.add("show");
+  const first = row.querySelector("button"); if (first) first.focus();
+}
+function closeCard() { $("overlay").classList.remove("show"); }
+
+function flashBad(i) {
+  const el = $("board").children[i];
+  el.classList.remove("bad"); void el.offsetWidth; el.classList.add("bad");
+  setTimeout(() => el.classList.remove("bad"), 600);
+}
+
+function buildBoard() {
+  const N = game.N, b = $("board");
+  b.innerHTML = "";
+  b.style.gridTemplateColumns = b.style.gridTemplateRows = `repeat(${N}, minmax(0, 1fr))`;
+  b.style.setProperty("--n", N);
+  for (let i = 0; i < N * N; i++) {
+    const r = Math.floor(i / N), c = i % N, el = document.createElement("div");
+    el.className = "cell";
+    if (r === 0) el.classList.add("r0"); else if (game.reg[i - N] !== game.reg[i]) el.classList.add("bt");
+    if (c === 0) el.classList.add("c0"); else if (game.reg[i - 1] !== game.reg[i]) el.classList.add("bl");
+    el.style.background = game.colors[game.reg[i]];
+    el.dataset.i = i; el.tabIndex = 0; el.setAttribute("role", "gridcell");
+    b.append(el);
+  }
+  $("size").value = N;
+  showBreed();
+}
+
+function render() {
+  const kids = $("board").children;
+  game.cells.forEach((c, i) => {
+    const el = kids[i], s = show(c), N = game.N;
+    const html = s === "cat" ? "🐱" : s === "paw" ? '<span class="paw">🐾</span>' : "";
+    if (el.innerHTML !== html) el.innerHTML = html;
+    el.classList.toggle("wrong", game.wrong.includes(i));
+    el.setAttribute("aria-label", `Row ${Math.floor(i / N) + 1}, column ${i % N + 1}: ${s === "empty" ? "blank" : s}`);
+  });
+  $("hearts").innerHTML = Array.from({length: Math.max(HEARTS, game.livesUsed)},
+    (_, k) => k < game.hearts ? "♥" : '<span class="lost">♥</span>').join("");
+  $("hearts").setAttribute("aria-label", `${game.hearts} ${game.hearts === 1 ? "life" : "lives"} left`);
+  $("found").textContent = `🐱 ${game.cells.filter(c => c.cat).length} / ${game.N}`;
+  $("completeBtn").style.display = settings.autoGrade ? "none" : "";
+  $("auditBtn").style.display = settings.autoGrade ? "none" : "";
+  $("auditBtn").disabled = game.status !== "playing";
+  $("eraseBtn").setAttribute("aria-pressed", erasing);
+  $("undoBtn").disabled = !game.history.length || game.status !== "playing";
+  $("gradeTgl").checked = settings.autoGrade;
+  $("exclTgl").checked = settings.autoExclude;
+}
+
+/* ---------- input ---------- */
+let press = null;
+function cellAt(x, y) {
+  const el = document.elementFromPoint(x, y);
+  const cell = el && el.closest && el.closest("#board .cell");
+  return cell ? +cell.dataset.i : -1;
+}
+const board = $("board");
+board.addEventListener("pointerdown", e => {
+  if (!game || game.status !== "playing" || busy) return;
+  const i = cellAt(e.clientX, e.clientY); if (i < 0) return;
+  e.preventDefault();
+  try { board.setPointerCapture(e.pointerId); } catch (_) {}
+  press = {start: i, last: i, drag: false, snap: false};
+});
+board.addEventListener("pointermove", e => {
+  if (!press) return;
+  const i = cellAt(e.clientX, e.clientY);
+  if (i < 0 || i === press.last) return;
+  if (!press.drag) { press.drag = true; keepCatMarks(); paintPaw(press.start, press); }
+  paintPaw(i, press); press.last = i; render();
+});
+function endPress() {
+  if (!press) return;
+  if (!press.drag) tap(press.start); else save();
+  press = null;
+}
+board.addEventListener("pointerup", endPress);
+board.addEventListener("pointercancel", () => { press = null; });
+board.addEventListener("keydown", e => {
+  if ((e.key === "Enter" || e.key === " ") && e.target.classList.contains("cell")) {
+    e.preventDefault(); if (game.status === "playing" && !busy) tap(+e.target.dataset.i);
+  }
+});
+
+$("newBtn").onclick = newPuzzle;
+$("size").onchange = e => { settings.size = +e.target.value; save(); newPuzzle(); };
+$("undoBtn").onclick = undo;
+$("restartBtn").onclick = () => { if (!busy) restart(); };
+$("completeBtn").onclick = complete;
+$("auditBtn").onclick = audit;
+$("eraseBtn").onclick = () => { erasing = !erasing; if (game) render(); };
+$("gradeTgl").onchange = e => {
+  settings.autoGrade = e.target.checked;
+  if (game) { game.wrong = []; note(""); if (settings.autoGrade) gradeNow(); render(); }
+  save();
+};
+$("exclTgl").onchange = e => { settings.autoExclude = e.target.checked; save(); };
+document.addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); }
+});
+
+/* ---------- how to play ---------- */
+// A small solved example: four cats on a 4 × 4 board with four colors, plus a few paw notes.
+function exampleArt() {
+  const ns = "http://www.w3.org/2000/svg", el = (t, a) => { const e = document.createElementNS(ns, t); for (const k in a) e.setAttribute(k, a[k]); return e; };
+  const reg = [0,0,1,1, 0,2,2,1, 3,2,2,1, 3,3,2,1], cats = [1, 7, 8, 14], paws = [0, 4, 6], cols = PALETTE.slice(0, 4);
+  const svg = el("svg", {viewBox: "-0.08 -0.08 4.16 4.16", class: "howto", "aria-hidden": "true"});
+  reg.forEach((g, i) => svg.append(el("rect", {x: i % 4, y: Math.floor(i / 4), width: 1, height: 1, fill: cols[g]})));
+  for (let k = 1; k < 4; k++) svg.append(el("path", {d: `M${k} 0V4M0 ${k}H4`, stroke: "rgba(42,37,48,.22)", "stroke-width": .03}));
+  // thick lines where the color changes
+  let d = "";
+  reg.forEach((g, i) => { const x = i % 4, y = Math.floor(i / 4);
+    if (x < 3 && reg[i + 1] !== g) d += `M${x + 1} ${y}V${y + 1}`;
+    if (y < 3 && reg[i + 4] !== g) d += `M${x} ${y + 1}H${x + 1}`; });
+  svg.append(el("path", {d, stroke: "#2A2530", "stroke-width": .09, "stroke-linecap": "square"}));
+  svg.append(el("rect", {width: 4, height: 4, rx: .08, fill: "none", stroke: "#2A2530", "stroke-width": .12}));
+  const emoji = (i, t, size) => { const tx = el("text", {x: i % 4 + .5, y: Math.floor(i / 4) + .56, "text-anchor": "middle", "dominant-baseline": "middle", "font-size": size}); tx.textContent = t; svg.append(tx); };
+  cats.forEach(i => emoji(i, "🐱", .62));
+  paws.forEach(i => emoji(i, "🐾", .4));
+  return svg;
+}
+function showHelp() {
+  const media = document.createElement("div");
+  media.append(exampleArt());
+  const ol = document.createElement("ol"); ol.className = "steps";
+  for (const t of ["Place one 🐱 in every row, every column, and every color.",
+                   "Cats can't touch, not even diagonally.",
+                   "Tap a square once for 🐾 (no cat here), twice for 🐱, and again to clear it. Drag to paw several squares at once.",
+                   "Turn on Erase 🐾 to tap or drag paws away."]) {
+    const li = document.createElement("li"); li.textContent = t; ol.append(li);
+  }
+  const tip = document.createElement("p"); tip.className = "tip";
+  tip.textContent = "Auto exclude fills in paws for you after each cat. Auto grade checks each cat as you place it, and makes the game harder.";
+  media.append(ol, tip);
+  openCard("How to play", "", [["Show me on the board", () => { closeCard(); settings.seenHelp = false; helpOnFirstVisit(); }, true],
+    ["Got it", () => { closeCard(); settings.seenHelp = true; save(); }]], media);
+}
+// First visit only: once the first puzzle is on the board, walk through the rules on it. Nothing is
+// placed on the puzzle; the marks are only drawn over it. The cat in the middle of the "can't touch"
+// step and the paws are just examples, not where the answer's cats are.
+function spotlightSteps() {
+  const N = game.N, r = Math.floor(N / 2), c = Math.floor(N / 2), g = game.reg[r * N + c];
+  const row = [...Array(N).keys()].map(x => [x, r]), col = [...Array(N).keys()].map(y => [c, y]);
+  const region = game.reg.flatMap((v, j) => v === g ? [[j % N, Math.floor(j / N)]] : []);
+  const around = []; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) around.push([c + dx, r + dy]);
+  const drag = [0, 1, 2].map(x => [x, N - 1]);
+  return [
+    {say: "Place one 🐱 in every row", lit: row},
+    {say: "every column", lit: col},
+    {say: "and every color", lit: region},
+    {say: "Cats can't touch, not even diagonally", lit: around, marks: around.map(([x, y]) => [x, y, x === c && y === r ? "🐱" : "❌"])},
+    {say: "Tap once for 🐾, twice for 🐱", lit: [[c, r]], marks: [[c, r, ["🐾", "🐱"]]]},
+    {say: "Drag to 🐾 several squares at once", lit: drag, marks: drag.map(([x, y]) => [x, y, "🐾"])},
+  ];
+}
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || game.status !== "playing" || $("board").parentElement.querySelector(".spot")) return;
+  G.spotlight({grid: $("board"), w: game.N, h: game.N, steps: spotlightSteps(), done: () => { settings.seenHelp = true; save(); }});
+}
+$("helpBtn").onclick = () => { if (!busy) showHelp(); };
+
+/* ---------- start ---------- */
+load();
+G.checkClock(game);
+G.setupTimer({name: "catdoku", game: () => game, playing: g => g.status === "playing", save});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.N : settings.size);
+
+/* ---------- sharing ---------- */
+$("shareBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Catdoku", won: game.status === "won",
+  puzzle: () => ({g: "catdoku", N: game.N, reg: game.reg, sol: game.sol, colors: game.colors}),
+  progress: () => ({cats: game.cells.flatMap((c, k) => c.cat ? [k] : []), paws: game.cells.flatMap((c, k) => c.manual ? [k] : [])})}); };
+// A puzzle from a share link, with its cats and paw marks so far if they were sent (that isn't timed).
+function openShared(d) {
+  const N = d.N;
+  game = {N, reg: d.reg, sol: d.sol, colors: d.colors || assignColors(d.reg, N), cells: blankCells(N),
+          hearts: HEARTS, livesUsed: HEARTS, status: "playing", history: [], wrong: [], ...G.freshClock()};
+  if (d.p) {
+    game.timed = false;
+    for (const k of d.p.paws) game.cells[k].manual = true;
+    for (const k of d.p.cats) {
+      game.cells[k].cat = true;
+      if (settings.autoExclude) for (const j of peers(k)) if (!game.cells[j].src.includes(k)) game.cells[j].src.push(k);
+    }
+  }
+  settings.size = N; $("size").value = N; buildBoard(); render(); save(); note(""); prefetch(N);
+  // A finished board shared back (say, by a helper) shows as solved.
+  const cats = game.cells.flatMap((c, k) => c.cat ? [k] : []);
+  if (cats.length === N && cats.every(isSolution)) { game.status = "won"; G.finishClock(game); save(); render(); setTimeout(showWon, 1200); }
+}
+const shared = G.readShare("catdoku");
+renderStreak();
+$("size").value = settings.size;
+if (game) G.reopen(() => {
+  buildBoard(); render(); note("");
+  $("size").value = settings.size;
+  if (game.status === "won") showWon();
+  else if (game.status === "lost") showLost();
+  else helpOnFirstVisit();
+  prefetch(settings.size);
+}, why => { game = null; busy = false; newPuzzle().then(() => note(why, 0)); });
+else if (!shared) newPuzzle().then(helpOnFirstVisit);
+const shareOpts = () => ({name: "Catdoku", inProgress: !!(game && game.status === "playing" && game.history.length), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, shareOpts());
+// A share link opened while this page is already showing only changes the address, so watch for it.
+window.addEventListener("hashchange", () => { const d = G.readShare("catdoku"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
