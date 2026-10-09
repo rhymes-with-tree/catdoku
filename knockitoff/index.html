@@ -27,7 +27,7 @@
 <style>
 /* A wooden tabletop seen from above, the cat on it, and things (drawn from the side) to push off the edge. */
 :root{--board:min(94vw,520px); --gold:#E0A526}
-.tabletop{width:var(--board);touch-action:none;user-select:none;-webkit-user-select:none;cursor:pointer}
+.tabletop{width:var(--board);touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:pointer}
 .tabletop svg{display:block;width:100%;height:auto}
 .key{width:var(--board);display:flex;flex-direction:column;gap:8px}
 .key h3{margin:0;font-size:16px;font-weight:800;text-align:center}
@@ -530,9 +530,21 @@ document.addEventListener("keydown", e => {
   const d = KEYS[e.key]; if (d !== undefined && game) { e.preventDefault(); tryStep(d); }
 });
 let press = null;
-$("board").addEventListener("pointerdown", e => { press = {x: e.clientX, y: e.clientY}; });
+const squareAt = (cx, cy) => {
+  const svg = $("svg"), pt = svg.createSVGPoint(); pt.x = cx; pt.y = cy;
+  const p = pt.matrixTransform(svg.getScreenCTM().inverse()), x = Math.floor(p.x / U), y = Math.floor(p.y / U);
+  return x >= 0 && y >= 0 && x < game.W && y < game.H ? y * game.W + x : -1;
+};
+$("board").addEventListener("pointerdown", e => {
+  const p = press = {x: e.clientX, y: e.clientY};
+  // held still for a moment on a special thing: show what it does, instead of walking there
+  p.hold = setTimeout(() => { if (press === p && game && explainAt(squareAt(p.x, p.y))) press = null; }, 550);
+});
+$("board").addEventListener("pointermove", e => { if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 10) clearTimeout(press.hold); });
+$("board").addEventListener("contextmenu", e => e.preventDefault());
 $("board").addEventListener("pointerup", e => {
   const p0 = press; press = null;
+  if (p0) clearTimeout(p0.hold);
   if (!p0 || !playing()) return;
   const dx = e.clientX - p0.x, dy = e.clientY - p0.y;
   if (Math.hypot(dx, dy) > 24) return tryStep(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 3 : 2) : (dy > 0 ? 1 : 0));
@@ -569,9 +581,9 @@ function showHelp() {
     const li = document.createElement("li"); li.textContent = t; ol.append(li);
   }
   const tip = document.createElement("p"); tip.className = "tip";
-  tip.textContent = "Swipe or use the arrow keys to step, or tap a square to walk there. Use the fewest moves possible for a gold paw.";
+  tip.textContent = "Swipe or use the arrow keys to step, or tap a square to walk there. Use the fewest moves possible for a gold paw. Press and hold anything special on the table to see what it does.";
   media.append(ol, tip);
-  G.openCard("How to play", "", [["Show me on the board", () => { G.closeCard(); settings.seenHelp = false; helpOnFirstVisit(); }, true],
+  G.openCard("How to play", "", [["Show me on the board", () => { G.closeCard(); helpOnFirstVisit(true); }, true],
     ["Got it", () => { G.closeCard(); settings.seenHelp = true; save(); }]], media);
 }
 // Where the table's squares are on the page, for the spotlight (the table has a margin round it).
@@ -624,15 +636,16 @@ function spotlightSteps() {
 }
 // The first time each new kind of thing turns up on this device, it gets a spotlight of its own.
 const NEW_THINGS = [
-  {key: "budge", say: "Lemons and books won't budge", cells: () => game.cur.items.filter(it => kioCls(it.k) === 3).map(it => it.c)},
+  {key: "lemon", say: "The cat won't touch a lemon", cells: () => game.cur.items.filter(it => it.k === "l").map(it => it.c)},
+  {key: "books", say: "Books are heavy and won't move", cells: () => game.cur.items.filter(it => it.k === "b").map(it => it.c)},
   {key: "roll", say: "Balls of yarn and pencils roll until they hit something", cells: () => game.cur.items.filter(it => kioCls(it.k) === 1).map(it => it.c)},
-  {key: "walls", say: "Walls stop things falling off that side", cells: () => wallCells()},
+  {key: "walls", say: "Walls stop things from falling off", cells: () => wallCells()},
   {key: "bowl", say: "Keep your food bowl on the table", cells: () => game.cur.items.filter(it => it.k === "f").map(it => it.c)},
   {key: "shape", say: "Tables come in new shapes", cells: () => game.on.some(v => !v) ? game.on.flatMap((v, c) => v ? [c] : []) : []},
-  {key: "candle", say: "Keep the candle away from books", cells: () => game.cur.items.filter(it => it.k === "c" || it.k === "b").map(it => it.c)},
-  {key: "nip", say: "Catnip makes the cat roll about: that step counts as 3 moves", cells: () => game.nip || []},
+  {key: "candle", say: `If you knock over a candle, you have ${kioFireMoves()} moves to knock water on the floor`, cells: () => game.cur.items.filter(it => it.k === "c").map(it => it.c)},
+  {key: "nip", say: "Watch out for catnip! It will slow you down", cells: () => game.nip || []},
   {key: "tape", say: "The cat won't step on tape", cells: () => game.tape || []},
-  {key: "paper", say: "Paper towels unroll the way the loose end points", cells: () => game.cur.items.filter(it => it.k === "p").map(it => it.c)},
+  {key: "paper", say: "Depending on the direction you push it, paper towels unroll! Unrolled paper towels can cover tape.", cells: () => game.cur.items.filter(it => it.k === "p").map(it => it.c)},
 ];
 // The squares along walled sides.
 function wallCells() {
@@ -644,16 +657,30 @@ function wallCells() {
   }
   return out;
 }
+// The spotlight steps for the special things on this table (all of them, or only ones not seen yet).
+const thingSteps = onlyNew => NEW_THINGS.filter(n => !(onlyNew && (settings.seenThings || {})[n.key]) && n.cells().length)
+  .map(n => ({say: n.say, lit: n.cells().map(xy), outline: n.cells().map(c => [xy(c)]), key: n.key}));
+const markSeen = steps => { const seen = settings.seenThings || (settings.seenThings = {}); for (const s of steps) if (s.key) seen[s.key] = true; save(); };
 function newThings() {
   if (!game || game.won || !settings.seenHelp || document.querySelector(".spot")) return;
-  const seen = settings.seenThings || (settings.seenThings = {});
-  const steps = NEW_THINGS.filter(n => !seen[n.key] && n.cells().length).map(n => ({say: n.say, lit: n.cells().map(xy), outline: n.cells().map(c => [xy(c)]), key: n.key}));
-  if (!steps.length) return;
-  G.spotlight({grid: $("svg"), w: game.W, h: game.H, map: spotMap, steps, done: () => { for (const s of steps) seen[s.key] = true; save(); }});
+  const steps = thingSteps(true);
+  if (steps.length) G.spotlight({grid: $("svg"), w: game.W, h: game.H, map: spotMap, steps, done: () => markSeen(steps)});
 }
-function helpOnFirstVisit() {
-  if (settings.seenHelp || !game || game.won || document.querySelector(".spot")) return;
-  G.spotlight({grid: $("svg"), w: game.W, h: game.H, map: spotMap, steps: spotlightSteps(), done: () => { settings.seenHelp = true; save(); }});
+// Press and hold a special thing (or catnip, tape, a wall square) to see its spotlight again.
+function thingAt(c) { return NEW_THINGS.find(n => n.key !== "shape" && n.cells().includes(c)); }
+function explainAt(c) {
+  const n = thingAt(c); if (!n || document.querySelector(".spot")) return false;
+  G.spotlight({grid: $("svg"), w: game.W, h: game.H, map: spotMap, finish: false,
+    steps: [{say: n.say, lit: n.cells().map(xy), outline: n.cells().map(c => [xy(c)])}]});
+  return true;
+}
+// The first visit walks through the basics; "Show me on the board" also runs through every special thing
+// on the table that's out.
+function helpOnFirstVisit(all) {
+  if ((settings.seenHelp && !all) || !game || game.won || document.querySelector(".spot")) return;
+  const extra = all ? thingSteps(false) : [];
+  G.spotlight({grid: $("svg"), w: game.W, h: game.H, map: spotMap, steps: [...spotlightSteps(), ...extra],
+    done: () => { settings.seenHelp = true; markSeen(extra); }});
 }
 // Players from before these spotlights had seen the How to play card, which covers everything; they
 // only get spotlights for things on levels past the one they're on.
