@@ -210,7 +210,7 @@ const G = (() => {
     let last = Date.now();
     setInterval(() => {
       const now = Date.now(), g = T.game(), dt = Math.min(now - last, 1500); last = now;
-      if (g && g.timed && g.started && T.playing(g) && !document.hidden && !$("overlay").classList.contains("show")) g.ms = (g.ms || 0) + dt;
+      if (g && g.timed && g.started && T.playing(g) && !document.hidden && !$("overlay").classList.contains("show") && !document.querySelector(".spot")) g.ms = (g.ms || 0) + dt;
       showTime();
     }, 500);
     document.addEventListener("visibilitychange", () => { if (document.hidden) T.save(); });
@@ -371,7 +371,9 @@ const G = (() => {
   // arrows: [{to: [x, y] (a corner between squares), from: [dx, dy] (the way the arrow comes in)}],
   // els: [element or [elements]…], lines: [{edges: [[x1, y1, x2, y2]…], tone}], enter() and leave() to show
   // something on the board just while the step is up}.
-  // It covers the screen, so taps on it never reach the game (or start its timer).
+  // shapes: [{poly}|{path, width}|{arrow, from}] in page pixels, or a function returning them (see show).
+  // finish: false leaves out "Let's Play!" (for a one-off tip in the middle of a game).
+  // It covers the screen, so taps on it never reach the game (or start its timer), and the timer waits.
   function spotlight(o) {
     const wrap = o.grid.parentElement, layer = document.createElement("div"), ns = "http://www.w3.org/2000/svg";
     layer.className = "spot"; layer.tabIndex = 0; layer.setAttribute("role", "dialog"); layer.setAttribute("aria-live", "polite");
@@ -396,10 +398,21 @@ const G = (() => {
       });
       layer.innerHTML = "";
       const svg = svgEl("svg", {viewBox: `0 0 ${W} ${H}`, width: W, height: H, "aria-hidden": "true"});
-      let d = `M0 0H${W}V${H}H0Z`;
-      for (const [x, y] of lit) d += `M${X(x)} ${Y(y)}H${X(x + 1)}V${Y(y + 1)}H${X(x)}Z`;
-      for (const r of els) d += `M${r.x} ${r.y}h${r.w}v${r.h}h${-r.w}Z`;
-      svg.append(svgEl("path", {d, "fill-rule": "evenodd", class: "dim"}));
+      // Shapes in page pixels (for boards that aren't squares): {poly: [[x, y]…]} is lit and outlined,
+      // {path: [[x, y]…], width} is a lit band along a line (a track), {arrow: [x, y], from: [dx, dy]}.
+      const shapes = (typeof st.shapes === "function" ? st.shapes() : st.shapes) || [];
+      // everything dims except the holes cut in a mask
+      const mask = svgEl("mask", {id: "spotMask", maskUnits: "userSpaceOnUse", x: 0, y: 0, width: W, height: H});
+      mask.append(svgEl("rect", {x: 0, y: 0, width: W, height: H, fill: "#fff"}));
+      for (const [x, y] of lit) mask.append(svgEl("rect", {x: X(x) - 0.5, y: Y(y) - 0.5, width: cw + 1, height: ch + 1, fill: "#000"}));
+      for (const r of els) mask.append(svgEl("rect", {x: r.x, y: r.y, width: r.w, height: r.h, rx: 6, fill: "#000"}));
+      const ptsOf = pts => pts.map(([x, y], i) => `${i ? "L" : "M"}${x} ${y}`).join("");
+      for (const sh of shapes) {
+        if (sh.poly) mask.append(svgEl("path", {d: ptsOf(sh.poly) + "Z", fill: "#000"}));
+        if (sh.path) mask.append(svgEl("path", {d: ptsOf(sh.path) + (sh.closed ? "Z" : ""), fill: "none", stroke: "#000", "stroke-width": sh.width, "stroke-linejoin": "round", "stroke-linecap": "round"}));
+      }
+      const defs = svgEl("defs", {}); defs.append(mask); svg.append(defs);
+      svg.append(svgEl("rect", {x: 0, y: 0, width: W, height: H, class: "dim", mask: "url(#spotMask)"}));
       const sw = Math.max(3, cw * 0.07);
       for (const group of st.outline || [lit]) {   // red lines where the outlined squares meet the rest
         const set = new Set(group.map(([x, y]) => y * o.w + x)), has = (x, y) => x >= 0 && y >= 0 && x < o.w && y < o.h && set.has(y * o.w + x);
@@ -422,12 +435,18 @@ const G = (() => {
           "font-size": cw * (size || (m === "❌" ? 0.42 : 0.56))});
         t.textContent = Array.isArray(m) ? m[frame % m.length] : m; svg.append(t);
       }
-      for (const {to: [gx, gy], from: [dx, dy]} of st.arrows || []) {   // bold arrows pointing at a point between squares
-        const n = Math.hypot(dx, dy), ux = dx / n, uy = dy / n, tx = X(gx) + ux * 3, ty = Y(gy) + uy * 3, len = Math.max(34, cw * 0.95), hd = Math.max(13, cw * 0.32);
+      // a bold arrow with its tip at (ax, ay), coming in from direction (dx, dy); size is a square's width
+      const arrow = (ax, ay, dx, dy, size) => {
+        const n = Math.hypot(dx, dy), ux = dx / n, uy = dy / n, tx = ax + ux * 3, ty = ay + uy * 3, len = Math.max(34, size * 0.95), hd = Math.max(13, size * 0.32);
         const tail = [tx + ux * len, ty + uy * len], base = [tx + ux * hd, ty + uy * hd], px = -uy * hd * 0.62, py = ux * hd * 0.62;
         const shaft = `M${tail[0]} ${tail[1]}L${base[0]} ${base[1]}`, head = `M${tx} ${ty}L${base[0] + px} ${base[1] + py}L${base[0] - px} ${base[1] - py}Z`;
-        for (const [cls, w] of [["arrowLine back", Math.max(10, cw * 0.2)], ["arrowLine", Math.max(5, cw * 0.1)]]) svg.append(svgEl("path", {d: shaft, class: cls, "stroke-width": w}));
-        svg.append(svgEl("path", {d: head, class: "arrowHead", "stroke-width": Math.max(3, cw * 0.06)}));
+        for (const [cls, w] of [["arrowLine back", Math.max(10, size * 0.2)], ["arrowLine", Math.max(5, size * 0.1)]]) svg.append(svgEl("path", {d: shaft, class: cls, "stroke-width": w}));
+        svg.append(svgEl("path", {d: head, class: "arrowHead", "stroke-width": Math.max(3, size * 0.06)}));
+      };
+      for (const {to: [gx, gy], from: [dx, dy]} of st.arrows || []) arrow(X(gx), Y(gy), dx, dy, cw);   // pointing at a point between squares
+      for (const sh of shapes) {
+        if (sh.poly) svg.append(svgEl("path", {d: ptsOf(sh.poly) + "Z", class: "edge" + (st.tone === "ok" ? " ok" : ""), "stroke-width": 3, "stroke-linejoin": "round"}));
+        if (sh.arrow) arrow(sh.arrow[0], sh.arrow[1], sh.from[0], sh.from[1], sh.size || 40);
       }
       layer.append(svg);
       const say = document.createElement("div"); say.className = "say";
@@ -440,16 +459,23 @@ const G = (() => {
       const sh = say.offsetHeight, l = say.offsetLeft, r = l + say.offsetWidth;
       // things to keep clear of: the lit squares, and any arrows
       const keep = lit.map(([x, y]) => [X(x), Y(y), X(x + 1), Y(y + 1)]);
-      for (const {to: [gx, gy], from: [dx, dy]} of st.arrows || []) {
-        const n = Math.hypot(dx, dy), len = Math.max(34, cw * 0.95) + 8, ax = X(gx), ay = Y(gy), bx = ax + dx / n * len, by = ay + dy / n * len;
+      const arrowBox = (ax, ay, dx, dy, size) => {
+        const n = Math.hypot(dx, dy), len = Math.max(34, size * 0.95) + 8, bx = ax + dx / n * len, by = ay + dy / n * len;
         keep.push([Math.min(ax, bx) - 8, Math.min(ay, by) - 8, Math.max(ax, bx) + 8, Math.max(ay, by) + 8]);
+      };
+      for (const {to: [gx, gy], from: [dx, dy]} of st.arrows || []) arrowBox(X(gx), Y(gy), dx, dy, cw);
+      for (const sh of shapes) {
+        if (sh.arrow) arrowBox(sh.arrow[0], sh.arrow[1], sh.from[0], sh.from[1], sh.size || 40);
+        if (sh.poly) { const xs = sh.poly.map(p => p[0]), ys = sh.poly.map(p => p[1]); keep.push([Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]); }
+        // a band along a line counts only lightly: words may cross a track, but not sit on what's lit
+        if (sh.path) for (let i = 0; i < sh.path.length; i += 4) { const [x, y] = sh.path[i]; keep.push([x - sh.width / 2, y - sh.width / 2, x + sh.width / 2, y + sh.width / 2, 0.02]); }
       }
       let best = b.top + b.height / 2 - sh / 2, bestCost = Infinity;
       for (let t = b.top + 4; t <= b.bottom - sh - 4; t += 4) {
         let cover = 0;
-        for (const [x1, y1, x2, y2] of keep) {
+        for (const [x1, y1, x2, y2, weight = 1] of keep) {
           const w = Math.min(r, x2) - Math.max(l, x1), h = Math.min(t + sh, y2) - Math.max(t, y1);
-          if (w > 0 && h > 0) cover += w * h;
+          if (w > 0 && h > 0) cover += w * h * weight;
         }
         const cost = cover * 1000 + Math.abs(t + sh / 2 - (b.top + b.height / 2));
         if (cost < bestCost) { bestCost = cost; best = t; }
@@ -481,6 +507,7 @@ const G = (() => {
       const was = o.steps[k]; if (was && was.leave) was.leave();
       if (++k >= o.steps.length) {   // all done: "Let's Play!" shows over the board and fades by itself
         clearInterval(ticker); removeEventListener("resize", redraw); removeEventListener("scroll", redraw); layer.remove(); if (o.done) o.done();
+        if (o.finish === false) return;   // a one-off tip in the middle of a game just goes away
         const go = document.createElement("div"); go.className = "spotGo"; go.setAttribute("aria-hidden", "true");
         const b = document.createElement("b"); b.textContent = "Let's Play!"; go.append(b); wrap.append(go);
         setTimeout(() => go.remove(), 1300);
