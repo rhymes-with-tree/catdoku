@@ -389,12 +389,22 @@ function diagonals() {
   const k = lanes.findIndex(l => game.isles[l.a].x !== game.isles[l.b].x && game.isles[l.a].y !== game.isles[l.b].y);
   if (k < 0) return;
   const W = game.W, map = () => { const r = $("svg").getBoundingClientRect(), s = r.width / (W * U + 48); return {ox: r.left + 24 * s, oy: r.top + 24 * s, cw: U * s, ch: U * s}; };
-  let was;
-  G.spotlight({grid: $("svg"), w: W, h: W, map, finish: false, done: () => { settings.seenDiag = true; save(); }, steps: [
-    {say: "You can now connect catwalks diagonally.", lit: laneCells(lanes[k]), outline: [laneCells(lanes[k])],
-     enter: () => { was = game.val.slice(); game.val[k] = 1; draw(); }, leave: () => { game.val = was; draw(); }},
-    {say: "Only horizontal, vertical, and diagonal. Other angles never work", els: [$("ways").children[1]]},
-  ]});
+  const I = game.isles, showing = ks => { let was; return {enter: () => { was = game.val.slice(); for (const j of ks) game.val[j] = 1; draw(); }, leave: () => { game.val = was; draw(); }}; };
+  const across = lanes.findIndex(l => I[l.a].y === I[l.b].y), down = lanes.findIndex(l => I[l.a].x === I[l.b].x), straight = [across, down].filter(j => j >= 0);
+  // two perches that aren't in line at all: a catwalk between them is shown, crossed out
+  let odd = null;
+  for (let a = 0; a < I.length && !odd; a++) for (let b = a + 1; b < I.length && !odd; b++) {
+    const dx = Math.abs(I[a].x - I[b].x), dy = Math.abs(I[a].y - I[b].y);
+    if (dx && dy && dx !== dy && dx + dy <= 4) odd = [a, b];
+  }
+  const steps = [{say: "You can now connect catwalks diagonally", lit: laneCells(lanes[k]), outline: [laneCells(lanes[k])], ...showing([k])}];
+  if (straight.length) steps.push({say: "You can still connect catwalks vertically or horizontally", lit: straight.flatMap(j => laneCells(lanes[j])), outline: straight.map(j => laneCells(lanes[j])), ...showing(straight)});
+  if (odd) {
+    const [a, b] = odd.map(i => I[i]), c = [a.x + 0.5, a.y + 0.5], d = [b.x + 0.5, b.y + 0.5];
+    steps.push({say: "You can't build at other angles", lit: [[a.x, a.y], [b.x, b.y]], outline: [[[a.x, a.y]], [[b.x, b.y]]],
+                lines: [{edges: [[...c, ...d]]}], marks: [[(a.x + b.x) / 2, (a.y + b.y) / 2, "❌", 0.8]]});
+  }
+  G.spotlight({grid: $("svg"), w: W, h: W, map, finish: false, done: () => { settings.seenDiag = true; save(); }, steps});
 }
 // First visit only: walk through the tower that's out. Two steps build a catwalk (one, then two) just
 // while they're up, and one shows a perch with 1 getting its catwalk and turning green; then the tower
@@ -437,7 +447,23 @@ function helpOnFirstVisit() {
     steps.push({say: "When a perch has all of its catwalks, a cat settles in", lit: [at(isles[fill.i])], tone: "ok",
                 enter: () => { was = game.val.slice(); for (const [k, c] of fill.v) game.val[k] = c; draw(); }, leave: () => { game.val = was; draw(); }});
   }
-  steps.push({say: "Catwalks can't cross, and in the end every perch joins into one tower", lit: all, outline: all.map(c => [c])});
+  // two catwalks that would cross, built just while the step is up, with a big ❌ where they meet
+  const kx = lanes.findIndex(l => l.cross.length);
+  if (kx >= 0) {
+    const ky = lanes[kx].cross[0], la = lanes[kx], lb = lanes[ky], ca = laneCells(la), cb = laneCells(lb);
+    const meet = ca.find(([x, y]) => cb.some(([u, v]) => u === x && v === y)) || [(isles[la.a].x + isles[la.b].x) / 2, (isles[lb.a].y + isles[lb.b].y) / 2];
+    let was;
+    steps.push({say: "Catwalks can't cross", lit: [...ca, ...cb], outline: [ca, cb], marks: [[meet[0], meet[1], "❌", 0.9]],
+                enter: () => { was = game.val.slice(); game.val[kx] = game.val[ky] = 1; draw(); }, leave: () => { game.val = was; draw(); }});
+  }
+  else if (across >= 0) {
+    // no two catwalks here could cross, so draw one crossing a built catwalk, crossed out
+    const ca = laneCells(lanes[across]), [mx, my] = ca[ca.length >> 1];
+    let was;
+    steps.push({say: "Catwalks can't cross", lit: ca, outline: [ca], lines: [{edges: [[mx + 0.5, my - 1, mx + 0.5, my + 2]]}], marks: [[mx, my, "❌", 0.9]],
+                enter: () => { was = game.val.slice(); game.val[across] = 1; draw(); }, leave: () => { game.val = was; draw(); }});
+  }
+  steps.push({say: "In the end every perch joins into one tower", lit: all, outline: all.map(c => [c])});
   G.spotlight({grid: $("svg"), w: W, h: W, map, steps, done: () => { settings.seenHelp = true; save(); }});
 }
 

@@ -391,15 +391,43 @@ function helpOnFirstVisit() {
     const run = [0, 1, 2].map(d => r * N + c + d);
     if (run.every(i => game.grid[i] === -1)) three = run;
   }
-  const sign = game.signs[0], row = r => [...Array(N).keys()].map(c => [c, r]);
+  const row = r => [...Array(N).keys()].map(c => [c, r]), col = c => [...Array(N).keys()].map(r => [c, r]);
   const showing = change => { let was; return {enter: () => { was = game.grid.slice(); change(); draw(); }, leave: () => { game.grid = was; draw(); }}; };
+  // a sign's two squares filled in to match it (keeping any toy already given there)
+  const fillSign = s => () => {
+    const ga = game.givens[s.a], gb = game.givens[s.b], a = ga >= 0 ? ga : gb >= 0 ? (s.same ? gb : 1 - gb) : 0;
+    game.grid[s.a] = a; game.grid[s.b] = s.same ? a : 1 - a;
+  };
+  // when the puzzle has no = (or no ×), borrow two empty side-by-side squares and show a sign there for the step
+  const example = isSame => {
+    for (let i = 0; i < N * N; i++) {
+      const j = i + 1;
+      if (i % N === N - 1 || game.grid[i] !== -1 || game.grid[j] !== -1 || game.signs.some(s => s.a === i || s.b === i || s.a === j || s.b === j)) continue;
+      return {a: i, b: j, same: isSame, borrowed: true};
+    }
+  };
+  const same = game.signs.find(s => s.same) || example(true), diff = game.signs.find(s => !s.same) || example(false);
+  // fill a sign's squares, adding the sign itself for the step when it's borrowed
+  const signStep = (say, s) => {
+    const fill = showing(fillSign(s));
+    return {say, lit: [xy(s.a), xy(s.b)], outline: [[xy(s.a), xy(s.b)]],
+      enter: () => { if (s.borrowed) game.signs.push(s); fill.enter(); },
+      leave: () => { if (s.borrowed) game.signs = game.signs.filter(x => x !== s); fill.leave(); }};
+  };
   const steps = [{say: "Fill every square with one of the two toys", lit: all, els: [$("key")]}];
-  if (empty >= 0) steps.push({say: "Tap once for the first toy, twice for the second, and again to empty it", lit: [xy(empty)], els: [$("key")],
-                              ...showing(() => { game.grid[empty] = 0; })});
-  steps.push({say: "Every row and column holds as many of one toy as the other", lit: row(Math.floor(N / 2))});
-  if (three) steps.push({say: "No three of the same toy can sit next to each other in a line", lit: three.map(xy), ...showing(() => { for (const i of three) game.grid[i] = 0; })});
-  if (sign) steps.push({say: "= means the two squares hold the same toy; × means they're different", lit: [xy(sign.a), xy(sign.b)], outline: [[xy(sign.a), xy(sign.b)]]});
-  steps.push({say: "Know two squares match (or don't) before you know which toy? Mark = × lets you add your own signs as notes", els: [$("markBtn")]});
+  // one short step per tap, so tapping along shows each one in turn
+  if (empty >= 0) {
+    const at = [xy(empty)];
+    steps.push({say: "Tap once for the first toy", lit: at, els: [$("key")], ...showing(() => { game.grid[empty] = 0; })},
+               {say: "Tap twice for the second toy", lit: at, els: [$("key")], ...showing(() => { game.grid[empty] = 1; })},
+               {say: "Tap again to empty it", lit: at});
+  }
+  steps.push({say: "Every row has an equal number of each toy", lit: row(Math.floor(N / 2))},
+             {say: "Every column is also equal", lit: col(Math.floor(N / 2))});
+  if (three) steps.push({say: "Three-in-a-row is not allowed", lit: three.map(xy), ...showing(() => { for (const i of three) game.grid[i] = 0; })});
+  if (same) steps.push(signStep("= means the two squares hold the same toy", same));
+  if (diff) steps.push(signStep("× means they're different", diff));
+  steps.push({say: "Use Mark to mark down some × or = notes", els: [$("markBtn")]});
   G.spotlight({grid: $("squares"), w: N, h: N, map, steps, done: () => { settings.seenHelp = true; save(); }});
 }
 
