@@ -383,12 +383,12 @@ function laneCells(l) {
   for (let x = A.x, y = A.y; ; x += dx, y += dy) { out.push([x, y]); if (x === B.x && y === B.y) break; }
   return out;
 }
-// The first time a tower lets catwalks go diagonally (from 10 × 10), a spotlight shows one.
-function diagonals() {
-  if (!game || game.won || !SIZES[game.N][2] || settings.seenDiag || !settings.seenHelp || document.querySelector(".spot")) return;
+// On towers with diagonal catwalks (from 10 × 10): steps showing one, and an off-angle one crossed out.
+// "still" adds a step reminding that straight catwalks work too, for when they weren't just shown.
+function diagSteps(still) {
+  if (!SIZES[game.N][2]) return [];
   const k = lanes.findIndex(l => game.isles[l.a].x !== game.isles[l.b].x && game.isles[l.a].y !== game.isles[l.b].y);
-  if (k < 0) return;
-  const W = game.W, map = () => { const r = $("svg").getBoundingClientRect(), s = r.width / (W * U + 48); return {ox: r.left + 24 * s, oy: r.top + 24 * s, cw: U * s, ch: U * s}; };
+  if (k < 0) return [];
   const I = game.isles, showing = ks => { let was; return {enter: () => { was = game.val.slice(); for (const j of ks) game.val[j] = 1; draw(); }, leave: () => { game.val = was; draw(); }}; };
   const across = lanes.findIndex(l => I[l.a].y === I[l.b].y), down = lanes.findIndex(l => I[l.a].x === I[l.b].x), straight = [across, down].filter(j => j >= 0);
   // two perches that aren't in line at all: a catwalk between them is shown, crossed out
@@ -397,13 +397,21 @@ function diagonals() {
     const dx = Math.abs(I[a].x - I[b].x), dy = Math.abs(I[a].y - I[b].y);
     if (dx && dy && dx !== dy && dx + dy <= 4) odd = [a, b];
   }
-  const steps = [{say: "You can now connect catwalks diagonally", lit: laneCells(lanes[k]), outline: [laneCells(lanes[k])], ...showing([k])}];
-  if (straight.length) steps.push({say: "You can still connect catwalks vertically or horizontally", lit: straight.flatMap(j => laneCells(lanes[j])), outline: straight.map(j => laneCells(lanes[j])), ...showing(straight)});
+  const steps = [{say: "You can now connect catwalks diagonally", lit: laneCells(lanes[k]), outline: [laneCells(lanes[k])], els: [...$("ways").children].slice(1, 2), ...showing([k])}];
+  if (still && straight.length) steps.push({say: "You can still connect catwalks vertically or horizontally", lit: straight.flatMap(j => laneCells(lanes[j])), outline: straight.map(j => laneCells(lanes[j])), ...showing(straight)});
   if (odd) {
     const [a, b] = odd.map(i => I[i]), c = [a.x + 0.5, a.y + 0.5], d = [b.x + 0.5, b.y + 0.5];
     steps.push({say: "You can't build at other angles", lit: [[a.x, a.y], [b.x, b.y]], outline: [[[a.x, a.y]], [[b.x, b.y]]],
                 lines: [{edges: [[...c, ...d]]}], marks: [[(a.x + b.x) / 2, (a.y + b.y) / 2, "❌", 0.8]]});
   }
+  return steps;
+}
+// The first time a tower lets catwalks go diagonally, a spotlight shows how.
+function diagonals() {
+  if (!game || game.won || settings.seenDiag || !settings.seenHelp || document.querySelector(".spot")) return;
+  const steps = diagSteps(true);
+  if (!steps.length) return;
+  const W = game.W, map = () => { const r = $("svg").getBoundingClientRect(), s = r.width / (W * U + 48); return {ox: r.left + 24 * s, oy: r.top + 24 * s, cw: U * s, ch: U * s}; };
   G.spotlight({grid: $("svg"), w: W, h: W, map, finish: false, done: () => { settings.seenDiag = true; save(); }, steps});
 }
 // First visit only: walk through the tower that's out. Two steps build a catwalk (one, then two) just
@@ -420,7 +428,8 @@ function helpOnFirstVisit() {
   // the perch with the smallest number that its catwalks can fill, and catwalks that fill it
   let fill = null;
   for (const i of isles.map((_, i) => i).sort((a, b) => isles[a].n - isles[b].n)) {
-    const mine = lanes.map((l, k) => k).filter(k => lanes[k].a === i || lanes[k].b === i), v = new Map();
+    const flat = k => isles[lanes[k].a].x === isles[lanes[k].b].x || isles[lanes[k].a].y === isles[lanes[k].b].y;
+    const mine = lanes.map((l, k) => k).filter(k => lanes[k].a === i || lanes[k].b === i).sort((a, b) => flat(b) - flat(a)), v = new Map();
     let need = isles[i].n;
     for (const k of mine) { const c = Math.min(2, need); if (c > 0) { v.set(k, c); need -= c; } }
     if (!need) { fill = {i, v}; break; }
@@ -442,6 +451,7 @@ function helpOnFirstVisit() {
     steps.push({say: "Catwalks connect horizontally or vertically", lit: ls.flatMap(k => laneCells(lanes[k])), outline: ls.map(k => laneCells(lanes[k])), els: [ways[0]],
                 enter: () => { was = game.val.slice(); for (const k of ls) game.val[k] = 1; draw(); }, leave: () => { game.val = was; draw(); }});
   }
+  steps.push(...diagSteps(false));
   if (fill) {
     let was;
     steps.push({say: "When a perch has all of its catwalks, a cat settles in", lit: [at(isles[fill.i])], tone: "ok",
@@ -463,8 +473,7 @@ function helpOnFirstVisit() {
     steps.push({say: "Catwalks can't cross", lit: ca, outline: [ca], lines: [{edges: [[mx + 0.5, my - 1, mx + 0.5, my + 2]]}], marks: [[mx, my, "❌", 0.9]],
                 enter: () => { was = game.val.slice(); game.val[across] = 1; draw(); }, leave: () => { game.val = was; draw(); }});
   }
-  steps.push({say: "In the end every perch joins into one tower", lit: all, outline: all.map(c => [c])});
-  G.spotlight({grid: $("svg"), w: W, h: W, map, steps, done: () => { settings.seenHelp = true; save(); }});
+  G.spotlight({grid: $("svg"), w: W, h: W, map, steps, done: () => { settings.seenHelp = true; if (SIZES[game.N][2]) settings.seenDiag = true; save(); }});
 }
 
 for (let n = 1; n < SIZES.length; n++) $("size").append(new Option(sizeLabel(n), n));

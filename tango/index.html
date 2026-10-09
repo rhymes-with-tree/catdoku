@@ -39,7 +39,8 @@
 @keyframes pop{from{transform:scale(.6)}}
 .sq.bad{box-shadow:inset 0 0 0 3px #E16251}
 .sign{position:absolute;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:#fff;border:2px solid #2A2530;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;line-height:1;pointer-events:none;z-index:2}
-.sign.bad{background:#E16251;color:#fff}
+.sign.bad,.sign.no{background:#E16251;color:#fff}
+.sign.ok{background:#4E9A5B;color:#fff}
 /* the player's own = and × notes, in teal so they're never mistaken for the puzzle's */
 .sign.mine{background:#3C8681;color:#fff;border-color:#2A2530;border-style:dashed}
 .tray.marking{cursor:crosshair;box-shadow:0 0 0 3px #3C8681}
@@ -257,7 +258,7 @@ function draw() {
   $("board").querySelectorAll(".sign").forEach(s => s.remove());
   game.signs.forEach((s, k) => {
     const A = cells[s.a].getBoundingClientRect(), B = cells[s.b].getBoundingClientRect(), d = document.createElement("div");
-    d.className = "sign" + (badSign.has(k) ? " bad" : ""); d.textContent = s.same ? "=" : "×";
+    d.className = "sign" + (badSign.has(k) ? " bad" : "") + (litSign && litSign.s === s ? " " + litSign.tone : ""); d.textContent = s.same ? "=" : "×";
     d.style.left = ((A.left + A.right + B.left + B.right) / 4 - box.left - bl) + "px"; d.style.top = ((A.top + A.bottom + B.top + B.bottom) / 4 - box.top - bt) + "px";
     $("board").append(d);
   });
@@ -280,7 +281,7 @@ const snapshot = () => game.history.push({grid: game.grid.slice(), notes: (game.
 function restore(h) { if (Array.isArray(h)) game.grid = h; else { game.grid = h.grid; game.notes = h.notes; } }
 // Mark = ×: the player's own signs between squares, as notes. While it's on, a tap goes to the edge
 // nearest the finger and turns it = , then ×, then off. They're never checked; they're just reminders.
-let marking = false;
+let marking = false, litSign = null;  // litSign: a sign the walkthrough is pointing at, coloured to match
 $("markBtn").onclick = () => {
   if (!game || game.won) return;
   marking = !marking; draw();
@@ -408,11 +409,12 @@ function helpOnFirstVisit() {
   };
   const same = game.signs.find(s => s.same) || example(true), diff = game.signs.find(s => !s.same) || example(false);
   // fill a sign's squares, adding the sign itself for the step when it's borrowed
+  // the sign is coloured to match (green for =, red for ×) just while its step is up
   const signStep = (say, s) => {
-    const fill = showing(fillSign(s));
-    return {say, lit: [xy(s.a), xy(s.b)], outline: [[xy(s.a), xy(s.b)]],
-      enter: () => { if (s.borrowed) game.signs.push(s); fill.enter(); },
-      leave: () => { if (s.borrowed) game.signs = game.signs.filter(x => x !== s); fill.leave(); }};
+    const fill = showing(fillSign(s)), tone = s.same ? "ok" : "no";
+    return {say, lit: [xy(s.a), xy(s.b)], outline: [[xy(s.a), xy(s.b)]], tone,
+      enter: () => { if (s.borrowed) game.signs.push(s); litSign = {s, tone}; fill.enter(); },
+      leave: () => { if (s.borrowed) game.signs = game.signs.filter(x => x !== s); litSign = null; fill.leave(); }};
   };
   const steps = [{say: "Fill every square with one of the two toys", lit: all, els: [$("key")]}];
   // one short step per tap, so tapping along shows each one in turn
@@ -424,10 +426,10 @@ function helpOnFirstVisit() {
   }
   steps.push({say: "Every row has an equal number of each toy", lit: row(Math.floor(N / 2))},
              {say: "Every column is also equal", lit: col(Math.floor(N / 2))});
-  if (three) steps.push({say: "Three-in-a-row is not allowed", lit: three.map(xy), ...showing(() => { for (const i of three) game.grid[i] = 0; })});
+  if (three) steps.push({say: "Three-in-a-row is not allowed", lit: three.map(xy), marks: [[...xy(three[2]), "❌", 0.8]], ...showing(() => { for (const i of three) game.grid[i] = 0; })});
   if (same) steps.push(signStep("= means the two squares hold the same toy", same));
   if (diff) steps.push(signStep("× means they're different", diff));
-  steps.push({say: "Use Mark to mark down some × or = notes", els: [$("markBtn")]});
+  steps.push({say: "You can mark down × or = notes for yourself", els: [$("markBtn")]});
   G.spotlight({grid: $("squares"), w: N, h: N, map, steps, done: () => { settings.seenHelp = true; save(); }});
 }
 
