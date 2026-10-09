@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Toy Tango</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-09.2";
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-09.2">
+<style>
+/* Two toys share out a grid in the toy box: every line holds as many of one as the other, no three alike in a row,
+   and = / × signs between squares say whether neighbours match. */
+.key{width:var(--board);display:flex;justify-content:center;gap:18px;align-items:center;font-weight:600}
+.key span{display:flex;align-items:center;gap:6px}
+.key img{width:34px;height:34px}
+.tray{width:var(--board);position:relative;background:#E9DCC6;border:3px solid #A98663;border-radius:14px;padding:6px;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.squares{display:grid;gap:4px}
+.sq{aspect-ratio:1;background:#F7F1E4;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;box-shadow:inset 0 -2px 0 rgba(42,37,48,.12)}
+.sq.given{background:#E0D2BA;cursor:default}
+.sq img{width:82%;height:82%;object-fit:contain;pointer-events:none;animation:pop .18s ease-out}
+.sq.given img{animation:none}
+@keyframes pop{from{transform:scale(.6)}}
+.sq.bad{box-shadow:inset 0 0 0 3px #E16251}
+.sign{position:absolute;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:#fff;border:2px solid #2A2530;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;line-height:1;pointer-events:none;z-index:2}
+.sign.bad{background:#E16251;color:#fff}
+.won .sq img{animation:hop .5s ease-out}
+@keyframes hop{40%{transform:translateY(-8px) scale(1.1)}}
+.rules{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin:6px 0 10px}
+.rules figure{margin:0;text-align:center;font-size:13px;color:var(--ink-soft)}
+.rules .row{display:flex;gap:3px;justify-content:center;margin-bottom:2px}
+.rules .row span{width:30px;height:30px;border-radius:6px;background:#F7F1E4;display:flex;align-items:center;justify-content:center;position:relative}
+.rules .row span img{width:85%;height:85%}
+.rules .row b{position:absolute;right:-9px;top:50%;margin-top:-9px;width:16px;height:16px;border-radius:50%;background:#fff;border:2px solid #2A2530;font-size:11px;line-height:12px;text-align:center;z-index:1}
+.rules .no span{box-shadow:inset 0 0 0 2px #E16251}
+@media (prefers-reduced-motion:reduce){.sq img,.won .sq img{animation:none}}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Toy Tango</h1><div class="stripe"></div><p class="tagline">Share two toys out fairly</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New puzzle</button>
+  </div>
+  <div class="key" id="key"></div>
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="tray" id="board" aria-label="Squares to fill with toys"><div class="squares" id="squares"></div></div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="undoBtn">Undo</button>
+    <button id="clearBtn">Clear</button>
+    <button id="toysBtn">Toys</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+
+  <div class="help">
+    <p>Fill every square with one of the two toys: tap once for the first toy, twice for the second, and again to empty it.</p>
+    <p>Every row and every column has the same number of each toy, and no three of the same toy sit next to each other in a line. An <b>=</b> between two squares means they hold the same toy; an <b>×</b> means they're different. Squares that break a rule are outlined in red. Every puzzle has exactly one answer.</p>
+  </div>
+</main>
+
+<script src="../games.js?v=2026-10-09.2"></script>
+<script>
+/* ---------- puzzles (plain functions, also run in a background worker) ---------- */
+// A grid of N × N squares, each 0 or 1 (the two toys). Every row and column has N/2 of each, no three the same
+// in a line; clues are some squares already filled, and = or × signs between some side-by-side squares.
+// Levels: each size first with a few extra toys put out to start, then with only the clues it needs.
+function levelOf(n) { return [null, [6, 4], [6, 0], [8, 5], [8, 0], [10, 6], [10, 0]][n]; }
+// Every way to finish a grid, counted up to `limit`: fill squares one at a time, after working out every square the
+// rules force (a pair or gap in a line, a full line, or a sign next to a filled square).
+function countSolutions(N, start, signs, limit = 2) {
+  const half = N / 2;
+  let found = 0, steps = 0;
+  const lines = [];
+  for (let r = 0; r < N; r++) lines.push([...Array(N)].map((_, c) => r * N + c));
+  for (let c = 0; c < N; c++) lines.push([...Array(N)].map((_, r) => r * N + c));
+  const bySq = [...Array(N * N)].map(() => []);
+  signs.forEach((s, k) => { bySq[s.a].push(k); bySq[s.b].push(k); });
+  function settle(g) {
+    for (let changed = true; changed;) {
+      changed = false;
+      const put = (i, v) => { if (g[i] === -1) { g[i] = v; changed = true; return true; } return g[i] === v; };
+      for (const L of lines) {
+        let n0 = 0, n1 = 0;
+        for (const i of L) { if (g[i] === 0) n0++; else if (g[i] === 1) n1++; }
+        if (n0 > half || n1 > half) return false;
+        if (n0 === half) for (const i of L) if (g[i] === -1) { g[i] = 1; changed = true; }
+        if (n1 === half) for (const i of L) if (g[i] === -1) { g[i] = 0; changed = true; }
+        for (let k = 0; k + 2 < N; k++) {
+          const a = g[L[k]], b = g[L[k + 1]], c = g[L[k + 2]];
+          if (a !== -1 && a === b && b === c) return false;
+          if (a !== -1 && a === b && c === -1 && !put(L[k + 2], 1 - a)) return false;
+          if (b !== -1 && b === c && a === -1 && !put(L[k], 1 - b)) return false;
+          if (a !== -1 && a === c && b === -1 && !put(L[k + 1], 1 - a)) return false;
+        }
+      }
+      for (const s of signs) {
+        const a = g[s.a], b = g[s.b];
+        if (a !== -1 && b !== -1) { if ((a === b) !== s.same) return false; }
+        else if (a !== -1) { g[s.b] = s.same ? a : 1 - a; changed = true; }
+        else if (b !== -1) { g[s.a] = s.same ? b : 1 - b; changed = true; }
+      }
+    }
+    return true;
+  }
+  function go(g) {
+    if (found >= limit || ++steps > 200000) return;
+    if (!settle(g)) return;
+    const i = g.indexOf(-1);
+    if (i < 0) { found++; go.last = g; return; }
+    for (const v of [0, 1]) { const h = g.slice(); h[i] = v; go(h); }
+  }
+  go(start.slice());
+  return steps > 200000 ? -1 : found;
+}
+
+// A random full grid that keeps the rules: fill square by square, backing up when stuck.
+function randomGrid(N) {
+  const half = N / 2, g = new Array(N * N).fill(-1);
+  const ok = (i) => {
+    const r = Math.floor(i / N), c = i % N, v = g[i];
+    let row = 0, col = 0;
+    for (let k = 0; k < N; k++) { if (g[r * N + k] === v) row++; if (g[k * N + c] === v) col++; }
+    if (row > half || col > half) return false;
+    if (c >= 2 && g[i - 1] === v && g[i - 2] === v) return false;
+    if (r >= 2 && g[i - N] === v && g[i - 2 * N] === v) return false;
+    return true;
+  };
+  function fill(i) {
+    if (i === N * N) return true;
+    for (const v of Math.random() < .5 ? [0, 1] : [1, 0]) { g[i] = v; if (ok(i) && fill(i + 1)) return true; }
+    g[i] = -1; return false;
+  }
+  fill(0);
+  return g;
+}
+
+// Make a puzzle: start from a full grid, offer clues (filled squares and signs) at random until there's only one
+// answer, then take away any clue that isn't needed.
+function makePuzzle(N) {
+  const sol = randomGrid(N), clues = [];
+  for (let i = 0; i < N * N; i++) clues.push({sq: i});
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+    if (c + 1 < N) clues.push({a: r * N + c, b: r * N + c + 1});
+    if (r + 1 < N) clues.push({a: r * N + c, b: (r + 1) * N + c});
+  }
+  // a fair shuffle: about as many squares filled as signs, as in Tango
+  for (let i = clues.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [clues[i], clues[j]] = [clues[j], clues[i]]; }
+  const sq = clues.filter(c => c.sq !== undefined), sg = clues.filter(c => c.sq === undefined);
+  clues.length = 0; for (let k = 0; k < Math.max(sq.length, sg.length); k++) { if (sq[k]) clues.push(sq[k]); if (sg[k]) clues.push(sg[k]); }
+  const used = [];
+  const test = list => {
+    const g = new Array(N * N).fill(-1), signs = [];
+    for (const c of list) if (c.sq !== undefined) g[c.sq] = sol[c.sq]; else signs.push({a: c.a, b: c.b, same: sol[c.a] === sol[c.b]});
+    return countSolutions(N, g, signs);
+  };
+  for (const c of clues) { used.push(c); if (test(used) === 1) break; }
+  for (let k = used.length - 1; k >= 0; k--) { const without = used.filter((_, j) => j !== k); if (test(without) === 1) used.splice(k, 1); }
+  const givens = new Array(N * N).fill(-1), signs = [];
+  for (const c of used) if (c.sq !== undefined) givens[c.sq] = sol[c.sq]; else signs.push({a: c.a, b: c.b, same: sol[c.a] === sol[c.b]});
+  return {N, sol, givens, signs};
+}
+function makeLevel(n) {
+  const [N, extra] = levelOf(n), p = makePuzzle(N), empty = p.givens.map((v, i) => v === -1 ? i : -1).filter(i => i >= 0);
+  for (let k = 0; k < extra && empty.length; k++) { const i = empty.splice(Math.floor(Math.random() * empty.length), 1)[0]; p.givens[i] = p.sol[i]; }
+  return p;
+}
+
+/* ---------- toys ---------- */
+// The toy library's kinds, one per colour (as in Pounce). Each puzzle picks two different colours, so the two
+// toys are easy to tell apart, and a picture for each from the ones the player hasn't left out.
+const KINDS = [
+  {c: "#BD5538", looks: [["wiffle-red", "red wiffle balls"], ["swirl-red", "red swirl balls"], ["crochet-stars", "star balls"], ["tinsel", "tinsel balls"]]},
+  {c: "#ECA818", looks: [["wiffle-yellow", "yellow wiffle balls"]]},
+  {c: "#73A7AE", looks: [["wiffle-teal", "teal wiffle balls"], ["fish", "fish"]]},
+  {c: "#6AA673", looks: [["lattice", "lattice balls"]]},
+  {c: "#B3B94B", looks: [["spiky-lime", "spiky pom-poms"]]},
+  {c: "#B94588", looks: [["swirl-purple", "plum swirl balls"], ["bell-purple", "bell balls"]]},
+  {c: "#7885BA", looks: [["spring", "springs"], ["rope-blue", "rope balls"]]},
+  {c: "#825840", looks: [["cork-paw", "cork paw balls"], ["burlap-paws", "burlap balls"], ["rattan", "rattan balls"]]},
+  {c: "#5E5866", looks: [["mouse", "mice"]]},
+  {c: "#E16A4A", looks: [["felt-rainbow", "rainbow balls"], ["ribbon-tail", "ribbon balls"], ["spiky-rainbow", "spiky balls"]]},
+];
+const TOYS_PREF = "catdoku.tango.toys.v1", MIN_COLOURS = 2;
+let offToys = new Set(G.load(TOYS_PREF).off || []);
+const toySrc = f => `../toys/${f}.webp?v=2026-10-09.2`;
+const nameOf = f => { for (const k of KINDS) for (const [g, n] of k.looks) if (g === f) return n; return "toy"; };
+function pickToys() {
+  let kinds = KINDS.map((_, i) => i).filter(k => KINDS[k].looks.some(([f]) => !offToys.has(f)));
+  if (kinds.length < 2) kinds = KINDS.map((_, i) => i);
+  for (let i = kinds.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [kinds[i], kinds[j]] = [kinds[j], kinds[i]]; }
+  return kinds.slice(0, 2).map(k => KINDS[k].looks[G.pickLook(KINDS[k], offToys)][0]);
+}
+
+/* ---------- game ---------- */
+const STORE = "catdoku.tango.v1", MAX_LEVEL = 6;
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1}, state.settings);
+let game = state.game || null, busy = false;
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !busy && !$("overlay").classList.contains("show");
+const levelName = n => { const [N, extra] = levelOf(n); return `Level ${n} · ${N} × ${N}${extra ? ", a head start" : ""}`; };
+const build = G.builder([levelOf, countSolutions, randomGrid, makePuzzle, makeLevel], "makeLevel");
+const img = f => `<img src="${toySrc(f)}" alt="${nameOf(f)}">`;
+
+function lines(N) {
+  const out = [];
+  for (let r = 0; r < N; r++) out.push([...Array(N)].map((_, c) => r * N + c));
+  for (let c = 0; c < N; c++) out.push([...Array(N)].map((_, r) => r * N + c));
+  return out;
+}
+// Squares and signs that break a rule as things stand.
+function problems() {
+  const N = game.N, half = N / 2, g = game.grid, bad = new Set(), badSign = new Set();
+  for (const L of lines(N)) {
+    for (const v of [0, 1]) if (L.filter(i => g[i] === v).length > half) L.forEach(i => { if (g[i] === v) bad.add(i); });
+    for (let k = 0; k + 2 < N; k++) { const a = g[L[k]]; if (a !== -1 && a === g[L[k + 1]] && a === g[L[k + 2]]) [0, 1, 2].forEach(d => bad.add(L[k + d])); }
+  }
+  game.signs.forEach((s, k) => { const a = g[s.a], b = g[s.b]; if (a !== -1 && b !== -1 && (a === b) !== s.same) { badSign.add(k); bad.add(s.a); bad.add(s.b); } });
+  return {bad, badSign};
+}
+function draw() {
+  const N = game.N, el = $("squares"), {bad, badSign} = problems();
+  el.style.gridTemplateColumns = `repeat(${N}, 1fr)`;
+  el.innerHTML = game.grid.map((v, i) => `<div class="sq${game.givens[i] !== -1 ? " given" : ""}${bad.has(i) ? " bad" : ""}" data-i="${i}" role="button" aria-label="${v === -1 ? "Empty" : nameOf(game.toys[v])}">${v === -1 ? "" : img(game.toys[v])}</div>`).join("");
+  // each sign sits on the edge between its two squares
+  const cells = [...el.children], box = $("board").getBoundingClientRect(), bl = $("board").clientLeft, bt = $("board").clientTop;
+  $("board").querySelectorAll(".sign").forEach(s => s.remove());
+  game.signs.forEach((s, k) => {
+    const A = cells[s.a].getBoundingClientRect(), B = cells[s.b].getBoundingClientRect(), d = document.createElement("div");
+    d.className = "sign" + (badSign.has(k) ? " bad" : ""); d.textContent = s.same ? "=" : "×";
+    d.style.left = ((A.left + A.right + B.left + B.right) / 4 - box.left - bl) + "px"; d.style.top = ((A.top + A.bottom + B.top + B.bottom) / 4 - box.top - bt) + "px";
+    $("board").append(d);
+  });
+  $("key").innerHTML = `<span>Tap once: ${img(game.toys[0])}</span><span>Twice: ${img(game.toys[1])}</span>`;
+  const empty = game.grid.filter(v => v === -1).length;
+  $("count").textContent = game.won ? "Solved!" : empty ? `${empty} square${empty === 1 ? "" : "s"} to fill` : bad.size ? "Something's not right" : "";
+  $("undoBtn").disabled = !game.history.length || game.won; $("clearBtn").disabled = !game.history.length || game.won;
+}
+$("squares").addEventListener("click", e => {
+  if (!playing()) return;
+  const c = e.target.closest(".sq"); if (!c) return;
+  const i = +c.dataset.i; if (game.givens[i] !== -1) return;
+  game.history.push(game.grid.slice());
+  game.grid[i] = game.grid[i] === -1 ? 0 : game.grid[i] === 0 ? 1 : -1;
+  if (!game.grid.includes(-1) && !problems().bad.size) win(); else { draw(); save(); }
+});
+$("undoBtn").onclick = () => { if (playing() && game.history.length) { game.grid = game.history.pop(); draw(); save(); } };
+$("clearBtn").onclick = () => { if (playing() && game.history.length) { game.history.push(game.grid.slice()); game.grid = game.givens.slice(); draw(); save(); G.note("Back to the start. Undo brings your toys back.", 3500); } };
+addEventListener("resize", () => { if (game) draw(); });
+
+/* ---------- endings ---------- */
+function win() {
+  game.won = true; G.finishClock(game);
+  const next = Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save();
+  $("board").classList.remove("won"); $("board").getBoundingClientRect(); $("board").classList.add("won"); draw();
+  G.track(`Toy Tango solved level ${game.level}`);
+  build.prefetch(next);
+  const g = game;
+  setTimeout(() => { if (game === g) finishCard(); }, 900);
+}
+function finishCard() {
+  const next = settings.level, N = game.N;
+  let text = `Every row and column of the ${N} × ${N} toy box shares its toys out fairly.`;
+  text += game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my toys", game.result,
+    {title: "Fair and square!", next: `Next: level ${next}`, after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- new puzzles ---------- */
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
+async function newPuzzle() {
+  if (busy) return;
+  busy = true;
+  const n = settings.level;
+  G.openCard("Tidying the toy box…", n >= 5 ? "Big boxes can take a few seconds." : "", []);
+  const p = await build.take(n);
+  game = {level: n, N: p.N, givens: p.givens, signs: p.signs, grid: p.givens.slice(), toys: pickToys(), history: [], won: false, ...G.freshClock()};
+  busy = false; G.closeCard(); $("board").classList.remove("won"); G.note("");
+  draw(); save();
+  build.prefetch(n);
+  G.track(`Toy Tango new puzzle level ${n}`);
+}
+
+/* ---------- how to play ---------- */
+function rulesPicture(t) {
+  const sq = (v, sign) => `<span>${v < 0 ? "" : `<img src="${toySrc(t[v])}" alt="">`}${sign ? `<b>${sign}</b>` : ""}</span>`;
+  const fig = (cells, caption, no) => `<figure class="${no ? "no" : ""}"><div class="row">${cells}</div><figcaption>${caption}</figcaption></figure>`;
+  return fig(sq(0) + sq(1) + sq(0) + sq(1), "Half and half in a line") +
+    fig(sq(0) + sq(0) + sq(0), "No three alike", true) +
+    fig(sq(0, "=") + sq(0), "= means the same") + fig(sq(0, "×") + sq(1), "× means different");
+}
+function showHelp() {
+  const media = document.createElement("div");
+  const pics = document.createElement("div"); pics.className = "rules"; pics.innerHTML = rulesPicture(game ? game.toys : ["fish", "wiffle-yellow"]);
+  const ol = document.createElement("ol"); ol.className = "steps";
+  for (const t of ["Fill every square with one of the two toys: tap once for the first, twice for the second, again to empty it.",
+                   "Every row and column holds as many of one toy as the other.",
+                   "No three of the same toy sit next to each other in a line.",
+                   "= between two squares means the same toy; × means different."]) {
+    const li = document.createElement("li"); li.textContent = t; ol.append(li);
+  }
+  const tip = document.createElement("p"); tip.className = "tip";
+  tip.textContent = "Squares that break a rule are outlined in red. Every puzzle has exactly one answer.";
+  media.append(pics, ol, tip);
+  G.openCard("How to play", "", [["Let's play", () => { G.closeCard(); settings.seenHelp = true; save(); }, true]], media);
+}
+function helpOnFirstVisit() { if (!settings.seenHelp && game && playing()) showHelp(); }
+
+/* ---------- choosing toys ---------- */
+$("toysBtn").onclick = () => G.toyPicker({kinds: KINDS, off: offToys, min: MIN_COLOURS, src: toySrc, save: off => {
+  offToys = off; G.save(TOYS_PREF, {off: [...off]});
+  // swap in new toys straight away if this puzzle uses one that's been left out
+  if (game && !game.won && game.toys.some(f => off.has(f))) { game.toys = pickToys(); draw(); save(); G.note("Here are your toys.", 3000); }
+  else G.note("Saved. Your toys are used from the next puzzle.", 3500);
+}});
+
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", "") + (n === MAX_LEVEL ? " (hardest)" : ""), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
+$("helpBtn").onclick = showHelp;
+
+G.nav("tango");
+G.checkClock(game);
+G.setupTimer({name: "tango", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level",
+  emptyText: "Solve a puzzle and your times will show up here. They're kept on this device only."});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+if (game && Array.isArray(game.grid) && Array.isArray(game.signs)) G.reopen(() => {
+    if (!levelOf(game.level) || game.grid.length !== game.N * game.N) throw new Error("the saved puzzle doesn't fit its level");
+    draw();
+    if (game.won) finishCard();
+    build.prefetch(settings.level); helpOnFirstVisit();
+  }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
+else newPuzzle().then(helpOnFirstVisit);
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
