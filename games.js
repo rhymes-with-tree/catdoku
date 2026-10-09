@@ -131,16 +131,29 @@ const G = (() => {
   // the admire button.
   // After admiring, point to the page's own new-puzzle button (New floor, New table…), or the level list.
   const admireNote = () => $("newBtn") ? `Done! Tap ${$("newBtn").textContent.trim()} when you're ready for another.` : "Done! Pick a level when you're ready for another.";
+  // A perfect clear (no help, nothing lost, no undo) earns a gold paw: o.gold puts one on the win card.
+  const PAW = "M100 6 C126 6 141 28 153 46 C172 50 197 70 195 101 C193 133 166 147 140 141 C125 138 112 131 100 131 C88 131 75 138 60 141 C34 147 7 133 5 101 C3 70 28 50 47 46 C59 28 74 6 100 6Z";
+  function goldPaw() {
+    const box = document.createElement("div");
+    box.innerHTML = `<svg class="goldpaw" viewBox="-3 -3 106 92" aria-hidden="true"><g fill="#E0A526" stroke="#2A2530" stroke-width="2.5">
+      ${[[16.5, 30.5, -24], [38.5, 15, -8], [61.5, 15, 8], [83.5, 30.5, 24]].map(([x, y, r]) => `<ellipse cx="${x}" cy="${y}" rx="9.5" ry="10.75" transform="rotate(${r} ${x} ${y})" vector-effect="non-scaling-stroke"/>`).join("")}
+      <path d="${PAW}" transform="translate(19 35.3) scale(.31 .298)" vector-effect="non-scaling-stroke"/></g></svg>`;
+    return box.firstChild;
+  }
   function winCard(text, onNext, admire = "Admire my board", result, o = {}) {
     const media = document.createElement("div");
+    if (o.gold) media.append(goldPaw());
     const p = document.createElement("p"); p.textContent = text;
     const name = document.createElement("p"); name.className = "catname";
     name.textContent = `Meet ${NAMES[Math.floor(Math.random() * NAMES.length)]}!`;
     const tl = timeLineEl(result); if (tl) media.append(tl);
-    media.append(p, catPhoto(), name);
+    media.append(p);
+    // how to earn the gold paw, when this one missed it
+    if (!o.gold && o.goldTip) { const g = document.createElement("p"); g.className = "goldtip"; g.textContent = o.goldTip; media.append(g); }
+    media.append(catPhoto(), name);
     const btns = [[o.next || "New puzzle", onNext, true]];
     if (admire !== null) btns.push([admire, () => { closeCard(); note(admireNote(), 0); }]);
-    openCard(o.title || "Solved!", "", btns, media, o.after);
+    openCard(o.gold ? "Gold paw!" : o.title || "Solved!", "", btns, media, o.after);
   }
 
   // Count a moment in the game (a puzzle started or solved) on the GoatCounter dashboard.
@@ -167,6 +180,8 @@ const G = (() => {
   style.textContent = `
     .timer{background:none;border:none;border-radius:8px;padding:0 6px;font:inherit;font-weight:600;color:var(--ink-soft);font-variant-numeric:tabular-nums;cursor:pointer;white-space:nowrap}
     .timer:hover{background:none;color:var(--ink)}
+    .card .goldpaw{width:84px;height:84px;margin:0 auto 10px;display:block}
+    .card .goldtip{font-size:14px;color:var(--ink-soft)}
     .card .timeline{font-weight:800;color:var(--ink);margin:0 0 12px}
     .bests{width:100%;border-collapse:collapse;margin:0 0 14px;font-variant-numeric:tabular-nums;color:var(--ink)}
     .bests th,.bests td{padding:4px 6px;text-align:left;border-bottom:1px solid var(--line)}
@@ -593,5 +608,5 @@ const G = (() => {
   }
 
   return {$, nav, load, save, builder, openCard, closeCard, winCard, sizeUp, otherSize, note, cellAt, track, reopen,
-          setupTimer, freshClock, spotlight, toysOff, saveToys, needToys, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, toyPicker, pickLook};
+          setupTimer, freshClock, spotlight, toysOff, saveToys, needToys, goldPaw, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, toyPicker, pickLook};
 })();
