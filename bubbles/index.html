@@ -96,7 +96,7 @@ G.nav("bubbles");
 // Sizes are in bubble widths. A bubble that ends up in row ROWS (counting the rows the shelf has come
 // down) is over the cat's line, and the level is lost.
 const COLS = 8, ROWS = 12, RH = Math.sqrt(3) / 2, TOP = 0.3;
-const LINE = TOP + 1 + (ROWS - 1) * RH, SX = COLS / 2, SY = LINE + 1.05, HT = LINE + 2.1;
+const LINE = TOP + 1 + (ROWS - 1) * RH, SX = COLS / 2, SY = LINE + 1.15, HT = LINE + 2.8;
 const EMPTY = -1, KIT = 10, YARN = 11, PEG = 12;   // 0–9 are kinds of toy; then a kitten, a yarn tangle, a cat-tree post
 const ZOOM = 1, BOUNCY = 2, NIP = 3;               // special bubbles the cat can bat
 const isToy = k => k >= 0 && k < KIT;
@@ -218,7 +218,7 @@ function pushRow(B, kinds, clump, rnd = Math.random) {
 // (bubbles with a kitten inside only come down by falling, or in a zoomies or bouncy burst). Later
 // levels have more kinds of toy, more rows, yarn tangles (from 5) and cat-tree posts that hold up
 // whatever hangs from them (from 10). The shelf comes down a row every EVERY[n] bats. A simulated player
-// that knows where every bat lands, but aims a little off now and then, wins every level up to 11 and
+// that knows where every bat lands, but aims a little off now and then, wins nearly every level up to 11 and
 // 80–95% of levels 12 to 20 (a person, seeing only the first bounce, finds them harder).
 const MAX_LEVEL = 20;
 const EVERY = [9, 9, 9, 8, 8, 8, 8, 7, 7, 7, 7, 6, 6, 6, 6, 6, 5, 5, 5, 5];
@@ -670,16 +670,16 @@ function draw() {
   drawCat();
   // the bubble wand with the bubble about to go, and the next one waiting
   const q = d.queue;
-  // while pulling, the bubble sits back on a stretchy band, opposite the way it'll go
-  let bx = SX, by = SY;
-  if (pull) { const d = Math.hypot(pull[0] - SX, pull[1] - SY), k = d ? Math.min(d, 1.4) * 0.45 / d : 0; bx += (pull[0] - SX) * k; by += (pull[1] - SY) * k; }
-  if (pull) {
-    ctx.strokeStyle = "rgba(185,69,136,.8)"; ctx.lineWidth = 3;
-    for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo((SX + s * 0.55) * U, SY * U); ctx.lineTo(bx * U, by * U); ctx.stroke(); }
-  }
-  if (!fly && q[0]) drawBubble(q[0].k, q[0].sp, bx, by, {sq: pull ? 0 : 0.03 * Math.sin(now * 3)});
-  ctx.strokeStyle = "#B94588"; ctx.lineWidth = 4; circle(ctx, SX * U, SY * U, 0.56 * U); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo((SX + 0.4) * U, (SY + 0.4) * U); ctx.lineTo((SX + 0.75) * U, (HT - 0.05) * U); ctx.stroke();
+  // The wand turns to point the way it'll bat, handle trailing behind. Pulling draws the whole wand
+  // back with the finger; letting go springs it forward again.
+  let ox = 0, oy = 0;
+  if (pull) { const d = Math.hypot(pull[0] - SX, pull[1] - SY), k = d ? Math.min(d, 1.2) * 0.42 / d : 0; ox = (pull[0] - SX) * k; oy = (pull[1] - SY) * k; }
+  else if (now - spring.t0 < 0.35) { const u = (now - spring.t0) / 0.35, f = Math.cos(u * PI * 1.5) * (1 - u); ox = spring.x * f; oy = spring.y * f; }
+  const wx = SX + ox, wy = SY + oy, ax = Math.cos(aim), ay = -Math.sin(aim);
+  ctx.strokeStyle = "#B94588"; ctx.lineCap = "round";
+  ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo((wx - ax * 0.56) * U, (wy - ay * 0.56) * U); ctx.lineTo((wx - ax * 1.1) * U, (wy - ay * 1.1) * U); ctx.stroke();
+  if (!fly && q[0]) drawBubble(q[0].k, q[0].sp, wx, wy, {sq: pull ? 0 : 0.03 * Math.sin(now * 3)});
+  ctx.lineWidth = 4; circle(ctx, wx * U, wy * U, 0.56 * U); ctx.stroke(); ctx.lineCap = "butt";
   if (q[1]) {
     drawBubble(q[1].k, q[1].sp, 1.25, SY + 0.2, {size: 0.72});
     ctx.font = "600 14px 'Baloo 2', system-ui, sans-serif"; ctx.fillStyle = "#5E5866"; ctx.textAlign = "center";
@@ -689,7 +689,7 @@ function draw() {
   if (!batted && !fly) {   // until the first bat, say how
     ctx.font = "600 17px 'Baloo 2', system-ui, sans-serif"; ctx.fillStyle = "#2A2530"; ctx.textAlign = "center";
     ctx.globalAlpha = 0.6 + 0.4 * Math.sin(now * 3);
-    ctx.fillText("Pull back from the wand, let go to bat", COLS / 2 * U, (LINE - 0.35) * U); ctx.globalAlpha = 1;
+    ctx.fillText("Touch the floor, pull back, let go to bat", COLS / 2 * U, (LINE - 0.35) * U); ctx.globalAlpha = 1;
   }
   if (fly) {
     let dist = (now - fly.t0) * SPEED, p = fly.path, i = 1;
@@ -753,18 +753,20 @@ function loop(t) {
 }
 
 /* ---------- input ---------- */
-// The wand is a slingshot: touch down on the floor, pull back away from where the bubble should go
-// and let go. The aim line shows the way while you pull. A short pull (let go near where you started)
+// The wand is a slingshot: touch down anywhere on the floor, pull back away from where the bubble
+// should go and let go. The aim line shows the way while you pull. A short pull (let go near where you started)
 // calls it off. Touches up among the bubbles do nothing, so you can't just tap the spot you want.
 // Tap the next bubble to swap.
 const MIN_AIM = 0.14, PULL = 0.5;   // the shallowest angle, and how far to pull (in bubbles) before letting go bats
-let pull = null;                    // where the finger is while pulling, in bubbles
+let pull = null, from = null;       // how far the finger has pulled back, and where it touched down (in bubbles)
+let spring = {t0: -9, x: 0, y: 0};  // the wand springing forward after a pull
 const toUnits = e => { const r = canvas.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * COLS, (e.clientY - r.top) / r.width * COLS]; };
 function pullTo(x, y) {
-  pull = [x, y];
-  if (Math.hypot(x - SX, y - SY) < PULL) return;
-  let a = Math.atan2(y - SY, SX - x);   // the bubble goes the opposite way to the pull
-  if (a <= 0) a = SX - x >= 0 ? MIN_AIM : PI - MIN_AIM;
+  const px = x - from[0], py = y - from[1];
+  pull = [SX + px, SY + py];
+  if (Math.hypot(px, py) < PULL) return;
+  let a = Math.atan2(py, -px);   // the bubble goes the opposite way to the pull
+  if (a <= 0) a = px <= 0 ? MIN_AIM : PI - MIN_AIM;
   aim = Math.min(PI - MIN_AIM, Math.max(MIN_AIM, a));
 }
 const onNext = (x, y) => Math.hypot(x - 1.25, y - SY - 0.1) < 0.75;
@@ -777,15 +779,16 @@ canvas.addEventListener("pointerdown", e => {
   e.preventDefault();
   const [x, y] = toUnits(e);
   if (onNext(x, y)) return swap();
-  if (y < LINE) { if (!batted) G.note("Pull back from the wand on the floor to aim.", 3000); return; }
+  if (y < LINE) { if (!batted) G.note("Touch the floor and pull back to aim.", 3000); return; }
   try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
-  aiming = true; pullTo(x, y);
+  aiming = true; from = [x, y]; pullTo(x, y);
 });
 canvas.addEventListener("pointermove", e => { if (aiming && S && !S.over) pullTo(...toUnits(e)); });
 canvas.addEventListener("pointerup", e => {
   if (!aiming) return;
   aiming = false; pullTo(...toUnits(e));
-  const far = Math.hypot(pull[0] - SX, pull[1] - SY) >= PULL;
+  const d = Math.hypot(pull[0] - SX, pull[1] - SY), far = d >= PULL, k = d ? Math.min(d, 1.2) * 0.42 / d : 0;
+  spring = {t0: now, x: (pull[0] - SX) * k, y: (pull[1] - SY) * k};
   pull = null;
   if (far) { batted = true; bat(); }
 });
