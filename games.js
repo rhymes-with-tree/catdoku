@@ -335,9 +335,10 @@ const G = (() => {
   // The toy pictures a game uses, in colour order (each colour is one kind of toy). Tap one to leave it
   // out. o: {kinds (each {looks: [[picture, name]…]}), off (picture names left out), min (colours that
   // must keep a picture), src(picture) for its address, save(off)}.
+  // o.why, when given, says what the game needs (shown when the toys picked aren't enough for it).
   function toyPicker(o) {
     const off = new Set(o.off), media = document.createElement("div"), grid = document.createElement("div");
-    const tip = document.createElement("p"); tip.className = "tip"; tip.textContent = "Tap a toy to leave it out.";
+    const tip = document.createElement("p"); tip.className = "tip"; tip.textContent = o.why || "Tap a toy to leave it out.";
     grid.className = "toypick";
     for (const k of o.kinds) for (const [f, name] of k.looks) {
       const b = document.createElement("button"), img = document.createElement("img");
@@ -349,7 +350,7 @@ const G = (() => {
     }
     const count = document.createElement("p"); count.className = "pickNote"; count.setAttribute("aria-live", "polite");
     media.append(tip, grid, count);
-    openCard("Your toys", "", [["Save", () => { closeCard(); o.save(off); }, true], ["Cancel", closeCard]], media);
+    openCard("Toy chest", "", [["Save", () => { closeCard(); o.save(off); }, true], ["Cancel", closeCard]], media);
     const save = $("card").querySelector(".btns button");
     function check() {
       const n = o.kinds.filter(k => k.looks.some(([f]) => !off.has(f))).length, short = n < o.min;
@@ -357,6 +358,26 @@ const G = (() => {
       count.textContent = short ? `Keep toys in at least ${o.min} colours (${n} now).` : `${n} of ${o.kinds.length} colours in play.`;
     }
     check();
+  }
+  // The toys left out are one choice for every game. Each game used to keep its own: the first
+  // game opened since then brings its choice along. legacy: that game's old storage key.
+  const TOYS = "catdoku.toys.v1";
+  function toysOff(legacy) {
+    let s = load(TOYS);
+    if (!Array.isArray(s.off)) { s = {off: (legacy && load(legacy).off) || []}; save(TOYS, s); }
+    return new Set(s.off);
+  }
+  function saveToys(off) { save(TOYS, {off: [...off]}); }
+  // Colours that still have a toy in play.
+  const toyColours = (kinds, off) => kinds.filter(k => k.looks.some(([f]) => !off.has(f))).length;
+  // A game needing toys in more colours than are picked opens the toy chest, saying what it needs,
+  // once nothing else (a walkthrough or a card) is up. o: as toyPicker, plus game (its name).
+  function needToys(o, tries = 0) {
+    if (!tries) { setTimeout(() => needToys(o, 1), 1200); return; }  // give a first-visit walkthrough time to start
+    const n = toyColours(o.kinds, o.off());
+    if (n >= o.min) return;
+    if (document.querySelector(".spot") || $("overlay").classList.contains("show")) { if (tries < 200) setTimeout(() => needToys(o, tries + 1), 1500); return; }
+    toyPicker({...o, off: o.off(), why: `${o.game} needs toys in at least ${o.min} colours. You have ${n}, so put some back in.`});
   }
   // Which of a kind's pictures to show, picked from those not left out (any, if all are).
   function pickLook(k, off) {
@@ -572,5 +593,5 @@ const G = (() => {
   }
 
   return {$, nav, load, save, builder, openCard, closeCard, winCard, sizeUp, otherSize, note, cellAt, track, reopen,
-          setupTimer, freshClock, spotlight, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, toyPicker, pickLook};
+          setupTimer, freshClock, spotlight, toysOff, saveToys, needToys, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, toyPicker, pickLook};
 })();
