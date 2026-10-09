@@ -174,7 +174,7 @@ const G = (() => {
     .bests td.num,.bests th.num{text-align:right}
     .bests tr.now td{font-weight:800}
     .card h3{margin:4px 0 6px;font-size:18px}
-    .spot{position:absolute;inset:0;z-index:5;cursor:pointer;animation:spotIn .35s ease-out;-webkit-tap-highlight-color:transparent;touch-action:none}
+    .spot{position:fixed;inset:0;z-index:9;cursor:pointer;animation:spotIn .35s ease-out;-webkit-tap-highlight-color:transparent;touch-action:none}
     .spot:focus{outline:none}
     .spot svg{position:absolute;inset:0;display:block}
     .spot .dim{fill:rgba(42,37,48,.66)}
@@ -358,26 +358,37 @@ const G = (() => {
   }
 
   /* ---------- first-time spotlight ---------- */
-  // Teach a game on its own board: each step dims everything but some squares, outlines them in red,
-  // can put marks on them (a 🐱, ❌…; a list of marks takes turns), and says one line. A tap or
-  // Space shows the next step; after the last, `done` runs. `grid` is the element the squares fill,
-  // `w` × `h` squares; each step is {say, lit: [[x, y]…], outline (default: lit), marks: [[x, y, mark]…]}.
-  // It sits over the board, so taps on it never reach the game (or start its timer).
+  // Teach a game on its own board: each step dims the whole screen except some squares (and, if it
+  // names them, other things on the page such as a key above the board), outlines them in red, can
+  // put marks on squares (a 🐱, ❌…; a list of marks takes turns), and says one line over the board.
+  // A tap or Space shows the next step; after the last, "Let's Play!" shows and `done` runs.
+  // `grid` is the element the squares fill, `w` × `h` squares; each step is
+  // {say, lit: [[x, y]…], outline (default: lit), marks: [[x, y, mark]…], els: [element…]}.
+  // It covers the screen, so taps on it never reach the game (or start its timer).
   function spotlight(o) {
     const wrap = o.grid.parentElement, layer = document.createElement("div"), ns = "http://www.w3.org/2000/svg";
     layer.className = "spot"; layer.tabIndex = 0; layer.setAttribute("role", "dialog"); layer.setAttribute("aria-live", "polite");
-    wrap.append(layer);
+    document.body.append(layer);
     let k = -1, frame = 0, ticker = null;
     const svgEl = (t, a) => { const e = document.createElementNS(ns, t); for (const n in a) e.setAttribute(n, a[n]); return e; };
+    // Bring the board (and anything else the steps light) into view first.
+    {
+      const tops = [wrap, ...o.steps.flatMap(st => st.els || [])].map(e => e.getBoundingClientRect());
+      const top = Math.min(...tops.map(r => r.top)), bottom = Math.max(...tops.map(r => r.bottom));
+      if (top < 0 || bottom > innerHeight) scrollBy(0, bottom - top < innerHeight ? (top + bottom - innerHeight) / 2 : top - 8);
+    }
     function show() {
-      const st = o.steps[k], g = o.grid, W = wrap.clientWidth, H = wrap.clientHeight;
-      const cw = g.clientWidth / o.w, ch = g.clientHeight / o.h, ox = g.offsetLeft + g.clientLeft, oy = g.offsetTop + g.clientTop;
-      const X = x => ox + x * cw, Y = y => oy + y * ch, lit = st.lit || [], on = new Set(lit.map(([x, y]) => y * o.w + x));
+      const st = o.steps[k], g = o.grid.getBoundingClientRect(), b = wrap.getBoundingClientRect(), W = innerWidth, H = innerHeight;
+      const cw = o.grid.clientWidth / o.w, ch = o.grid.clientHeight / o.h, ox = g.left + o.grid.clientLeft, oy = g.top + o.grid.clientTop;
+      const X = x => ox + x * cw, Y = y => oy + y * ch, lit = st.lit || [];
+      const els = (st.els || []).map(e => { const r = e.getBoundingClientRect(), p = 5; return {x: r.left - p, y: r.top - p, w: r.width + 2 * p, h: r.height + 2 * p}; });
       layer.innerHTML = "";
       const svg = svgEl("svg", {viewBox: `0 0 ${W} ${H}`, width: W, height: H, "aria-hidden": "true"});
       let d = `M0 0H${W}V${H}H0Z`;
       for (const [x, y] of lit) d += `M${X(x)} ${Y(y)}H${X(x + 1)}V${Y(y + 1)}H${X(x)}Z`;
+      for (const r of els) d += `M${r.x} ${r.y}h${r.w}v${r.h}h${-r.w}Z`;
       svg.append(svgEl("path", {d, "fill-rule": "evenodd", class: "dim"}));
+      const sw = Math.max(3, cw * 0.07);
       for (const group of st.outline || [lit]) {   // red lines where the outlined squares meet the rest
         const set = new Set(group.map(([x, y]) => y * o.w + x)), has = (x, y) => x >= 0 && y >= 0 && x < o.w && y < o.h && set.has(y * o.w + x);
         let e = "";
@@ -387,8 +398,9 @@ const G = (() => {
           if (!has(x - 1, y)) e += `M${X(x)} ${Y(y)}V${Y(y + 1)}`;
           if (!has(x + 1, y)) e += `M${X(x + 1)} ${Y(y)}V${Y(y + 1)}`;
         }
-        svg.append(svgEl("path", {d: e, class: "edge", "stroke-width": Math.max(3, cw * 0.07)}));
+        svg.append(svgEl("path", {d: e, class: "edge", "stroke-width": sw}));
       }
+      for (const r of els) svg.append(svgEl("rect", {x: r.x, y: r.y, width: r.w, height: r.h, rx: 6, class: "edge", "stroke-width": sw}));
       for (const [x, y, m] of st.marks || []) {
         const t = svgEl("text", {x: X(x + 0.5), y: Y(y + 0.56), "text-anchor": "middle", "dominant-baseline": "middle",
           "font-size": cw * (m === "❌" ? 0.42 : 0.56)});
@@ -396,20 +408,21 @@ const G = (() => {
       }
       layer.append(svg);
       const say = document.createElement("div"); say.className = "say";
-      const b = document.createElement("b"); sayWith(b, st.say);
+      say.style.left = `${b.left + b.width * 0.04}px`; say.style.width = `${b.width * 0.92}px`;
+      const bw = document.createElement("b"); sayWith(bw, st.say);
       const tap = document.createElement("small"); tap.textContent = "Tap to go on";
-      say.append(b, tap); layer.append(say);
-      // The words go where they cover the least of the lit squares (and, among those, nearest the
-      // middle of the board), so they never sit on what the step is pointing at if they can help it.
+      say.append(bw, tap); layer.append(say);
+      // The words go over the board where they cover the least of the lit squares (and, among those,
+      // nearest the middle), so they never sit on what the step is pointing at if they can help it.
       const sh = say.offsetHeight, l = say.offsetLeft, r = l + say.offsetWidth;
-      let best = H / 2 - sh / 2, bestCost = Infinity;
-      for (let t = 4; t <= H - sh - 4; t += 4) {
+      let best = b.top + b.height / 2 - sh / 2, bestCost = Infinity;
+      for (let t = b.top + 4; t <= b.bottom - sh - 4; t += 4) {
         let cover = 0;
         for (const [x, y] of lit) {
           const w = Math.min(r, X(x + 1)) - Math.max(l, X(x)), h = Math.min(t + sh, Y(y + 1)) - Math.max(t, Y(y));
           if (w > 0 && h > 0) cover += w * h;
         }
-        const cost = cover * 1000 + Math.abs(t + sh / 2 - H / 2);
+        const cost = cover * 1000 + Math.abs(t + sh / 2 - (b.top + b.height / 2));
         if (cost < bestCost) { bestCost = cost; best = t; }
       }
       say.style.top = `${best}px`;
@@ -433,10 +446,11 @@ const G = (() => {
         el.append(w);
       }
     }
+    const redraw = () => k >= 0 && k < o.steps.length && show();
     function next(e) {
       if (e) { e.preventDefault(); e.stopPropagation(); }
       if (++k >= o.steps.length) {   // all done: "Let's Play!" shows over the board and fades by itself
-        clearInterval(ticker); ro.disconnect(); layer.remove(); if (o.done) o.done();
+        clearInterval(ticker); removeEventListener("resize", redraw); removeEventListener("scroll", redraw); layer.remove(); if (o.done) o.done();
         const go = document.createElement("div"); go.className = "spotGo"; go.setAttribute("aria-hidden", "true");
         const b = document.createElement("b"); b.textContent = "Let's Play!"; go.append(b); wrap.append(go);
         setTimeout(() => go.remove(), 1300);
@@ -444,11 +458,11 @@ const G = (() => {
       }
       frame = 0; show();
     }
-    const ro = new ResizeObserver(() => k >= 0 && k < o.steps.length && show());
+    addEventListener("resize", redraw); addEventListener("scroll", redraw, {passive: true});
     layer.addEventListener("pointerdown", next);
     layer.addEventListener("keydown", e => { if (e.key === " " || e.key === "Enter" || e.key === "Escape") next(e); });
     ticker = setInterval(() => { const st = o.steps[k]; if (st && (st.marks || []).some(m => Array.isArray(m[2]))) { frame++; show(); } }, 900);
-    next(); ro.observe(wrap); layer.focus({preventScroll: true});
+    next(); layer.focus({preventScroll: true});
   }
 
   let msgTimer = null;
