@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-09.2"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-09.3"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -22,7 +22,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-09.2">
+<link rel="stylesheet" href="../games.css?v=2026-10-09.3">
 <style>
 /* A living room floor: a winding ball track on the rug, with wicker baskets of toys around it. */
 .wrap.room{height:auto;aspect-ratio:2/3;max-width:calc((100svh - 40px) * 2 / 3)}
@@ -82,7 +82,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-09.2"></script>
+<script src="../games.js?v=2026-10-09.3"></script>
 <script>
 const $ = G.$;
 G.nav("toybox");
@@ -595,8 +595,8 @@ function rainbow(kind) {
 /* ---------- tips ---------- */
 // Short tips that pop up the first time each situation comes up; this device remembers which were seen.
 const TIPS = {
-  pick: ["Pick a toy", "When the two front toys in a basket are different, tap the one you want to send."],
-  full: ["The track is filling up", "The counter at the top shows how many toys are on the track and how many it holds. If it fills up and no toy has a basket to go to, the track jams. Send toys that have somewhere to go, and use a helper if you get stuck."],
+  pick: () => { const b = live().find(b => mixedFront(b) && landed(b)); return b && {say: "Tap the toy you want to send", shapes: () => [{poly: frontRow(b)}]}; },
+  full: () => ({say: "The track is filling up", els: [$("meter")], shapes: () => [trackBand()]}),
 };
 let tipWaiting = null;
 function tip(key) {
@@ -605,10 +605,10 @@ function tip(key) {
   tipWaiting = key;
   // Wait a moment so the move that prompted it can be seen, and for any other card to close.
   (function show() {
-    if ($("overlay").classList.contains("show") || loading || picking) return setTimeout(show, 600);
+    if ($("overlay").classList.contains("show") || document.querySelector(".spot") || loading || picking) return setTimeout(show, 600);
     const s = G.load("toybox.tips"); s[tipWaiting] = true; G.save("toybox.tips", s);
-    const [title, text] = TIPS[tipWaiting]; tipWaiting = null;
-    G.openCard(title, text, [["Got it", G.closeCard, true]]);
+    const step = TIPS[tipWaiting](); tipWaiting = null;
+    if (step && !document.querySelector(".spot")) G.spotlight({grid: canvas, w: 1, h: 1, steps: [step], finish: false});
   })();
 }
 // A basket whose front row holds two different toys.
@@ -843,7 +843,7 @@ canvas.addEventListener("pointerdown", e => {
 let last = performance.now();
 function loop(t) {
   const dt = Math.min(0.05, (t - last) / 1000); last = t; now += dt;
-  if (S && sprites.length) { update(dt); draw(); }
+  if (S && sprites.length) { if (!document.querySelector(".spot")) update(dt); draw(); }   // the room waits while a spotlight is up
   requestAnimationFrame(loop);
 }
 
@@ -860,15 +860,51 @@ $("basketBtn").onclick = () => ready() && addBasket();
 $("restartBtn").onclick = () => S && !loading && (pickShake(false), start(S.level, S.d));
 function helpCard() {
   const media = document.createElement("div"), ol = document.createElement("ol"); ol.className = "steps";
-  for (const t of ["Tap a basket to send its front toys out.",
+  for (const t of ["Tap a basket to send its front toys out. If they're different, tap the one you want.",
                    "Toys roll into a matching basket, or an empty one.",
                    "Fill a basket with one kind of toy to clear it."]) {
     const li = document.createElement("li"); li.textContent = t; ol.append(li);
   }
   const tip = document.createElement("p"); tip.className = "tip";
-  tip.textContent = "Don't let the track jam.";
+  tip.textContent = "Don't let the track jam. Stuck? Each level has one of each helper below the room.";
   media.append(ol, tip);
-  G.openCard("How to play", "", [["Let's play", G.closeCard, true]], media);
+  G.openCard("How to play", "", [["Show me on the board", () => { G.closeCard(); intro(true); }, true], ["Got it", G.closeCard]], media);
+}
+/* ---------- first-time spotlight ---------- */
+// Shapes on the room for the spotlight, in page pixels.
+function toPage(x, y) { const r = canvas.getBoundingClientRect(); return [r.left + x * r.width / W, r.top + y * r.height / H]; }
+const pageScale = () => canvas.getBoundingClientRect().width / W;
+const quad = (b, u0, u1, v) => [[u0, -v], [u1, -v], [u1, v], [u0, v]].map(([u, w]) => { const p = frame(b, u, w); return toPage(p.x, p.y); });
+const basketShape = b => quad(b, 20, basketEnd(b) + 4, 42);
+// the front row of a basket (where its next toys come from)
+const frontRow = b => { const fr = (b.items.length - 1) >> 1, u = 48 + CELL * (b.rows - 1 - fr); return quad(b, u - CELL / 2 - 2, u + CELL / 2 + 2, CELL + 4); };
+function trackBand() {
+  const pts = []; for (let s = 0; s < L; s += 6) { const p = at(s); pts.push(toPage(p.x, p.y)); }
+  return {path: pts, closed: true, width: 44 * pageScale()};
+}
+// First visit (or "Show me on the board"): walk through the room on the level that's out.
+function intro(again) {
+  const seen = G.load("toybox.tips");
+  if (!again && seen.intro) return;
+  if (!S || loading || S.over || document.querySelector(".spot")) { if (!again) setTimeout(intro, 400); return; }
+  const bs = live().filter(b => b.items.length && !b.done);
+  // the basket the level's solver would tip first, else any with toys
+  const first = (S.d.moves || []).map(m => Array.isArray(m) ? m[0] : m).find(i => typeof i === "number" && S.baskets[i] && bs.includes(S.baskets[i]));
+  const b1 = first !== undefined ? S.baskets[first] : bs[0];
+  if (!b1) return;
+  const k = b1.items[b1.items.length - 1].kind, to = live().find(o => o !== b1 && !o.done && takes(o, k));
+  // the tidiest basket, other than the first one if another has a run of two or more
+  const byTidy = bs.slice().sort((a, b) => runOf(b) - runOf(a) || b.items.length - a.items.length);
+  const tidy = byTidy.find(b => b !== b1 && runOf(b) >= 2) || byTidy[0];
+  const front = b => { const fr = (b.items.length - 1) >> 1, p = frame(b, 48 + CELL * (b.rows - 1 - fr) - CELL / 2 - 4, 0); return toPage(p.x, p.y); };
+  const steps = [
+    {say: "Tap a basket to send the front toys onto the track", shapes: () => [{poly: basketShape(b1)}, {arrow: front(b1), from: [-b1.dx, -b1.dy], size: 40 * pageScale()}]},
+    {say: "Toys roll into a matching basket, or an empty one", shapes: () => [trackBand(), ...(to ? [{poly: basketShape(to)}] : [])]},
+    {say: "Fill a basket with one kind of toy to clear it", shapes: () => [{poly: basketShape(tidy)}]},
+    {say: "Don't jam the track!", els: [$("meter")], shapes: () => [trackBand()]},
+    {say: "Helpers can get you unstuck", els: [[...document.querySelectorAll(".helpers button")]]},
+  ];
+  G.spotlight({grid: canvas, w: 1, h: 1, steps, done: () => { const s = G.load("toybox.tips"); s.intro = true; G.save("toybox.tips", s); }});
 }
 $("helpBtn").onclick = helpCard;
 
@@ -902,7 +938,9 @@ $("bestBtn").onclick = () => G.showBests("Best times", S ? S.level : 1);
 
 const saved = G.load("toybox.v2");
 G.reopen(() => { if (saved.d && saved.level <= MAX_LEVEL) start(saved.level, saved.d); else startLevel(saved.level || 1); }, why => { startLevel(saved.level || 1).then(() => G.note(why, 0)); });
-if (!saved.level) helpCard();
+// Players from before the spotlight had the How to play card instead, so it's only for new players.
+if (saved.level) { const s = G.load("toybox.tips"); if (!s.intro) { s.intro = true; G.save("toybox.tips", s); } }
+intro();
 requestAnimationFrame(loop);
 </script>
 <!-- Visit counts (GoatCounter: no cookies, nothing personal) -->

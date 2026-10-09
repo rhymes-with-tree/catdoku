@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-09.2";
+  var BUILD = "2026-10-09.3";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-09.2">
+<link rel="stylesheet" href="../games.css?v=2026-10-09.3">
 <style>
 /* Nip Trip: rounded colour tiles in a soft tray, over a catnip haze that breathes and takes on the last
    colour made. Blocks are the Catdoku palette, each with a symbol built from the primaries' marks. */
@@ -99,6 +99,9 @@ details.menu[open] summary{margin-bottom:10px}
 .float.z{left:62%;font-size:15px}
 .float.prr{font-size:15px;color:#B94588}
 @keyframes rise{0%{opacity:0;transform:translateY(6px) scale(.8)}20%{opacity:1}100%{opacity:0;transform:translate(14px,-46px) scale(1.15)}}
+.card ol.steps{text-align:left;margin:0 0 14px;padding-left:24px;color:var(--ink);font-size:16px;line-height:1.35}
+.card ol.steps li{margin:0 0 8px;display:list-item}
+.card .tip{font-size:14px;margin:0 0 14px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}#haze{opacity:.4}.float{display:none}}
 </style>
 </head>
@@ -115,6 +118,7 @@ details.menu[open] summary{margin-bottom:10px}
     <button class="napper" id="napper" aria-label="The cat. Give it a pat"><img id="napImg" alt=""></button>
     <div class="board" id="board" role="grid" aria-label="Colour blocks"></div>
   </div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
   <div class="rules" aria-label="How colours mix">
     <svg id="wheel" viewBox="-60 -60 120 120" aria-hidden="true"></svg>
     <ul>
@@ -124,7 +128,7 @@ details.menu[open] summary{margin-bottom:10px}
       <li><b>Next-door</b> colours don't mix.</li>
     </ul>
   </div>
-  <div class="actions"><button id="undoBtn">Undo</button><button id="colBtn" aria-expanded="false">Colours</button></div>
+  <div class="actions"><button id="undoBtn">Undo</button><button id="colBtn" aria-expanded="false">Colours</button><button id="helpBtn">How to play</button></div>
   <div class="picker" id="picker" hidden>
     <h2>Pick your colours</h2>
     <p>Tap one in each column, or the rainbow square for any colour you like. The board changes as you go, and your colours are kept on this device.</p>
@@ -145,7 +149,7 @@ details.menu[open] summary{margin-bottom:10px}
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-09.2"></script>
+<script src="../games.js?v=2026-10-09.3"></script>
 <script>
 // The paint wheel, in order: red, orange, yellow, green, blue, purple. Mud (6) comes from opposites.
 // Each colour also has its own symbol, so colours can be told apart without seeing the hue: the primaries are
@@ -201,7 +205,8 @@ const KEY = "niptrip";
 const NAPPERS = ["c14-36", "c16-5", "c14-34", "c15-6", "c14-35", "c15-5", "c16-3"];
 let napper = G.load("niptrip.cat").cat;
 if (!NAPPERS.includes(napper)) { napper = NAPPERS[Math.floor(Math.random() * NAPPERS.length)]; G.save("niptrip.cat", {cat: napper}); }
-$("napImg").src = `../cats/${napper}.webp`;
+const CAT_SRC = {};  // filled with embedded pictures when the page is bundled into one file
+$("napImg").src = CAT_SRC[napper] || `../cats/${napper}.webp`;
 function float(cls, text) {
   const f = document.createElement("span"); f.className = "float " + cls; f.textContent = text;
   $("napper").append(f); setTimeout(() => f.remove(), 2500);
@@ -405,7 +410,78 @@ $("widthSel").onchange = () => newBoard();
 $("spawnSel").onchange = () => newBoard();
 $("undoBtn").onclick = undo;
 G.nav("niptrip");
+let hadBoard = false; try { hadBoard = !!localStorage.getItem(KEY); } catch (e) {}   // storage can be blocked
 newBoard(true);
+
+/* ---------- how to play ---------- */
+// The first visit walks through a real mix on the board (shown, then put back), the colour wheel, a row
+// floating away (shown, then put back) and the cat. "Show me on the board" on the card does it again.
+const SEEN = "niptrip.seen";
+function intro(again) {
+  if ((!again && G.load(SEEN).seen) || busy || document.querySelector(".spot")) return;
+  const xy = i => [i % W, Math.floor(i / W)];
+  // two blocks next to each other that mix into a new colour, near the bottom
+  let pair = null;
+  for (let i = W * H - 1; i >= 0 && !pair; i--) for (const j of [i - 1, i - W]) {
+    if (j < 0 || !adjacent(i, j)) continue;
+    const r = mix(grid[j], grid[i]);
+    if (r >= 0 && r !== grid[i] && r !== grid[j] && r !== MUD) { pair = [j, i, r]; break; }
+  }
+  // Show something on the board while a step is up (or, with `later`, a moment after it comes up, so a
+  // mix happens in front of you), then put the board back.
+  const showing = (change, later) => { let was, timer;
+    return {enter: () => { was = grid.slice(); if (later) { later.before?.(); draw(); timer = setTimeout(() => { change(); draw(later.flags || {}); }, 1000); } else { change(); draw(); } },
+            leave: () => { clearTimeout(timer); grid = was; draw(); }}; };
+  // A slice of the rules wheel (0–5), or 6 for the mud in the middle, as a shape on the page.
+  const wheelPart = k => {
+    const r = $("wheel").getBoundingClientRect(), s = r.width / 120, cx = r.left + 60 * s, cy = r.top + 60 * s, pts = [];
+    if (k === MUD) { for (let a = 0; a < 24; a++) pts.push([cx + 22 * s * Math.cos(a * Math.PI / 12), cy + 22 * s * Math.sin(a * Math.PI / 12)]); return {poly: pts}; }
+    const a0 = (k * 60 - 120) * Math.PI / 180, a1 = a0 + Math.PI / 3;
+    for (let n = 0; n <= 8; n++) { const a = a0 + (a1 - a0) * n / 8; pts.push([cx + 57 * s * Math.cos(a), cy + 57 * s * Math.sin(a)]); }
+    for (let n = 8; n >= 0; n--) { const a = a0 + (a1 - a0) * n / 8; pts.push([cx + 25 * s * Math.cos(a), cy + 25 * s * Math.sin(a)]); }
+    return {poly: pts};
+  };
+  // the two blocks at the bottom left, for laying out an example pair
+  const A = (H - 1) * W, B = A + 1, pairLit = [xy(A), xy(B)], pairOut = [[xy(A)], [xy(B)]], toB = [{to: [1, H - 0.5], from: [-1, 0], size: 0.9}];
+  const example = (ca, cb, after) => showing(() => after(), {before: () => { grid[A] = ca; grid[B] = cb; }});
+  const steps = [{say: "There's no timer, no goal, just color.", lit: [...Array(W * H).keys()].map(xy)}];
+  if (pair) {
+    const [a, b, r] = pair, [ax, ay] = xy(a), [bx, by] = xy(b);
+    steps.push({say: "Tap a block, then one next to it", lit: [xy(a), xy(b)], outline: [[xy(a)], [xy(b)]],
+                arrows: [{to: [(ax + bx) / 2 + 0.5, (ay + by) / 2 + 0.5], from: [ax - bx, ay - by]}]},
+               {say: "The first slides over and they mix like paint", lit: [xy(b)], ...showing(() => { grid[b] = r; })});
+  }
+  const primaries = [...Array(W * H).keys()].filter(i => [0, 2, 4].includes(grid[i]));
+  steps.push(
+    {say: "Not all colors mix. The wheel shows the rules", els: [document.querySelector(".rules")]},
+    {say: "Primary colors mix with each other", lit: primaries.map(xy), shapes: () => [0, 2, 4].map(wheelPart)},
+    {say: "Merging secondary colors strengthens their shared color", lit: pairLit, outline: pairOut, arrows: toB,
+     shapes: () => [1, 5, 0].map(wheelPart), ...example(1, 5, () => { grid[B] = mix(1, 5); grid[A] = grid[A - W]; })},
+    {say: "Opposite colors turn into mud.", lit: pairLit, outline: pairOut, arrows: toB,
+     shapes: () => [0, 3, MUD].map(wheelPart), ...example(0, 3, () => { grid[B] = MUD; grid[A] = grid[A - W]; })},
+    {say: "To remove mud, mix it with more mud", lit: pairLit, outline: pairOut, arrows: toB,
+     shapes: () => [wheelPart(MUD)], ...showing(() => {}, {before: () => { grid[A] = grid[B] = MUD; }, flags: {[A]: "clear", [B]: "clear"}})},
+    {say: "A row that's all one colour floats away", lit: [...Array(W).keys()].map(x => [x, H - 1]),
+     ...showing(() => { for (let x = 0; x < W; x++) grid[(H - 1) * W + x] = grid[(H - 1) * W]; })},
+    {say: "Curl up with the cat and get cozy", els: [$("napper")]});
+  G.spotlight({grid: $("board"), w: W, h: H, steps, done: () => G.save(SEEN, {seen: true})});
+}
+function helpCard() {
+  const media = document.createElement("div"), ol = document.createElement("ol"); ol.className = "steps";
+  for (const t of ["Tap a block, then one next to it (up, down or sideways). The first slides onto the second and they mix like paint.",
+                   "Two colours two steps apart round the wheel make the one between them. Opposites make mud; two of the same join into one, and two muds vanish. Next-door colours don't mix.",
+                   "A row that's all one colour floats away. There's no goal and no timer."]) {
+    const li = document.createElement("li"); li.textContent = t; ol.append(li);
+  }
+  const tip = document.createElement("p"); tip.className = "tip";
+  tip.textContent = "Every colour has a symbol too, so you can play by shape. Colours lets you pick your own colours.";
+  media.append(ol, tip);
+  G.openCard("How to play", "", [["Show me on the board", () => { G.closeCard(); intro(true); }, true], ["Got it", G.closeCard]], media);
+}
+$("helpBtn").onclick = helpCard;
+// Players from before the spotlight already know their way round.
+if (hadBoard && !G.load(SEEN).seen) G.save(SEEN, {seen: true});
+setTimeout(intro, 300);
 </script>
 <!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
 <script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>

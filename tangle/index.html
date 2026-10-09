@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-09.2";
+  var BUILD = "2026-10-09.3";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-09.2">
+<link rel="stylesheet" href="../games.css?v=2026-10-09.3">
 <style>
 /* Strands of yarn knotted through balls of yarn on a felt mat. Drag the balls until no two strands cross. */
 .mat{width:var(--board);aspect-ratio:1;background:#F3E3C7;border:3px solid #B98C5E;border-radius:18px;position:relative;overflow:hidden;
@@ -63,8 +63,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-09.2"></script>
-<script src="../colorways.js?v=2026-10-09.2"></script>
+<script src="../games.js?v=2026-10-09.3"></script>
+<script src="../colorways.js?v=2026-10-09.3"></script>
 <script>
 /* ---------- levels ---------- */
 // Strands per level, and whether the yarn is ombré. Every two strands meet at one ball, so 4 strands make 6 balls,
@@ -254,9 +254,36 @@ function showHelp() {
   const tip = document.createElement("p"); tip.className = "tip";
   tip.textContent = "Every tangle can be undone. Once it is, keep moving the yarn about to make any shape you like.";
   media.append(ol, tip);
-  G.openCard("How to play", "", [["Let's play", () => { G.closeCard(); settings.seenHelp = true; save(); }, true]], media);
+  G.openCard("How to play", "", [["Show me on the board", () => { G.closeCard(); settings.seenHelp = false; helpOnFirstVisit(); }, true],
+    ["Got it", () => { G.closeCard(); settings.seenHelp = true; save(); }]], media);
 }
-function helpOnFirstVisit() { if (!settings.seenHelp && game && playing()) showHelp(); }
+// First visit only: walk through the tangle that's out: a strand and its balls, where strands cross, a
+// ball to drag, and the count.
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || !playing() || document.querySelector(".spot")) return;
+  const B = game.balls, E = game.edges, r = sizeOf(B.length);
+  const page = (x, y) => { const m = $("svg").getScreenCTM(); return [m.a * x + m.e, m.d * y + m.f]; };
+  const ring = (x, y, rad) => ({poly: [...Array(20).keys()].map(k => page(x + rad * Math.cos(k * Math.PI / 10), y + rad * Math.sin(k * Math.PI / 10)))});
+  const scale = () => $("svg").getScreenCTM().a;
+  // one strand (a single length of yarn between two balls), near the middle
+  const mid = e => Math.hypot((B[e.a].x + B[e.b].x) / 2 - 500, (B[e.a].y + B[e.b].y) / 2 - 500);
+  const one = E.slice().sort((a, b) => mid(a) - mid(b))[0];
+  const X = crossings(B, E);
+  // a ball on a strand that crosses another (dragging it helps), near the middle
+  const crossing = new Set(); E.forEach((e, i) => E.forEach((f, j) => { if (i < j && crossings(B, [e, f]).length) [e.a, e.b, f.a, f.b].forEach(k => crossing.add(k)); }));
+  const pick = [...crossing].sort((a, b) => Math.hypot(B[a].x - 500, B[a].y - 500) - Math.hypot(B[b].x - 500, B[b].y - 500))[0] ?? 0;
+  const mat = () => { const r = $("svg").getBoundingClientRect(); return [{poly: [[r.left, r.top], [r.right, r.top], [r.right, r.bottom], [r.left, r.bottom]]}]; };
+  const steps = [
+    {say: "The cats have tangled up the yarn!", shapes: mat},
+    {say: "Each strand is connected to two yarn balls",
+     shapes: () => [{path: [page(B[one.a].x, B[one.a].y), page(B[one.b].x, B[one.b].y)], width: r * 0.9 * scale()}, ring(B[one.a].x, B[one.a].y, r * 1.15), ring(B[one.b].x, B[one.b].y, r * 1.15)]},
+    {say: "Little dots show where strands cross", shapes: () => X.map(([x, y]) => ring(x, y, r * 0.45))},
+    {say: "Untangle the mess by dragging the yarn balls until no two strands cross",
+     shapes: () => [ring(B[pick].x, B[pick].y, r * 1.2), {arrow: page(B[pick].x, B[pick].y - r * 1.3), from: [0, -1], size: 46}]},
+    {say: "The count shows how many crossings are left", els: [$("count")]},
+  ];
+  G.spotlight({grid: $("svg"), w: 1, h: 1, steps, done: () => { settings.seenHelp = true; save(); }});
+}
 
 for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", ""), n));
 $("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };

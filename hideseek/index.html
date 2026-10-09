@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-09.2";
+  var BUILD = "2026-10-09.3";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&family=Permanent+Marker&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-09.2">
+<link rel="stylesheet" href="../games.css?v=2026-10-09.3">
 <style>
 /* A wooden floor covered in cardboard boxes. Checked boxes get a number written on them in marker, like a
    labelled box; marked ones get a cat doodled on; a startled cat's box gets HISS scrawled across it. */
@@ -41,6 +41,9 @@
 .sq .hissed{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--marker);color:#B23A28;font-size:.72em;transform:rotate(-12deg);z-index:1}
 .sq img.sleeper{position:absolute;inset:14%;width:72%;height:72%;object-fit:contain;filter:drop-shadow(0 2px 2px rgba(60,30,10,.35))}
 .sq.hiss{animation:shake .4s}
+/* after the walkthrough, the boxes are swept away and set out again, so the example is clearly gone */
+.floor.reshuffle .sq{animation:reshuffle .7s ease-in-out var(--d,0s) both}
+@keyframes reshuffle{0%{transform:none}35%{transform:scale(.2) rotate(var(--r,20deg));opacity:0}65%{transform:scale(.2) rotate(calc(var(--r,20deg) * -1));opacity:0}100%{transform:none;opacity:1}}
 @keyframes shake{25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
 .sq.hintme{animation:glow .6s ease-in-out 4 alternate}
 @keyframes glow{to{filter:brightness(1.25) drop-shadow(0 0 4px #FFE07A)}}
@@ -82,7 +85,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-09.2"></script>
+<script src="../games.js?v=2026-10-09.3"></script>
 <script>
 /* ---------- sizes ---------- */
 // Width, height and cats, from Minesweeper's beginner board up to its expert one stood on end (16 across, 30 down),
@@ -110,10 +113,11 @@ const DOODLE = `<svg class="doodle" viewBox="0 0 100 100" aria-hidden="true"><g 
 // The curled-up cats from Sunbeams (../cats/), nearly round, so each fits one box. Each box picks one,
 // turned and flipped its own way, so a floor full of cats doesn't look like one cat repeated.
 const CURLED = ["c14-36", "c16-5", "c14-34", "c15-6", "c14-35", "c15-5", "c16-3"];
+const CAT_SRC = {};  // filled with embedded pictures when the page is bundled into one file
 function hash(x) { x = Math.imul(x ^ (x >>> 16), 0x45d9f3b); x = Math.imul(x ^ (x >>> 16), 0x45d9f3b); return (x ^ (x >>> 16)) >>> 0; }
 function sleeper(i) {
   const h = hash(i * 977 + game.seed), turn = (h >> 3) % 4 * 90, flip = h & 4 ? -1 : 1;
-  return `<img class="sleeper" src="../cats/${CURLED[h % CURLED.length]}.webp" alt="" style="transform:rotate(${turn}deg) scaleX(${flip})">`;
+  return `<img class="sleeper" src="${CAT_SRC[CURLED[h % CURLED.length]] || `../cats/${CURLED[h % CURLED.length]}.webp`}" alt="" style="transform:rotate(${turn}deg) scaleX(${flip})">`;
 }
 
 /* ---------- hiding the cats ---------- */
@@ -367,9 +371,34 @@ function showHelp() {
   const tip = document.createElement("p"); tip.className = "tip";
   tip.textContent = "Your first box is always safe, and every floor can be cleared by thinking it through, with no guessing.";
   media.append(ol, tip);
-  G.openCard("How to play", "", [["Let's play", () => { G.closeCard(); settings.seenHelp = true; save(); }, true]], media);
+  G.openCard("How to play", "", [["Show me on the board", () => { G.closeCard(); settings.seenHelp = false; helpOnFirstVisit(); }, true],
+    ["Got it", () => { G.closeCard(); settings.seenHelp = true; save(); }]], media);
 }
-function helpOnFirstVisit() { if (!settings.seenHelp && game && playing()) showHelp(); }
+// First visit only: walk through the floor before the first box is checked. The cats aren't hidden
+// until then, so the label and cats in step 3 are only an example drawn over the boxes.
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || !playing() || document.querySelector(".spot")) return;
+  const {W, H} = game, all = [], mid = [W >> 1, H >> 1];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) all.push([x, y]);
+  const around = []; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) around.push([1 + dx, 1 + dy]);
+  const steps = [
+    {say: "Cats are napping in some of these boxes", lit: all},
+    {say: "Numbers tell you how many cats are in any of the neighboring boxes—including diagonals.", lit: around,
+     marks: [[1, 1, "2"], [0, 0, "🐱", 0.5], [2, 1, "🐱", 0.5]]},
+    {say: "To check if there's a cat, tap the box. Your first box is always safe.", lit: [mid]},
+    {say: "Be careful! Waking a sleeping cat will cost you a life", els: [$("hearts")]},
+    {say: "Mark the box as a POSSIBLE cat with a long press or by turning on 'Mark'", els: [$("markBtn")]},
+    {say: "Stuck? Hint shows an empty box", els: [$("hintBtn")]},
+  ];
+  G.spotlight({grid: $("board"), w: W, h: H, steps, done: () => { settings.seenHelp = true; save(); reshuffle(); }});
+}
+// Sweep the boxes away and set them out again (the floor itself doesn't change).
+function reshuffle() {
+  const fl = $("board");
+  for (const sq of fl.children) { sq.style.setProperty("--d", `${(Math.random() * 0.3).toFixed(2)}s`); sq.style.setProperty("--r", `${Math.round(Math.random() * 60 - 30)}deg`); }
+  fl.classList.remove("reshuffle"); void fl.offsetWidth; fl.classList.add("reshuffle");
+  setTimeout(() => fl.classList.remove("reshuffle"), 1100);
+}
 
 G.nav("hideseek");
 G.checkClock(game);

@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-09.2";
+  var BUILD = "2026-10-09.3";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-09.2">
+<link rel="stylesheet" href="../games.css?v=2026-10-09.3">
 <style>
 /* A gigantic cat tower: numbered carpeted perches on a papered wall, linked by sisal-wrapped catwalks. */
 .wall{width:var(--board);aspect-ratio:1;background:#EBDDCB;border:3px solid #A98663;border-radius:16px;overflow:hidden;touch-action:manipulation;user-select:none;-webkit-user-select:none}
@@ -71,7 +71,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-09.2"></script>
+<script src="../games.js?v=2026-10-09.3"></script>
 <script>
 /* ---------- the puzzle ---------- */
 // A perch: {x, y, n}. Catwalks run from a perch to the nearest perch straight across or up and down (and on the
@@ -211,6 +211,7 @@ function ropeBridge(x1, y1, x2, y2, side) {
 /* ---------- cat-tower pieces ---------- */
 // Each perch is a real cat-tower part, picked from where it sits so it stays the same: a round carpeted platform,
 // a cubby box with a hole, or a hammock, in one of a few carpet colours, with one of the curled-up Sunbeams cats.
+const CAT_SRC = {};  // filled with embedded pictures when the page is bundled into one file
 const CATS = "../cats/", NAPPERS = ["c14-36", "c16-5", "c14-34", "c15-6", "c14-35", "c15-5", "c16-3"];
 const CARPETS = ["#D8C3A5", "#C9B9D6", "#E3B9A9", "#B7C8BC", "#E8D9B8", "#BFC7D8"];
 function pieceOf(p) {
@@ -267,7 +268,7 @@ function draw(flash) {
     s += `<g class="isle" data-i="${i}" role="button" aria-label="Perch needing ${p.n}, has ${have[i]}"><circle cx="${cx}" cy="${cy}" r="${U * .6}" fill="transparent"/>
       ${i === sel ? `<circle cx="${cx}" cy="${cy}" r="${U * .52}" fill="rgba(185,69,136,.15)" stroke="#B94588" stroke-width="6"/>` : ""}
       ${PIECES[look.kind](cx, cy, look.color)}
-      ${done ? `<image class="cat" href="${CATS}${look.cat}.webp" x="${cx - 46}" y="${cy - 34}" width="62" height="56" preserveAspectRatio="xMidYMid meet"/>` : ""}
+      ${done ? `<image class="cat" href="${CAT_SRC[look.cat] || `${CATS}${look.cat}.webp`}" x="${cx - 46}" y="${cy - 34}" width="62" height="56" preserveAspectRatio="xMidYMid meet"/>` : ""}
       <circle cx="${cx + 30}" cy="${cy - 26}" r="25" fill="${badge}" stroke="#2A2530" stroke-width="4"/>
       <text x="${cx + 30}" y="${cy - 15}" text-anchor="middle" font-size="${p.n > 9 ? 27 : 34}" fill="${ink}" font-family="Baloo 2, sans-serif">${p.n}</text></g>`;
   });
@@ -342,6 +343,7 @@ function newTower() {
   lanes = lanesOf(game.isles, W, diag); game.val = lanes.map(() => 0); sel = -1;
   $("board").classList.remove("won"); G.closeCard(); G.note("");
   draw(); save();
+  setTimeout(diagonals, 300);
   G.track(`Catwalk new tower ${sizeLabel(N)}`);
 }
 
@@ -372,9 +374,107 @@ function showHelp() {
   tip.textContent = "A perch's number turns green when it has all its catwalks (and a cat settles on it), and red if it has too many. Every tower has exactly one answer.";
   const ways = document.createElement("div"); ways.className = "ways"; ways.innerHTML = WAYS;
   media.append(ways, ol, tip);
-  G.openCard("How to play", "", [["Let's play", () => { G.closeCard(); settings.seenHelp = true; save(); }, true]], media);
+  G.openCard("How to play", "", [["Show me on the board", () => { G.closeCard(); settings.seenHelp = false; helpOnFirstVisit(); }, true],
+    ["Got it", () => { G.closeCard(); settings.seenHelp = true; save(); }]], media);
 }
-function helpOnFirstVisit() { if (!settings.seenHelp && game && playing()) showHelp(); }
+// The squares a catwalk runs over, from one perch to the other.
+function laneCells(l) {
+  const A = game.isles[l.a], B = game.isles[l.b], dx = Math.sign(B.x - A.x), dy = Math.sign(B.y - A.y), out = [];
+  for (let x = A.x, y = A.y; ; x += dx, y += dy) { out.push([x, y]); if (x === B.x && y === B.y) break; }
+  return out;
+}
+// On towers with diagonal catwalks (from 10 × 10): steps showing one, and an off-angle one crossed out.
+// "still" adds a step reminding that straight catwalks work too, for when they weren't just shown.
+function diagSteps(still) {
+  if (!SIZES[game.N][2]) return [];
+  const k = lanes.findIndex(l => game.isles[l.a].x !== game.isles[l.b].x && game.isles[l.a].y !== game.isles[l.b].y);
+  if (k < 0) return [];
+  const I = game.isles, showing = ks => { let was; return {enter: () => { was = game.val.slice(); for (const j of ks) game.val[j] = 1; draw(); }, leave: () => { game.val = was; draw(); }}; };
+  const across = lanes.findIndex(l => I[l.a].y === I[l.b].y), down = lanes.findIndex(l => I[l.a].x === I[l.b].x), straight = [across, down].filter(j => j >= 0);
+  // two perches that aren't in line at all: a catwalk between them is shown, crossed out
+  let odd = null;
+  for (let a = 0; a < I.length && !odd; a++) for (let b = a + 1; b < I.length && !odd; b++) {
+    const dx = Math.abs(I[a].x - I[b].x), dy = Math.abs(I[a].y - I[b].y);
+    if (dx && dy && dx !== dy && dx + dy <= 4) odd = [a, b];
+  }
+  const steps = [{say: "You can now connect catwalks diagonally", lit: laneCells(lanes[k]), outline: [laneCells(lanes[k])], els: [...$("ways").children].slice(1, 2), ...showing([k])}];
+  if (still && straight.length) steps.push({say: "You can still connect catwalks vertically or horizontally", lit: straight.flatMap(j => laneCells(lanes[j])), outline: straight.map(j => laneCells(lanes[j])), ...showing(straight)});
+  if (odd) {
+    const [a, b] = odd.map(i => I[i]), c = [a.x + 0.5, a.y + 0.5], d = [b.x + 0.5, b.y + 0.5];
+    steps.push({say: "You can't build at other angles", lit: [[a.x, a.y], [b.x, b.y]], outline: [[[a.x, a.y]], [[b.x, b.y]]],
+                lines: [{edges: [[...c, ...d]]}], marks: [[(a.x + b.x) / 2, (a.y + b.y) / 2, "❌", 0.8]]});
+  }
+  return steps;
+}
+// The first time a tower lets catwalks go diagonally, a spotlight shows how.
+function diagonals() {
+  if (!game || game.won || settings.seenDiag || !settings.seenHelp || document.querySelector(".spot")) return;
+  const steps = diagSteps(true);
+  if (!steps.length) return;
+  const W = game.W, map = () => { const r = $("svg").getBoundingClientRect(), s = r.width / (W * U + 48); return {ox: r.left + 24 * s, oy: r.top + 24 * s, cw: U * s, ch: U * s}; };
+  G.spotlight({grid: $("svg"), w: W, h: W, map, finish: false, done: () => { settings.seenDiag = true; save(); }, steps});
+}
+// First visit only: walk through the tower that's out. Two steps build a catwalk (one, then two) just
+// while they're up, and one shows a perch with 1 getting its catwalk and turning green; then the tower
+// goes back as it was.
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || !playing() || document.querySelector(".spot")) return;
+  const {W, isles} = game, at = p => [p.x, p.y], all = isles.map(at);
+  const map = () => { const r = $("svg").getBoundingClientRect(), s = r.width / (W * U + 48); return {ox: r.left + 24 * s, oy: r.top + 24 * s, cw: U * s, ch: U * s}; };
+  const building = (k, v) => { let was; return {enter: () => { was = game.val.slice(); game.val[k] = v; draw(); }, leave: () => { game.val = was; draw(); }}; };
+  // a pair of perches a catwalk can join, near the middle; and a perch needing 1 with a catwalk it could take
+  const mid = l => Math.hypot((isles[l.a].x + isles[l.b].x) / 2 - W / 2, (isles[l.a].y + isles[l.b].y) / 2 - W / 2);
+  const k0 = lanes.map((l, k) => k).sort((a, b) => mid(lanes[a]) - mid(lanes[b]))[0];
+  // the perch with the smallest number that its catwalks can fill, and catwalks that fill it
+  let fill = null;
+  for (const i of isles.map((_, i) => i).sort((a, b) => isles[a].n - isles[b].n)) {
+    const flat = k => isles[lanes[k].a].x === isles[lanes[k].b].x || isles[lanes[k].a].y === isles[lanes[k].b].y;
+    const mine = lanes.map((l, k) => k).filter(k => lanes[k].a === i || lanes[k].b === i).sort((a, b) => flat(b) - flat(a)), v = new Map();
+    let need = isles[i].n;
+    for (const k of mine) { const c = Math.min(2, need); if (c > 0) { v.set(k, c); need -= c; } }
+    if (!need) { fill = {i, v}; break; }
+  }
+  const ways = [...$("ways").children];
+  // a straight-across and an up-and-down catwalk on this tower, with the squares they run over
+  const across = lanes.findIndex(l => isles[l.a].y === isles[l.b].y), down = lanes.findIndex(l => isles[l.a].x === isles[l.b].x);
+  const steps = [{say: "Build a giant cat tower by linking its perches with catwalks", lit: all, outline: all.map(c => [c])}];
+  if (k0 !== undefined) {
+    const l = lanes[k0], pair = [at(isles[l.a]), at(isles[l.b])], both = {lit: pair, outline: pair.map(c => [c])};
+    steps.push({say: "The number tells you how many catwalks are connected to each perch", lit: [pair[0]]},
+               {say: "Tap a perch, then another, to build a catwalk between them", ...both, ...building(k0, 1)},
+               {say: "Tap them again for a second catwalk.", ...both, ...building(k0, 2)},
+               {say: "A third time takes them away.", ...both, ...building(k0, 0)});
+  }
+  if (across >= 0 || down >= 0) {
+    const ls = [across, down].filter(k => k >= 0);
+    let was;
+    steps.push({say: "Catwalks connect horizontally or vertically", lit: ls.flatMap(k => laneCells(lanes[k])), outline: ls.map(k => laneCells(lanes[k])), els: [ways[0]],
+                enter: () => { was = game.val.slice(); for (const k of ls) game.val[k] = 1; draw(); }, leave: () => { game.val = was; draw(); }});
+  }
+  steps.push(...diagSteps(false));
+  if (fill) {
+    let was;
+    steps.push({say: "When a perch has all of its catwalks, a cat settles in", lit: [at(isles[fill.i])], tone: "ok",
+                enter: () => { was = game.val.slice(); for (const [k, c] of fill.v) game.val[k] = c; draw(); }, leave: () => { game.val = was; draw(); }});
+  }
+  // two catwalks that would cross, built just while the step is up, with a big ❌ where they meet
+  const kx = lanes.findIndex(l => l.cross.length);
+  if (kx >= 0) {
+    const ky = lanes[kx].cross[0], la = lanes[kx], lb = lanes[ky], ca = laneCells(la), cb = laneCells(lb);
+    const meet = ca.find(([x, y]) => cb.some(([u, v]) => u === x && v === y)) || [(isles[la.a].x + isles[la.b].x) / 2, (isles[lb.a].y + isles[lb.b].y) / 2];
+    let was;
+    steps.push({say: "Catwalks can't cross", lit: [...ca, ...cb], outline: [ca, cb], marks: [[meet[0], meet[1], "❌", 0.9]],
+                enter: () => { was = game.val.slice(); game.val[kx] = game.val[ky] = 1; draw(); }, leave: () => { game.val = was; draw(); }});
+  }
+  else if (across >= 0) {
+    // no two catwalks here could cross, so draw one crossing a built catwalk, crossed out
+    const ca = laneCells(lanes[across]), [mx, my] = ca[ca.length >> 1];
+    let was;
+    steps.push({say: "Catwalks can't cross", lit: ca, outline: [ca], lines: [{edges: [[mx + 0.5, my - 1, mx + 0.5, my + 2]]}], marks: [[mx, my, "❌", 0.9]],
+                enter: () => { was = game.val.slice(); game.val[across] = 1; draw(); }, leave: () => { game.val = was; draw(); }});
+  }
+  G.spotlight({grid: $("svg"), w: W, h: W, map, steps, done: () => { settings.seenHelp = true; if (SIZES[game.N][2]) settings.seenDiag = true; save(); }});
+}
 
 for (let n = 1; n < SIZES.length; n++) $("size").append(new Option(sizeLabel(n), n));
 $("size").onchange = e => { G.closeCard(); startSize(+e.target.value); };
@@ -389,13 +489,15 @@ $("bestBtn").onclick = () => G.showBests("Best times", game ? game.N : settings.
 
 if (!(settings.size >= 1 && settings.size < SIZES.length)) settings.size = 1;
 $("size").value = settings.size;
+// Players already past the first tower with diagonals know about them.
+if (settings.seenHelp && settings.size > 4 && settings.seenDiag === undefined) settings.seenDiag = true;
 if (game && Array.isArray(game.isles) && Array.isArray(game.val)) G.reopen(() => {
     if (!SIZES[game.N]) throw new Error("unknown size");
     lanes = lanesOf(game.isles, game.W, SIZES[game.N][2]);
     if (lanes.length !== game.val.length) throw new Error("the saved tower doesn't match its catwalks");
     draw();
     if (game.won) finishCard();
-    helpOnFirstVisit();
+    helpOnFirstVisit(); diagonals();
   }, why => { game = null; newTower(); G.note(why, 0); });
 else { newTower(); helpOnFirstVisit(); }
 </script>

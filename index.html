@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-09.2";
+  var BUILD = "2026-10-09.3";
   fetch("version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -169,7 +169,7 @@ button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
   </div>
 </main>
 
-<script src="games.js?v=2026-10-09.2"></script>
+<script src="games.js?v=2026-10-09.3"></script>
 <script>G.nav("catdoku", "");</script>
 <script>
 const PALETTE = ["#BD5538","#73A7AE","#ECA818","#6AA673","#B94588","#B3B94B",
@@ -790,16 +790,38 @@ function showHelp() {
   const ol = document.createElement("ol"); ol.className = "steps";
   for (const t of ["Place one 🐱 in every row, every column, and every color.",
                    "Cats can't touch, not even diagonally.",
-                   "Tap a square once for 🐾 (no cat here), twice for 🐱, and again to clear it. Drag to paw several squares at once."]) {
+                   "Tap a square once for 🐾 (no cat here), twice for 🐱, and again to clear it. Drag to paw several squares at once.",
+                   "Turn on Erase 🐾 to tap or drag paws away."]) {
     const li = document.createElement("li"); li.textContent = t; ol.append(li);
   }
   const tip = document.createElement("p"); tip.className = "tip";
   tip.textContent = "Auto exclude fills in paws for you after each cat. Auto grade checks each cat as you place it, and makes the game harder.";
   media.append(ol, tip);
-  openCard("How to play", "", [["Let's play", () => { closeCard(); settings.seenHelp = true; save(); }, true]], media);
+  openCard("How to play", "", [["Show me on the board", () => { closeCard(); settings.seenHelp = false; helpOnFirstVisit(); }, true],
+    ["Got it", () => { closeCard(); settings.seenHelp = true; save(); }]], media);
 }
-// First visit only: show the directions once the first puzzle is on the board.
-function helpOnFirstVisit() { if (!settings.seenHelp && game && game.status === "playing") showHelp(); }
+// First visit only: once the first puzzle is on the board, walk through the rules on it. Nothing is
+// placed on the puzzle; the marks are only drawn over it. The cat in the middle of the "can't touch"
+// step and the paws are just examples, not where the answer's cats are.
+function spotlightSteps() {
+  const N = game.N, r = Math.floor(N / 2), c = Math.floor(N / 2), g = game.reg[r * N + c];
+  const row = [...Array(N).keys()].map(x => [x, r]), col = [...Array(N).keys()].map(y => [c, y]);
+  const region = game.reg.flatMap((v, j) => v === g ? [[j % N, Math.floor(j / N)]] : []);
+  const around = []; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) around.push([c + dx, r + dy]);
+  const drag = [0, 1, 2].map(x => [x, N - 1]);
+  return [
+    {say: "Place one 🐱 in every row", lit: row},
+    {say: "every column", lit: col},
+    {say: "and every color", lit: region},
+    {say: "Cats can't touch, not even diagonally", lit: around, marks: around.map(([x, y]) => [x, y, x === c && y === r ? "🐱" : "❌"])},
+    {say: "Tap once for 🐾, twice for 🐱", lit: [[c, r]], marks: [[c, r, ["🐾", "🐱"]]]},
+    {say: "Drag to 🐾 several squares at once", lit: drag, marks: drag.map(([x, y]) => [x, y, "🐾"])},
+  ];
+}
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || game.status !== "playing" || $("board").parentElement.querySelector(".spot")) return;
+  G.spotlight({grid: $("board"), w: game.N, h: game.N, steps: spotlightSteps(), done: () => { settings.seenHelp = true; save(); }});
+}
 $("helpBtn").onclick = () => { if (!busy) showHelp(); };
 
 /* ---------- start ---------- */

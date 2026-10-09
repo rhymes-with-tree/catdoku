@@ -9,7 +9,7 @@ const G = (() => {
     ["Sunbeams", "sunbeams", "Every cat gets a warm spot", "#ECA818"],
     ["Toy Box", "toybox", "Put every toy back in its basket", "#B3B94B"],
     ["Pounce", "pounce", "Swap toys and line up three of a kind", "#6AA673"],
-    ["Twirl", "twirl", "Pull every ribbon off the mat", "#B94588"],
+    ["Twirl", "twirl", "Send every ribbon off the mat", "#B94588"],
     ["Toe Beans", "toebeans", "Make the number on the big pad", "#DD9DAD"],
     ["Knock It Off", "knockitoff", "Push everything off the table", "#7885BA"],
     ["Hide & Seek", "hideseek", "Find every cat hiding in the boxes", "#C9A26B"],
@@ -17,6 +17,7 @@ const G = (() => {
     ["Tangle", "tangle", "Untangle the yarn the cat got into", "#3C8681"],
     ["Catwalk", "catwalk", "Link the perches of a giant cat tower", "#A98663"],
     ["Toy Tango", "tango", "Share two toys out fairly", "#B94588"],
+    ["Bubbles", "bubbles", "Bat bubbles up and pop three of a kind", "#5FA0C8"],
   ];
   const $ = id => document.getElementById(id);
 
@@ -172,7 +173,30 @@ const G = (() => {
     .bests th{font-size:13px;color:var(--ink-soft);font-weight:600}
     .bests td.num,.bests th.num{text-align:right}
     .bests tr.now td{font-weight:800}
-    .card h3{margin:4px 0 6px;font-size:18px}`;
+    .card h3{margin:4px 0 6px;font-size:18px}
+    .card ol.steps{text-align:left;margin:0 0 14px;padding-left:24px;color:var(--ink);font-size:16px;line-height:1.35}
+    .card ol.steps li{margin:0 0 8px;display:list-item}
+    .card .tip{font-size:14px;margin:0 0 14px}
+    .spot{position:fixed;inset:0;z-index:9;cursor:pointer;animation:spotIn .35s ease-out;-webkit-tap-highlight-color:transparent;touch-action:none}
+    .spot:focus{outline:none}
+    .spot svg{position:absolute;inset:0;display:block}
+    .spot .dim{fill:rgba(42,37,48,.66)}
+    .spot .edge{fill:none;stroke:#E23B3B;stroke-linecap:round}
+    .spot .edge.ok{stroke:#4FB35F}
+    .spot .arrowLine{fill:none;stroke:#FFF4D2;stroke-linecap:round}
+    .spot .arrowLine.back{stroke:var(--ink)}
+    .spot .arrowHead{fill:#FFF4D2;stroke:var(--ink);stroke-linejoin:round;paint-order:stroke fill}
+    .spot .say{position:absolute;left:4%;right:4%;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;pointer-events:none}
+    .spot .say b{font-size:clamp(24px,7vw,36px);font-weight:800;line-height:1.1;color:#FFF4D2;-webkit-text-stroke:6px var(--ink);paint-order:stroke fill;text-wrap:balance}
+    .spot .say small{font-size:15px;font-weight:600;color:#FFF4D2;-webkit-text-stroke:3px var(--ink);paint-order:stroke fill;opacity:.9;animation:spotTap 1.6s ease-in-out infinite}
+    .spot .say b .w{white-space:nowrap}
+    .spot .say b .emo{-webkit-text-stroke:0;display:inline-block;background:#FFF4D2;border:3px solid var(--ink);border-radius:999px;padding:0 .12em;margin:0 .04em;line-height:1.15;font-size:.85em;vertical-align:.06em}
+    .spotGo{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;pointer-events:none;animation:spotGo 1.3s ease-out forwards}
+    .spotGo b{font-size:clamp(34px,10vw,52px);font-weight:800;color:#FFF4D2;-webkit-text-stroke:7px var(--ink);paint-order:stroke fill}
+    @keyframes spotGo{0%{opacity:0;transform:scale(.7)}18%{opacity:1;transform:scale(1.06)}30%{transform:scale(1)}70%{opacity:1}100%{opacity:0;transform:scale(1.08)}}
+    @keyframes spotIn{from{opacity:0}}
+    @keyframes spotTap{50%{opacity:.45}}
+    @media (prefers-reduced-motion:reduce){.spot,.spot .say small{animation:none}.spotGo{animation:spotGoFade 1.3s forwards}@keyframes spotGoFade{70%{opacity:1}100%{opacity:0}}}`;
   document.head.append(style);
 
   // {name, game(), playing(game), save(), and optionally label(n) and noun for what bests are kept by,
@@ -189,7 +213,7 @@ const G = (() => {
     let last = Date.now();
     setInterval(() => {
       const now = Date.now(), g = T.game(), dt = Math.min(now - last, 1500); last = now;
-      if (g && g.timed && g.started && T.playing(g) && !document.hidden && !$("overlay").classList.contains("show")) g.ms = (g.ms || 0) + dt;
+      if (g && g.timed && g.started && T.playing(g) && !document.hidden && !$("overlay").classList.contains("show") && !document.querySelector(".spot")) g.ms = (g.ms || 0) + dt;
       showTime();
     }, 500);
     document.addEventListener("visibilitychange", () => { if (document.hidden) T.save(); });
@@ -340,6 +364,182 @@ const G = (() => {
     return from[Math.floor(Math.random() * from.length)];
   }
 
+  /* ---------- first-time spotlight ---------- */
+  // Teach a game on its own board: each step dims the whole screen except some squares (and, if it
+  // names them, other things on the page such as a key above the board), outlines them in red, can
+  // put marks on squares (a 🐱, ❌…; a list of marks takes turns), and says one line over the board.
+  // A tap or Space shows the next step; after the last, "Let's Play!" shows and `done` runs.
+  // `grid` is the element the squares fill, `w` × `h` squares; each step is
+  // {say, lit: [[x, y]…], outline (default: lit), tone ("ok" outlines green, not red), marks: [[x, y, mark, size]…],
+  // arrows: [{to: [x, y] (a corner between squares), from: [dx, dy] (the way the arrow comes in), size}],
+  // els: [element, [elements] or a function returning either…], lines: [{edges: [[x1, y1, x2, y2]…], tone}], enter() and leave() to show
+  // something on the board just while the step is up}.
+  // shapes: [{poly}|{path, width}|{arrow, from}] in page pixels, or a function returning them (see show).
+  // map: () => ({ox, oy, cw, ch}) in page pixels, when the squares don't simply fill `grid`.
+  // finish: false leaves out "Let's Play!" (for a one-off tip in the middle of a game).
+  // It covers the screen, so taps on it never reach the game (or start its timer), and the timer waits.
+  function spotlight(o) {
+    const wrap = o.grid.parentElement, layer = document.createElement("div"), ns = "http://www.w3.org/2000/svg";
+    layer.className = "spot"; layer.tabIndex = 0; layer.setAttribute("role", "dialog"); layer.setAttribute("aria-live", "polite");
+    document.body.append(layer);
+    let k = -1, frame = 0, ticker = null;
+    const svgEl = (t, a) => { const e = document.createElementNS(ns, t); for (const n in a) e.setAttribute(n, a[n]); return e; };
+    // Bring the board (and anything else the steps light) into view first.
+    {
+      const tops = [wrap, ...o.steps.flatMap(st => (st.els || []).map(e => typeof e === "function" ? e() : e).flat())].map(e => e.getBoundingClientRect());
+      const top = Math.min(...tops.map(r => r.top)), bottom = Math.max(...tops.map(r => r.bottom));
+      if (top < 0 || bottom > innerHeight) scrollBy(0, bottom - top < innerHeight ? (top + bottom - innerHeight) / 2 : top - 8);
+    }
+    function show() {
+      const st = o.steps[k], g = o.grid.getBoundingClientRect(), b = wrap.getBoundingClientRect(), W = innerWidth, H = innerHeight;
+      // where the squares are: worked out from the grid element, or given by the game (o.map) when its
+      // squares don't fill the element (a margin round the mat, zoom…)
+      const m = o.map ? o.map() : {ox: g.left + o.grid.clientLeft, oy: g.top + o.grid.clientTop, cw: o.grid.clientWidth / o.w, ch: o.grid.clientHeight / o.h};
+      const {cw, ch, ox, oy} = m;
+      const X = x => ox + x * cw, Y = y => oy + y * ch, lit = st.lit || [];
+      // each thing to light is an element, or a list of elements lit together as one box
+      const els = (st.els || []).map(e => {
+        if (typeof e === "function") e = e();   // for things the game redraws while the step is up
+        const rs = (Array.isArray(e) ? e : [e]).map(x => x.getBoundingClientRect()), p = 5;
+        const l = Math.min(...rs.map(r => r.left)), t = Math.min(...rs.map(r => r.top)), r = Math.max(...rs.map(r => r.right)), btm = Math.max(...rs.map(r => r.bottom));
+        return {x: l - p, y: t - p, w: r - l + 2 * p, h: btm - t + 2 * p};
+      });
+      layer.innerHTML = "";
+      const svg = svgEl("svg", {viewBox: `0 0 ${W} ${H}`, width: W, height: H, "aria-hidden": "true"});
+      // Shapes in page pixels (for boards that aren't squares): {poly: [[x, y]…]} is lit and outlined,
+      // {path: [[x, y]…], width} is a lit band along a line (a track), {arrow: [x, y], from: [dx, dy]}.
+      const shapes = (typeof st.shapes === "function" ? st.shapes() : st.shapes) || [];
+      // everything dims except the holes cut in a mask
+      const mask = svgEl("mask", {id: "spotMask", maskUnits: "userSpaceOnUse", x: 0, y: 0, width: W, height: H});
+      mask.append(svgEl("rect", {x: 0, y: 0, width: W, height: H, fill: "#fff"}));
+      for (const [x, y] of lit) mask.append(svgEl("rect", {x: X(x) - 0.5, y: Y(y) - 0.5, width: cw + 1, height: ch + 1, fill: "#000"}));
+      for (const r of els) mask.append(svgEl("rect", {x: r.x, y: r.y, width: r.w, height: r.h, rx: 6, fill: "#000"}));
+      const ptsOf = pts => pts.map(([x, y], i) => `${i ? "L" : "M"}${x} ${y}`).join("");
+      for (const sh of shapes) {
+        if (sh.poly) mask.append(svgEl("path", {d: ptsOf(sh.poly) + "Z", fill: "#000"}));
+        if (sh.path) mask.append(svgEl("path", {d: ptsOf(sh.path) + (sh.closed ? "Z" : ""), fill: "none", stroke: "#000", "stroke-width": sh.width, "stroke-linejoin": "round", "stroke-linecap": "round"}));
+      }
+      const defs = svgEl("defs", {}); defs.append(mask); svg.append(defs);
+      svg.append(svgEl("rect", {x: 0, y: 0, width: W, height: H, class: "dim", mask: "url(#spotMask)"}));
+      const sw = Math.max(3, cw * 0.07);
+      for (const group of st.outline || [lit]) {   // red lines where the outlined squares meet the rest
+        const set = new Set(group.map(([x, y]) => y * o.w + x)), has = (x, y) => x >= 0 && y >= 0 && x < o.w && y < o.h && set.has(y * o.w + x);
+        let e = "";
+        for (const [x, y] of group) {
+          if (!has(x, y - 1)) e += `M${X(x)} ${Y(y)}H${X(x + 1)}`;
+          if (!has(x, y + 1)) e += `M${X(x)} ${Y(y + 1)}H${X(x + 1)}`;
+          if (!has(x - 1, y)) e += `M${X(x)} ${Y(y)}V${Y(y + 1)}`;
+          if (!has(x + 1, y)) e += `M${X(x + 1)} ${Y(y)}V${Y(y + 1)}`;
+        }
+        svg.append(svgEl("path", {d: e, class: "edge" + (st.tone === "ok" ? " ok" : ""), "stroke-width": sw}));
+      }
+      // outlines round page elements and shapes keep one thickness (the squares' depends on their size)
+      for (const r of els) svg.append(svgEl("rect", {x: r.x, y: r.y, width: r.w, height: r.h, rx: 6, class: "edge", "stroke-width": 3.5}));
+      for (const ln of st.lines || []) {   // lines along chosen square edges, [x1, y1, x2, y2] in squares
+        const e = ln.edges.map(([x1, y1, x2, y2]) => `M${X(x1)} ${Y(y1)}L${X(x2)} ${Y(y2)}`).join("");
+        svg.append(svgEl("path", {d: e, class: "edge" + (ln.tone === "ok" ? " ok" : ""), "stroke-width": sw * 1.4}));
+      }
+      for (const [x, y, m, size] of st.marks || []) {   // x, y can fall between squares; size is in squares
+        const t = svgEl("text", {x: X(x + 0.5), y: Y(y + 0.56), "text-anchor": "middle", "dominant-baseline": "middle",
+          "font-size": cw * (size || (m === "❌" ? 0.42 : 0.56))});
+        t.textContent = Array.isArray(m) ? m[frame % m.length] : m; svg.append(t);
+      }
+      // a bold arrow with its tip at (ax, ay), coming in from direction (dx, dy); size is a square's width
+      const arrow = (ax, ay, dx, dy, size) => {
+        const n = Math.hypot(dx, dy), ux = dx / n, uy = dy / n, tx = ax + ux * 3, ty = ay + uy * 3, len = Math.max(34, size * 0.95), hd = Math.max(13, size * 0.32);
+        const tail = [tx + ux * len, ty + uy * len], base = [tx + ux * hd, ty + uy * hd], px = -uy * hd * 0.62, py = ux * hd * 0.62;
+        const shaft = `M${tail[0]} ${tail[1]}L${base[0]} ${base[1]}`, head = `M${tx} ${ty}L${base[0] + px} ${base[1] + py}L${base[0] - px} ${base[1] - py}Z`;
+        for (const [cls, w] of [["arrowLine back", Math.max(10, size * 0.2)], ["arrowLine", Math.max(5, size * 0.1)]]) svg.append(svgEl("path", {d: shaft, class: cls, "stroke-width": w}));
+        svg.append(svgEl("path", {d: head, class: "arrowHead", "stroke-width": Math.max(3, size * 0.06)}));
+      };
+      for (const {to: [gx, gy], from: [dx, dy], size} of st.arrows || []) arrow(X(gx), Y(gy), dx, dy, (size || 1) * cw);   // pointing at a point between squares; size in squares
+      for (const sh of shapes) {
+        if (sh.poly) svg.append(svgEl("path", {d: ptsOf(sh.poly) + "Z", class: "edge" + (st.tone === "ok" ? " ok" : ""), "stroke-width": 3.5, "stroke-linejoin": "round"}));
+        if (sh.arrow) arrow(sh.arrow[0], sh.arrow[1], sh.from[0], sh.from[1], sh.size || 40);
+      }
+      layer.append(svg);
+      const say = document.createElement("div"); say.className = "say";
+      say.style.left = `${b.left + b.width * 0.04}px`; say.style.width = `${b.width * 0.92}px`;
+      const bw = document.createElement("b"); sayWith(bw, st.say);
+      const tap = document.createElement("small"); tap.textContent = "Tap to go on";
+      say.append(bw, tap); layer.append(say);
+      // The words go over the board where they cover the least of the lit squares (and, among those,
+      // nearest the middle), so they never sit on what the step is pointing at if they can help it.
+      const sh = say.offsetHeight, l = say.offsetLeft, r = l + say.offsetWidth;
+      // things to keep clear of: the lit squares and page elements, and any arrows
+      const keep = lit.map(([x, y]) => [X(x), Y(y), X(x + 1), Y(y + 1)]);
+      for (const r of els) keep.push([r.x, r.y, r.x + r.w, r.y + r.h]);
+      const arrowBox = (ax, ay, dx, dy, size) => {
+        const n = Math.hypot(dx, dy), len = Math.max(34, size * 0.95) + 8, bx = ax + dx / n * len, by = ay + dy / n * len;
+        keep.push([Math.min(ax, bx) - 8, Math.min(ay, by) - 8, Math.max(ax, bx) + 8, Math.max(ay, by) + 8]);
+      };
+      for (const {to: [gx, gy], from: [dx, dy], size} of st.arrows || []) arrowBox(X(gx), Y(gy), dx, dy, (size || 1) * cw);
+      for (const sh of shapes) {
+        if (sh.arrow) arrowBox(sh.arrow[0], sh.arrow[1], sh.from[0], sh.from[1], sh.size || 40);
+        if (sh.poly) { const xs = sh.poly.map(p => p[0]), ys = sh.poly.map(p => p[1]); keep.push([Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]); }
+        // a band along a line counts only lightly: words may cross a track, but not sit on what's lit
+        if (sh.path) for (let i = 0; i < sh.path.length; i += 4) { const [x, y] = sh.path[i]; keep.push([x - sh.width / 2, y - sh.width / 2, x + sh.width / 2, y + sh.width / 2, 0.02]); }
+      }
+      let best = b.top + b.height / 2 - sh / 2, bestCost = Infinity;
+      for (let t = b.top + 4; t <= b.bottom - sh - 4; t += 4) {
+        let cover = 0;
+        for (const [x1, y1, x2, y2, weight = 1] of keep) {
+          const w = Math.min(r, x2) - Math.max(l, x1), h = Math.min(t + sh, y2) - Math.max(t, y1);
+          if (w > 0 && h > 0) cover += w * h * weight;
+        }
+        const cost = cover * 1000 + Math.abs(t + sh / 2 - (b.top + b.height / 2));
+        if (cost < bestCost) { bestCost = cost; best = t; }
+      }
+      say.style.top = `${best}px`;
+      layer.setAttribute("aria-label", `${st.say}. ${tap.textContent}.`);
+    }
+    // Emoji in the words keep their own colours (no outline) on a pale chip, and never start a line
+    // on their own: each sticks to the word before it.
+    function sayWith(el, text) {
+      for (const part of text.split(" ")) {
+        const w = document.createElement("span"); w.className = "w";
+        for (const bit of part.split(/(\p{Extended_Pictographic}(?:\uFE0F)?)/u)) {
+          if (!bit) continue;
+          if (/\p{Extended_Pictographic}/u.test(bit)) { const e = document.createElement("span"); e.className = "emo"; e.textContent = bit; w.append(e); }
+          else w.append(bit);
+        }
+        if (el.childNodes.length) {
+          const prev = el.lastChild;   // an emoji word sticks to the word before it
+          if (/^\p{Extended_Pictographic}/u.test(part)) { prev.append(" ", ...w.childNodes); continue; }
+          el.append(" ");
+        }
+        el.append(w);
+      }
+    }
+    const redraw = () => k >= 0 && k < o.steps.length && show();
+    function next(e) {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      const was = o.steps[k]; if (was && was.leave) was.leave();
+      if (++k >= o.steps.length) {   // all done: "Let's Play!" shows over the board and fades by itself
+        clearInterval(ticker); removeEventListener("resize", redraw); removeEventListener("scroll", redraw); layer.remove(); if (o.done) o.done();
+        if (o.finish === false) return;   // a one-off tip in the middle of a game just goes away
+        const go = document.createElement("div"); go.className = "spotGo"; go.setAttribute("aria-hidden", "true");
+        const b = document.createElement("b"); b.textContent = "Let's Play!"; go.append(b); wrap.append(go);
+        setTimeout(() => go.remove(), 1300);
+        return;
+      }
+      frame = 0; if (o.steps[k].enter) o.steps[k].enter();
+      // bring what this step lights into view if it's off the screen
+      const rs = (o.steps[k].els || []).map(e => typeof e === "function" ? e() : e).flat().map(x => x.getBoundingClientRect());
+      if (rs.length) {
+        const top = Math.min(...rs.map(r => r.top)), bottom = Math.max(...rs.map(r => r.bottom));
+        if (bottom > innerHeight - 8) scrollBy(0, bottom - innerHeight + 24); else if (top < 8) scrollBy(0, top - 24);
+      }
+      show();
+      setTimeout(redraw, 350);   // and again once the page has settled (a message line can shift things)
+    }
+    addEventListener("resize", redraw); addEventListener("scroll", redraw, {passive: true});
+    layer.addEventListener("pointerdown", next);
+    layer.addEventListener("keydown", e => { if (e.key === " " || e.key === "Enter" || e.key === "Escape") next(e); });
+    ticker = setInterval(() => { const st = o.steps[k]; if (st && (st.marks || []).some(m => Array.isArray(m[2]))) { frame++; show(); } }, 900);
+    next(); layer.focus({preventScroll: true});
+  }
+
   let msgTimer = null;
   function note(text, ms) {
     clearTimeout(msgTimer);
@@ -372,5 +572,5 @@ const G = (() => {
   }
 
   return {$, nav, load, save, builder, openCard, closeCard, winCard, sizeUp, otherSize, note, cellAt, track, reopen,
-          setupTimer, freshClock, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, toyPicker, pickLook};
+          setupTimer, freshClock, spotlight, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, toyPicker, pickLook};
 })();

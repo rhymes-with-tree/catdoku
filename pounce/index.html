@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-09.2"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-09.3"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -22,7 +22,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-09.2">
+<link rel="stylesheet" href="../games.css?v=2026-10-09.3">
 <style>
 /* A quilted play mat in a wooden frame, covered in toys. */
 .wrap canvas{display:block;width:100%;height:100%;border:3px solid #5C3A22;border-radius:12px;touch-action:none;
@@ -78,7 +78,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-09.2"></script>
+<script src="../games.js?v=2026-10-09.3"></script>
 <script>
 const $ = G.$;
 G.nav("pounce");
@@ -616,15 +616,57 @@ function helpCard() {
   const media = document.createElement("div"), ol = document.createElement("ol"); ol.className = "steps";
   for (const t of ["Swap two toys next to each other to line up three or more of a kind.",
                    "Catch the toys shown above the mat before your moves run out.",
-                   "Line up four to make a toy with the zoomies (it clears its line), an L or T for a bouncy one (it clears round about it), or five for catnip (swap it with a toy to clear every toy of that kind)."]) {
+                   "Line up four to make a toy with the zoomies (it clears its line), an L or T for a bouncy one (it clears round about it), or five for catnip (swap it with a toy to clear every toy of that kind).",
+                   "Zen, at the end of the level list, has no goals and no move limit."]) {
     const li = document.createElement("li"); li.textContent = t; ol.append(li);
   }
   const tip = document.createElement("p"); tip.className = "tip";
   tip.textContent = "Drag a toy onto its neighbour, or tap one and then the other.";
   media.append(ol, tip);
-  G.openCard("How to play", "", [["Let's play", G.closeCard, true]], media);
+  G.openCard("How to play", "", [["Show me on the board", () => { G.closeCard(); intro(true); }, true], ["Got it", G.closeCard]], media);
 }
 $("helpBtn").onclick = helpCard;
+
+/* ---------- first-time spotlight ---------- */
+// The first visit (or "Show me on the board") walks through a real swap on the mat that's out: the two
+// toys, then the same two swapped (just while that step is up) with the line they make, then the goals
+// and the moves.
+const INTRO = "catdoku.pounce.intro.v1";
+function intro(again) {
+  if (!again && G.load(INTRO).seen) return;
+  if (!S || S.over || busy || document.querySelector(".spot")) return;
+  const mv = findMove(S.g); if (!mv) return;
+  const [a, b] = mv, xy = i => [i % N, Math.floor(i / N)];
+  const swapOver = () => { swapCells(S.g, a, b); slide(S.g[a], a, 0.2); slide(S.g[b], b, 0.2); };
+  let line = [a, b];
+  swapCells(S.g, a, b);
+  const run = runsOf(S.g).find(r => r.cells.includes(a) || r.cells.includes(b)); if (run) line = run.cells;
+  swapCells(S.g, a, b);
+  hint = null; hintAt = Infinity;
+  // Special toys: lay out a shape in one kind of toy, with the special toy it makes in it, just while
+  // the step is up; the mat goes back as it was.
+  const r = N >> 1, k0 = S.g[r * N + 2].k >= 0 ? S.g[r * N + 2].k : S.d.kinds[0];
+  const shape = (cells, at, sp) => {
+    let before;
+    return {lit: cells.map(xy),
+      enter: () => { before = cells.map(i => [S.g[i].k, S.g[i].sp]); cells.forEach(i => { S.g[i].k = k0; S.g[i].sp = 0; });
+                     S.g[at].sp = sp; if (sp === NIP) S.g[at].k = -1; },
+      leave: () => { cells.forEach((i, j) => { [S.g[i].k, S.g[i].sp] = before[j]; }); }};
+  };
+  const row = n => [...Array(n).keys()].map(c => r * N + 2 + c);
+  const steps = [
+    {say: "Swap two toys next to each other", lit: [xy(a), xy(b)], outline: [[xy(a)], [xy(b)]]},
+    {say: "Line up three or more of a kind and they disappear from the board", lit: line.map(xy), enter: swapOver, leave: swapOver},
+    {say: "Line up four for a toy with the zoomies: it clears its whole line", ...shape(row(4), r * N + 3, ROW)},
+    {say: "Line up an L for a bouncy toy: it clears all around it", ...shape([...row(3), (r - 1) * N + 2, (r - 2) * N + 2], r * N + 2, BOMB)},
+    {say: "or a T", ...shape([...row(3), (r + 1) * N + 3, (r + 2) * N + 3], r * N + 3, BOMB)},
+    {say: "Line up five for catnip: swap it to clear every toy of one kind", ...shape(row(5), r * N + 4, NIP)},
+  ];
+  if (S.level) steps.push({say: "Catch the toys shown above", els: [[...$("goals").children]]},
+                          {say: "Before your moves run out", els: [$("moves")]},
+                          {say: "Or play zen mode", els: [$("levelSel")]});
+  G.spotlight({grid: canvas, w: N, h: N, steps, done: () => { G.save(INTRO, {seen: true}); hintAt = now + 6; }});
+}
 
 /* ---------- choosing toys ---------- */
 $("toysBtn").onclick = () => G.toyPicker({kinds: KINDS, off: offToys, min: MIN_COLOURS, src: toySrc, save: off => {
@@ -641,7 +683,9 @@ const saved = G.load(STORE), first = saved.level ?? 1;
 climb = saved.climb || saved.level || 1;
 G.reopen(() => { if (saved.d && first <= MAX_LEVEL) start(first, saved.d); else startLevel(first); },
   why => { startLevel(first); G.note(why, 0); });
-if (saved.level === undefined) helpCard();
+// Players from before the spotlight had the How to play card instead, so it's only for new players.
+if (saved.level !== undefined && !G.load(INTRO).seen) G.save(INTRO, {seen: true});
+intro();
 requestAnimationFrame(loop);
 </script>
 <!-- Visit counts (GoatCounter: no cookies, nothing personal) -->

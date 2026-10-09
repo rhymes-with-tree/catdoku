@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-09.2";
+  var BUILD = "2026-10-09.3"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-09.2">
+<link rel="stylesheet" href="../games.css?v=2026-10-09.3">
 <style>
 /* Two toys share out a grid in the toy box: every line holds as many of one as the other, no three alike in a row,
    and = / × signs between squares say whether neighbours match. */
@@ -39,7 +39,12 @@
 @keyframes pop{from{transform:scale(.6)}}
 .sq.bad{box-shadow:inset 0 0 0 3px #E16251}
 .sign{position:absolute;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:#fff;border:2px solid #2A2530;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;line-height:1;pointer-events:none;z-index:2}
-.sign.bad{background:#E16251;color:#fff}
+.sign.bad,.sign.no{background:#E16251;color:#fff}
+.sign.ok{background:#4E9A5B;color:#fff}
+/* the player's own = and × notes, in teal so they're never mistaken for the puzzle's */
+.sign.mine{background:#3C8681;color:#fff;border-color:#2A2530;border-style:dashed}
+.tray.marking{cursor:crosshair;box-shadow:0 0 0 3px #3C8681}
+.tray.marking .sq{cursor:crosshair}
 .won .sq img{animation:hop .5s ease-out}
 @keyframes hop{40%{transform:translateY(-8px) scale(1.1)}}
 .rules{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin:6px 0 10px}
@@ -70,6 +75,7 @@
   <div class="actions">
     <button id="undoBtn">Undo</button>
     <button id="clearBtn">Clear</button>
+    <button id="markBtn" aria-pressed="false">Mark = ×</button>
     <button id="toysBtn">Toys</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
@@ -81,7 +87,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-09.2"></script>
+<script src="../games.js?v=2026-10-09.3"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // A grid of N × N squares, each 0 or 1 (the two toys). Every row and column has N/2 of each, no three the same
@@ -205,7 +211,8 @@ const KINDS = [
 ];
 const TOYS_PREF = "catdoku.tango.toys.v1", MIN_COLOURS = 2;
 let offToys = new Set(G.load(TOYS_PREF).off || []);
-const toySrc = f => `../toys/${f}.webp?v=2026-10-09.2`;
+const TOY_SRC = {};  // filled with embedded pictures when the page is bundled into one file
+const toySrc = f => TOY_SRC[f] || `../toys/${f}.webp?v=${window.SITE_BUILD || ""}`;  // a new version gets new pictures
 const nameOf = f => { for (const k of KINDS) for (const [g, n] of k.looks) if (g === f) return n; return "toy"; };
 function pickToys() {
   let kinds = KINDS.map((_, i) => i).filter(k => KINDS[k].looks.some(([f]) => !offToys.has(f)));
@@ -251,30 +258,70 @@ function draw() {
   $("board").querySelectorAll(".sign").forEach(s => s.remove());
   game.signs.forEach((s, k) => {
     const A = cells[s.a].getBoundingClientRect(), B = cells[s.b].getBoundingClientRect(), d = document.createElement("div");
-    d.className = "sign" + (badSign.has(k) ? " bad" : ""); d.textContent = s.same ? "=" : "×";
+    d.className = "sign" + (badSign.has(k) ? " bad" : "") + (litSign && litSign.s === s ? " " + litSign.tone : ""); d.textContent = s.same ? "=" : "×";
     d.style.left = ((A.left + A.right + B.left + B.right) / 4 - box.left - bl) + "px"; d.style.top = ((A.top + A.bottom + B.top + B.bottom) / 4 - box.top - bt) + "px";
     $("board").append(d);
   });
-  $("key").innerHTML = `<span>Tap once: ${img(game.toys[0])}</span><span>Twice: ${img(game.toys[1])}</span>`;
+  for (const m of game.notes || []) {
+    const A = cells[m.a].getBoundingClientRect(), B = cells[m.b].getBoundingClientRect(), d = document.createElement("div");
+    d.className = "sign mine"; d.textContent = m.same ? "=" : "×";
+    d.style.left = ((A.left + A.right + B.left + B.right) / 4 - box.left - bl) + "px"; d.style.top = ((A.top + A.bottom + B.top + B.bottom) / 4 - box.top - bt) + "px";
+    $("board").append(d);
+  }
+  $("board").classList.toggle("marking", marking);
+  $("markBtn").setAttribute("aria-pressed", String(marking));
+  $("key").innerHTML = marking ? `<span>Tap between two squares: = then × then off</span>`
+    : `<span>Tap once: ${img(game.toys[0])}</span><span>Twice: ${img(game.toys[1])}</span>`;
   const empty = game.grid.filter(v => v === -1).length;
   $("count").textContent = game.won ? "Solved!" : empty ? `${empty} square${empty === 1 ? "" : "s"} to fill` : bad.size ? "Something's not right" : "";
   $("undoBtn").disabled = !game.history.length || game.won; $("clearBtn").disabled = !game.history.length || game.won;
 }
+// Undo steps keep the toys and the player's own signs (older saves kept just the toys).
+const snapshot = () => game.history.push({grid: game.grid.slice(), notes: (game.notes || []).map(m => ({...m}))});
+function restore(h) { if (Array.isArray(h)) game.grid = h; else { game.grid = h.grid; game.notes = h.notes; } }
+// Mark = ×: the player's own signs between squares, as notes. While it's on, a tap goes to the edge
+// nearest the finger and turns it = , then ×, then off. They're never checked; they're just reminders.
+let marking = false, litSign = null;  // litSign: a sign the walkthrough is pointing at, coloured to match
+$("markBtn").onclick = () => {
+  if (!game || game.won) return;
+  marking = !marking; draw();
+  if (marking && !settings.seenMarks) { settings.seenMarks = true; save(); G.note("Your teal = and × are just notes for you.", 6000); }
+};
+function edgeAt(x, y) {
+  const el = $("squares"), r = el.getBoundingClientRect(), N = game.N, gap = parseFloat(getComputedStyle(el).columnGap) || 0;
+  const pitch = (r.width + gap) / N, fx = (x - r.left + gap / 2) / pitch, fy = (y - r.top + gap / 2) / pitch;
+  const col = Math.min(N - 1, Math.max(0, Math.floor(fx))), row = Math.min(N - 1, Math.max(0, Math.floor(fy)));
+  const vx = Math.round(fx), hy = Math.round(fy), dv = Math.abs(fx - vx), dh = Math.abs(fy - hy);
+  const okV = vx > 0 && vx < N, okH = hy > 0 && hy < N;
+  if (okV && (!okH || dv <= dh)) return {a: row * N + vx - 1, b: row * N + vx};
+  if (okH) return {a: (hy - 1) * N + col, b: hy * N + col};
+  return null;
+}
+$("board").addEventListener("click", e => {
+  if (!marking || !playing()) return;
+  e.stopPropagation();
+  const ed = edgeAt(e.clientX, e.clientY); if (!ed) return;
+  if (game.signs.some(s => s.a === ed.a && s.b === ed.b)) { G.note("That one's already part of the puzzle.", 2500); return; }
+  snapshot();
+  const notes = game.notes || (game.notes = []), k = notes.findIndex(m => m.a === ed.a && m.b === ed.b);
+  if (k < 0) notes.push({...ed, same: true}); else if (notes[k].same) notes[k].same = false; else notes.splice(k, 1);
+  draw(); save();
+}, true);
 $("squares").addEventListener("click", e => {
   if (!playing()) return;
   const c = e.target.closest(".sq"); if (!c) return;
   const i = +c.dataset.i; if (game.givens[i] !== -1) return;
-  game.history.push(game.grid.slice());
+  snapshot();
   game.grid[i] = game.grid[i] === -1 ? 0 : game.grid[i] === 0 ? 1 : -1;
   if (!game.grid.includes(-1) && !problems().bad.size) win(); else { draw(); save(); }
 });
-$("undoBtn").onclick = () => { if (playing() && game.history.length) { game.grid = game.history.pop(); draw(); save(); } };
-$("clearBtn").onclick = () => { if (playing() && game.history.length) { game.history.push(game.grid.slice()); game.grid = game.givens.slice(); draw(); save(); G.note("Back to the start. Undo brings your toys back.", 3500); } };
+$("undoBtn").onclick = () => { if (playing() && game.history.length) { restore(game.history.pop()); draw(); save(); } };
+$("clearBtn").onclick = () => { if (playing() && game.history.length) { snapshot(); game.grid = game.givens.slice(); game.notes = []; draw(); save(); G.note("Back to the start. Undo brings your toys back.", 3500); } };
 addEventListener("resize", () => { if (game) draw(); });
 
 /* ---------- endings ---------- */
 function win() {
-  game.won = true; G.finishClock(game);
+  game.won = true; G.finishClock(game); marking = false;
   const next = Math.min(MAX_LEVEL, game.level + 1);
   settings.level = next; $("levelSel").value = next; save();
   $("board").classList.remove("won"); $("board").getBoundingClientRect(); $("board").classList.add("won"); draw();
@@ -325,11 +372,66 @@ function showHelp() {
     const li = document.createElement("li"); li.textContent = t; ol.append(li);
   }
   const tip = document.createElement("p"); tip.className = "tip";
-  tip.textContent = "Squares that break a rule are outlined in red. Every puzzle has exactly one answer.";
+  tip.textContent = "Squares that break a rule are outlined in red. Every puzzle has exactly one answer. Know two squares match (or don't) before you know which toy? Turn on Mark = × and tap between them to add your own teal = or ×. They're just notes for you and don't change the puzzle.";
   media.append(pics, ol, tip);
-  G.openCard("How to play", "", [["Let's play", () => { G.closeCard(); settings.seenHelp = true; save(); }, true]], media);
+  G.openCard("How to play", "", [["Show me on the board", () => { G.closeCard(); settings.seenHelp = false; helpOnFirstVisit(); }, true],
+    ["Got it", () => { G.closeCard(); settings.seenHelp = true; save(); }]], media);
 }
-function helpOnFirstVisit() { if (!settings.seenHelp && game && playing()) showHelp(); }
+// First visit only: walk through the puzzle that's out. One step puts three of a kind in a row (just while
+// it's up) so the red outline shows; the box goes back as it was.
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || !playing() || document.querySelector(".spot")) return;
+  const N = game.N, xy = i => [i % N, Math.floor(i / N)], all = [...Array(N * N).keys()].map(xy);
+  // the squares sit in a grid with gaps, so work out where they are from the first and last
+  const map = () => { const sq = $("squares").children, a = sq[0].getBoundingClientRect(), z = sq[N * N - 1].getBoundingClientRect(), gap = (z.right - a.left - N * a.width) / (N - 1);
+    return {ox: a.left - gap / 2, oy: a.top - gap / 2, cw: a.width + gap, ch: a.height + gap}; };
+  const empty = game.grid.findIndex((v, i) => v === -1 && game.givens[i] === -1);
+  // three empty squares in a row, for the "no three alike" example
+  let three = null;
+  for (let r = 0; r < N && !three; r++) for (let c = 0; c + 2 < N && !three; c++) {
+    const run = [0, 1, 2].map(d => r * N + c + d);
+    if (run.every(i => game.grid[i] === -1)) three = run;
+  }
+  const row = r => [...Array(N).keys()].map(c => [c, r]), col = c => [...Array(N).keys()].map(r => [c, r]);
+  const showing = change => { let was; return {enter: () => { was = game.grid.slice(); change(); draw(); }, leave: () => { game.grid = was; draw(); }}; };
+  // a sign's two squares filled in to match it (keeping any toy already given there)
+  const fillSign = s => () => {
+    const ga = game.givens[s.a], gb = game.givens[s.b], a = ga >= 0 ? ga : gb >= 0 ? (s.same ? gb : 1 - gb) : 0;
+    game.grid[s.a] = a; game.grid[s.b] = s.same ? a : 1 - a;
+  };
+  // when the puzzle has no = (or no ×), borrow two empty side-by-side squares and show a sign there for the step
+  const example = isSame => {
+    for (let i = 0; i < N * N; i++) {
+      const j = i + 1;
+      if (i % N === N - 1 || game.grid[i] !== -1 || game.grid[j] !== -1 || game.signs.some(s => s.a === i || s.b === i || s.a === j || s.b === j)) continue;
+      return {a: i, b: j, same: isSame, borrowed: true};
+    }
+  };
+  const same = game.signs.find(s => s.same) || example(true), diff = game.signs.find(s => !s.same) || example(false);
+  // fill a sign's squares, adding the sign itself for the step when it's borrowed
+  // the sign is coloured to match (green for =, red for ×) just while its step is up
+  const signStep = (say, s) => {
+    const fill = showing(fillSign(s)), tone = s.same ? "ok" : "no";
+    return {say, lit: [xy(s.a), xy(s.b)], outline: [[xy(s.a), xy(s.b)]], tone,
+      enter: () => { if (s.borrowed) game.signs.push(s); litSign = {s, tone}; fill.enter(); },
+      leave: () => { if (s.borrowed) game.signs = game.signs.filter(x => x !== s); litSign = null; fill.leave(); }};
+  };
+  const steps = [{say: "Fill every square with one of the two toys", lit: all, els: [$("key")]}];
+  // one short step per tap, so tapping along shows each one in turn
+  if (empty >= 0) {
+    const at = [xy(empty)];
+    steps.push({say: "Tap once for the first toy", lit: at, els: [$("key")], ...showing(() => { game.grid[empty] = 0; })},
+               {say: "Tap twice for the second toy", lit: at, els: [$("key")], ...showing(() => { game.grid[empty] = 1; })},
+               {say: "Tap again to empty it", lit: at});
+  }
+  steps.push({say: "Every row has an equal number of each toy", lit: row(Math.floor(N / 2))},
+             {say: "Every column is also equal", lit: col(Math.floor(N / 2))});
+  if (three) steps.push({say: "Three-in-a-row is not allowed", lit: three.map(xy), marks: [[...xy(three[2]), "❌", 0.8]], ...showing(() => { for (const i of three) game.grid[i] = 0; })});
+  if (same) steps.push(signStep("= means the two squares hold the same toy", same));
+  if (diff) steps.push(signStep("× means they're different", diff));
+  steps.push({say: "You can mark down × or = notes for yourself", els: [$("markBtn")]});
+  G.spotlight({grid: $("squares"), w: N, h: N, map, steps, done: () => { settings.seenHelp = true; save(); }});
+}
 
 /* ---------- choosing toys ---------- */
 $("toysBtn").onclick = () => G.toyPicker({kinds: KINDS, off: offToys, min: MIN_COLOURS, src: toySrc, save: off => {

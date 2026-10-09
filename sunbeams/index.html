@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-09.2";
+  var BUILD = "2026-10-09.3";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-09.2">
+<link rel="stylesheet" href="../games.css?v=2026-10-09.3">
 <style>
 /* A wooden floor in the shade; sunbeams are patches of window light, each with a cat stretched out in it. */
 .board{border-color:#5C3A22;border-radius:12px;position:relative;z-index:2}
@@ -74,7 +74,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-09.2"></script>
+<script src="../games.js?v=2026-10-09.3"></script>
 <script>
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 // Split the grid into random rectangles, scanning for the first uncovered cell each time.
@@ -155,7 +155,7 @@ const SLEEPERS = [
   ["c15-36",2.96,3], ["c16-16",3.0,2], ["c16-14",3.36,2], ["c15-33",3.72,3], ["c15-32",3.78,3], ["c15-35",3.78,3],
   ["c16-13",3.82,2], ["c16-15",3.93,2], ["c14-53",4.12,1], ["c16-1",4.2,2], ["c14-52",4.29,1], ["c15-37",4.33,3],
   ["c14-55",4.57,1], ["c14-59",4.62,1], ["c14-57",4.67,1], ["c15-1",5.06,3], ["c14-58",5.32,1], ["c15-34",5.38,3]];
-const CAT_DIR = "../cats/";
+const CAT_DIR = "../cats/", CAT_SRC = {};  // CAT_SRC is filled with embedded pictures when the page is bundled into one file
 // A steady pseudo-random number for a square, so each cat keeps its look between redraws.
 function hash(x) { x = Math.imul(x ^ (x >>> 16), 0x45d9f3b); x = Math.imul(x ^ (x >>> 16), 0x45d9f3b); return (x ^ (x >>> 16)) >>> 0; }
 
@@ -179,7 +179,7 @@ function sizeTag(g, x, y, n, asleep) {
 }
 function catImage(g, name, w, h, tf) {
   const k = el(g, "g", {transform:tf});
-  el(k, "image", {href:CAT_DIR + name + ".webp", x:-w / 2, y:-h / 2, width:w, height:h, preserveAspectRatio:"none"});
+  el(k, "image", {href:CAT_SRC[name] || CAT_DIR + name + ".webp", x:-w / 2, y:-h / 2, width:w, height:h, preserveAspectRatio:"none"});
 }
 // All the poses of one cat count as the same cat when spreading them round the floor.
 const catOf = name => name.startsWith("c16-") ? "fluffy tuxedo" : name;
@@ -400,10 +400,50 @@ function showHelp() {
   const tip = document.createElement("p"); tip.className = "tip";
   tip.textContent = "Drag from corner to corner to let the light in. Tap a sunbeam to take it away.";
   media.append(ol, tip);
-  G.openCard("How to play", "", [["Let's play", () => { G.closeCard(); settings.seenHelp = true; save(); }, true]], media);
+  G.openCard("How to play", "", [["Show me on the board", () => { G.closeCard(); settings.seenHelp = false; helpOnFirstVisit(); }, true],
+    ["Got it", () => { G.closeCard(); settings.seenHelp = true; save(); }]], media);
 }
-// First visit only: show the directions once the first puzzle is on the board.
-function helpOnFirstVisit() { if (!settings.seenHelp && game && !game.won) showHelp(); }
+// First visit only: once the first floor is on the board, walk through the rules on it. The example
+// sunbeam is only shown while its steps are up (nothing is saved). It's a size that fits its cat,
+// not checked against the answer.
+function spotlightSteps() {
+  const N = game.N, at = k => [k % N, Math.floor(k / N)], cats = game.clue.flatMap((n, k) => n ? [k] : []);
+  const box = R => cellsIn(N, R).map(at), centre = k => Math.abs(k % N - (N - 1) / 2) + Math.abs(Math.floor(k / N) - (N - 1) / 2);
+  // a sunbeam around one cat (3 to 6 squares if there is one, near the middle), holding no other cat
+  let beam = null;
+  for (const k of cats.slice().sort((a, b) => (game.clue[a] >= 3 && game.clue[a] <= 6 ? 0 : 1) - (game.clue[b] >= 3 && game.clue[b] <= 6 ? 0 : 1) || centre(a) - centre(b))) {
+    const n = game.clue[k], r0 = Math.floor(k / N), c0 = k % N, fits = [];
+    for (let h = 1; h <= n; h++) if (n % h === 0) { const w = n / h;
+      for (let r = r0 - h + 1; r <= r0; r++) for (let c = c0 - w + 1; c <= c0; c++) {
+        const R = {r, c, h, w};
+        if (r >= 0 && c >= 0 && r + h <= N && c + w <= N && valid(R)) fits.push(R);
+      } }
+    fits.sort((A, B) => Math.abs(A.w - A.h) - Math.abs(B.w - B.h));
+    if (fits.length) { beam = fits[0]; break; }
+  }
+  // two cats in a line with an empty square between them (for the ❌), near the middle, and the
+  // rectangle round both; failing that, two cats side by side
+  let two = null;
+  for (const a of cats) for (const b of cats) if (a < b && (a % N === b % N || Math.floor(a / N) === Math.floor(b / N))) {
+    const R = rectFrom(a, b), len = R.w * R.h, cost = (len === 3 ? 0 : len === 2 ? 100 : 50 * len) + centre(a) + centre(b);
+    if (cellsIn(N, R).filter(k => game.clue[k]).length === 2 && (!two || cost < two.cost)) two = {...R, cost};
+  }
+  const show = R => ({enter: () => { game.rects.push(R); render(); }, leave: () => { game.rects.pop(); render(); }});
+  const steps = [{say: "Every number is a cat", lit: cats.map(at), outline: cats.map(k => [at(k)])}];
+  if (beam) steps.push({say: "Each cat needs a sunbeam with that many squares", lit: box(beam), ...show(beam)});
+  if (two) steps.push({say: "Just one cat per sunbeam", lit: box(two), marks: [[two.c + (two.w - 1) / 2, two.r + (two.h - 1) / 2, "❌", two.w * two.h === 2 ? 0.5 : 0.8]]});
+  steps.push({say: "Fill the whole floor with sunshine", lit: [...Array(N * N).keys()].map(at)});
+  if (beam) {
+    steps.push({say: "Drag from corner to corner to let the light in", lit: box(beam),
+                arrows: [{to: [beam.c, beam.r], from: [-1, -1]}, {to: [beam.c + beam.w, beam.r + beam.h], from: [1, 1]}], ...show(beam)},
+               {say: "Tap a sunbeam to take it away", lit: box(beam), ...show(beam)});
+  }
+  return steps;
+}
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || game.won || document.querySelector(".spot")) return;
+  G.spotlight({grid: $("board"), w: game.N, h: game.N, steps: spotlightSteps(), done: () => { settings.seenHelp = true; save(); }});
+}
 
 G.nav("sunbeams");
 G.checkClock(game);

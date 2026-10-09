@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-09.2"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-09.3"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -22,7 +22,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-09.2">
+<link rel="stylesheet" href="../games.css?v=2026-10-09.3">
 <style>
 /* A play mat covered in satin ribbons; each one slides off the way its pointed end points, along its own path.
    Big mats zoom, and scroll inside their frame. */
@@ -48,7 +48,7 @@
 </head>
 <body>
 <main>
-  <header><h1>Twirl</h1><div class="stripe"></div><p class="tagline">Pull every ribbon off the mat</p></header>
+  <header><h1>Twirl</h1><div class="stripe"></div><p class="tagline">Send every ribbon off the mat</p></header>
   <nav class="games" id="games" aria-label="Games"></nav>
 
   <div class="bar">
@@ -64,7 +64,7 @@
 
   <div class="wrap mat" id="wrap">
     <div class="scroller" id="scroller">
-      <canvas id="board" aria-label="Ribbons covering a play mat. Tap a ribbon to pull it off the way its pointed end points."></canvas>
+      <canvas id="board" aria-label="Ribbons covering a play mat. Tap a ribbon to send it off; it slides the way its pointed end points."></canvas>
     </div>
     <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
   </div>
@@ -76,13 +76,13 @@
   </div>
 
   <div class="help">
-    <p>Tap a ribbon to pull it off the mat the way its pointed end points. It only comes off if nothing is in the way. A blocked tap costs a life.</p>
+    <p>Tap a ribbon to send it off the mat; it slides the way its pointed end points. It only comes off if nothing is in the way. A blocked tap costs a life.</p>
     <p>Pinch or use − and + to zoom; drag to look around. Turn off Twisty ribbons if you'd rather every ribbon lay flat.</p>
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-09.2"></script>
-<script src="../colorways.js?v=2026-10-09.2"></script>
+<script src="../games.js?v=2026-10-09.3"></script>
+<script src="../colorways.js?v=2026-10-09.3"></script>
 <script>
 const $ = G.$;
 G.nav("twirl");
@@ -288,7 +288,7 @@ function hud() {
   $("count").textContent = `🎀 ${left()} left`;
 }
 
-// What's on each square right now (ribbons already pulled off are gone at once, even mid-flight).
+// What's on each square right now (ribbons already sent off are gone at once, even mid-flight).
 function occupancy() {
   const d = S.d, occ = new Int16Array(d.W * d.H).fill(-1), gone = new Set(d.gone);
   d.ribbons.forEach((r, k) => { if (!gone.has(k)) for (const i of r.cells) occ[i] = k; });
@@ -563,13 +563,51 @@ function loop(t) { now += Math.min(0.05, (t - last) / 1000); last = t; draw(); r
 /* ---------- how to play ---------- */
 function helpCard() {
   const media = document.createElement("div"), ol = document.createElement("ol"); ol.className = "steps";
-  for (const t of ["Tap a ribbon to pull it off the way its pointed end points.",
+  for (const t of ["Tap a ribbon to send it off. It slides the way its pointed end points.",
                    "It only comes off if nothing is in the way.",
-                   "A blocked tap costs a life. Clear every ribbon to finish the level."]) {
+                   "A blocked tap costs a life. Clear every ribbon to finish the level.",
+                   "Turn off Twisty ribbons to draw every ribbon flat."]) {
     const li = document.createElement("li"); li.textContent = t; ol.append(li);
   }
-  media.append(ol);
-  G.openCard("How to play", "", [["Let's play", G.closeCard, true]], media);
+  const tip = document.createElement("p"); tip.className = "tip";
+  tip.textContent = "Big mats zoom: pinch, or use − and +, and drag to look around.";
+  media.append(ol, tip);
+  G.openCard("How to play", "", [["Show me on the board", () => { G.closeCard(); intro(true); }, true], ["Got it", G.closeCard]], media);
+}
+/* ---------- first-time spotlight ---------- */
+// The first visit (or "Show me on the board") walks through the mat that's out: a ribbon that's free to
+// go and the way it'll slide, a blocked ribbon and what's in its way, the lives, the mat, and zoom.
+const INTRO = "catdoku.twirl.intro.v1";
+// What a ribbon would hit if tapped now: [the ribbon, the square], or null if it's free.
+function blockerOf(k) {
+  const d = S.d, r = d.ribbons[k], occ = occupancy(), h = r.cells[r.cells.length - 1], [dx, dy] = DIRS[r.dir];
+  for (let x = h % d.W + dx, y = ((h / d.W) | 0) + dy; x >= 0 && y >= 0 && x < d.W && y < d.H; x += dx, y += dy) if (occ[y * d.W + x] >= 0) return [occ[y * d.W + x], y * d.W + x];
+  return null;
+}
+function intro(again) {
+  if (!again && G.load(INTRO).seen) return;
+  if (!S || S.over || loading || document.querySelector(".spot")) { if (!again) setTimeout(intro, 400); return; }
+  const d = S.d, gone = new Set(d.gone), xy = i => [i % d.W, (i / d.W) | 0];
+  const here = d.ribbons.map((_, k) => k).filter(k => !gone.has(k));
+  const mid = k => { const [x, y] = xy(d.ribbons[k].cells[d.ribbons[k].cells.length >> 1]); return Math.abs(x - d.W / 2) + Math.abs(y - d.H / 2); };
+  // a free ribbon of three squares or more near the middle; its arrow lies along it, ending just past its tip
+  const free = here.filter(k => !blockerOf(k)).sort((a, b) => (d.ribbons[b].cells.length >= 3) - (d.ribbons[a].cells.length >= 3) || mid(a) - mid(b))[0];
+  const stuck = here.filter(k => blockerOf(k)).sort((a, b) => mid(a) - mid(b))[0];
+  const map = () => { const r = canvas.getBoundingClientRect(); return {ox: r.left + PAD / matW() * r.width, oy: r.top + PAD / matH() * r.height, cw: r.width / matW(), ch: r.height / matH()}; };
+  const cellsOf = k => d.ribbons[k].cells.map(xy), steps = [];
+  if (free !== undefined) {
+    const r = d.ribbons[free], [hx, hy] = xy(r.cells[r.cells.length - 1]), [dx, dy] = DIRS[r.dir];
+    steps.push({say: "Tap a ribbon to send it off", lit: cellsOf(free)},
+               {say: "It slides the way its pointed end points", lit: cellsOf(free), arrows: [{to: [hx + 0.5 + dx * 0.9, hy + 0.5 + dy * 0.9], from: [-dx, -dy], size: 1.7}]});
+  }
+  if (stuck !== undefined) {
+    const [b, at] = blockerOf(stuck), [bx, by] = xy(at);
+    steps.push({say: "Only if nothing is in the way", lit: [...cellsOf(stuck), ...cellsOf(b)], outline: [cellsOf(stuck), cellsOf(b)], marks: [[bx, by, "❌", 0.7]]});
+  }
+  steps.push({say: "A blocked tap costs a life", els: [$("hearts")]},
+             {say: "Clear every ribbon to finish", lit: here.flatMap(cellsOf)},
+             {say: "Pinch or use − and + to zoom", els: [document.querySelector(".zoom")]});
+  G.spotlight({grid: canvas, w: d.W, h: d.H, map, steps, done: () => G.save(INTRO, {seen: true})});
 }
 $("helpBtn").onclick = helpCard;
 G.setupTimer({name: "twirl", game: () => S, playing: g => !g.over && !loading, save,
@@ -577,9 +615,12 @@ G.setupTimer({name: "twirl", game: () => S, playing: g => !g.over && !loading, s
   emptyText: "Finish a level and your times will show up here. They're kept on this device only."});
 $("bestBtn").onclick = () => G.showBests("Best times", S ? S.level : saved.level ?? 1);
 
-G.reopen(() => { if (saved.d && saved.level <= MAX_LEVEL) start(saved.level, saved.d); else startLevel(saved.level ?? 1); },
-  why => { startLevel(saved.level ?? 1).then(() => G.note(why, 0)); });
-if (saved.level === undefined) helpCard();
+// New players start on level 0, the small mat with the biggest ribbons.
+G.reopen(() => { if (saved.d && saved.level <= MAX_LEVEL) start(saved.level, saved.d); else startLevel(saved.level ?? 0); },
+  why => { startLevel(saved.level ?? 0).then(() => G.note(why, 0)); });
+// Players from before the spotlight had the How to play card instead, so it's only for new players.
+if (saved.level !== undefined && !G.load(INTRO).seen) G.save(INTRO, {seen: true});
+intro();
 requestAnimationFrame(loop);
 </script>
 <!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
