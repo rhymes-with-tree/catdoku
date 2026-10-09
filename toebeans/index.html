@@ -372,12 +372,33 @@ function showHelp() {
     const li = document.createElement("li"); li.textContent = t; ol.append(li);
   }
   const tip = document.createElement("p"); tip.className = "tip";
-  tip.textContent = "Hit it exactly to move up a level. If you're stuck, Finish here: within 10 keeps your level, further off moves you back one.";
+  tip.textContent = "Hit it exactly to move up a level. Undo is free. If you're stuck, Finish here: within 10 keeps your level, further off moves you back one.";
   media.append(ol, tip);
-  G.openCard("How to play", "", [["Let's play", () => { G.closeCard(); settings.seenHelp = true; save(); }, true]], media);
+  G.openCard("How to play", "", [["Show me on the board", () => { G.closeCard(); settings.seenHelp = false; helpOnFirstVisit(); }, true],
+    ["Got it", () => { G.closeCard(); settings.seenHelp = true; save(); }]], media);
 }
-// First visit only: show the directions once the first puzzle is dealt.
-function helpOnFirstVisit() { if (!settings.seenHelp && game && playing()) showHelp(); }
+// First visit only: once the first puzzle is dealt, walk through it on the paw. The tiles are redrawn as
+// the steps go, so the numbers being used look picked; step 5 shows a real sum in the second tile (just
+// while it's up), and everything goes back as it was.
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || !playing() || document.querySelector(".spot")) return;
+  const tile = i => () => $("beans").children[i], toes = () => [...document.querySelectorAll(".toe")], all = () => [...$("beans").children];
+  const [a, b] = [game.beans[0], game.beans[1]], sum = opResult(a, "+", b);
+  const set = (p, o) => ({enter: () => { pick = p; op = o; render(); }, leave: () => { pick = op = null; render(); }});
+  let was;
+  const steps = [
+    {say: "Make the number on the big pad", els: [$("pad")]},
+    {say: "Tap a number", els: [tile(0)], ...set(0, null)},
+    {say: "then a toe bean", els: [toes], ...set(0, "+")},
+    {say: "then another number", els: [tile(1)], ...set(0, "+")},
+    {say: "The answer takes the second number's place", els: [tile(1)],
+     enter: () => { was = game.beans.slice(); game.beans[0] = null; game.beans[1] = sum; render(); },
+     leave: () => { game.beans = was; render(); }},
+    {say: "You don't have to use every number", els: [all]},
+    {say: "Stuck? Finish here", els: [$("finishBtn")]},
+  ];
+  G.spotlight({grid: $("beans"), w: 1, h: 1, steps, done: () => { settings.seenHelp = true; save(); render(); }});
+}
 
 G.nav("toebeans");
 G.checkClock(game);

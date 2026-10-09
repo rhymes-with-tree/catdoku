@@ -369,7 +369,7 @@ const G = (() => {
   // `grid` is the element the squares fill, `w` × `h` squares; each step is
   // {say, lit: [[x, y]…], outline (default: lit), tone ("ok" outlines green, not red), marks: [[x, y, mark, size]…],
   // arrows: [{to: [x, y] (a corner between squares), from: [dx, dy] (the way the arrow comes in), size}],
-  // els: [element or [elements]…], lines: [{edges: [[x1, y1, x2, y2]…], tone}], enter() and leave() to show
+  // els: [element, [elements] or a function returning either…], lines: [{edges: [[x1, y1, x2, y2]…], tone}], enter() and leave() to show
   // something on the board just while the step is up}.
   // shapes: [{poly}|{path, width}|{arrow, from}] in page pixels, or a function returning them (see show).
   // map: () => ({ox, oy, cw, ch}) in page pixels, when the squares don't simply fill `grid`.
@@ -383,7 +383,7 @@ const G = (() => {
     const svgEl = (t, a) => { const e = document.createElementNS(ns, t); for (const n in a) e.setAttribute(n, a[n]); return e; };
     // Bring the board (and anything else the steps light) into view first.
     {
-      const tops = [wrap, ...o.steps.flatMap(st => (st.els || []).flat())].map(e => e.getBoundingClientRect());
+      const tops = [wrap, ...o.steps.flatMap(st => (st.els || []).map(e => typeof e === "function" ? e() : e).flat())].map(e => e.getBoundingClientRect());
       const top = Math.min(...tops.map(r => r.top)), bottom = Math.max(...tops.map(r => r.bottom));
       if (top < 0 || bottom > innerHeight) scrollBy(0, bottom - top < innerHeight ? (top + bottom - innerHeight) / 2 : top - 8);
     }
@@ -396,6 +396,7 @@ const G = (() => {
       const X = x => ox + x * cw, Y = y => oy + y * ch, lit = st.lit || [];
       // each thing to light is an element, or a list of elements lit together as one box
       const els = (st.els || []).map(e => {
+        if (typeof e === "function") e = e();   // for things the game redraws while the step is up
         const rs = (Array.isArray(e) ? e : [e]).map(x => x.getBoundingClientRect()), p = 5;
         const l = Math.min(...rs.map(r => r.left)), t = Math.min(...rs.map(r => r.top)), r = Math.max(...rs.map(r => r.right)), btm = Math.max(...rs.map(r => r.bottom));
         return {x: l - p, y: t - p, w: r - l + 2 * p, h: btm - t + 2 * p};
@@ -462,8 +463,9 @@ const G = (() => {
       // The words go over the board where they cover the least of the lit squares (and, among those,
       // nearest the middle), so they never sit on what the step is pointing at if they can help it.
       const sh = say.offsetHeight, l = say.offsetLeft, r = l + say.offsetWidth;
-      // things to keep clear of: the lit squares, and any arrows
+      // things to keep clear of: the lit squares and page elements, and any arrows
       const keep = lit.map(([x, y]) => [X(x), Y(y), X(x + 1), Y(y + 1)]);
+      for (const r of els) keep.push([r.x, r.y, r.x + r.w, r.y + r.h]);
       const arrowBox = (ax, ay, dx, dy, size) => {
         const n = Math.hypot(dx, dy), len = Math.max(34, size * 0.95) + 8, bx = ax + dx / n * len, by = ay + dy / n * len;
         keep.push([Math.min(ax, bx) - 8, Math.min(ay, by) - 8, Math.max(ax, bx) + 8, Math.max(ay, by) + 8]);
@@ -518,7 +520,14 @@ const G = (() => {
         setTimeout(() => go.remove(), 1300);
         return;
       }
-      frame = 0; if (o.steps[k].enter) o.steps[k].enter(); show();
+      frame = 0; if (o.steps[k].enter) o.steps[k].enter();
+      // bring what this step lights into view if it's off the screen
+      const rs = (o.steps[k].els || []).map(e => typeof e === "function" ? e() : e).flat().map(x => x.getBoundingClientRect());
+      if (rs.length) {
+        const top = Math.min(...rs.map(r => r.top)), bottom = Math.max(...rs.map(r => r.bottom));
+        if (bottom > innerHeight - 8) scrollBy(0, bottom - innerHeight + 24); else if (top < 8) scrollBy(0, top - 24);
+      }
+      show();
     }
     addEventListener("resize", redraw); addEventListener("scroll", redraw, {passive: true});
     layer.addEventListener("pointerdown", next);
