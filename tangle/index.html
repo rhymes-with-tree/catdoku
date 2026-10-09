@@ -254,9 +254,33 @@ function showHelp() {
   const tip = document.createElement("p"); tip.className = "tip";
   tip.textContent = "Every tangle can be undone. Once it is, keep moving the yarn about to make any shape you like.";
   media.append(ol, tip);
-  G.openCard("How to play", "", [["Let's play", () => { G.closeCard(); settings.seenHelp = true; save(); }, true]], media);
+  G.openCard("How to play", "", [["Show me on the board", () => { G.closeCard(); settings.seenHelp = false; helpOnFirstVisit(); }, true],
+    ["Got it", () => { G.closeCard(); settings.seenHelp = true; save(); }]], media);
 }
-function helpOnFirstVisit() { if (!settings.seenHelp && game && playing()) showHelp(); }
+// First visit only: walk through the tangle that's out: a strand and its balls, where strands cross, a
+// ball to drag, and the count.
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || !playing() || document.querySelector(".spot")) return;
+  const B = game.balls, E = game.edges, r = sizeOf(B.length);
+  const page = (x, y) => { const m = $("svg").getScreenCTM(); return [m.a * x + m.e, m.d * y + m.f]; };
+  const ring = (x, y, rad) => ({poly: [...Array(20).keys()].map(k => page(x + rad * Math.cos(k * Math.PI / 10), y + rad * Math.sin(k * Math.PI / 10)))});
+  const scale = () => $("svg").getScreenCTM().a;
+  // one strand: the edges sharing the first edge's colour, and the balls along it
+  const col = E[0].ca, strand = E.filter(e => e.ca === col), balls = [...new Set(strand.flatMap(e => [e.a, e.b]))];
+  const X = crossings(B, E);
+  // a ball on a strand that crosses another (dragging it helps), near the middle
+  const crossing = new Set(); E.forEach((e, i) => E.forEach((f, j) => { if (i < j && crossings(B, [e, f]).length) [e.a, e.b, f.a, f.b].forEach(k => crossing.add(k)); }));
+  const pick = [...crossing].sort((a, b) => Math.hypot(B[a].x - 500, B[a].y - 500) - Math.hypot(B[b].x - 500, B[b].y - 500))[0] ?? 0;
+  const steps = [
+    {say: "Each strand of yarn is knotted through balls of yarn",
+     shapes: () => [...strand.map(e => ({path: [page(B[e.a].x, B[e.a].y), page(B[e.b].x, B[e.b].y)], width: r * 0.9 * scale()})), ...balls.map(k => ring(B[k].x, B[k].y, r * 1.15))]},
+    {say: "Little dots show where strands cross", shapes: () => X.map(([x, y]) => ring(x, y, r * 0.45))},
+    {say: "Drag the balls around until no two strands cross",
+     shapes: () => [ring(B[pick].x, B[pick].y, r * 1.2), {arrow: page(B[pick].x, B[pick].y - r * 1.3), from: [0, -1], size: 46}]},
+    {say: "The count shows how many crossings are left", els: [$("count")]},
+  ];
+  G.spotlight({grid: $("svg"), w: 1, h: 1, steps, done: () => { settings.seenHelp = true; save(); }});
+}
 
 for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", ""), n));
 $("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };

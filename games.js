@@ -528,6 +528,7 @@ const G = (() => {
         if (bottom > innerHeight - 8) scrollBy(0, bottom - innerHeight + 24); else if (top < 8) scrollBy(0, top - 24);
       }
       show();
+      setTimeout(redraw, 350);   // and again once the page has settled (a message line can shift things)
     }
     addEventListener("resize", redraw); addEventListener("scroll", redraw, {passive: true});
     layer.addEventListener("pointerdown", next);
