@@ -82,7 +82,7 @@
   </div>
 
   <div class="help">
-    <p>Touch the floor and pull back from the wand to aim, then let go to bat a bubble up. When three or more bubbles with the same toy touch, they pop, and anything left hanging falls.</p>
+    <p>Point where you want the bubble to go, then let go to bat it up. When three or more bubbles with the same toy touch, they pop, and anything left hanging falls.</p>
   </div>
 </main>
 
@@ -670,8 +670,7 @@ function draw() {
   drawCat();
   // the bubble wand with the bubble about to go, and the next one waiting
   const q = d.queue;
-  // The ring stays put with the bubble in it; the wand's handle swings round behind it as you aim,
-  // towards the finger pulling it.
+  // The ring stays put with the bubble in it; the wand's handle swings round behind it as you aim.
   const wx = SX, wy = SY, ax = Math.cos(aim), ay = -Math.sin(aim);
   ctx.strokeStyle = "#B94588"; ctx.lineCap = "round";
   ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo((wx - ax * 0.56) * U, (wy - ay * 0.56) * U); ctx.lineTo((wx - ax * 1.1) * U, (wy - ay * 1.1) * U); ctx.stroke();
@@ -686,7 +685,7 @@ function draw() {
   if (!batted && !fly) {   // until the first bat, say how
     ctx.font = "600 17px 'Baloo 2', system-ui, sans-serif"; ctx.fillStyle = "#2A2530"; ctx.textAlign = "center";
     ctx.globalAlpha = 0.6 + 0.4 * Math.sin(now * 3);
-    ctx.fillText("Touch the floor, pull back, let go to bat", COLS / 2 * U, (LINE - 0.35) * U); ctx.globalAlpha = 1;
+    ctx.fillText("Point where it should go, let go to bat", COLS / 2 * U, (LINE - 0.35) * U); ctx.globalAlpha = 1;
   }
   if (fly) {
     let dist = (now - fly.t0) * SPEED, p = fly.path, i = 1;
@@ -750,21 +749,12 @@ function loop(t) {
 }
 
 /* ---------- input ---------- */
-// The wand is a slingshot: touch down anywhere on the floor, pull back away from where the bubble
-// should go and let go. The aim line shows the way while you pull. A short pull (let go near where you started)
-// calls it off. Touches up among the bubbles do nothing, so you can't just tap the spot you want.
-// Tap the next bubble to swap.
-const MIN_AIM = 0.14, PULL = 0.5;   // the shallowest angle, and how far to pull (in bubbles) before letting go bats
-let pull = null, from = null;       // how far the finger has pulled back, and where it touched down (in bubbles)
+// Like Snood: the wand turns to face wherever you point (the mouse, or a finger anywhere on the
+// board, dragged to fine-tune) and letting go bats the bubble that way. Letting go on the floor
+// below the wand doesn't bat, so a drag can be called off there. Tap the next bubble to swap.
+const MIN_AIM = 0.14;   // the shallowest angle
 const toUnits = e => { const r = canvas.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * COLS, (e.clientY - r.top) / r.width * COLS]; };
-function pullTo(x, y) {
-  const px = x - from[0], py = y - from[1];
-  pull = [SX + px, SY + py];
-  if (Math.hypot(px, py) < PULL) return;
-  let a = Math.atan2(py, -px);   // the bubble goes the opposite way to the pull
-  if (a <= 0) a = px <= 0 ? MIN_AIM : PI - MIN_AIM;
-  aim = Math.min(PI - MIN_AIM, Math.max(MIN_AIM, a));
-}
+function aimAt(x, y) { if (y < SY - 0.2) aim = Math.min(PI - MIN_AIM, Math.max(MIN_AIM, Math.atan2(SY - y, x - SX))); }
 const onNext = (x, y) => Math.hypot(x - 1.25, y - SY - 0.1) < 0.75;
 function swap() {
   if (!S || S.over || busy || fly) return;
@@ -775,19 +765,20 @@ canvas.addEventListener("pointerdown", e => {
   e.preventDefault();
   const [x, y] = toUnits(e);
   if (onNext(x, y)) return swap();
-  if (y < LINE) { if (!batted) G.note("Touch the floor and pull back to aim.", 3000); return; }
   try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
-  aiming = true; from = [x, y]; pullTo(x, y);
+  aiming = true; aimAt(x, y);
 });
-canvas.addEventListener("pointermove", e => { if (aiming && S && !S.over) pullTo(...toUnits(e)); });
+canvas.addEventListener("pointermove", e => {
+  if (!S || S.over || (!aiming && e.pointerType !== "mouse")) return;
+  aimAt(...toUnits(e));
+});
 canvas.addEventListener("pointerup", e => {
   if (!aiming) return;
-  aiming = false; pullTo(...toUnits(e));
-  const far = Math.hypot(pull[0] - SX, pull[1] - SY) >= PULL;
-  pull = null;
-  if (far) { batted = true; bat(); }
+  aiming = false;
+  const [x, y] = toUnits(e);
+  if (y < SY - 0.2) { aimAt(x, y); batted = true; bat(); }
 });
-canvas.addEventListener("pointercancel", () => { aiming = false; pull = null; });
+canvas.addEventListener("pointercancel", () => { aiming = false; });
 canvas.addEventListener("keydown", e => {
   if (!S || S.over) return;
   const step = e.shiftKey ? 0.005 : 0.03;
@@ -800,7 +791,7 @@ canvas.addEventListener("keydown", e => {
 /* ---------- how to play ---------- */
 function helpCard() {
   const media = document.createElement("div"), ol = document.createElement("ol"); ol.className = "steps";
-  for (const t of ["The wand is a slingshot: touch the floor and pull back away from where you want the bubble to go. The dotted line shows the way. Let go to bat it up; it bounces off the sides.",
+  for (const t of ["Point where you want the bubble to go (drag to fine-tune) and the wand turns to face it. The dotted line shows the way. Let go to bat it up; it bounces off the sides.",
                    "When three or more bubbles with the same toy touch, they pop. Anything left hanging falls.",
                    "Each level asks you to pop every bubble, catch some toys, or free the kittens: kittens come down when nothing holds them up.",
                    "Every few bats the shelf comes down a row. Don't let the bubbles reach the cat!",
@@ -808,7 +799,7 @@ function helpCard() {
     const li = document.createElement("li"); li.textContent = t; ol.append(li);
   }
   const tip = document.createElement("p"); tip.className = "tip";
-  tip.textContent = "Let go close to where you started to call off a shot. Tap the next bubble to swap it in. Yarn tangles come apart when something next to them pops; cat-tree posts never come down. Arrow keys aim, Space bats.";
+  tip.textContent = "To call off a shot, drag down onto the floor before letting go. Tap the next bubble to swap it in. Yarn tangles come apart when something next to them pops; cat-tree posts never come down. Arrow keys aim, Space bats.";
   media.append(ol, tip);
   G.openCard("How to play", "", [["Let's play", G.closeCard, true]], media);
 }
