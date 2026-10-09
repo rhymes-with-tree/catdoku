@@ -179,6 +179,7 @@ const G = (() => {
     .spot svg{position:absolute;inset:0;display:block}
     .spot .dim{fill:rgba(42,37,48,.66)}
     .spot .edge{fill:none;stroke:#E23B3B;stroke-linecap:round}
+    .spot .edge.ok{stroke:#4FB35F}
     .spot .say{position:absolute;left:4%;right:4%;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;pointer-events:none}
     .spot .say b{font-size:clamp(24px,7vw,36px);font-weight:800;line-height:1.1;color:#FFF4D2;-webkit-text-stroke:6px var(--ink);paint-order:stroke fill;text-wrap:balance}
     .spot .say small{font-size:15px;font-weight:600;color:#FFF4D2;-webkit-text-stroke:3px var(--ink);paint-order:stroke fill;opacity:.9;animation:spotTap 1.6s ease-in-out infinite}
@@ -363,7 +364,9 @@ const G = (() => {
   // put marks on squares (a 🐱, ❌…; a list of marks takes turns), and says one line over the board.
   // A tap or Space shows the next step; after the last, "Let's Play!" shows and `done` runs.
   // `grid` is the element the squares fill, `w` × `h` squares; each step is
-  // {say, lit: [[x, y]…], outline (default: lit), marks: [[x, y, mark]…], els: [element or [elements]…]}.
+  // {say, lit: [[x, y]…], outline (default: lit), tone ("ok" outlines green, not red), marks: [[x, y, mark]…],
+  // els: [element or [elements]…], lines: [{edges: [[x1, y1, x2, y2]…], tone}], enter() and leave() to show
+  // something on the board just while the step is up}.
   // It covers the screen, so taps on it never reach the game (or start its timer).
   function spotlight(o) {
     const wrap = o.grid.parentElement, layer = document.createElement("div"), ns = "http://www.w3.org/2000/svg";
@@ -403,9 +406,13 @@ const G = (() => {
           if (!has(x - 1, y)) e += `M${X(x)} ${Y(y)}V${Y(y + 1)}`;
           if (!has(x + 1, y)) e += `M${X(x + 1)} ${Y(y)}V${Y(y + 1)}`;
         }
-        svg.append(svgEl("path", {d: e, class: "edge", "stroke-width": sw}));
+        svg.append(svgEl("path", {d: e, class: "edge" + (st.tone === "ok" ? " ok" : ""), "stroke-width": sw}));
       }
       for (const r of els) svg.append(svgEl("rect", {x: r.x, y: r.y, width: r.w, height: r.h, rx: 6, class: "edge", "stroke-width": sw}));
+      for (const ln of st.lines || []) {   // lines along chosen square edges, [x1, y1, x2, y2] in squares
+        const e = ln.edges.map(([x1, y1, x2, y2]) => `M${X(x1)} ${Y(y1)}L${X(x2)} ${Y(y2)}`).join("");
+        svg.append(svgEl("path", {d: e, class: "edge" + (ln.tone === "ok" ? " ok" : ""), "stroke-width": sw * 1.4}));
+      }
       for (const [x, y, m] of st.marks || []) {
         const t = svgEl("text", {x: X(x + 0.5), y: Y(y + 0.56), "text-anchor": "middle", "dominant-baseline": "middle",
           "font-size": cw * (m === "❌" ? 0.42 : 0.56)});
@@ -454,6 +461,7 @@ const G = (() => {
     const redraw = () => k >= 0 && k < o.steps.length && show();
     function next(e) {
       if (e) { e.preventDefault(); e.stopPropagation(); }
+      const was = o.steps[k]; if (was && was.leave) was.leave();
       if (++k >= o.steps.length) {   // all done: "Let's Play!" shows over the board and fades by itself
         clearInterval(ticker); removeEventListener("resize", redraw); removeEventListener("scroll", redraw); layer.remove(); if (o.done) o.done();
         const go = document.createElement("div"); go.className = "spotGo"; go.setAttribute("aria-hidden", "true");
@@ -461,7 +469,7 @@ const G = (() => {
         setTimeout(() => go.remove(), 1300);
         return;
       }
-      frame = 0; show();
+      frame = 0; if (o.steps[k].enter) o.steps[k].enter(); show();
     }
     addEventListener("resize", redraw); addEventListener("scroll", redraw, {passive: true});
     layer.addEventListener("pointerdown", next);

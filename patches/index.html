@@ -35,6 +35,12 @@
   border:2px solid #2A2530;box-shadow:0 1px 2px rgba(42,37,48,.35);
   background:radial-gradient(circle at 37% 37%,#2A2530 9%,transparent 11%),radial-gradient(circle at 63% 37%,#2A2530 9%,transparent 11%),
     radial-gradient(circle at 37% 63%,#2A2530 9%,transparent 11%),radial-gradient(circle at 63% 63%,#2A2530 9%,transparent 11%),#F6F1E7}
+.cell.mine::before{content:"";position:absolute;left:50%;top:50%;width:36%;height:36%;transform:translate(-50%,-50%);border-radius:50%;
+  border:2px solid #F6F1E7;box-shadow:0 0 0 2px #2A2530,0 1px 3px rgba(42,37,48,.4);z-index:1;
+  background:radial-gradient(circle at 37% 37%,#F6F1E7 9%,transparent 11%),radial-gradient(circle at 63% 37%,#F6F1E7 9%,transparent 11%),
+    radial-gradient(circle at 37% 63%,#F6F1E7 9%,transparent 11%),radial-gradient(circle at 63% 63%,#F6F1E7 9%,transparent 11%),#853C68}
+.paint .swatch.mine{background:radial-gradient(circle at 39% 39%,#F6F1E7 7%,transparent 9%),radial-gradient(circle at 61% 39%,#F6F1E7 7%,transparent 9%),
+    radial-gradient(circle at 39% 61%,#F6F1E7 7%,transparent 9%),radial-gradient(circle at 61% 61%,#F6F1E7 7%,transparent 9%),#853C68}
 .cell.clash::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(45deg,rgba(176,32,48,.6) 0 3px,transparent 3px 9px)}
 .paints{display:flex;gap:8px;align-items:flex-start;justify-content:center;flex-wrap:wrap;width:var(--board)}
 .paint{display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;padding:2px;font-size:13px;font-weight:600;color:var(--ink-soft)}
@@ -49,7 +55,8 @@ main{--nw:min(calc(var(--board) * .4), 210px);--sw:min(calc(var(--board) * .5), 
 .paints{min-height:calc(var(--nw) * .56 - 58px);
   align-content:flex-end;justify-content:flex-start;margin-bottom:-6px}
 .wrap{margin:0 0 calc(var(--sw) * .43)}
-@media (max-width:480px){.paints{gap:4px 8px}.paint{font-size:11px;padding:2px 0}.paint .swatch{width:38px;height:38px;font-size:17px}}
+@media (max-width:480px){.paints{gap:4px 6px}.paint{font-size:11px;padding:2px 0}.paint .swatch{width:38px;height:38px;font-size:17px}}
+@media (max-width:400px){.paints{gap:4px 3px}.paint{font-size:10.5px;padding:0}.paint .swatch{width:34px;height:34px}}
 .cat{position:absolute;height:auto;pointer-events:none;user-select:none;z-index:3}
 .cat.nap{width:var(--nw);right:-2%;bottom:calc(100% - var(--nw) * .22)}
 .cat.stretch{width:var(--sw);transform:scaleX(-1);left:max(-16%, calc((var(--board) - 100vw) / 2));top:calc(100% - var(--sw) * .24)}
@@ -224,9 +231,31 @@ const clashes = () => {
   return bad;
 };
 
-function snapshot() { game.history.push(game.col.slice()); if (game.history.length > 300) game.history.shift(); }
-function undo() { if (!game.history.length || game.won) return; game.col = game.history.pop(); render(); save(); }
-function clearAll() { if (game.won) return; snapshot(); game.col = game.given.slice(); render(); save(); }
+// Undo steps keep the fabrics and the player's own buttons (older saves kept just the fabrics).
+const mark = () => ({col: game.col.slice(), mine: (game.mine || []).slice()});
+function snapshot() { game.history.push(mark()); if (game.history.length > 300) game.history.shift(); }
+function undo() {
+  if (!game.history.length || game.won) return;
+  const h = game.history.pop();
+  if (Array.isArray(h)) game.col = h; else { game.col = h.col; game.mine = h.mine; }
+  render(); save();
+}
+function clearAll() { if (game.won) return; snapshot(); game.col = game.given.slice(); game.mine = []; render(); save(); }
+// The player's own buttons: just notes, in plum, on patches they want to remember. They don't sew a
+// patch down; it can still be changed. MINE is the brush that puts one on or takes it off.
+const MINE = -2;
+function toggleMine(g) {
+  if (game.given[g] >= 0) { G.note("That patch is already sewn."); return false; }
+  const m = game.mine || (game.mine = []), at = m.indexOf(g);
+  if (at >= 0) m.splice(at, 1); else m.push(g);
+  return true;
+}
+// The square nearest the middle of a patch, where its button goes.
+function middleOf(g) {
+  const N = game.N, cells = game.reg.map((x, i) => x === g ? i : -1).filter(i => i >= 0);
+  const cy = cells.reduce((s, i) => s + Math.floor(i / N), 0) / cells.length, cx = cells.reduce((s, i) => s + i % N, 0) / cells.length;
+  return cells.reduce((b, i) => (Math.floor(i / N) - cy) ** 2 + (i % N - cx) ** 2 < (Math.floor(b / N) - cy) ** 2 + (b % N - cx) ** 2 ? i : b);
+}
 
 // Paint a region. On a tap, painting a region its own color clears it.
 function paint(g, isTap) {
@@ -308,19 +337,21 @@ function buildBoard() {
 
 function render() {
   const bad = clashes(), kids = $("board").children, N = game.N, W = $("board").clientWidth, step = W / N || 40;
+  const mineAt = new Set((game.mine || []).map(middleOf));
   if (W && W !== render.w) { drawSeams($("board"), game.reg, N, W); render.w = W; }
   for (let i = 0; i < N * N; i++) {
     const g = game.reg[i], c = game.col[g];
     fabricOn(kids[i], c >= 0 ? look()[c] : MUSLIN, (i % N) * step, Math.floor(i / N) * step);
     kids[i].classList.toggle("clash", bad.has(g));
+    kids[i].classList.toggle("mine", mineAt.has(i));
     kids[i].setAttribute("aria-label", `Row ${Math.floor(i / N) + 1}, column ${i % N + 1}: ${c >= 0 ? look()[c].name : "plain muslin"}${game.given[g] >= 0 ? ", already sewn" : ""}`);
   }
   const done = game.col.filter(c => c >= 0).length;
   $("count").textContent = `🧵 ${done} / ${game.R} patches`;
   if (bad.size) G.note(`${bad.size} patches match a neighbor.`, 0); else if ($("msg").textContent.includes("match a neighbor")) G.note("");
   $("undoBtn").disabled = !game.history.length || game.won;
-  $("clearBtn").disabled = game.won || game.col.every((c, g) => c === game.given[g]);
-  [...$("paints").children].forEach((b, k) => b.setAttribute("aria-pressed", k === brush));
+  $("clearBtn").disabled = game.won || (game.col.every((c, g) => c === game.given[g]) && !(game.mine || []).length);
+  [...$("paints").children].forEach((b, k) => b.setAttribute("aria-pressed", k === brush || (brush === MINE && k === look().length)));
 }
 
 /* ---------- input ---------- */
@@ -334,6 +365,11 @@ function swatchButton(label, dress, onPick) {
 function buildSwatches() {
   $("paints").innerHTML = "";
   look().forEach((f, k) => swatchButton(f.name, sw => fabricOn(sw, f), () => { brush = k; }));
+  swatchButton("Mine", sw => sw.classList.add("mine"), () => {
+    brush = MINE;
+    // the first time, say what they're for
+    if (!settings.seenMine) { settings.seenMine = true; save(); G.note("Your own buttons are notes for you: tap a patch to mark it, and again to take the button off. They don't sew it down.", 7000); }
+  });
 }
 buildSwatches();
 $("fabricTgl").checked = settings.fabric;
@@ -347,25 +383,26 @@ board.addEventListener("pointerdown", e => {
   const i = G.cellAt(e.clientX, e.clientY); if (i < 0) return;
   e.preventDefault();
   try { board.setPointerCapture(e.pointerId); } catch (_) {}
-  press = {start: game.reg[i], last: game.reg[i], drag: false, before: game.col.slice()};
+  press = {start: game.reg[i], last: game.reg[i], drag: false, before: mark()};
 });
 board.addEventListener("pointermove", e => {
   if (!press) return;
   const i = G.cellAt(e.clientX, e.clientY); if (i < 0) return;
   const g = game.reg[i];
-  if (g === press.last) return;
+  if (g === press.last || brush === MINE) return;
   if (!press.drag) { press.drag = true; paint(press.start, false); }
   press.last = g; paint(g, false); render();
 });
 function endPress() {
   if (!press) return;
   const p = press; press = null;
-  if (!p.drag) paint(p.start, true);
-  if (p.before.join() !== game.col.join()) { game.history.push(p.before); if (game.history.length > 300) game.history.shift(); }
+  if (!p.drag) { if (brush === MINE) toggleMine(p.start); else paint(p.start, true); }
+  const now = mark();
+  if (p.before.col.join() !== now.col.join() || p.before.mine.join() !== now.mine.join()) { game.history.push(p.before); if (game.history.length > 300) game.history.shift(); }
   render(); save(); checkWin();
 }
 board.addEventListener("pointerup", endPress);
-board.addEventListener("pointercancel", () => { if (press) { game.col = press.before; press = null; render(); } });
+board.addEventListener("pointercancel", () => { if (press) { game.col = press.before.col; game.mine = press.before.mine; press = null; render(); } });
 
 $("newBtn").onclick = newPuzzle;
 $("size").onchange = e => { settings.size = +e.target.value; save(); newPuzzle(); };
@@ -398,38 +435,61 @@ function showHelp() {
     const li = document.createElement("li"); li.textContent = t; ol.append(li);
   }
   const tip = document.createElement("p"); tip.className = "tip";
-  tip.textContent = "Pick a fabric, then tap or drag across patches. Tap a patch again to take it off. Matching patches side by side get red hatching.";
+  tip.textContent = "Pick a fabric, then tap or drag across patches. Tap a patch again to take it off. Matching patches side by side get red hatching. Pick Mine to put your own plum buttons on patches: they're just notes for you, to remember what you're sure of, and don't change anything.";
   media.append(ol, tip);
   G.openCard("How to play", "", [["Got it", () => { G.closeCard(); settings.seenHelp = true; save(); }, true],
     ["Show me on the board", () => { G.closeCard(); settings.seenHelp = false; helpOnFirstVisit(); }]], media);
 }
-// First visit only: once the first quilt is on the board, walk through the rules on it.
+// First visit only: once the first quilt is on the board, walk through the rules on it. Two steps show
+// fabric on patches just while they're up (nothing is saved): a patch matching the neighbour it shares
+// a seam with, and two patches that only meet at a corner in the same fabric.
 function spotlightSteps() {
   const N = game.N, at = k => [k % N, Math.floor(k / N)], cellsOf = g => game.reg.flatMap((r, k) => r === g ? [at(k)] : []);
-  // the empty patch nearest the middle, an empty neighbour sharing a seam with it, and two patches
-  // that only meet at a corner
-  const mid = g => { const cs = cellsOf(g); return Math.min(...cs.map(([x, y]) => Math.abs(x - (N - 1) / 2) + Math.abs(y - (N - 1) / 2))); };
+  const mid = g => Math.min(...cellsOf(g).map(([x, y]) => Math.abs(x - (N - 1) / 2) + Math.abs(y - (N - 1) / 2)));
   const open = [...game.given.keys()].filter(g => game.given[g] < 0).sort((a, b) => mid(a) - mid(b));
-  const a = open[0], b = game.adj[a].find(h => game.given[h] < 0) ?? game.adj[a][0];
+  const a = open[0];
+  // try it on: show some patches in some fabrics while a step is up, then put the quilt back
+  const tryOn = fab => { let before; return {enter: () => { before = game.col.slice(); for (const [g, f] of fab) game.col[g] = f; render(); },
+                                              leave: () => { game.col = before; render(); }}; };
+  // an empty patch beside a sewn one (or another empty one), and the seam between them
+  const sewnNext = open.map(g => [g, game.adj[g].find(h => game.given[h] >= 0)]).find(([, h]) => h !== undefined);
+  const [m, n] = sewnNext || [a, game.adj[a][0]], f = game.given[n] >= 0 ? game.given[n] : 0;
+  const seam = [];
+  for (let k = 0; k < N * N; k++) {
+    const [x, y] = at(k);
+    if (game.reg[k] !== m) continue;
+    if (x + 1 < N && game.reg[k + 1] === n) seam.push([x + 1, y, x + 1, y + 1]);
+    if (x > 0 && game.reg[k - 1] === n) seam.push([x, y, x, y + 1]);
+    if (y + 1 < N && game.reg[k + N] === n) seam.push([x, y + 1, x + 1, y + 1]);
+    if (y > 0 && game.reg[k - N] === n) seam.push([x, y, x + 1, y]);
+  }
+  // two patches that only meet at a corner, not both sewn in different fabrics
   let corner = null;
   for (let k = 0; k < N * N && !corner; k++) {
     const [x, y] = at(k);
     for (const dx of [-1, 1]) {
-      const j = (y + 1) * N + x + dx;
       if (y + 1 >= N || x + dx < 0 || x + dx >= N) continue;
-      const g = game.reg[k], h = game.reg[j];
-      if (g !== h && !game.adj[g].includes(h)) { corner = [g, h]; break; }
+      const g = game.reg[k], h = game.reg[(y + 1) * N + x + dx];
+      if (g === h || game.adj[g].includes(h) || (game.given[g] >= 0 && game.given[h] >= 0)) continue;
+      corner = [g, h]; break;
     }
   }
   const buttons = [...game.given.keys()].filter(g => game.given[g] >= 0);
   const steps = [
     {say: "Give every patch a fabric", lit: cellsOf(a)},
-    {say: "Patches that share a seam can't match", lit: [...cellsOf(a), ...cellsOf(b)], outline: [cellsOf(a), cellsOf(b)]},
+    {say: "Patches that share a seam can't match", lit: [...cellsOf(m), ...cellsOf(n)], outline: [], lines: [{edges: seam}],
+     ...tryOn([[m, f], ...(game.given[n] >= 0 ? [] : [[n, f]])])},
   ];
-  if (corner) steps.push({say: "Corners are OK", lit: [...cellsOf(corner[0]), ...cellsOf(corner[1])], outline: [cellsOf(corner[0]), cellsOf(corner[1])]});
+  if (corner) {
+    const [g, h] = corner, cf = game.given[g] >= 0 ? game.given[g] : game.given[h] >= 0 ? game.given[h] : 1;
+    steps.push({say: "Corners are OK", lit: [...cellsOf(g), ...cellsOf(h)], outline: [cellsOf(g), cellsOf(h)], tone: "ok",
+                ...tryOn([g, h].filter(x => game.given[x] < 0).map(x => [x, cf]))});
+  }
   if (buttons.length) steps.push({say: "Buttons are already sewn", lit: buttons.flatMap(cellsOf), outline: buttons.map(cellsOf)});
-  steps.push({say: "Pick a fabric", els: [[...$("paints").children]]},
-             {say: "Then tap or drag across patches", lit: cellsOf(a)});
+  const sw = [...$("paints").children];
+  steps.push({say: "Pick a fabric", els: [sw.slice(0, 4)]},
+             {say: "Then tap or drag across patches", lit: cellsOf(a)},
+             {say: "Add your own buttons as notes", els: [sw[4]]});
   return steps;
 }
 function helpOnFirstVisit() {

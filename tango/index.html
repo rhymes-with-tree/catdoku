@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-09.3";
+  var BUILD = "2026-10-09.3"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -40,6 +40,10 @@
 .sq.bad{box-shadow:inset 0 0 0 3px #E16251}
 .sign{position:absolute;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:#fff;border:2px solid #2A2530;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;line-height:1;pointer-events:none;z-index:2}
 .sign.bad{background:#E16251;color:#fff}
+/* the player's own = and × notes, in teal so they're never mistaken for the puzzle's */
+.sign.mine{background:#3C8681;color:#fff;border-color:#2A2530;border-style:dashed}
+.tray.marking{cursor:crosshair;box-shadow:0 0 0 3px #3C8681}
+.tray.marking .sq{cursor:crosshair}
 .won .sq img{animation:hop .5s ease-out}
 @keyframes hop{40%{transform:translateY(-8px) scale(1.1)}}
 .rules{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin:6px 0 10px}
@@ -70,6 +74,7 @@
   <div class="actions">
     <button id="undoBtn">Undo</button>
     <button id="clearBtn">Clear</button>
+    <button id="markBtn" aria-pressed="false">Mark = ×</button>
     <button id="toysBtn">Toys</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
@@ -205,7 +210,8 @@ const KINDS = [
 ];
 const TOYS_PREF = "catdoku.tango.toys.v1", MIN_COLOURS = 2;
 let offToys = new Set(G.load(TOYS_PREF).off || []);
-const toySrc = f => `../toys/${f}.webp?v=2026-10-09.3`;
+const TOY_SRC = {};  // filled with embedded pictures when the page is bundled into one file
+const toySrc = f => TOY_SRC[f] || `../toys/${f}.webp?v=${window.SITE_BUILD || ""}`;  // a new version gets new pictures
 const nameOf = f => { for (const k of KINDS) for (const [g, n] of k.looks) if (g === f) return n; return "toy"; };
 function pickToys() {
   let kinds = KINDS.map((_, i) => i).filter(k => KINDS[k].looks.some(([f]) => !offToys.has(f)));
@@ -255,26 +261,66 @@ function draw() {
     d.style.left = ((A.left + A.right + B.left + B.right) / 4 - box.left - bl) + "px"; d.style.top = ((A.top + A.bottom + B.top + B.bottom) / 4 - box.top - bt) + "px";
     $("board").append(d);
   });
-  $("key").innerHTML = `<span>Tap once: ${img(game.toys[0])}</span><span>Twice: ${img(game.toys[1])}</span>`;
+  for (const m of game.notes || []) {
+    const A = cells[m.a].getBoundingClientRect(), B = cells[m.b].getBoundingClientRect(), d = document.createElement("div");
+    d.className = "sign mine"; d.textContent = m.same ? "=" : "×";
+    d.style.left = ((A.left + A.right + B.left + B.right) / 4 - box.left - bl) + "px"; d.style.top = ((A.top + A.bottom + B.top + B.bottom) / 4 - box.top - bt) + "px";
+    $("board").append(d);
+  }
+  $("board").classList.toggle("marking", marking);
+  $("markBtn").setAttribute("aria-pressed", String(marking));
+  $("key").innerHTML = marking ? `<span>Tap between two squares: = then × then off</span>`
+    : `<span>Tap once: ${img(game.toys[0])}</span><span>Twice: ${img(game.toys[1])}</span>`;
   const empty = game.grid.filter(v => v === -1).length;
   $("count").textContent = game.won ? "Solved!" : empty ? `${empty} square${empty === 1 ? "" : "s"} to fill` : bad.size ? "Something's not right" : "";
   $("undoBtn").disabled = !game.history.length || game.won; $("clearBtn").disabled = !game.history.length || game.won;
 }
+// Undo steps keep the toys and the player's own signs (older saves kept just the toys).
+const snapshot = () => game.history.push({grid: game.grid.slice(), notes: (game.notes || []).map(m => ({...m}))});
+function restore(h) { if (Array.isArray(h)) game.grid = h; else { game.grid = h.grid; game.notes = h.notes; } }
+// Mark = ×: the player's own signs between squares, as notes. While it's on, a tap goes to the edge
+// nearest the finger and turns it = , then ×, then off. They're never checked; they're just reminders.
+let marking = false;
+$("markBtn").onclick = () => {
+  if (!game || game.won) return;
+  marking = !marking; draw();
+  if (marking && !settings.seenMarks) { settings.seenMarks = true; save(); G.note("Your teal = and × are just notes for you.", 6000); }
+};
+function edgeAt(x, y) {
+  const el = $("squares"), r = el.getBoundingClientRect(), N = game.N, gap = parseFloat(getComputedStyle(el).columnGap) || 0;
+  const pitch = (r.width + gap) / N, fx = (x - r.left + gap / 2) / pitch, fy = (y - r.top + gap / 2) / pitch;
+  const col = Math.min(N - 1, Math.max(0, Math.floor(fx))), row = Math.min(N - 1, Math.max(0, Math.floor(fy)));
+  const vx = Math.round(fx), hy = Math.round(fy), dv = Math.abs(fx - vx), dh = Math.abs(fy - hy);
+  const okV = vx > 0 && vx < N, okH = hy > 0 && hy < N;
+  if (okV && (!okH || dv <= dh)) return {a: row * N + vx - 1, b: row * N + vx};
+  if (okH) return {a: (hy - 1) * N + col, b: hy * N + col};
+  return null;
+}
+$("board").addEventListener("click", e => {
+  if (!marking || !playing()) return;
+  e.stopPropagation();
+  const ed = edgeAt(e.clientX, e.clientY); if (!ed) return;
+  if (game.signs.some(s => s.a === ed.a && s.b === ed.b)) { G.note("That one's already part of the puzzle.", 2500); return; }
+  snapshot();
+  const notes = game.notes || (game.notes = []), k = notes.findIndex(m => m.a === ed.a && m.b === ed.b);
+  if (k < 0) notes.push({...ed, same: true}); else if (notes[k].same) notes[k].same = false; else notes.splice(k, 1);
+  draw(); save();
+}, true);
 $("squares").addEventListener("click", e => {
   if (!playing()) return;
   const c = e.target.closest(".sq"); if (!c) return;
   const i = +c.dataset.i; if (game.givens[i] !== -1) return;
-  game.history.push(game.grid.slice());
+  snapshot();
   game.grid[i] = game.grid[i] === -1 ? 0 : game.grid[i] === 0 ? 1 : -1;
   if (!game.grid.includes(-1) && !problems().bad.size) win(); else { draw(); save(); }
 });
-$("undoBtn").onclick = () => { if (playing() && game.history.length) { game.grid = game.history.pop(); draw(); save(); } };
-$("clearBtn").onclick = () => { if (playing() && game.history.length) { game.history.push(game.grid.slice()); game.grid = game.givens.slice(); draw(); save(); G.note("Back to the start. Undo brings your toys back.", 3500); } };
+$("undoBtn").onclick = () => { if (playing() && game.history.length) { restore(game.history.pop()); draw(); save(); } };
+$("clearBtn").onclick = () => { if (playing() && game.history.length) { snapshot(); game.grid = game.givens.slice(); game.notes = []; draw(); save(); G.note("Back to the start. Undo brings your toys back.", 3500); } };
 addEventListener("resize", () => { if (game) draw(); });
 
 /* ---------- endings ---------- */
 function win() {
-  game.won = true; G.finishClock(game);
+  game.won = true; G.finishClock(game); marking = false;
   const next = Math.min(MAX_LEVEL, game.level + 1);
   settings.level = next; $("levelSel").value = next; save();
   $("board").classList.remove("won"); $("board").getBoundingClientRect(); $("board").classList.add("won"); draw();
@@ -325,7 +371,7 @@ function showHelp() {
     const li = document.createElement("li"); li.textContent = t; ol.append(li);
   }
   const tip = document.createElement("p"); tip.className = "tip";
-  tip.textContent = "Squares that break a rule are outlined in red. Every puzzle has exactly one answer.";
+  tip.textContent = "Squares that break a rule are outlined in red. Every puzzle has exactly one answer. Know two squares match (or don't) before you know which toy? Turn on Mark = × and tap between them to add your own teal = or ×. They're just notes for you and don't change the puzzle.";
   media.append(pics, ol, tip);
   G.openCard("How to play", "", [["Let's play", () => { G.closeCard(); settings.seenHelp = true; save(); }, true]], media);
 }
