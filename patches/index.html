@@ -394,16 +394,48 @@ function showHelp() {
   const ol = document.createElement("ol"); ol.className = "steps";
   for (const t of ["Give every patch one of the four fabrics.",
                    "Patches that share a seam can't match. Patches may touch at a corner.",
-                   "Patches with a button are already sewn and cannot be changed or moved."]) {
+                   "Patches with a button are already sewn and can't be changed."]) {
     const li = document.createElement("li"); li.textContent = t; ol.append(li);
   }
   const tip = document.createElement("p"); tip.className = "tip";
-  tip.textContent = "Pick a fabric, then tap or drag across patches. Tap a patch again to take it off.";
+  tip.textContent = "Pick a fabric, then tap or drag across patches. Tap a patch again to take it off. Matching patches side by side get red hatching.";
   media.append(ol, tip);
-  G.openCard("How to play", "", [["Let's play", () => { G.closeCard(); settings.seenHelp = true; save(); }, true]], media);
+  G.openCard("How to play", "", [["Got it", () => { G.closeCard(); settings.seenHelp = true; save(); }, true],
+    ["Show me on the board", () => { G.closeCard(); settings.seenHelp = false; helpOnFirstVisit(); }]], media);
 }
-// First visit only: show the directions once the first puzzle is on the board.
-function helpOnFirstVisit() { if (!settings.seenHelp && game && !game.won) showHelp(); }
+// First visit only: once the first quilt is on the board, walk through the rules on it.
+function spotlightSteps() {
+  const N = game.N, at = k => [k % N, Math.floor(k / N)], cellsOf = g => game.reg.flatMap((r, k) => r === g ? [at(k)] : []);
+  // the empty patch nearest the middle, an empty neighbour sharing a seam with it, and two patches
+  // that only meet at a corner
+  const mid = g => { const cs = cellsOf(g); return Math.min(...cs.map(([x, y]) => Math.abs(x - (N - 1) / 2) + Math.abs(y - (N - 1) / 2))); };
+  const open = [...game.given.keys()].filter(g => game.given[g] < 0).sort((a, b) => mid(a) - mid(b));
+  const a = open[0], b = game.adj[a].find(h => game.given[h] < 0) ?? game.adj[a][0];
+  let corner = null;
+  for (let k = 0; k < N * N && !corner; k++) {
+    const [x, y] = at(k);
+    for (const dx of [-1, 1]) {
+      const j = (y + 1) * N + x + dx;
+      if (y + 1 >= N || x + dx < 0 || x + dx >= N) continue;
+      const g = game.reg[k], h = game.reg[j];
+      if (g !== h && !game.adj[g].includes(h)) { corner = [g, h]; break; }
+    }
+  }
+  const buttons = [...game.given.keys()].filter(g => game.given[g] >= 0);
+  const steps = [
+    {say: "Give every patch a fabric", lit: cellsOf(a)},
+    {say: "Patches that share a seam can't match", lit: [...cellsOf(a), ...cellsOf(b)], outline: [cellsOf(a), cellsOf(b)]},
+  ];
+  if (corner) steps.push({say: "Corners are OK", lit: [...cellsOf(corner[0]), ...cellsOf(corner[1])], outline: [cellsOf(corner[0]), cellsOf(corner[1])]});
+  if (buttons.length) steps.push({say: "Buttons are already sewn", lit: buttons.flatMap(cellsOf), outline: buttons.map(cellsOf)});
+  steps.push({say: "Pick a fabric", els: [[...$("paints").children]]},
+             {say: "Then tap or drag across patches", lit: cellsOf(a)});
+  return steps;
+}
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || game.won || document.querySelector(".spot")) return;
+  G.spotlight({grid: $("board"), w: game.N, h: game.N, steps: spotlightSteps(), done: () => { settings.seenHelp = true; save(); }});
+}
 $("helpBtn").onclick = () => { if (!busy) showHelp(); };
 document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); } });
 

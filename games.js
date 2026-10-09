@@ -363,7 +363,7 @@ const G = (() => {
   // put marks on squares (a 🐱, ❌…; a list of marks takes turns), and says one line over the board.
   // A tap or Space shows the next step; after the last, "Let's Play!" shows and `done` runs.
   // `grid` is the element the squares fill, `w` × `h` squares; each step is
-  // {say, lit: [[x, y]…], outline (default: lit), marks: [[x, y, mark]…], els: [element…]}.
+  // {say, lit: [[x, y]…], outline (default: lit), marks: [[x, y, mark]…], els: [element or [elements]…]}.
   // It covers the screen, so taps on it never reach the game (or start its timer).
   function spotlight(o) {
     const wrap = o.grid.parentElement, layer = document.createElement("div"), ns = "http://www.w3.org/2000/svg";
@@ -373,7 +373,7 @@ const G = (() => {
     const svgEl = (t, a) => { const e = document.createElementNS(ns, t); for (const n in a) e.setAttribute(n, a[n]); return e; };
     // Bring the board (and anything else the steps light) into view first.
     {
-      const tops = [wrap, ...o.steps.flatMap(st => st.els || [])].map(e => e.getBoundingClientRect());
+      const tops = [wrap, ...o.steps.flatMap(st => (st.els || []).flat())].map(e => e.getBoundingClientRect());
       const top = Math.min(...tops.map(r => r.top)), bottom = Math.max(...tops.map(r => r.bottom));
       if (top < 0 || bottom > innerHeight) scrollBy(0, bottom - top < innerHeight ? (top + bottom - innerHeight) / 2 : top - 8);
     }
@@ -381,7 +381,12 @@ const G = (() => {
       const st = o.steps[k], g = o.grid.getBoundingClientRect(), b = wrap.getBoundingClientRect(), W = innerWidth, H = innerHeight;
       const cw = o.grid.clientWidth / o.w, ch = o.grid.clientHeight / o.h, ox = g.left + o.grid.clientLeft, oy = g.top + o.grid.clientTop;
       const X = x => ox + x * cw, Y = y => oy + y * ch, lit = st.lit || [];
-      const els = (st.els || []).map(e => { const r = e.getBoundingClientRect(), p = 5; return {x: r.left - p, y: r.top - p, w: r.width + 2 * p, h: r.height + 2 * p}; });
+      // each thing to light is an element, or a list of elements lit together as one box
+      const els = (st.els || []).map(e => {
+        const rs = (Array.isArray(e) ? e : [e]).map(x => x.getBoundingClientRect()), p = 5;
+        const l = Math.min(...rs.map(r => r.left)), t = Math.min(...rs.map(r => r.top)), r = Math.max(...rs.map(r => r.right)), btm = Math.max(...rs.map(r => r.bottom));
+        return {x: l - p, y: t - p, w: r - l + 2 * p, h: btm - t + 2 * p};
+      });
       layer.innerHTML = "";
       const svg = svgEl("svg", {viewBox: `0 0 ${W} ${H}`, width: W, height: H, "aria-hidden": "true"});
       let d = `M0 0H${W}V${H}H0Z`;
