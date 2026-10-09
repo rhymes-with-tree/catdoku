@@ -380,7 +380,7 @@ function start(level, d) {
   if (level) climb = level; else S.timed = false;   // zen isn't timed
   if (d.ms) { S.ms = d.ms; S.started = true; }
   busy = false; effects = []; wob = new Map(); fly = null; shelf = shelfFrom = d.B.drops; aim = Math.PI / 2;
-  intro = d.goal === "kittens" && !G.load(SEEN).kittens ? {t0: now} : null;
+  intro = nextIntro();
   $("levelSel").value = level;
   G.save(STORE, {level, d, climb}); hud(true);
   $("restartBtn").textContent = level ? "Restart level" : "New board";
@@ -750,31 +750,40 @@ function loop(t) {
   requestAnimationFrame(loop);
 }
 
-/* ---------- first kitten level ---------- */
-// The first time a kitten level starts on this device, everything but the kittens dims and the board
-// says what to do. A tap (or Space) puts it away and the round starts; it isn't shown again.
+/* ---------- first-time spotlights ---------- */
+// The first time something new turns up on this device (kittens to free, yarn tangles, cat-tree
+// posts), everything else dims, the new things glow and the board names what to do. A tap (or
+// Space) puts it away; if a level brings two new things, the next one follows. Each is shown once.
 const SEEN = "catdoku.bubbles.seen.v1";
+const SPOTLIGHTS = [
+  {key: "kittens", kind: KIT, title: "Free the Kittens!", when: d => d.goal === "kittens"},
+  {key: "yarn", kind: YARN, title: "Pop beside the yarn!", when: d => cellsOf(d.B).some(([, , k]) => k === YARN)},
+  {key: "posts", kind: PEG, title: "Posts never fall!", when: d => cellsOf(d.B).some(([, , k]) => k === PEG)},
+];
+function nextIntro() {
+  const seen = G.load(SEEN), sp = S && SPOTLIGHTS.find(x => !seen[x.key] && x.when(S.d));
+  return sp ? {...sp, t0: now} : null;
+}
 function endIntro() {
-  intro = null; const seen = G.load(SEEN); seen.kittens = true; G.save(SEEN, seen);
+  const seen = G.load(SEEN); seen[intro.key] = true; G.save(SEEN, seen);
+  intro = nextIntro();
 }
 function drawIntro() {
   const B = S.d.B, u = Math.min(1, (now - intro.t0) / 0.4), mid = COLS / 2 * U;
   ctx.fillStyle = `rgba(42,37,48,${0.62 * u})`; ctx.fillRect(0, 0, COLS * U, HT * U);
   B.rows.forEach((row, r) => row.forEach((k, c) => {
-    if (k !== KIT) return;
+    if (k !== intro.kind) return;
     const x = cellX(B, r, c), y = cellY(B, r), p = 0.5 + 0.5 * Math.sin(now * 4);
     ctx.fillStyle = `rgba(255,236,160,${(0.35 + 0.25 * p) * u})`; circle(ctx, x * U, y * U, (0.62 + 0.06 * p) * U); ctx.fill();
-    drawBubble(KIT, 0, x, y, {cat: kitten(r, c)});
+    drawBubble(k, 0, x, y, {cat: k === KIT && kitten(r, c)});
   }));
   ctx.save(); ctx.globalAlpha = u; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
-  const low = Math.max(...cellsOf(B).map(([r]) => cellY(B, r))), y = ((low + 0.5 + LINE) / 2 - 0.9) * U;   // in the open space under the bubbles
-  ctx.font = "800 44px 'Baloo 2', system-ui, sans-serif"; ctx.strokeStyle = "#2A2530"; ctx.lineWidth = 8;
-  ctx.strokeText("Free the Kittens!", mid, y); ctx.fillStyle = "#FFF4D2"; ctx.fillText("Free the Kittens!", mid, y);
-  ctx.font = "600 19px 'Baloo 2', system-ui, sans-serif"; ctx.fillStyle = "#FFF4D2";
-  ctx.fillText("They're napping in bubbles. Pop the", mid, y + 44);
-  ctx.fillText("bubbles holding them up so they fall.", mid, y + 68);
+  const low = Math.max(...cellsOf(B).map(([r]) => cellY(B, r))), y = ((low + 0.5 + LINE) / 2 - 0.4) * U;   // in the open space under the bubbles
+  let fs = 44; do ctx.font = `800 ${fs}px 'Baloo 2', system-ui, sans-serif`; while (ctx.measureText(intro.title).width > COLS * U - 36 && --fs > 20);
+  ctx.strokeStyle = "#2A2530"; ctx.lineWidth = 8;
+  ctx.strokeText(intro.title, mid, y); ctx.fillStyle = "#FFF4D2"; ctx.fillText(intro.title, mid, y);
   ctx.globalAlpha = u * (0.6 + 0.4 * Math.sin(now * 3)); ctx.font = "600 16px 'Baloo 2', system-ui, sans-serif";
-  ctx.fillText("Tap to play", mid, y + 104);
+  ctx.fillText("Tap to play", mid, y + 46);
   ctx.restore();
 }
 
