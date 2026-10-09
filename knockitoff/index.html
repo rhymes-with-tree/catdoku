@@ -570,9 +570,51 @@ function showHelp() {
   const tip = document.createElement("p"); tip.className = "tip";
   tip.textContent = "Swipe or use the arrow keys to step, or tap a square to walk there. Use the fewest moves possible for a gold paw.";
   media.append(ol, tip);
-  G.openCard("How to play", "", [["Let's play", () => { G.closeCard(); settings.seenHelp = true; save(); }, true]], media);
+  G.openCard("How to play", "", [["Show me on the board", () => { G.closeCard(); settings.seenHelp = false; helpOnFirstVisit(); }, true],
+    ["Got it", () => { G.closeCard(); settings.seenHelp = true; save(); }]], media);
 }
-function helpOnFirstVisit() { if (!settings.seenHelp && game && !game.won) showHelp(); }
+// Where the table's squares are on the page, for the spotlight (the table has a margin round it).
+function spotMap() { const r = $("svg").getBoundingClientRect(), s = r.width / (game.W * U + 2 * M); return {ox: r.left + M * s, oy: r.top + M * s, cw: U * s, ch: U * s}; }
+// First visit only: once the first table is out, walk through it: everything to knock off, the cat, a
+// push that sends something over the edge, moving, the moves count, and Hint.
+function spotlightSteps() {
+  const {W, H} = game, on = (x, y) => x >= 0 && y >= 0 && x < W && y < H && game.on[y * W + x];
+  const things = game.cur.items, taken = new Set([...things.map(it => it.c), game.cur.cat]);
+  // a thing at the edge, with a free square on its other side for the cat to push from
+  let push = null;
+  for (const it of things) for (const [dx, dy] of STEP) {
+    const [x, y] = xy(it.c);
+    if (kioCls(it.k) === 3 || on(x + dx, y + dy) || !on(x - dx, y - dy) || taken.has((y - dy) * W + x - dx)) continue;
+    push = {it, x, y, dx, dy}; break;
+  }
+  const cat = xy(game.cur.cat), all = [];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (on(x, y)) all.push([x, y]);
+  const steps = [
+    {say: "Knock everything off the table", lit: things.filter(it => kioCls(it.k) !== 2 && kioCls(it.k) !== 3).map(it => xy(it.c)), outline: things.map(it => [xy(it.c)])},
+    {say: "This is you", lit: [cat]},
+  ];
+  if (push) {
+    const {x, y, dx, dy} = push, from = [x - dx, y - dy];
+    // the cat stands behind the thing, facing it, while these two steps are up
+    let was;
+    const stand = {enter: () => { was = {cat: game.cur.cat, face: game.cur.face}; game.cur.cat = from[1] * W + from[0];
+                                  game.cur.face = STEP.findIndex(([a, b]) => a === dx && b === dy); sync(true); },
+                   leave: () => { Object.assign(game.cur, was); sync(true); }};
+    steps.push({say: "Walk into a thing to push it", lit: [from, [x, y]], outline: [[from], [[x, y]]],
+                arrows: [{to: [x + 0.5 - dx * 0.5, y + 0.5 - dy * 0.5], from: [-dx, -dy]}], ...stand},
+               {say: "Push it past the edge and it falls off", lit: [from, [x, y]], outline: [[from], [[x, y]]],
+                arrows: [{to: [x + 0.5 + dx * 1.3, y + 0.5 + dy * 1.3], from: [-dx, -dy], size: 1.2}], ...stand});
+  }
+  steps.push({say: "You can only push, never pull, and one thing at a time", lit: all},
+             {say: "Swipe, use the arrow keys, or tap a square to walk there", lit: all},
+             {say: "Use the fewest moves for a gold paw", els: [$("count")]},
+             {say: "Stuck? Hint shows the next step", els: [$("hintBtn")]});
+  return steps;
+}
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || game.won || document.querySelector(".spot")) return;
+  G.spotlight({grid: $("svg"), w: game.W, h: game.H, map: spotMap, steps: spotlightSteps(), done: () => { settings.seenHelp = true; save(); }});
+}
 
 G.nav("knockitoff");
 G.checkClock(game);
