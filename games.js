@@ -181,7 +181,7 @@ const G = (() => {
     .spot .edge{fill:none;stroke:#E23B3B;stroke-linecap:round}
     .spot .say{position:absolute;left:4%;right:4%;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;pointer-events:none}
     .spot .say b{font-size:clamp(24px,7vw,36px);font-weight:800;line-height:1.1;color:#FFF4D2;-webkit-text-stroke:6px var(--ink);paint-order:stroke fill;text-wrap:balance}
-    .spot .say small{font-size:15px;font-weight:600;color:#FFF4D2;opacity:.85;animation:spotTap 1.6s ease-in-out infinite}
+    .spot .say small{font-size:15px;font-weight:600;color:#FFF4D2;-webkit-text-stroke:3px var(--ink);paint-order:stroke fill;opacity:.9;animation:spotTap 1.6s ease-in-out infinite}
     .spot .say b .w{white-space:nowrap}
     .spot .say b .emo{-webkit-text-stroke:0;display:inline-block;background:#FFF4D2;border:3px solid var(--ink);border-radius:999px;padding:0 .12em;margin:0 .04em;line-height:1.15;font-size:.85em;vertical-align:.06em}
     .spotGo{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;pointer-events:none;animation:spotGo 1.3s ease-out forwards}
@@ -395,14 +395,24 @@ const G = (() => {
         t.textContent = Array.isArray(m) ? m[frame % m.length] : m; svg.append(t);
       }
       layer.append(svg);
-      // the words go in the biggest dim band above or below the lit squares
-      const ys = lit.map(([, y]) => y), top = lit.length ? Y(Math.min(...ys)) : H / 2, bottom = lit.length ? Y(Math.max(...ys) + 1) : H / 2;
       const say = document.createElement("div"); say.className = "say";
       const b = document.createElement("b"); sayWith(b, st.say);
       const tap = document.createElement("small"); tap.textContent = "Tap to go on";
       say.append(b, tap); layer.append(say);
-      const mid = top > H - bottom ? top / 2 : (bottom + H) / 2;
-      say.style.top = `${Math.max(4, Math.min(H - say.offsetHeight - 4, mid - say.offsetHeight / 2))}px`;
+      // The words go where they cover the least of the lit squares (and, among those, nearest the
+      // middle of the board), so they never sit on what the step is pointing at if they can help it.
+      const sh = say.offsetHeight, l = say.offsetLeft, r = l + say.offsetWidth;
+      let best = H / 2 - sh / 2, bestCost = Infinity;
+      for (let t = 4; t <= H - sh - 4; t += 4) {
+        let cover = 0;
+        for (const [x, y] of lit) {
+          const w = Math.min(r, X(x + 1)) - Math.max(l, X(x)), h = Math.min(t + sh, Y(y + 1)) - Math.max(t, Y(y));
+          if (w > 0 && h > 0) cover += w * h;
+        }
+        const cost = cover * 1000 + Math.abs(t + sh / 2 - H / 2);
+        if (cost < bestCost) { bestCost = cost; best = t; }
+      }
+      say.style.top = `${best}px`;
       layer.setAttribute("aria-label", `${st.say}. ${tap.textContent}.`);
     }
     // Emoji in the words keep their own colours (no outline) on a pale chip, and never start a line
