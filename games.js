@@ -44,6 +44,7 @@ const G = (() => {
       const sm = document.createElement("small"); sm.textContent = slug === current ? "You're here" : blurb;
       a.append(b, sm); panel.append(a);
     }
+    panel.append(feelSwitches());
     const show = open => { panel.hidden = !open; btn.setAttribute("aria-expanded", String(open)); };
     btn.onclick = e => { e.stopPropagation(); show(panel.hidden); };
     document.addEventListener("click", e => { if (!panel.hidden && !el.contains(e.target)) show(false); });
@@ -147,6 +148,7 @@ const G = (() => {
   function winCard(text, onNext, admire = "Admire my board", result, o = {}) {
     const media = document.createElement("div");
     if (o.gold) media.append(goldPaw());
+    cheer();
     const p = document.createElement("p"); p.textContent = text;
     const name = document.createElement("p"); name.className = "catname";
     name.textContent = `Meet ${NAMES[Math.floor(Math.random() * NAMES.length)]}!`;
@@ -227,6 +229,7 @@ const G = (() => {
     T = opts;
     const board = $("board"), start = () => { const g = T.game(); if (g && g.timed && T.playing(g) && !$("overlay").classList.contains("show")) g.started = true; };
     board.addEventListener("pointerdown", start, true);
+    board.addEventListener("pointerdown", () => { const g = T.game(); if (g && T.playing(g)) buzz("tap"); }, true);
     board.addEventListener("keydown", start, true);
     const btn = $("timer");
     btn.onclick = () => { const p = load(PREFS); p.hideTimer = !p.hideTimer; save(PREFS, p); showTime(); };
@@ -363,6 +366,60 @@ const G = (() => {
       [won ? "Share my solved board" : "Share with my progress", () => send(Object.assign(o.puzzle(), {p: o.progress()}), "with progress")],
       ["Cancel", closeCard],
     ]);
+  }
+
+  /* ---------- buzz and purr ---------- */
+  // Phones can tap back (a buzz) and the page can purr. Both are switched in the games menu; buzz starts on,
+  // purring starts off. Android phones vibrate. iPhones don't let pages vibrate, but they tap when a switch
+  // (<input switch>) flips, so a hidden one is flipped instead; that only works straight after a tap.
+  const feel = () => Object.assign({buzz: true, purr: false}, load(PREFS).feel);
+  let iosSwitch = null;
+  function buzz(kind = "tap") {
+    if (!feel().buzz) return;
+    try { if (matchMedia("(prefers-reduced-motion: reduce)").matches) return; } catch (e) {}
+    const pattern = {tap: 8, pop: 14, purr: [12, 60, 12, 60, 12], win: [30, 70, 30, 70, 60]}[kind] || 8;
+    if (navigator.vibrate) { try { navigator.vibrate(pattern); } catch (e) {} return; }
+    if (!iosSwitch) {
+      const label = document.createElement("label"), box = document.createElement("input");
+      box.type = "checkbox"; box.setAttribute("switch", ""); label.append(box);
+      label.style.cssText = "position:fixed;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;left:-9px;top:0";
+      label.setAttribute("aria-hidden", "true"); document.body.append(label); iosSwitch = label;
+    }
+    const taps = Array.isArray(pattern) ? 3 : 1;
+    for (let i = 0; i < taps; i++) setTimeout(() => iosSwitch.click(), i * 110);
+  }
+  // A purr made on the spot: a low rumble that swells and fades, twice, like breathing out and in.
+  let ears = null;
+  function purr(force) {
+    if (!force && !feel().purr) return;
+    try {
+      ears = ears || new (window.AudioContext || window.webkitAudioContext)();
+      if (ears.state === "suspended") ears.resume();
+      const now = ears.currentTime, len = 2.2, rate = ears.sampleRate, buf = ears.createBuffer(1, Math.floor(rate * len), rate), d = buf.getChannelData(0);
+      for (let i = 0, last = 0; i < d.length; i++) {
+        const s = i / rate, beat = Math.max(0, Math.sin(2 * Math.PI * 26 * s)) ** 3;   // about 26 rumbles a second
+        last = last * .9 + (Math.random() * 2 - 1) * .1;                                  // soft, breathy noise
+        const breath = Math.sin(Math.PI * ((s % 1.1) / 1.1)) ** 1.5 * (s % 1.1 < .65 ? 1 : .55);
+        d[i] = last * beat * breath * 6;
+      }
+      const src = ears.createBufferSource(), low = ears.createBiquadFilter(), vol = ears.createGain();
+      src.buffer = buf; low.type = "lowpass"; low.frequency.value = 380; vol.gain.value = .55;
+      src.connect(low).connect(vol).connect(ears.destination); src.start(now);
+    } catch (e) {}
+  }
+  // A solved puzzle: a happy buzz and a purr.
+  function cheer() { buzz("win"); purr(); }
+  function feelSwitches() {
+    const box = document.createElement("div"); box.className = "feel";
+    for (const [key, text] of [["buzz", "Buzz"], ["purr", "Purring"]]) {
+      const lab = document.createElement("label"); lab.className = "toggle";
+      const inp = document.createElement("input"); inp.type = "checkbox"; inp.checked = feel()[key];
+      inp.onchange = () => { const p = load(PREFS); p.feel = Object.assign(feel(), {[key]: inp.checked}); save(PREFS, p);
+        if (inp.checked) key === "buzz" ? buzz("win") : purr(true); };
+      const sw = document.createElement("span"); sw.className = "sw";
+      lab.append(inp, sw, text); box.append(lab);
+    }
+    return box;
   }
 
   /* ---------- choosing toys ---------- */
@@ -627,5 +684,5 @@ const G = (() => {
   }
 
   return {GAMES, $, nav, load, save, builder, openCard, closeCard, winCard, sizeUp, otherSize, note, cellAt, track, reopen,
-          setupTimer, freshClock, spotlight, toysOff, saveToys, needToys, goldPaw, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, toyPicker, pickLook};
+          setupTimer, freshClock, spotlight, toysOff, saveToys, needToys, goldPaw, shareResult, buzz, purr, cheer, feelSwitches, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, toyPicker, pickLook};
 })();

@@ -1,10 +1,20 @@
 # Catdoku
 
-A cat-themed logic puzzle in a single HTML file. Place one 🐱 in every row, every column, and every color region — and no two cats may touch, not even diagonally.
+A family of cat-themed puzzle games, each a single HTML page. The first, Catdoku (in `catdoku/`), is a logic puzzle: place one 🐱 in every row, every column, and every color region — and no two cats may touch, not even diagonally.
 
 ## Play
 
-Open `index.html` in any modern browser. No build step or dependencies.
+Open `index.html` in any modern browser: the front page has a tile for every game, with a picture, a line about it and how many you've solved on this device. No build step or dependencies. (Catdoku used to be the front page; old share links to it are passed on to `catdoku/`.)
+
+## Across every game
+
+- **How to play:** the first visit plays a walkthrough on the real board (everything else dims and a short line says what to look at). The How to play button opens the steps as a card, with "Show me on the board" to play the walkthrough again. The rules aren't printed on the page; Nip Trip keeps its colour wheel and Catwalk its direction tiles.
+- **Layout:** status line, board, action buttons, then settings (level or size, New puzzle) below the board.
+- **Gold paw:** a perfect clear shows a gold paw on the win card: no life lost in Catdoku, Hide & Seek and Twirl; no helpers or extra moves in Pounce, Bubbles and Toy Box; no Undo or Clear in Catwalk, Patches, Sunbeams, Fair Play and Yarn; the fewest moves in Knock It Off; an exact hit in Toe Beans. Otherwise the card says how to earn one.
+- **Help:** any help (a hint, Audit, a helper, extra moves, a revive) keeps you on the same level or size and costs the gold paw; your time still counts. A clean win moves you up. Toe Beans alone moves you back, when you finish far from the goal (close but not exact stays).
+- **Share:** every win card can share a result (game, level, time, gold paw) with a link to the game. Catdoku, Yarn, Patches, Sunbeams, Toe Beans, Knock It Off, Hide & Seek, Catwalk, Tangle and Fair Play can also share a link to the exact puzzle, fresh or with your progress.
+- **Toys:** the Toys button opens the toy chest, one choice for every game that uses toys. A game that needs toys in more colours than are picked opens it and says how many it needs.
+- **Buzz and purring:** switches in the games menu and on the front page. Buzz (on to start with) taps on the board and buzzes on a win; Android phones vibrate, and iPhones get a tap from flipping a hidden switch, which only works straight after a touch. Purring (off to start with) plays a purr, made on the spot, on a win and when you pet the Nip Trip cat.
 
 ## Features
 
@@ -13,7 +23,7 @@ Open `index.html` in any modern browser. No build step or dependencies.
 - Auto grade and auto exclude toggles
 - Paw marks (🐾) by tapping or dragging, with an erase mode
 - Undo, restart, audit, and lives with revives
-- Wins move you up a size; a win that needed Audit or a revive, or running out of lives, keeps you at the same size
+- Wins move you up a size; a win that needed Audit or a revive, or running out of lives, keeps you at the same size; a win without losing a life earns a gold paw
 - Progress saved in `localStorage`
 - Cat photos, facts, and breeds from public cat APIs (all optional; the game works offline)
 
