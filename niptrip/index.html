@@ -427,19 +427,43 @@ function intro(again) {
     const r = mix(grid[j], grid[i]);
     if (r >= 0 && r !== grid[i] && r !== grid[j] && r !== MUD) { pair = [j, i, r]; break; }
   }
-  const showing = change => { let was; return {enter: () => { was = grid.slice(); change(); draw(); }, leave: () => { grid = was; draw(); }}; };
-  const steps = [];
+  // Show something on the board while a step is up (or, with `later`, a moment after it comes up, so a
+  // mix happens in front of you), then put the board back.
+  const showing = (change, later) => { let was, timer;
+    return {enter: () => { was = grid.slice(); if (later) { later.before?.(); draw(); timer = setTimeout(() => { change(); draw(later.flags || {}); }, 1000); } else { change(); draw(); } },
+            leave: () => { clearTimeout(timer); grid = was; draw(); }}; };
+  // A slice of the rules wheel (0–5), or 6 for the mud in the middle, as a shape on the page.
+  const wheelPart = k => {
+    const r = $("wheel").getBoundingClientRect(), s = r.width / 120, cx = r.left + 60 * s, cy = r.top + 60 * s, pts = [];
+    if (k === MUD) { for (let a = 0; a < 24; a++) pts.push([cx + 22 * s * Math.cos(a * Math.PI / 12), cy + 22 * s * Math.sin(a * Math.PI / 12)]); return {poly: pts}; }
+    const a0 = (k * 60 - 120) * Math.PI / 180, a1 = a0 + Math.PI / 3;
+    for (let n = 0; n <= 8; n++) { const a = a0 + (a1 - a0) * n / 8; pts.push([cx + 57 * s * Math.cos(a), cy + 57 * s * Math.sin(a)]); }
+    for (let n = 8; n >= 0; n--) { const a = a0 + (a1 - a0) * n / 8; pts.push([cx + 25 * s * Math.cos(a), cy + 25 * s * Math.sin(a)]); }
+    return {poly: pts};
+  };
+  // the two blocks at the bottom left, for laying out an example pair
+  const A = (H - 1) * W, B = A + 1, pairLit = [xy(A), xy(B)], pairOut = [[xy(A)], [xy(B)]], toB = [{to: [1, H - 0.5], from: [-1, 0], size: 0.9}];
+  const example = (ca, cb, after) => showing(() => after(), {before: () => { grid[A] = ca; grid[B] = cb; }});
+  const steps = [{say: "There's no timer, no goal, just color.", lit: [...Array(W * H).keys()].map(xy)}];
   if (pair) {
     const [a, b, r] = pair, [ax, ay] = xy(a), [bx, by] = xy(b);
     steps.push({say: "Tap a block, then one next to it", lit: [xy(a), xy(b)], outline: [[xy(a)], [xy(b)]],
                 arrows: [{to: [(ax + bx) / 2 + 0.5, (ay + by) / 2 + 0.5], from: [ax - bx, ay - by]}]},
-               {say: "The first slides onto the second and they mix like paint", lit: [xy(b)], ...showing(() => { grid[b] = r; })});
+               {say: "The first slides over and they mix like paint", lit: [xy(b)], ...showing(() => { grid[b] = r; })});
   }
-  const bottom = [...Array(W).keys()].map(x => [x, H - 1]);
-  steps.push({say: "The wheel shows what mixes into what", els: [document.querySelector(".rules")]},
-             {say: "A row that's all one colour floats away", lit: bottom, ...showing(() => { for (let x = 0; x < W; x++) grid[(H - 1) * W + x] = grid[(H - 1) * W]; })},
-             {say: "There's no goal and no timer. Just mix.", lit: [...Array(W * H).keys()].map(xy)},
-             {say: "Give the cat a pat", els: [$("napper")]});
+  const primaries = [...Array(W * H).keys()].filter(i => [0, 2, 4].includes(grid[i]));
+  steps.push(
+    {say: "Not all colors mix. The wheel shows the rules", els: [document.querySelector(".rules")]},
+    {say: "Primary colors mix with each other", lit: primaries.map(xy), shapes: () => [0, 2, 4].map(wheelPart)},
+    {say: "Merging secondary colors strengthens their shared color", lit: pairLit, outline: pairOut, arrows: toB,
+     shapes: () => [1, 5, 0].map(wheelPart), ...example(1, 5, () => { grid[B] = mix(1, 5); grid[A] = grid[A - W]; })},
+    {say: "Some colors turn into mud.", lit: pairLit, outline: pairOut, arrows: toB,
+     shapes: () => [0, 3, MUD].map(wheelPart), ...example(0, 3, () => { grid[B] = MUD; grid[A] = grid[A - W]; })},
+    {say: "To remove mud, mix it with more mud", lit: pairLit, outline: pairOut, arrows: toB,
+     shapes: () => [wheelPart(MUD)], ...showing(() => {}, {before: () => { grid[A] = grid[B] = MUD; }, flags: {[A]: "clear", [B]: "clear"}})},
+    {say: "A row that's all one colour floats away", lit: [...Array(W).keys()].map(x => [x, H - 1]),
+     ...showing(() => { for (let x = 0; x < W; x++) grid[(H - 1) * W + x] = grid[(H - 1) * W]; })},
+    {say: "Give the cat a pat", els: [$("napper")]});
   G.spotlight({grid: $("board"), w: W, h: H, steps, done: () => G.save(SEEN, {seen: true})});
 }
 function helpCard() {
