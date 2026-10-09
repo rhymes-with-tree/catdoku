@@ -616,15 +616,41 @@ function helpCard() {
   const media = document.createElement("div"), ol = document.createElement("ol"); ol.className = "steps";
   for (const t of ["Swap two toys next to each other to line up three or more of a kind.",
                    "Catch the toys shown above the mat before your moves run out.",
-                   "Line up four to make a toy with the zoomies (it clears its line), an L or T for a bouncy one (it clears round about it), or five for catnip (swap it with a toy to clear every toy of that kind)."]) {
+                   "Line up four to make a toy with the zoomies (it clears its line), an L or T for a bouncy one (it clears round about it), or five for catnip (swap it with a toy to clear every toy of that kind).",
+                   "Zen, at the end of the level list, has no goals and no move limit."]) {
     const li = document.createElement("li"); li.textContent = t; ol.append(li);
   }
   const tip = document.createElement("p"); tip.className = "tip";
   tip.textContent = "Drag a toy onto its neighbour, or tap one and then the other.";
   media.append(ol, tip);
-  G.openCard("How to play", "", [["Let's play", G.closeCard, true]], media);
+  G.openCard("How to play", "", [["Got it", G.closeCard, true], ["Show me on the board", () => { G.closeCard(); intro(true); }]], media);
 }
 $("helpBtn").onclick = helpCard;
+
+/* ---------- first-time spotlight ---------- */
+// The first visit (or "Show me on the board") walks through a real swap on the mat that's out: the two
+// toys, then the same two swapped (just while that step is up) with the line they make, then the goals
+// and the moves.
+const INTRO = "catdoku.pounce.intro.v1";
+function intro(again) {
+  if (!again && G.load(INTRO).seen) return;
+  if (!S || S.over || busy || document.querySelector(".spot")) return;
+  const mv = findMove(S.g); if (!mv) return;
+  const [a, b] = mv, xy = i => [i % N, Math.floor(i / N)];
+  const swapOver = () => { swapCells(S.g, a, b); slide(S.g[a], a, 0.2); slide(S.g[b], b, 0.2); };
+  let line = [a, b];
+  swapCells(S.g, a, b);
+  const run = runsOf(S.g).find(r => r.cells.includes(a) || r.cells.includes(b)); if (run) line = run.cells;
+  swapCells(S.g, a, b);
+  hint = null; hintAt = Infinity;
+  const steps = [
+    {say: "Swap two toys next to each other", lit: [xy(a), xy(b)], outline: [[xy(a)], [xy(b)]]},
+    {say: "Line up three or more of a kind", lit: line.map(xy), enter: swapOver, leave: swapOver},
+  ];
+  if (S.level) steps.push({say: "Catch the toys shown above", els: [[...$("goals").children]]},
+                          {say: "Before your moves run out", els: [$("moves")]});
+  G.spotlight({grid: canvas, w: N, h: N, steps, done: () => { G.save(INTRO, {seen: true}); hintAt = now + 6; }});
+}
 
 /* ---------- choosing toys ---------- */
 $("toysBtn").onclick = () => G.toyPicker({kinds: KINDS, off: offToys, min: MIN_COLOURS, src: toySrc, save: off => {
@@ -641,7 +667,9 @@ const saved = G.load(STORE), first = saved.level ?? 1;
 climb = saved.climb || saved.level || 1;
 G.reopen(() => { if (saved.d && first <= MAX_LEVEL) start(first, saved.d); else startLevel(first); },
   why => { startLevel(first); G.note(why, 0); });
-if (saved.level === undefined) helpCard();
+// Players from before the spotlight had the How to play card instead, so it's only for new players.
+if (saved.level !== undefined && !G.load(INTRO).seen) G.save(INTRO, {seen: true});
+intro();
 requestAnimationFrame(loop);
 </script>
 <!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
