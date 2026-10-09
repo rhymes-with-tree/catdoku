@@ -284,6 +284,7 @@ function drawTable() {
   catEl = el($("things"), "g", {class: "thing cat"}, CAT);
   board = kioBoard(game);
   drawKey(); sync(true);
+  setTimeout(newThings, 400);   // anything new on this table gets its spotlight
 }
 // What's on this table: what to knock off, what to protect, and what won't budge.
 function drawKey() {
@@ -575,45 +576,90 @@ function showHelp() {
 }
 // Where the table's squares are on the page, for the spotlight (the table has a margin round it).
 function spotMap() { const r = $("svg").getBoundingClientRect(), s = r.width / (game.W * U + 2 * M); return {ox: r.left + M * s, oy: r.top + M * s, cw: U * s, ch: U * s}; }
-// First visit only: once the first table is out, walk through it: everything to knock off, the cat, a
-// push that sends something over the edge, moving, the moves count, and Hint.
+// First visit only: once the first table is out, walk through it: the cat, the goal, moving, a push,
+// one thing at a time, the moves count, and Hint. Two steps arrange the table for a moment (the cat
+// behind a thing; the cat behind two things in a row) and put it back.
 function spotlightSteps() {
   const {W, H} = game, on = (x, y) => x >= 0 && y >= 0 && x < W && y < H && game.on[y * W + x];
   const things = game.cur.items, taken = new Set([...things.map(it => it.c), game.cur.cat]);
-  // a thing at the edge, with a free square on its other side for the cat to push from
-  let push = null;
-  for (const it of things) for (const [dx, dy] of STEP) {
-    const [x, y] = xy(it.c);
-    if (kioCls(it.k) === 3 || on(x + dx, y + dy) || !on(x - dx, y - dy) || taken.has((y - dy) * W + x - dx)) continue;
-    push = {it, x, y, dx, dy}; break;
-  }
   const cat = xy(game.cur.cat), all = [];
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (on(x, y)) all.push([x, y]);
-  const steps = [
-    {say: "Knock everything off the table", lit: things.filter(it => kioCls(it.k) !== 2 && kioCls(it.k) !== 3).map(it => xy(it.c)), outline: things.map(it => [xy(it.c)])},
-    {say: "This is you", lit: [cat]},
-  ];
-  if (push) {
-    const {x, y, dx, dy} = push, from = [x - dx, y - dy];
-    // the cat stands behind the thing, facing it, while these two steps are up
+  // show the cat (and some things) somewhere else while a step is up, then put everything back
+  const arrange = (catAt, face, moves = []) => {
     let was;
-    const stand = {enter: () => { was = {cat: game.cur.cat, face: game.cur.face}; game.cur.cat = from[1] * W + from[0];
-                                  game.cur.face = STEP.findIndex(([a, b]) => a === dx && b === dy); sync(true); },
-                   leave: () => { Object.assign(game.cur, was); sync(true); }};
-    steps.push({say: "Walk into a thing to push it", lit: [from, [x, y]], outline: [[from], [[x, y]]],
-                arrows: [{to: [x + 0.5 - dx * 0.5, y + 0.5 - dy * 0.5], from: [-dx, -dy]}], ...stand},
-               {say: "Push it past the edge and it falls off", lit: [from, [x, y]], outline: [[from], [[x, y]]],
-                arrows: [{to: [x + 0.5 + dx * 1.3, y + 0.5 + dy * 1.3], from: [-dx, -dy], size: 1.2}], ...stand});
+    return {enter: () => { was = {cat: game.cur.cat, face: game.cur.face, items: game.cur.items};
+                           game.cur.items = game.cur.items.map(it => { const m = moves.find(([id]) => id === it.id); return m ? {...it, c: m[1]} : it; });
+                           game.cur.cat = catAt; game.cur.face = face; sync(true); },
+            leave: () => { Object.assign(game.cur, was); sync(true); }};
+  };
+  const pushable = things.filter(it => kioCls(it.k) !== 2 && kioCls(it.k) !== 3);
+  const steps = [
+    {say: "This is you", lit: [cat]},
+    {say: "You want to knock things off the table in as few moves as possible", lit: pushable.map(it => xy(it.c)), outline: pushable.map(it => [xy(it.c)])},
+    {say: "Tap a square to travel to it. You can also swipe or use the arrow keys.", lit: all},
+  ];
+  // a thing with a free square behind it for the cat to push from
+  for (const it of pushable) {
+    const [x, y] = xy(it.c), d = STEP.findIndex(([dx, dy]) => on(x - dx, y - dy) && !taken.has((y - dy) * W + x - dx) && on(x + dx, y + dy));
+    if (d < 0) continue;
+    const [dx, dy] = STEP[d], from = [x - dx, y - dy];
+    steps.push({say: "Walk into a thing to push it", lit: [from, [x, y]], outline: [[from], [[x, y]]], ...arrange(from[1] * W + from[0], d)});
+    break;
   }
-  steps.push({say: "You can only push, never pull, and one thing at a time", lit: all},
-             {say: "Swipe, use the arrow keys, or tap a square to walk there", lit: all},
-             {say: "Use the fewest moves for a gold paw", els: [$("count")]},
+  // two things in a row in front of the cat: the far one blocks the push
+  if (pushable.length >= 2) {
+    const [a, b] = pushable, free = c => !taken.has(c) || c === game.cur.cat || c === a.c || c === b.c;
+    let row = null;
+    for (let y = 0; y < H && !row; y++) for (let x = 0; x + 2 < W && !row; x++)
+      if ([0, 1, 2].every(k => on(x + k, y) && free(y * W + x + k))) row = [x, y];
+    if (row) {
+      const [x, y] = row;
+      steps.push({say: "You can only push one thing at a time", lit: [[x, y], [x + 1, y], [x + 2, y]], outline: [[[x, y]], [[x + 1, y]], [[x + 2, y]]],
+                  marks: [[x + 2, y, "❌", 0.8]], ...arrange(y * W + x, 3, [[a.id, y * W + x + 1], [b.id, y * W + x + 2]])});
+    }
+  }
+  steps.push({say: "Use the fewest moves for a gold paw", els: [$("count")]},
              {say: "Stuck? Hint shows the next step", els: [$("hintBtn")]});
   return steps;
+}
+// The first time each new kind of thing turns up on this device, it gets a spotlight of its own.
+const NEW_THINGS = [
+  {key: "budge", say: "Lemons and books won't budge", cells: () => game.cur.items.filter(it => kioCls(it.k) === 3).map(it => it.c)},
+  {key: "roll", say: "Balls of yarn and pencils roll until they hit something", cells: () => game.cur.items.filter(it => kioCls(it.k) === 1).map(it => it.c)},
+  {key: "walls", say: "Walls stop things falling off that side", cells: () => wallCells()},
+  {key: "bowl", say: "Keep your food bowl on the table", cells: () => game.cur.items.filter(it => it.k === "f").map(it => it.c)},
+  {key: "shape", say: "Tables come in new shapes", cells: () => game.on.some(v => !v) ? game.on.flatMap((v, c) => v ? [c] : []) : []},
+  {key: "candle", say: "Keep the candle away from books", cells: () => game.cur.items.filter(it => it.k === "c" || it.k === "b").map(it => it.c)},
+  {key: "nip", say: "Catnip makes the cat roll about: that step counts as 3 moves", cells: () => game.nip || []},
+  {key: "tape", say: "The cat won't step on tape", cells: () => game.tape || []},
+  {key: "paper", say: "Paper towels unroll the way the loose end points", cells: () => game.cur.items.filter(it => it.k === "p").map(it => it.c)},
+];
+// The squares along walled sides.
+function wallCells() {
+  const {W, H} = game, out = [];
+  for (let c = 0; c < W * H; c++) {
+    if (!game.on[c]) continue;
+    const x = c % W, y = Math.floor(c / W);
+    if ((y === 0 && game.walls & 1) || (y === H - 1 && game.walls & 2) || (x === 0 && game.walls & 4) || (x === W - 1 && game.walls & 8)) out.push(c);
+  }
+  return out;
+}
+function newThings() {
+  if (!game || game.won || !settings.seenHelp || document.querySelector(".spot")) return;
+  const seen = settings.seenThings || (settings.seenThings = {});
+  const steps = NEW_THINGS.filter(n => !seen[n.key] && n.cells().length).map(n => ({say: n.say, lit: n.cells().map(xy), outline: n.cells().map(c => [xy(c)]), key: n.key}));
+  if (!steps.length) return;
+  G.spotlight({grid: $("svg"), w: game.W, h: game.H, map: spotMap, steps, done: () => { for (const s of steps) seen[s.key] = true; save(); }});
 }
 function helpOnFirstVisit() {
   if (settings.seenHelp || !game || game.won || document.querySelector(".spot")) return;
   G.spotlight({grid: $("svg"), w: game.W, h: game.H, map: spotMap, steps: spotlightSteps(), done: () => { settings.seenHelp = true; save(); }});
+}
+// Players from before these spotlights had seen the How to play card, which covers everything; they
+// only get spotlights for things on levels past the one they're on.
+if (settings.seenHelp && !settings.seenThings) {
+  const by = {budge: 2, roll: 3, walls: 4, bowl: 5, shape: 6, candle: 7, nip: 8, tape: 9, paper: 10};
+  settings.seenThings = Object.fromEntries(Object.entries(by).filter(([, n]) => n <= settings.level).map(([k]) => [k, true]));
 }
 
 G.nav("knockitoff");
