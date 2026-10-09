@@ -370,7 +370,7 @@ let climb = 1;     // the level to go back to after zen
 const TOYS_PREF = "catdoku.bubbles.toys.v1", MIN_COLOURS = 6;
 let offToys = new Set(G.load(TOYS_PREF).off || []);
 const deal = n => makeLevel(n, Math.random, offToys);
-let batted = false, busy = false, now = 0, aim = Math.PI / 2, aiming = false, effects = [], wob = new Map(), fly = null, shelf = 0, shelfFrom = 0, shelfT0 = -9;
+let intro = null, batted = false, busy = false, now = 0, aim = Math.PI / 2, aiming = false, effects = [], wob = new Map(), fly = null, shelf = 0, shelfFrom = 0, shelfT0 = -9;
 const save = () => { if (S && !S.over) { S.d.ms = S.ms; G.save(STORE, {level: S.level, d: S.d, climb}); } };
 $("wrap").style.aspectRatio = `${COLS} / ${HT}`;
 
@@ -380,6 +380,7 @@ function start(level, d) {
   if (level) climb = level; else S.timed = false;   // zen isn't timed
   if (d.ms) { S.ms = d.ms; S.started = true; }
   busy = false; effects = []; wob = new Map(); fly = null; shelf = shelfFrom = d.B.drops; aim = Math.PI / 2;
+  intro = d.goal === "kittens" && !G.load(SEEN).kittens ? {t0: now} : null;
   $("levelSel").value = level;
   G.save(STORE, {level, d, climb}); hud(true);
   $("restartBtn").textContent = level ? "Restart level" : "New board";
@@ -659,7 +660,7 @@ function draw() {
   const d = S.d, B = d.B;
   const u = Math.min(1, Math.max(0, (now - shelfT0) / 0.4)), drops = shelfFrom + (B.drops - shelfFrom) * ease(u);
   shelf = u >= 1 ? B.drops : drops;
-  if (!S.over && !busy && !fly) drawAim();
+  if (!S.over && !busy && !fly && !intro) drawAim();
   B.rows.forEach((row, r) => row.forEach((k, c) => {
     if (k === EMPTY) return;
     const w = wob.get(r * COLS + c); let sq = 0;
@@ -682,7 +683,7 @@ function draw() {
     ctx.fillText("next", 1.25 * U, (SY - 0.32) * U);
     ctx.fillText("⇄", 2.05 * U, (SY + 0.32) * U);
   }
-  if (!batted && !fly) {   // until the first bat, say how
+  if (!batted && !fly && !intro) {   // until the first bat, say how
     ctx.font = "600 17px 'Baloo 2', system-ui, sans-serif"; ctx.fillStyle = "#2A2530"; ctx.textAlign = "center";
     ctx.globalAlpha = 0.6 + 0.4 * Math.sin(now * 3);
     ctx.fillText("Point where it should go, let go to bat", COLS / 2 * U, (LINE - 0.35) * U); ctx.globalAlpha = 1;
@@ -724,6 +725,7 @@ function draw() {
       ctx.strokeStyle = `rgba(232,160,19,${1 - u})`; ctx.lineWidth = 8 * (1 - u) + 1; circle(ctx, e.x * U, e.y * U, U * (0.4 + 1.9 * ease(u))); ctx.stroke();
     }
   }
+  if (intro) drawIntro();
   for (const e of effects) if (e.type === "cheer" && now >= e.t0) {
     const u = (now - e.t0) / e.dur, sz = 44 * (u < 0.15 ? 0.6 + u / 0.15 * 0.4 : 1), y = (LINE * 0.55 - u * 0.6) * U;
     ctx.save(); ctx.globalAlpha = u > 0.7 ? (1 - u) / 0.3 : 1; ctx.font = `800 ${sz}px 'Baloo 2', system-ui, sans-serif`;
@@ -748,6 +750,34 @@ function loop(t) {
   requestAnimationFrame(loop);
 }
 
+/* ---------- first kitten level ---------- */
+// The first time a kitten level starts on this device, everything but the kittens dims and the board
+// says what to do. A tap (or Space) puts it away and the round starts; it isn't shown again.
+const SEEN = "catdoku.bubbles.seen.v1";
+function endIntro() {
+  intro = null; const seen = G.load(SEEN); seen.kittens = true; G.save(SEEN, seen);
+}
+function drawIntro() {
+  const B = S.d.B, u = Math.min(1, (now - intro.t0) / 0.4), mid = COLS / 2 * U;
+  ctx.fillStyle = `rgba(42,37,48,${0.62 * u})`; ctx.fillRect(0, 0, COLS * U, HT * U);
+  B.rows.forEach((row, r) => row.forEach((k, c) => {
+    if (k !== KIT) return;
+    const x = cellX(B, r, c), y = cellY(B, r), p = 0.5 + 0.5 * Math.sin(now * 4);
+    ctx.fillStyle = `rgba(255,236,160,${(0.35 + 0.25 * p) * u})`; circle(ctx, x * U, y * U, (0.62 + 0.06 * p) * U); ctx.fill();
+    drawBubble(KIT, 0, x, y, {cat: kitten(r, c)});
+  }));
+  ctx.save(); ctx.globalAlpha = u; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+  const low = Math.max(...cellsOf(B).map(([r]) => cellY(B, r))), y = ((low + 0.5 + LINE) / 2 - 0.9) * U;   // in the open space under the bubbles
+  ctx.font = "800 44px 'Baloo 2', system-ui, sans-serif"; ctx.strokeStyle = "#2A2530"; ctx.lineWidth = 8;
+  ctx.strokeText("Free the Kittens!", mid, y); ctx.fillStyle = "#FFF4D2"; ctx.fillText("Free the Kittens!", mid, y);
+  ctx.font = "600 19px 'Baloo 2', system-ui, sans-serif"; ctx.fillStyle = "#FFF4D2";
+  ctx.fillText("They're napping in bubbles. Pop the", mid, y + 44);
+  ctx.fillText("bubbles holding them up so they fall.", mid, y + 68);
+  ctx.globalAlpha = u * (0.6 + 0.4 * Math.sin(now * 3)); ctx.font = "600 16px 'Baloo 2', system-ui, sans-serif";
+  ctx.fillText("Tap to play", mid, y + 104);
+  ctx.restore();
+}
+
 /* ---------- input ---------- */
 // Like Snood: the wand turns to face wherever you point (the mouse, or a finger anywhere on the
 // board, dragged to fine-tune) and letting go bats the bubble that way. Letting go on the floor
@@ -763,6 +793,7 @@ function swap() {
 canvas.addEventListener("pointerdown", e => {
   if (!S || S.over) return;
   e.preventDefault();
+  if (intro) return endIntro();
   const [x, y] = toUnits(e);
   if (onNext(x, y)) return swap();
   try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
@@ -781,6 +812,7 @@ canvas.addEventListener("pointerup", e => {
 canvas.addEventListener("pointercancel", () => { aiming = false; });
 canvas.addEventListener("keydown", e => {
   if (!S || S.over) return;
+  if (intro) { if (e.key === " " || e.key === "Enter" || e.key === "Escape") { e.preventDefault(); endIntro(); } return; }
   const step = e.shiftKey ? 0.005 : 0.03;
   if (e.key === "ArrowLeft") { e.preventDefault(); aim = Math.min(PI - MIN_AIM, aim + step); }
   else if (e.key === "ArrowRight") { e.preventDefault(); aim = Math.max(MIN_AIM, aim - step); }
@@ -811,7 +843,7 @@ $("toysBtn").onclick = () => G.toyPicker({kinds: KINDS, off: offToys, min: MIN_C
   if (S && !S.over && S.d.kinds.some(k => off.has(lookOf(k)[0]))) { newBoard(); G.note("Here's a new board with your toys.", 4000); }
   else G.note("Saved. Your toys are used from the next board.", 4000);
 }});
-G.setupTimer({name: "bubbles", game: () => S, playing: g => !g.over, save,
+G.setupTimer({name: "bubbles", game: () => S, playing: g => !g.over && !intro, save,
   label: n => `Level ${n}`, noun: "level",
   emptyText: "Finish a level and your times will show up here. They're kept on this device only."});
 $("bestBtn").onclick = () => G.showBests("Best times", S && S.level ? S.level : climb);
