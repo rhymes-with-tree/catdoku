@@ -99,6 +99,9 @@ details.menu[open] summary{margin-bottom:10px}
 .float.z{left:62%;font-size:15px}
 .float.prr{font-size:15px;color:#B94588}
 @keyframes rise{0%{opacity:0;transform:translateY(6px) scale(.8)}20%{opacity:1}100%{opacity:0;transform:translate(14px,-46px) scale(1.15)}}
+.card ol.steps{text-align:left;margin:0 0 14px;padding-left:24px;color:var(--ink);font-size:16px;line-height:1.35}
+.card ol.steps li{margin:0 0 8px;display:list-item}
+.card .tip{font-size:14px;margin:0 0 14px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}#haze{opacity:.4}.float{display:none}}
 </style>
 </head>
@@ -115,6 +118,7 @@ details.menu[open] summary{margin-bottom:10px}
     <button class="napper" id="napper" aria-label="The cat. Give it a pat"><img id="napImg" alt=""></button>
     <div class="board" id="board" role="grid" aria-label="Colour blocks"></div>
   </div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
   <div class="rules" aria-label="How colours mix">
     <svg id="wheel" viewBox="-60 -60 120 120" aria-hidden="true"></svg>
     <ul>
@@ -124,7 +128,7 @@ details.menu[open] summary{margin-bottom:10px}
       <li><b>Next-door</b> colours don't mix.</li>
     </ul>
   </div>
-  <div class="actions"><button id="undoBtn">Undo</button><button id="colBtn" aria-expanded="false">Colours</button></div>
+  <div class="actions"><button id="undoBtn">Undo</button><button id="colBtn" aria-expanded="false">Colours</button><button id="helpBtn">How to play</button></div>
   <div class="picker" id="picker" hidden>
     <h2>Pick your colours</h2>
     <p>Tap one in each column, or the rainbow square for any colour you like. The board changes as you go, and your colours are kept on this device.</p>
@@ -201,7 +205,8 @@ const KEY = "niptrip";
 const NAPPERS = ["c14-36", "c16-5", "c14-34", "c15-6", "c14-35", "c15-5", "c16-3"];
 let napper = G.load("niptrip.cat").cat;
 if (!NAPPERS.includes(napper)) { napper = NAPPERS[Math.floor(Math.random() * NAPPERS.length)]; G.save("niptrip.cat", {cat: napper}); }
-$("napImg").src = `../cats/${napper}.webp`;
+const CAT_SRC = {};  // filled with embedded pictures when the page is bundled into one file
+$("napImg").src = CAT_SRC[napper] || `../cats/${napper}.webp`;
 function float(cls, text) {
   const f = document.createElement("span"); f.className = "float " + cls; f.textContent = text;
   $("napper").append(f); setTimeout(() => f.remove(), 2500);
@@ -405,7 +410,54 @@ $("widthSel").onchange = () => newBoard();
 $("spawnSel").onchange = () => newBoard();
 $("undoBtn").onclick = undo;
 G.nav("niptrip");
+const hadBoard = !!localStorage.getItem(KEY);
 newBoard(true);
+
+/* ---------- how to play ---------- */
+// The first visit walks through a real mix on the board (shown, then put back), the colour wheel, a row
+// floating away (shown, then put back) and the cat. "Show me on the board" on the card does it again.
+const SEEN = "niptrip.seen";
+function intro(again) {
+  if ((!again && G.load(SEEN).seen) || busy || document.querySelector(".spot")) return;
+  const xy = i => [i % W, Math.floor(i / W)];
+  // two blocks next to each other that mix into a new colour, near the bottom
+  let pair = null;
+  for (let i = W * H - 1; i >= 0 && !pair; i--) for (const j of [i - 1, i - W]) {
+    if (j < 0 || !adjacent(i, j)) continue;
+    const r = mix(grid[j], grid[i]);
+    if (r >= 0 && r !== grid[i] && r !== grid[j] && r !== MUD) { pair = [j, i, r]; break; }
+  }
+  const showing = change => { let was; return {enter: () => { was = grid.slice(); change(); draw(); }, leave: () => { grid = was; draw(); }}; };
+  const steps = [];
+  if (pair) {
+    const [a, b, r] = pair, [ax, ay] = xy(a), [bx, by] = xy(b);
+    steps.push({say: "Tap a block, then one next to it", lit: [xy(a), xy(b)], outline: [[xy(a)], [xy(b)]],
+                arrows: [{to: [(ax + bx) / 2 + 0.5, (ay + by) / 2 + 0.5], from: [ax - bx, ay - by]}]},
+               {say: "The first slides onto the second and they mix like paint", lit: [xy(b)], ...showing(() => { grid[b] = r; })});
+  }
+  const bottom = [...Array(W).keys()].map(x => [x, H - 1]);
+  steps.push({say: "The wheel shows what mixes into what", els: [document.querySelector(".rules")]},
+             {say: "A row that's all one colour floats away", lit: bottom, ...showing(() => { for (let x = 0; x < W; x++) grid[(H - 1) * W + x] = grid[(H - 1) * W]; })},
+             {say: "There's no goal and no timer. Just mix.", lit: [...Array(W * H).keys()].map(xy)},
+             {say: "Give the cat a pat", els: [$("napper")]});
+  G.spotlight({grid: $("board"), w: W, h: H, steps, done: () => G.save(SEEN, {seen: true})});
+}
+function helpCard() {
+  const media = document.createElement("div"), ol = document.createElement("ol"); ol.className = "steps";
+  for (const t of ["Tap a block, then one next to it (up, down or sideways). The first slides onto the second and they mix like paint.",
+                   "Two colours two steps apart round the wheel make the one between them. Opposites make mud; two of the same join into one, and two muds vanish. Next-door colours don't mix.",
+                   "A row that's all one colour floats away. There's no goal and no timer."]) {
+    const li = document.createElement("li"); li.textContent = t; ol.append(li);
+  }
+  const tip = document.createElement("p"); tip.className = "tip";
+  tip.textContent = "Every colour has a symbol too, so you can play by shape. Colours lets you pick your own colours.";
+  media.append(ol, tip);
+  G.openCard("How to play", "", [["Show me on the board", () => { G.closeCard(); intro(true); }, true], ["Got it", G.closeCard]], media);
+}
+$("helpBtn").onclick = helpCard;
+// Players from before the spotlight already know their way round.
+if (hadBoard && !G.load(SEEN).seen) G.save(SEEN, {seen: true});
+setTimeout(intro, 300);
 </script>
 <!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
 <script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
