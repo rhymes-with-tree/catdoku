@@ -136,7 +136,8 @@ const G = (() => {
   // the admire button.
   // After admiring, point to the page's own new-puzzle button (New floor, New table…), or the level list.
   const admireNote = () => $("newBtn") ? `Done! Tap ${$("newBtn").textContent.trim()} when you're ready for another.` : "Done! Pick a level when you're ready for another.";
-  // A perfect clear (no help, nothing lost, no undo) earns a gold paw: o.gold puts one on the win card.
+  // A perfect clear (no help, nothing lost, no undo) earns a gold paw: o.gold puts one on the win card,
+  // with o.goldWhy saying what earned it.
   const PAW = "M100 6 C126 6 141 28 153 46 C172 50 197 70 195 101 C193 133 166 147 140 141 C125 138 112 131 100 131 C88 131 75 138 60 141 C34 147 7 133 5 101 C3 70 28 50 47 46 C59 28 74 6 100 6Z";
   function goldPaw() {
     const box = document.createElement("div");
@@ -147,15 +148,14 @@ const G = (() => {
   }
   function winCard(text, onNext, admire = "Admire my board", result, o = {}) {
     const media = document.createElement("div");
-    if (o.gold) media.append(goldPaw());
+    // what earned the gold paw ("No undos!"), under the paw
+    if (o.gold) { media.append(goldPaw()); if (o.goldWhy) { const g = document.createElement("p"); g.className = "goldwhy"; g.textContent = o.goldWhy; media.append(g); } }
     cheer();
     const p = document.createElement("p"); p.textContent = text;
     const name = document.createElement("p"); name.className = "catname";
     name.textContent = `Meet ${NAMES[Math.floor(Math.random() * NAMES.length)]}!`;
     const tl = timeLineEl(result); if (tl) media.append(tl);
     media.append(p);
-    // how to earn the gold paw, when this one missed it
-    if (!o.gold && o.goldTip) { const g = document.createElement("p"); g.className = "goldtip"; g.textContent = o.goldTip; media.append(g); }
     media.append(catPhoto(), name);
     const btns = [[o.next || "New puzzle", onNext, true]];
     if (admire !== null) btns.push([admire, () => { closeCard(); note(admireNote(), 0); }]);
@@ -188,7 +188,7 @@ const G = (() => {
     .timer{background:none;border:none;border-radius:8px;padding:0 6px;font:inherit;font-weight:600;color:var(--ink-soft);font-variant-numeric:tabular-nums;cursor:pointer;white-space:nowrap}
     .timer:hover{background:none;color:var(--ink)}
     .card .goldpaw{width:84px;height:84px;margin:0 auto 10px;display:block}
-    .card .goldtip{font-size:14px;color:var(--ink-soft)}
+    .card p.goldwhy{margin:-4px 0 12px;font-weight:800;color:#B07A10}
     .card .timeline{font-weight:800;color:var(--ink);margin:0 0 12px}
     .bests{width:100%;border-collapse:collapse;margin:0 0 14px;font-variant-numeric:tabular-nums;color:var(--ink)}
     .bests th,.bests td{padding:4px 6px;text-align:left;border-bottom:1px solid var(--line)}
@@ -369,10 +369,9 @@ const G = (() => {
   }
 
   /* ---------- buzz and purr ---------- */
-  // Phones can tap back (a buzz) and the page can purr. Both are switched in the games menu; buzz starts on,
-  // purring starts off. Android phones vibrate. iPhones don't let pages vibrate, but they tap when a switch
+  // Phones can tap back (a buzz) and the page can purr. Both are switched in the games menu, and start off. Android phones vibrate. iPhones don't let pages vibrate, but they tap when a switch
   // (<input switch>) flips, so a hidden one is flipped instead; that only works straight after a tap.
-  const feel = () => Object.assign({buzz: true, purr: false}, load(PREFS).feel);
+  const feel = () => Object.assign({buzz: false, purr: false}, load(PREFS).feel);
   let iosSwitch = null;
   function buzz(kind = "tap") {
     if (!feel().buzz) return;
