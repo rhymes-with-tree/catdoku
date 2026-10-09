@@ -425,7 +425,8 @@ const G = (() => {
         }
         svg.append(svgEl("path", {d: e, class: "edge" + (st.tone === "ok" ? " ok" : ""), "stroke-width": sw}));
       }
-      for (const r of els) svg.append(svgEl("rect", {x: r.x, y: r.y, width: r.w, height: r.h, rx: 6, class: "edge", "stroke-width": sw}));
+      // outlines round page elements and shapes keep one thickness (the squares' depends on their size)
+      for (const r of els) svg.append(svgEl("rect", {x: r.x, y: r.y, width: r.w, height: r.h, rx: 6, class: "edge", "stroke-width": 3.5}));
       for (const ln of st.lines || []) {   // lines along chosen square edges, [x1, y1, x2, y2] in squares
         const e = ln.edges.map(([x1, y1, x2, y2]) => `M${X(x1)} ${Y(y1)}L${X(x2)} ${Y(y2)}`).join("");
         svg.append(svgEl("path", {d: e, class: "edge" + (ln.tone === "ok" ? " ok" : ""), "stroke-width": sw * 1.4}));
@@ -445,7 +446,7 @@ const G = (() => {
       };
       for (const {to: [gx, gy], from: [dx, dy]} of st.arrows || []) arrow(X(gx), Y(gy), dx, dy, cw);   // pointing at a point between squares
       for (const sh of shapes) {
-        if (sh.poly) svg.append(svgEl("path", {d: ptsOf(sh.poly) + "Z", class: "edge" + (st.tone === "ok" ? " ok" : ""), "stroke-width": 3, "stroke-linejoin": "round"}));
+        if (sh.poly) svg.append(svgEl("path", {d: ptsOf(sh.poly) + "Z", class: "edge" + (st.tone === "ok" ? " ok" : ""), "stroke-width": 3.5, "stroke-linejoin": "round"}));
         if (sh.arrow) arrow(sh.arrow[0], sh.arrow[1], sh.from[0], sh.from[1], sh.size || 40);
       }
       layer.append(svg);
