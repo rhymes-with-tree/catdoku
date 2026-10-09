@@ -173,7 +173,18 @@ const G = (() => {
     .bests th{font-size:13px;color:var(--ink-soft);font-weight:600}
     .bests td.num,.bests th.num{text-align:right}
     .bests tr.now td{font-weight:800}
-    .card h3{margin:4px 0 6px;font-size:18px}`;
+    .card h3{margin:4px 0 6px;font-size:18px}
+    .spot{position:absolute;inset:0;z-index:5;cursor:pointer;animation:spotIn .35s ease-out;-webkit-tap-highlight-color:transparent;touch-action:none}
+    .spot:focus{outline:none}
+    .spot svg{position:absolute;inset:0;display:block}
+    .spot .dim{fill:rgba(42,37,48,.66)}
+    .spot .edge{fill:none;stroke:#E23B3B;stroke-linecap:round}
+    .spot .say{position:absolute;left:4%;right:4%;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;pointer-events:none}
+    .spot .say b{font-size:clamp(24px,7vw,36px);font-weight:800;line-height:1.1;color:#FFF4D2;-webkit-text-stroke:6px var(--ink);paint-order:stroke fill;text-wrap:balance}
+    .spot .say small{font-size:15px;font-weight:600;color:#FFF4D2;opacity:.85;animation:spotTap 1.6s ease-in-out infinite}
+    @keyframes spotIn{from{opacity:0}}
+    @keyframes spotTap{50%{opacity:.45}}
+    @media (prefers-reduced-motion:reduce){.spot,.spot .say small{animation:none}}`;
   document.head.append(style);
 
   // {name, game(), playing(game), save(), and optionally label(n) and noun for what bests are kept by,
@@ -341,6 +352,66 @@ const G = (() => {
     return from[Math.floor(Math.random() * from.length)];
   }
 
+  /* ---------- first-time spotlight ---------- */
+  // Teach a game on its own board: each step dims everything but some squares, outlines them in red,
+  // can put marks on them (a 🐱, ❌…; a list of marks takes turns), and says one line. A tap or
+  // Space shows the next step; after the last, `done` runs. `grid` is the element the squares fill,
+  // `w` × `h` squares; each step is {say, lit: [[x, y]…], outline (default: lit), marks: [[x, y, mark]…]}.
+  // It sits over the board, so taps on it never reach the game (or start its timer).
+  function spotlight(o) {
+    const wrap = o.grid.parentElement, layer = document.createElement("div"), ns = "http://www.w3.org/2000/svg";
+    layer.className = "spot"; layer.tabIndex = 0; layer.setAttribute("role", "dialog"); layer.setAttribute("aria-live", "polite");
+    wrap.append(layer);
+    let k = -1, frame = 0, ticker = null;
+    const svgEl = (t, a) => { const e = document.createElementNS(ns, t); for (const n in a) e.setAttribute(n, a[n]); return e; };
+    function show() {
+      const st = o.steps[k], g = o.grid, W = wrap.clientWidth, H = wrap.clientHeight;
+      const cw = g.clientWidth / o.w, ch = g.clientHeight / o.h, ox = g.offsetLeft + g.clientLeft, oy = g.offsetTop + g.clientTop;
+      const X = x => ox + x * cw, Y = y => oy + y * ch, lit = st.lit || [], on = new Set(lit.map(([x, y]) => y * o.w + x));
+      layer.innerHTML = "";
+      const svg = svgEl("svg", {viewBox: `0 0 ${W} ${H}`, width: W, height: H, "aria-hidden": "true"});
+      let d = `M0 0H${W}V${H}H0Z`;
+      for (const [x, y] of lit) d += `M${X(x)} ${Y(y)}H${X(x + 1)}V${Y(y + 1)}H${X(x)}Z`;
+      svg.append(svgEl("path", {d, "fill-rule": "evenodd", class: "dim"}));
+      for (const group of st.outline || [lit]) {   // red lines where the outlined squares meet the rest
+        const set = new Set(group.map(([x, y]) => y * o.w + x)), has = (x, y) => x >= 0 && y >= 0 && x < o.w && y < o.h && set.has(y * o.w + x);
+        let e = "";
+        for (const [x, y] of group) {
+          if (!has(x, y - 1)) e += `M${X(x)} ${Y(y)}H${X(x + 1)}`;
+          if (!has(x, y + 1)) e += `M${X(x)} ${Y(y + 1)}H${X(x + 1)}`;
+          if (!has(x - 1, y)) e += `M${X(x)} ${Y(y)}V${Y(y + 1)}`;
+          if (!has(x + 1, y)) e += `M${X(x + 1)} ${Y(y)}V${Y(y + 1)}`;
+        }
+        svg.append(svgEl("path", {d: e, class: "edge", "stroke-width": Math.max(3, cw * 0.07)}));
+      }
+      for (const [x, y, m] of st.marks || []) {
+        const t = svgEl("text", {x: X(x + 0.5), y: Y(y + 0.56), "text-anchor": "middle", "dominant-baseline": "middle",
+          "font-size": cw * (m === "❌" ? 0.42 : 0.56)});
+        t.textContent = Array.isArray(m) ? m[frame % m.length] : m; svg.append(t);
+      }
+      layer.append(svg);
+      // the words go in the biggest dim band above or below the lit squares
+      const ys = lit.map(([, y]) => y), top = lit.length ? Y(Math.min(...ys)) : H / 2, bottom = lit.length ? Y(Math.max(...ys) + 1) : H / 2;
+      const say = document.createElement("div"); say.className = "say";
+      const b = document.createElement("b"); b.textContent = st.say;
+      const tap = document.createElement("small"); tap.textContent = k < o.steps.length - 1 ? "Tap to go on" : "Tap to play";
+      say.append(b, tap); layer.append(say);
+      const mid = top > H - bottom ? top / 2 : (bottom + H) / 2;
+      say.style.top = `${Math.max(4, Math.min(H - say.offsetHeight - 4, mid - say.offsetHeight / 2))}px`;
+      layer.setAttribute("aria-label", `${st.say}. ${tap.textContent}.`);
+    }
+    function next(e) {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      if (++k >= o.steps.length) { clearInterval(ticker); ro.disconnect(); layer.remove(); if (o.done) o.done(); return; }
+      frame = 0; show();
+    }
+    const ro = new ResizeObserver(() => k >= 0 && k < o.steps.length && show());
+    layer.addEventListener("pointerdown", next);
+    layer.addEventListener("keydown", e => { if (e.key === " " || e.key === "Enter" || e.key === "Escape") next(e); });
+    ticker = setInterval(() => { const st = o.steps[k]; if (st && (st.marks || []).some(m => Array.isArray(m[2]))) { frame++; show(); } }, 900);
+    next(); ro.observe(wrap); layer.focus({preventScroll: true});
+  }
+
   let msgTimer = null;
   function note(text, ms) {
     clearTimeout(msgTimer);
@@ -373,5 +444,5 @@ const G = (() => {
   }
 
   return {$, nav, load, save, builder, openCard, closeCard, winCard, sizeUp, otherSize, note, cellAt, track, reopen,
-          setupTimer, freshClock, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, toyPicker, pickLook};
+          setupTimer, freshClock, spotlight, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, toyPicker, pickLook};
 })();
