@@ -182,9 +182,14 @@ const G = (() => {
     .spot .say{position:absolute;left:4%;right:4%;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;pointer-events:none}
     .spot .say b{font-size:clamp(24px,7vw,36px);font-weight:800;line-height:1.1;color:#FFF4D2;-webkit-text-stroke:6px var(--ink);paint-order:stroke fill;text-wrap:balance}
     .spot .say small{font-size:15px;font-weight:600;color:#FFF4D2;opacity:.85;animation:spotTap 1.6s ease-in-out infinite}
+    .spot .say b .w{white-space:nowrap}
+    .spot .say b .emo{-webkit-text-stroke:0;display:inline-block;background:#FFF4D2;border:3px solid var(--ink);border-radius:999px;padding:0 .12em;margin:0 .04em;line-height:1.15;font-size:.85em;vertical-align:.06em}
+    .spotGo{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;pointer-events:none;animation:spotGo 1.3s ease-out forwards}
+    .spotGo b{font-size:clamp(34px,10vw,52px);font-weight:800;color:#FFF4D2;-webkit-text-stroke:7px var(--ink);paint-order:stroke fill}
+    @keyframes spotGo{0%{opacity:0;transform:scale(.7)}18%{opacity:1;transform:scale(1.06)}30%{transform:scale(1)}70%{opacity:1}100%{opacity:0;transform:scale(1.08)}}
     @keyframes spotIn{from{opacity:0}}
     @keyframes spotTap{50%{opacity:.45}}
-    @media (prefers-reduced-motion:reduce){.spot,.spot .say small{animation:none}}`;
+    @media (prefers-reduced-motion:reduce){.spot,.spot .say small{animation:none}.spotGo{animation:spotGoFade 1.3s forwards}@keyframes spotGoFade{70%{opacity:1}100%{opacity:0}}}`;
   document.head.append(style);
 
   // {name, game(), playing(game), save(), and optionally label(n) and noun for what bests are kept by,
@@ -393,16 +398,40 @@ const G = (() => {
       // the words go in the biggest dim band above or below the lit squares
       const ys = lit.map(([, y]) => y), top = lit.length ? Y(Math.min(...ys)) : H / 2, bottom = lit.length ? Y(Math.max(...ys) + 1) : H / 2;
       const say = document.createElement("div"); say.className = "say";
-      const b = document.createElement("b"); b.textContent = st.say;
-      const tap = document.createElement("small"); tap.textContent = k < o.steps.length - 1 ? "Tap to go on" : "Tap to play";
+      const b = document.createElement("b"); sayWith(b, st.say);
+      const tap = document.createElement("small"); tap.textContent = "Tap to go on";
       say.append(b, tap); layer.append(say);
       const mid = top > H - bottom ? top / 2 : (bottom + H) / 2;
       say.style.top = `${Math.max(4, Math.min(H - say.offsetHeight - 4, mid - say.offsetHeight / 2))}px`;
       layer.setAttribute("aria-label", `${st.say}. ${tap.textContent}.`);
     }
+    // Emoji in the words keep their own colours (no outline) on a pale chip, and never start a line
+    // on their own: each sticks to the word before it.
+    function sayWith(el, text) {
+      for (const part of text.split(" ")) {
+        const w = document.createElement("span"); w.className = "w";
+        for (const bit of part.split(/(\p{Extended_Pictographic}(?:\uFE0F)?)/u)) {
+          if (!bit) continue;
+          if (/\p{Extended_Pictographic}/u.test(bit)) { const e = document.createElement("span"); e.className = "emo"; e.textContent = bit; w.append(e); }
+          else w.append(bit);
+        }
+        if (el.childNodes.length) {
+          const prev = el.lastChild;   // an emoji word sticks to the word before it
+          if (/^\p{Extended_Pictographic}/u.test(part)) { prev.append(" ", ...w.childNodes); continue; }
+          el.append(" ");
+        }
+        el.append(w);
+      }
+    }
     function next(e) {
       if (e) { e.preventDefault(); e.stopPropagation(); }
-      if (++k >= o.steps.length) { clearInterval(ticker); ro.disconnect(); layer.remove(); if (o.done) o.done(); return; }
+      if (++k >= o.steps.length) {   // all done: "Let's Play!" shows over the board and fades by itself
+        clearInterval(ticker); ro.disconnect(); layer.remove(); if (o.done) o.done();
+        const go = document.createElement("div"); go.className = "spotGo"; go.setAttribute("aria-hidden", "true");
+        const b = document.createElement("b"); b.textContent = "Let's Play!"; go.append(b); wrap.append(go);
+        setTimeout(() => go.remove(), 1300);
+        return;
+      }
       frame = 0; show();
     }
     const ro = new ResizeObserver(() => k >= 0 && k < o.steps.length && show());
