@@ -373,9 +373,35 @@ function showHelp() {
   const tip = document.createElement("p"); tip.className = "tip";
   tip.textContent = "Squares that break a rule are outlined in red. Every puzzle has exactly one answer. Know two squares match (or don't) before you know which toy? Turn on Mark = × and tap between them to add your own teal = or ×. They're just notes for you and don't change the puzzle.";
   media.append(pics, ol, tip);
-  G.openCard("How to play", "", [["Let's play", () => { G.closeCard(); settings.seenHelp = true; save(); }, true]], media);
+  G.openCard("How to play", "", [["Show me on the board", () => { G.closeCard(); settings.seenHelp = false; helpOnFirstVisit(); }, true],
+    ["Got it", () => { G.closeCard(); settings.seenHelp = true; save(); }]], media);
 }
-function helpOnFirstVisit() { if (!settings.seenHelp && game && playing()) showHelp(); }
+// First visit only: walk through the puzzle that's out. One step puts three of a kind in a row (just while
+// it's up) so the red outline shows; the box goes back as it was.
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || !playing() || document.querySelector(".spot")) return;
+  const N = game.N, xy = i => [i % N, Math.floor(i / N)], all = [...Array(N * N).keys()].map(xy);
+  // the squares sit in a grid with gaps, so work out where they are from the first and last
+  const map = () => { const sq = $("squares").children, a = sq[0].getBoundingClientRect(), z = sq[N * N - 1].getBoundingClientRect(), gap = (z.right - a.left - N * a.width) / (N - 1);
+    return {ox: a.left - gap / 2, oy: a.top - gap / 2, cw: a.width + gap, ch: a.height + gap}; };
+  const empty = game.grid.findIndex((v, i) => v === -1 && game.givens[i] === -1);
+  // three empty squares in a row, for the "no three alike" example
+  let three = null;
+  for (let r = 0; r < N && !three; r++) for (let c = 0; c + 2 < N && !three; c++) {
+    const run = [0, 1, 2].map(d => r * N + c + d);
+    if (run.every(i => game.grid[i] === -1)) three = run;
+  }
+  const sign = game.signs[0], row = r => [...Array(N).keys()].map(c => [c, r]);
+  const showing = change => { let was; return {enter: () => { was = game.grid.slice(); change(); draw(); }, leave: () => { game.grid = was; draw(); }}; };
+  const steps = [{say: "Fill every square with one of the two toys", lit: all, els: [$("key")]}];
+  if (empty >= 0) steps.push({say: "Tap once for the first toy, twice for the second, and again to empty it", lit: [xy(empty)], els: [$("key")],
+                              ...showing(() => { game.grid[empty] = 0; })});
+  steps.push({say: "Every row and column holds as many of one toy as the other", lit: row(Math.floor(N / 2))});
+  if (three) steps.push({say: "No three of the same toy can sit next to each other in a line", lit: three.map(xy), ...showing(() => { for (const i of three) game.grid[i] = 0; })});
+  if (sign) steps.push({say: "= means the two squares hold the same toy; × means they're different", lit: [xy(sign.a), xy(sign.b)], outline: [[xy(sign.a), xy(sign.b)]]});
+  steps.push({say: "Know two squares match (or don't) before you know which toy? Mark = × lets you add your own signs as notes", els: [$("markBtn")]});
+  G.spotlight({grid: $("squares"), w: N, h: N, map, steps, done: () => { settings.seenHelp = true; save(); }});
+}
 
 /* ---------- choosing toys ---------- */
 $("toysBtn").onclick = () => G.toyPicker({kinds: KINDS, off: offToys, min: MIN_COLOURS, src: toySrc, save: off => {
