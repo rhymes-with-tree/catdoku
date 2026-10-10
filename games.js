@@ -238,6 +238,12 @@ const G = (() => {
     }, 500);
     document.addEventListener("visibilitychange", () => { if (document.hidden) T.save(); });
     showTime();
+    // On a short screen, scroll just far enough when the page opens that the whole board shows (when it can)
+    setTimeout(() => {
+      if (scrollY > 0 || document.querySelector(".spot")) return;
+      const r = board.getBoundingClientRect();
+      if (r.bottom > innerHeight && r.height < innerHeight - 16) scrollTo({top: Math.min(r.bottom - innerHeight + 12, r.top - 8)});
+    }, 700);
   }
   function showTime() {
     const g = T && T.game(), btn = $("timer"); if (!btn) return;
