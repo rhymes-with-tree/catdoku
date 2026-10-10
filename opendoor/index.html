@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-10.13"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-10.14"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-10.13">
+<link rel="stylesheet" href="../games.css?v=2026-10-10.14">
 <style>
 /* A KenKen house: every row and column holds 1 to N once, and walls split the floor into rooms whose numbers
    must make the room's sign. Each room has a door that opens when the room is right; with every door open,
@@ -38,6 +38,11 @@
 .cell.same .v{color:#3C8681}
 .cell .v{font-size:calc(var(--cell) * .56);font-weight:800;line-height:1;margin-top:calc(var(--cell) * .12);color:var(--ink)}
 .cell.clash .v{color:#C8392B}
+/* Hint: a number it puts down glows gold; a wrong number it finds flashes red */
+.cell.hinted{animation:hinted 1.6s ease-out}
+.cell.hintBad{animation:hintBad 1.6s ease-out}
+@keyframes hinted{0%,40%{box-shadow:inset 0 0 0 4px #ECA818;background-color:#FFE9A8}}
+@keyframes hintBad{0%,20%,50%{box-shadow:inset 0 0 0 4px #C8392B}35%,65%{box-shadow:none}}
 .cell .sign{position:absolute;left:calc(var(--cell) * .07);top:calc(var(--cell) * .02);font-size:max(10px,calc(var(--cell) * .24));font-weight:800;line-height:1.1;
   color:var(--ink);white-space:nowrap;pointer-events:none;z-index:2}
 .cell .sign.wrong{color:#C8392B}
@@ -87,6 +92,7 @@
   <div class="pad" id="pad" aria-label="Numbers"></div>
   <div class="key" id="key"></div>
   <div class="actions">
+    <button id="hintBtn">Hint</button>
     <button id="undoBtn">Undo</button>
     <button id="clearBtn">Clear</button>
     <button id="notesBtn" aria-pressed="false">Notes</button>
@@ -101,7 +107,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-10.13"></script>
+<script src="../games.js?v=2026-10-10.14"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N grid where every row and column holds 1 to N once, cut into rooms (cages). Each room has a sign:
@@ -345,7 +351,7 @@ function draw() {
     const k = plan.at[i], room = plan.rooms[k], [floor, lit] = FLOORS[plan.floor[k]];
     const r = Math.floor(i / N), c = i % N, peer = sel >= 0 && i !== sel && (r === sr || c === sc);
     const cls = ["cell", right[k] || (forceOpen === k) ? "done" : "", i === sel ? "sel" : "", peer ? "peer" : "",
-      clash.has(i) ? "clash" : "", sel >= 0 && g[sel] && g[i] === g[sel] && i !== sel ? "same" : ""].filter(Boolean).join(" ");
+      clash.has(i) ? "clash" : "", flash && flash.i === i ? flash.kind : "", sel >= 0 && g[sel] && g[i] === g[sel] && i !== sel ? "same" : ""].filter(Boolean).join(" ");
     const sign = plan.signAt[k] === i ? `<span class="sign${wrong[k] ? " wrong" : ""}">${room.t}${OPS[room.op]}</span>` : "";
     const notes = !g[i] && game.notes[i] ? `<span class="notes" style="grid-template-columns:repeat(${cols},1fr)">${[...Array(N)].map((_, v) => `<span>${game.notes[i] >> (v + 1) & 1 ? v + 1 : ""}</span>`).join("")}</span>` : "";
     const say = `Row ${r + 1}, column ${c + 1}: ${g[i] || "empty"}${sign ? `. Room sign ${room.t}${OPS[room.op]}` : ""}`;
@@ -358,11 +364,12 @@ function draw() {
   const open = right.filter(Boolean).length, rooms = plan.rooms.length;
   $("count").textContent = game.won ? "Every door is open!" : `${open} of ${rooms} doors open`;
   $("key").textContent = noting ? "Notes: tap numbers to jot them down as maybes" : sel < 0 && !game.won ? "Tap a square, then a number" : "";
+  $("hintBtn").disabled = game.won;
   $("undoBtn").disabled = !game.history.length || game.won; $("clearBtn").disabled = !game.history.length || game.won;
   return {clash, right, wrong};
 }
 // The walls between rooms (thin seams inside a room), with each room's door hung in one of them.
-let forceOpen = -1, rattle = new Set(), wasOpen = [];
+let forceOpen = -1, rattle = new Set(), wasOpen = [], flash = null;
 function drawWalls(right) {
   const N = game.N, svg = $("walls"), at = plan.at;
   svg.setAttribute("viewBox", `0 0 ${N} ${N}`);
@@ -453,6 +460,36 @@ document.addEventListener("keydown", e => {
 document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
 function undo() { if (playing() && game.history.length) { game.undid = true; const h = game.history.pop(); game.grid = h.grid; game.notes = h.notes; draw(); save(); } }
 $("undoBtn").onclick = undo;
+// Hint: first points out a number that's wrong, if there is one; otherwise puts down one number, in a room that's
+// nearly full so a door is close to opening. Any hint keeps you on the same level and costs the gold paw.
+let answer = null;
+const solution = () => answer && answer.g === game ? answer.sol : (answer = {g: game, sol: solveRooms(game.N, plan.rooms, 1).first}).sol;
+function hint() {
+  if (!playing()) return;
+  const sol = solution(), g = game.grid;
+  if (!sol) return;
+  game.hinted = true; game.started = true;
+  const wrong = g.map((v, i) => v && v !== sol[i] ? i : -1).filter(i => i >= 0);
+  if (wrong.length) {
+    const i = wrong.includes(sel) ? sel : wrong[0];
+    sel = i; flash = {i, kind: "hintBad"}; draw(); save();
+    G.note(wrong.length > 1 ? `That one's wrong (and ${wrong.length - 1} more)` : "That one's wrong", 4000);
+  } else {
+    const empty = (i => !g[i]), left = k => plan.rooms[k].cells.filter(empty).length;
+    const cands = g.map((_, i) => i).filter(empty).sort((a, b) => left(plan.at[a]) - left(plan.at[b]) || a - b);
+    const i = cands.includes(sel) ? sel : cands[0];
+    snapshot();
+    g[i] = sol[i];
+    const N = game.N, r = Math.floor(i / N), c = i % N;
+    for (let j = 0; j < N; j++) { game.notes[r * N + j] &= ~(1 << sol[i]); game.notes[j * N + c] &= ~(1 << sol[i]); }
+    sel = i; flash = {i, kind: "hinted"};
+    if (check().right.every(Boolean)) { win(); return; }
+    draw(); save();
+    G.note(`That square is a ${sol[i]}.`, 3000);
+  }
+  const f = flash; setTimeout(() => { if (flash === f) flash = null; }, 1700);
+}
+$("hintBtn").onclick = hint;
 $("clearBtn").onclick = () => { if (playing() && game.history.length) { game.undid = true; snapshot(); game.grid = game.grid.map(() => 0); game.notes = game.notes.map(() => 0); draw(); save(); G.note("Every door's shut again. Undo brings your numbers back.", 3500); } };
 addEventListener("resize", () => { if (game && plan) draw(); });
 
@@ -460,7 +497,7 @@ addEventListener("resize", () => { if (game && plan) draw(); });
 // Every door is open, so a cat runs right across the house, then the finishing card.
 function win() {
   game.won = true; G.finishClock(game); sel = -1; noting = false;
-  const next = Math.min(MAX_LEVEL, game.level + 1);
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
   settings.level = next; $("levelSel").value = next; save();
   draw();
   G.track(`Open the Door solved level ${game.level}`);
@@ -493,9 +530,9 @@ function runCat() {
 function finishCard() {
   const next = settings.level, N = game.N;
   let text = `Every door in the ${N} × ${N} house is open, and the cat's off exploring.`;
-  text += game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my house", game.result,
-    {title: "Door's open!", gold: !game.undid, goldWhy: "No undos!", next: `Next: level ${next}`, after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+    {title: "Door's open!", gold: !game.undid && !game.hinted, goldWhy: "No undos or hints!", next: `Next: level ${next}`, after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
 }
 
 /* ---------- new puzzles ---------- */
@@ -556,7 +593,7 @@ function showHelp() {
     const li = document.createElement("li"); li.textContent = t; ol.append(li);
   }
   const tip = document.createElement("p"); tip.className = "tip";
-  tip.textContent = "Tap a square, then a number (tap it again to take it away). A number that's already in its row or column turns red, and a full room whose numbers don't make its sign has its sign in red. Notes lets you jot down numbers a square might be. Every puzzle has exactly one answer.";
+  tip.textContent = "Tap a square, then a number (tap it again to take it away). A number that's already in its row or column turns red, and a full room whose numbers don't make its sign has its sign in red. Notes lets you jot down numbers a square might be. Stuck? Hint points out a wrong number, or fills in a square for you (you stay on the same level). Every puzzle has exactly one answer.";
   media.append(pics, ol, tip);
   G.openCard("How to play", "", [["Show me on the board", () => { G.closeCard(); settings.seenHelp = false; helpOnFirstVisit(); }, true],
     ["Got it", () => { G.closeCard(); settings.seenHelp = true; save(); }]], media);
