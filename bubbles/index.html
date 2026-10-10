@@ -862,16 +862,20 @@ function walkthrough(again) {
     }
   }
   const aimTo = (x, y) => { let was; return {enter: () => { was = aim; aim = Math.atan2(SY - y, x - SX); }, leave: () => { aim = was; }}; };
-  // a shot that bounces off the left side: up and to the left, then up and to the right
-  // (shallow, so it reaches the side below the bubbles; it ends where it would meet them)
-  const ba = 0.8 * PI, wx = 0.5, slope = Math.tan(PI - ba), wy = SY - (SX - wx) * slope;
-  const top = Math.min(wy - 0.5, cellY(B, low) + 0.8), bounce = [[SX, SY], [wx, wy], [Math.min(COLS - 0.5, wx + (wy - top) / slope), top]];
+  // a real shot that bounces off one side and then sticks: the one that travels furthest after the bounce
+  let bounce = null, bounceAng = 0, bestRun = 0;
+  for (let a = MIN_AIM; a < PI - MIN_AIM; a += 0.01) {
+    const f = flight(B, a); if (!f || f.path.length !== 3) continue;
+    const [, [wx, wy], [ex, ey]] = f.path, run = Math.hypot(ex - wx, ey - wy);
+    if (run > bestRun) { bestRun = run; bounce = f.path; bounceAng = a; }
+  }
   const steps = [
-    {say: "This is your bubble", shapes: () => [ring(SX, SY, 0.6)]},
+    {say: "You're the cat!", shapes: () => [ring(COLS - 1.25, SY + 0.05, 0.95)]},
+    {say: "Bat this bubble up with your wand", shapes: () => [ring(SX, SY, 0.6)]},
     {say: "Point where you want it to go", shapes: () => [ring(SX, SY, 0.6), band([[SX, SY], [tx, ty + 0.5]])], ...aimTo(tx, ty)},
     {say: "Let go to bat it up", shapes: () => [band([[SX, SY], [tx, ty + 0.5]]), ring(tx, ty, 0.6), {arrow: px(tx, ty + 0.6), from: [SX - tx, SY - ty], size: unit()}], ...aimTo(tx, ty)},
-    {say: "It bounces off the sides", shapes: () => [band(bounce)], ...aimTo(bounce[1][0], bounce[1][1])},
   ];
+  if (bounce) { let was; steps.push({say: "It bounces off the sides", shapes: () => [band(bounce)], enter: () => { was = aim; aim = bounceAng; }, leave: () => { aim = was; }}); }
   if (three) {
     const k0 = S.d.queue[0].k >= 0 && S.d.queue[0].k < 10 ? S.d.queue[0].k : three[0][2];
     let was;
