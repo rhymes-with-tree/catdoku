@@ -157,7 +157,7 @@ const G = (() => {
     media.append(catPhoto(), name);
     const btns = [[o.next || "New puzzle", onNext, true]];
     if (admire !== null) btns.push([admire, () => { closeCard(); note(admireNote(), 0); }]);
-    btns.push(["Share my result", () => shareResult(result, o.gold)]);
+    btns.push(["Share my result", e => shareResult(result, o.gold, e.currentTarget)]);
     openCard(o.gold ? "Gold paw!" : o.title || "Solved!", "", btns, media, o.after);
   }
 
@@ -328,27 +328,36 @@ const G = (() => {
     else go();
   }
   // Send text and a link: the share sheet, else the clipboard, else a box to copy from by hand.
-  // keep: leave the card that's up (the win card) open after sharing.
-  async function sendLink(title, text, url, keep) {
-    const done = msg => { if (!keep) closeCard(); if (msg) note(msg, 5000); };
+  // o.btn: the button that was pressed, which says what happened ("Copied!") and keeps the card that's up
+  // (the win card) open; without it, the card closes and the note line says so.
+  async function sendLink(title, text, url, o = {}) {
+    const all = text + " " + url;
+    const done = msg => {
+      if (!o.btn) { closeCard(); if (msg) note(msg, 5000); return; }
+      if (!msg) return;
+      const was = o.btn.dataset.label || o.btn.textContent; o.btn.dataset.label = was;
+      o.btn.textContent = msg; setTimeout(() => { o.btn.textContent = was; }, 2500);
+    };
     if (navigator.share) {
       try { await navigator.share({title, text, url}); done(); return; }
       catch (e) { if (e.name === "AbortError") return; }
     }
-    try { await navigator.clipboard.writeText(text + " " + url); done("Copied. Paste it into a message."); return; } catch (e) {}
-    const box = document.createElement("textarea"); box.value = text + " " + url; box.readOnly = true; box.rows = 4;
-    box.style.cssText = "width:100%;font:inherit;font-size:13px;margin:0 0 14px;border:2px solid var(--line);border-radius:8px;padding:6px";
-    openCard("Copy this", "Select it and copy it into a message.", [["Done", closeCard, true]], box);
+    try { await navigator.clipboard.writeText(all); done(o.btn ? "Copied! Paste it into a message." : "Copied. Paste it into a message."); return; } catch (e) {}
+    // No share sheet and no clipboard: a box to copy from, under the button (or on a card of its own)
+    const box = document.createElement("textarea"); box.value = all; box.readOnly = true; box.rows = 3;
+    box.style.cssText = "width:100%;font:inherit;font-size:13px;margin:0;border:2px solid var(--line);border-radius:8px;padding:6px";
+    if (o.btn) { if (!o.btn.nextElementSibling || o.btn.nextElementSibling.tagName !== "TEXTAREA") o.btn.after(box); else o.btn.nextElementSibling.select(); }
+    else openCard("Copy this", "Select it and copy it into a message.", [["Done", closeCard, true]], box);
     box.focus(); box.select();
   }
   // A finished puzzle's result to share: the game, level or size, time, and gold paw, with a link to the game.
-  function shareResult(r, gold) {
+  function shareResult(r, gold, btn) {
     const name = document.querySelector("header h1").textContent, bits = [name];
     if (r && r.n != null && T) bits.push(label(r.n));
     if (r && r.ms != null && !load(PREFS).hideTimer) bits.push("⏱ " + clock(r.ms));
     if (gold) bits.push("Gold paw 🐾");
     track(`${name} result shared`);
-    sendLink(name, bits.join(" · "), location.origin + location.pathname, true);
+    sendLink(name, bits.join(" · "), location.origin + location.pathname, {btn});
   }
   // The Share card: a fresh copy of the puzzle, or the puzzle with the moves so far.
   function shareCard(o) {
