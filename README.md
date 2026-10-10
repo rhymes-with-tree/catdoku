@@ -4,7 +4,7 @@ A family of cat-themed puzzle games, each a single HTML page. The first, Catdoku
 
 ## Play
 
-Open `index.html` in any modern browser: the front page has a tile for every game, with a little picture of its board, a line about it and how many you've solved on this device. No build step or dependencies. (Catdoku used to be the front page; old share links to it are passed on to `catdoku/`.) The board pictures are in `icons/`, made by `tools/board-icons.js` (Playwright): serve the site, then run `node tools/board-icons.js` (or name some games) to make them again after a game's look changes.
+Open `index.html` in any modern browser: the front page has a tile for every game, with an icon drawn from its board, a line about it and how many you've solved on this device. No build step or dependencies. (Catdoku used to be the front page; old share links to it are passed on to `catdoku/`.) The icons are in `icons/`, drawn by `tools/make-icons.py` (`python3 tools/make-icons.py` draws them again).
 
 ## Across every game
 
