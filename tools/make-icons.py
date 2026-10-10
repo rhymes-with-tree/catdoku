@@ -241,9 +241,29 @@ def bubbles():
     return frame("#E4F0F4", out)
 
 
+# Open the Door!: rooms of numbers with their signs, one door swung open and one still shut.
+def opendoor():
+    s, o = 24, 14
+    floors = ["#FFF4D6", "#FFF4D6", "#E2DDEC", "#DDE7D6", "#DDE7D6", "#E2DDEC", "#EDD9D3", "#EDD9D3", "#E2DDEC"]
+    out = ""
+    for k, f in enumerate(floors):
+        out += f'<rect x="{o + k % 3 * s}" y="{o + k // 3 * s}" width="{s}" height="{s}" fill="{f}"/>'
+    for k, v in enumerate([1, 2, 3, 3, 1, 2, 2, 3, 1]):
+        out += text(o + k % 3 * s + 12, o + k // 3 * s + 14, v, 13)
+    out += text(o + 7, o + 5, "3+", 7) + text(o + 2 * s + 6, o + 5, "6×", 7) + text(o + 5, o + s + 5, "4+", 7) + text(o + 5, o + 2 * s + 5, "1−", 7)
+    walls = f"M{o} {o}H{o+3*s}V{o+3*s}H{o}Z M{o+2*s} {o}V{o+s+7}M{o+2*s} {o+s+17}V{o+3*s} M{o} {o+s}H{o+2*s} M{o} {o+2*s}H{o+5}M{o+19} {o+2*s}H{o+2*s}"
+    out += f'<path d="{walls}" fill="none" stroke="{INK}" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round"/>'
+    # open: the door from the wall below the 3+ room's left square, swung up into it
+    out += f'<rect x="{o+17}" y="{o+2*s-15}" width="3" height="15" rx="1" fill="#B07C4F" stroke="{INK}" stroke-width="1.2"/>'
+    # shut: a door in the wall between the 6× room and the middle
+    out += f'<rect x="{o+2*s-1.6}" y="{o+s+5}" width="3.2" height="14" rx="1" fill="#B07C4F" stroke="{INK}" stroke-width="1.2"/>'
+    return frame("#F3EBDD", out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
-         "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles}
+         "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
+         "opendoor": opendoor}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")
