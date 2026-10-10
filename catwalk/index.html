@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-09.3";
+  var BUILD = "2026-10-09.4";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-09.3">
+<link rel="stylesheet" href="../games.css?v=2026-10-09.4">
 <style>
 /* A gigantic cat tower: numbered carpeted perches on a papered wall, linked by sisal-wrapped catwalks. */
 .wall{width:var(--board);aspect-ratio:1;background:#EBDDCB;border:3px solid #A98663;border-radius:16px;overflow:hidden;touch-action:manipulation;user-select:none;-webkit-user-select:none}
@@ -47,11 +47,6 @@
   <header><h1>Catwalk</h1><div class="stripe"></div><p class="tagline">Build a gigantic cat tower: link every perch with catwalks</p></header>
   <nav class="games" id="games" aria-label="Games"></nav>
 
-  <div class="bar">
-    <label>Size <select id="size" aria-label="Tower size"></select></label>
-    <button id="newBtn" class="primary">New tower</button>
-  </div>
-
   <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
 
   <div class="wall" id="board" aria-label="Perches on a cat tower"><svg id="svg"></svg></div>
@@ -60,18 +55,18 @@
   <div class="actions">
     <button id="undoBtn">Undo</button>
     <button id="restartBtn">Restart</button>
+    <button id="shareBtn">Share</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
   </div>
-
-  <div class="help">
-    <p>Each perch needs exactly as many catwalks as its number. Tap a perch, then another perch, to build a catwalk between them. Do the same again for a second catwalk, and a third time to take them away.</p>
-    <div class="ways" id="ways"></div>
-    <p>A catwalk joins a perch to the nearest perch straight across or up and down (and on towers from 10 × 10, also at 45°), never through another perch. Catwalks can't cross, at most two join the same pair of perches, and when you're done the cats must be able to reach every perch: it all joins into one tower. Every tower has exactly one answer.</p>
+  <div class="ways" id="ways"></div>
+  <div class="bar">
+    <label>Size <select id="size" aria-label="Tower size"></select></label>
+    <button id="newBtn" class="primary">New tower</button>
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-09.3"></script>
+<script src="../games.js?v=2026-10-09.4"></script>
 <script>
 /* ---------- the puzzle ---------- */
 // A perch: {x, y, n}. Catwalks run from a perch to the nearest perch straight across or up and down (and on the
@@ -314,8 +309,8 @@ $("svg").addEventListener("click", e => {
   const have = totals();
   if (game.isles.every((p, i) => have[i] === p.n)) G.note("Every perch is right, but the tower is in pieces.", 0);
 });
-$("undoBtn").onclick = () => { if (playing() && game.history.length) { game.val = game.history.pop(); sel = -1; draw(); save(); } };
-$("restartBtn").onclick = () => { if (playing() && game.history.length) { game.history.push(game.val.slice()); game.val = game.val.map(() => 0); sel = -1; draw(); save(); G.note("Back to bare perches. Undo brings your catwalks back.", 3500); } };
+$("undoBtn").onclick = () => { if (playing() && game.history.length) { game.undid = true; game.val = game.history.pop(); sel = -1; draw(); save(); } };
+$("restartBtn").onclick = () => { if (playing() && game.history.length) { game.undid = true; game.history.push(game.val.slice()); game.val = game.val.map(() => 0); sel = -1; draw(); save(); G.note("Back to bare perches. Undo brings your catwalks back.", 3500); } };
 
 /* ---------- endings ---------- */
 function win() {
@@ -331,7 +326,7 @@ function finishCard() {
   let text = `All ${game.isles.length} perches are linked, and the cats can climb the whole tower.`;
   text += next > game.N ? ` Next up: ${sizeLabel(next)}.` : " That's the biggest tower; here's another.";
   G.winCard(text, () => { G.closeCard(); startSize(next); }, "Admire my tower", game.result,
-    {title: "Tower built!", next: `Next: ${SIZES[next][0]} × ${SIZES[next][0]}`, after: G.otherSize($("size"), next, startSize)});
+    {title: "Tower built!", gold: !game.undid, goldWhy: "No undos!", next: `Next: ${SIZES[next][0]} × ${SIZES[next][0]}`, after: G.otherSize($("size"), next, startSize)});
 }
 
 /* ---------- new towers ---------- */
@@ -345,6 +340,23 @@ function newTower() {
   draw(); save();
   setTimeout(diagonals, 300);
   G.track(`Catwalk new tower ${sizeLabel(N)}`);
+}
+
+/* ---------- sharing ---------- */
+$("shareBtn").onclick = () => { if (game) G.shareCard({name: "Catwalk", won: game.won,
+  puzzle: () => ({g: "catwalk", N: game.N, isles: game.isles.map(({x, y, n}) => [x, y, n])}),
+  progress: () => ({val: game.val.slice()})}); };
+// A tower from a share link, with its catwalks so far if they were sent (that isn't timed).
+function openShared(d) {
+  if (!SIZES[d.N] || !Array.isArray(d.isles)) { G.note("That share link didn't work.", 5000); return; }
+  const W = SIZES[d.N][0];
+  game = {N: d.N, W, isles: d.isles.map(([x, y, n]) => ({x, y, n})), history: [], won: false, ...G.freshClock()};
+  lanes = lanesOf(game.isles, W, SIZES[d.N][2]);
+  game.val = d.p && Array.isArray(d.p.val) && d.p.val.length === lanes.length ? d.p.val.slice() : lanes.map(() => 0);
+  if (d.p) game.timed = false;
+  settings.size = d.N; $("size").value = d.N; sel = -1;
+  $("board").classList.remove("won"); draw(); save();
+  if (d.p && solved()) win();
 }
 
 /* ---------- how to play ---------- */
@@ -491,6 +503,7 @@ if (!(settings.size >= 1 && settings.size < SIZES.length)) settings.size = 1;
 $("size").value = settings.size;
 // Players already past the first tower with diagonals know about them.
 if (settings.seenHelp && settings.size > 4 && settings.seenDiag === undefined) settings.seenDiag = true;
+const shared = G.readShare("catwalk");
 if (game && Array.isArray(game.isles) && Array.isArray(game.val)) G.reopen(() => {
     if (!SIZES[game.N]) throw new Error("unknown size");
     lanes = lanesOf(game.isles, game.W, SIZES[game.N][2]);
@@ -499,7 +512,11 @@ if (game && Array.isArray(game.isles) && Array.isArray(game.val)) G.reopen(() =>
     if (game.won) finishCard();
     helpOnFirstVisit(); diagonals();
   }, why => { game = null; newTower(); G.note(why, 0); });
-else { newTower(); helpOnFirstVisit(); }
+else if (!shared) { newTower(); helpOnFirstVisit(); }
+const shareOpts = () => ({name: "Catwalk", inProgress: !!(game && !game.won && game.history.length), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, shareOpts());
+// A share link opened while this page is already showing only changes the address, so watch for it.
+window.addEventListener("hashchange", () => { const d = G.readShare("catwalk"); if (d) G.offerShare(d, shareOpts()); });
 </script>
 <!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
 <script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>

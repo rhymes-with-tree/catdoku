@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-09.3"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-09.4"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -22,7 +22,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-09.3">
+<link rel="stylesheet" href="../games.css?v=2026-10-09.4">
 <style>
 /* A living room floor: a winding ball track on the rug, with wicker baskets of toys around it. */
 .wrap.room{height:auto;aspect-ratio:2/3;max-width:calc((100svh - 40px) * 2 / 3)}
@@ -50,11 +50,6 @@
   <header><h1>Toy Box</h1><div class="stripe"></div><p class="tagline">Put every toy back in its basket</p></header>
   <nav class="games" id="games" aria-label="Games"></nav>
 
-  <div class="bar">
-    <label>Level <select id="levelSel" aria-label="Level"></select></label>
-    <button id="restartBtn">Restart level</button>
-  </div>
-
   <div class="status">
     <span class="info"><span id="level"></span><button class="timer" id="timer" hidden></button><span class="meter" id="meter" title="Toys on the track"><span class="fill" id="fill"></span><span id="ctext"></span></span></span>
     <span class="msg" id="msg" aria-live="polite"></span>
@@ -76,13 +71,14 @@
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
   </div>
-
-  <div class="help">
-    <p>Send toys onto the track and fill each basket with one kind of toy. Don't let the track jam.</p>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="restartBtn">Restart level</button>
   </div>
+
 </main>
 
-<script src="../games.js?v=2026-10-09.3"></script>
+<script src="../games.js?v=2026-10-09.4"></script>
 <script>
 const $ = G.$;
 G.nav("toybox");
@@ -500,11 +496,11 @@ function win() {
   // A level finished without helpers or a jam moves you up; otherwise you play this level again.
   const helped = !!S.d.helped, next = helped ? S.level : Math.min(MAX_LEVEL, S.level + 1);
   G.save("toybox.v2", {level: next});
-  const text = helped ? `Level ${S.level} done. You had some help, so next up is level ${next} again with new toys.`
+  const text = helped ? `Level ${S.level} done. Next up: another level ${next}.`
     : next > S.level ? `Level ${S.level} done. Next up: level ${next}, with ${params(next).C} spaces on the track.`
     : `Level ${S.level} done. That's the hardest level; next up is another one.`;
   // The finishing card from the other games: time, a cat photo and a name for the cat.
-  G.winCard(text, () => { G.closeCard(); startLevel(next); }, null, result, {title: "All tidy!", next: `Next: level ${next}`,
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, null, result, {title: "All tidy!", gold: !!S.level && !helped, goldWhy: "No helpers used!", next: `Next: level ${next}`,
     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
 }
 function lose() {
@@ -912,7 +908,7 @@ $("helpBtn").onclick = helpCard;
 // Toy pictures the player has left out, kept on this device. The bigger levels use nine of the ten
 // colours, so at most one whole colour can go.
 const TOYS_PREF = "catdoku.toybox.toys.v1", MIN_COLOURS = 9;
-let offToys = new Set(G.load(TOYS_PREF).off || []);
+let offToys = G.toysOff(TOYS_PREF);
 // Fit a dealt level to the player's toys: a colour left out swaps with a kept colour the level doesn't
 // use (to the solver kinds are only labels, so it can still be won), and each colour shows a kept picture.
 function fitToys(d) {
@@ -924,13 +920,15 @@ function fitToys(d) {
   d.look = KINDS.map(k => G.pickLook(k, offToys));
   return d;
 }
-$("toysBtn").onclick = () => G.toyPicker({kinds: KINDS, off: offToys, min: MIN_COLOURS,
+const toyChest = () => ({kinds: KINDS, off: offToys, min: MIN_COLOURS,
   src: f => TOY_SRC[f] || `../toys/${f}.webp?v=${window.SITE_BUILD || ""}`, save: off => {
-  offToys = off; G.save(TOYS_PREF, {off: [...off]});
+  offToys = off; G.saveToys(off);
   const uses = S && [...new Set(S.d.toys.flat())].some(k => off.has(lookOf(k)[0]));
   if (uses && !loading && !S.over) { pickShake(false); start(S.level, fitToys(S.d)); G.note("The level starts again with your toys.", 4000); }
   else G.note("Saved. Your toys are used from the next level.", 4000);
 }});
+$("toysBtn").onclick = () => G.toyPicker(toyChest());
+G.needToys({...toyChest(), off: () => offToys, game: "Toy Box"});
 G.setupTimer({name: "toybox", game: () => S, playing: g => !g.over && !loading, save: () => {},
   label: n => `Level ${n}`, noun: "level",
   emptyText: "Finish a level and your times will show up here. They're kept on this device only."});

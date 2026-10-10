@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-09.3"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-09.4"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -22,7 +22,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-09.3">
+<link rel="stylesheet" href="../games.css?v=2026-10-09.4">
 <style>
 /* Toys in soap bubbles, clinging under a shelf, and a cat at the bottom batting more up. */
 .wrap{height:auto}
@@ -53,11 +53,6 @@
   <header><h1>Bubbles</h1><div class="stripe"></div><p class="tagline">Bat bubbles up and pop three of a kind</p></header>
   <nav class="games" id="games" aria-label="Games"></nav>
 
-  <div class="bar">
-    <label>Level <select id="levelSel" aria-label="Level"></select></label>
-    <button id="restartBtn">Restart level</button>
-  </div>
-
   <div class="status">
     <span class="info"><span class="moves" id="moves"></span><button class="timer" id="timer" hidden></button></span>
     <span class="msg" id="msg" aria-live="polite"></span>
@@ -80,13 +75,14 @@
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
   </div>
-
-  <div class="help">
-    <p>Point where you want the bubble to go, then let go to bat it up. When three or more bubbles with the same toy touch, they pop, and anything left hanging falls.</p>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="restartBtn">Restart level</button>
   </div>
+
 </main>
 
-<script src="../games.js?v=2026-10-09.3"></script>
+<script src="../games.js?v=2026-10-09.4"></script>
 <script>
 const $ = G.$;
 G.nav("bubbles");
@@ -368,7 +364,7 @@ let climb = 1;     // the level to go back to after zen
 // Toy pictures the player has chosen to leave out, kept on this device. Zen uses five kinds and the
 // big levels six.
 const TOYS_PREF = "catdoku.bubbles.toys.v1", MIN_COLOURS = 6;
-let offToys = new Set(G.load(TOYS_PREF).off || []);
+let offToys = G.toysOff(TOYS_PREF);
 const deal = n => makeLevel(n, Math.random, offToys);
 let intro = null, batted = false, busy = false, now = 0, aim = Math.PI / 2, aiming = false, effects = [], wob = new Map(), fly = null, shelf = 0, shelfFrom = 0, shelfT0 = -9;
 const save = () => { if (S && !S.over) { S.d.ms = S.ms; G.save(STORE, {level: S.level, d: S.d, climb}); } };
@@ -485,13 +481,13 @@ function win() {
   G.track(`Bubbles level ${S.level} done`);
   const result = G.finishClock(S), helped = S.d.helped, next = helped ? S.level : Math.min(MAX_LEVEL, S.level + 1);
   climb = next; G.save(STORE, {level: next, climb});
-  const text = helped ? `Level ${S.level} done. You had some help, so next up is level ${next} again with new bubbles.`
+  const text = helped ? `Level ${S.level} done. Next up: another level ${next}.`
     : next > S.level ? `Level ${S.level} done. Next up: level ${next}.` : `Level ${S.level} done. That's the hardest level; next up is another one.`;
   // Everything still up there comes down to celebrate.
   const B = S.d.B;
   cellsOf(B).forEach(([r, c, k]) => { if (k !== PEG) { effects.push({type: "fall", k, x: cellX(B, r, c), y: cellY(B, r), vx: (Math.random() - 0.5) * 2, vy: -2 * Math.random(), t0: now + Math.random() * 0.4, dur: 2.4}); B.rows[r][c] = EMPTY; } });
   const game = S;
-  setTimeout(() => S === game && G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my board", result, {title: "Purr-fect!", next: `Next: level ${next}`,
+  setTimeout(() => S === game && G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my board", result, {title: "Purr-fect!", gold: !!S.level && !helped, goldWhy: "No helpers used!", next: `Next: level ${next}`,
     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")}), 900);
 }
 function lost() {
@@ -830,6 +826,80 @@ canvas.addEventListener("keydown", e => {
   else if (e.key === "ArrowDown") { e.preventDefault(); swap(); }
 });
 
+/* ---------- the walkthrough ---------- */
+// The first visit (or "Show me on the board") walks through the board that's out: your bubble, aiming,
+// batting, a bounce, three of a kind (laid out just while that step is up), the goal, the shelf, the
+// cat's line, the next bubble and the helpers. Then any kittens, yarn or posts get their own spotlight.
+const WALK = "catdoku.bubbles.walk.v1";
+function walkthrough(again) {
+  if (!again && G.load(WALK).seen) return;
+  if (!S || S.over || fly || document.querySelector(".spot")) return;
+  intro = null;
+  const B = S.d.B, rect = () => canvas.getBoundingClientRect();
+  const px = (x, y) => { const r = rect(), s = r.width / COLS; return [r.left + x * s, r.top + y * s]; };
+  const unit = () => rect().width / COLS;
+  const ring = (x, y, rad = 0.55) => ({poly: [...Array(20).keys()].map(i => px(x + rad * Math.cos(i / 20 * 2 * PI), y + rad * Math.sin(i / 20 * 2 * PI)))});
+  const band = (pts, w = 0.7) => ({path: pts.map(([x, y]) => px(x, y)), width: w * unit()});
+  // the lowest bubbles: something to aim at, and three side by side to make into a match
+  const cells = cellsOf(B).filter(([, , k]) => k >= 0 && k < 10), low = Math.max(...cells.map(([r]) => r));
+  const bottom = cells.filter(([r]) => r === low).sort((a, b) => a[1] - b[1]);
+  const target = bottom[Math.floor(bottom.length / 2)] || cells[0];
+  const tx = cellX(B, target[0], target[1]), ty = cellY(B, target[0]);
+  // three toys side by side to make into a match: where popping them would bring the most down
+  const fallsFrom = gone => {
+    const R = B.rows.map(row => row.slice()); for (const [y, x] of gone) R[y][x] = EMPTY;
+    const held = new Set(), queue = [], all = [];
+    R.forEach((row, y) => row.forEach((k, x) => { if (k === EMPTY) return; all.push([y, x]); if (y === 0 || k === PEG) { held.add(y * COLS + x); queue.push([y, x]); } }));
+    while (queue.length) { const [y, x] = queue.pop(); for (const [v, u] of nbrs(B, y, x)) if (R[v][u] !== EMPTY && !held.has(v * COLS + u)) { held.add(v * COLS + u); queue.push([v, u]); } }
+    return all.filter(([y, x]) => !held.has(y * COLS + x));
+  };
+  let three = null, falls = [];
+  for (let r0 = low; r0 >= 0; r0--) {
+    const row = cells.filter(([r]) => r === r0).sort((a, b) => a[1] - b[1]);
+    for (let i = 0; i + 2 < row.length; i++) if (row[i + 2][1] - row[i][1] === 2) {
+      const f = fallsFrom(row.slice(i, i + 3));
+      if (!three || f.length > falls.length) { three = row.slice(i, i + 3); falls = f; }
+    }
+  }
+  const aimTo = (x, y) => { let was; return {enter: () => { was = aim; aim = Math.atan2(SY - y, x - SX); }, leave: () => { aim = was; }}; };
+  // a real shot that bounces off one side and then sticks: the one that travels furthest after the bounce
+  let bounce = null, bounceAng = 0, bestRun = 0;
+  for (let a = MIN_AIM; a < PI - MIN_AIM; a += 0.01) {
+    const f = flight(B, a); if (!f || f.path.length !== 3) continue;
+    const [, [wx, wy], [ex, ey]] = f.path, run = Math.hypot(ex - wx, ey - wy);
+    if (run > bestRun) { bestRun = run; bounce = f.path; bounceAng = a; }
+  }
+  const steps = [
+    {say: "You're the cat!", shapes: () => [ring(COLS - 1.25, SY + 0.05, 0.95)]},
+    {say: "Bat this bubble up with your wand", shapes: () => [ring(SX, SY, 0.6)]},
+    {say: "Point where you want it to go", shapes: () => [ring(SX, SY, 0.6), band([[SX, SY], [tx, ty + 0.5]])], ...aimTo(tx, ty)},
+    {say: "Let go to bat it up", shapes: () => [band([[SX, SY], [tx, ty + 0.5]]), ring(tx, ty, 0.6), {arrow: px(tx, ty + 0.6), from: [SX - tx, SY - ty], size: unit()}], ...aimTo(tx, ty)},
+  ];
+  if (bounce) { let was; steps.push({say: "It bounces off the sides", shapes: () => [band(bounce)], enter: () => { was = aim; aim = bounceAng; }, leave: () => { aim = was; }}); }
+  if (three) {
+    const k0 = S.d.queue[0].k >= 0 && S.d.queue[0].k < 10 ? S.d.queue[0].k : three[0][2];
+    let was;
+    steps.push({say: "When three or more of a kind touch, they pop", shapes: () => three.map(([r, c]) => ring(cellX(B, r, c), cellY(B, r))),
+      enter: () => { was = three.map(([r, c]) => B.rows[r][c]); for (const [r, c] of three) B.rows[r][c] = k0; },
+      leave: () => { three.forEach(([r, c], i) => { B.rows[r][c] = was[i]; }); }});
+  }
+  if (three && falls.length) {
+    let was;
+    steps.push({say: "Anything left hanging falls", shapes: () => falls.map(([r, c]) => ring(cellX(B, r, c), cellY(B, r))),
+      enter: () => { was = three.map(([r, c]) => B.rows[r][c]); for (const [r, c] of three) B.rows[r][c] = EMPTY; },
+      leave: () => { three.forEach(([r, c], i) => { B.rows[r][c] = was[i]; }); }});
+  }
+  if (S.level) steps.push({say: {clear: "Pop every bubble to clear the level", catch: "Catch the toys shown above", kittens: "Free the kittens"}[S.d.goal], els: [$("goals")]});
+  steps.push({say: "Every few bats, the shelf comes down a row", els: [$("moves")], shapes: () => [band([[0, TOP + B.drops * RH * 0.5], [COLS, TOP + B.drops * RH * 0.5]], TOP + B.drops * RH + 0.4)]},
+             {say: "Don't let the bubbles reach the cat's line!", shapes: () => [band([[0.1, LINE], [COLS - 0.1, LINE]], 0.45)]},
+             {say: "Tap the next bubble to swap it in", shapes: () => [ring(1.25, SY + 0.2, 0.5)]});
+  if (S.level) steps.push({say: "Need a hand? Each level has one of each helper", els: [[$("sightBtn"), $("nipBtn"), $("shakeBtn")]]},
+                          {say: "Or play zen mode", els: [$("levelSel")]});
+  G.spotlight({grid: canvas, w: COLS, h: Math.ceil(HT), steps,
+    map: () => { const r = rect(), s = r.width / COLS; return {ox: r.left, oy: r.top, cw: s, ch: s}; },
+    done: () => { G.save(WALK, {seen: true}); intro = nextIntro(); }});
+}
+
 /* ---------- how to play ---------- */
 function helpCard() {
   const media = document.createElement("div"), ol = document.createElement("ol"); ol.className = "steps";
@@ -843,22 +913,23 @@ function helpCard() {
   const tip = document.createElement("p"); tip.className = "tip";
   tip.textContent = "To call off a shot, drag down onto the floor before letting go. Tap the next bubble to swap it in. Yarn tangles come apart when something next to them pops; cat-tree posts never come down. Arrow keys aim, Space bats.";
   media.append(ol, tip);
-  // On a level with kittens, yarn or posts, their spotlights can be shown again.
+  // "Show me on the board" plays the walkthrough, then this level's kittens, yarn or posts again.
   const again = S && !S.over ? SPOTLIGHTS.filter(x => x.when(S.d)) : [];
-  // "Show me on the board" comes first when this level has something to show
-  const btns = again.length ? [["Show me on the board", () => {
-    G.closeCard(); const seen = G.load(SEEN); for (const x of again) delete seen[x.key]; G.save(SEEN, seen); intro = nextIntro();
+  const btns = S && !S.over ? [["Show me on the board", () => {
+    G.closeCard(); const seen = G.load(SEEN); for (const x of again) delete seen[x.key]; G.save(SEEN, seen); walkthrough(true);
   }, true], ["Got it", G.closeCard]] : [["Got it", G.closeCard, true]];
   G.openCard("How to play", "", btns, media);
 }
 $("helpBtn").onclick = helpCard;
 
 /* ---------- choosing toys ---------- */
-$("toysBtn").onclick = () => G.toyPicker({kinds: KINDS, off: offToys, min: MIN_COLOURS, src: toySrc, save: off => {
-  offToys = off; G.save(TOYS_PREF, {off: [...off]});
+const toyChest = () => ({kinds: KINDS, off: offToys, min: MIN_COLOURS, src: toySrc, save: off => {
+  offToys = off; G.saveToys(off);
   if (S && !S.over && S.d.kinds.some(k => off.has(lookOf(k)[0]))) { newBoard(); G.note("Here's a new board with your toys.", 4000); }
   else G.note("Saved. Your toys are used from the next board.", 4000);
 }});
+$("toysBtn").onclick = () => G.toyPicker(toyChest());
+G.needToys({...toyChest(), off: () => offToys, game: "Bubbles"});
 G.setupTimer({name: "bubbles", game: () => S, playing: g => !g.over && !intro, save,
   label: n => `Level ${n}`, noun: "level",
   emptyText: "Finish a level and your times will show up here. They're kept on this device only."});
@@ -868,7 +939,9 @@ const saved = G.load(STORE), first = saved.level ?? 1;
 climb = saved.climb || saved.level || 1;
 G.reopen(() => { if (saved.d && first <= MAX_LEVEL) start(first, saved.d); else startLevel(first); },
   why => { startLevel(first); G.note(why, 0); });
-if (saved.level === undefined) helpCard();
+// Players from before the walkthrough have already found their way round.
+if (!G.load(WALK).seen && (climb > 1 || G.load("catdoku.bests.v1").bubbles)) G.save(WALK, {seen: true});
+setTimeout(() => walkthrough(), 400);
 requestAnimationFrame(loop);
 </script>
 <!-- Visit counts (GoatCounter: no cookies, nothing personal) -->

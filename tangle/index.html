@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-09.3";
+  var BUILD = "2026-10-09.4";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-09.3">
+<link rel="stylesheet" href="../games.css?v=2026-10-09.4">
 <style>
 /* Strands of yarn knotted through balls of yarn on a felt mat. Drag the balls until no two strands cross. */
 .mat{width:var(--board);aspect-ratio:1;background:#F3E3C7;border:3px solid #B98C5E;border-radius:18px;position:relative;overflow:hidden;
@@ -41,30 +41,25 @@
   <header><h1>Tangle</h1><div class="stripe"></div><p class="tagline">The cat got into the yarn. Untangle it!</p></header>
   <nav class="games" id="games" aria-label="Games"></nav>
 
-  <div class="bar">
-    <label>Level <select id="levelSel" aria-label="Level"></select></label>
-    <button id="newBtn" class="primary">New tangle</button>
-  </div>
-
   <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
 
   <div class="mat" id="board" aria-label="Balls of yarn knotted together by strands"><svg id="svg" viewBox="0 0 1000 1000"></svg></div>
   <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
 
   <div class="actions">
+    <button id="shareBtn">Share</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
   </div>
-
-  <div class="help">
-    <p>Each strand of yarn is knotted through several balls. Drag the balls around until no two strands cross. Little dots show where strands still cross, and every tangle can be undone.</p>
-    <p>On ombré levels each strand shades through many colours, so follow the strands, not the colours.</p>
-    <p>Once it's untangled, keep moving the yarn about to make any shape you like.</p>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New tangle</button>
   </div>
+
 </main>
 
-<script src="../games.js?v=2026-10-09.3"></script>
-<script src="../colorways.js?v=2026-10-09.3"></script>
+<script src="../games.js?v=2026-10-09.4"></script>
+<script src="../colorways.js?v=2026-10-09.4"></script>
 <script>
 /* ---------- levels ---------- */
 // Strands per level, and whether the yarn is ombré. Every two strands meet at one ball, so 4 strands make 6 balls,
@@ -224,12 +219,14 @@ function win() {
   const g = game;
   setTimeout(() => { if (game === g) finishCard(); }, 900);   // a moment to see the yarn hop
 }
+// Tangle has no Undo, so its gold paw is for beating your best time at the level.
+const beatBest = () => { const r = game.result; return !!(r && r.ms != null && r.best != null && r.isBest); };
 function finishCard() {
   const next = settings.level, N = game.N;
   let text = `You untangled ${game.balls.length} balls of yarn in ${game.moves} move${game.moves === 1 ? "" : "s"}, and the cat pounced on it.`;
   text += N === MAX_LEVEL ? " That's the hardest level; next up is another one." : ` Next up: level ${next}.`;
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my yarn", game.result,
-    {title: "Untangled!", next: `Next: level ${next}`, after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+    {title: "Untangled!", gold: beatBest(), goldWhy: "A new best time!", next: `Next: level ${next}`, after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
 }
 
 /* ---------- new tangles ---------- */
@@ -237,9 +234,28 @@ function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); ne
 function newTangle() {
   const N = settings.level, t = makeTangle(N);
   game = {N, balls: t.balls, edges: t.edges, moves: 0, won: false, ...G.freshClock()};
+  game.start = game.balls.map(b => [Math.round(b.x), Math.round(b.y)]);   // where the balls began, for sharing
   $("board").classList.remove("won"); G.closeCard(); G.note("");
   draw(); save();
   G.track(`Tangle new tangle level ${N}`);
+}
+
+/* ---------- sharing ---------- */
+const spots = () => game.balls.map(b => [Math.round(b.x), Math.round(b.y)]);
+$("shareBtn").onclick = () => { if (game) G.shareCard({name: "Tangle", won: game.won,
+  puzzle: () => ({g: "tangle", N: game.N, at: game.start || spots(), colors: game.balls.map(b => b.color),
+                  edges: game.edges.map(e => [e.a, e.b, e.k, e.ca, e.cb])}),
+  progress: () => ({at: spots()})}); };
+// A tangle from a share link, with the balls where they'd got to if that was sent (that isn't timed).
+function openShared(d) {
+  if (!(d.N >= 1 && d.N <= MAX_LEVEL) || !Array.isArray(d.at) || !Array.isArray(d.edges)) { G.note("That share link didn't work.", 5000); return; }
+  const at = d.p && Array.isArray(d.p.at) && d.p.at.length === d.at.length ? d.p.at : d.at;
+  game = {N: d.N, balls: at.map(([x, y], i) => ({x, y, color: (d.colors || [])[i]})), edges: d.edges.map(([a, b, k, ca, cb]) => ({a, b, k, ca, cb})),
+          start: d.at, moves: 0, won: false, ...G.freshClock()};
+  if (d.p) game.timed = false;
+  settings.level = d.N; $("levelSel").value = d.N;
+  $("board").classList.remove("won");
+  if (draw() === 0 && d.p) win(); else save();
 }
 
 /* ---------- how to play ---------- */
@@ -298,13 +314,18 @@ $("bestBtn").onclick = () => G.showBests("Best times", game ? game.N : settings.
 
 if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
 $("levelSel").value = settings.level;
+const shared = G.readShare("tangle");
 if (game && Array.isArray(game.balls) && Array.isArray(game.edges)) G.reopen(() => {
     if (!(game.N >= 1 && game.N <= MAX_LEVEL)) throw new Error("unknown level");
     draw();
     if (game.won) finishCard();
     helpOnFirstVisit();
   }, why => { game = null; newTangle(); G.note(why, 0); });
-else { newTangle(); helpOnFirstVisit(); }
+else if (!shared) { newTangle(); helpOnFirstVisit(); }
+const shareOpts = () => ({name: "Tangle", inProgress: !!(game && !game.won && game.moves), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, shareOpts());
+// A share link opened while this page is already showing only changes the address, so watch for it.
+window.addEventListener("hashchange", () => { const d = G.readShare("tangle"); if (d) G.offerShare(d, shareOpts()); });
 </script>
 <!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
 <script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>

@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-09.3"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-09.4"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -22,7 +22,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-09.3">
+<link rel="stylesheet" href="../games.css?v=2026-10-09.4">
 <style>
 /* A quilted play mat in a wooden frame, covered in toys. */
 .wrap canvas{display:block;width:100%;height:100%;border:3px solid #5C3A22;border-radius:12px;touch-action:none;
@@ -51,11 +51,6 @@
   <header><h1>Pounce</h1><div class="stripe"></div><p class="tagline">Swap toys and line up three of a kind</p></header>
   <nav class="games" id="games" aria-label="Games"></nav>
 
-  <div class="bar">
-    <label>Level <select id="levelSel" aria-label="Level"></select></label>
-    <button id="restartBtn">Restart level</button>
-  </div>
-
   <div class="status">
     <span class="info"><span class="moves" id="moves"></span><button class="timer" id="timer" hidden></button></span>
     <span class="msg" id="msg" aria-live="polite"></span>
@@ -68,17 +63,19 @@
   </div>
 
   <div class="actions">
+    <button id="hintBtn">Hint</button>
     <button id="toysBtn">Toys</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
   </div>
-
-  <div class="help">
-    <p>Swap two toys next to each other to line up three or more of a kind.<span id="goalHelp"> Catch the toys shown above before your moves run out.</span></p>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="restartBtn">Restart level</button>
   </div>
+
 </main>
 
-<script src="../games.js?v=2026-10-09.3"></script>
+<script src="../games.js?v=2026-10-09.4"></script>
 <script>
 const $ = G.$;
 G.nav("pounce");
@@ -268,7 +265,7 @@ const STORE = "catdoku.pounce.v1";
 let climb = 1;   // the level to go back to after zen
 // Toy pictures the player has chosen to leave out, kept on this device.
 const TOYS_PREF = "catdoku.pounce.toys.v1", MIN_COLOURS = 6;
-let offToys = new Set(G.load(TOYS_PREF).off || []);
+let offToys = G.toysOff(TOYS_PREF);
 const deal = n => makeLevel(n, Math.random, offToys);
 let busy = false, picked = -1, cursor = -1, now = 0, effects = [], hintAt = 0, hint = null;
 const save = () => { if (S && !S.over) { S.d.grid = S.g.map(t => [t.k, t.sp]); S.d.ms = S.ms; G.save(STORE, {level: S.level, d: S.d, climb}); } };
@@ -284,7 +281,6 @@ function start(level, d) {
   $("levelSel").value = level;
   G.save(STORE, {level, d, climb}); hud(true);
   $("restartBtn").textContent = level ? "Restart level" : "New board";
-  $("goalHelp").hidden = !level;   // zen has no toys to catch
   G.note(level ? "" : `Zen: no goals and no move limit. Pick level ${climb} to carry on with the levels.`, level ? 3500 : 8000);
   if (level && !d.moves) outOfMoves();   // saved after the last move ran out
 }
@@ -403,15 +399,15 @@ function win() {
   S.over = true;
   G.track(`Pounce level ${S.level} done`);
   const result = G.finishClock(S), spare = S.d.moves;
-  // A level won without extra moves moves you up; otherwise you play this level again.
+  // A level won without a hint or extra moves moves you up; otherwise you play this level again.
   const helped = S.d.helped, next = helped ? S.level : Math.min(MAX_LEVEL, S.level + 1);
   climb = next; G.save(STORE, {level: next, climb});
   const spareText = spare ? ` with ${spare} ${spare === 1 ? "move" : "moves"} to spare` : " on the very last move";
-  const text = helped ? `Level ${S.level} done. You had some extra moves, so next up is level ${next} again with new toys.`
+  const text = helped ? `Level ${S.level} done${spareText}. Next up: another level ${next}.`
     : next > S.level ? `Level ${S.level} done${spareText}. Next up: level ${next}.`
     : `Level ${S.level} done${spareText}. That's the hardest level; next up is another one.`;
   const game = S;
-  setTimeout(() => S === game && G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my board", result, {title: "Purr-fect!", next: `Next: level ${next}`,
+  setTimeout(() => S === game && G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my board", result, {title: "Purr-fect!", gold: !!S.level && !helped, goldWhy: "No hints used!", next: `Next: level ${next}`,
     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")}), 700);
 }
 function outOfMoves() {
@@ -561,8 +557,6 @@ new ResizeObserver(resize).observe(canvas);
 let last = performance.now();
 function loop(t) {
   now += Math.min(0.05, (t - last) / 1000); last = t;
-  // After a while with nothing happening, two toys that can be swapped give a little wiggle.
-  if (S && !S.over && !busy && !hint && now > hintAt && !$("overlay").classList.contains("show")) { hint = findMove(S.g); hintAt = now; }
   draw();
   requestAnimationFrame(loop);
 }
@@ -617,6 +611,7 @@ function helpCard() {
   for (const t of ["Swap two toys next to each other to line up three or more of a kind.",
                    "Catch the toys shown above the mat before your moves run out.",
                    "Line up four to make a toy with the zoomies (it clears its line), an L or T for a bouncy one (it clears round about it), or five for catnip (swap it with a toy to clear every toy of that kind).",
+                   "Stuck? Hint wiggles two toys you can swap.",
                    "Zen, at the end of the level list, has no goals and no move limit."]) {
     const li = document.createElement("li"); li.textContent = t; ol.append(li);
   }
@@ -626,6 +621,12 @@ function helpCard() {
   G.openCard("How to play", "", [["Show me on the board", () => { G.closeCard(); intro(true); }, true], ["Got it", G.closeCard]], media);
 }
 $("helpBtn").onclick = helpCard;
+// Hint: two toys that can be swapped give a little wiggle. Like any help, it keeps you on this level (not in zen).
+$("hintBtn").onclick = () => {
+  if (!S || S.over || busy || document.querySelector(".spot")) return;
+  hint = findMove(S.g); hintAt = now;
+  if (S.level && !S.d.helped) { S.d.helped = true; save(); }
+};
 
 /* ---------- first-time spotlight ---------- */
 // The first visit (or "Show me on the board") walks through a real swap on the mat that's out: the two
@@ -669,11 +670,13 @@ function intro(again) {
 }
 
 /* ---------- choosing toys ---------- */
-$("toysBtn").onclick = () => G.toyPicker({kinds: KINDS, off: offToys, min: MIN_COLOURS, src: toySrc, save: off => {
-  offToys = off; G.save(TOYS_PREF, {off: [...off]});
+const toyChest = () => ({kinds: KINDS, off: offToys, min: MIN_COLOURS, src: toySrc, save: off => {
+  offToys = off; G.saveToys(off);
   if (S && !S.over && S.d.kinds.some(k => off.has(lookOf(k)[0]))) { newBoard(); G.note("Here's a new board with your toys.", 4000); }
   else G.note("Saved. Your toys are used from the next board.", 4000);
 }});
+$("toysBtn").onclick = () => G.toyPicker(toyChest());
+G.needToys({...toyChest(), off: () => offToys, game: "Pounce"});
 G.setupTimer({name: "pounce", game: () => S, playing: g => !g.over, save,
   label: n => `Level ${n}`, noun: "level",
   emptyText: "Finish a level and your times will show up here. They're kept on this device only."});

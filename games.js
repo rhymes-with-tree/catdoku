@@ -16,13 +16,13 @@ const G = (() => {
     ["Nip Trip", "niptrip", "Zen out and play with colour", "#9874CA"],
     ["Tangle", "tangle", "Untangle the yarn the cat got into", "#3C8681"],
     ["Catwalk", "catwalk", "Link the perches of a giant cat tower", "#A98663"],
-    ["Toy Tango", "tango", "Share two toys out fairly", "#B94588"],
+    ["Fair Play", "tango", "Share two toys out fairly", "#B94588"],
     ["Bubbles", "bubbles", "Bat bubbles up and pop three of a kind", "#5FA0C8"],
   ];
   const $ = id => document.getElementById(id);
 
   // The games menu: an "All games" button that opens a grid of every game, with this one marked.
-  // Game pages sit one folder below the Catdoku root, so links start with ../ unless `base` says otherwise.
+  // Game pages sit one folder below the front page, so links start with ../ unless `base` says otherwise.
   function nav(current, base = "../") {
     const el = $("games"); el.innerHTML = "";
     const btn = document.createElement("button");
@@ -31,15 +31,20 @@ const G = (() => {
     btn.innerHTML = `<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>All ${GAMES.length} games<span class="caret" aria-hidden="true">▾</span>`;
     const panel = document.createElement("div");
     panel.className = "gamesPanel"; panel.id = "gamesPanel"; panel.hidden = true;
+    const home = document.createElement("a");
+    home.className = "gameTile home"; home.href = base || "./";
+    home.innerHTML = "<b>Front page</b><small>Every game at a glance</small>";
+    panel.append(home);
     for (const [name, slug, blurb, color] of GAMES) {
       const a = document.createElement("a");
       a.className = "gameTile"; a.style.setProperty("--tile", color);
-      a.href = slug === "catdoku" ? base || "./" : `${base}${slug}/`;
+      a.href = `${base}${slug}/`;
       if (slug === current) a.setAttribute("aria-current", "page");
       const b = document.createElement("b"); b.textContent = name;
       const sm = document.createElement("small"); sm.textContent = slug === current ? "You're here" : blurb;
       a.append(b, sm); panel.append(a);
     }
+    panel.append(feelSwitches());
     const show = open => { panel.hidden = !open; btn.setAttribute("aria-expanded", String(open)); };
     btn.onclick = e => { e.stopPropagation(); show(panel.hidden); };
     document.addEventListener("click", e => { if (!panel.hidden && !el.contains(e.target)) show(false); });
@@ -131,16 +136,31 @@ const G = (() => {
   // the admire button.
   // After admiring, point to the page's own new-puzzle button (New floor, New table…), or the level list.
   const admireNote = () => $("newBtn") ? `Done! Tap ${$("newBtn").textContent.trim()} when you're ready for another.` : "Done! Pick a level when you're ready for another.";
+  // A perfect clear (no help, nothing lost, no undo) earns a gold paw: o.gold puts one on the win card,
+  // with o.goldWhy saying what earned it.
+  const PAW = "M100 6 C126 6 141 28 153 46 C172 50 197 70 195 101 C193 133 166 147 140 141 C125 138 112 131 100 131 C88 131 75 138 60 141 C34 147 7 133 5 101 C3 70 28 50 47 46 C59 28 74 6 100 6Z";
+  function goldPaw() {
+    const box = document.createElement("div");
+    box.innerHTML = `<svg class="goldpaw" viewBox="-3 -3 106 92" aria-hidden="true"><g fill="#E0A526" stroke="#2A2530" stroke-width="2.5">
+      ${[[16.5, 30.5, -24], [38.5, 15, -8], [61.5, 15, 8], [83.5, 30.5, 24]].map(([x, y, r]) => `<ellipse cx="${x}" cy="${y}" rx="9.5" ry="10.75" transform="rotate(${r} ${x} ${y})" vector-effect="non-scaling-stroke"/>`).join("")}
+      <path d="${PAW}" transform="translate(19 35.3) scale(.31 .298)" vector-effect="non-scaling-stroke"/></g></svg>`;
+    return box.firstChild;
+  }
   function winCard(text, onNext, admire = "Admire my board", result, o = {}) {
     const media = document.createElement("div");
+    // what earned the gold paw ("No undos!"), under the paw
+    if (o.gold) { media.append(goldPaw()); if (o.goldWhy) { const g = document.createElement("p"); g.className = "goldwhy"; g.textContent = o.goldWhy; media.append(g); } }
+    cheer();
     const p = document.createElement("p"); p.textContent = text;
     const name = document.createElement("p"); name.className = "catname";
     name.textContent = `Meet ${NAMES[Math.floor(Math.random() * NAMES.length)]}!`;
     const tl = timeLineEl(result); if (tl) media.append(tl);
-    media.append(p, catPhoto(), name);
+    media.append(p);
+    media.append(catPhoto(), name);
     const btns = [[o.next || "New puzzle", onNext, true]];
     if (admire !== null) btns.push([admire, () => { closeCard(); note(admireNote(), 0); }]);
-    openCard(o.title || "Solved!", "", btns, media, o.after);
+    btns.push(["Share my result", () => shareResult(result, o.gold)]);
+    openCard(o.gold ? "Gold paw!" : o.title || "Solved!", "", btns, media, o.after);
   }
 
   // Count a moment in the game (a puzzle started or solved) on the GoatCounter dashboard.
@@ -167,6 +187,8 @@ const G = (() => {
   style.textContent = `
     .timer{background:none;border:none;border-radius:8px;padding:0 6px;font:inherit;font-weight:600;color:var(--ink-soft);font-variant-numeric:tabular-nums;cursor:pointer;white-space:nowrap}
     .timer:hover{background:none;color:var(--ink)}
+    .card .goldpaw{width:84px;height:84px;margin:0 auto 10px;display:block}
+    .card p.goldwhy{margin:-4px 0 12px;font-weight:800;color:#B07A10}
     .card .timeline{font-weight:800;color:var(--ink);margin:0 0 12px}
     .bests{width:100%;border-collapse:collapse;margin:0 0 14px;font-variant-numeric:tabular-nums;color:var(--ink)}
     .bests th,.bests td{padding:4px 6px;text-align:left;border-bottom:1px solid var(--line)}
@@ -207,6 +229,7 @@ const G = (() => {
     T = opts;
     const board = $("board"), start = () => { const g = T.game(); if (g && g.timed && T.playing(g) && !$("overlay").classList.contains("show")) g.started = true; };
     board.addEventListener("pointerdown", start, true);
+    board.addEventListener("pointerdown", () => { const g = T.game(); if (g && T.playing(g)) buzz("tap"); }, true);
     board.addEventListener("keydown", start, true);
     const btn = $("timer");
     btn.onclick = () => { const p = load(PREFS); p.hideTimer = !p.hideTimer; save(PREFS, p); showTime(); };
@@ -234,14 +257,15 @@ const G = (() => {
 
   // Call once when a puzzle is solved: records the time and returns what the card shows.
   function finishClock(g) {
-    if (!g.timed) return (g.result = {ms: null});
-    const all = load(BESTS), mine = (all[T.name] = all[T.name] || {}), row = (mine[g.N] = mine[g.N] || {solves: 0, times: []});
+    const n = g.level ?? g.N;   // bests are kept by level where a game has levels, else by size
+    if (!g.timed) return (g.result = {ms: null, n});
+    const all = load(BESTS), mine = (all[T.name] = all[T.name] || {}), row = (mine[n] = mine[n] || {solves: 0, times: []});
     const before = row.times.length ? row.times[0].ms : null;
     row.solves++;
     row.times.push({ms: g.ms, d: new Date().toISOString().slice(0, 10)});
     row.times.sort((a, b) => a.ms - b.ms); row.times = row.times.slice(0, KEEP);
     save(BESTS, all);
-    return (g.result = {ms: g.ms, best: before, isBest: before === null || g.ms < before});
+    return (g.result = {ms: g.ms, n, best: before, isBest: before === null || g.ms < before});
   }
   function timeLine(r) {
     if (!r || r.ms == null) return "";
@@ -306,22 +330,35 @@ const G = (() => {
     if (o.inProgress) openCard("Open the shared puzzle?", "Your puzzle in progress will be replaced.", [["Open it", go, true], ["Keep mine", closeCard]]);
     else go();
   }
+  // Send text and a link: the share sheet, else the clipboard, else a box to copy from by hand.
+  // keep: leave the card that's up (the win card) open after sharing.
+  async function sendLink(title, text, url, keep) {
+    const done = msg => { if (!keep) closeCard(); if (msg) note(msg, 5000); };
+    if (navigator.share) {
+      try { await navigator.share({title, text, url}); done(); return; }
+      catch (e) { if (e.name === "AbortError") return; }
+    }
+    try { await navigator.clipboard.writeText(text + " " + url); done("Copied. Paste it into a message."); return; } catch (e) {}
+    const box = document.createElement("textarea"); box.value = text + " " + url; box.readOnly = true; box.rows = 4;
+    box.style.cssText = "width:100%;font:inherit;font-size:13px;margin:0 0 14px;border:2px solid var(--line);border-radius:8px;padding:6px";
+    openCard("Copy this", "Select it and copy it into a message.", [["Done", closeCard, true]], box);
+    box.focus(); box.select();
+  }
+  // A finished puzzle's result to share: the game, level or size, time, and gold paw, with a link to the game.
+  function shareResult(r, gold) {
+    const name = document.querySelector("header h1").textContent, bits = [name];
+    if (r && r.n != null && T) bits.push(label(r.n));
+    if (r && r.ms != null && !load(PREFS).hideTimer) bits.push("⏱ " + clock(r.ms));
+    if (gold) bits.push("Gold paw 🐾");
+    track(`${name} result shared`);
+    sendLink(name, bits.join(" · "), location.origin + location.pathname, true);
+  }
   // The Share card: a fresh copy of the puzzle, or the puzzle with the moves so far.
   function shareCard(o) {
-    const send = async (data, what) => {
-      const url = shareUrl(data);
+    const send = (data, what) => {
       track(`${o.name} shared${what ? " " + what : ""}`);
-      if (navigator.share) {
-        const text = !data.p ? `Try this ${o.name} puzzle!` : o.won ? `Here's my finished ${o.name} puzzle!` : `Can you help me with this ${o.name} puzzle?`;
-        try { await navigator.share({title: o.name, text, url}); closeCard(); return; }
-        catch (e) { if (e.name === "AbortError") return; }
-      }
-      try { await navigator.clipboard.writeText(url); closeCard(); note("Link copied. Paste it into a message.", 5000); return; } catch (e) {}
-      // No share sheet and no clipboard: show the link to copy by hand.
-      const box = document.createElement("textarea"); box.value = url; box.readOnly = true; box.rows = 4;
-      box.style.cssText = "width:100%;font:inherit;font-size:13px;margin:0 0 14px;border:2px solid var(--line);border-radius:8px;padding:6px";
-      openCard("Copy this link", "Select the link and copy it into a message.", [["Done", closeCard, true]], box);
-      box.focus(); box.select();
+      const text = !data.p ? `Try this ${o.name} puzzle!` : o.won ? `Here's my finished ${o.name} puzzle!` : `Can you help me with this ${o.name} puzzle?`;
+      sendLink(o.name, text, shareUrl(data));
     };
     const won = o.won;
     openCard("Share this puzzle", "Send a link so someone else can play this exact puzzle.", [
@@ -331,13 +368,67 @@ const G = (() => {
     ]);
   }
 
+  /* ---------- buzz and purr ---------- */
+  // Phones can tap back (a buzz) and the page can purr. Both are switched in the games menu, and start off. Android phones vibrate. iPhones don't let pages vibrate, but they tap when a switch
+  // (<input switch>) flips, so a hidden one is flipped instead; that only works straight after a tap.
+  const feel = () => Object.assign({buzz: false, purr: false}, load(PREFS).feel);
+  let iosSwitch = null;
+  function buzz(kind = "tap") {
+    if (!feel().buzz) return;
+    try { if (matchMedia("(prefers-reduced-motion: reduce)").matches) return; } catch (e) {}
+    const pattern = {tap: 8, pop: 14, purr: [12, 60, 12, 60, 12], win: [30, 70, 30, 70, 60]}[kind] || 8;
+    if (navigator.vibrate) { try { navigator.vibrate(pattern); } catch (e) {} return; }
+    if (!iosSwitch) {
+      const label = document.createElement("label"), box = document.createElement("input");
+      box.type = "checkbox"; box.setAttribute("switch", ""); label.append(box);
+      label.style.cssText = "position:fixed;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;left:-9px;top:0";
+      label.setAttribute("aria-hidden", "true"); document.body.append(label); iosSwitch = label;
+    }
+    const taps = Array.isArray(pattern) ? 3 : 1;
+    for (let i = 0; i < taps; i++) setTimeout(() => iosSwitch.click(), i * 110);
+  }
+  // A purr made on the spot: a low rumble that swells and fades, twice, like breathing out and in.
+  let ears = null;
+  function purr(force) {
+    if (!force && !feel().purr) return;
+    try {
+      ears = ears || new (window.AudioContext || window.webkitAudioContext)();
+      if (ears.state === "suspended") ears.resume();
+      const now = ears.currentTime, len = 2.2, rate = ears.sampleRate, buf = ears.createBuffer(1, Math.floor(rate * len), rate), d = buf.getChannelData(0);
+      for (let i = 0, last = 0; i < d.length; i++) {
+        const s = i / rate, beat = Math.max(0, Math.sin(2 * Math.PI * 26 * s)) ** 3;   // about 26 rumbles a second
+        last = last * .9 + (Math.random() * 2 - 1) * .1;                                  // soft, breathy noise
+        const breath = Math.sin(Math.PI * ((s % 1.1) / 1.1)) ** 1.5 * (s % 1.1 < .65 ? 1 : .55);
+        d[i] = last * beat * breath * 6;
+      }
+      const src = ears.createBufferSource(), low = ears.createBiquadFilter(), vol = ears.createGain();
+      src.buffer = buf; low.type = "lowpass"; low.frequency.value = 380; vol.gain.value = .55;
+      src.connect(low).connect(vol).connect(ears.destination); src.start(now);
+    } catch (e) {}
+  }
+  // A solved puzzle: a happy buzz and a purr.
+  function cheer() { buzz("win"); purr(); }
+  function feelSwitches() {
+    const box = document.createElement("div"); box.className = "feel";
+    for (const [key, text] of [["buzz", "Buzz"], ["purr", "Purring"]]) {
+      const lab = document.createElement("label"); lab.className = "toggle";
+      const inp = document.createElement("input"); inp.type = "checkbox"; inp.checked = feel()[key];
+      inp.onchange = () => { const p = load(PREFS); p.feel = Object.assign(feel(), {[key]: inp.checked}); save(PREFS, p);
+        if (inp.checked) key === "buzz" ? buzz("win") : purr(true); };
+      const sw = document.createElement("span"); sw.className = "sw";
+      lab.append(inp, sw, text); box.append(lab);
+    }
+    return box;
+  }
+
   /* ---------- choosing toys ---------- */
   // The toy pictures a game uses, in colour order (each colour is one kind of toy). Tap one to leave it
   // out. o: {kinds (each {looks: [[picture, name]…]}), off (picture names left out), min (colours that
   // must keep a picture), src(picture) for its address, save(off)}.
+  // o.why, when given, says what the game needs (shown when the toys picked aren't enough for it).
   function toyPicker(o) {
     const off = new Set(o.off), media = document.createElement("div"), grid = document.createElement("div");
-    const tip = document.createElement("p"); tip.className = "tip"; tip.textContent = "Tap a toy to leave it out.";
+    const tip = document.createElement("p"); tip.className = "tip"; tip.textContent = o.why || "Tap a toy to leave it out.";
     grid.className = "toypick";
     for (const k of o.kinds) for (const [f, name] of k.looks) {
       const b = document.createElement("button"), img = document.createElement("img");
@@ -349,7 +440,7 @@ const G = (() => {
     }
     const count = document.createElement("p"); count.className = "pickNote"; count.setAttribute("aria-live", "polite");
     media.append(tip, grid, count);
-    openCard("Your toys", "", [["Save", () => { closeCard(); o.save(off); }, true], ["Cancel", closeCard]], media);
+    openCard("Toy chest", "", [["Save", () => { closeCard(); o.save(off); }, true], ["Cancel", closeCard]], media);
     const save = $("card").querySelector(".btns button");
     function check() {
       const n = o.kinds.filter(k => k.looks.some(([f]) => !off.has(f))).length, short = n < o.min;
@@ -357,6 +448,26 @@ const G = (() => {
       count.textContent = short ? `Keep toys in at least ${o.min} colours (${n} now).` : `${n} of ${o.kinds.length} colours in play.`;
     }
     check();
+  }
+  // The toys left out are one choice for every game. Each game used to keep its own: the first
+  // game opened since then brings its choice along. legacy: that game's old storage key.
+  const TOYS = "catdoku.toys.v1";
+  function toysOff(legacy) {
+    let s = load(TOYS);
+    if (!Array.isArray(s.off)) { s = {off: (legacy && load(legacy).off) || []}; save(TOYS, s); }
+    return new Set(s.off);
+  }
+  function saveToys(off) { save(TOYS, {off: [...off]}); }
+  // Colours that still have a toy in play.
+  const toyColours = (kinds, off) => kinds.filter(k => k.looks.some(([f]) => !off.has(f))).length;
+  // A game needing toys in more colours than are picked opens the toy chest, saying what it needs,
+  // once nothing else (a walkthrough or a card) is up. o: as toyPicker, plus game (its name).
+  function needToys(o, tries = 0) {
+    if (!tries) { setTimeout(() => needToys(o, 1), 1200); return; }  // give a first-visit walkthrough time to start
+    const n = toyColours(o.kinds, o.off());
+    if (n >= o.min) return;
+    if (document.querySelector(".spot") || $("overlay").classList.contains("show")) { if (tries < 200) setTimeout(() => needToys(o, tries + 1), 1500); return; }
+    toyPicker({...o, off: o.off(), why: `${o.game} needs toys in at least ${o.min} colours. You have ${n}, so put some back in.`});
   }
   // Which of a kind's pictures to show, picked from those not left out (any, if all are).
   function pickLook(k, off) {
@@ -571,6 +682,6 @@ const G = (() => {
     }
   }
 
-  return {$, nav, load, save, builder, openCard, closeCard, winCard, sizeUp, otherSize, note, cellAt, track, reopen,
-          setupTimer, freshClock, spotlight, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, toyPicker, pickLook};
+  return {GAMES, $, nav, load, save, builder, openCard, closeCard, winCard, sizeUp, otherSize, note, cellAt, track, reopen,
+          setupTimer, freshClock, spotlight, toysOff, saveToys, needToys, goldPaw, shareResult, buzz, purr, cheer, feelSwitches, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, toyPicker, pickLook};
 })();
