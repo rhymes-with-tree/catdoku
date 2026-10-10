@@ -169,8 +169,8 @@ def hideseek():
     return frame("#C9A26B", out)
 
 
-# Nip Trip: blocks of colour with their marks.
-def niptrip():
+# Pawlette: blocks of colour with their marks.
+def pawlette():
     cols = [["#E16251", "#3FA9AE", "#F0B323"], ["#3FA9AE", "#E16251", "#E16251"], ["#F0B323", "#F0B323", "#3FA9AE"]]
     out = ""
     for r in range(3):
@@ -242,7 +242,7 @@ def bubbles():
 
 
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
-         "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "niptrip": niptrip,
+         "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles}
 
 if __name__ == "__main__":
