@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Open the Door!</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-10.12"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-10.12">
+<style>
+/* A KenKen house: every row and column holds 1 to N once, and walls split the floor into rooms whose numbers
+   must make the room's sign. Each room has a door that opens when the room is right; with every door open,
+   a cat runs across the house. */
+.house{position:relative;width:var(--board);height:var(--board);border:3px solid var(--ink);border-radius:6px;background:#F3EBDD;
+  user-select:none;-webkit-user-select:none;touch-action:manipulation;--cell:40px}
+.cells{position:absolute;inset:0;display:grid}
+.cell{position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer;background:var(--floor);transition:background .4s}
+.cell.done{background:var(--lit)}
+.cell.sel{box-shadow:inset 0 0 0 3px #3C8681;z-index:1}
+.cell.peer{background-image:linear-gradient(rgba(60,134,129,.10),rgba(60,134,129,.10))}
+.cell.same .v{color:#3C8681}
+.cell .v{font-size:calc(var(--cell) * .56);font-weight:800;line-height:1;margin-top:calc(var(--cell) * .12);color:var(--ink)}
+.cell.clash .v{color:#C8392B}
+.cell .sign{position:absolute;left:calc(var(--cell) * .07);top:calc(var(--cell) * .02);font-size:max(10px,calc(var(--cell) * .24));font-weight:800;line-height:1.1;
+  color:var(--ink);white-space:nowrap;pointer-events:none;z-index:2}
+.cell .sign.wrong{color:#C8392B}
+.cell .notes{position:absolute;inset:calc(var(--cell) * .26) calc(var(--cell) * .06) calc(var(--cell) * .04);display:grid;align-items:center;justify-items:center;
+  font-size:max(8px,calc(var(--cell) * .2));font-weight:600;line-height:1;color:var(--ink-soft);pointer-events:none}
+.walls{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.walls .seam{stroke:rgba(42,37,48,.18);stroke-width:.015}
+.walls .wall{stroke:var(--ink);stroke-width:.08;stroke-linecap:round}
+.door{transition:transform .6s cubic-bezier(.3,1.5,.5,1);transform-box:view-box}
+.door rect{fill:#B07C4F;stroke:var(--ink);stroke-width:.025}
+.door circle{fill:#ECA818;stroke:var(--ink);stroke-width:.015}
+.door.open{transform:rotate(var(--swing))}
+.door.rattle{animation:rattle .45s}
+@keyframes rattle{20%{transform:rotate(calc(var(--swing) * .08))}45%{transform:rotate(calc(var(--swing) * -.06))}70%{transform:rotate(calc(var(--swing) * .04))}}
+/* the cat that runs across once every door is open */
+.runner{position:absolute;left:0;width:calc(var(--cell) * 1.5);pointer-events:none;z-index:4;animation:run 2.1s linear forwards}
+.runner svg{display:block;width:100%;animation:bound .3s ease-in-out infinite}
+.runner .legsA{animation:legs .3s steps(1) infinite}
+.runner .legsB{animation:legs .3s steps(1) infinite reverse}
+@keyframes run{from{transform:translateX(-110%)}to{transform:translateX(calc(var(--board) + 10%))}}
+@keyframes bound{50%{transform:translateY(-14%) rotate(-4deg)}}
+@keyframes legs{0%{opacity:1}50%{opacity:0}}
+.pad{width:var(--board);display:flex;gap:6px;justify-content:center}
+.pad button{flex:1 1 0;max-width:58px;padding:6px 0;font-size:22px;font-weight:800;line-height:1.1}
+.pad button.erase{font-size:18px}
+.pad.noting button:not(.erase){border-style:dashed;color:#3C8681}
+.key{width:var(--board);text-align:center;font-weight:600;font-size:15px;color:var(--ink-soft);margin-top:-6px}
+.rulesPic{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;margin:0 0 12px}
+.rulesPic figure{margin:0;font-size:13px;color:var(--ink-soft)}
+.rulesPic svg{width:96px;height:auto;display:block;margin:0 auto 2px}
+@media (prefers-reduced-motion:reduce){.door{transition:none}.runner,.runner svg,.runner .legsA,.runner .legsB{animation:none}}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Open the Door!</h1><div class="stripe"></div><p class="tagline">Fill every room so the cat can get through</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap house" id="board" aria-label="The house: squares to fill with numbers">
+    <div class="cells" id="cells"></div>
+    <svg class="walls" id="walls" aria-hidden="true" preserveAspectRatio="none"></svg>
+  </div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="pad" id="pad" aria-label="Numbers"></div>
+  <div class="key" id="key"></div>
+  <div class="actions">
+    <button id="undoBtn">Undo</button>
+    <button id="clearBtn">Clear</button>
+    <button id="notesBtn" aria-pressed="false">Notes</button>
+    <button id="shareBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New puzzle</button>
+  </div>
+
+</main>
+
+<script src="../games.js?v=2026-10-10.12"></script>
+<script>
+/* ---------- puzzles (plain functions, also run in a background worker) ---------- */
+// An N × N grid where every row and column holds 1 to N once, cut into rooms (cages). Each room has a sign:
+// a number and a sum (+), difference (−), product (×) or quotient (÷) its numbers make. A room of one
+// square just shows its number. Levels: [size, the signs it uses, how big rooms get].
+function levelOf(n) {
+  return [null, [4, "+-"], [5, "+-"], [5, "+-x/"], [6, "+-x/"], [7, "+-x/"], [8, "+-x/"], [9, "+-x/"]][n];
+}
+// A random full grid: fill square by square with numbers in a random order, backing up when stuck
+// (and starting over if it takes too long).
+function randomLatin(N) {
+  for (;;) {
+    const g = new Array(N * N).fill(0), rows = new Array(N).fill(0), cols = new Array(N).fill(0);
+    let steps = 0;
+    const fill = i => {
+      if (i === N * N) return true;
+      if (++steps > 20000) return false;
+      const r = Math.floor(i / N), c = i % N, vs = [];
+      for (let v = 1; v <= N; v++) if (!(rows[r] >> v & 1) && !(cols[c] >> v & 1)) vs.push(v);
+      for (let k = vs.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [vs[k], vs[j]] = [vs[j], vs[k]]; }
+      for (const v of vs) {
+        g[i] = v; rows[r] |= 1 << v; cols[c] |= 1 << v;
+        if (fill(i + 1)) return true;
+        rows[r] &= ~(1 << v); cols[c] &= ~(1 << v);
+      }
+      g[i] = 0; return false;
+    };
+    if (fill(0)) return g;
+  }
+}
+// What a room's numbers make with its sign.
+function cageValue(op, vals) {
+  if (op === "+") return vals.reduce((a, b) => a + b, 0);
+  if (op === "x") return vals.reduce((a, b) => a * b, 1);
+  const hi = Math.max(vals[0], vals[1]), lo = Math.min(vals[0], vals[1]);
+  if (op === "-") return hi - lo;
+  if (op === "/") return hi % lo ? 0 : hi / lo;
+  return vals[0];
+}
+// Cut the grid into rooms of one to four squares, mostly two and three.
+function makeRooms(N) {
+  const room = new Array(N * N).fill(-1), rooms = [], order = [...Array(N * N).keys()];
+  for (let k = order.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [order[k], order[j]] = [order[j], order[k]]; }
+  const nbrs = i => { const r = Math.floor(i / N), c = i % N, out = []; if (r) out.push(i - N); if (r < N - 1) out.push(i + N); if (c) out.push(i - 1); if (c < N - 1) out.push(i + 1); return out; };
+  for (const s of order) {
+    if (room[s] >= 0) continue;
+    const want = [2, 2, 2, 3, 3, 3, 4, N > 5 ? 4 : 3][Math.floor(Math.random() * 8)], cells = [s];
+    room[s] = rooms.length;
+    while (cells.length < want) {
+      const free = [...new Set(cells.flatMap(nbrs))].filter(j => room[j] < 0);
+      if (!free.length) break;
+      const j = free[Math.floor(Math.random() * free.length)]; room[j] = rooms.length; cells.push(j);
+    }
+    rooms.push(cells);
+  }
+  // a lone square joins a small room next door, now and then, so there aren't too many given numbers
+  for (let k = 0; k < rooms.length; k++) {
+    if (rooms[k].length !== 1 || Math.random() < 0.3) continue;
+    const next = nbrs(rooms[k][0]).map(j => room[j]).filter(q => rooms[q].length < 4 && q !== k);
+    if (!next.length) continue;
+    const q = next[Math.floor(Math.random() * next.length)];
+    rooms[q].push(rooms[k][0]); room[rooms[k][0]] = q; rooms[k] = [];
+  }
+  return rooms.filter(r => r.length);
+}
+// Give a room a sign the level allows, from the numbers in it.
+function pickSign(cells, sol, ops) {
+  const vals = cells.map(i => sol[i]);
+  if (cells.length === 1) return {op: "", t: vals[0]};
+  const choices = [];
+  if (cells.length === 2) {
+    const hi = Math.max(...vals), lo = Math.min(...vals);
+    if (ops.includes("/") && hi % lo === 0) choices.push("/", "/", "/");
+    if (ops.includes("-")) choices.push("-", "-");
+  }
+  choices.push("+");
+  if (ops.includes("x")) choices.push("x");
+  const op = choices[Math.floor(Math.random() * choices.length)];
+  return {op, t: cageValue(op, vals)};
+}
+// Every answer to a puzzle, counted up to `limit` (and the first one found). Each room keeps the list of
+// ways its numbers could go; numbers are ruled out square by square until one is left or it has to guess.
+function solveRooms(N, cages, limit = 2) {
+  const full = (1 << (N + 1)) - 2, at = new Array(N * N), tuples = [];
+  cages.forEach((cg, k) => {
+    for (const i of cg.cells) at[i] = k;
+    const list = [], vals = [], n = cg.cells.length;
+    const go = j => {
+      if (j === n) { if (cageValue(cg.op, vals) === cg.t) list.push(vals.slice()); return; }
+      for (let v = 1; v <= N; v++) {
+        let ok = true;
+        for (let q = 0; q < j; q++) if (vals[q] === v && (Math.floor(cg.cells[q] / N) === Math.floor(cg.cells[j] / N) || cg.cells[q] % N === cg.cells[j] % N)) { ok = false; break; }
+        if (ok) { vals[j] = v; go(j + 1); }
+      }
+    };
+    go(0); tuples.push(list);
+  });
+  let found = 0, first = null, steps = 0;
+  const bit = v => 1 << v, ones = m => { let c = 0; while (m) { m &= m - 1; c++; } return c; };
+  function settle(dom, alive) {
+    for (let changed = true; changed;) {
+      changed = false;
+      for (let k = 0; k < cages.length; k++) {
+        const cells = cages[k].cells, keep = [], seen = new Array(cells.length).fill(0);
+        for (const t of alive[k]) {
+          let ok = true;
+          for (let q = 0; q < cells.length; q++) if (!(dom[cells[q]] & bit(t[q]))) { ok = false; break; }
+          if (ok) { keep.push(t); for (let q = 0; q < cells.length; q++) seen[q] |= bit(t[q]); }
+        }
+        if (!keep.length) return false;
+        alive[k] = keep;
+        for (let q = 0; q < cells.length; q++) if (dom[cells[q]] !== seen[q]) { dom[cells[q]] = seen[q]; changed = true; }
+      }
+      for (let i = 0; i < N * N; i++) {
+        if (ones(dom[i]) !== 1) continue;
+        const r = Math.floor(i / N), c = i % N;
+        for (let j = 0; j < N; j++) {
+          for (const p of [r * N + j, j * N + c]) if (p !== i && dom[p] & dom[i]) { dom[p] &= ~dom[i]; if (!dom[p]) return false; changed = true; }
+        }
+      }
+      // a number with only one place left in a row or column goes there
+      for (let a = 0; a < N; a++) for (const line of [0, 1]) {
+        for (let v = 1; v <= N; v++) {
+          let where = -1, n = 0;
+          for (let b = 0; b < N; b++) { const p = line ? b * N + a : a * N + b; if (dom[p] & bit(v)) { where = p; n++; } }
+          if (!n) return false;
+          if (n === 1 && dom[where] !== bit(v)) { dom[where] = bit(v); changed = true; }
+        }
+      }
+    }
+    return true;
+  }
+  function go(dom, alive) {
+    if (found >= limit || ++steps > 20000) return;
+    if (!settle(dom, alive)) return;
+    let best = -1, bn = 99;
+    for (let i = 0; i < N * N; i++) { const n = ones(dom[i]); if (n > 1 && n < bn) { bn = n; best = i; } }
+    if (best < 0) { found++; if (!first) first = dom.map(m => Math.log2(m)); else go.second = dom.map(m => Math.log2(m)); return; }
+    for (let v = 1; v <= N; v++) if (dom[best] & bit(v)) { const d = dom.slice(); d[best] = bit(v); go(d, alive.slice()); }
+  }
+  go(new Array(N * N).fill(full), tuples.slice());
+  return {count: steps > 20000 ? -1 : found, first, second: go.second || null};
+}
+// Make a puzzle: a full grid, rooms, and a sign on each. While two answers fit, a room where they differ
+// gets a new sign, or is split in two, and it's checked again.
+function makePuzzle(n) {
+  const [N, ops] = levelOf(n);
+  for (;;) {
+    const sol = randomLatin(N), cages = makeRooms(N).map(cells => ({cells, ...pickSign(cells, sol, ops)}));
+    for (let tries = 0; tries < 40; tries++) {
+      const r = solveRooms(N, cages);
+      if (r.count === 1) return {N, cages: cages.map(c => [c.cells, c.t, c.op])};
+      if (r.count < 0 || !r.second) break;
+      const diff = r.first.map((v, i) => v !== r.second[i] ? i : -1).filter(i => i >= 0);
+      const d = diff[Math.floor(Math.random() * diff.length)], k = cages.findIndex(c => c.cells.includes(d)), cg = cages[k];
+      if (cg.cells.length > 2 && Math.random() < 0.5) {
+        // split the room: the square on its own goes with a neighbour from the room, if it has one
+        const rest = cg.cells.filter(i => i !== d), adj = rest.find(i => Math.abs(i - d) === N || (Math.abs(i - d) === 1 && Math.floor(i / N) === Math.floor(d / N)));
+        const a = adj !== undefined ? [d, adj] : [d], b = cg.cells.filter(i => !a.includes(i));
+        const connected = cells => { const seen = new Set([cells[0]]), todo = [cells[0]]; while (todo.length) { const i = todo.pop(); for (const j of cells) if (!seen.has(j) && (Math.abs(i - j) === N || (Math.abs(i - j) === 1 && Math.floor(i / N) === Math.floor(j / N)))) { seen.add(j); todo.push(j); } } return seen.size === cells.length; };
+        if (connected(b)) { cages.splice(k, 1, {cells: a, ...pickSign(a, sol, ops)}, {cells: b, ...pickSign(b, sol, ops)}); continue; }
+      }
+      Object.assign(cg, pickSign(cg.cells, sol, ops));
+    }
+  }
+}
+
+
+/* ---------- the house ---------- */
+const STORE = "catdoku.opendoor.v1", MAX_LEVEL = 7;
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1}, state.settings);
+let game = state.game || null, busy = false, sel = -1, noting = false, running = false;
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
+const OPS = {"+": "+", "-": "−", "x": "×", "/": "÷", "": ""};
+const levelName = n => { const [N, ops] = levelOf(n); return `Level ${n} · ${N} × ${N}${ops === "+-" ? ", + and − only" : ""}`; };
+const build = G.builder([levelOf, randomLatin, cageValue, makeRooms, pickSign, solveRooms, makePuzzle], "makePuzzle");
+// floor colours for the rooms (no two rooms side by side match), and each one lit up once its room is right
+const FLOORS = [["#EFE2CC", "#FFF4D6"], ["#DDE7D6", "#F1FBE6"], ["#E2DDEC", "#F6F1FF"], ["#EDD9D3", "#FFEFE8"], ["#D8E4E6", "#EEFAFB"]];
+
+// Everything about the rooms that doesn't change while playing: which room each square is in, floor colours,
+// where each room's sign goes, and its door.
+let plan = null;
+function makePlan() {
+  const N = game.N, rooms = game.cages.map(([cells, t, op]) => ({cells, t, op})), at = new Array(N * N);
+  rooms.forEach((r, k) => r.cells.forEach(i => at[i] = k));
+  // next-door rooms get different floors
+  const floor = [];
+  rooms.forEach((r, k) => {
+    const near = new Set();
+    for (const i of r.cells) for (const j of nbrs(N, i)) if (at[j] !== k && floor[at[j]] !== undefined) near.add(floor[at[j]]);
+    floor[k] = [0, 1, 2, 3, 4].find(f => !near.has(f)) ?? k % FLOORS.length;
+  });
+  // A door for each room, in one of its walls: a wall shared with another room where it can, never one
+  // that already has a door. An edge is [x1, y1, x2, y2] in squares; `into` is the side its room is on.
+  const used = new Set(), doors = [];
+  rooms.forEach((r, k) => {
+    const inner = [], outer = [];
+    for (const i of r.cells) {
+      const x = i % N, y = Math.floor(i / N);
+      for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+        const nx = x + dx, ny = y + dy, out = nx < 0 || ny < 0 || nx >= N || ny >= N;
+        if (!out && at[ny * N + nx] === k) continue;
+        const e = dy ? [x, y + (dy > 0 ? 1 : 0), x + 1, y + (dy > 0 ? 1 : 0)] : [x + (dx > 0 ? 1 : 0), y, x + (dx > 0 ? 1 : 0), y + 1];
+        (out ? outer : inner).push({e, into: [-dx, -dy]});
+      }
+    }
+    const list = inner.length ? inner : outer, start = r.cells.reduce((a, b) => a * 7 + b, r.cells.length) % list.length;
+    for (let q = 0; q < list.length; q++) {
+      const d = list[(start + q) % list.length], key = d.e.join();
+      if (!used.has(key)) { used.add(key); doors[k] = d; break; }
+    }
+  });
+  plan = {rooms, at, floor, doors, signAt: rooms.map(r => Math.min(...r.cells))};
+  wasOpen = game.grid.some(Boolean) ? check().right.slice() : [];
+}
+function nbrs(N, i) { const r = Math.floor(i / N), c = i % N, out = []; if (r) out.push(i - N); if (r < N - 1) out.push(i + N); if (c) out.push(i - 1); if (c < N - 1) out.push(i + 1); return out; }
+
+// Squares whose number is already in their row or column, and rooms that are full: right or wrong.
+function check() {
+  const N = game.N, g = game.grid, clash = new Set();
+  for (let a = 0; a < N; a++) for (const line of [0, 1]) {
+    const seen = {};
+    for (let b = 0; b < N; b++) { const i = line ? b * N + a : a * N + b; if (g[i]) (seen[g[i]] = seen[g[i]] || []).push(i); }
+    for (const v in seen) if (seen[v].length > 1) seen[v].forEach(i => clash.add(i));
+  }
+  const right = plan.rooms.map(r => r.cells.every(i => g[i] && !clash.has(i)) && cageValue(r.op, r.cells.map(i => g[i])) === r.t);
+  const wrong = plan.rooms.map(r => r.cells.every(i => g[i]) && cageValue(r.op, r.cells.map(i => g[i])) !== r.t);
+  return {clash, right, wrong};
+}
+
+function draw() {
+  const N = game.N, el = $("cells"), {clash, right, wrong} = check(), g = game.grid;
+  $("board").style.setProperty("--cell", ($("board").clientWidth / N) + "px");
+  el.style.gridTemplateColumns = el.style.gridTemplateRows = `repeat(${N}, 1fr)`;
+  const cols = Math.ceil(Math.sqrt(N)), sr = sel >= 0 ? Math.floor(sel / N) : -1, sc = sel % N;
+  let html = "";
+  for (let i = 0; i < N * N; i++) {
+    const k = plan.at[i], room = plan.rooms[k], [floor, lit] = FLOORS[plan.floor[k]];
+    const r = Math.floor(i / N), c = i % N, peer = sel >= 0 && i !== sel && (r === sr || c === sc);
+    const cls = ["cell", right[k] || (forceOpen === k) ? "done" : "", i === sel ? "sel" : "", peer ? "peer" : "",
+      clash.has(i) ? "clash" : "", sel >= 0 && g[sel] && g[i] === g[sel] && i !== sel ? "same" : ""].filter(Boolean).join(" ");
+    const sign = plan.signAt[k] === i ? `<span class="sign${wrong[k] ? " wrong" : ""}">${room.t}${OPS[room.op]}</span>` : "";
+    const notes = !g[i] && game.notes[i] ? `<span class="notes" style="grid-template-columns:repeat(${cols},1fr)">${[...Array(N)].map((_, v) => `<span>${game.notes[i] >> (v + 1) & 1 ? v + 1 : ""}</span>`).join("")}</span>` : "";
+    const say = `Row ${r + 1}, column ${c + 1}: ${g[i] || "empty"}${sign ? `. Room sign ${room.t}${OPS[room.op]}` : ""}`;
+    html += `<div class="${cls}" data-i="${i}" role="button" aria-label="${say}" style="--floor:${floor};--lit:${lit}">${sign}${g[i] ? `<span class="v">${g[i]}</span>` : notes}</div>`;
+  }
+  el.innerHTML = html;
+  drawWalls(right);
+  $("pad").classList.toggle("noting", noting);
+  $("notesBtn").setAttribute("aria-pressed", String(noting));
+  const open = right.filter(Boolean).length, rooms = plan.rooms.length;
+  $("count").textContent = game.won ? "Every door is open!" : `${open} of ${rooms} doors open`;
+  $("key").textContent = noting ? "Notes: tap numbers to jot them down as maybes" : sel < 0 && !game.won ? "Tap a square, then a number" : "";
+  $("undoBtn").disabled = !game.history.length || game.won; $("clearBtn").disabled = !game.history.length || game.won;
+  return {clash, right, wrong};
+}
+// The walls between rooms (thin seams inside a room), with each room's door hung in one of them.
+let forceOpen = -1, rattle = new Set(), wasOpen = [];
+function drawWalls(right) {
+  const N = game.N, svg = $("walls"), at = plan.at;
+  svg.setAttribute("viewBox", `0 0 ${N} ${N}`);
+  const doorAt = new Map(plan.doors.map((d, k) => d && [d.e.join(), k]).filter(Boolean));
+  let seams = "", walls = "", doors = "";
+  const swung = [];
+  const wall = e => {
+    const k = doorAt.get(e.join()), [x1, y1, x2, y2] = e;
+    if (k === undefined) { walls += `M${x1} ${y1}L${x2} ${y2}`; return; }
+    // leave a doorway in the middle of the wall
+    const lx = (x2 - x1), ly = (y2 - y1);
+    walls += `M${x1} ${y1}L${x1 + lx * .18} ${y1 + ly * .18}M${x1 + lx * .82} ${y1 + ly * .82}L${x2} ${y2}`;
+  };
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const i = y * N + x;
+    if (x + 1 < N) (at[i] === at[i + 1] ? (seams += `M${x + 1} ${y}V${y + 1}`) : wall([x + 1, y, x + 1, y + 1]));
+    if (y + 1 < N) (at[i] === at[i + N] ? (seams += `M${x} ${y + 1}H${x + 1}`) : wall([x, y + 1, x + 1, y + 1]));
+    if (!x) wall([0, y, 0, y + 1]); if (x === N - 1) wall([N, y, N, y + 1]);
+    if (!y) wall([x, 0, x + 1, 0]); if (y === N - 1) wall([x, N, x + 1, N]);
+  }
+  plan.doors.forEach((d, k) => {
+    if (!d) return;
+    // hinged at the doorway's far end (right or bottom), so an open door lies along the side of the room, clear of
+    // its sign (top left) and mostly clear of the number
+    const [x1, y1, x2, y2] = d.e, horiz = y1 === y2, hx = x1 + (x2 - x1) * .82, hy = y1 + (y2 - y1) * .82, len = .64, th = .11;
+    // the door swings into its own room: clockwise turns a door lying right-to-left upwards, and one lying bottom-to-top to the right
+    const swing = horiz ? (d.into[1] > 0 ? -90 : 90) : (d.into[0] > 0 ? 90 : -90);
+    const box = horiz ? `x="${hx - len}" y="${hy - th / 2}" width="${len}" height="${th}"` : `x="${hx - th / 2}" y="${hy - len}" width="${th}" height="${len}"`;
+    const kx = horiz ? hx - len * .82 : hx, ky = horiz ? hy : hy - len * .82;
+    // drawn as it was last time, then swung to how it is now, so a door opening (or shutting on Undo) moves
+    const now = !!(right[k] || forceOpen === k);
+    if (now !== !!wasOpen[k]) swung.push([k, now]);
+    const cls = ["door", wasOpen[k] ? "open" : "", rattle.has(k) ? "rattle" : ""].filter(Boolean).join(" ");
+    wasOpen[k] = now;
+    doors += `<g class="${cls}" data-k="${k}" style="transform-origin:${hx}px ${hy}px;--swing:${swing}deg"><rect ${box} rx=".03"/><circle cx="${kx}" cy="${ky}" r=".035"/></g>`;
+  });
+  svg.innerHTML = `<path class="seam" d="${seams}"/><path class="wall" d="${walls}" fill="none"/>${doors}`;
+  if (swung.length) { svg.getBoundingClientRect(); for (const [k, now] of swung) svg.querySelector(`.door[data-k="${k}"]`).classList.toggle("open", now); }
+}
+
+/* ---------- playing ---------- */
+const snapshot = () => game.history.push({grid: game.grid.slice(), notes: game.notes.slice()});
+function put(v) {
+  if (!playing() || sel < 0) return;
+  game.started = true;
+  const before = check();
+  snapshot();
+  if (noting && v) {
+    if (game.grid[sel]) game.grid[sel] = 0;
+    game.notes[sel] ^= 1 << v;
+  } else {
+    game.grid[sel] = v && game.grid[sel] !== v ? v : 0;
+    // a number put down comes off the notes in its row and column
+    if (game.grid[sel]) { const N = game.N, r = Math.floor(sel / N), c = sel % N; for (let j = 0; j < N; j++) { game.notes[r * N + j] &= ~(1 << v); game.notes[j * N + c] &= ~(1 << v); } }
+    else if (!v) game.notes[sel] = 0;
+  }
+  // a room that's just been filled in wrong rattles its door
+  const after = check(), k = plan.at[sel];
+  if (after.wrong[k] && !before.wrong[k]) { rattle.add(k); setTimeout(() => { rattle.delete(k); }, 500); }
+  if (after.right.every(Boolean)) { win(); return; }
+  draw(); save();
+}
+$("cells").addEventListener("click", e => {
+  if (!playing()) return;
+  const c = e.target.closest(".cell"); if (!c) return;
+  sel = +c.dataset.i === sel ? -1 : +c.dataset.i; draw();
+});
+function makePad() {
+  const pad = $("pad"); pad.innerHTML = "";
+  for (let v = 1; v <= game.N; v++) { const b = document.createElement("button"); b.textContent = v; b.onclick = () => put(v); pad.append(b); }
+  const er = document.createElement("button"); er.className = "erase"; er.textContent = "⌫"; er.setAttribute("aria-label", "Erase"); er.onclick = () => put(0); pad.append(er);
+}
+$("notesBtn").onclick = () => { if (!game || game.won) return; noting = !noting; draw(); };
+document.addEventListener("keydown", e => {
+  if (!playing() || document.querySelector(".spot") || e.target.tagName === "SELECT" || e.ctrlKey || e.metaKey || e.altKey) return;
+  const N = game.N, k = e.key;
+  if (/^[1-9]$/.test(k) && +k <= N) { if (sel < 0) sel = 0; put(+k); e.preventDefault(); return; }
+  if (k === "Backspace" || k === "Delete" || k === "0") { put(0); e.preventDefault(); return; }
+  if (k === "n" || k === "N") { noting = !noting; draw(); return; }
+  const mv = {ArrowUp: -N, ArrowDown: N, ArrowLeft: -1, ArrowRight: 1}[k];
+  if (mv !== undefined) {
+    e.preventDefault();
+    if (sel < 0) sel = 0;
+    else if (!((k === "ArrowLeft" && sel % N === 0) || (k === "ArrowRight" && sel % N === N - 1) || sel + mv < 0 || sel + mv >= N * N)) sel += mv;
+    draw();
+  }
+});
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
+function undo() { if (playing() && game.history.length) { game.undid = true; const h = game.history.pop(); game.grid = h.grid; game.notes = h.notes; draw(); save(); } }
+$("undoBtn").onclick = undo;
+$("clearBtn").onclick = () => { if (playing() && game.history.length) { game.undid = true; snapshot(); game.grid = game.grid.map(() => 0); game.notes = game.notes.map(() => 0); draw(); save(); G.note("Every door's shut again. Undo brings your numbers back.", 3500); } };
+addEventListener("resize", () => { if (game && plan) draw(); });
+
+/* ---------- endings ---------- */
+// Every door is open, so a cat runs right across the house, then the finishing card.
+function win() {
+  game.won = true; G.finishClock(game); sel = -1; noting = false;
+  const next = Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save();
+  draw();
+  G.track(`Open the Door solved level ${game.level}`);
+  build.prefetch(next);
+  const g = game, still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  running = true;
+  setTimeout(() => { if (game === g) runCat(); }, 700);
+  setTimeout(() => { running = false; if (game === g) finishCard(); }, still ? 1200 : 3000);
+}
+const COATS = [["#E8A35A", "#B9692E"], ["#9A9AA4", "#62626C"], ["#3A3540", "#1E1B22"], ["#F2E6D2", "#C9A26B"], ["#C98B5B", "#5E3B22"]];
+function runCat() {
+  const old = document.querySelector(".runner"); if (old) old.remove();
+  const [fur, dark] = COATS[Math.floor(Math.random() * COATS.length)], N = game.N, row = Math.floor(N / 2);
+  const d = document.createElement("div"); d.className = "runner"; d.setAttribute("aria-hidden", "true");
+  d.style.top = `calc(var(--cell) * ${row + .5} - var(--cell) * .55)`;
+  const leg = (x1, y1, x2, y2) => `<path d="M${x1} ${y1}L${x2} ${y2}" stroke="#2A2530" stroke-width="9" stroke-linecap="round"/><path d="M${x1} ${y1}L${x2} ${y2}" stroke="${fur}" stroke-width="5" stroke-linecap="round"/>`;
+  d.innerHTML = `<svg viewBox="0 0 120 72">
+    <path d="M30 36Q12 30 8 10" fill="none" stroke="#2A2530" stroke-width="9" stroke-linecap="round"/><path d="M30 36Q12 30 8 10" fill="none" stroke="${fur}" stroke-width="5" stroke-linecap="round"/>
+    <g class="legsA">${leg(80, 44, 102, 58)}${leg(40, 44, 16, 56)}</g>
+    <g class="legsB">${leg(78, 46, 72, 66)}${leg(44, 46, 52, 66)}</g>
+    <ellipse cx="60" cy="38" rx="32" ry="15" fill="${fur}" stroke="#2A2530" stroke-width="3"/>
+    <path d="M52 25Q55 33 52 41M62 24Q65 33 62 42M72 25Q75 33 72 41" fill="none" stroke="${dark}" stroke-width="3" stroke-linecap="round"/>
+    <path d="M86 20L89 5L97 16L104 5L107 21" fill="${fur}" stroke="#2A2530" stroke-width="3" stroke-linejoin="round"/>
+    <circle cx="96" cy="27" r="13" fill="${fur}" stroke="#2A2530" stroke-width="3"/>
+    <circle cx="101" cy="25" r="2.4" fill="#2A2530"/><path d="M107 30l2.5 1.5-2.5 1.5z" fill="#DD9DAD"/>
+  </svg>`;
+  $("board").append(d);
+  setTimeout(() => d.remove(), 2400);
+}
+function finishCard() {
+  const next = settings.level, N = game.N;
+  let text = `Every door in the ${N} × ${N} house is open, and the cat's off exploring.`;
+  text += game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my house", game.result,
+    {title: "Door's open!", gold: !game.undid, goldWhy: "No undos!", next: `Next: level ${next}`, after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- new puzzles ---------- */
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
+function begin(p, level) {
+  game = {level, N: p.N, cages: p.cages, grid: new Array(p.N * p.N).fill(0), notes: new Array(p.N * p.N).fill(0), history: [], won: false, ...G.freshClock()};
+  sel = -1; noting = false; makePlan(); makePad();
+}
+async function newPuzzle() {
+  if (busy) return;
+  busy = true;
+  const n = settings.level;
+  G.openCard("Building the house…", n >= 6 ? "Big houses can take a few seconds." : "", []);
+  const p = await build.take(n);
+  begin(p, n);
+  busy = false; G.closeCard(); G.note("");
+  draw(); save();
+  build.prefetch(n);
+  G.track(`Open the Door new puzzle level ${n}`);
+}
+
+/* ---------- sharing ---------- */
+$("shareBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Open the Door!", won: game.won,
+  puzzle: () => ({g: "opendoor", N: game.level, c: game.cages}),
+  progress: () => ({grid: game.grid, notes: game.notes})}); };
+// A puzzle from a share link, with its numbers so far if they were sent (that isn't timed).
+function openShared(d) {
+  const lv = levelOf(d.N), N = lv && lv[0];
+  const okCages = Array.isArray(d.c) && d.c.every(c => Array.isArray(c) && Array.isArray(c[0]) && c[0].every(i => Number.isInteger(i) && i >= 0 && i < N * N) && Number.isInteger(c[1]) && OPS[c[2]] !== undefined)
+    && d.c.flatMap(c => c[0]).sort((a, b) => a - b).every((i, k) => i === k) && d.c.flatMap(c => c[0]).length === N * N;
+  if (!lv || !okCages) { G.note("That share link didn't work.", 5000); return; }
+  begin({N, cages: d.c}, d.N);
+  if (d.p && Array.isArray(d.p.grid) && d.p.grid.length === N * N) { game.grid = d.p.grid.map(v => +v || 0); if (Array.isArray(d.p.notes) && d.p.notes.length === N * N) game.notes = d.p.notes.map(v => +v || 0); game.timed = false; }
+  settings.level = d.N; $("levelSel").value = d.N;
+  draw(); save(); build.prefetch(d.N);
+  if (d.p && check().right.every(Boolean)) win();
+}
+
+/* ---------- how to play ---------- */
+function rulesPicture() {
+  // a two-square room signed 3+ holding 1 and 2, with its door swung open
+  const room = (sign, a, b, open) => `<svg viewBox="-.1 -.1 2.2 1.2"><rect x="0" y="0" width="2" height="1" fill="${open ? "#FFF4D6" : "#EFE2CC"}"/>
+    <path d="M1 0V1" stroke="rgba(42,37,48,.25)" stroke-width=".02"/>
+    <path d="M0 0H2V1H1.82M1.18 1H0Z" fill="none" stroke="#2A2530" stroke-width=".08" stroke-linejoin="round"/>
+    <g style="transform-origin:1.82px 1px;transform:rotate(${open ? 90 : 0}deg)"><rect x="1.18" y=".945" width=".64" height=".11" rx=".03" fill="#B07C4F" stroke="#2A2530" stroke-width=".025"/></g>
+    <text x=".07" y=".25" font-size=".24" font-weight="800" fill="#2A2530">${sign}</text>
+    <text x=".5" y=".72" font-size=".5" font-weight="800" text-anchor="middle" fill="#2A2530">${a}</text><text x="1.5" y=".72" font-size=".5" font-weight="800" text-anchor="middle" fill="#2A2530">${b}</text></svg>`;
+  return `<figure>${room("3+", 1, 2, true)}<figcaption>1 + 2 = 3: open!</figcaption></figure><figure>${room("6×", 2, 4, false)}<figcaption>2 × 4 isn't 6: shut</figcaption></figure>`;
+}
+function showHelp() {
+  const media = document.createElement("div"), N = game ? game.N : 4;
+  const pics = document.createElement("div"); pics.className = "rulesPic"; pics.innerHTML = rulesPicture();
+  const ol = document.createElement("ol"); ol.className = "steps";
+  for (const t of [`Fill every square with a number from 1 to ${N}.`,
+                   "Every row and every column has each number once.",
+                   "Walls split the house into rooms. A room's numbers must make its sign: 7+ adds up to 7, 2− is a difference of 2, 12× multiplies to 12, 3÷ divides to 3. A room with no sign beside its number is just that number.",
+                   "Get a room right and its door opens. Open every door and the cat can run through!"]) {
+    const li = document.createElement("li"); li.textContent = t; ol.append(li);
+  }
+  const tip = document.createElement("p"); tip.className = "tip";
+  tip.textContent = "Tap a square, then a number (tap it again to take it away). A number that's already in its row or column turns red, and a full room whose numbers don't make its sign has its sign in red. Notes lets you jot down numbers a square might be. Every puzzle has exactly one answer.";
+  media.append(pics, ol, tip);
+  G.openCard("How to play", "", [["Show me on the board", () => { G.closeCard(); settings.seenHelp = false; helpOnFirstVisit(); }, true],
+    ["Got it", () => { G.closeCard(); settings.seenHelp = true; save(); }]], media);
+}
+// First visit only: walk through the house that's out, opening one room's door just while its step is up.
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || !playing() || document.querySelector(".spot")) return;
+  const N = game.N, xy = i => [i % N, Math.floor(i / N)], all = [...Array(N * N).keys()].map(xy);
+  const row = r => [...Array(N).keys()].map(c => [c, r]), col = c => [...Array(N).keys()].map(r => [c, r]);
+  // the example room: the first with two or more squares and a sign
+  const k = plan.rooms.findIndex(r => r.cells.length > 1), room = plan.rooms[k], lit = room.cells.map(xy);
+  const what = {"+": "add up to", "-": "have a difference of", "x": "multiply to", "/": "divide to make"}[room.op];
+  const steps = [
+    {say: `Fill every square with a number from 1 to ${N}`, lit: all},
+    {say: "Every row has each number once", lit: row(Math.floor(N / 2))},
+    {say: "So does every column", lit: col(Math.floor(N / 2))},
+    {say: `Walls make rooms. This room's numbers must ${what} ${room.t}`, lit, outline: [lit]},
+    {say: "Get a room right and its door opens 🚪", lit, outline: [lit], tone: "ok", enter: () => { forceOpen = k; draw(); }, leave: () => { forceOpen = -1; draw(); }},
+    {say: "Open every door and the cat runs through 🐈", lit: all, tone: "ok"},
+    {say: "Tap a square, then a number", els: [$("pad")]},
+    {say: "Notes let you jot down maybes", els: [$("notesBtn")]},
+  ];
+  G.spotlight({grid: $("cells"), w: N, h: N, steps, done: () => { settings.seenHelp = true; save(); }});
+}
+
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", "") + (n === MAX_LEVEL ? " (hardest)" : ""), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
+$("helpBtn").onclick = showHelp;
+
+G.nav("opendoor");
+G.checkClock(game);
+G.setupTimer({name: "opendoor", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+const shared = G.readShare("opendoor");
+if (game && Array.isArray(game.grid) && Array.isArray(game.cages)) G.reopen(() => {
+    if (!levelOf(game.level) || game.grid.length !== game.N * game.N) throw new Error("the saved puzzle doesn't fit its level");
+    if (!Array.isArray(game.notes)) game.notes = new Array(game.N * game.N).fill(0);
+    makePlan(); makePad(); draw();
+    if (game.won) finishCard();
+    build.prefetch(settings.level); helpOnFirstVisit();
+  }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
+else if (!shared) newPuzzle().then(helpOnFirstVisit);
+const shareOpts = () => ({name: "Open the Door!", inProgress: !!(game && !game.won && game.history.length), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, shareOpts());
+// A share link opened while this page is already showing only changes the address, so watch for it.
+window.addEventListener("hashchange", () => { const d = G.readShare("opendoor"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
