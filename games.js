@@ -339,7 +339,9 @@ const G = (() => {
       o.btn.textContent = msg; setTimeout(() => { o.btn.textContent = was; }, 2500);
     };
     if (navigator.share) {
-      try { await navigator.share({title, text, url}); done(); return; }
+      // One piece of text with the link at the end: given text and a link separately, Messages on an
+      // iPhone keeps only the link (or a preview card of it) and the text is lost.
+      try { await navigator.share({text: text + "\n" + url}); done(); return; }
       catch (e) { if (e.name === "AbortError") return; }
     }
     try { await navigator.clipboard.writeText(all); done(o.btn ? "Copied! Paste it into a message." : "Copied. Paste it into a message."); return; } catch (e) {}
