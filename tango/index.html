@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-10.9"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-10.10"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-10.9">
+<link rel="stylesheet" href="../games.css?v=2026-10-10.10">
 <style>
 /* Two toys share out a grid in the toy box: every line holds as many of one as the other, no three alike in a row,
    and = / × signs between squares say whether neighbours match. */
@@ -84,15 +84,17 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-10.9"></script>
+<script src="../games.js?v=2026-10-10.10"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // A grid of N × N squares, each 0 or 1 (the two toys). Every row and column has N/2 of each, no three the same
 // in a line; clues are some squares already filled, and = or × signs between some side-by-side squares.
 // Levels: each size first with a few extra toys put out to start, then with only the clues it needs.
-function levelOf(n) { return [null, [6, 4], [6, 0], [8, 5], [8, 0], [10, 6], [10, 0]][n]; }
+// Level 1 (the third number) also puts out toys until it can be solved with the simple rules alone, no guessing.
+function levelOf(n) { return [null, [6, 3, true], [6, 0], [8, 5], [8, 0], [10, 6], [10, 0]][n]; }
 // Every way to finish a grid, counted up to `limit`: fill squares one at a time, after working out every square the
 // rules force (a pair or gap in a line, a full line, or a sign next to a filled square).
+// With limit 0, it only checks whether the simple rules alone fill the whole grid (1 if so, else 0).
 function countSolutions(N, start, signs, limit = 2) {
   const half = N / 2;
   let found = 0, steps = 0;
@@ -135,6 +137,7 @@ function countSolutions(N, start, signs, limit = 2) {
     if (i < 0) { found++; go.last = g; return; }
     for (const v of [0, 1]) { const h = g.slice(); h[i] = v; go(h); }
   }
+  if (limit === 0) { const g = start.slice(); return settle(g) && !g.includes(-1) ? 1 : 0; }
   go(start.slice());
   return steps > 200000 ? -1 : found;
 }
@@ -186,7 +189,9 @@ function makePuzzle(N) {
   return {N, sol, givens, signs};
 }
 function makeLevel(n) {
-  const [N, extra] = levelOf(n), p = makePuzzle(N), empty = p.givens.map((v, i) => v === -1 ? i : -1).filter(i => i >= 0);
+  const [N, extra, easy] = levelOf(n), p = makePuzzle(N), empty = p.givens.map((v, i) => v === -1 ? i : -1).filter(i => i >= 0);
+  // put out toys until the simple rules finish the puzzle, then the head start on top
+  while (easy && empty.length && !countSolutions(N, p.givens, p.signs, 0)) { const i = empty.splice(Math.floor(Math.random() * empty.length), 1)[0]; p.givens[i] = p.sol[i]; }
   for (let k = 0; k < extra && empty.length; k++) { const i = empty.splice(Math.floor(Math.random() * empty.length), 1)[0]; p.givens[i] = p.sol[i]; }
   return p;
 }
