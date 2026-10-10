@@ -49,6 +49,17 @@ const G = (() => {
     document.addEventListener("click", e => { if (!panel.hidden && !el.contains(e.target)) show(false); });
     document.addEventListener("keydown", e => { if (e.key === "Escape" && !panel.hidden) { show(false); btn.focus(); } });
     el.append(btn, panel);
+    // On a short screen, scroll just far enough when the page opens that the whole board shows (when it can),
+    // once the fonts and the board have settled, and only if the player hasn't scrolled or a walkthrough isn't up
+    const fit = () => {
+      if (scrollY > 0 || document.querySelector(".spot") || $("overlay").classList.contains("show")) return;
+      const board = $("board"); if (!board) return;
+      const r = board.getBoundingClientRect();
+      if (r.bottom > innerHeight && r.height < innerHeight - 16) scrollTo({top: Math.min(r.bottom - innerHeight + 14, r.top - 8)});
+    };
+    const settled = () => setTimeout(fit, 500);
+    const loaded = new Promise(ok => document.readyState === "complete" ? ok() : addEventListener("load", ok, {once: true}));
+    Promise.all([loaded, document.fonts ? document.fonts.ready : null]).then(settled);
   }
 
 
@@ -238,12 +249,6 @@ const G = (() => {
     }, 500);
     document.addEventListener("visibilitychange", () => { if (document.hidden) T.save(); });
     showTime();
-    // On a short screen, scroll just far enough when the page opens that the whole board shows (when it can)
-    setTimeout(() => {
-      if (scrollY > 0 || document.querySelector(".spot")) return;
-      const r = board.getBoundingClientRect();
-      if (r.bottom > innerHeight && r.height < innerHeight - 16) scrollTo({top: Math.min(r.bottom - innerHeight + 12, r.top - 8)});
-    }, 700);
   }
   function showTime() {
     const g = T && T.game(), btn = $("timer"); if (!btn) return;
