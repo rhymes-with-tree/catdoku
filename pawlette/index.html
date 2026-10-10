@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pawlette</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-10.6";
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-10.6">
+<style>
+/* Pawlette: rounded colour tiles in a soft tray, over a catnip haze that breathes and takes on the last
+   colour made. Blocks are the Catdoku palette, each with a symbol built from the primaries' marks. */
+:root{--board:min(94vw,440px)}
+body{min-height:100vh}
+.rules{width:var(--board)}
+details.menu .bar{width:auto}
+.board{width:var(--board);display:grid;gap:6px;padding:8px;background:rgba(247,248,243,.55);border:2px solid var(--line);border-radius:16px;
+  user-select:none;-webkit-user-select:none;touch-action:manipulation}
+/* each block sits apart as its own little tile, so two of them sliding together reads as a merge */
+.cell{position:relative;aspect-ratio:1;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:9px;
+  box-shadow:0 3px 0 rgba(42,37,48,.22),0 4px 8px rgba(42,37,48,.12),inset 0 1px 0 rgba(255,255,255,.25);transition:background .15s,transform .15s}
+.cell.slide{z-index:3;transition:transform .24s cubic-bezier(.5,0,.7,.4)}
+.cell svg{width:46%;height:46%;opacity:.9}
+.cell.sel{box-shadow:0 0 0 3px #fff,0 0 0 6px var(--ink),0 8px 14px rgba(42,37,48,.25);transform:translateY(-3px);z-index:1}
+.cell.blend{transition:background .6s ease-in-out}
+.cell.blend svg{animation:fadein .6s ease-in-out}
+@keyframes fadein{from{opacity:0;transform:scale(.6) rotate(-45deg)}}
+.cell.pop{animation:swell .6s ease-in-out}
+@keyframes swell{50%{transform:scale(1.08)}}
+.cell.drop{animation:drift .5s cubic-bezier(.3,.7,.4,1)}
+@keyframes drift{from{transform:translateY(-70%);opacity:0}}
+/* a full row glows, then dissolves upward like a puff of coloured smoke */
+.cell.clear{animation:puff .8s ease-in forwards;z-index:2}
+@keyframes puff{
+  0%{filter:none}
+  35%{filter:brightness(1.18);box-shadow:0 0 18px 6px rgba(255,255,255,.75)}
+  100%{filter:brightness(1.25) blur(8px);transform:translateY(-40%) scale(1.25);opacity:0}}
+.cell.no{animation:wobble .5s ease-in-out}
+@keyframes wobble{20%{transform:rotate(-5deg)}50%{transform:rotate(4deg)}80%{transform:rotate(-2deg)}}
+.cell.swirl{animation:swirl .7s ease-in-out}
+@keyframes swirl{0%{opacity:0;transform:scale(.5) rotate(-90deg)}}
+/* the catnip haze: a soft glow behind everything that slowly breathes and takes on the last colour made */
+@property --haze{syntax:"<color>";inherits:true;initial-value:#9874CA}
+#haze{position:fixed;inset:-20%;z-index:-1;pointer-events:none;--haze:#9874CA;transition:--haze 4s ease-in-out;
+  background:radial-gradient(circle at 50% 45%,var(--haze) 0%,transparent 70%);
+  animation:breathe 7s ease-in-out infinite}
+@keyframes breathe{0%,100%{opacity:.25;transform:scale(.8)}50%{opacity:.95;transform:scale(1.18)}}
+.tally{display:flex;align-items:center;gap:6px;color:var(--ink-soft)}
+.tally svg{width:20px;height:20px}
+details.menu{width:var(--board)}
+/* the colour picker: one column per colour on the wheel, plus mud; the board above shows each pick at once */
+.picker{width:var(--board);background:var(--panel);border:2px solid var(--line);border-radius:12px;padding:12px}
+.picker h2{margin:0 0 4px;font-size:20px;text-align:center}
+.picker p{margin:0 0 10px;font-size:14px;color:var(--ink-soft);text-align:center}
+.pcols{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.pcol h3{margin:0 0 4px;font-size:12px;text-align:center;text-transform:capitalize;font-weight:600}
+.sw{display:block;width:100%;aspect-ratio:1;border:0;border-radius:7px;padding:0;margin:0 0 5px;cursor:pointer;position:relative}
+.sw:hover{background:inherit}
+.sw.on{box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--ink)}
+.sw.on::after{content:"✓";position:absolute;inset:0;display:grid;place-items:center;font-weight:800;color:var(--tick,#fff)}
+.sw.custom{background:conic-gradient(#E16251,#ECA818,#6AA673,#30A6B3,#9874CA,#E16251)!important;overflow:hidden}
+.sw.custom input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0}
+.picker .btns{display:flex;gap:10px;justify-content:center;margin-top:8px}
+details.menu summary{cursor:pointer;color:var(--ink-soft);font-weight:600;list-style:none;text-align:center}
+details.menu summary::-webkit-details-marker{display:none}
+details.menu[open] summary{margin-bottom:10px}
+.rules{display:flex;gap:14px;align-items:center;background:var(--panel);border:2px solid var(--line);border-radius:12px;padding:10px 12px}
+.rules svg{width:120px;height:120px;flex:none}
+.rules ul{margin:0;padding-left:18px;font-size:14px;color:var(--ink-soft)}
+.rules li{margin:0 0 4px}
+.rules b{color:var(--ink)}
+/* the cat napping on the corner of the tray: it breathes with the haze, purrs after a row clears or a pat,
+   and drifts off into zZz when nobody's played for a while */
+.boardwrap{position:relative;width:var(--board);margin-top:60px}
+.napper{position:absolute;right:4px;top:0;width:88px;transform:translateY(-86%);z-index:4;cursor:pointer;border:0;padding:0;background:none}
+.napper:hover{background:none}
+.napper img{display:block;width:100%;transform-origin:50% 90%;animation:snooze 7s ease-in-out infinite;filter:drop-shadow(0 4px 4px rgba(42,37,48,.18))}
+@keyframes snooze{0%,100%{transform:scale(.97,.95)}50%{transform:scale(1.03,1.05)}}
+.napper.purr{animation:purr .09s linear 12}
+@keyframes purr{0%,100%{translate:0 0}25%{translate:-1.2px .6px}75%{translate:1.2px -.6px}}
+.float{position:absolute;left:30%;top:-4px;font-weight:800;color:var(--ink-soft);pointer-events:none;white-space:nowrap;animation:rise 2.4s ease-out forwards}
+.float.z{left:62%;font-size:15px}
+.float.prr{font-size:15px;color:#B94588}
+@keyframes rise{0%{opacity:0;transform:translateY(6px) scale(.8)}20%{opacity:1}100%{opacity:0;transform:translate(14px,-46px) scale(1.15)}}
+.card ol.steps{text-align:left;margin:0 0 14px;padding-left:24px;color:var(--ink);font-size:16px;line-height:1.35}
+.card ol.steps li{margin:0 0 8px;display:list-item}
+.card .tip{font-size:14px;margin:0 0 14px}
+/* Zen or Swipe */
+.modes{display:flex;gap:6px;background:var(--panel);border:2px solid var(--line);border-radius:999px;padding:3px}
+.modes button{border:0;border-radius:999px;padding:3px 16px;background:none}
+.modes button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.swipe .zenonly,.zen .swipeonly{display:none!important}
+.cell.empty{background:rgba(42,37,48,.06)!important;box-shadow:none;cursor:default}
+.cell.empty svg{display:none}
+#sboard{touch-action:none}
+.coming{display:flex;align-items:center;gap:6px;color:var(--ink-soft);font-weight:600}
+.coming i{display:inline-block;width:22px;height:22px;border-radius:6px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}#haze{opacity:.4}.float{display:none}}
+</style>
+</head>
+<body>
+<div id="haze" aria-hidden="true"></div>
+<main>
+  <header>
+    <h1>Pawlette</h1><div class="stripe"></div>
+    <p class="tagline">Zen out and play with colour</p>
+  </header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+  <div class="modes" role="group" aria-label="Mode"><button id="zenBtn" aria-pressed="true">Zen</button><button id="swipeBtn" aria-pressed="false">Swipe</button></div>
+  <div class="status"><span class="tally" id="score"></span><span class="coming swipeonly" id="coming"></span><span class="msg" id="msg" aria-live="polite"></span></div>
+  <div class="boardwrap">
+    <button class="napper" id="napper" aria-label="The cat. Give it a pat"><img id="napImg" alt=""></button>
+    <div class="board zenonly" id="board" role="grid" aria-label="Colour blocks"></div>
+    <div class="board swipeonly" id="sboard" role="grid" aria-label="Colour blocks: swipe to slide them"></div>
+  </div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+  <div class="rules" aria-label="How colours mix">
+    <svg id="wheel" viewBox="-60 -60 120 120" aria-hidden="true"></svg>
+    <ul class="zenonly">
+      <li>Two colours <b>two steps apart</b> mix into the one <b>between</b> them.</li>
+      <li><b>Opposites</b> make <b>mud</b>, which never mixes.</li>
+      <li>Two of the <b>same colour</b> join into one, and <b>two muds</b> vanish.</li>
+      <li><b>Next-door</b> colours don't mix.</li>
+    </ul>
+    <ul class="swipeonly">
+      <li>Swipe and every block slides. <b>Red, yellow and blue</b> combine when they bump: two different ones make the colour <b>between</b> them, two the same join into one.</li>
+      <li><b>Orange, green and purple</b> never merge. Fill a whole <b>row or column</b> with one of them to clear it.</li>
+      <li>You start with two of red, yellow and blue; the third comes after <b>two lines</b>.</li>
+    </ul>
+  </div>
+  <div class="actions"><button id="undoBtn">Undo</button><button id="sNewBtn" class="swipeonly">New game</button><button id="colBtn" aria-expanded="false">Colours</button><button id="helpBtn">How to play</button></div>
+  <div class="picker" id="picker" hidden>
+    <h2>Pick your colours</h2>
+    <p>Tap one in each column, or the rainbow square for any colour you like. The board changes as you go, and your colours are kept on this device.</p>
+    <div class="pcols" id="pcols"></div>
+    <div class="btns"><button id="resetCol">Back to the usual</button><button id="doneCol" class="primary">Done</button></div>
+  </div>
+  <details class="menu zenonly">
+    <summary>Board settings</summary>
+    <div class="bar">
+      <label>Width <select id="widthSel"><option>4</option><option selected>5</option><option>6</option><option>7</option></select></label>
+      <label>Colours <select id="spawnSel"><option value="3" selected>Red, yellow, blue</option><option value="6">All six</option></select></label>
+      <button id="newBtn" class="primary">New board</button>
+    </div>
+  </details>
+</main>
+
+<script src="../games.js?v=2026-10-10.6"></script>
+<script>
+// The paint wheel, in order: red, orange, yellow, green, blue, purple. Mud (6) comes from opposites.
+// Each colour also has its own symbol, so colours can be told apart without seeing the hue: the primaries are
+// a vertical line (red), a horizontal line (yellow) and a dot (blue), and a mix wears both its colours' marks.
+const COLOURS = [
+  {name: "red", hex: "#E16251", shape: `<rect x="9.75" y="2" width="4.5" height="20" rx="2"/>`},
+  {name: "orange", hex: "#EC814D", shape: `<rect x="9.75" y="2" width="4.5" height="20" rx="2"/><rect x="2" y="9.75" width="20" height="4.5" rx="2"/>`},
+  {name: "yellow", hex: "#ECA818", shape: `<rect x="2" y="9.75" width="20" height="4.5" rx="2"/>`},
+  {name: "green", hex: "#6AA673", shape: `<rect x="2" y="9.75" width="20" height="4.5" rx="2"/><circle cx="12" cy="12" r="6"/>`},
+  {name: "blue", hex: "#30A6B3", shape: `<circle cx="12" cy="12" r="6"/>`},
+  {name: "purple", hex: "#9874CA", shape: `<rect x="9.75" y="2" width="4.5" height="20" rx="2"/><circle cx="12" cy="12" r="6"/>`},
+  {name: "mud", hex: "#3B2A22", shape: `<rect x="9.75" y="2" width="4.5" height="20" rx="2"/><rect x="2" y="9.75" width="20" height="4.5" rx="2"/><circle cx="12" cy="12" r="6"/>`},
+];
+const MUD = 6;
+// The colours anyone can pick from: Catdoku's palette and Yarn's colourways, round the wheel, plus darks for mud.
+const DEFAULT_HEX = COLOURS.map(c => c.hex);
+const CHOICES = [
+  ["#E16251", "#BD5538", "#CB5D4A", "#B34D3E", "#AA4833", "#DE775D", "#D25488", "#874539"],
+  ["#EC814D", "#E16A4A", "#EB8663", "#DA7854", "#D16C4D", "#F0AB44", "#EFB75D", "#FFB0A2"],
+  ["#ECA818", "#E8AB4F", "#FAC366", "#FACE55", "#FFD178", "#C1C670", "#B3B94B", "#CAD578"],
+  ["#6AA673", "#6EB46B", "#80CB7E", "#51A366", "#78CE99", "#398042", "#54765C", "#86D29B"],
+  ["#30A6B3", "#73A7AE", "#3C8681", "#1EABBE", "#5AC7E0", "#7885BA", "#5C7ACB", "#4867AD"],
+  ["#9874CA", "#AA81CF", "#AD8EC2", "#8D78AD", "#7C5AAA", "#B94588", "#C2508B", "#9A387C"],
+  ["#3B2A22", "#2A2530", "#4B3A30", "#5B2919", "#3D1429", "#212D4B", "#204A29", "#44256F"],
+];
+const COLOUR_KEY = "niptrip.colours";
+// White symbols on most colours; dark ones on a colour light enough to wash them out.
+function inkFor(hex) {
+  const n = parseInt(hex.slice(1), 16), lin = v => (v /= 255) <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4;
+  const L = .2126 * lin(n >> 16) + .7152 * lin(n >> 8 & 255) + .0722 * lin(n & 255);
+  return L > .45 ? "#2A2530" : "#fff";
+}
+// What two colours make, or -1 if they don't mix.
+function mix(a, b) {
+  if (a === b) return a;
+  if (a === MUD || b === MUD) return -1;
+  const d = Math.min((a - b + 6) % 6, (b - a + 6) % 6);
+  if (d === 1) return -1;
+  if (d === 3) return MUD;
+  return (a + 2) % 6 === b ? (a + 1) % 6 : (b + 1) % 6;
+}
+
+const $ = G.$;
+let W = 5, H = 8, grid, sel = -1, cleared = 0, palette = 6, history = [], busy = false;
+const spawn = () => palette === 3 ? [0, 2, 4][Math.floor(Math.random() * 3)] : Math.floor(Math.random() * 6);
+const rowSame = r => { const c = grid[r * W]; for (let x = 1; x < W; x++) if (grid[r * W + x] !== c) return false; return true; };
+
+const LEAF = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22 V10" stroke="#6AA673" stroke-width="2" stroke-linecap="round"/><path d="M12 13 C4 13 3 6 5 2 C9 3 13 6 12 13 Z M12 11 C18 11 21 6 19 2 C15 3 11 5 12 11 Z" fill="#6AA673"/></svg>`;
+// Saved under the game's first name (Nip Trip), so boards, colours and cats carry over.
+const KEY = "niptrip";
+
+/* ---------- the napping cat ---------- */
+// One of the curled-up Sunbeams cats, kept for this device so it's always your cat.
+const NAPPERS = ["c14-36", "c16-5", "c14-34", "c15-6", "c14-35", "c15-5", "c16-3"];
+let napper = G.load("niptrip.cat").cat;
+if (!NAPPERS.includes(napper)) { napper = NAPPERS[Math.floor(Math.random() * NAPPERS.length)]; G.save("niptrip.cat", {cat: napper}); }
+const CAT_SRC = {};  // filled with embedded pictures when the page is bundled into one file
+$("napImg").src = CAT_SRC[napper] || `../cats/${napper}.webp`;
+function float(cls, text) {
+  const f = document.createElement("span"); f.className = "float " + cls; f.textContent = text;
+  $("napper").append(f); setTimeout(() => f.remove(), 2500);
+}
+// A purr: a little rumble and a "prrr".
+function purr() {
+  const n = $("napper"); n.classList.remove("purr"); void n.offsetWidth; n.classList.add("purr");
+  setTimeout(() => n.classList.remove("purr"), 1100);
+  float("prr", "prrr ♥");
+}
+// After half a minute with no play the cat dozes off, and a z drifts up every few seconds until you play again.
+let lastPlay = Date.now();
+const played = () => { lastPlay = Date.now(); };
+setInterval(() => { if (Date.now() - lastPlay > 30000 && !document.hidden) float("z", Math.random() < .5 ? "z" : "Z"); }, 2600);
+$("napper").onclick = () => { played(); purr(); };
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify({W, palette, grid, cleared, haze: lastColour})); } catch (e) {}
+}
+function restore() {
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY));
+    if (!s || !Array.isArray(s.grid) || s.grid.length !== s.W * (s.W + 3)) return false;
+    W = s.W; H = W + 3; palette = s.palette; grid = s.grid; cleared = s.cleared || 0;
+    $("widthSel").value = W; $("spawnSel").value = palette;
+    if (s.haze >= 0) setHaze(s.haze);
+    return true;
+  } catch (e) { return false; }
+}
+let lastColour = -1;
+function setHaze(c) { lastColour = c; $("haze").style.setProperty("--haze", COLOURS[c].hex); }
+function newBoard(fromSave) {
+  if (!(fromSave === true && restore())) {
+    if (fromSave !== true) G.track(`Pawlette new board ${$("widthSel").value} wide`);
+    W = +$("widthSel").value; palette = +$("spawnSel").value; H = W + 3;
+    grid = Array.from({length: W * H}, spawn);
+    // start without any finished rows
+    for (let r = 0; r < H; r++) while (rowSame(r)) grid[r * W] = spawn();
+    cleared = 0;
+  }
+  sel = -1; history = []; busy = false; note("");
+  $("board").style.gridTemplateColumns = `repeat(${W}, 1fr)`;
+  // as wide as the page allows, but never taller than the screen leaves room for (see --tall)
+  const fit = `min(var(--board), calc(var(--tall) * ${W / H}))`;
+  document.querySelector(".boardwrap").style.width = fit; $("board").style.width = fit;
+  $("board").innerHTML = "";
+  for (let i = 0; i < W * H; i++) { const d = document.createElement("div"); d.className = "cell"; d.dataset.i = i; d.setAttribute("role", "gridcell"); $("board").append(d); }
+  draw(); save(); checkStuck();
+}
+function draw(flags = {}, blends = {}) {
+  const kids = $("board").children;
+  for (let i = 0; i < W * H; i++) {
+    const c = COLOURS[grid[i]], el = kids[i];
+    if (i in blends) {
+      // start from the old colour, then let it run into the new one
+      el.classList.add("blend"); el.style.transition = "none"; el.style.background = blends[i];
+      void el.offsetWidth; el.style.transition = ""; el.style.background = c.hex;
+    } else { el.classList.remove("blend"); el.style.background = c.hex; }
+    el.innerHTML = `<svg viewBox="0 0 24 24" fill="${inkFor(c.hex)}" aria-hidden="true">${c.shape}</svg>`;
+    el.setAttribute("aria-label", c.name);
+    el.classList.toggle("sel", i === sel);
+    el.classList.remove("pop", "drop", "clear", "no", "swirl");
+    if (flags[i]) { void el.offsetWidth; el.classList.add(flags[i]); }
+  }
+  if (typeof mode !== "undefined" && mode === "swipe") return;
+  $("score").innerHTML = cleared ? `${LEAF}${cleared}` : "";
+  $("undoBtn").disabled = !history.length;
+}
+const adjacent = (a, b) => (Math.abs(a - b) === 1 && Math.floor(a / W) === Math.floor(b / W)) || Math.abs(a - b) === W;
+
+// Remove the block at i: the blocks above it in its column drop one, and a new block falls in at the top.
+function dropInto(i, flags) {
+  const x = i % W;
+  for (let y = Math.floor(i / W); y > 0; y--) { grid[y * W + x] = grid[(y - 1) * W + x]; flags[y * W + x] = "drop"; }
+  grid[x] = spawn(); flags[x] = "drop";
+}
+function tap(i) {
+  played();
+  if (busy) return;
+  if (sel < 0 || sel === i) { sel = sel === i ? -1 : i; note(""); draw(); return; }
+  if (!adjacent(sel, i)) { sel = i; draw(); return; }
+  const r = mix(grid[sel], grid[i]);
+  if (r < 0) { const f = {}; f[i] = f[sel] = "no"; sel = -1; draw(f); return; }
+  history.push({grid: grid.slice(), cleared});
+  if (history.length > 50) history.shift();
+  const from = sel; sel = -1; busy = true; note("");
+  // the first block slides over onto the second, then they merge
+  const kids = $("board").children, a = kids[from], b = kids[i];
+  a.classList.remove("sel");
+  a.classList.add("slide");
+  a.style.transform = `translate(${b.offsetLeft - a.offsetLeft}px, ${b.offsetTop - a.offsetTop}px) scale(.85)`;
+  setTimeout(() => { a.classList.remove("slide"); a.style.transform = ""; merge(from, i, r); }, 240);
+}
+function merge(from, i, r) {
+  const flags = {}, blends = {};
+  if (grid[from] === MUD && grid[i] === MUD) {
+    // two muds vanish: both puff away and their columns drop
+    const f = {}; f[from] = f[i] = "clear"; draw(f);
+    setTimeout(() => {
+      dropInto(Math.min(from, i), flags); dropInto(Math.max(from, i), flags);
+      draw(flags); save();
+      setTimeout(() => { busy = false; clearRows(); }, 500);
+    }, 650);
+    return;
+  }
+  const was = COLOURS[grid[i]].hex;
+  grid[i] = r;
+  dropInto(from, flags);
+  // the mixed colour lands on the second block; if that was above the first one, it drops a square with its column
+  const at = from % W === i % W && from > i ? i + W : i;
+  flags[at] = "pop"; blends[at] = was;
+  setHaze(r);
+  draw(flags, blends); save();
+  setTimeout(() => { busy = false; clearRows(); }, 600);
+}
+// Clear every row that's all one colour, let the rest fall, and keep going while new rows complete.
+function clearRows() {
+  const full = []; for (let r = 0; r < H; r++) if (rowSame(r)) full.push(r);
+  if (!full.length) { checkStuck(); return; }
+  busy = true;
+  const flags = {}; full.forEach(r => { for (let x = 0; x < W; x++) flags[r * W + x] = "clear"; });
+  setHaze(grid[full[0] * W]);
+  draw(flags);
+  setTimeout(() => {
+    const drop = {};
+    for (const r of full) for (let x = 0; x < W; x++) dropInto(r * W + x, drop);
+    cleared += full.length; purr();
+    draw(drop); save();
+    setTimeout(() => { busy = false; clearRows(); }, 500);
+  }, 800);
+}
+const canMix = () => { for (let i = 0; i < W * H; i++) for (const j of [i + 1, i + W]) if (j < W * H && adjacent(i, j) && mix(grid[i], grid[j]) >= 0) return true; return false; };
+// When no two blocks next to each other can mix, the same blocks swirl into a new order that has a mix.
+function checkStuck() {
+  if (canMix()) return;
+  busy = true;
+  setTimeout(() => {
+    const keep = grid.slice();
+    for (let t = 0; t < 200; t++) {
+      grid = keep.slice();
+      for (let k = grid.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [grid[k], grid[j]] = [grid[j], grid[k]]; }
+      let full = false; for (let r = 0; r < H; r++) if (rowSame(r)) full = true;
+      if (canMix() && !full) break;
+    }
+    // a board made of only mud and lone colours might never mix again; then bring in a few fresh blocks
+    if (!canMix()) for (let k = 0; k < W; k++) grid[Math.floor(Math.random() * grid.length)] = spawn();
+    const f = {}; for (let i = 0; i < W * H; i++) f[i] = "swirl";
+    history = []; note("A fresh swirl."); draw(f); save();
+    setTimeout(() => { busy = false; note(""); checkStuck(); }, 1400);
+  }, 500);
+}
+function undo() {
+  if (busy || !history.length) return;
+  const h = history.pop(); grid = h.grid; cleared = h.cleared; sel = -1; note(""); draw(); save();
+}
+const note = t => G.note(t, 2500);
+// The rules wheel: six colours round a circle, with mud in the middle.
+function drawWheel() {
+  let s = "";
+  for (let k = 0; k < 6; k++) {
+    const a0 = (k * 60 - 120) * Math.PI / 180, a1 = ((k + 1) * 60 - 120) * Math.PI / 180, R = 56, r = 26;
+    const p = (rad, ang) => `${(rad * Math.cos(ang)).toFixed(1)} ${(rad * Math.sin(ang)).toFixed(1)}`;
+    s += `<path d="M${p(r, a0)} L${p(R, a0)} A${R} ${R} 0 0 1 ${p(R, a1)} L${p(r, a1)} A${r} ${r} 0 0 0 ${p(r, a0)} Z" fill="${COLOURS[k].hex}" stroke="#F7F8F3" stroke-width="2"/>`;
+    const am = (a0 + a1) / 2, cx = 41 * Math.cos(am), cy = 41 * Math.sin(am);
+    s += `<g transform="translate(${(cx - 6).toFixed(1)} ${(cy - 6).toFixed(1)}) scale(.5)" fill="${inkFor(COLOURS[k].hex)}">${COLOURS[k].shape}</g>`;
+  }
+  s += `<circle r="22" fill="${COLOURS[MUD].hex}" stroke="#F7F8F3" stroke-width="2"/><g transform="translate(-6 -6) scale(.5)" fill="${inkFor(COLOURS[MUD].hex)}">${COLOURS[MUD].shape}</g>`;
+  $("wheel").innerHTML = s;
+}
+
+/* ---------- picking colours ---------- */
+function setColours(hexes) {
+  hexes.forEach((h, k) => { COLOURS[k].hex = h; });
+  drawWheel(); draw(); if (sw) sDraw();
+  if (lastColour >= 0) setHaze(lastColour);
+}
+function drawPicker() {
+  $("pcols").innerHTML = COLOURS.map((c, k) => {
+    const list = CHOICES[k].includes(c.hex) ? CHOICES[k] : CHOICES[k].concat(c.hex);
+    return `<div class="pcol"><h3>${c.name}</h3>${list.map(h =>
+      `<button class="sw${h === c.hex ? " on" : ""}" style="background:${h};--tick:${inkFor(h)}" data-k="${k}" data-h="${h}" aria-label="${c.name} ${h}" aria-pressed="${h === c.hex}"></button>`).join("")}
+      <label class="sw custom" title="Any colour"><input type="color" data-k="${k}" value="${c.hex}" aria-label="Any colour for ${c.name}"></label></div>`;
+  }).join("");
+}
+function pickColour(k, h) {
+  const hexes = COLOURS.map(c => c.hex); hexes[k] = h.toUpperCase();
+  setColours(hexes); drawPicker();
+  G.save(COLOUR_KEY, {hexes});
+}
+$("pcols").addEventListener("click", e => { const b = e.target.closest("button.sw"); if (b) pickColour(+b.dataset.k, b.dataset.h); });
+$("pcols").addEventListener("change", e => { if (e.target.type === "color") pickColour(+e.target.dataset.k, e.target.value); });
+const showPicker = on => { $("picker").hidden = !on; $("colBtn").setAttribute("aria-expanded", String(on)); if (on) drawPicker(); };
+$("colBtn").onclick = () => showPicker($("picker").hidden);
+$("doneCol").onclick = () => showPicker(false);
+$("resetCol").onclick = () => { setColours(DEFAULT_HEX); drawPicker(); G.save(COLOUR_KEY, {}); };
+{
+  const saved = G.load(COLOUR_KEY).hexes;
+  if (Array.isArray(saved) && saved.length === COLOURS.length && saved.every(h => /^#[0-9A-F]{6}$/i.test(h))) saved.forEach((h, k) => { COLOURS[k].hex = h.toUpperCase(); });
+}
+drawWheel();
+
+$("board").addEventListener("click", e => { const c = e.target.closest(".cell"); if (c) tap(+c.dataset.i); });
+$("newBtn").onclick = () => newBoard();
+$("widthSel").onchange = () => newBoard();
+$("spawnSel").onchange = () => newBoard();
+$("undoBtn").onclick = () => mode === "swipe" ? sUndo() : undo();
+G.nav("pawlette");
+let hadBoard = false; try { hadBoard = !!localStorage.getItem(KEY); } catch (e) {}   // storage can be blocked
+newBoard(true);
+
+/* ---------- swipe mode ---------- */
+// A 5 × 5 board where every block slides when you swipe. Only red, yellow and blue (0, 2, 4) combine as they bump,
+// once each per swipe: two the same join, two different make the colour between. Orange, green and purple never
+// merge; a whole row or column of one colour clears. A game starts with two of the primaries, and the third
+// comes in once two lines are cleared. It's over when the board is full and nothing can combine.
+const SW = 5, SWIPE_KEY = "niptrip.swipe", THIRD_AT = 2;
+let sw = null, sHistory = [], sBusy = false;
+const sMix = (a, b) => a % 2 || b % 2 ? -1 : a === b ? a : mix(a, b);
+const sAt = (x, y) => sw.grid[y * SW + x];
+function sSave() { G.save(SWIPE_KEY, sw); }
+function sNew() {
+  const out = [0, 2, 4][Math.floor(Math.random() * 3)];
+  sw = {grid: new Array(SW * SW).fill(-1), pair: [0, 2, 4].filter(c => c !== out), lines: 0, swipes: 0, over: false, best: (sw && sw.best) || 0};
+  sHistory = [];
+  const f = {}; for (let k = 0; k < 3; k++) sAdd(f);
+  sDraw(f); sSave(); G.note("");
+  G.track("Pawlette new swipe game");
+}
+function sAdd(flags) {
+  const empty = sw.grid.map((c, i) => c < 0 ? i : -1).filter(i => i >= 0);
+  if (!empty.length) return;
+  const i = empty[Math.floor(Math.random() * empty.length)], from = sw.lines < THIRD_AT ? sw.pair : [0, 2, 4];
+  sw.grid[i] = from[Math.floor(Math.random() * from.length)]; flags[i] = "swirl";
+}
+function sDraw(flags = {}) {
+  const b = $("sboard");
+  if (b.children.length !== SW * SW) {
+    b.style.gridTemplateColumns = `repeat(${SW}, 1fr)`; b.innerHTML = "";
+    for (let i = 0; i < SW * SW; i++) { const d = document.createElement("div"); d.className = "cell"; d.setAttribute("role", "gridcell"); b.append(d); }
+  }
+  [...b.children].forEach((el, i) => {
+    const v = sw.grid[i];
+    el.className = "cell" + (v < 0 ? " empty" : "");
+    if (v < 0) { el.style.background = ""; el.innerHTML = ""; el.setAttribute("aria-label", "empty"); }
+    else { const c = COLOURS[v]; el.style.background = c.hex; el.innerHTML = `<svg viewBox="0 0 24 24" fill="${inkFor(c.hex)}" aria-hidden="true">${c.shape}</svg>`; el.setAttribute("aria-label", c.name); }
+    if (flags[i]) { void el.offsetWidth; el.classList.add(flags[i]); }
+  });
+  if (mode !== "swipe") return;
+  $("score").innerHTML = `${LEAF}${sw.lines} line${sw.lines === 1 ? "" : "s"}${sw.best ? ` · best ${sw.best}` : ""}`;
+  // the primary still to come, and how many lines until it does
+  const third = [0, 2, 4].find(c => !sw.pair.includes(c)), left = THIRD_AT - sw.lines;
+  $("coming").innerHTML = left > 0 ? `<i style="background:${COLOURS[third].hex}"></i>after ${left} line${left === 1 ? "" : "s"}` : "";
+  $("undoBtn").disabled = !sHistory.length || sw.over;
+}
+function sCanMove() {
+  if (sw.grid.includes(-1)) return true;
+  for (let y = 0; y < SW; y++) for (let x = 0; x < SW; x++) {
+    if (x + 1 < SW && sMix(sAt(x, y), sAt(x + 1, y)) >= 0) return true;
+    if (y + 1 < SW && sMix(sAt(x, y), sAt(x, y + 1)) >= 0) return true;
+  }
+  return false;
+}
+function swipe(dx, dy) {
+  played();
+  if (!sw || sw.over || sBusy || mode !== "swipe") return;
+  const before = sw.grid.join(), prev = {grid: sw.grid.slice(), lines: sw.lines, swipes: sw.swipes}, flags = {};
+  const lines = [];
+  for (let a = 0; a < SW; a++) { const L = []; for (let k = 0; k < SW; k++) { const t = (dx || dy) > 0 ? SW - 1 - k : k; L.push(dx ? a * SW + t : t * SW + a); } lines.push(L); }
+  let made = -1;
+  for (const L of lines) {
+    const out = [], merged = [];
+    for (const i of L) {
+      const c = sw.grid[i]; if (c < 0) continue;
+      const last = out.length - 1;
+      if (last >= 0 && !merged[last]) { const r = sMix(out[last], c); if (r >= 0) { out[last] = r; merged[last] = true; made = r; continue; } }
+      out.push(c); merged.push(false);
+    }
+    L.forEach((i, k) => { sw.grid[i] = k < out.length ? out[k] : -1; if (merged[k]) flags[i] = "pop"; });
+  }
+  if (sw.grid.join() === before) { G.note("Nothing moves that way.", 1500); return; }
+  sHistory.push(prev); if (sHistory.length > 30) sHistory.shift();
+  sw.swipes++;
+  if (made >= 0) setHaze(made);
+  sDraw(flags);
+  // whole rows and columns of one colour clear
+  const full = [];
+  for (let a = 0; a < SW; a++) {
+    const row = [...Array(SW)].map((_, k) => a * SW + k), col = [...Array(SW)].map((_, k) => k * SW + a);
+    for (const L of [row, col]) if (sw.grid[L[0]] >= 0 && L.every(i => sw.grid[i] === sw.grid[L[0]])) full.push(L);
+  }
+  const finish = () => {
+    const f = {}; sAdd(f);
+    if (!sCanMove()) {
+      sw.over = true; if (sw.lines > (sw.best || 0)) sw.best = sw.lines;
+      G.track(`Pawlette swipe game over ${sw.lines} lines`);
+      setTimeout(() => G.openCard("No moves left", `You cleared ${sw.lines} line${sw.lines === 1 ? "" : "s"} in ${sw.swipes} swipes.${sw.lines && sw.lines === sw.best ? " That's your best yet!" : sw.best ? ` Your best is ${sw.best}.` : ""}`,
+        [["Play again", () => { G.closeCard(); sNew(); }, true], ["Look at the board", G.closeCard]]), 600);
+    }
+    sDraw(f); sSave();
+  };
+  if (!full.length) { finish(); return; }
+  sBusy = true;
+  const had = sw.lines, f = {};
+  full.flat().forEach(i => { f[i] = "clear"; });
+  setHaze(sw.grid[full[0][0]]);
+  setTimeout(() => sDraw(f), 260);
+  setTimeout(() => {
+    full.flat().forEach(i => { sw.grid[i] = -1; });
+    sw.lines += full.length; purr();
+    if (had < THIRD_AT && sw.lines >= THIRD_AT) G.note(`Here comes ${COLOURS[[0, 2, 4].find(c => !sw.pair.includes(c))].name}!`, 3000);
+    sBusy = false; finish();
+  }, 1100);
+}
+function sUndo() {
+  if (!sHistory.length || sw.over || sBusy) return;
+  Object.assign(sw, sHistory.pop()); sDraw(); sSave();
+}
+// swipes on the board, and the arrow keys
+let touch = null;
+$("sboard").addEventListener("pointerdown", e => { touch = {x: e.clientX, y: e.clientY}; });
+$("sboard").addEventListener("pointerup", e => {
+  if (!touch) return;
+  const dx = e.clientX - touch.x, dy = e.clientY - touch.y; touch = null;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
+  if (Math.abs(dx) > Math.abs(dy)) swipe(dx > 0 ? 1 : -1, 0); else swipe(0, dy > 0 ? 1 : -1);
+});
+addEventListener("keydown", e => {
+  if (mode !== "swipe" || $("overlay").classList.contains("show")) return;
+  const k = {ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1]}[e.key]; if (!k) return;
+  e.preventDefault(); swipe(...k);
+});
+$("sNewBtn").onclick = () => { G.closeCard(); sNew(); };
+
+/* ---------- zen or swipe ---------- */
+const MODE_KEY = "niptrip.mode";
+var mode = "zen"; // var, so draw() can ask before this line runs
+function setMode(m) {
+  mode = m; G.save(MODE_KEY, {mode});
+  document.body.classList.toggle("swipe", m === "swipe"); document.body.classList.toggle("zen", m !== "swipe");
+  $("zenBtn").setAttribute("aria-pressed", String(m !== "swipe")); $("swipeBtn").setAttribute("aria-pressed", String(m === "swipe"));
+  G.note("");
+  if (m === "swipe") {
+    if (!sw) { const s = G.load(SWIPE_KEY); if (Array.isArray(s.grid) && s.grid.length === SW * SW && Array.isArray(s.pair)) sw = s; else sNew(); }
+    const sq = "min(var(--board), var(--tall))"; document.querySelector(".boardwrap").style.width = sq; $("sboard").style.width = sq; sDraw();
+  } else { newBoardFit(); draw(); }
+}
+// the zen board's width depends on its shape, so it's set again when coming back to zen
+function newBoardFit() { const fit = `min(var(--board), calc(var(--tall) * ${W / H}))`; document.querySelector(".boardwrap").style.width = fit; $("board").style.width = fit; }
+$("zenBtn").onclick = () => setMode("zen");
+$("swipeBtn").onclick = () => setMode("swipe");
+setMode(G.load(MODE_KEY).mode === "swipe" ? "swipe" : "zen");
+
+/* ---------- how to play ---------- */
+// The first visit walks through a real mix on the board (shown, then put back), the colour wheel, a row
+// floating away (shown, then put back) and the cat. "Show me on the board" on the card does it again.
+const SEEN = "niptrip.seen";
+function intro(again) {
+  if ((!again && G.load(SEEN).seen) || busy || document.querySelector(".spot") || mode === "swipe") return;
+  const xy = i => [i % W, Math.floor(i / W)];
+  // two blocks next to each other that mix into a new colour, near the bottom
+  let pair = null;
+  for (let i = W * H - 1; i >= 0 && !pair; i--) for (const j of [i - 1, i - W]) {
+    if (j < 0 || !adjacent(i, j)) continue;
+    const r = mix(grid[j], grid[i]);
+    if (r >= 0 && r !== grid[i] && r !== grid[j] && r !== MUD) { pair = [j, i, r]; break; }
+  }
+  // Show something on the board while a step is up (or, with `later`, a moment after it comes up, so a
+  // mix happens in front of you), then put the board back.
+  const showing = (change, later) => { let was, timer;
+    return {enter: () => { was = grid.slice(); if (later) { later.before?.(); draw(); timer = setTimeout(() => { change(); draw(later.flags || {}); }, 1000); } else { change(); draw(); } },
+            leave: () => { clearTimeout(timer); grid = was; draw(); }}; };
+  // A slice of the rules wheel (0–5), or 6 for the mud in the middle, as a shape on the page.
+  const wheelPart = k => {
+    const r = $("wheel").getBoundingClientRect(), s = r.width / 120, cx = r.left + 60 * s, cy = r.top + 60 * s, pts = [];
+    if (k === MUD) { for (let a = 0; a < 24; a++) pts.push([cx + 22 * s * Math.cos(a * Math.PI / 12), cy + 22 * s * Math.sin(a * Math.PI / 12)]); return {poly: pts}; }
+    const a0 = (k * 60 - 120) * Math.PI / 180, a1 = a0 + Math.PI / 3;
+    for (let n = 0; n <= 8; n++) { const a = a0 + (a1 - a0) * n / 8; pts.push([cx + 57 * s * Math.cos(a), cy + 57 * s * Math.sin(a)]); }
+    for (let n = 8; n >= 0; n--) { const a = a0 + (a1 - a0) * n / 8; pts.push([cx + 25 * s * Math.cos(a), cy + 25 * s * Math.sin(a)]); }
+    return {poly: pts};
+  };
+  // the two blocks at the bottom left, for laying out an example pair
+  const A = (H - 1) * W, B = A + 1, pairLit = [xy(A), xy(B)], pairOut = [[xy(A)], [xy(B)]], toB = [{to: [1, H - 0.5], from: [-1, 0], size: 0.9}];
+  const example = (ca, cb, after) => showing(() => after(), {before: () => { grid[A] = ca; grid[B] = cb; }});
+  const steps = [{say: "There's no timer, no goal, just color.", lit: [...Array(W * H).keys()].map(xy)}];
+  if (pair) {
+    const [a, b, r] = pair, [ax, ay] = xy(a), [bx, by] = xy(b);
+    steps.push({say: "Tap a block, then one next to it", lit: [xy(a), xy(b)], outline: [[xy(a)], [xy(b)]],
+                arrows: [{to: [(ax + bx) / 2 + 0.5, (ay + by) / 2 + 0.5], from: [ax - bx, ay - by]}]},
+               {say: "The first slides over and they mix like paint", lit: [xy(b)], ...showing(() => { grid[b] = r; })});
+  }
+  const primaries = [...Array(W * H).keys()].filter(i => [0, 2, 4].includes(grid[i]));
+  steps.push(
+    {say: "Not all colors mix. The wheel shows the rules", els: [document.querySelector(".rules")]},
+    {say: "Primary colors mix with each other", lit: primaries.map(xy), shapes: () => [0, 2, 4].map(wheelPart)},
+    {say: "Merging secondary colors strengthens their shared color", lit: pairLit, outline: pairOut, arrows: toB,
+     shapes: () => [1, 5, 0].map(wheelPart), ...example(1, 5, () => { grid[B] = mix(1, 5); grid[A] = grid[A - W]; })},
+    {say: "Opposite colors turn into mud.", lit: pairLit, outline: pairOut, arrows: toB,
+     shapes: () => [0, 3, MUD].map(wheelPart), ...example(0, 3, () => { grid[B] = MUD; grid[A] = grid[A - W]; })},
+    {say: "To remove mud, mix it with more mud", lit: pairLit, outline: pairOut, arrows: toB,
+     shapes: () => [wheelPart(MUD)], ...showing(() => {}, {before: () => { grid[A] = grid[B] = MUD; }, flags: {[A]: "clear", [B]: "clear"}})},
+    {say: "A row that's all one colour floats away", lit: [...Array(W).keys()].map(x => [x, H - 1]),
+     ...showing(() => { for (let x = 0; x < W; x++) grid[(H - 1) * W + x] = grid[(H - 1) * W]; })},
+    {say: "Curl up with the cat and get cozy", els: [$("napper")]});
+  G.spotlight({grid: $("board"), w: W, h: H, steps, done: () => G.save(SEEN, {seen: true})});
+}
+function helpCard() {
+  if (mode === "swipe") {
+    const media = document.createElement("div"), ol = document.createElement("ol"); ol.className = "steps";
+    for (const t of ["Swipe (or use the arrow keys) and every block slides that way, and a new block appears.",
+                     "Red, yellow and blue combine when they bump: two different ones make the colour between them, two the same join into one.",
+                     "Orange, green and purple never merge. Fill a whole row or column with one of them to clear it.",
+                     "You start with two of red, yellow and blue; the third comes after two lines. When the board fills and nothing can combine, it's over."]) {
+      const li = document.createElement("li"); li.textContent = t; ol.append(li);
+    }
+    media.append(ol);
+    G.openCard("How to play Swipe", "", [["Got it", G.closeCard, true]], media);
+    return;
+  }
+  const media = document.createElement("div"), ol = document.createElement("ol"); ol.className = "steps";
+  for (const t of ["Tap a block, then one next to it (up, down or sideways). The first slides onto the second and they mix like paint.",
+                   "Two colours two steps apart round the wheel make the one between them. Opposites make mud; two of the same join into one, and two muds vanish. Next-door colours don't mix.",
+                   "A row that's all one colour floats away. There's no goal and no timer."]) {
+    const li = document.createElement("li"); li.textContent = t; ol.append(li);
+  }
+  const tip = document.createElement("p"); tip.className = "tip";
+  tip.textContent = "Every colour has a symbol too, so you can play by shape. Colours lets you pick your own colours.";
+  media.append(ol, tip);
+  G.openCard("How to play", "", [["Show me on the board", () => { G.closeCard(); intro(true); }, true], ["Got it", G.closeCard]], media);
+}
+$("helpBtn").onclick = helpCard;
+// Players from before the spotlight already know their way round.
+if (hadBoard && !G.load(SEEN).seen) G.save(SEEN, {seen: true});
+setTimeout(intro, 300);
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
