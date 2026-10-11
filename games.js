@@ -196,9 +196,6 @@ const G = (() => {
     .bests td.num,.bests th.num{text-align:right}
     .bests tr.now td{font-weight:800}
     .card h3{margin:4px 0 6px;font-size:18px}
-    .card ol.steps{text-align:left;margin:0 0 14px;padding-left:24px;color:var(--ink);font-size:16px;line-height:1.35}
-    .card ol.steps li{margin:0 0 8px;display:list-item}
-    .card .tip{font-size:14px;margin:0 0 14px}
     .spot{position:fixed;inset:0;z-index:9;cursor:pointer;animation:spotIn .35s ease-out;-webkit-tap-highlight-color:transparent;touch-action:none}
     .spot:focus{outline:none}
     .spot svg{position:absolute;inset:0;display:block}
@@ -608,6 +605,10 @@ const G = (() => {
     next(); layer.focus({preventScroll: true});
   }
 
+  // How to play plays a game's walkthrough on its board. When there's no puzzle out to show it on (it's
+  // finished), say how to get one.
+  function helpLater() { note($("newBtn") ? `Tap ${$("newBtn").textContent.trim()}, then How to play.` : "Pick a level, then tap How to play.", 4000); }
+
   let msgTimer = null;
   function note(text, ms) {
     clearTimeout(msgTimer);
@@ -639,6 +640,6 @@ const G = (() => {
     }
   }
 
-  return {GAMES, $, nav, load, save, builder, openCard, closeCard, winCard, sizeUp, otherSize, note, cellAt, track, reopen,
+  return {GAMES, $, nav, load, save, builder, openCard, closeCard, winCard, sizeUp, otherSize, note, helpLater, cellAt, track, reopen,
           setupTimer, freshClock, spotlight, toysOff, saveToys, needToys, goldPaw, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, toyPicker, pickLook};
 })();
