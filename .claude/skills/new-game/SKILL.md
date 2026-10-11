@@ -65,8 +65,9 @@ Copy the structure of `tunnelrun/` or `opendoor/`: the head (BUILD check script,
   `hashchange`, call `G.readShare(slug)`, then `G.offerShare(d, {name, inProgress, open, after})`.
   `readShare` only returns data with `g` equal to the slug and a truthy `N`; check every other field
   before using it. A puzzle opened with progress isn't timed (`game.timed = false`).
-- **How to play:** a card (`G.openCard`) whose first button, "Show me on the board", replays the
-  walkthrough, and a first-visit walkthrough with `G.spotlight({grid, w, h, steps, done})`. The w × h
+- **How to play:** a first-visit walkthrough with `G.spotlight({grid, w, h, steps, done})`, and the How
+  to play button plays it again. There's no rules card, so every rule, control and tip goes in a step.
+  When there's no puzzle out to show it on, call `G.helpLater()`. The w × h
   squares fill `grid`'s client box unless a `map` function says where they are (see the comment above
   `spotlight` in `games.js`); Tunnel Run passes the div around its SVG. "Let's Play!" is placed in
   `grid`'s parent, which needs `position: relative` (`.wrap` has it).
