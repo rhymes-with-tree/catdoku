@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-11.4";
+  var BUILD = "2026-10-11.5";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-11.4">
+<link rel="stylesheet" href="../games.css?v=2026-10-11.5">
 <style>
 /* A wooden floor in the shade; sunbeams are patches of window light, each with a cat stretched out in it. */
 .board{border-color:#5C3A22;border-radius:12px;position:relative;z-index:2}
@@ -64,7 +64,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-11.4"></script>
+<script src="../games.js?v=2026-10-11.5"></script>
 <script>
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 // Split the grid into random rectangles, scanning for the first uncovered cell each time.
@@ -377,18 +377,21 @@ function showHelp() {
 function spotlightSteps() {
   const N = game.N, at = k => [k % N, Math.floor(k / N)], cats = game.clue.flatMap((n, k) => n ? [k] : []);
   const box = R => cellsIn(N, R).map(at), centre = k => Math.abs(k % N - (N - 1) / 2) + Math.abs(Math.floor(k / N) - (N - 1) / 2);
-  // a sunbeam around one cat (3 to 6 squares if there is one, near the middle), holding no other cat
-  let beam = null;
-  for (const k of cats.slice().sort((a, b) => (game.clue[a] >= 3 && game.clue[a] <= 6 ? 0 : 1) - (game.clue[b] >= 3 && game.clue[b] <= 6 ? 0 : 1) || centre(a) - centre(b))) {
-    const n = game.clue[k], r0 = Math.floor(k / N), c0 = k % N, fits = [];
+  // Example sunbeams, each round one cat and holding no other: a square at least 2 × 2 (beam) and a
+  // rectangle at least 2 squares each way that isn't square, round another cat (wide), so it's clear sunbeams
+  // needn't be one square wide. Failing those, the nearest thing: then cats of 4 to 9, near the middle.
+  const fits = [];
+  for (const k of cats) {
+    const n = game.clue[k], r0 = Math.floor(k / N), c0 = k % N;
     for (let h = 1; h <= n; h++) if (n % h === 0) { const w = n / h;
       for (let r = r0 - h + 1; r <= r0; r++) for (let c = c0 - w + 1; c <= c0; c++) {
         const R = {r, c, h, w};
-        if (r >= 0 && c >= 0 && r + h <= N && c + w <= N && valid(R)) fits.push(R);
+        if (r >= 0 && c >= 0 && r + h <= N && c + w <= N && valid(R)) fits.push({R, k, cost: (Math.min(w, h) >= 2 ? 0 : 1000) + (n >= 4 && n <= 9 ? 0 : 100) + centre(k)});
       } }
-    fits.sort((A, B) => Math.abs(A.w - A.h) - Math.abs(B.w - B.h));
-    if (fits.length) { beam = fits[0]; break; }
   }
+  const pick = (score, not) => fits.filter(f => f.k !== not).sort((a, b) => score(a) - score(b))[0];
+  const sq = pick(f => f.cost + (f.R.w === f.R.h ? 0 : 50)), beam = sq && sq.R;
+  const wd = pick(f => f.cost + (f.R.w !== f.R.h && Math.max(f.R.w, f.R.h) <= 2 * Math.min(f.R.w, f.R.h) ? 0 : 50), sq && sq.k), wide = wd ? wd.R : beam;
   // two cats in a line with an empty square between them (for the ❌), near the middle, and the
   // rectangle round both; failing that, two cats side by side
   let two = null;
@@ -398,13 +401,13 @@ function spotlightSteps() {
   }
   const show = R => ({enter: () => { game.rects.push(R); render(); }, leave: () => { game.rects.pop(); render(); }});
   const steps = [{say: "Every number is a cat", lit: cats.map(at), outline: cats.map(k => [at(k)])}];
-  if (beam) steps.push({say: "Each cat needs a rectangle of sunlight with that many squares", lit: box(beam), ...show(beam)});
+  if (beam) steps.push({say: "Each cat needs a rectangle or square of sunlight with that many squares", lit: box(beam), ...show(beam)});
   if (two) steps.push({say: "Just one cat per sunbeam", lit: box(two), marks: [[two.c + (two.w - 1) / 2, two.r + (two.h - 1) / 2, "❌", two.w * two.h === 2 ? 0.5 : 0.8]]});
   steps.push({say: "Fill the whole floor with sunshine", lit: [...Array(N * N).keys()].map(at)});
   if (beam) {
-    steps.push({say: "Drag from corner to corner to let the light in", lit: box(beam),
-                arrows: [{to: [beam.c, beam.r], from: [-1, -1]}, {to: [beam.c + beam.w, beam.r + beam.h], from: [1, 1]}], ...show(beam)},
-               {say: "Tap a sunbeam to take it away", lit: box(beam), ...show(beam)});
+    steps.push({say: "Drag from corner to corner to let the light in", lit: box(wide),
+                arrows: [{to: [wide.c, wide.r], from: [-1, -1]}, {to: [wide.c + wide.w, wide.r + wide.h], from: [1, 1]}], ...show(wide)},
+               {say: "Tap a sunbeam to take it away", lit: box(wide), ...show(wide)});
   }
   return steps;
 }
