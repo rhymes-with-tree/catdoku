@@ -285,10 +285,27 @@ def tunnelrun():
     return frame("#E8DCC4", out)
 
 
+# Copycat: four boxes, two open on the same toy, two still shut.
+def copycat():
+    out = ""
+    for r in range(2):
+        for c in range(2):
+            x, y = 16 + c * 36, 16 + r * 36
+            if (r, c) in ((0, 0), (1, 1)):
+                out += (f'<rect x="{x}" y="{y}" width="32" height="32" rx="3" fill="#E3C394" stroke="{INK}" stroke-width="2"/>'
+                        f'<path d="M{x} {y}L{x+7} {y+7}H{x+25}L{x+32} {y}M{x} {y+32}L{x+7} {y+25}H{x+25}L{x+32} {y+32}" fill="none" stroke="{INK}" stroke-width="1.5" opacity=".6"/>')
+                out += yarnball(x + 16, y + 16, 8, PLUM)
+            else:
+                out += (f'<rect x="{x}" y="{y}" width="32" height="32" rx="3" fill="#D9A86C" stroke="{INK}" stroke-width="2"/>'
+                        f'<line x1="{x}" y1="{y+16}" x2="{x+32}" y2="{y+16}" stroke="{INK}" stroke-width="1.5" opacity=".45"/>'
+                        f'<rect x="{x+12}" y="{y}" width="8" height="32" fill="#F3D7AE" opacity=".6"/>')
+    return frame("#C99A6B", out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")
