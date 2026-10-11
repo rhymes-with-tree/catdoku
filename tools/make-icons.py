@@ -260,10 +260,35 @@ def opendoor():
     return frame("#F3EBDD", out)
 
 
+# Tunnel Run: tunnel pieces on a rug round the cat's bed, the joined ones purple and crinkly, one still grey.
+def tunnelrun():
+    s, o = 24, 14
+    PURPLE, RIB, GREY, EDGE = "#9874CA", "#7C5AB0", "#8C98AA", "#3E3848"
+    # each square: the sides its tunnel opens onto (u r d l), and whether it's joined yet
+    tiles = [("rd", 1), ("rdl", 1), ("l", 1), ("ud", 1), ("u", 1), ("ud", 0), ("ur", 1), ("rl", 1), ("l", 1)]
+    out = f'<rect x="{o+s+3}" y="{o+s+3}" width="{s-6}" height="{s-6}" rx="7" fill="#E7A9A0" stroke="#C98378" stroke-width="1.5"/>'
+    for layer in ("edge", "tube", "rib"):
+        for k, (sides, on) in enumerate(tiles):
+            cx, cy = o + k % 3 * s + s / 2, o + k // 3 * s + s / 2
+            ends = {"u": (cx, cy - s / 2), "r": (cx + s / 2, cy), "d": (cx, cy + s / 2), "l": (cx - s / 2, cy)}
+            d = "".join(f"M{cx} {cy}L{ends[c][0]} {ends[c][1]}" for c in sides)
+            if layer == "edge":
+                out += f'<circle cx="{cx}" cy="{cy}" r="6.5" fill="{EDGE}"/><path d="{d}" stroke="{EDGE}" stroke-width="13" fill="none"/>'
+            elif layer == "tube":
+                c = PURPLE if on else GREY
+                out += f'<path d="{d}" stroke="{c}" stroke-width="10" fill="none"/><circle cx="{cx}" cy="{cy}" r="5" fill="{c}"/>'
+                if len(sides) == 1 and k != 4:
+                    out += f'<circle cx="{cx}" cy="{cy}" r="3.2" fill="#3A2F45"/>'
+            elif on and len(sides) > 1:
+                out += f'<path d="{d}" stroke="{RIB}" stroke-width="10" stroke-dasharray="1.2 2.6" fill="none" opacity=".8"/>'
+    out += catface(o + s * 1.5, o + s * 1.5 + 1, 6.5)   # the cat on its bed
+    return frame("#E8DCC4", out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor}
+         "opendoor": opendoor, "tunnelrun": tunnelrun}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")
