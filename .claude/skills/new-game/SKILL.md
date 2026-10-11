@@ -1,6 +1,6 @@
 ---
 name: new-game
-description: Add a new game to the Catdoku site, from choosing an idea through a playable preview to a finished game page and PR. Use when the user wants ideas for new games, wants to try one out, or wants one added to the site.
+description: Add a new game to the Catdoku site, from a playable preview to a finished game page and PR. Use when the user wants to try out a game idea or have one added to the site.
 ---
 
 # Adding a game
@@ -9,16 +9,13 @@ Each game is one page, `<slug>/index.html`, using the shared `games.css` and `ga
 The front page (`index.html`) and every game's menu list the games from `G.GAMES`. The user plays on a
 phone, so check layouts at about 400 px wide.
 
-Order: idea, preview, port, housekeeping, test, branch and PR.
+Order: theme, preview, port, housekeeping, test, branch and PR.
 
-## 1. Idea
+## 1. Theme
 
-- Read the README's game sections and `G.GAMES` in `games.js`. Compare candidates with the existing
-  games by mechanic (what the player does: place, sort, slide, rotate, connect, fill in numbers), not
-  by theme, and say when an existing game already uses a candidate's mechanic.
-- Name each candidate by its genre and a well-known example the user will recognise (Simon Tatham's
-  Puzzles, an NYT or LinkedIn game, a popular app). Leave themes out until the user picks one.
-- Then offer a few cat themes for the chosen game and recommend one.
+The user brings the game idea. Read the README's game sections and `G.GAMES` in `games.js`, and if an
+existing game already uses the same mechanic (what the player does: place, sort, slide, rotate,
+connect, fill in numbers), say which. Then offer a few cat themes for it and recommend one.
 
 ## 2. Preview
 
