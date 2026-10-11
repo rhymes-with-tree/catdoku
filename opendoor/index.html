@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-11.1"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-11.3"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-11.1">
+<link rel="stylesheet" href="../games.css?v=2026-10-11.3">
 <style>
 /* A KenKen house: every row and column holds 1 to N once, and walls split the floor into rooms whose numbers
    must make the room's sign. Each room has a door that opens when the room is right; with every door open,
@@ -72,7 +72,8 @@
 .key{width:var(--board);text-align:center;font-weight:600;font-size:15px;color:var(--ink-soft);margin-top:-6px}
 .rulesPic{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;margin:0 0 12px}
 .rulesPic figure{margin:0;font-size:13px;color:var(--ink-soft)}
-.rulesPic svg{width:96px;height:auto;display:block;margin:0 auto 2px}
+.rulesPic figure{max-width:120px;text-align:center}
+.rulesPic svg{max-width:100%;height:auto;display:block;margin:0 auto 2px}
 @media (prefers-reduced-motion:reduce){.door{transition:none}.runner,.runner svg,.runner .legsA,.runner .legsB{animation:none}}
 </style>
 </head>
@@ -96,6 +97,7 @@
     <button id="undoBtn">Undo</button>
     <button id="clearBtn">Clear</button>
     <button id="notesBtn" aria-pressed="false">Notes</button>
+    <button id="allNotesBtn">All notes</button>
     <button id="shareBtn">Share</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
@@ -107,7 +109,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-11.1"></script>
+<script src="../games.js?v=2026-10-11.3"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N grid where every row and column holds 1 to N once, cut into rooms (cages). Each room has a sign:
@@ -364,7 +366,7 @@ function draw() {
   const open = right.filter(Boolean).length, rooms = plan.rooms.length;
   $("count").textContent = game.won ? "Every door is open!" : `${open} of ${rooms} doors open`;
   $("key").textContent = noting ? "Notes: tap numbers to jot them down as maybes" : sel < 0 && !game.won ? "Tap a square, then a number" : "";
-  $("hintBtn").disabled = game.won;
+  $("hintBtn").disabled = game.won; $("allNotesBtn").disabled = game.won;
   $("undoBtn").disabled = !game.history.length || game.won; $("clearBtn").disabled = !game.history.length || game.won;
   return {clash, right, wrong};
 }
@@ -443,6 +445,17 @@ function makePad() {
   const er = document.createElement("button"); er.className = "erase"; er.textContent = "⌫"; er.setAttribute("aria-label", "Erase"); er.onclick = () => put(0); pad.append(er);
 }
 $("notesBtn").onclick = () => { if (!game || game.won) return; noting = !noting; draw(); };
+// All notes: every empty square gets every number from 1 to N as a note (not just the ones that could fit),
+// ready to cross off. Undo takes them away again.
+$("allNotesBtn").onclick = () => {
+  if (!playing()) return;
+  const full = (1 << (game.N + 1)) - 2;
+  if (game.grid.every((v, i) => v || game.notes[i] === full)) { G.note("They're all there already", 3000); return; }
+  snapshot();
+  game.notes = game.notes.map((m, i) => game.grid[i] ? m : full);
+  game.started = true; draw(); save();
+  G.note(`Notes 1 to ${game.N} in every empty square`, 3000);
+};
 document.addEventListener("keydown", e => {
   if (!playing() || document.querySelector(".spot") || e.target.tagName === "SELECT" || e.ctrlKey || e.metaKey || e.altKey) return;
   const N = game.N, k = e.key;
@@ -573,14 +586,30 @@ function openShared(d) {
 
 /* ---------- how to play ---------- */
 function rulesPicture() {
-  // a two-square room signed 3+ holding 1 and 2, with its door swung open
-  const room = (sign, a, b, open) => `<svg viewBox="-.1 -.1 2.2 1.2"><rect x="0" y="0" width="2" height="1" fill="${open ? "#FFF4D6" : "#EFE2CC"}"/>
-    <path d="M1 0V1" stroke="rgba(42,37,48,.25)" stroke-width=".02"/>
-    <path d="M0 0H2V1H1.82M1.18 1H0Z" fill="none" stroke="#2A2530" stroke-width=".08" stroke-linejoin="round"/>
-    <g style="transform-origin:1.82px 1px;transform:rotate(${open ? 90 : 0}deg)"><rect x="1.18" y=".945" width=".64" height=".11" rx=".03" fill="#B07C4F" stroke="#2A2530" stroke-width=".025"/></g>
-    <text x=".07" y=".25" font-size=".24" font-weight="800" fill="#2A2530">${sign}</text>
-    <text x=".5" y=".72" font-size=".5" font-weight="800" text-anchor="middle" fill="#2A2530">${a}</text><text x="1.5" y=".72" font-size=".5" font-weight="800" text-anchor="middle" fill="#2A2530">${b}</text></svg>`;
-  return `<figure>${room("3+", 1, 2, true)}<figcaption>1 + 2 = 3: open!</figcaption></figure><figure>${room("6×", 2, 4, false)}<figcaption>2 × 4 isn't 6: shut</figcaption></figure>`;
+  // A finished room with its door open: cells are [x, y, number], the sign goes in the first, and the door hangs
+  // in the bottom wall of the last.
+  const room = (sign, cells) => {
+    const w = Math.max(...cells.map(c => c[0])) + 1, h = Math.max(...cells.map(c => c[1])) + 1;
+    const has = (x, y) => cells.some(c => c[0] === x && c[1] === y), [dx, dy] = cells[cells.length - 1];
+    let walls = "", seams = "";
+    for (const [x, y] of cells) {
+      for (const [ax, ay, bx, by, nx, ny] of [[x, y, x + 1, y, x, y - 1], [x + 1, y, x + 1, y + 1, x + 1, y], [x, y + 1, x + 1, y + 1, x, y + 1], [x, y, x, y + 1, x - 1, y]]) {
+        if (has(nx, ny)) { seams += `M${ax} ${ay}L${bx} ${by}`; continue; }
+        if (x === dx && y === dy && ay === y + 1 && by === y + 1) walls += `M${x} ${y + 1}H${x + .18}M${x + .82} ${y + 1}H${x + 1}`;   // the doorway
+        else walls += `M${ax} ${ay}L${bx} ${by}`;
+      }
+    }
+    return `<svg viewBox="-.1 -.1 ${w + .2} ${h + .2}" style="width:${w * 48}px">
+      ${cells.map(([x, y]) => `<rect x="${x}" y="${y}" width="1" height="1" fill="#FFF4D6"/>`).join("")}
+      <path d="${seams}" stroke="rgba(42,37,48,.25)" stroke-width=".02"/>
+      <path d="${walls}" fill="none" stroke="#2A2530" stroke-width=".08" stroke-linecap="round"/>
+      <g style="transform-origin:${dx + .82}px ${dy + 1}px;transform:rotate(90deg)"><rect x="${dx + .18}" y="${dy + .945}" width=".64" height=".11" rx=".03" fill="#B07C4F" stroke="#2A2530" stroke-width=".025"/></g>
+      <text x="${cells[0][0] + .07}" y="${cells[0][1] + .25}" font-size=".24" font-weight="800" fill="#2A2530">${sign}</text>
+      ${cells.map(([x, y, v]) => `<text x="${x + .5}" y="${y + .72}" font-size=".5" font-weight="800" text-anchor="middle" fill="#2A2530">${v}</text>`).join("")}</svg>`;
+  };
+  return `<figure>${room("3+", [[0, 0, 1], [1, 0, 2]])}<figcaption>1 + 2 = 3</figcaption></figure>
+    <figure>${room("2−", [[0, 0, 1], [1, 0, 3]])}<figcaption>3 − 1 = 2: either way round</figcaption></figure>
+    <figure>${room("5+", [[0, 0, 2], [1, 0, 1], [1, 1, 2]])}<figcaption>Two 2s, in different rows and columns</figcaption></figure>`;
 }
 function showHelp() {
   const media = document.createElement("div"), N = game ? game.N : 4;
@@ -588,12 +617,14 @@ function showHelp() {
   const ol = document.createElement("ol"); ol.className = "steps";
   for (const t of [`Fill every square with a number from 1 to ${N}.`,
                    "Every row and every column has each number once.",
-                   "Walls split the house into rooms. A room's numbers must make its sign: 7+ adds up to 7, 2− is a difference of 2, 12× multiplies to 12, 3÷ divides to 3. A room with no sign beside its number is just that number.",
+                   "Walls split the house into rooms. A room's numbers must make its sign: 7+ adds up to 7, 12× multiplies to 12. A room with no sign beside its number is just that number.",
+                   "− and ÷ work either way round: take the smaller number from the bigger, or divide the bigger by the smaller. 2− can be 3 and 1 or 1 and 3, and 3÷ can be 6 and 2 or 2 and 6.",
+                   "A number can be used more than once in a room, as long as it isn't twice in the same row or column.",
                    "Get a room right and its door opens. Open every door and the cat can run through!"]) {
     const li = document.createElement("li"); li.textContent = t; ol.append(li);
   }
   const tip = document.createElement("p"); tip.className = "tip";
-  tip.textContent = "Tap a square, then a number (tap it again to take it away). A number that's already in its row or column turns red, and a full room whose numbers don't make its sign has its sign in red. Notes lets you jot down numbers a square might be. Stuck? Hint points out a wrong number, or fills in a square for you (you stay on the same level). Every puzzle has exactly one answer.";
+  tip.textContent = `Tap a square, then a number (tap it again to take it away). A number that's already in its row or column turns red, and a full room whose numbers don't make its sign has its sign in red. Notes lets you jot down numbers a square might be, and All notes puts every number from 1 to ${N} in every empty square for you to cross off. Stuck? Hint points out a wrong number, or fills in a square for you (you stay on the same level). Every puzzle has exactly one answer.`;
   media.append(pics, ol, tip);
   G.openCard("How to play", "", [["Show me on the board", () => { G.closeCard(); settings.seenHelp = false; helpOnFirstVisit(); }, true],
     ["Got it", () => { G.closeCard(); settings.seenHelp = true; save(); }]], media);
@@ -606,11 +637,17 @@ function helpOnFirstVisit() {
   // the example room: the first with two or more squares and a sign
   const k = plan.rooms.findIndex(r => r.cells.length > 1), room = plan.rooms[k], lit = room.cells.map(xy);
   const what = {"+": "add up to", "-": "have a difference of", "x": "multiply to", "/": "divide to make"}[room.op];
+  // a − or ÷ room, to say the order doesn't matter, and a bent room (not all in one line), where a number can repeat
+  const extra = [], diff = plan.rooms.find(r => r.op === "-" || r.op === "/");
+  if (diff) extra.push({say: `Either way round: ${diff.t}${OPS[diff.op]} is the bigger number ${diff.op === "-" ? "minus" : "divided by"} the smaller`, lit: diff.cells.map(xy), outline: [diff.cells.map(xy)]});
+  const bent = plan.rooms.find(r => new Set(r.cells.map(i => i % N)).size > 1 && new Set(r.cells.map(i => Math.floor(i / N))).size > 1);
+  if (bent) extra.push({say: "A number can repeat in a room, just not in the same row or column", lit: bent.cells.map(xy), outline: [bent.cells.map(xy)]});
   const steps = [
     {say: `Fill every square with a number from 1 to ${N}`, lit: all},
     {say: "Every row has each number once", lit: row(Math.floor(N / 2))},
     {say: "So does every column", lit: col(Math.floor(N / 2))},
     {say: `Walls make rooms. This room's numbers must ${what} ${room.t}`, lit, outline: [lit]},
+    ...extra,
     {say: "Get a room right and its door opens 🚪", lit, outline: [lit], tone: "ok", enter: () => { forceOpen = k; draw(); }, leave: () => { forceOpen = -1; draw(); }},
     {say: "Open every door and the cat runs through 🐈", lit: all, tone: "ok"},
     {say: "Tap a square, then a number", els: [$("pad")]},
