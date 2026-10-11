@@ -21,7 +21,8 @@ the same file path so the link stays the same.
 
 - Write the page without `<!DOCTYPE>`, `<html>`, `<head>` or `<body>`; the artifact adds them. Start
   with `<title>`, the Baloo 2 font link, and one `<style>` holding `games.css` and the page's own CSS.
-  Then the markup, `games.js` in a `<script>`, and the page's script.
+  Then the markup, `games.js` in a `<script>` (and `colorways.js` if the game uses it), and the page's
+  script.
 - An artifact can't reach the rest of the site or other hosts. Pictures from `cats/` or `toys/` show
   only if embedded as `data:` URIs, the win card's cat photo (TheCatAPI) doesn't load, the games menu
   links go nowhere, and share links don't work (only a bare `#token` reaches the page). Hide the games
@@ -54,7 +55,8 @@ Copy the structure of `tunnelrun/` or `opendoor/`: the head (BUILD check script,
 - **Saving:** `G.load`/`G.save` under `catdoku.<slug>.v1`. Reopen a save inside `G.reopen(fn, fresh)`;
   if `fn` throws, `fresh(message)` should start a new puzzle and show the message.
 - **Winning:** `G.winCard(text, onNext, admire, result, {title, gold, goldWhy, next, after})`, with
-  `after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")`. Gold paw rules
+  `after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")`. When `gold` is
+  true the card's title is "Gold paw!", so `title` only shows on other wins. Gold paw rules
   differ by game (README, "Across every game"). For a logic puzzle, follow Tunnel Run and Open the
   Door!: a hint, Undo, Restart or Clear costs the gold paw; a hint also keeps the player on the same
   level, and a win without one moves up. Tunnel Run: `gold: !game.undid && !game.hinted`,
@@ -107,13 +109,13 @@ Serve the repo and drive it with Playwright at about 400 × 860. Load Playwright
 - no page errors (failed loads of fonts, GoatCounter and cat photos are expected offline);
 - the front page shows the new tile and icon.
 
-Syntax-check the main script with `node --check` on the extracted `<script>` block. Shell state doesn't
+Syntax-check the main script with `node --check` on the extracted `<script>` block. Variables don't
 carry between commands, so start the server, run the tests and stop it in one command
 (`python3 -m http.server 8766 & S=$!; …; kill $S`), or stop a leftover one with `fuser -k 8766/tcp`.
 Don't use `pkill -f`: the pattern matches the shell running the command and kills it.
 
 ## 6. Branch and PR
 
-Branch `claude/<slug>` from `main`. One commit, described like the earlier game commits (what the game
-is, how puzzles are made, levels, features, build bump). Push and open a PR. Don't subscribe to or watch
-it; the user merges when ready.
+Branch `claude/<slug>` from `main`, unless the session names a branch to use. One commit, described
+like the earlier game commits (what the game is, how puzzles are made, levels, features, build bump).
+Push and open a PR. Don't subscribe to or watch it; the user merges when ready.
