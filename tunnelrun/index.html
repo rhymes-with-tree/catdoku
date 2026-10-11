@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tunnel Run</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-11.1"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-11.1">
+<style>
+/* A rug covered in pieces of cat tunnel, with the cat's bed in the middle. Turn the pieces until they all join
+   into one network; pieces joined to the bed turn purple and crinkly, and when every one is joined the cat runs
+   through the lot. */
+.rug{--off:#8C98AA; --on:#9874CA; --on-ring:#7C5AB0; --zoom:#ECA818; --zoom-ring:#C98A0E; --edge:#3E3848;
+  background:#E8DCC4;border:3px solid var(--ink);border-radius:10px;overflow:hidden;
+  touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.rug .grid{position:absolute;inset:0}
+.rug svg{display:block;width:100%;height:100%;outline:none}
+.piece{cursor:pointer;transform-box:view-box;transition:transform .16s ease-out}
+.piece.fixed{cursor:default}
+.tube{stroke:var(--off);transition:stroke .2s}
+.hub{fill:var(--off);transition:fill .2s}
+.ring{stroke:transparent;transition:stroke .2s}
+.edge{stroke:var(--edge)} .edgehub{fill:var(--edge)}
+.mouth{fill:#3A2F45}
+.lit .tube{stroke:var(--on)} .lit .hub{fill:var(--on)} .lit .ring{stroke:var(--on-ring)}
+.zoomed .tube{stroke:var(--zoom)} .zoomed .hub{fill:var(--zoom)} .zoomed .ring{stroke:var(--zoom-ring)}
+/* tunnels that join up with each other but go round in a loop, never reaching the bed */
+.lost .tube{animation:lost .7s ease-in-out infinite alternate}
+@keyframes lost{to{stroke:#E16A4A}}
+.hintbox{fill:none;stroke:#6AA673;stroke-width:8;pointer-events:none;animation:glow .45s ease-in-out infinite alternate}
+@keyframes glow{to{stroke-opacity:.35}}
+.cursor{fill:none;stroke:#73A7AE;stroke-width:6;pointer-events:none}
+.cat{font-size:54px;pointer-events:none}
+@media (prefers-reduced-motion:reduce){.piece,.tube,.hub,.ring{transition:none}.hintbox,.lost .tube{animation:none}.lost .tube{stroke:#E16A4A}}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Tunnel Run</h1><div class="stripe"></div><p class="tagline">Assemble the tunnels so the cat can run through them all!</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap rug" id="board"><div class="grid" id="grid"><svg id="svg" tabindex="0" role="application" aria-label="Tunnel pieces on a rug. Tap a piece to turn it; arrow keys and Space work too."></svg></div></div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="shareBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New tunnels</button>
+  </div>
+
+</main>
+
+<script src="../games.js?v=2026-10-11.1"></script>
+<script>
+/* ---------- tunnel networks (plain functions, also run in a background worker) ---------- */
+// A piece's tunnels are a 4-bit mask of the sides they open onto: 1 up, 2 right, 4 down, 8 left.
+// Every network is a tree grown from the bed in the middle, so it joins every piece with no loops.
+function levelSize(n) { return [null, 5, 6, 7, 8, 9, 10, 11][n]; }
+function rot(m) { return ((m << 1) | (m >> 3)) & 15; }   // a quarter turn clockwise
+function opp(d) { return ((d << 2) | (d >> 2)) & 15; }   // the side facing it
+function bits(m) { return (m & 1) + (m >> 1 & 1) + (m >> 2 & 1) + (m >> 3 & 1); }
+// The square through side d of square i, or -1 off the edge.
+function nbr(N, i, d) {
+  const x = i % N, y = Math.floor(i / N);
+  if (d === 1) return y > 0 ? i - N : -1;
+  if (d === 4) return y < N - 1 ? i + N : -1;
+  if (d === 8) return x > 0 ? i - 1 : -1;
+  return x < N - 1 ? i + 1 : -1;
+}
+// Every way a piece can lie, as a set of masks (bit m set: mask m).
+function turnsOf(m) { let s = 0; for (let k = 0; k < 4; k++) { s |= 1 << m; m = rot(m); } return s; }
+
+// Grow a random network over the whole rug from the middle, with no four-way crossings.
+function growTree(N) {
+  for (;;) {
+    const cells = new Array(N * N).fill(0), inTree = new Array(N * N).fill(false), start = (N >> 1) * N + (N >> 1);
+    inTree[start] = true;
+    const frontier = []; let count = 1;
+    const add = i => { for (const d of [1, 2, 4, 8]) { const j = nbr(N, i, d); if (j >= 0 && !inTree[j]) frontier.push([i, d, j]); } };
+    add(start);
+    while (count < N * N && frontier.length) {
+      const k = Math.floor(Math.random() * frontier.length), [i, d, j] = frontier[k];
+      frontier[k] = frontier[frontier.length - 1]; frontier.pop();
+      if (inTree[j] || bits(cells[i]) >= 3) continue;
+      cells[i] |= d; cells[j] |= opp(d); inTree[j] = true; count++;
+      add(j);
+    }
+    if (count === N * N) return cells;
+  }
+}
+
+// Find the answers to a set of pieces, stopping at `limit`. The bed's piece (fixed, if given) never turns.
+// Each piece keeps a set of ways it could lie; a side every way opens (or none does) settles the neighbour's
+// side too. Then: no loop among the tunnels that are certain, everything still able to join up, and two dead
+// ends never face each other (they'd be cut off). Where that runs out, try each way for the most settled piece.
+function solveNet(N, pieces, limit, fixed) {
+  const n = N * N, dom = new Array(n), D = [1, 2, 4, 8];
+  for (let i = 0; i < n; i++) {
+    let s = i === fixed ? 1 << pieces[i] : turnsOf(pieces[i]);
+    for (let m = 0; m < 16; m++) if (s >> m & 1) {
+      for (const d of D) if ((m & d) && nbr(N, i, d) < 0) { s &= ~(1 << m); break; }
+      if (bits(pieces[i]) === 1 && n > 2) { const j = nbr(N, i, m); if (j >= 0 && bits(pieces[j]) === 1) s &= ~(1 << m); }
+    }
+    dom[i] = s;
+  }
+  const sols = [];
+  const andOf = s => { let a = 15; for (let m = 0; m < 16; m++) if (s >> m & 1) a &= m; return a; };
+  const orOf = s => { let o = 0; for (let m = 0; m < 16; m++) if (s >> m & 1) o |= m; return o; };
+  const keep = (s, want) => { let r = 0; for (let m = 0; m < 16; m++) if ((s >> m & 1) && want(m)) r |= 1 << m; return r; };
+  function settle(dom, queue) {
+    const inQ = new Uint8Array(n); for (const i of queue) inQ[i] = 1;
+    while (queue.length) {
+      const i = queue.pop(); inQ[i] = 0;
+      const must = andOf(dom[i]), may = orOf(dom[i]);
+      for (const d of D) {
+        const j = nbr(N, i, d); if (j < 0) continue;
+        const od = opp(d); let s = dom[j];
+        if (!(may & d)) s = keep(s, m => !(m & od));
+        if (must & d) s = keep(s, m => (m & od));
+        if (s !== dom[j]) { if (!s) return false; dom[j] = s; if (!inQ[j]) { inQ[j] = 1; queue.push(j); } }
+      }
+    }
+    return true;
+  }
+  function joinsUp(dom) {
+    const p1 = Array.from({length: n}, (_, i) => i), p2 = p1.slice();
+    const find = (p, a) => { while (p[a] !== a) a = p[a] = p[p[a]]; return a; };
+    let parts = n;
+    for (let i = 0; i < n; i++) {
+      const must = andOf(dom[i]), may = orOf(dom[i]);
+      for (const d of [2, 4]) {
+        const j = nbr(N, i, d); if (j < 0) continue;
+        if (must & d) { const a = find(p1, i), b = find(p1, j); if (a === b) return false; p1[a] = b; }
+        if (may & d) { const a = find(p2, i), b = find(p2, j); if (a !== b) { p2[a] = b; parts--; } }
+      }
+    }
+    return parts === 1;
+  }
+  function search(dom) {
+    if (sols.length >= limit || !joinsUp(dom)) return;
+    let best = -1, fewest = 99;
+    for (let i = 0; i < n; i++) { let c = 0, v = dom[i]; while (v) { v &= v - 1; c++; } if (c > 1 && c < fewest) { fewest = c; best = i; } }
+    if (best < 0) {
+      const sol = dom.map(s => 31 - Math.clz32(s));
+      if (sol.reduce((t, m) => t + bits(m), 0) / 2 === n - 1) sols.push(sol);   // joined, no loops: one network
+      return;
+    }
+    for (let m = 0; m < 16 && sols.length < limit; m++) if (dom[best] >> m & 1) {
+      const d2 = dom.slice(); d2[best] = 1 << m;
+      if (settle(d2, [best])) search(d2);
+    }
+  }
+  const d0 = dom.slice();
+  if (settle(d0, [...Array(n).keys()])) search(d0);
+  return sols;
+}
+// Cut the tunnel on one side of square i, then join the two halves somewhere else.
+function reroute(N, tree, i) {
+  const ds = [1, 2, 4, 8].filter(d => tree[i] & d), d = ds[Math.floor(Math.random() * ds.length)], j = nbr(N, i, d);
+  const t = tree.slice(); t[i] &= ~d; t[j] &= ~opp(d);
+  const side = new Uint8Array(N * N), stack = [i]; side[i] = 1;
+  while (stack.length) { const c = stack.pop(); for (const e of [1, 2, 4, 8]) if (t[c] & e) { const k = nbr(N, c, e); if (!side[k]) { side[k] = 1; stack.push(k); } } }
+  const ways = [];
+  for (let c = 0; c < N * N; c++) if (side[c]) for (const e of [1, 2, 4, 8]) {
+    const k = nbr(N, c, e);
+    if (k < 0 || side[k] || (c === i && e === d) || bits(t[c]) >= 3 || bits(t[k]) >= 3) continue;
+    ways.push([c, e, k]);
+  }
+  if (!ways.length) return null;
+  const [c, e, k] = ways[Math.floor(Math.random() * ways.length)];
+  t[c] |= e; t[k] |= opp(e);
+  return t;
+}
+// A network with exactly one answer: while a second answer turns up, re-route a tunnel where the two differ.
+function makePuzzle(level) {
+  const N = levelSize(level), bed = (N >> 1) * N + (N >> 1);
+  for (;;) {
+    let tree = growTree(N);
+    for (let tries = 0; tries < 400; tries++) {
+      const sols = solveNet(N, tree, 2, bed);
+      if (sols.length === 1) return {N, sol: tree};
+      const diff = [];
+      for (let i = 0; i < N * N; i++) if (sols[0][i] !== sols[1][i]) diff.push(i);
+      tree = reroute(N, tree, diff[Math.floor(Math.random() * diff.length)]) || tree;
+    }
+  }
+}
+
+/* ---------- game state ---------- */
+const STORE = "catdoku.tunnelrun.v1", MAX_LEVEL = 7;
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1}, state.settings);
+let game = state.game || null, busy = false, running = false, hinting = false, cursor = -1;
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
+const levelName = n => { const N = levelSize(n); return `Level ${n} · ${N} × ${N}`; };
+const build = G.builder([levelSize, rot, opp, bits, nbr, turnsOf, growTree, solveNet, reroute, makePuzzle], "makePuzzle");
+const bedOf = N => (N >> 1) * N + (N >> 1);
+const rotN = (m, k) => { for (k = ((k % 4) + 4) % 4; k > 0; k--) m = rot(m); return m; };
+// How a piece lies now: its answer turned a quarter turn clockwise game.turns[i] times.
+const cur = i => rotN(game.sol[i], game.turns[i]);
+
+/* ---------- drawing ---------- */
+// Each piece is drawn the way its answer lies and turned as a whole, so turning it animates.
+// `angle` keeps adding up, so a piece always turns the way it was tapped.
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+let pieces = [], angle = [];
+function draw() {
+  const svg = $("svg"), N = game.N, bed = bedOf(N), S = N * 100;
+  svg.innerHTML = ""; svg.setAttribute("viewBox", `0 0 ${S} ${S}`);
+  const bx = bed % N * 100 + 50, by = Math.floor(bed / N) * 100 + 50;
+  el("rect", {x: bx - 46, y: by - 46, width: 92, height: 92, rx: 30, fill: "#E7A9A0", stroke: "#C98378", "stroke-width": 5}, svg);
+  pieces = []; angle = [];
+  for (let i = 0; i < N * N; i++) {
+    const x = i % N * 100, y = Math.floor(i / N) * 100, cx = x + 50, cy = y + 50, m = game.sol[i];
+    const g = el("g", {class: "piece" + (i === bed ? " fixed" : ""), "data-i": i}, svg);
+    g.style.transformOrigin = `${cx}px ${cy}px`;
+    el("rect", {x, y, width: 100, height: 100, fill: "transparent"}, g);
+    const path = [1, 2, 4, 8].filter(d => m & d).map(d => `M${cx} ${cy}L${d === 2 ? x + 100 : d === 8 ? x : cx} ${d === 1 ? y : d === 4 ? y + 100 : cy}`).join("");
+    el("circle", {cx, cy, r: 24, class: "edgehub"}, g);
+    el("path", {d: path, class: "edge", "stroke-width": 48, fill: "none"}, g);
+    el("circle", {cx, cy, r: 20, class: "hub"}, g);
+    el("path", {d: path, class: "tube", "stroke-width": 40, fill: "none"}, g);
+    // the crinkly ribs, shown once a piece is joined to the bed
+    el("path", {d: path, class: "ring", "stroke-width": 40, fill: "none", "stroke-dasharray": "4 10", "stroke-dashoffset": -24}, g);
+    el("circle", {cx, cy, r: 20, class: "hub"}, g);
+    if (bits(m) === 1) el("circle", {cx, cy, r: 13, class: "mouth"}, g);   // a dead end: the tunnel's open mouth
+    angle[i] = game.turns[i] * 90;
+    g.style.transform = `rotate(${angle[i]}deg)`;
+    pieces.push(g);
+  }
+  el("rect", {x: -200, y: -200, width: 92, height: 92, rx: 10, class: "cursor", id: "cursor"}, svg);
+  el("rect", {x: -200, y: -200, width: 88, height: 88, rx: 14, class: "hintbox", id: "hintbox"}, svg);
+  const cat = el("text", {x: bx, y: by + 4, "text-anchor": "middle", "dominant-baseline": "middle", class: "cat", id: "cat"}, svg);
+  cat.textContent = "🐈";
+  showCursor(); update();
+}
+// Which pieces are joined to the bed.
+function joined() {
+  const N = game.N, bed = bedOf(N), lit = new Uint8Array(N * N), stack = [bed]; lit[bed] = 1; let count = 1;
+  while (stack.length) {
+    const i = stack.pop(), m = cur(i);
+    for (const d of [1, 2, 4, 8]) if (m & d) {
+      const j = nbr(N, i, d);
+      if (j >= 0 && !lit[j] && (cur(j) & opp(d))) { lit[j] = 1; count++; stack.push(j); }
+    }
+  }
+  return {lit, count};
+}
+function update() {
+  const N = game.N, all = N * N, {lit, count} = joined();
+  pieces.forEach((g, i) => g.classList.toggle("lit", !!lit[i]));
+  // Every tunnel meeting another, but not every piece joined: some go round in a loop that never reaches the bed.
+  let loose = 0;
+  for (let i = 0; i < all; i++) for (const d of [1, 2, 4, 8]) if (cur(i) & d) { const j = nbr(N, i, d); if (j < 0 || !(cur(j) & opp(d))) loose++; }
+  const lost = !game.won && count < all && !loose;
+  pieces.forEach((g, i) => g.classList.toggle("lost", lost && !lit[i]));
+  const left = all - count;
+  $("count").textContent = game.won ? "Every tunnel joined!" : lost ? "These tunnels go round in a loop" : left <= 3 ? `Almost! ${left} grey piece${left === 1 ? "" : "s"} to join` : `${count} of ${all} joined`;
+  $("hintBtn").disabled = game.won || hinting;
+  $("undoBtn").disabled = !game.history.length || game.won;
+  $("restartBtn").disabled = !game.history.length || game.won;
+  return count === all;
+}
+// Turn the pictures to match game.turns (after Undo or Restart), each the short way round.
+function lineUp() {
+  pieces.forEach((g, i) => {
+    let a = game.turns[i] * 90;
+    while (a - angle[i] > 180) a -= 360;
+    while (angle[i] - a > 180) a += 360;
+    angle[i] = a; g.style.transform = `rotate(${a}deg)`;
+  });
+}
+
+/* ---------- playing ---------- */
+function turn(i, dir) {
+  if (!playing() || i === bedOf(game.N)) return;
+  game.started = true;
+  game.turns[i] = (game.turns[i] + dir + 4) % 4;
+  angle[i] += dir * 90; pieces[i].style.transform = `rotate(${angle[i]}deg)`;
+  game.history.push([i, dir]);
+  if (update()) { win(); return; }
+  save();
+}
+// Tap turns a piece clockwise; press and hold (or right-click) turns it back.
+let press = null;
+$("svg").addEventListener("pointerdown", e => {
+  const g = e.target.closest(".piece"); if (!g || !playing()) return;
+  const i = +g.dataset.i;
+  press = {i, held: false, t: setTimeout(() => { press.held = true; turn(i, -1); }, 450)};
+});
+$("svg").addEventListener("pointerup", e => {
+  if (!press) return;
+  clearTimeout(press.t);
+  const g = e.target.closest(".piece");
+  if (!press.held && g && +g.dataset.i === press.i) turn(press.i, 1);
+  press = null;
+});
+for (const ev of ["pointercancel", "pointerleave"]) $("svg").addEventListener(ev, () => { if (press) { clearTimeout(press.t); press = null; } });
+$("svg").addEventListener("contextmenu", e => {
+  e.preventDefault(); if (press) { clearTimeout(press.t); press = null; }
+  const g = e.target.closest(".piece"); if (g) turn(+g.dataset.i, -1);
+});
+// Keys: arrows move a cursor round the rug, Space or Enter turns (with Shift, turns back).
+function showCursor() {
+  const c = $("cursor"); if (!c || !game) return;
+  if (cursor < 0) { c.setAttribute("x", -200); return; }
+  c.setAttribute("x", cursor % game.N * 100 + 4); c.setAttribute("y", Math.floor(cursor / game.N) * 100 + 4);
+}
+$("svg").addEventListener("keydown", e => {
+  if (!playing() || e.ctrlKey || e.metaKey || e.altKey) return;
+  const N = game.N; if (cursor < 0) cursor = bedOf(N);
+  const x = cursor % N, y = Math.floor(cursor / N), to = (nx, ny) => { cursor = Math.max(0, Math.min(N - 1, ny)) * N + Math.max(0, Math.min(N - 1, nx)); };
+  if (e.key === "ArrowUp") to(x, y - 1);
+  else if (e.key === "ArrowDown") to(x, y + 1);
+  else if (e.key === "ArrowLeft") to(x - 1, y);
+  else if (e.key === "ArrowRight") to(x + 1, y);
+  else if (e.key === " " || e.key === "Enter") turn(cursor, e.shiftKey ? -1 : 1);
+  else return;
+  e.preventDefault(); showCursor();
+});
+$("svg").addEventListener("blur", () => { cursor = -1; showCursor(); });
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
+
+// Undo takes back a turn, or a Restart.
+function undo() {
+  if (!playing() || !game.history.length) return;
+  game.undid = true;
+  const h = game.history.pop();
+  if (Array.isArray(h)) game.turns[h[0]] = (game.turns[h[0]] - h[1] + 4) % 4; else game.turns = h.turns;
+  lineUp(); update(); save();
+}
+$("undoBtn").onclick = undo;
+$("restartBtn").onclick = () => {
+  if (!playing() || !game.history.length) return;
+  game.undid = true;
+  game.history.push({turns: game.turns.slice()});
+  game.turns = game.start.slice();
+  lineUp(); update(); save();
+  G.note("Back to how the tunnels started. Undo brings your turns back.", 4000);
+};
+// Hint: a green box shows a piece that's the wrong way, then it turns the right way. It picks one next to the
+// joined part where it can. A hint keeps you on the same level and costs the gold paw.
+$("hintBtn").onclick = () => {
+  if (!playing() || hinting) return;
+  const N = game.N, {lit} = joined(), wrong = [...Array(N * N).keys()].filter(i => cur(i) !== game.sol[i]);
+  if (!wrong.length) return;
+  const near = wrong.filter(i => lit[i] || [1, 2, 4, 8].some(d => { const j = nbr(N, i, d); return j >= 0 && lit[j]; }));
+  const pool = near.length ? near : wrong, i = pool[Math.floor(Math.random() * pool.length)];
+  game.hinted = true; game.started = true; hinting = true; update(); save();
+  const box = $("hintbox"), g = game;
+  box.setAttribute("x", i % N * 100 + 6); box.setAttribute("y", Math.floor(i / N) * 100 + 6);
+  G.note("This piece is the wrong way round…", 0);
+  setTimeout(() => {
+    hinting = false;
+    if (game !== g || game.won) return;
+    G.note("");
+    // the short way round: three turns one way is one turn the other
+    const k = [1, 2, 3].find(k => rotN(cur(i), k) === game.sol[i]);
+    if (k === 3) turn(i, -1); else for (let s = 0; s < k; s++) turn(i, 1);
+    setTimeout(() => box.setAttribute("x", -200), 700);
+    update();
+  }, 900);
+};
+
+/* ---------- endings ---------- */
+// Every piece joined: the cat runs out along every branch and back, the tunnels turning gold as it goes.
+function win() {
+  game.won = true; G.finishClock(game); cursor = -1; showCursor();
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save();
+  update();
+  G.track(`Tunnel Run solved level ${game.level}`);
+  build.prefetch(next);
+  running = true;
+  const g = game, done = () => { running = false; if (game === g) finishCard(); };
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) { pieces.forEach(p => p.classList.add("zoomed")); setTimeout(done, 800); return; }
+  const N = game.N, path = [], seen = new Uint8Array(N * N);
+  (function walk(i) { seen[i] = 1; path.push(i); for (const d of [1, 2, 4, 8]) if (game.sol[i] & d) { const j = nbr(N, i, d); if (!seen[j]) { walk(j); path.push(i); } } })(bedOf(N));
+  const cat = $("cat"), step = Math.max(28, Math.min(110, 4500 / path.length)), t0 = performance.now();
+  let k = 0;
+  (function frame(now) {
+    if (game !== g) return;
+    const pos = (now - t0) / step, a = Math.min(Math.floor(pos), path.length - 1), b = Math.min(a + 1, path.length - 1), f = pos - Math.floor(pos);
+    while (k <= a) pieces[path[k++]].classList.add("zoomed");
+    const ax = path[a] % N * 100 + 50, ay = Math.floor(path[a] / N) * 100 + 50, bx = path[b] % N * 100 + 50, by = Math.floor(path[b] / N) * 100 + 50;
+    const x = ax + (bx - ax) * f, y = ay + (by - ay) * f;
+    cat.setAttribute("x", x); cat.setAttribute("y", y + 4);
+    // the cat faces left, so it's flipped to run right
+    cat.setAttribute("transform", bx > ax ? `translate(${2 * x} 0) scale(-1 1)` : "");
+    if (a < path.length - 1) requestAnimationFrame(frame); else { cat.removeAttribute("transform"); setTimeout(done, 500); }
+  })(t0);
+}
+function finishCard() {
+  const next = settings.level, N = game.N;
+  let text = `The cat zoomed through every tunnel on the ${N} × ${N} rug.`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my tunnels", game.result,
+    {title: "Zoom!", gold: !game.undid && !game.hinted, goldWhy: "No hints or undos!", next: `Next: level ${next}`, after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- new tunnels ---------- */
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
+// Every piece but the bed's starts turned away from its answer (a straight piece has only one other way to lie).
+function begin(p, level, turns) {
+  const bed = bedOf(p.N);
+  turns = turns || p.sol.map((m, i) => { if (i === bed) return 0; const ks = [1, 2, 3].filter(k => rotN(m, k) !== m); return ks[Math.floor(Math.random() * ks.length)]; });
+  game = {level, N: p.N, sol: p.sol, start: turns.slice(), turns: turns.slice(), history: [], won: false, ...G.freshClock()};
+  cursor = -1;
+}
+async function newPuzzle() {
+  if (busy) return;
+  busy = true;
+  const n = settings.level;
+  G.openCard("Laying out the tunnels…", "", []);
+  const p = await build.take(n);
+  begin(p, n);
+  busy = false; G.closeCard(); G.note("");
+  draw(); save();
+  build.prefetch(n);
+  G.track(`Tunnel Run new puzzle level ${n}`);
+}
+
+/* ---------- sharing ---------- */
+// The answer and how the pieces started, each as one hex digit per square; with progress, how they lie now.
+const hex = a => a.map(v => v.toString(16)).join("");
+$("shareBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Tunnel Run", won: game.won,
+  puzzle: () => ({g: "tunnelrun", N: game.level, s: hex(game.sol), t: game.start.join("")}),
+  progress: () => game.turns.join("")}); };
+function openShared(d) {
+  const N = levelSize(d.N), ok = s => typeof s === "string" && s.length === N * N;
+  const sol = ok(d.s) && /^[0-9a-f]+$/.test(d.s) ? [...d.s].map(c => parseInt(c, 16)) : null;
+  const start = ok(d.t) && /^[0-3]+$/.test(d.t) ? [...d.t].map(Number) : null;
+  if (!N || !sol || !start || start[bedOf(N)] || solveNet(N, sol, 2, bedOf(N)).length !== 1) { G.note("That share link didn't work.", 5000); return; }
+  begin({N, sol}, d.N, start);
+  if (ok(d.p) && /^[0-3]+$/.test(d.p) && d.p[bedOf(N)] === "0") { game.turns = [...d.p].map(Number); game.timed = false; }
+  settings.level = d.N; $("levelSel").value = d.N;
+  draw(); save(); build.prefetch(d.N);
+  if (d.p && joined().count === N * N) win();
+}
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  const media = document.createElement("div"), ol = document.createElement("ol"); ol.className = "steps";
+  for (const t of ["The rug is covered in pieces of cat tunnel, all turned the wrong way. The cat waits on its bed in the middle.",
+                   "Tap a piece to turn it a quarter turn. Press and hold (or right-click) to turn it back.",
+                   "Pieces joined to the bed turn purple and crinkly. The bed's own tunnel is already the right way round.",
+                   "Join every piece into one network, with no tunnel left open, and the cat runs through them all!"]) {
+    const li = document.createElement("li"); li.textContent = t; ol.append(li);
+  }
+  const tip = document.createElement("p"); tip.className = "tip";
+  tip.textContent = "Every rug has exactly one answer. Tunnels never run off the edge, and two dead ends never face each other. Stuck? Hint shows a piece that's the wrong way round.";
+  media.append(ol, tip);
+  G.openCard("How to play", "", [["Show me on the board", () => { G.closeCard(); settings.seenHelp = false; helpOnFirstVisit(); }, true],
+    ["Got it", () => { G.closeCard(); settings.seenHelp = true; save(); }]], media);
+}
+// First visit only: walk through the rug that's out.
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || !playing() || document.querySelector(".spot")) return;
+  const N = game.N, bed = bedOf(N), xy = i => [i % N, Math.floor(i / N)], all = [...Array(N * N).keys()].map(xy);
+  const {lit} = joined(), litNow = all.filter(([x, y]) => lit[y * N + x]);
+  // a piece next to the bed to show turning
+  const by = [1, 2, 4, 8].map(d => nbr(N, bed, d)).filter(j => j >= 0 && cur(j) !== game.sol[j]);
+  const one = xy(by.length ? by[0] : nbr(N, bed, 1));
+  const steps = [
+    {say: "The cat's tunnels are all muddled up 🐈", lit: all},
+    {say: "Tap a piece to turn it", lit: [one]},
+    {say: "Hold a piece to turn it back", lit: [one]},
+    {say: "Pieces joined to the cat's bed turn purple", lit: litNow, tone: "ok"},
+    {say: "The bed's own tunnel never turns", lit: [xy(bed)]},
+    {say: "Join every piece, with no tunnel left open, and the cat runs through them all!", lit: all, tone: "ok"},
+    {say: "Stuck? Hint shows a piece to turn", els: [$("hintBtn")]},
+  ];
+  G.spotlight({grid: $("grid"), w: N, h: N, steps, done: () => { settings.seenHelp = true; save(); }});
+}
+
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", "") + (n === MAX_LEVEL ? " (hardest)" : ""), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
+$("helpBtn").onclick = showHelp;
+
+G.nav("tunnelrun");
+G.checkClock(game);
+G.setupTimer({name: "tunnelrun", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+const shared = G.readShare("tunnelrun");
+if (game && Array.isArray(game.sol) && Array.isArray(game.turns)) G.reopen(() => {
+    if (levelSize(game.level) !== game.N || game.sol.length !== game.N * game.N || game.turns.length !== game.N * game.N) throw new Error("the saved tunnels don't fit their level");
+    draw();
+    if (game.won) { pieces.forEach(p => p.classList.add("zoomed")); finishCard(); }
+    build.prefetch(settings.level); helpOnFirstVisit();
+  }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
+else if (!shared) newPuzzle().then(helpOnFirstVisit);
+const shareOpts = () => ({name: "Tunnel Run", inProgress: !!(game && !game.won && game.history.length), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, shareOpts());
+// A share link opened while this page is already showing only changes the address, so watch for it.
+window.addEventListener("hashchange", () => { const d = G.readShare("tunnelrun"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>

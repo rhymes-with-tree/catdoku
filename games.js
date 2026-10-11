@@ -19,6 +19,7 @@ const G = (() => {
     ["Fair Play", "tango", "Share two toys out fairly", "#B94588"],
     ["Bubbles", "bubbles", "Bat bubbles up and pop three of a kind", "#5FA0C8"],
     ["Open the Door!", "opendoor", "Solve the puzzle so the cat can get through!", "#4E577D"],
+    ["Tunnel Run", "tunnelrun", "Assemble the tunnels for the cat to run through", "#7E63B8"],
   ];
   const $ = id => document.getElementById(id);
 
