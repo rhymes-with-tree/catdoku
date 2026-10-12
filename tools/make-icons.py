@@ -336,10 +336,24 @@ def unravel():
     return frame(PAPER, out)
 
 
+# Tail Chase: the cat from above on a rug, a strand of yarn trailing behind it, a toy ahead.
+def tailchase():
+    out = ""
+    for y in range(14, 92, 12): out += f'<rect x="7" y="{y}" width="86" height="6" fill="#C99A6B" opacity=".18"/>'
+    out += f'<path d="M24 76 L24 52 L56 52 L56 34" fill="none" stroke="{INK}" stroke-opacity=".25" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>'
+    out += f'<path d="M24 76 L24 52 L56 52 L56 34" fill="none" stroke="{PLUM}" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>'
+    out += circle(24, 78, 5, PLUM, 2)
+    out += (f'<g transform="translate(56 30)"><ellipse cx="0" cy="6" rx="7.5" ry="9" fill="#E9A15B" stroke="{INK}" stroke-width="2"/>'
+            f'<path d="M-5.5 -9 L-5 -16 L-1 -12 Z M5.5 -9 L5 -16 L1 -12 Z" fill="#E9A15B" stroke="{INK}" stroke-width="1.6" stroke-linejoin="round"/>'
+            f'<circle cx="0" cy="-6" r="6" fill="#E9A15B" stroke="{INK}" stroke-width="2"/></g>')
+    out += yarnball(78, 24, 7, TEAL)
+    return frame("#E9D3B4", out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")
