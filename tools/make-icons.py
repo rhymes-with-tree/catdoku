@@ -318,10 +318,28 @@ def nightlight():
     return frame("#221D36", out)
 
 
+# Unravel: a strand of yarn along part of a pegboard shape, the ball at its end, an arrow on one line.
+def unravel():
+    pts = {(0, 0): (24, 26), (1, 0): (50, 26), (2, 0): (76, 26), (0, 1): (24, 52), (1, 1): (50, 52), (2, 1): (76, 52), (0, 2): (24, 78), (1, 2): (50, 78), (2, 2): (76, 78)}
+    rest = [((0, 0), (1, 0)), ((1, 0), (2, 0)), ((2, 0), (2, 1)), ((1, 0), (1, 1)), ((2, 1), (2, 2)), ((1, 2), (2, 2))]
+    done = [((0, 2), (0, 1)), ((0, 1), (1, 1)), ((1, 1), (1, 2)), ((1, 2), (0, 2))]
+    out = ""
+    for a, b in rest:
+        (x1, y1), (x2, y2) = pts[a], pts[b]
+        out += f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="#9A8768" stroke-width="2.5" stroke-dasharray="5 3.5" stroke-linecap="round"/>'
+    out += f'<path d="M73 61L76 67L79 61Z" fill="#9A8768"/>'
+    d = "M" + " L".join(f"{pts[p][0]} {pts[p][1]}" for p in [(0, 2), (0, 1), (1, 1), (1, 2), (0, 2)])
+    out += f'<path d="{d}" fill="none" stroke="{INK}" stroke-opacity=".3" stroke-width="9" stroke-linejoin="round"/>'
+    out += f'<path d="{d}" fill="none" stroke="{ORANGE}" stroke-width="7" stroke-linejoin="round"/>'
+    for p in pts.values(): out += circle(p[0], p[1], 3.2, "#fff", 1.8)
+    out += yarnball(24, 78, 8, ORANGE)
+    return frame(PAPER, out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")
