@@ -65,6 +65,10 @@
 .words{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:6px;font-weight:600;text-transform:capitalize}
 .words .smash{color:#C9773F}
 .words .rare{color:var(--ink-soft);font-style:italic}
+.words u{text-decoration-thickness:2px;text-underline-offset:3px}
+.words .more{color:#C9773F;animation:glow 1.6s ease-in-out infinite alternate}
+@keyframes glow{from{text-shadow:0 0 2px rgba(236,140,40,.3)}to{text-shadow:0 0 10px rgba(236,140,40,.9)}}
+@media (prefers-reduced-motion:reduce){.words .more{animation:none;text-shadow:0 0 6px rgba(236,140,40,.7)}}
 .words .new{animation:pop .4s ease-out}
 @keyframes pop{from{transform:scale(1.4)}}
 .toast{position:fixed;left:50%;top:22%;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:6px 16px;border-radius:999px;font-weight:700;z-index:5;pointer-events:none;animation:toast 1.4s ease-out forwards}
@@ -195,7 +199,9 @@ function draw() {
   $("entry").innerHTML = [...typed].map(ch => `<span class="${ch === game.centre ? "c" : ""}">${ch}</span>`).join("") + `<span class="caret"></span>`;
   const n = game.found.length, sorted = game.found.slice().sort();
   $("foundSum").textContent = n ? `You've found ${n} word${n === 1 ? "" : "s"} (${commonFound()} of ${answers.length} everyday ones)` : "No words yet";
-  $("words").innerHTML = sorted.map(w => `<span class="${lettersOf(w).length === 7 ? "smash" : EXTRA.has(w) ? "rare" : ""}${w === lastWord ? " new" : ""}">${w}</span>`).join("");
+  const glow = game.hinted ? new Set(startsMore(answers.filter(w => !game.found.includes(w)))) : new Set();
+  $("words").innerHTML = sorted.map(w => { const x = suffixOf(w);
+    return `<span class="${lettersOf(w).length === 7 ? "smash" : EXTRA.has(w) ? "rare" : ""}${glow.has(w) ? " more" : ""}${w === lastWord ? " new" : ""}">${x ? `${w.slice(0, -x.length)}<u>${x}</u>` : w}</span>`; }).join("");
   $("hintBtn").disabled = game.won;
   drawHints();
 }
@@ -301,34 +307,23 @@ function submit() {
 // Peeking costs the gold paw.
 let clueAt = 0;
 const UP = w => `<b>${w}</b>`;
-const SUFFIXES = ["ing", "tion", "ness", "ment", "able", "less", "ful", "ly", "ty", "ity", "er", "ed", "est", "al", "ic", "ish", "ous", "ive", "age", "ate", "en", "ward"];
-const PREFIXES = ["re", "un", "in", "de", "dis", "pre", "over", "out", "under", "mis", "non", "anti", "ex"];
-const known = w => COMMON.has(w) || EXTRA.has(w);
+// Common endings, longest first so -ITY wins over -TY. A word counts as having one if at least three letters
+// come before it.
+const SUFFIXES = ["tion", "ness", "ment", "able", "less", "ity", "ing", "ful", "ous", "ive", "ish", "est", "ly", "ty", "ed", "er"];
+const suffixOf = w => SUFFIXES.find(x => w.endsWith(x) && w.length >= x.length + 3);
+// found words that are the start of an everyday word not found yet (HEAT, while HEATED is left)
+const startsMore = left => game.found.filter(f => left.some(w => w.length > f.length && w.startsWith(f)));
+// Two kinds of clue: the endings the words left use, and found words that start a longer one.
 function cluesFor(left) {
-  const clues = [], n = (k, one, many) => k === 1 ? one : many.replace("#", k);
-  const smashes = left.filter(w => lettersOf(w).length === 7);
-  if (smashes.length) clues.push(smashes.length === 1 ? `There's a keyboard smash still to find. It starts with ${UP(smashes[0][0])}.`
-    : `There are ${smashes.length} keyboard smashes still to find, starting with ${[...new Set(smashes.map(w => w[0]))].map(UP).join(" and ")}.`);
-  // the words you found most recently, and what's left that starts or ends the same way
-  for (const f of game.found.slice().reverse().slice(0, 3)) {
-    const start = f.slice(0, 2), end = f.slice(-2);
-    if (left.some(w => w.startsWith(start))) { clues.push(`Good work finding ${UP(f)}! Can you think of another word that starts with ${UP(start)}?`); break; }
-    if (left.some(w => w.endsWith(end) && w !== f)) { clues.push(`Good work finding ${UP(f)}! Can you think of another word that ends with ${UP("-" + end)}?`); break; }
+  const clues = [], ends = {};
+  for (const w of left) { const x = suffixOf(w); if (x) ends[x] = (ends[x] || 0) + 1; }
+  for (const x of Object.keys(ends).sort((a, b) => ends[b] - ends[a]))
+    clues.push(`Suffix alert: ${ends[x] === 1 ? "a word left ends" : `${ends[x]} words left end`} with ${UP("-" + x)}.`);
+  for (const f of startsMore(left).reverse()) {
+    const k = left.filter(w => w.length > f.length && w.startsWith(f)).length;
+    clues.push(`Good work finding ${UP(f)}! ${k === 1 ? "A longer word starts" : `${k} longer words start`} with ${UP(f)}.`);
   }
-  const anagram = game.found.find(f => left.some(w => w !== f && [...w].sort().join("") === [...f].sort().join("")));
-  if (anagram) clues.push(`The letters of ${UP(anagram)} can be rearranged into another word.`);
-  const suffix = SUFFIXES.map(x => [x, left.filter(w => w.endsWith(x) && w.length >= x.length + 3).length]).filter(([, k]) => k).sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)[0];
-  if (suffix) clues.push(`Suffix alert: this keyboard lets you make words that end with ${UP("-" + suffix[0])}.`);
-  const prefix = PREFIXES.map(x => [x, left.filter(w => w.startsWith(x) && w.length >= x.length + 3).length]).filter(([, k]) => k).sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)[0];
-  if (prefix) clues.push(`Prefix alert: some words left start with ${UP(prefix[0] + "-")}.`);
-  const joined = left.find(w => { for (let i = 3; i <= w.length - 3; i++) if (known(w.slice(0, i)) && known(w.slice(i))) return true; return false; });
-  if (joined) clues.push(`One word left is two shorter words joined together. It starts with ${UP(joined[0])}.`);
-  const doubles = left.filter(w => /(.)\1/.test(w));
-  if (doubles.length) clues.push(`${n(doubles.length, "One word left has", "# words left have")} a double letter, like ${UP(doubles[0].match(/(.)\1/)[0])}.`);
-  const twice = left.filter(w => w.split(game.centre).length > 2).length;
-  if (twice) clues.push(`${n(twice, "One word left uses", "# words left use")} the gold ${UP(game.centre)} more than once.`);
-  const longest = Math.max(...left.map(w => w.length));
-  clues.push(`The longest word left has ${longest} letters${left.filter(w => w.length === longest).length > 1 ? " (there's more than one)" : ""}.`);
+  if (!clues.length) clues.push("No endings or longer words to point to. Try the grid above.");
   return clues;
 }
 function drawHints() {
@@ -365,7 +360,7 @@ function drawHints() {
   $("clueNext").onclick = () => { clueAt++; drawHints(); };
 }
 $("hints").addEventListener("toggle", () => {
-  if ($("hints").open && game && !game.hinted && !game.won) { game.hinted = true; save(); }
+  if ($("hints").open && game && !game.hinted && !game.won) { game.hinted = true; save(); draw(); return; }
   if (game) drawHints();
 });
 $("hintBtn").onclick = () => { $("hints").open = true; $("hints").scrollIntoView({behavior: "smooth", block: "start"}); };
