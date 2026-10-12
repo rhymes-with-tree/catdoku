@@ -350,10 +350,27 @@ def tailchase():
     return frame("#E9D3B4", out)
 
 
+# Keyboard Cat: three rows of keys, some with paw prints, one gold, and a big paw reaching in.
+def keyboardcat():
+    out = f'<rect x="12" y="34" width="76" height="52" rx="7" fill="#3B3646"/>'
+    on = {(0, 2), (0, 5), (1, 1), (1, 6), (2, 3)}
+    for r, n in enumerate((6, 5, 4)):
+        for c in range(n):
+            x, y = 17 + r * 5 + c * 11.5, 40 + r * 15
+            works = (r, c) == (0, 3) or (r, c) in on
+            fill = YELLOW if (r, c) == (0, 3) else "#F7F1E4" if works else "#4A4556"
+            tilt = "" if works else f' transform="rotate({((r * 5 + c) * 37 % 11 - 5) * 2} {x + 4.8} {y + 5.5})"'
+            out += f'<rect x="{x}" y="{y + (0 if works else 1)}" width="9.5" height="11" rx="2" fill="{fill}"{tilt}/>'
+    out += (f'<rect x="45" y="0" width="16" height="30" fill="#E9A15B" stroke="{INK}" stroke-width="2.2"/>'
+            f'<ellipse cx="53" cy="32" rx="11" ry="9" fill="#E9A15B" stroke="{INK}" stroke-width="2.2"/>')
+    for x in (45.5, 50.5, 55.5, 60.5): out += f'<circle cx="{x}" cy="39.5" r="3.1" fill="#E9A15B" stroke="{INK}" stroke-width="1.8"/>'
+    return frame("#ECEEE7", out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")
