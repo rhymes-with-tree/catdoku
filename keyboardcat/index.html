@@ -106,6 +106,11 @@
 .wordclue{margin:0 0 16px;text-align:left}
 .wordclue .pos{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--ink-soft);margin:0 0 4px}
 .wordclue p{margin:0 0 8px;color:var(--ink)}
+.wordclue .from{font-size:20px;font-weight:700}
+.wordclue .parts{margin:0 0 8px;padding-left:20px}
+.wordclue .note{font-size:14px;color:var(--ink-soft)}
+.wordclue .note summary{cursor:pointer}
+.wordclue .note p{color:var(--ink-soft);margin-top:4px}
 .wordclue .hide{background:#2A2530;color:#2A2530;border-radius:3px;padding:0 .2em}
 .smashes{margin:-8px 0 14px;text-align:center;font-size:15px;color:var(--ink-soft)}
 .smashes b{color:#C9773F}
@@ -407,7 +412,7 @@ const clueCache = {};
 function hideWord(text, w) {
   // the word and any longer form of it (TAPPET, TAPPETS), and the "word" a definition points to as a form of it
   const esc = s => s.replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
-  return esc(text).replace(new RegExp(`\\b${w}[a-z]*`, "gi"), m => `<span class="hide">${"x".repeat(m.length)}</span>`);
+  return esc(text).replace(new RegExp(`\\b${w}[a-z]*|\u0000+`, "gi"), m => `<span class="hide">${"x".repeat(m.length)}</span>`);
 }
 const plainText = html => { const d = document.createElement("div"); d.innerHTML = html; d.querySelectorAll("sup, .reference, style").forEach(x => x.remove()); return d.textContent.replace(/\s+/g, " ").trim(); };
 async function lookUpMeaning(w) {
@@ -422,19 +427,63 @@ async function lookUpMeaning(w) {
   if (!out.length) throw new Error("none");
   return out;
 }
-async function lookUpOrigin(w) {
+// Where a word comes from, as the languages it passed through. Wiktionary's etymology names them newest first
+// ("From Middle English …, from Old French …, from Latin …"); they're shown oldest first, ending in English. A word
+// built from English parts (gun + running) is described by where its parts come from instead, without naming them.
+const LANGS = ["Proto-Indo-European", "Proto-Germanic", "Proto-West Germanic", "Proto-Italic", "Proto-Slavic", "Proto-Celtic",
+  "Old English", "Middle English", "Early Modern English", "Old French", "Middle French", "Anglo-Norman", "Old Northern French",
+  "Old Norse", "Old Saxon", "Old High German", "Middle High German", "Middle Low German", "Middle Dutch", "Old Irish",
+  "Late Latin", "Medieval Latin", "Vulgar Latin", "New Latin", "Classical Latin", "Ancient Greek", "Byzantine Greek",
+  "Latin", "Greek", "French", "German", "Dutch", "Italian", "Spanish", "Portuguese", "Arabic", "Persian", "Hindi", "Urdu",
+  "Sanskrit", "Hebrew", "Yiddish", "Turkish", "Russian", "Polish", "Czech", "Hungarian", "Finnish", "Swedish", "Danish",
+  "Norwegian", "Icelandic", "Irish", "Scottish Gaelic", "Welsh", "Cornish", "Breton", "Japanese", "Chinese", "Mandarin",
+  "Cantonese", "Korean", "Malay", "Tamil", "Bengali", "Swahili", "Zulu", "Afrikaans", "Nahuatl", "Quechua", "Tupi",
+  "Hawaiian", "Maori", "Inuit", "Algonquian", "Ojibwe", "Taino", "Aramaic", "Akkadian", "Egyptian", "Etruscan", "Gaulish",
+  "Celtic", "Frankish", "Gothic", "Norse", "Provençal", "Occitan", "Catalan", "Romani", "Tagalog", "Thai", "Vietnamese"];
+const LANG_RE = new RegExp(`\\b(${LANGS.map(l => l.replace(/-/g, "\\-")).join("|")})\\b`, "g");
+// the language names in a piece of etymology, in the order they come, each once
+function languagesIn(text) {
+  const seen = [];
+  for (const m of text.matchAll(LANG_RE)) if (!seen.includes(m[1])) seen.push(m[1]);
+  // "Latin" right after "Late Latin" etc. is the same step; keep the more exact name
+  return seen.filter(l => !seen.some(o => o !== l && o.endsWith(" " + l)));
+}
+async function etymology(w) {
   const api = `${WIKI}/w/api.php?origin=*&format=json&formatversion=2&action=parse&page=${encodeURIComponent(w)}`;
   const secs = (await (await fetch(`${api}&prop=sections`)).json()).parse.sections;
   // the first Etymology heading inside the English section
   const en = secs.findIndex(x => x.line === "English" && x.toclevel === 1);
   if (en < 0) throw new Error("none");
-  const ety = secs.slice(en + 1).find((x, i, a) => x.toclevel === 1 || /^Etymology/.test(x.line));
+  const ety = secs.slice(en + 1).find(x => x.toclevel === 1 || /^Etymology/.test(x.line));
   if (!ety || ety.toclevel === 1) throw new Error("none");
   const html = (await (await fetch(`${api}&prop=text&section=${ety.index}`)).json()).parse.text;
   const d = document.createElement("div"); d.innerHTML = html;
-  const para = [...d.querySelectorAll("p")].map(p => plainText(p.innerHTML)).find(t => t.length > 3);
-  if (!para) throw new Error("none");
-  return para;
+  const p = [...d.querySelectorAll("p")].find(p => plainText(p.innerHTML).length > 3);
+  if (!p) throw new Error("none");
+  const text = plainText(p.innerHTML);
+  // English parts it's built from: "gun + running", "tap + -et"
+  const parts = /\+/.test(text) ? [...new Set([...p.querySelectorAll('a[href*="#English"]')]
+    .map(a => decodeURIComponent(a.getAttribute("href").replace(/^\/wiki\//, "").replace(/#.*/, "")).replace(/_/g, " ")))]
+    .filter(x => x !== w).slice(0, 3) : [];
+  return {text, langs: languagesIn(text).filter(l => !/^Proto-/.test(l)), parts};
+}
+// languages newest first in, oldest first out, ending in English
+const chain = langs => [...langs].reverse().concat("English").join(" → ");
+async function lookUpOrigin(w) {
+  const e = await etymology(w);
+  if (e.parts.length >= 2) {
+    // built from English parts: where each part comes from, without saying what the parts are
+    const said = await Promise.all(e.parts.map(async (x, i) => {
+      const what = x.startsWith("-") ? "an ending" : x.endsWith("-") ? "a beginning" : `a word`;
+      try { const pe = await etymology(x); return `${what} from ${pe.langs.length ? chain(pe.langs) : "English"}`; }
+      catch (err) { return `${what} we couldn't trace`; }
+    }));
+    // the note names the parts, so black them out too
+    const note = e.parts.reduce((t, x) => t.split(x).join("\u0000".repeat(x.length)), e.text);
+    return {summary: `Made in English from ${e.parts.length === 2 ? "two" : e.parts.length} parts`, steps: said, note};
+  }
+  if (!e.langs.length) return {summary: "Made in English", steps: [], note: e.text};
+  return {summary: chain(e.langs), steps: [], note: e.text};
 }
 function wordClue(w) {
   const box = document.createElement("div"); box.className = "wordclue";
@@ -447,7 +496,9 @@ function wordClue(w) {
       const got = clueCache[key] || (clueCache[key] = await (kind === "meaning" ? lookUpMeaning(w) : lookUpOrigin(w)));
       box.innerHTML = kind === "meaning"
         ? got.map(d => `<div class="pos">${d.pos}</div><p>${hideWord(d.text, w)}</p>`).join("")
-        : `<div class="pos">Where it comes from</div><p>${hideWord(got, w)}</p>`;
+        : `<div class="pos">Where it comes from</div><p class="from">${got.summary}</p>`
+          + (got.steps.length ? `<ul class="parts">${got.steps.map(x => `<li>${x}</li>`).join("")}</ul>` : "")
+          + `<details class="note"><summary>The full note</summary><p>${hideWord(got.note, w)}</p></details>`;
     } catch (e) {
       delete clueCache[kind + ":" + w];
       box.innerHTML = `<p>${navigator.onLine === false ? "That needs the internet. Try again when you're connected." : `Couldn't find ${kind === "meaning" ? "a meaning" : "where it comes from"} for this one (or couldn't reach Wiktionary).`}</p>`;
