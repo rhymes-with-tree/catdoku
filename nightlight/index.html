@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Night Light</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-12.2"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-12.2">
+<style>
+/* A dark room full of cats. Awake cats' eyes glow; tap a cat and it and the cats beside it blink, so open
+   eyes shut and shut eyes open. When every cat's asleep, the room goes dark. */
+.wrap.roomwrap{height:auto}
+.room{display:grid;margin:0 auto;padding:6px;gap:4px;border-radius:12px;border:3px solid var(--ink);
+  background:radial-gradient(ellipse at 50% 0%,#3A3358 0%,#221D36 60%,#18142A 100%);
+  user-select:none;-webkit-user-select:none;touch-action:manipulation;transition:background .8s}
+.cat{position:relative;aspect-ratio:1;cursor:pointer;border-radius:8px}
+.cat svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.cat .head{fill:#0F0C1C;stroke:#4A4268;stroke-width:2}
+.cat .eye{fill:#F2DA5C;transition:transform .16s ease-in;transform-box:fill-box;transform-origin:center}
+.cat .pupil{fill:#0F0C1C;transition:transform .16s ease-in;transform-box:fill-box;transform-origin:center}
+.cat .glow{fill:#F2DA5C;opacity:.22;filter:blur(6px);transition:opacity .2s}
+.cat .shut{fill:none;stroke:#6E6590;stroke-width:3;stroke-linecap:round;opacity:0;transition:opacity .15s .1s}
+.cat.asleep .eye,.cat.asleep .pupil{transform:scaleY(0)}
+.cat.asleep .glow{opacity:0}
+.cat.asleep .shut{opacity:1}
+.cat.hintme{animation:glow .45s ease-in-out 4 alternate}
+@keyframes glow{to{filter:drop-shadow(0 0 7px #FFE07A) brightness(1.4)}}
+.room.dark{background:radial-gradient(ellipse at 50% 0%,#221D36 0%,#100D1D 70%)}
+.left{display:flex;gap:12px;align-items:center}
+.taps{color:var(--ink-soft)}
+@media (prefers-reduced-motion:reduce){.cat .eye,.cat .pupil,.cat .glow,.cat .shut{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Night Light</h1><div class="stripe"></div><p class="tagline">Get every cat to close its eyes</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span class="left"><span id="count"></span><span class="taps" id="taps"></span></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap roomwrap"><div class="room" id="board" role="grid" aria-label="A dark room full of cats"></div></div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="shareBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New room</button>
+  </div>
+</main>
+
+<script src="../games.js?v=2026-10-12.2"></script>
+<script>
+/* ---------- puzzles (plain functions, also run in a background worker) ---------- */
+// Levels: [columns, rows, taps the answer takes].
+function levelOf(n) { return [null, [3, 3, 3], [4, 4, 4], [4, 4, 6], [5, 5, 7], [5, 5, 10], [6, 6, 12], [7, 7, 15]][n]; }
+// The fewest taps that put every cat to sleep from `awake` (a 0/1 list), as a list of squares, or null if
+// it can't be done. Each tap flips its square and the four beside it, and the order doesn't matter, so this
+// is a set of equations over 0 and 1. Some sizes have more than one answer: try them all, keep the shortest.
+function fewestTaps(W, H, awake) {
+  const N = W * H, rows = [];
+  for (let i = 0; i < N; i++) {
+    const r = new Uint8Array(N + 1), x = i % W, y = Math.floor(i / W);
+    r[i] = 1; if (x > 0) r[i - 1] = 1; if (x < W - 1) r[i + 1] = 1; if (y > 0) r[i - W] = 1; if (y < H - 1) r[i + W] = 1;
+    r[N] = awake[i] ? 1 : 0; rows.push(r);
+  }
+  const pivotOf = [];  // pivotOf[col] = row, for columns with a pivot
+  let r = 0;
+  for (let c = 0; c < N && r < N; c++) {
+    let p = r; while (p < N && !rows[p][c]) p++;
+    if (p === N) continue;
+    [rows[r], rows[p]] = [rows[p], rows[r]];
+    for (let q = 0; q < N; q++) if (q !== r && rows[q][c]) for (let k = c; k <= N; k++) rows[q][k] ^= rows[r][k];
+    pivotOf[c] = r++;
+  }
+  for (let q = r; q < N; q++) if (rows[q][N]) return null;
+  const free = []; for (let c = 0; c < N; c++) if (pivotOf[c] === undefined) free.push(c);
+  let best = null;
+  for (let m = 0; m < 1 << free.length; m++) {
+    const x = new Uint8Array(N);
+    free.forEach((c, k) => { x[c] = (m >> k) & 1; });
+    for (let c = 0; c < N; c++) if (pivotOf[c] !== undefined) {
+      const row = rows[pivotOf[c]]; let v = row[N];
+      for (const f of free) if (row[f] && x[f]) v ^= 1;
+      x[c] = v;
+    }
+    const taps = []; x.forEach((v, i) => { if (v) taps.push(i); });
+    if (!best || taps.length < best.length) best = taps;
+  }
+  return best;
+}
+// A room: tap a few random cats in a dark room (in reverse, that's the answer), and keep it if no shorter
+// answer exists, so the fewest taps is exactly the level's number.
+function makeRoom(n) {
+  const [W, H, T] = levelOf(n), N = W * H, awake = new Array(N).fill(0), picks = [];
+  const all = [...Array(N).keys()];
+  for (let k = 0; k < T; k++) picks.push(all.splice(Math.floor(Math.random() * all.length), 1)[0]);
+  for (const i of picks) {
+    const x = i % W, y = Math.floor(i / W);
+    for (const j of [i, x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, y > 0 ? i - W : -1, y < H - 1 ? i + W : -1]) if (j >= 0) awake[j] ^= 1;
+  }
+  const best = fewestTaps(W, H, awake);
+  if (!best || best.length !== T) return null;
+  return {W, H, awake, par: T};
+}
+
+/* ---------- pictures ---------- */
+// A cat's head in silhouette: ears, two eyes (open, with a slit pupil and a glow) and the same eyes shut.
+const CAT = `<svg viewBox="0 0 100 100" aria-hidden="true">
+  <ellipse class="glow" cx="36" cy="58" rx="13" ry="10"/><ellipse class="glow" cx="64" cy="58" rx="13" ry="10"/>
+  <path class="head" d="M18 70 C14 52 16 40 20 30 L22 12 L38 26 C46 23 54 23 62 26 L78 12 L80 30 C84 40 86 52 82 70 C76 86 24 86 18 70 Z"/>
+  <ellipse class="eye" cx="36" cy="57" rx="9" ry="7.5"/><ellipse class="eye" cx="64" cy="57" rx="9" ry="7.5"/>
+  <ellipse class="pupil" cx="36" cy="57" rx="2.2" ry="6.5"/><ellipse class="pupil" cx="64" cy="57" rx="2.2" ry="6.5"/>
+  <path class="shut" d="M27 57 Q36 64 45 57 M55 57 Q64 64 73 57"/></svg>`;
+
+/* ---------- game ---------- */
+// game: {level, W, H, start (awake at the start), awake, par (fewest taps), taps (every tap counts, even ones
+//        undone), history (undo steps), hinted, won}
+const STORE = "catdoku.nightlight.v1", MAX_LEVEL = 7;
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1}, state.settings);
+let game = state.game || null, busy = false, lit = -1;
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !busy && !$("overlay").classList.contains("show");
+const levelName = n => { const [W, H, T] = levelOf(n); return `Level ${n} · ${W} × ${H}, ${T} taps`; };
+const build = G.builder([levelOf, fewestTaps, makeRoom], "makeRoom");
+const awakeCount = () => game.awake.filter(Boolean).length;
+const around = i => { const {W, H} = game, x = i % W, y = Math.floor(i / W);
+  return [i, x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, y > 0 ? i - W : -1, y < H - 1 ? i + W : -1].filter(j => j >= 0); };
+
+function draw() {
+  const el = $("board"), {W, H} = game;
+  el.style.gridTemplateColumns = `repeat(${W}, 1fr)`;
+  el.style.width = `min(100%, ${W * 96}px)`;
+  if (el.children.length !== W * H) {
+    el.innerHTML = "";
+    for (let i = 0; i < W * H; i++) { const c = document.createElement("div"); c.className = "cat"; c.dataset.i = i; c.setAttribute("role", "button"); c.innerHTML = CAT; el.append(c); }
+  }
+  [...el.children].forEach((c, i) => {
+    c.classList.toggle("asleep", !game.awake[i]);
+    c.setAttribute("aria-label", game.awake[i] ? "Awake cat" : "Sleeping cat");
+  });
+  el.classList.toggle("dark", !!game.won);
+  const n = awakeCount();
+  $("count").textContent = game.won ? "Lights out!" : `${n} cat${n === 1 ? "" : "s"} awake`;
+  $("taps").textContent = `${game.taps} tap${game.taps === 1 ? "" : "s"} · fewest ${game.par}`;
+  $("undoBtn").disabled = !game.history.length || game.won; $("restartBtn").disabled = !game.history.length || game.won;
+  $("hintBtn").disabled = game.won;
+}
+function flip(i) { for (const j of around(i)) game.awake[j] ^= 1; }
+function tap(i) {
+  if (!playing()) return;
+  game.history.push(i); game.taps++;
+  flip(i); draw(); save();
+  if (!awakeCount()) win();
+}
+$("board").addEventListener("click", e => { const c = e.target.closest(".cat"); if (c) tap(+c.dataset.i); });
+// Undo flips the last tap back (a tap undoes itself). Taps still count, so Undo and Restart are free but don't
+// win back the taps.
+$("undoBtn").onclick = () => { if (playing() && game.history.length) { flip(game.history.pop()); draw(); save(); } };
+$("restartBtn").onclick = () => {
+  if (!playing() || !game.history.length) return;
+  game.awake = game.start.slice(); game.history = []; draw(); save();
+  G.note("Back to the start. Your taps still count.", 3500);
+};
+// Hint: glow a cat that's part of the shortest way from here, then tap it. A hint keeps you on the same level.
+function hint() {
+  if (!playing()) return;
+  const best = fewestTaps(game.W, game.H, game.awake);
+  if (!best || !best.length) return;
+  const i = best[Math.floor(Math.random() * best.length)];
+  game.hinted = true; save(); busy = true;
+  const c = $("board").children[i]; c.classList.remove("hintme"); void c.offsetWidth; c.classList.add("hintme");
+  G.note(`Tap the glowing cat. ${best.length === 1 ? "That's the last one!" : `${best.length} taps to go.`}`, 4000);
+  const g = game;
+  setTimeout(() => { busy = false; if (game === g && !game.won) tap(i); setTimeout(() => c.classList.remove("hintme"), 700); }, 900);
+}
+$("hintBtn").onclick = hint;
+
+/* ---------- endings ---------- */
+const goldOK = () => !game.hinted && game.taps <= game.par;
+function win() {
+  game.won = true; G.finishClock(game);
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save(); draw();
+  G.track(`Night Light solved level ${game.level}`);
+  build.prefetch(next);
+  const g = game;
+  setTimeout(() => { if (game === g) finishCard(); }, 1300);
+}
+function finishCard() {
+  const next = settings.level;
+  let text = `Every cat's asleep, in ${game.taps} tap${game.taps === 1 ? "" : "s"} (the fewest is ${game.par}).`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the dark", game.result,
+    {title: "Goodnight!", gold: goldOK(), goldWhy: "The fewest taps, and no hint!", next: `Next: level ${next}`,
+     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- new rooms ---------- */
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
+function fresh(n, p) { return {level: n, W: p.W, H: p.H, start: p.awake.slice(), awake: p.awake.slice(), par: p.par, taps: 0, history: [], hinted: false, won: false, ...G.freshClock()}; }
+async function newPuzzle() {
+  if (busy) return;
+  busy = true;
+  const n = settings.level;
+  const p = await build.take(n);
+  game = fresh(n, p);
+  busy = false; G.closeCard(); G.note(""); draw(); save();
+  build.prefetch(n);
+  G.track(`Night Light new puzzle level ${n}`);
+}
+
+/* ---------- sharing ---------- */
+$("shareBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Night Light", won: game.won,
+  puzzle: () => ({g: "nightlight", N: game.level, awake: game.start}),
+  progress: () => ({awake: game.awake, taps: game.taps})}); };
+function openShared(d) {
+  const lv = levelOf(d.N), ok = a => Array.isArray(a) && lv && a.length === lv[0] * lv[1] && a.every(v => v === 0 || v === 1);
+  const best = ok(d.awake) && fewestTaps(lv[0], lv[1], d.awake);
+  if (!best || !best.length) { G.note("That share link didn't work.", 5000); return; }
+  game = fresh(d.N, {W: lv[0], H: lv[1], awake: d.awake, par: best.length});
+  if (d.p && ok(d.p.awake) && fewestTaps(lv[0], lv[1], d.p.awake)) { game.awake = d.p.awake.slice(); game.taps = Math.max(0, d.p.taps | 0); game.timed = false; }
+  settings.level = d.N; $("levelSel").value = d.N;
+  draw(); save(); build.prefetch(d.N);
+  if (!awakeCount()) { game.won = true; draw(); save(); }
+}
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  settings.seenHelp = false; helpOnFirstVisit();
+  if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
+}
+// First visit: show what a tap does on a cat in the middle (just while the step is up), then the goal.
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || !playing() || game.history.length || document.querySelector(".spot")) return;
+  const {W, H} = game, xy = i => [i % W, Math.floor(i / W)], all = [...Array(W * H).keys()].map(xy);
+  const mid = Math.floor(H / 2) * W + Math.floor(W / 2), awakeOnes = all.filter((_, i) => game.awake[i]);
+  const showing = change => { let was; return {enter: () => { was = game.awake.slice(); change(); draw(); }, leave: () => { game.awake = was; draw(); }}; };
+  const steps = [
+    {say: "Glowing eyes mean a cat is awake", lit: awakeOnes.length ? awakeOnes : all},
+    {say: "Tap a cat: it and the cats next to it blink", lit: around(mid).map(xy), ...showing(() => flip(mid))},
+    {say: "Put every cat to sleep", lit: all, tone: "ok", ...showing(() => { game.awake = game.awake.map(() => 0); })},
+  ];
+  G.spotlight({grid: $("board"), w: W, h: H, steps, map, done: () => { settings.seenHelp = true; save(); }});
+}
+function map() {
+  const sq = $("board").children, n = game.W * game.H, a = sq[0].getBoundingClientRect(), z = sq[n - 1].getBoundingClientRect();
+  const gx = game.W > 1 ? (z.left - a.left) / (game.W - 1) - a.width : 0, gy = game.H > 1 ? (z.top - a.top) / (game.H - 1) - a.height : 0;
+  return {ox: a.left - gx / 2, oy: a.top - gy / 2, cw: a.width + gx, ch: a.height + gy};
+}
+
+/* ---------- start ---------- */
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", "") + (n === MAX_LEVEL ? " (hardest)" : ""), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
+$("helpBtn").onclick = showHelp;
+
+G.nav("nightlight");
+G.checkClock(game);
+G.setupTimer({name: "nightlight", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level",
+  emptyText: "Put a room of cats to sleep and your times will show up here. They're kept on this device only."});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+const shared = G.readShare("nightlight");
+if (game && Array.isArray(game.awake)) G.reopen(() => {
+    if (!levelOf(game.level) || game.awake.length !== game.W * game.H) throw new Error("the saved room doesn't fit its level");
+    draw();
+    if (game.won) finishCard(); else helpOnFirstVisit();
+    build.prefetch(settings.level);
+  }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
+else if (!shared) newPuzzle().then(helpOnFirstVisit);
+const shareOpts = () => ({name: "Night Light", inProgress: !!(game && !game.won && game.taps), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, shareOpts());
+window.addEventListener("hashchange", () => { const d = G.readShare("nightlight"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>

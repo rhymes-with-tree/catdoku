@@ -21,6 +21,7 @@ const G = (() => {
     ["Open the Door!", "opendoor", "Solve the puzzle so the cat can get through!", "#4E577D"],
     ["Tunnel Run", "tunnelrun", "Assemble the tunnels for the cat to run through", "#7E63B8"],
     ["Copycat", "copycat", "Find the boxes with matching toys", "#D08A4E"],
+    ["Night Light", "nightlight", "Get every cat to close its eyes", "#3A3358"],
   ];
   const $ = id => document.getElementById(id);
 

@@ -302,10 +302,26 @@ def copycat():
     return frame("#C99A6B", out)
 
 
+# Night Light: a dark room of cats, most asleep, one with glowing eyes.
+def nightlight():
+    out = ""
+    for r in range(2):
+        for c in range(2):
+            x, y = 30 + c * 40, 32 + r * 38
+            out += (f'<path d="M{x-14} {y+8}C{x-16} {y-2} {x-15} {y-8} {x-13} {y-12}L{x-12} {y-22}L{x-5} {y-14}C{x-2} {y-15} {x+2} {y-15} {x+5} {y-14}'
+                    f'L{x+12} {y-22}L{x+13} {y-12}C{x+15} {y-8} {x+16} {y-2} {x+14} {y+8}C{x+10} {y+16} {x-10} {y+16} {x-14} {y+8}Z" fill="#0F0C1C" stroke="#6E6590" stroke-width="1.5"/>')
+            if (r, c) == (0, 1):
+                out += (f'<ellipse cx="{x-6}" cy="{y}" rx="4.5" ry="3.8" fill="#F2DA5C"/><ellipse cx="{x+6}" cy="{y}" rx="4.5" ry="3.8" fill="#F2DA5C"/>'
+                        f'<ellipse cx="{x-6}" cy="{y}" rx="1.1" ry="3.2" fill="#0F0C1C"/><ellipse cx="{x+6}" cy="{y}" rx="1.1" ry="3.2" fill="#0F0C1C"/>')
+            else:
+                out += f'<path d="M{x-10} {y}Q{x-6} {y+3} {x-2} {y}M{x+2} {y}Q{x+6} {y+3} {x+10} {y}" fill="none" stroke="#8C82B4" stroke-width="1.8" stroke-linecap="round"/>'
+    return frame("#221D36", out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")
