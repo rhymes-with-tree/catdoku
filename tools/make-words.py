@@ -3,7 +3,7 @@ Usage: download SCOWL (https://wordlist.aspell.net/, e.g. scowl-2020.12.07.tar.g
        domain; e.g. https://raw.githubusercontent.com/dolph/dictionary/master/enable1.txt), then
        python3 tools/make-words.py scowl-2020.12.07/final enable1.txt keyboardcat/words.json
 SCOWL is (c) Kevin Atkinson; its notice is in keyboardcat/WORDS-LICENSE.txt and must stay with the list.
-common (the answers): SCOWL sizes 10-60 (American, British, Canadian and shared English spellings).
+common (the answers): SCOWL sizes 10-50 (American, British, Canadian and shared English spellings).
 extra (accepted too): SCOWL up to size 80, everything in ENABLE, and a few newer words SCOWL and ENABLE don't have.
 Accents are dropped (épée counts as epee). Only a-z words of 4+ letters, with at most 7 different letters and no
 's' (as in Spelling Bee, so plurals don't double every list), and nothing on the blocklist."""
@@ -22,7 +22,7 @@ def scowl_words(top):
         if kind in ("english", "american", "british", "canadian") and "variant" not in name and size <= top:
             words |= {plain(w.strip()) for w in open(f, encoding="latin-1")}
     return {w for w in words if ok(w)}
-common = scowl_words(60)
+common = scowl_words(50)
 extra = (scowl_words(80) | {w.strip() for w in open(enable) if ok(w.strip())} | {w for w in ALSO if ok(w)}) - common
 json.dump({"common": sorted(common), "extra": sorted(extra)}, open(out, "w"), separators=(",", ":"))
 pangrams = [w for w in common if len(set(w)) == 7]

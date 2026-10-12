@@ -95,7 +95,14 @@
 .words{list-style:none;margin:0;padding:0;columns:2;column-gap:24px;font-size:clamp(19px,2.2vw,26px);font-weight:700}
 .words li{break-inside:avoid;line-height:1.75;text-transform:capitalize;white-space:nowrap}
 .words li.blank{text-transform:uppercase;color:#5A5266}
-.words li.blank i{display:inline-block;width:.62em;height:.12em;margin-left:.2em;background:currentColor;vertical-align:-.05em;opacity:.8}
+.words li.blank button{all:unset;cursor:pointer;border-radius:6px;padding:0 4px;margin-left:-4px}
+.words li.blank button:hover,.words li.blank button:focus-visible{background:#EDE6F7;outline:none}
+.words li.blank small{font-size:.72em;font-weight:600;margin-left:2px}
+.wordclue{margin:0 0 16px;text-align:left}
+.wordclue .pos{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--ink-soft);margin:0 0 4px}
+.wordclue p{margin:0 0 8px;color:var(--ink)}
+.wordclue .hide{background:#2A2530;color:#2A2530;border-radius:3px;padding:0 .2em}
+.tapclue{margin:-6px 0 12px;text-align:center;font-size:14px;color:var(--ink-soft)}
 .none{margin:0;column-span:all;text-align:center;color:var(--ink-soft);font-size:17px;font-weight:500}
 .words .smash{color:#C9773F}
 .words .rare{color:var(--ink-soft);font-style:italic}
@@ -136,6 +143,7 @@
   <section class="side" aria-label="Your words">
     <div class="sidehead" id="foundSum">No words yet</div>
     <div class="chips" id="chips"></div>
+    <p class="tapclue" id="tapClue" hidden>Tap a word you haven't found for a clue about it.</p>
     <ul class="words" id="words"></ul>
   </section>
   </div>
@@ -351,7 +359,10 @@ function drawWords() {
   // every word in the list links to its meaning, to learn the new ones
   const link = (w, text) => `<a href="https://en.wiktionary.org/wiki/${w}" target="_blank" rel="noopener" title="What does ${w} mean?">${text}</a>`;
   const missed = w => `<li><span class="missed">${link(w, w)}</span></li>`;
-  const blank = w => `<li class="blank" aria-label="${w[0]}, ${w.length} letters">${w[0]}${"<i></i>".repeat(w.length - 1)}</li>`;
+  // a word left: its first letter and length, M(5); tap it for a clue
+  blanks = [];
+  $("tapClue").hidden = !(h.left && left.length && !game.revealed);
+  const blank = w => `<li class="blank"><button data-b="${blanks.push(w) - 1}" aria-label="${w[0]}, ${w.length} letters: tap for a clue">${w[0]}<small>(${w.length})</small></button></li>`;
   // the two-letter starts (or found words) the words left begin with
   const startOf = w => game.found.filter(f => f.length < w.length && w.startsWith(f)).sort((a, b) => b.length - a.length)[0] || w.slice(0, 2);
   const starts = {};
@@ -367,6 +378,65 @@ function drawWords() {
   $("words").innerHTML = shown.sort(order).map(w => found.has(w) ? word(w) : game.revealed ? missed(w) : blank(w)).join("");
   if (!shown.length && !h.pairs) $("words").innerHTML = `<p class="none">Type a word and press Enter.</p>`;
 }
+let blanks = [];  // the words left, in the order their blanks are drawn
+$("words").addEventListener("click", e => { const b = e.target.closest("button[data-b]"); if (b && game && !game.revealed) wordClue(blanks[+b.dataset.b]); });
+
+/* ---------- a clue about one word ---------- */
+// Tap a word left (with Words Remaining on) for a clue: what it means, or where it comes from, from Wiktionary. This
+// needs an internet connection. Wherever the word itself turns up in the answer, it's blacked out.
+const WIKI = "https://en.wiktionary.org";
+const clueCache = {};
+function hideWord(text, w) {
+  // the word and any longer form of it (TAPPET, TAPPETS), and the "word" a definition points to as a form of it
+  const esc = s => s.replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+  return esc(text).replace(new RegExp(`\\b${w}[a-z]*`, "gi"), m => `<span class="hide">${"x".repeat(m.length)}</span>`);
+}
+const plainText = html => { const d = document.createElement("div"); d.innerHTML = html; d.querySelectorAll("sup, .reference, style").forEach(x => x.remove()); return d.textContent.replace(/\s+/g, " ").trim(); };
+async function lookUpMeaning(w) {
+  const r = await fetch(`${WIKI}/api/rest_v1/page/definition/${encodeURIComponent(w)}`);
+  if (!r.ok) throw new Error(r.status);
+  const en = (await r.json()).en || [];
+  const out = [];
+  for (const sense of en) for (const d of sense.definitions || []) {
+    const text = plainText(d.definition || "");
+    if (text && out.length < 3) out.push({pos: sense.partOfSpeech, text});
+  }
+  if (!out.length) throw new Error("none");
+  return out;
+}
+async function lookUpOrigin(w) {
+  const api = `${WIKI}/w/api.php?origin=*&format=json&formatversion=2&action=parse&page=${encodeURIComponent(w)}`;
+  const secs = (await (await fetch(`${api}&prop=sections`)).json()).parse.sections;
+  // the first Etymology heading inside the English section
+  const en = secs.findIndex(x => x.line === "English" && x.toclevel === 1);
+  if (en < 0) throw new Error("none");
+  const ety = secs.slice(en + 1).find((x, i, a) => x.toclevel === 1 || /^Etymology/.test(x.line));
+  if (!ety || ety.toclevel === 1) throw new Error("none");
+  const html = (await (await fetch(`${api}&prop=text&section=${ety.index}`)).json()).parse.text;
+  const d = document.createElement("div"); d.innerHTML = html;
+  const para = [...d.querySelectorAll("p")].map(p => plainText(p.innerHTML)).find(t => t.length > 3);
+  if (!para) throw new Error("none");
+  return para;
+}
+function wordClue(w) {
+  const box = document.createElement("div"); box.className = "wordclue";
+  box.innerHTML = `<p>Want a clue? It comes from Wiktionary, so it needs the internet.</p>`;
+  const show = async (kind) => {
+    box.innerHTML = `<p>Looking it up…</p>`;
+    try {
+      const key = kind + ":" + w;
+      const got = clueCache[key] || (clueCache[key] = await (kind === "meaning" ? lookUpMeaning(w) : lookUpOrigin(w)));
+      box.innerHTML = kind === "meaning"
+        ? got.map(d => `<div class="pos">${d.pos}</div><p>${hideWord(d.text, w)}</p>`).join("")
+        : `<div class="pos">Where it comes from</div><p>${hideWord(got, w)}</p>`;
+    } catch (e) {
+      delete clueCache[kind + ":" + w];
+      box.innerHTML = `<p>${navigator.onLine === false ? "That needs the internet. Try again when you're connected." : `Couldn't find ${kind === "meaning" ? "a meaning" : "where it comes from"} for this one (or couldn't reach Wiktionary).`}</p>`;
+    }
+  };
+  G.openCard(`${w[0].toUpperCase()} (${w.length})`, "", [["What does it mean?", () => show("meaning"), true], ["Where's it from?", () => show("origin")], ["Close", G.closeCard]], box);
+}
+
 $("hintbar").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b || !game) return;
   if (b.id === "revealBtn") return reveal();
