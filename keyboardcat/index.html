@@ -72,7 +72,13 @@
   .play>*{grid-column:1;--board:min(560px,46vw);order:0!important}
   .play>.side{grid-column:2;grid-row:1/span 6;width:100%;min-height:100%;position:sticky;top:12px}
 }
-.status .sharelink{padding:3px 12px;font-size:15px;margin-left:auto}
+.status .sharelink{padding:3px 12px;font-size:15px}
+.statbtns{margin-left:auto;display:flex;gap:8px}
+.choose{display:flex;flex-direction:column;gap:10px;margin:0 0 16px;text-align:left}
+.choose label{display:flex;flex-direction:column;gap:4px;font-weight:600}
+.choose input{font:inherit;font-size:24px;font-weight:800;letter-spacing:4px;text-transform:uppercase;padding:6px 10px;border:2px solid var(--ink);border-radius:10px;background:var(--paper);color:var(--ink)}
+.choose input#chooseGold{width:3.2ch;text-align:center;background:#ECA818;color:#2A2530}
+.choose .err{margin:0;color:#B4473A;font-size:15px;min-height:1.4em}
 .bar,.hintbtns{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;width:var(--board)}
 .bar button,.hintbtns button{padding:9px 6px;font-size:clamp(14px,3.6vw,16px);line-height:1.2}
 .hintbtns button{background:#D9D0EA;border-color:#2A2530;font-weight:500}
@@ -91,7 +97,7 @@
 .words li{break-inside:avoid;line-height:1.75;text-transform:capitalize;white-space:nowrap}
 .words li.blank{text-transform:uppercase;color:#5A5266}
 .words li.blank i{display:inline-block;width:.62em;height:.12em;margin-left:.2em;background:currentColor;vertical-align:-.05em;opacity:.8}
-.none{margin:0;text-align:center;color:var(--ink-soft)}
+.none{margin:0;column-span:all;text-align:center;color:var(--ink-soft);font-size:17px;font-weight:500}
 .words .smash{color:#C9773F}
 .words .rare{color:var(--ink-soft);font-style:italic}
 /* highlights: an ending more words share (yellow), a word that starts a longer one (orange), a word whose letters
@@ -117,7 +123,7 @@
   <div class="rank"><div class="rankrow"><b id="rankName">Kitten</b><span id="score"></span></div><div class="dots" id="dots"></div></div>
   <div class="entry" id="entry" aria-live="polite"></div>
   <div class="keyboard" id="board" aria-label="Keyboard"></div>
-  <div class="status"><span class="which" id="which"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span><button class="sharelink" id="shareBtn">Share</button></div>
+  <div class="status"><span class="which" id="which"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span><span class="statbtns"><button class="sharelink" id="chooseBtn">Choose keys</button><button class="sharelink" id="shareBtn">Share</button></span></div>
   <div class="bar">
     <button id="todayBtn">Today's keyboard</button>
     <button id="newBtn" class="primary">New keyboard</button>
@@ -159,15 +165,17 @@ const $ = G.$;
 let state = G.load(STORE);
 let saved = Object.assign({seenHelp: false, games: {}}, state);
 let game = null, typed = "", answers = [], extras = [], max = 0;
-const save = () => { if (game) saved.games[game.id] = {found: game.found, hinted: game.hinted, won: game.won, hints: game.hints}; prune(); G.save(STORE, saved); };
+const save = () => { if (game) saved.games[game.id] = {found: game.found, hinted: game.hinted, won: game.won, hints: game.hints, t: Date.now()}; prune(); G.save(STORE, saved); };
 // keep the last 40 keyboards played
-function prune() { const ids = Object.keys(saved.games); if (ids.length > 40) for (const id of ids.slice(0, ids.length - 40)) delete saved.games[id]; }
+function prune() { const ids = Object.keys(saved.games).sort((a, b) => (saved.games[a].t || 0) - (saved.games[b].t || 0)); for (const id of ids.slice(0, Math.max(0, ids.length - 40))) delete saved.games[id]; }
 // Today's keyboard: the same for everyone on the same date, picked from the list in a scattered order.
 const dayNumber = () => { const d = new Date(); return Math.floor((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(2026, 0, 1)) / 864e5); };
 const dailyId = day => ((day * 7919 + 1234) % W.puzzles.length + W.puzzles.length) % W.puzzles.length;
 
+// A keyboard's id is its place in the list, or, for keys you chose yourself that aren't in it, "c:" and its 8 letters.
+const lettersFor = id => typeof id === "string" ? id.slice(2) : W.puzzles[id];
 function openKeyboard(id, daily) {
-  const p = W.puzzles[id], keys = p.slice(0, 7), centre = p[7], was = saved.games[id] || {};
+  const p = lettersFor(id), keys = p.slice(0, 7), centre = p[7], was = saved.games[id] || {};
   game = {id, daily, keys, centre, found: was.found || [], hinted: !!was.hinted, won: !!was.won, hints: Object.assign({}, was.hints)};
   ({answers, extra: extras} = answersFor(keys, centre));
   COMMON = new Set(answers); EXTRA = new Set(extras);
@@ -204,7 +212,7 @@ function draw() {
   $("rankName").textContent = RANKS[r][0];
   $("score").textContent = `${s} point${s === 1 ? "" : "s"}`;
   $("dots").innerHTML = RANKS.map((_, i) => `<i class="${i <= r ? "on" : ""}" title="${RANKS[i][0]}"></i>`).join("");
-  $("which").textContent = game.daily != null ? `Today's keyboard (#${game.daily + 1})` : `Keyboard ${game.id + 1}`;
+  $("which").textContent = game.daily != null ? `Today's keyboard (#${game.daily + 1})` : typeof game.id === "string" ? "Your keys" : `Keyboard ${game.id + 1}`;
   $("entry").innerHTML = [...typed].map(ch => `<span class="${ch === game.centre ? "c" : ""}">${ch}</span>`).join("") + `<span class="caret"></span>`;
   drawWords();
 }
@@ -373,14 +381,50 @@ function newKeyboard() {
   let id; do id = Math.floor(Math.random() * W.puzzles.length); while (game && id === game.id);
   openKeyboard(id, null); G.track("Keyboard Cat new keyboard");
 }
+/* ---------- choosing your own keys ---------- */
+// Type in any seven keys (to play the same letters as another word game, say). Words come from this game's own list,
+// so the answers won't always match.
+const MIN_WORDS = 5;
+// the id for these keys: their place in the list if they're there, otherwise "c:" and the letters
+function idFor(keys, centre) {
+  const p = [...keys].sort().join("") + centre, at = W.puzzles.indexOf(p);
+  return at >= 0 ? at : "c:" + p;
+}
+// what's wrong with these keys, or null if they'll do
+function checkKeys(keys, centre) {
+  if (!/^[a-z]$/.test(centre || "")) return "Type the gold key.";
+  if (!/^[a-z]{7}$/.test(keys) || new Set(keys).size !== 7) return "Type 6 other keys, all different.";
+  if (!keys.includes(centre)) return "The gold key needs to be one of the 7.";
+  if (keys.includes("s")) return "Leave out S: like Spelling Bee, this game's word list has no words with S.";
+  const n = answersFor(keys, centre).answers.length;
+  if (n < MIN_WORDS) return `Those keys only make ${n} everyday word${n === 1 ? "" : "s"}. Try others.`;
+  return null;
+}
+function chooseKeys() {
+  const box = document.createElement("div"); box.className = "choose";
+  box.innerHTML = `<label>Gold key <input id="chooseGold" maxlength="1" autocomplete="off" autocapitalize="characters" spellcheck="false"></label>
+    <label>The other 6 keys <input id="chooseKeys" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false"></label>
+    <p class="err" id="chooseErr" aria-live="polite"></p>`;
+  const go = () => {
+    const centre = $("chooseGold").value.toLowerCase().trim(), keys = [...new Set(centre + $("chooseKeys").value.toLowerCase().replace(/[^a-z]/g, ""))].join("");
+    const err = checkKeys(keys, centre);
+    if (err) { $("chooseErr").textContent = err; return; }
+    G.closeCard(); openKeyboard(idFor(keys, centre), null); G.track("Keyboard Cat chose keys");
+  };
+  G.openCard("Choose keys", "Play any seven letters, like today's Spelling Bee. The words come from this game's list, so they won't all match.", [["Play these keys", go, true], ["Cancel", G.closeCard]], box);
+  $("chooseGold").addEventListener("input", e => { e.target.value = e.target.value.replace(/[^a-z]/gi, "").slice(-1); if (e.target.value) $("chooseKeys").focus(); });
+  for (const i of [$("chooseGold"), $("chooseKeys")]) i.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); go(); } });
+  $("chooseGold").focus();
+}
+$("chooseBtn").onclick = chooseKeys;
 $("todayBtn").onclick = () => { G.closeCard(); today(); };
 $("newBtn").onclick = () => { G.closeCard(); newKeyboard(); };
 $("shareBtn").onclick = () => { if (!game) return;
-  G.shareCard({name: "Keyboard Cat", won: game.won, puzzle: () => ({g: "keyboardcat", N: game.id + 1}), progress: () => ({found: game.found})});
+  G.shareCard({name: "Keyboard Cat", won: game.won, puzzle: () => typeof game.id === "string" ? {g: "keyboardcat", K: lettersFor(game.id)} : {g: "keyboardcat", N: game.id + 1}, progress: () => ({found: game.found})});
 };
 function openShared(d) {
-  const id = d.N - 1;
-  if (!(id >= 0 && id < W.puzzles.length)) { G.note("That share link didn't work.", 5000); return; }
+  const id = typeof d.K === "string" ? idFor(d.K.slice(0, 7), d.K[7]) : d.N - 1;
+  if (!(typeof id === "string" ? checkKeys(d.K.slice(0, 7), d.K[7]) === null : id >= 0 && id < W.puzzles.length)) { G.note("That share link didn't work.", 5000); return; }
   openKeyboard(id, null);
   if (d.p && Array.isArray(d.p.found)) { for (const w of d.p.found) if (typeof w === "string" && (COMMON.has(w) || EXTRA.has(w)) && !game.found.includes(w)) game.found.push(w); draw(); save(); }
 }
