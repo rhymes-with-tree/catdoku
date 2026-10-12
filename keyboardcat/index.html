@@ -70,6 +70,31 @@
 .toast{position:fixed;left:50%;top:22%;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:6px 16px;border-radius:999px;font-weight:700;z-index:5;pointer-events:none;animation:toast 1.4s ease-out forwards}
 @keyframes toast{0%{opacity:0;transform:translate(-50%,6px)}12%,75%{opacity:1;transform:translate(-50%,0)}100%{opacity:0}}
 .which{font-size:15px;color:var(--ink-soft)}
+.hints{width:var(--board);background:var(--panel);border:2px solid var(--line);border-radius:12px;padding:8px 12px}
+.hints summary{cursor:pointer;font-weight:600;list-style:none}
+.hints summary::-webkit-details-marker{display:none}
+.hints summary::after{content:" ▾";color:var(--ink-soft)}
+.hints[open] summary::after{content:" ▴"}
+.hints summary small{font-weight:500;color:var(--ink-soft)}
+.hints h3{margin:14px 0 2px;font-size:18px}
+.hints .sub{margin:0 0 8px;font-size:14px;color:var(--ink-soft)}
+.hints p{margin:0 0 8px}
+.lgrid{width:100%;border-collapse:collapse;font-size:16px;text-align:center;font-variant-numeric:tabular-nums}
+.lgrid th,.lgrid td{padding:5px 2px;border-bottom:1px solid var(--line)}
+.lgrid th{font-weight:600;color:var(--ink-soft)}
+.lgrid th:first-child{text-align:left;padding-left:4px}
+.lgrid td.n{background:#FBF3DA;font-weight:800;border-left:1px solid var(--line)}
+.lgrid td.z{border-left:1px solid var(--line)}
+.lgrid .tot{color:var(--ink-soft);font-weight:600;border-left:1px solid var(--line)}
+.pairs{display:flex;flex-direction:column;gap:6px}
+.pairs div{display:flex;flex-wrap:wrap;gap:6px}
+.pairs span{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;font-weight:600}
+.pairs span i{font-style:normal;padding:3px 7px}
+.pairs span b{padding:3px 8px;background:#FBF3DA;font-weight:800}
+.clue{border:2px solid var(--ink);border-radius:14px;padding:14px 16px;font-size:20px;line-height:1.35;min-height:96px}
+.clue b{text-transform:uppercase}
+.cluenav{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:8px;font-size:14px;color:var(--ink-soft)}
+.cluenav button{padding:6px 14px;border-radius:999px}
 @media (prefers-reduced-motion:reduce){.entry .caret{animation:none}}
 </style>
 </head>
@@ -87,8 +112,9 @@
 
   <details class="found" id="found"><summary id="foundSum">No words yet</summary><div class="words" id="words"></div></details>
 
+  <details class="hints" id="hints"><summary id="hintSum">Hints</summary><div id="hintBody"></div></details>
   <div class="actions">
-    <button id="hintBtn">Hint</button>
+    <button id="hintBtn">Hints</button>
     <button id="shareBtn">Share</button>
     <button id="helpBtn">How to play</button>
   </div>
@@ -136,7 +162,7 @@ function openKeyboard(id, daily) {
   ({answers, extra: extras} = answersFor(keys, centre));
   COMMON = new Set(answers); EXTRA = new Set(extras);
   max = answers.reduce((s, w) => s + points(w), 0);
-  typed = ""; drawKeys(); draw(); save();
+  typed = ""; clueAt = 0; $("hints").open = false; drawKeys(); draw(); save();
   placeCat({done: () => helpOnFirstVisit()});
 }
 const score = () => game.found.reduce((s, w) => s + points(w), 0);
@@ -171,6 +197,7 @@ function draw() {
   $("foundSum").textContent = n ? `You've found ${n} word${n === 1 ? "" : "s"} (${commonFound()} of ${answers.length} everyday ones)` : "No words yet";
   $("words").innerHTML = sorted.map(w => `<span class="${lettersOf(w).length === 7 ? "smash" : EXTRA.has(w) ? "rare" : ""}${w === lastWord ? " new" : ""}">${w}</span>`).join("");
   $("hintBtn").disabled = game.won;
+  drawHints();
 }
 /* ---------- the cat ---------- */
 // As a keyboard opens, a big cat trots across it from left to right and off the other side, quickly, leaving a paw
@@ -268,17 +295,80 @@ function submit() {
   if (commonFound() === answers.length && !game.won) win();
 }
 
-/* ---------- hint ---------- */
-// Hint: names a word you haven't found yet by its first two letters and its length (it never types it for you).
-function hint() {
-  if (!game || game.won) return;
-  const left = answers.filter(w => !game.found.includes(w));
-  if (!left.length) return;
-  const w = left[Math.floor(Math.random() * left.length)];
-  game.hinted = true; save();
-  G.note(`Try ${[8, 11, 18].includes(w.length) ? "an" : "a"} ${w.length}-letter word starting ${w.slice(0, 2).toUpperCase()}…`, 8000);
+/* ---------- hints ---------- */
+// Hints, like a word-game buddy: a grid of how many everyday words are left by first letter and length, the
+// two-letter starts, and clues to page through. They update as you find words, and never name a word outright.
+// Peeking costs the gold paw.
+let clueAt = 0;
+const UP = w => `<b>${w}</b>`;
+const SUFFIXES = ["ing", "tion", "ness", "ment", "able", "less", "ful", "ly", "ty", "ity", "er", "ed", "est", "al", "ic", "ish", "ous", "ive", "age", "ate", "en", "ward"];
+const PREFIXES = ["re", "un", "in", "de", "dis", "pre", "over", "out", "under", "mis", "non", "anti", "ex"];
+const known = w => COMMON.has(w) || EXTRA.has(w);
+function cluesFor(left) {
+  const clues = [], n = (k, one, many) => k === 1 ? one : many.replace("#", k);
+  const smashes = left.filter(w => lettersOf(w).length === 7);
+  if (smashes.length) clues.push(smashes.length === 1 ? `There's a keyboard smash still to find. It starts with ${UP(smashes[0][0])}.`
+    : `There are ${smashes.length} keyboard smashes still to find, starting with ${[...new Set(smashes.map(w => w[0]))].map(UP).join(" and ")}.`);
+  // the words you found most recently, and what's left that starts or ends the same way
+  for (const f of game.found.slice().reverse().slice(0, 3)) {
+    const start = f.slice(0, 2), end = f.slice(-2);
+    if (left.some(w => w.startsWith(start))) { clues.push(`Good work finding ${UP(f)}! Can you think of another word that starts with ${UP(start)}?`); break; }
+    if (left.some(w => w.endsWith(end) && w !== f)) { clues.push(`Good work finding ${UP(f)}! Can you think of another word that ends with ${UP("-" + end)}?`); break; }
+  }
+  const anagram = game.found.find(f => left.some(w => w !== f && [...w].sort().join("") === [...f].sort().join("")));
+  if (anagram) clues.push(`The letters of ${UP(anagram)} can be rearranged into another word.`);
+  const suffix = SUFFIXES.map(x => [x, left.filter(w => w.endsWith(x) && w.length >= x.length + 3).length]).filter(([, k]) => k).sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)[0];
+  if (suffix) clues.push(`Suffix alert: this keyboard lets you make words that end with ${UP("-" + suffix[0])}.`);
+  const prefix = PREFIXES.map(x => [x, left.filter(w => w.startsWith(x) && w.length >= x.length + 3).length]).filter(([, k]) => k).sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)[0];
+  if (prefix) clues.push(`Prefix alert: some words left start with ${UP(prefix[0] + "-")}.`);
+  const joined = left.find(w => { for (let i = 3; i <= w.length - 3; i++) if (known(w.slice(0, i)) && known(w.slice(i))) return true; return false; });
+  if (joined) clues.push(`One word left is two shorter words joined together. It starts with ${UP(joined[0])}.`);
+  const doubles = left.filter(w => /(.)\1/.test(w));
+  if (doubles.length) clues.push(`${n(doubles.length, "One word left has", "# words left have")} a double letter, like ${UP(doubles[0].match(/(.)\1/)[0])}.`);
+  const twice = left.filter(w => w.split(game.centre).length > 2).length;
+  if (twice) clues.push(`${n(twice, "One word left uses", "# words left use")} the gold ${UP(game.centre)} more than once.`);
+  const longest = Math.max(...left.map(w => w.length));
+  clues.push(`The longest word left has ${longest} letters${left.filter(w => w.length === longest).length > 1 ? " (there's more than one)" : ""}.`);
+  return clues;
 }
-$("hintBtn").onclick = hint;
+function drawHints() {
+  const box = $("hints");
+  $("hintSum").innerHTML = game.hinted ? "Hints" : "Hints <small>(peeking costs the gold paw)</small>";
+  if (!box.open) return;
+  const left = answers.filter(w => !game.found.includes(w));
+  if (!left.length) { $("hintBody").innerHTML = `<p class="sub">You've found every everyday word!</p>`; return; }
+  // the grid: first letters down the side, lengths across (9 and longer together)
+  const col = w => Math.min(w.length, 9), cols = [...new Set(left.map(col))].sort((a, b) => a - b);
+  const firsts = [...new Set(left.map(w => w[0]))].sort();
+  const count = (f, c) => left.filter(w => (!f || w[0] === f) && (!c || col(w) === c)).length;
+  const cell = k => k ? `<td class="n">${k}</td>` : `<td class="z"></td>`;
+  const smash = answers.filter(w => lettersOf(w).length === 7), perfect = smash.filter(w => w.length === 7).length;
+  const grid = `<table class="lgrid"><tr><th></th>${cols.map(c => `<th>${c === 9 ? "9+" : c}</th>`).join("")}<th>Σ</th></tr>
+    ${firsts.map(f => `<tr><th>${f.toUpperCase()}</th>${cols.map(c => cell(count(f, c))).join("")}<td class="tot">${count(f)}</td></tr>`).join("")}
+    <tr><th>Σ</th>${cols.map(c => `<td class="tot">${count(null, c)}</td>`).join("")}<td class="tot">${left.length}</td></tr></table>`;
+  const pairs = {};
+  for (const w of left) { const p = w.slice(0, 2); pairs[p] = (pairs[p] || 0) + 1; }
+  const byFirst = firsts.map(f => Object.keys(pairs).filter(p => p[0] === f).sort()).filter(ps => ps.length);
+  const clues = cluesFor(left);
+  clueAt = Math.min(clueAt, clues.length - 1);
+  $("hintBody").innerHTML = `
+    <h3>Words left</h3><p class="sub">How many everyday words are left, by first letter and length.</p>
+    <p>This keyboard has ${answers.length} everyday words worth ${max} points, with ${smash.length} keyboard smash${smash.length === 1 ? "" : "es"}${perfect ? ` (${perfect === smash.length && perfect === 1 ? "it uses" : perfect + " use"} each key just once)` : ""}.</p>
+    <p>Your keyboard smashes: ${smash.filter(w => game.found.includes(w)).length} of ${smash.length}</p>
+    ${grid}
+    <h3>Two-letter starts</h3><p class="sub">How many words are left for each pair of first letters.</p>
+    <div class="pairs">${byFirst.map(ps => `<div>${ps.map(p => `<span><i>${p.toUpperCase()}</i><b>${pairs[p]}</b></span>`).join("")}</div>`).join("")}</div>
+    <h3>Clues</h3><p class="sub">These change as you find words.</p>
+    <div class="clue">${clues[clueAt]}</div>
+    <div class="cluenav"><span>Clue ${clueAt + 1} of ${clues.length}</span><button id="cluePrev"${clueAt ? "" : " disabled"}>← Prev</button><button id="clueNext"${clueAt < clues.length - 1 ? "" : " disabled"}>Next →</button></div>`;
+  $("cluePrev").onclick = () => { clueAt--; drawHints(); };
+  $("clueNext").onclick = () => { clueAt++; drawHints(); };
+}
+$("hints").addEventListener("toggle", () => {
+  if ($("hints").open && game && !game.hinted && !game.won) { game.hinted = true; save(); }
+  if (game) drawHints();
+});
+$("hintBtn").onclick = () => { $("hints").open = true; $("hints").scrollIntoView({behavior: "smooth", block: "start"}); };
 
 /* ---------- winning ---------- */
 function win() {
