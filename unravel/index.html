@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Unravel</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-12.3"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-12.3">
+<style>
+/* Pegs on a board with a shape chalked between them. The cat unrolls one strand of yarn along the shape,
+   peg to peg, and the ball shrinks as it goes. Every line once, in one go. */
+.wrap.pegwrap{height:auto}
+.pegboard{position:relative;width:100%;margin:0 auto;background:var(--panel);border:3px solid var(--ink);border-radius:12px;
+  touch-action:none;user-select:none;-webkit-user-select:none;cursor:pointer}
+.pegboard svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.line{stroke:#B9A88C;stroke-width:.07;stroke-dasharray:.14 .1;stroke-linecap:round}
+.shade{fill:none;stroke:var(--ink);stroke-opacity:.28;stroke-width:.3;stroke-linecap:round;stroke-linejoin:round}
+.trail{fill:none;stroke-width:.22;stroke-linecap:round;stroke-linejoin:round}
+.twist{fill:none;stroke:#fff;stroke-opacity:.45;stroke-width:.07;stroke-dasharray:.08 .08;stroke-linecap:round;stroke-linejoin:round}
+.arrow{fill:#9A8768}
+.peg{fill:#E9DCC6;stroke:var(--ink);stroke-width:.05}
+.peg.open{fill:#fff}
+.peg.next{fill:#FFE9A8}
+.ball .wind{fill:none;stroke-width:.04}
+.hintline{stroke:#ECA818;stroke-width:.2;stroke-linecap:round;opacity:.9;animation:pulse .45s ease-in-out 4 alternate}
+.hintpeg{fill:none;stroke:#ECA818;stroke-width:.08;animation:pulse .45s ease-in-out 4 alternate}
+@keyframes pulse{to{opacity:.3}}
+.left{display:flex;gap:12px;align-items:center}
+@media (prefers-reduced-motion:reduce){.hintline,.hintpeg{animation:none}}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Unravel</h1><div class="stripe"></div><p class="tagline">Cover every line with one strand of yarn</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span class="left"><span id="count"></span></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap pegwrap"><div class="pegboard" id="board" role="application" aria-label="Pegs with lines between them"><svg id="art"></svg></div></div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="shareBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New shape</button>
+  </div>
+</main>
+
+<script src="../games.js?v=2026-10-12.3"></script>
+<script src="../colorways.js?v=2026-10-12.3"></script>
+<script>
+/* ---------- shapes (plain functions, also run in a background worker) ---------- */
+// Levels: [columns, rows of pegs, lines to cover, diagonals allowed, pegs the strand must cross itself at (go
+// through twice), how a shape is picked, then one-way lines and double lines]. Picking: a number is the most
+// often a random player may finish it; "best" of K keeps the shape a careful player (one who starts on an odd peg
+// and never cuts anything off) most often gets stuck on, which only one-way and double lines can do.
+function levelOf(n) {
+  return [null, [4, 4, 10, false, 1, 1], [4, 4, 14, true, 2, .7], [5, 5, 18, true, 3, .5],
+          [5, 5, 22, true, 3, "best", 3, 4, 0], [6, 6, 30, true, 5, "best", 25, 7, 2], [7, 7, 40, true, 8, "best", 30, 10, 3]][n];
+}
+// A line between pegs a and b, smaller first.
+function edgeKey(a, b) { return a < b ? a + "-" + b : b + "-" + a; }
+// The shape's lines, from its list of [a, b, kind] (kind 0: plain; 1: one way, from a to b; 2: double, covered
+// twice): each line by key, the lines at each peg, and how many times lines are covered in all.
+function lineTable(edges) {
+  const lines = {}, at = {};
+  for (const [a, b, k = 0] of edges) {
+    const key = edgeKey(a, b);
+    lines[key] = {a, b, k, need: k === 2 ? 2 : 1};
+    (at[a] = at[a] || []).push(key); (at[b] = at[b] || []).push(key);
+  }
+  return {lines, at, total: edges.reduce((s, e) => s + (e[2] === 2 ? 2 : 1), 0)};
+}
+// The pegs the strand can go to next from `end`, given how many times each line is covered (`used`, by key).
+function movesFrom(T, end, used) {
+  const out = [];
+  for (const key of T.at[end] || []) {
+    const L = T.lines[key];
+    if ((used[key] || 0) >= L.need) continue;
+    if (L.a === end) out.push(L.b); else if (L.k !== 1) out.push(L.a);
+  }
+  return out;
+}
+// A quick test that a strand from `end` might still cover what's left: it all joins up with `end`, and either no
+// peg has an odd number of line-ends left or two do and `end` is one. One-way lines can still make it impossible.
+function mightFinish(T, end, used) {
+  const deg = {};
+  let any = false;
+  for (const key in T.lines) {
+    const L = T.lines[key], r = L.need - (used[key] || 0);
+    if (r <= 0) continue;
+    any = true; deg[L.a] = (deg[L.a] || 0) + r; deg[L.b] = (deg[L.b] || 0) + r;
+  }
+  if (!any) return true;
+  if (!deg[end]) return false;
+  const seen = new Set([end]), todo = [end];
+  while (todo.length) {
+    const p = todo.pop();
+    for (const key of T.at[p]) {
+      const L = T.lines[key];
+      if (L.need - (used[key] || 0) <= 0) continue;
+      const q = L.a === p ? L.b : L.a;
+      if (!seen.has(q)) { seen.add(q); todo.push(q); }
+    }
+  }
+  for (const p in deg) if (!seen.has(+p)) return false;
+  const odd = Object.keys(deg).filter(p => deg[p] % 2).map(Number);
+  return odd.length === 0 || (odd.length === 2 && odd.includes(end));
+}
+// A whole way through that starts with `path` (the pegs so far), false if there's none, or null if the search
+// ran too long to say.
+function finishFrom(T, path, budget = 200000) {
+  if (!path.length) return false;
+  const used = {};
+  for (let k = 1; k < path.length; k++) { const key = edgeKey(path[k - 1], path[k]); used[key] = (used[key] || 0) + 1; }
+  let count = path.length - 1, steps = 0;
+  const way = path.slice();
+  function go(end) {
+    if (count === T.total) return true;
+    if (++steps > budget) return null;
+    for (const to of movesFrom(T, end, used)) {
+      const key = edgeKey(end, to);
+      used[key] = (used[key] || 0) + 1; count++; way.push(to);
+      if (mightFinish(T, to, used)) { const r = go(to); if (r !== false) return r; }
+      used[key]--; count--; way.pop();
+    }
+    return false;
+  }
+  if (!mightFinish(T, path[path.length - 1], used)) return false;
+  const r = go(path[path.length - 1]);
+  return r === true ? way : r;
+}
+// A shape for level n. Each try is a random walk from a random peg that never crosses one diagonal with the other
+// in the same square; it covers a line twice only to make a double line. The walk is a way through, so every shape
+// can be done, and its own direction gives the one-way lines theirs. A try is kept if the strand crosses itself at
+// enough pegs and players get stuck often enough (see levelOf). Returns null to be called again.
+function makeShape(n) {
+  const [W, H, L, diag, minCross, pick, K, oneWay = 0, doubles = 0] = levelOf(n);
+  const steps = diag ? [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]] : [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  function walk() {
+    const count = {}, dir = {};
+    let at = Math.floor(Math.random() * W * H), dbl = 0;
+    for (let k = 0; k < L; k++) {
+      const x = at % W, y = Math.floor(at / W), fresh = [], again = [];
+      for (const [dx, dy] of steps) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+        const to = ny * W + nx, c = count[edgeKey(at, to)] || 0;
+        if (dx && dy && count[edgeKey(y * W + nx, ny * W + x)]) continue;  // would cross the other diagonal
+        if (!c) fresh.push(to); else if (c === 1 && dbl < doubles) again.push(to);
+      }
+      const from = again.length && (!fresh.length || Math.random() < .2) ? again : fresh;
+      if (!from.length) return null;
+      const to = from[Math.floor(Math.random() * from.length)], key = edgeKey(at, to);
+      if (count[key]) dbl++; else dir[key] = [at, to];
+      count[key] = (count[key] || 0) + 1; at = to;
+    }
+    if (dbl < doubles) return null;
+    const singles = Object.keys(count).filter(key => count[key] === 1);
+    for (let i = singles.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [singles[i], singles[j]] = [singles[j], singles[i]]; }
+    const oneWays = new Set(singles.slice(0, oneWay));
+    const edges = Object.keys(count).map(key => {
+      const [a, b] = key.split("-").map(Number);
+      return count[key] === 2 ? [a, b, 2] : oneWays.has(key) ? [dir[key][0], dir[key][1], 1] : [a, b, 0];
+    });
+    const deg = {};
+    for (const [a, b, k] of edges) { const m = k === 2 ? 2 : 1; deg[a] = (deg[a] || 0) + m; deg[b] = (deg[b] || 0) + m; }
+    if (Object.values(deg).filter(d => d >= 4).length < minCross) return null;
+    return edges;
+  }
+  // how often (0 to 1) a player finishes: a random one takes any line it can; a careful one starts on an odd peg
+  // and never takes a line that leaves something it can't get back to
+  function finishRate(edges, R, careful) {
+    const T = lineTable(edges), pegs = Object.keys(T.at).map(Number), starts = pegs.filter(p => mightFinish(T, p, {}));
+    let done = 0;
+    for (let r = 0; r < R; r++) {
+      let at = starts[Math.floor(Math.random() * starts.length)], c = 0;
+      const used = {};
+      for (;;) {
+        let next = movesFrom(T, at, used);
+        if (careful) next = next.filter(q => { const key = edgeKey(at, q); used[key] = (used[key] || 0) + 1; const ok = mightFinish(T, q, used); used[key]--; return ok; });
+        if (!next.length) break;
+        const q = next[Math.floor(Math.random() * next.length)], key = edgeKey(at, q);
+        used[key] = (used[key] || 0) + 1; at = q; c++;
+      }
+      if (c === T.total) done++;
+    }
+    return done / R;
+  }
+  let best = null, bestRate = 2;
+  for (let tries = 0, kept = 0; tries < 4000 && kept < (pick === "best" ? K : 1); tries++) {
+    const edges = walk();
+    if (!edges) continue;
+    const rate = pick === "best" ? finishRate(edges, 60, true) : finishRate(edges, 200, false);
+    if (pick !== "best" && rate > pick) continue;
+    kept++;
+    if (rate < bestRate) { best = edges; bestRate = rate; }
+  }
+  if (!best) return null;
+  // trim the board to the shape, so no row or column of pegs sits empty
+  const xs = best.flatMap(e => [e[0] % W, e[1] % W]), ys = best.flatMap(e => [Math.floor(e[0] / W), Math.floor(e[1] / W)]);
+  const x0 = Math.min(...xs), y0 = Math.min(...ys), w = Math.max(...xs) - x0 + 1, h = Math.max(...ys) - y0 + 1;
+  const move = i => (Math.floor(i / W) - y0) * w + (i % W - x0);
+  best = best.map(([a, b, k]) => [move(a), move(b), k]);
+  return {W: w, H: h, edges: best.sort((p, q) => Math.min(p[0], p[1]) - Math.min(q[0], q[1]) || Math.max(p[0], p[1]) - Math.max(q[0], q[1]))};
+}
+
+/* ---------- the ball of yarn (as in Yarn) ---------- */
+// Shared clip and shading for every ball (drawn at radius 1, then scaled).
+function ballDefs() {
+  const defs = svgEl("defs", {}), clip = svgEl("clipPath", {id: "ballClip"});
+  clip.append(svgEl("circle", {r: .96}));
+  const lit = svgEl("radialGradient", {id: "ballLit", cx: .32, cy: .28, r: .75});
+  lit.append(svgEl("stop", {offset: 0, "stop-color": "#fff", "stop-opacity": .38}), svgEl("stop", {offset: .55, "stop-color": "#fff", "stop-opacity": 0}));
+  const dim = svgEl("radialGradient", {id: "ballDim", cx: .32, cy: .28, r: .95});
+  dim.append(svgEl("stop", {offset: .55, "stop-color": "#2A2530", "stop-opacity": 0}), svgEl("stop", {offset: 1, "stop-color": "#2A2530", "stop-opacity": .35}));
+  defs.append(clip, lit, dim);
+  return defs;
+}
+// Strands wound around three axes, like a real ball: each group is a set of ellipses through the same two poles.
+const WRAPS = [{rot: 18, ry: [.1, .3, .5, .7, .88]}, {rot: 108, ry: [.2, .45, .7]}, {rot: -40, ry: [.35, .62]}];
+// A darker strand shade: lower lightness (less for pale balls), same hue; yellows lean gold instead of going olive.
+function strandShade(color) {
+  const [L, a, b] = hexLab(color), C = Math.hypot(a, b) * 1.15;
+  let h = Math.atan2(b, a) * 180 / Math.PI;
+  if (h > 75 && h < 102) h -= 22;
+  return labHex([L - Math.min(.3, L * .4), C * Math.cos(h * Math.PI / 180), C * Math.sin(h * Math.PI / 180)]);
+}
+function yarnBall(color, r) {
+  const dark = strandShade(color), light = rampAt([color, "#FFFFFF"], .5);
+  const g = svgEl("g", {transform: `scale(${r})`});
+  g.append(svgEl("ellipse", {cx: .04, cy: .97, rx: .7, ry: .12, fill: "#2A2530", "fill-opacity": .13}));
+  g.append(svgEl("circle", {r: 1, fill: color}));
+  const w = svgEl("g", {"clip-path": "url(#ballClip)"});
+  for (const {rot, ry} of WRAPS) for (const k of ry) {
+    w.append(svgEl("ellipse", {rx: 1, ry: k, fill: "none", "stroke-width": .05, stroke: light, "stroke-opacity": .8, transform: `rotate(${rot}) translate(0 -.045)`}));
+    w.append(svgEl("ellipse", {rx: 1, ry: k, fill: "none", "stroke-width": .05, stroke: dark, transform: `rotate(${rot})`}));
+  }
+  g.append(w, svgEl("circle", {r: 1, fill: "url(#ballDim)"}), svgEl("circle", {r: 1, fill: "url(#ballLit)"}),
+    svgEl("circle", {r: 1, fill: "none", stroke: dark, "stroke-width": .07}));
+  return g;
+}
+
+/* ---------- game ---------- */
+// game: {level, W, H, edges ([a, b] lines), path (pegs the strand has visited, in order), color, undid, hinted, won}
+const STORE = "catdoku.unravel.v1", MAX_LEVEL = 6;
+const COLORS = ["#E16A4A", "#B94588", "#73A7AE", "#6AA673", "#7885BA", "#ECA818", "#BD5538"];
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1}, state.settings);
+let game = state.game || null, busy = false, hintMark = null;
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !busy && !$("overlay").classList.contains("show");
+const levelName = n => { const [W, H, L, , , , , oneWay, doubles] = levelOf(n); return `Level ${n} · ${W} × ${H}, ${L} lines${oneWay ? ", arrows" : ""}${doubles ? ", doubles" : ""}`; };
+const build = G.builder([levelOf, edgeKey, lineTable, movesFrom, mightFinish, finishFrom, makeShape], "makeShape");
+const NS = "http://www.w3.org/2000/svg";
+const svgEl = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+const pt = i => [i % game.W + .5, Math.floor(i / game.W) + .5];
+
+// The shape's line table (kept for the game it was made for), and how many times the strand covers each line.
+let tableFor = null, table = null;
+const T = () => { if (tableFor !== game) { tableFor = game; table = lineTable(game.edges); } return table; };
+function usedOf(path = game.path) { const u = {}; for (let k = 1; k < path.length; k++) { const key = edgeKey(path[k - 1], path[k]); u[key] = (u[key] || 0) + 1; } return u; }
+const covered = () => Math.max(0, game.path.length - 1);
+const pegsOf = () => Object.keys(T().at).map(Number);
+const DOUBLE = .12;  // how far apart a double line's two lines are drawn
+
+function draw() {
+  const {W, H} = game, svg = $("art"), used = usedOf(), path = game.path, end = path[path.length - 1], t = T();
+  const board = $("board");
+  board.style.width = `min(100%, ${W * 92}px)`; board.style.aspectRatio = `${W} / ${H}`;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.innerHTML = ""; svg.append(ballDefs());
+  // a line drawn `off` to one side (a double line's two lines sit either side of the middle)
+  const seg = (a, b, off) => { const [x1, y1] = pt(a), [x2, y2] = pt(b), l = Math.hypot(x2 - x1, y2 - y1), nx = -(y2 - y1) / l * off, ny = (x2 - x1) / l * off;
+    return {x1: x1 + nx, y1: y1 + ny, x2: x2 + nx, y2: y2 + ny}; };
+  // what's left to cover: dashed lines, an arrow on a one-way line, and the second line of a double line until it's covered
+  for (const key in t.lines) {
+    const L = t.lines[key], left = L.need - (used[key] || 0);
+    if (L.k === 2) { if (left >= 1) svg.append(svgEl("line", {...seg(L.a, L.b, DOUBLE), class: "line"})); if (left === 2) svg.append(svgEl("line", {...seg(L.a, L.b, -DOUBLE), class: "line"})); continue; }
+    if (left > 0) svg.append(svgEl("line", {...seg(L.a, L.b, 0), class: "line"}));
+    if (L.k === 1) {
+      const [x1, y1] = pt(L.a), [x2, y2] = pt(L.b), ang = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+      const arrow = svgEl("path", {d: "M-.13 -.12 L.11 0 L-.13 .12 Z", class: "arrow", transform: `translate(${(x1 + x2) / 2} ${(y1 + y2) / 2}) rotate(${ang})`});
+      if (left <= 0) arrow.setAttribute("fill-opacity", ".0");
+      svg.append(arrow);
+    }
+  }
+  // the strand: a soft shadow, the yarn, then a stitched highlight; a double line's first cover on one side, the second on the other
+  const segs = [], seen = {};
+  for (let k = 1; k < path.length; k++) {
+    const key = edgeKey(path[k - 1], path[k]), L = t.lines[key], o = seen[key] = (seen[key] || 0) + 1;
+    segs.push(seg(L.a, L.b, L.k === 2 ? (o === 1 ? -DOUBLE : DOUBLE) : 0));
+  }
+  for (const cls of ["shade", "trail", "twist"]) for (const sg of segs) svg.append(svgEl("line", {...sg, class: cls, ...(cls === "trail" ? {stroke: game.color} : {})}));
+  const nexts = path.length && !game.won ? new Set(movesFrom(t, end, used)) : new Set();
+  for (const p of pegsOf()) {
+    const [cx, cy] = pt(p), open = t.at[p].some(key => (used[key] || 0) < t.lines[key].need);
+    svg.append(svgEl("circle", {cx, cy, r: .1, class: "peg" + (nexts.has(p) ? " next" : open ? " open" : "")}));
+  }
+  if (hintMark) {
+    if (hintMark.to !== undefined) { const [x1, y1] = pt(hintMark.from), [x2, y2] = pt(hintMark.to); svg.append(svgEl("line", {x1, y1, x2, y2, class: "hintline"})); }
+    else { const [cx, cy] = pt(hintMark.peg); svg.append(svgEl("circle", {cx, cy, r: .3, class: "hintpeg"})); }
+  }
+  // the ball of yarn at the end of the strand, smaller the more is unrolled
+  if (path.length && !game.won) {
+    const [cx, cy] = pt(end), r = .16 + .2 * (1 - covered() / t.total);
+    const g = svgEl("g", {transform: `translate(${cx} ${cy})`});
+    g.append(yarnBall(game.color, r));
+    svg.append(g);
+  }
+  const left = t.total - covered();
+  $("count").textContent = game.won ? "All unravelled!" : `${left} line${left === 1 ? "" : "s"} to go`;
+  $("undoBtn").disabled = !path.length || game.won; $("restartBtn").disabled = !path.length || game.won; $("hintBtn").disabled = game.won;
+}
+
+/* ---------- drawing the strand ---------- */
+// Press a peg to start (or the strand's end to go on), then drag along the lines; or tap the next peg.
+function pegAt(e, slack) {
+  const r = $("board").getBoundingClientRect(), x = (e.clientX - r.left) / r.width * game.W, y = (e.clientY - r.top) / r.height * game.H;
+  const gx = Math.floor(x), gy = Math.floor(y);
+  if (gx < 0 || gy < 0 || gx >= game.W || gy >= game.H) return -1;
+  return Math.hypot(x - gx - .5, y - gy - .5) <= slack ? gy * game.W + gx : -1;
+}
+function step(to) {
+  const end = game.path[game.path.length - 1];
+  if (!movesFrom(T(), end, usedOf()).includes(to)) return false;
+  game.path.push(to);
+  return true;
+}
+function afterMove() {
+  hintMark = null;
+  if (covered() === T().total) { draw(); save(); win(); return; }
+  draw(); save();
+  const end = game.path[game.path.length - 1];
+  if (game.path.length > 1 && !movesFrom(T(), end, usedOf()).length) G.note("Stuck! No way on from here. Undo, or Restart.", 4500);
+}
+let dragging = false;
+// Winding back: drag the ball back along the strand, or press a peg the strand has been through, and the
+// yarn winds back up to there. It counts as an Undo.
+function windBack(to) { game.undid = true; game.path.length = to + 1; afterMove(); }
+$("board").addEventListener("pointerdown", e => {
+  if (!playing()) return;
+  const p = pegAt(e, .45); if (p < 0) return;
+  const path = game.path, onShape = !!T().at[p];
+  if (!path.length || path.length === 1) {
+    if (path.length === 1 && step(p)) { afterMove(); dragging = true; $("board").setPointerCapture(e.pointerId); return; }
+    if (!onShape) return;
+    game.path = [p]; afterMove();
+  } else if (p !== path[path.length - 1]) {
+    if (step(p)) afterMove();
+    else if (path.includes(p)) windBack(path.lastIndexOf(p));
+    else G.note("The strand goes on from the ball of yarn, along a line not covered yet (and with the arrow).", 3500);
+  }
+  dragging = true; $("board").setPointerCapture(e.pointerId);
+});
+$("board").addEventListener("pointermove", e => {
+  if (!dragging || !playing()) return;
+  const p = pegAt(e, .32), path = game.path;
+  if (p < 0 || p === path[path.length - 1]) return;
+  if (path.length > 1 && p === path[path.length - 2]) windBack(path.length - 2);   // back along the last line
+  else if (step(p)) afterMove();
+});
+const stopDrag = () => { dragging = false; };
+$("board").addEventListener("pointerup", stopDrag); $("board").addEventListener("pointercancel", stopDrag);
+
+$("undoBtn").onclick = () => { if (playing() && game.path.length) { game.undid = true; game.path.pop(); hintMark = null; draw(); save(); } };
+$("restartBtn").onclick = () => { if (playing() && game.path.length) { game.undid = true; game.path = []; hintMark = null; draw(); save(); G.note("Wound back up. Start from any peg.", 3000); } };
+
+// Hint: if the strand can't cover every line from where it is, wind it back to where it still can. Otherwise
+// glow the next line on a way that finishes (or the peg to start from), then take it. Keeps you on the level.
+function hint() {
+  if (!playing()) return;
+  game.hinted = true;
+  const t = T(), path = game.path;
+  if (path.length > 1 && finishFrom(t, path) === false) {
+    while (path.length > 1 && finishFrom(t, path) === false) path.pop();
+    if (path.length === 1 && finishFrom(t, path) === false) path.pop();
+    hintMark = path.length ? {peg: path[path.length - 1]} : null; draw(); save();
+    G.note("That strand couldn't cover every line, so it's wound back to where it still can.", 5000);
+    clearMark(); return;
+  }
+  if (!path.length || (path.length === 1 && finishFrom(t, path) === false)) {
+    const start = pegsOf().find(p => finishFrom(t, [p]));
+    game.path = [start]; hintMark = {peg: start}; draw(); save();
+    G.note("Start here.", 3500); clearMark(); return;
+  }
+  const end = path[path.length - 1], way = finishFrom(t, path), used = usedOf();
+  const to = way ? way[path.length] : movesFrom(t, end, used).find(q => { const key = edgeKey(end, q); used[key] = (used[key] || 0) + 1; return mightFinish(t, q, used); });
+  hintMark = {from: end, to}; draw(); save(); busy = true;
+  G.note("Follow the glowing line.", 3500);
+  const g = game;
+  setTimeout(() => { busy = false; if (game === g && !game.won) { step(to); afterMove(); } }, 900);
+}
+function clearMark() { const g = game; setTimeout(() => { if (game === g && hintMark) { hintMark = null; draw(); } }, 1800); }
+$("hintBtn").onclick = hint;
+
+/* ---------- endings ---------- */
+function win() {
+  game.won = true; G.finishClock(game);
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save(); draw();
+  G.track(`Unravel solved level ${game.level}`);
+  build.prefetch(next);
+  const g = game;
+  setTimeout(() => { if (game === g) finishCard(); }, 900);
+}
+function finishCard() {
+  const next = settings.level;
+  let text = `All ${T().total} lines covered with one strand of yarn.`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my yarn", game.result,
+    {title: "All unravelled!", gold: !game.undid && !game.hinted, goldWhy: "No hints or undos!", next: `Next: level ${next}`,
+     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- new shapes ---------- */
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
+const fresh = (n, p, color) => ({level: n, W: p.W, H: p.H, edges: p.edges, path: [], color: color || COLORS[Math.floor(Math.random() * COLORS.length)], undid: false, hinted: false, won: false, ...G.freshClock()});
+async function newPuzzle() {
+  if (busy) return;
+  busy = true;
+  const n = settings.level, p = await build.take(n);
+  game = fresh(n, p); hintMark = null;
+  busy = false; G.closeCard(); G.note(""); draw(); save();
+  build.prefetch(n);
+  G.track(`Unravel new puzzle level ${n}`);
+}
+
+/* ---------- sharing ---------- */
+$("shareBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Unravel", won: game.won,
+  puzzle: () => ({g: "unravel", N: game.level, W: game.W, H: game.H, edges: game.edges, color: game.color}), progress: () => ({path: game.path})}); };
+function openShared(d) {
+  const lv = levelOf(d.N), W = lv && (Number.isInteger(d.W) && d.W >= 2 && d.W <= lv[0] ? d.W : lv[0]), H = lv && (Number.isInteger(d.H) && d.H >= 2 && d.H <= lv[1] ? d.H : lv[1]), N = lv && W * H;
+  const ok = lv && Array.isArray(d.edges) && d.edges.length && d.edges.every(e => Array.isArray(e) && (e.length === 2 || (e.length === 3 && [0, 1, 2].includes(e[2]))) && e.slice(0, 2).every(v => Number.isInteger(v) && v >= 0 && v < N) && e[0] !== e[1]);
+  if (!ok) { G.note("That share link didn't work.", 5000); return; }
+  game = fresh(d.N, {W, H, edges: d.edges}, COLORS.includes(d.color) ? d.color : null);
+  if (!pegsOf().some(p => finishFrom(T(), [p]))) { game = null; newPuzzle(); G.note("That share link didn't work.", 5000); return; }
+  if (d.p && Array.isArray(d.p.path)) {
+    const p = d.p.path; game.path = p.length ? [p[0]] : [];
+    for (let k = 1; k < p.length && step(p[k]); k++);
+    game.timed = false;
+  }
+  settings.level = d.N; $("levelSel").value = d.N; hintMark = null;
+  draw(); save(); build.prefetch(d.N);
+  if (covered() === T().total) { game.won = true; draw(); save(); }
+}
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  settings.seenHelp = false; helpOnFirstVisit();
+  if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
+}
+// First visit: the shape, then the first few lines of a way through it (just while the step is up).
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || !playing() || game.path.length || document.querySelector(".spot")) return;
+  const {W, H} = game, xy = i => [i % W, Math.floor(i / W)], all = [...Array(W * H).keys()].map(xy), t = T();
+  // a way to start: the first three lines of a way through
+  const start = pegsOf().find(p => finishFrom(t, [p])), whole = finishFrom(t, [start]) || [start], way = whole.slice(0, 4);
+  const showing = path => ({enter: () => { game.path = path; draw(); }, leave: () => { game.path = []; draw(); }});
+  const kind = k => Object.values(t.lines).filter(L => L.k === k).flatMap(L => [xy(L.a), xy(L.b)]);
+  const steps = [
+    {say: "Cover every line with one strand of yarn", lit: all},
+    {say: "Start on a peg and drag along the lines", lit: way.map(xy), ...showing(way)},
+    {say: "Each line only once. Drag back, or tap a peg on the strand, to wind it back", lit: all, tone: "ok"},
+  ];
+  if (kind(1).length) steps.push({say: "Arrows only go one way", lit: kind(1)});
+  if (kind(2).length) steps.push({say: "Double lines need covering twice", lit: kind(2)});
+  G.spotlight({grid: $("board"), w: W, h: H, steps, done: () => { settings.seenHelp = true; save(); }});
+}
+
+/* ---------- start ---------- */
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", "") + (n === MAX_LEVEL ? " (hardest)" : ""), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
+$("helpBtn").onclick = showHelp;
+addEventListener("resize", () => { if (game) draw(); });
+
+G.nav("unravel");
+G.checkClock(game);
+G.setupTimer({name: "unravel", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level",
+  emptyText: "Unravel a shape and your times will show up here. They're kept on this device only."});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+const shared = G.readShare("unravel");
+if (game && Array.isArray(game.edges)) G.reopen(() => {
+    if (!levelOf(game.level) || !Array.isArray(game.path)) throw new Error("the saved shape doesn't fit its level");
+    draw();
+    if (game.won) finishCard(); else helpOnFirstVisit();
+    build.prefetch(settings.level);
+  }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
+else if (!shared) newPuzzle().then(helpOnFirstVisit);
+const shareOpts = () => ({name: "Unravel", inProgress: !!(game && !game.won && game.path.length > 1), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, shareOpts());
+window.addEventListener("hashchange", () => { const d = G.readShare("unravel"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
