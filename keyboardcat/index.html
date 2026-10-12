@@ -169,18 +169,21 @@ function answersFor(keys, centre) {
   const ok = w => w.includes(centre) && [...w].every(ch => keys.includes(ch));
   return {answers: W.common.filter(ok), extra: W.extra.filter(ok)};
 }
-// Ranks, as a share of the points every common answer is worth; Top Cat means every common answer.
-const RANKS = [["Kitten", 0], ["Curious", .02], ["Playful", .05], ["Pouncer", .1], ["Mouser", .2], ["Prowler", .3], ["Clever Cat", .45], ["Genius Cat", .7], ["Top Cat", 1]];
+// Ranks, as a share of the points every common answer is worth; the Cat's Meow means every common answer (and
+// the Cat's Pyjamas, every common answer without a hint).
+const RANKS = [["Kitten", 0], ["Curious", .02], ["Playful", .05], ["Pouncer", .1], ["Mouser", .2], ["Prowler", .3], ["Clever Cat", .45], ["Genius Cat", .7], ["The Cat's Meow", 1]];
+const PYJAMAS = "The Cat's Pyjamas";
 
 /* ---------- game ---------- */
 // game: {id (index into puzzles), daily (the day number, or null), keys, centre, found (words), revealed, won,
+//   hinted (a hint was used before winning),
 //   hints: which hints are on, {left, pairs, marks}}
 const STORE = "catdoku.keyboardcat.v1", ROWS = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
 const $ = G.$;
 let state = G.load(STORE);
 let saved = Object.assign({seenHelp: false, games: {}}, state);
 let game = null, typed = "", answers = [], extras = [], max = 0;
-const save = () => { if (game) saved.games[game.id] = {found: game.found, revealed: game.revealed, won: game.won, hints: game.hints, t: Date.now()}; prune(); G.save(STORE, saved); };
+const save = () => { if (game) saved.games[game.id] = {found: game.found, revealed: game.revealed, won: game.won, hinted: game.hinted, hints: game.hints, t: Date.now()}; prune(); G.save(STORE, saved); };
 // keep the last 40 keyboards played
 function prune() { const ids = Object.keys(saved.games).sort((a, b) => (saved.games[a].t || 0) - (saved.games[b].t || 0)); for (const id of ids.slice(0, Math.max(0, ids.length - 40))) delete saved.games[id]; }
 // Today's keyboard: the same for everyone on the same date, picked from the list in a scattered order.
@@ -191,7 +194,7 @@ const dailyId = day => ((day * 7919 + 1234) % W.puzzles.length + W.puzzles.lengt
 const lettersFor = id => typeof id === "string" ? id.slice(2) : W.puzzles[id];
 function openKeyboard(id, daily) {
   const p = lettersFor(id), keys = p.slice(0, 7), centre = p[7], was = saved.games[id] || {};
-  game = {id, daily, keys, centre, found: was.found || [], revealed: !!was.revealed, won: !!was.won, hints: Object.assign({}, was.hints)};
+  game = {id, daily, keys, centre, found: was.found || [], revealed: !!was.revealed, won: !!was.won, hinted: !!was.hinted, hints: Object.assign({}, was.hints)};
   ({answers, extra: extras} = answersFor(keys, centre));
   COMMON = new Set(answers); EXTRA = new Set(extras);
   max = answers.reduce((s, w) => s + points(w), 0);
@@ -224,7 +227,7 @@ function drawKeys() {
 }
 function draw() {
   const s = score(), r = rankAt(s);
-  $("rankName").textContent = RANKS[r][0];
+  $("rankName").textContent = r === RANKS.length - 1 && !game.hinted ? PYJAMAS : RANKS[r][0];
   $("score").textContent = `${s} point${s === 1 ? "" : "s"}`;
   $("dots").innerHTML = RANKS.map((_, i) => `<i class="${i <= r ? "on" : ""}" title="${RANKS[i][0]}"></i>`).join("");
   $("which").textContent = game.daily != null ? `Today's keyboard (#${game.daily + 1})` : typeof game.id === "string" ? "Your keys" : `Keyboard ${game.id + 1}`;
@@ -321,7 +324,7 @@ function submit() {
   const before = rankAt(score());
   game.found.push(w); lastWord = w; typed = "";
   const smash = lettersOf(w).length === 7, p = points(w);
-  toast(smash ? `${w.length === 7 ? "Perfect keyboard smash" : "Keyboard smash"}! +${p}` : EXTRA.has(w) ? `A rare one! +${p}` : `${["", "Nice!", "", "", "", "Good!", "Great!", "Purrfect!"][Math.min(7, w.length - 3)] || "Purrfect!"} +${p}`);
+  toast(smash ? `${w.length === 7 ? "Perfect Pounce" : "Full Pounce"}! +${p}` : EXTRA.has(w) ? `A rare one! +${p}` : `${["", "Nice!", "", "", "", "Good!", "Great!", "Purrfect!"][Math.min(7, w.length - 3)] || "Purrfect!"} +${p}`);
   const after = rankAt(score());
   draw(); save();
   if (after > before && after < RANKS.length - 1) setTimeout(() => toast(`You're now ${/^[AEIOU]/.test(RANKS[after][0]) ? "an" : "a"} ${RANKS[after][0]}!`), 1500);
@@ -345,10 +348,10 @@ const HINTS = [["left", "Words Remaining"], ["pairs", "Two-letter starts"], ["ma
 function drawWords() {
   const h = game.hints, left = answers.filter(w => !game.found.includes(w));
   const n = game.found.length;
-  // keyboard smashes use all 7 keys; a perfect one uses each key just once (7 letters long)
+  // a Full Pounce uses all 7 keys; a Perfect Pounce uses each key just once (7 letters long)
   const smash = answers.filter(w => lettersOf(w).length === 7), perfect = smash.filter(w => w.length === 7);
   const got = smash.filter(w => game.found.includes(w)).length;
-  $("smashes").innerHTML = `<b>${smash.length} keyboard smash${smash.length === 1 ? "" : "es"}</b>`
+  $("smashes").innerHTML = `<b>${smash.length} Full Pounce${smash.length === 1 ? "" : "s"}</b>`
     + (perfect.length ? ` (${perfect.length < smash.length ? perfect.length : smash.length === 1 ? "it's" : "all"} perfect: each key just once)` : "")
     + ` · you've found ${got}`;
   $("foundSum").textContent = n ? `You've found ${n} word${n === 1 ? "" : "s"} (${commonFound()} of ${answers.length} everyday ones)` : "No words yet";
@@ -433,6 +436,7 @@ function wordClue(w) {
   box.innerHTML = `<p>Want a clue? It comes from Wiktionary, so it needs the internet.</p>`;
   const show = async (kind) => {
     box.innerHTML = `<p>Looking it up…</p>`;
+    if (!game.won && !game.hinted) { game.hinted = true; save(); draw(); }
     try {
       const key = kind + ":" + w;
       const got = clueCache[key] || (clueCache[key] = await (kind === "meaning" ? lookUpMeaning(w) : lookUpOrigin(w)));
@@ -451,6 +455,7 @@ $("hintbar").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b || !game) return;
   if (b.id === "revealBtn") return reveal();
   const k = b.dataset.h; game.hints[k] = !game.hints[k];
+  if (game.hints[k] && !game.won) game.hinted = true;
   save(); draw();
 });
 
@@ -463,11 +468,11 @@ function reveal() {
 /* ---------- winning ---------- */
 function win() {
   game.won = true; save(); draw();
-  G.track(`Keyboard Cat top cat ${game.daily != null ? "daily" : "practice"}`);
+  G.track(`Keyboard Cat cat's meow ${game.daily != null ? "daily" : "practice"}`);
   setTimeout(() => {
     const text = `You found all ${answers.length} everyday words${game.found.length > answers.length ? `, and ${game.found.length - answers.length} rare one${game.found.length - answers.length === 1 ? "" : "s"} too` : ""}.`;
     G.winCard(text, () => { G.closeCard(); newKeyboard(); }, "Admire my words", null,
-      {title: "Top Cat!", gold: true, goldWhy: "Every everyday word!", next: "Another keyboard"});
+      {gold: true, goldWhy: game.hinted ? "You're the Cat's Meow!" : "You're the Cat's Pyjamas! (No hints!)", next: "Another keyboard"});
   }, 900);
 }
 
@@ -534,8 +539,8 @@ function helpOnFirstVisit() {
     {say: "The cat walked across the keyboard and broke it. Only 7 keys still work", els: [keyEls]},
     {say: "Every word must use the gold key", els: [centreEl]},
     {say: "Make words of 4 letters or more. Keys can be used again", els: [$("entry")]},
-    {say: "Use all 7 keys in one word for a keyboard smash!", els: [keyEls]},
-    {say: "Find every everyday word to become Top Cat", els: [$("dots")]},
+    {say: "Use all 7 keys in one word for a Full Pounce!", els: [keyEls]},
+    {say: "Find every everyday word to be the Cat's Meow (with no hints, the Cat's Pyjamas!)", els: [$("dots")]},
   ];
   G.spotlight({grid: $("board"), w: 10, h: 4, steps, done: () => { saved.seenHelp = true; save(); }});
 }
