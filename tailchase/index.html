@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tail Chase</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-12.4"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-12.4">
+<style>
+/* A cat chases toys round a rug, a strand of yarn trailing behind it that grows with every toy. Don't run into
+   the edge of the rug, the yarn, or anything left lying about. */
+.rug{position:relative;width:100%;aspect-ratio:1;border:4px solid #8C5A3C;border-radius:14px;overflow:hidden;
+  background:#E9D3B4;touch-action:none;user-select:none;-webkit-user-select:none}
+.rug canvas{position:absolute;inset:0;width:100%;height:100%}
+.tapgo{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;
+  font-weight:800;font-size:22px;color:#5A3A26;text-shadow:0 2px 0 #fff8}
+.tapgo[hidden]{display:none}
+.left{display:flex;gap:12px;align-items:center}
+/* steering buttons in a cross under the rug: pressed, not clicked, so a turn happens the moment a finger lands */
+.dpad{display:grid;grid-template-columns:repeat(3,64px);grid-template-rows:repeat(3,52px);gap:4px;justify-content:center;touch-action:none;user-select:none;-webkit-user-select:none}
+.dpad button{padding:0;font-size:22px;line-height:1;border-radius:14px;background:var(--panel)}
+.dpad button:active,.dpad button.down{background:var(--ink);color:var(--paper)}
+.dpad [data-d=up]{grid-area:1/2}.dpad [data-d=left]{grid-area:2/1}.dpad [data-d=right]{grid-area:2/3}.dpad [data-d=down]{grid-area:3/2}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Tail Chase</h1><div class="stripe"></div><p class="tagline">Catch the toys without getting tangled</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span class="left"><span id="count"></span></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap" style="height:auto"><div class="rug" id="board" role="application" aria-label="A rug. Swipe or use the arrow keys to steer the cat."><canvas id="cv"></canvas><div class="tapgo" id="tapgo">Swipe or press an arrow to start</div></div></div>
+  <div class="dpad" id="dpad" aria-label="Steering buttons">
+    <button data-d="up" aria-label="Up">▲</button><button data-d="left" aria-label="Left">◀</button><button data-d="right" aria-label="Right">▶</button><button data-d="down" aria-label="Down">▼</button>
+  </div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="pauseBtn">Pause</button>
+    <button id="restartBtn">Restart level</button>
+    <button id="toysBtn">Toys</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+  </div>
+</main>
+
+<script src="../games.js?v=2026-10-12.4"></script>
+<script>
+/* ---------- levels ---------- */
+// Level n: [squares across the rug, toys to catch, milliseconds per step at the start and at the end, things in
+// the way, patches of catnip]. Twenty levels, each a little more than the last: a bigger rug at 5 and 11, more toys, quicker steps,
+// from level 3 things from Knock It Off's table left lying about, and from level 5 patches of catnip.
+function levelOf(n) {
+  const t = (n - 1) / 19;
+  return [n <= 4 ? 12 : n <= 10 ? 14 : 16, Math.round(8 + 22 * t), Math.round(420 - 215 * t), Math.round(330 - 200 * t), n <= 2 ? 0 : Math.round((n - 2) * 12 / 18), n < 5 ? 0 : 1 + Math.floor((n - 5) / 4)];
+}
+const LEVELS = [null, ...Array.from({length: 20}, (_, i) => levelOf(i + 1))];
+const MAX_LEVEL = LEVELS.length - 1;
+const levelName = n => { const [N, T, , , S, C] = LEVELS[n]; return `Level ${n} · ${T} toys${S ? `, ${S} thing${S === 1 ? "" : "s"} in the way` : ""}${C ? ", catnip" : ""}`; };
+
+/* ---------- pictures ---------- */
+const KINDS = [
+  {c: "#BD5538", looks: [["wiffle-red", "red wiffle balls"], ["swirl-red", "red swirl balls"], ["crochet-stars", "star balls"], ["tinsel", "tinsel balls"]]},
+  {c: "#ECA818", looks: [["wiffle-yellow", "yellow wiffle balls"]]},
+  {c: "#73A7AE", looks: [["wiffle-teal", "teal wiffle balls"], ["fish", "fish"]]},
+  {c: "#6AA673", looks: [["lattice", "lattice balls"]]},
+  {c: "#B3B94B", looks: [["spiky-lime", "spiky pom-poms"]]},
+  {c: "#B94588", looks: [["swirl-purple", "plum swirl balls"], ["bell-purple", "bell balls"]]},
+  {c: "#7885BA", looks: [["spring", "springs"], ["rope-blue", "rope balls"]]},
+  {c: "#825840", looks: [["cork-paw", "cork paw balls"], ["burlap-paws", "burlap balls"], ["rattan", "rattan balls"]]},
+  {c: "#5E5866", looks: [["mouse", "mice"]]},
+  {c: "#E16A4A", looks: [["felt-rainbow", "rainbow balls"], ["ribbon-tail", "ribbon balls"], ["spiky-rainbow", "spiky balls"]]},
+];
+const ALL_LOOKS = KINDS.flatMap(k => k.looks.map(([f]) => f));
+const CURLED = ["c14-36", "c16-5", "c14-34", "c15-6", "c14-35", "c15-5", "c16-3"];
+const TOY_SRC = {};  // filled with embedded pictures when the page is bundled into one file
+const CAT_SRC = {};
+const toySrc = f => TOY_SRC[f] || `../toys/${f}.webp?v=${window.SITE_BUILD || ""}`;
+const catSrc = f => CAT_SRC[f] || `../cats/${f}.webp`;
+// The cat seen from above, from Knock It Off (facing up, without its tail: the yarn trails behind it instead).
+const INK = 'stroke="#2A2530" stroke-width="2.5"';
+const CAT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <ellipse cx="50" cy="60" rx="22" ry="26" fill="#E9A15B" ${INK}/>
+  <path d="M38 56 Q50 52 62 56 M36 66 Q50 62 64 66 M40 75 Q50 72 60 75" fill="none" stroke="#C7793A" stroke-width="3" stroke-linecap="round"/>
+  <path d="M35 27 L36 10 L47 19 Z M65 27 L64 10 L53 19 Z" fill="#E9A15B" ${INK} stroke-linejoin="round"/>
+  <circle cx="50" cy="30" r="16" fill="#E9A15B" ${INK}/>
+  <path d="M44 22 L46 28 M50 20 L50 27 M56 22 L54 28" stroke="#C7793A" stroke-width="2.5" stroke-linecap="round"/></svg>`;
+const CAT_PIC = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(CAT_SVG);
+// Things left lying about, from Knock It Off's table (each drawn in a 100 × 100 square).
+const INK_ = 'stroke="#2A2530" stroke-width="2.5"';
+const SHADOW = (rx = 26) => `<ellipse cx="50" cy="84" rx="${rx}" ry="7" fill="rgba(70,35,10,.28)"/>`;
+const HEART = `<path d="M76 14 C76 9 83 9 83 14 C83 9 90 9 90 14 C90 20 83 24 83 26 C83 24 76 20 76 14Z" fill="#D9534F" stroke="#fff" stroke-width="2"/>`;
+const ART = {
+  m: `${SHADOW(24)}<path d="M64 46 C80 46 80 68 64 68" fill="none" stroke="#2A2530" stroke-width="8"/><path d="M64 46 C80 46 80 68 64 68" fill="none" stroke="#fff" stroke-width="3.5"/>
+      <rect x="28" y="34" width="38" height="48" rx="6" fill="#fff" ${INK_}/><rect x="29.5" y="52" width="35" height="9" fill="#B94588"/>
+      <ellipse cx="47" cy="35" rx="18" ry="4.5" fill="#6B4A3B" ${INK_}/><path d="M40 26 q-4 -6 0 -12 M50 26 q-4 -6 0 -12" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".85"/>`,
+  g: `${SHADOW(20)}<path d="M33.5 42 L66.5 42 L63 82 L37 82 Z" fill="#8EC5E8"/><ellipse cx="50" cy="42" rx="16.5" ry="3" fill="#BFE0F5"/>
+      <path d="M31 20 L69 20 L63 82 L37 82 Z" fill="rgba(235,245,250,.35)" ${INK_} stroke-linejoin="round"/><path d="M38 26 L41 74" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".8"/>`,
+  s: `${SHADOW(22)}<g fill="#6AA673" stroke="#2A2530" stroke-width="2">${[-62, -32, 32, 62, 0].map(a => `<ellipse cx="50" cy="34" rx="7.5" ry="17" transform="rotate(${a} 50 50)"/>`).join("")}</g>
+      <path d="M33 60 L67 60 L62 84 L38 84 Z" fill="#D07A4E" ${INK_} stroke-linejoin="round"/><rect x="29" y="53" width="42" height="10" rx="3" fill="#E08F62" ${INK_}/>`,
+  v: `${SHADOW(22)}<path d="M50 30 L37 12 M50 30 L50 7 M50 30 L63 13" stroke="#3C8681" stroke-width="3"/>
+      <g stroke="#2A2530" stroke-width="2"><circle cx="37" cy="12" r="6" fill="#F2AEBB"/><circle cx="50" cy="7" r="6" fill="#ECA818"/><circle cx="63" cy="13" r="6" fill="#F2AEBB"/></g>
+      <path d="M42 30 C42 40 28 46 28 62 C28 76 38 84 50 84 C62 84 72 76 72 62 C72 46 58 40 58 30 Z" fill="#7885BA" ${INK_}/>
+      <path d="M30 60 Q50 68 70 60" fill="none" stroke="#C9CCEA" stroke-width="4"/><rect x="40" y="26" width="20" height="6" rx="2" fill="#4E577D" ${INK_}/>`,
+  h: `${SHADOW(22)}<g transform="rotate(-14 50 50)"><rect x="31" y="14" width="38" height="70" rx="8" fill="#2A2530"/><rect x="35" y="21" width="30" height="54" rx="3" fill="#73A7AE"/>
+      <g fill="#fff" opacity=".85"><rect x="39" y="26" width="8" height="8" rx="2"/><rect x="53" y="26" width="8" height="8" rx="2"/><rect x="39" y="40" width="8" height="8" rx="2"/><rect x="53" y="40" width="8" height="8" rx="2"/></g></g>`,
+  y: `${SHADOW(24)}<circle cx="50" cy="56" r="26" fill="#E79AAE" ${INK_}/>
+      <g fill="none" stroke="#C9677F" stroke-width="2.5"><path d="M27 50 Q50 34 75 52"/><path d="M26 61 Q50 46 76 63"/><path d="M31 72 Q52 58 72 73"/><path d="M41 32 Q32 56 44 81"/></g>
+      <path d="M70 72 C80 74 78 86 90 86" fill="none" stroke="#C9677F" stroke-width="3" stroke-linecap="round"/>`,
+  i: `${SHADOW(30)}<g transform="rotate(-22 50 58)"><rect x="18" y="51" width="54" height="14" fill="#F2C230" ${INK_}/><line x1="18" y1="58" x2="72" y2="58" stroke="#D9A41C" stroke-width="2"/>
+      <rect x="8" y="51" width="11" height="14" rx="3" fill="#E79AAE" ${INK_}/><rect x="17" y="51" width="5" height="14" fill="#C9CCDA" ${INK_}/>
+      <path d="M72 51 L90 58 L72 65 Z" fill="#EDD3AE" ${INK_} stroke-linejoin="round"/><path d="M84 55.7 L90 58 L84 60.3 Z" fill="#2A2530"/></g>`,
+  f: `${SHADOW(30)}<path d="M26 58 C30 42 70 42 74 58 Z" fill="#B9805F" ${INK_}/>
+      <g fill="#8A5A34"><circle cx="40" cy="52" r="3"/><circle cx="50" cy="48" r="3"/><circle cx="60" cy="52" r="3"/><circle cx="47" cy="55" r="3"/><circle cx="56" cy="56" r="3"/></g>
+      <path d="M20 58 L80 58 L71 82 L29 82 Z" fill="#B94588" ${INK_} stroke-linejoin="round"/>
+      <path d="M41 70 C45 65 54 65 58 70 C54 75 45 75 41 70 Z M57 70 L63 65.5 L63 74.5 Z" fill="#fff"/>${HEART}`,
+  L: `${SHADOW(30)}<ellipse cx="50" cy="82" rx="18" ry="5" fill="#4E577D" ${INK_}/><rect x="46.5" y="42" width="7" height="40" fill="#4E577D" ${INK_}/>
+      <path d="M28 46 L72 46 L62 12 L38 12 Z" fill="#F6E7B8" ${INK_} stroke-linejoin="round"/><path d="M32 40 L68 40" stroke="#E5CF8C" stroke-width="3"/>`,
+  b: `${SHADOW(34)}<rect x="18" y="66" width="62" height="16" rx="2" fill="#BD5538" ${INK_}/><rect x="70" y="68.5" width="8" height="11" fill="#F7F1E1"/>
+      <rect x="25" y="50" width="54" height="16" rx="2" fill="#4E577D" ${INK_}/><rect x="69" y="52.5" width="8" height="11" fill="#F7F1E1"/>
+      <rect x="16" y="34" width="58" height="16" rx="2" fill="#6AA673" ${INK_}/><rect x="64" y="36.5" width="8" height="11" fill="#F7F1E1"/>
+      <rect x="22" y="38" width="20" height="3" fill="#fff" opacity=".7"/>`,
+};
+// Only the things the cat can't get past in Knock It Off: lemons (cats can't stand citrus), piles of books, and
+// strips of tape (the cat won't step on tape).
+// A piece of tape across a square (part of a strip).
+const TAPE = `<rect x="-1" y="33" width="102" height="34" fill="#EFE6CC" opacity=".95"/><path d="M-1 33 H101 M-1 67 H101" stroke="#BFAE84" stroke-width="2.5"/>
+  <path d="M8 40 L22 60 M38 40 L52 60 M68 40 L82 60" stroke="#D9CDA8" stroke-width="2"/>`;
+ART.l = `${SHADOW(28)}<path d="M50 30 C44 22 52 14 60 16 C58 24 56 28 50 30 Z" fill="#6AA673" stroke="#2A2530" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M12 57 C20 40 36 33 50 33 C64 33 80 40 88 57 C80 74 64 81 50 81 C36 81 20 74 12 57 Z" fill="#F2D43A" ${INK_} stroke-linejoin="round"/>
+  <ellipse cx="38" cy="47" rx="10" ry="4" fill="#FBEA8C" transform="rotate(-15 38 47)"/>
+  <g fill="#D9B21C"><circle cx="58" cy="52" r="1.6"/><circle cx="66" cy="60" r="1.6"/><circle cx="48" cy="64" r="1.6"/><circle cx="36" cy="60" r="1.6"/><circle cx="62" cy="70" r="1.6"/></g>`;
+// A patch of catnip on the table (drawn into the table, under everything).
+const CATNIP = `<ellipse cx="50" cy="52" rx="38" ry="32" fill="#B9D59E" opacity=".75"/>
+  <g fill="#6AA673" stroke="#3C6E45" stroke-width="1.5">${[[30, 40, -40], [50, 30, 0], [70, 40, 40], [36, 64, -70], [64, 64, 70], [50, 56, 0]].map(([x, y, a]) =>
+    `<path d="M${x} ${y + 9} C${x - 8} ${y + 2} ${x - 6} ${y - 8} ${x} ${y - 11} C${x + 6} ${y - 8} ${x + 8} ${y + 2} ${x} ${y + 9} Z" transform="rotate(${a} ${x} ${y})"/>`).join("")}</g>
+  <g fill="#D9C8F0" stroke="#7885BA" stroke-width="1"><circle cx="42" cy="26" r="3.5"/><circle cx="58" cy="24" r="3.5"/><circle cx="50" cy="20" r="3.5"/></g>`;
+const NIP_PIC = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">${CATNIP}</svg>`);
+const THINGS = {l: "a lemon", b: "a pile of books", t: "the tape", T: "the tape"};  // t: tape across, T: up and down
+const thingPic = k => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">${k === "t" ? TAPE : k === "T" ? `<g transform="rotate(90 50 50)">${TAPE}</g>` : ART[k]}</svg>`);
+const pics = {};
+const pic = src => { if (!pics[src]) { const im = new Image(); im.onload = () => game && paint(); im.src = src; pics[src] = im; } return pics[src]; };
+let offToys = G.toysOff();
+function pickToy() {
+  const on = ALL_LOOKS.filter(f => !offToys.has(f)), from = on.length ? on : ALL_LOOKS;
+  return from[Math.floor(Math.random() * from.length)];
+}
+const YARN = ["#E16A4A", "#B94588", "#73A7AE", "#6AA673", "#7885BA", "#ECA818"];
+
+/* ---------- game ---------- */
+// game: {level, N, snake ([x, y] from the head back), dir, queue (turns waiting), toy {x, y, f}, caught, target,
+//        sleepers (things in the way, [x, y, kind]), color, state ("ready" | "running" | "paused" | "tangled" | "won")}
+const STORE = "catdoku.tailchase.v1";
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1, tries: {}}, state.settings);
+let game = null, timer = null;
+const save = () => G.save(STORE, {settings});
+const DIRS = {up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0]};
+const free = (x, y) => x >= 0 && y >= 0 && x < game.N && y < game.N && !game.snake.some(([a, b]) => a === x && b === y) && !game.sleepers.some(([a, b]) => a === x && b === y);
+
+function newRun(n) {
+  clearTimeout(timer);
+  const [N, target, , , S] = LEVELS[n], mid = Math.floor(N / 2);
+  game = {level: n, N, snake: [[mid, mid], [mid - 1, mid], [mid - 2, mid]], dir: "right", queue: [], toy: null, caught: 0, target,
+          sleepers: [], nip: [], roll: 0, color: YARN[Math.floor(Math.random() * YARN.length)], state: "ready", ...G.freshClock()};
+  // things in the way: lemons, piles of books and strips of tape two or three squares long; not on the starting
+  // row, not against the edge, and never next to each other
+  const near = (x, y) => game.sleepers.some(([a, b]) => Math.abs(a - x) < 2 && Math.abs(b - y) < 2);
+  for (let tries = 0, placed = 0; placed < S && tries < 800; tries++) {
+    const x = 1 + Math.floor(Math.random() * (N - 2)), y = 1 + Math.floor(Math.random() * (N - 2)), r = Math.random();
+    let cells = [[x, y]], k = r < .45 ? "l" : r < .75 ? "b" : null;
+    if (!k) { const across = Math.random() < .5, len = 2 + Math.floor(Math.random() * 2); k = across ? "t" : "T"; cells = Array.from({length: len}, (_, i) => across ? [x + i, y] : [x, y + i]); }
+    if (cells.some(([cx, cy]) => cx > N - 2 || cy > N - 2 || Math.abs(cy - mid) < 2 || near(cx, cy))) continue;
+    for (const [cx, cy] of cells) game.sleepers.push([cx, cy, k]);
+    placed++;
+  }
+  // catnip: patches the cat can cross, but it stops to roll about on them (as in Knock It Off)
+  const nips = LEVELS[n][5] || 0;
+  for (let tries = 0; game.nip.length < nips && tries < 500; tries++) {
+    const x = 1 + Math.floor(Math.random() * (N - 2)), y = 1 + Math.floor(Math.random() * (N - 2));
+    if (Math.abs(y - mid) < 2 || game.sleepers.some(([a, b]) => Math.abs(a - x) < 2 && Math.abs(b - y) < 2) || game.nip.some(([a, b]) => Math.abs(a - x) < 3 && Math.abs(b - y) < 3)) continue;
+    game.nip.push([x, y]);
+  }
+  placeToy();
+  $("tapgo").hidden = false; $("tapgo").textContent = "Swipe or press an arrow to start";
+  status(); paint();
+}
+function placeToy() {
+  const spots = [];
+  const m = game.level === 1 ? 1 : 0;   // on level 1, toys keep off the edge of the rug
+  for (let y = m; y < game.N - m; y++) for (let x = m; x < game.N - m; x++) if (free(x, y) && !game.nip.some(([a, b]) => a === x && b === y)) spots.push([x, y]);
+  const [x, y] = spots[Math.floor(Math.random() * spots.length)];
+  game.toy = {x, y, f: pickToy()};
+  pic(toySrc(game.toy.f));
+}
+const stepMs = () => { const [, T, a, b] = LEVELS[game.level]; return a + (b - a) * game.caught / T; };
+function status() {
+  $("count").textContent = game.state === "won" ? "All caught!" : `${game.caught} of ${game.target} toys`;
+  $("pauseBtn").textContent = game.state === "paused" ? "Go on" : "Pause";
+  $("pauseBtn").disabled = !["running", "paused"].includes(game.state);
+}
+
+// Steering: a turn waits its turn (two at most), and the cat can't turn straight back on itself.
+function steer(d) {
+  if (!game || game.state === "tangled" || game.state === "won" || $("overlay").classList.contains("show") || document.querySelector(".spot")) return;
+  const last = game.queue.length ? game.queue[game.queue.length - 1] : game.dir, [lx, ly] = DIRS[last], [dx, dy] = DIRS[d];
+  if (game.state === "ready") { if (d === "left") return; game.dir = d; start(); return; }
+  if (game.state === "paused") { resume(); }
+  if (dx === -lx && dy === -ly) return;
+  if (d === last || game.queue.length >= 2) return;
+  game.queue.push(d);
+}
+function start() { game.state = "running"; game.started = true; $("tapgo").hidden = true; status(); tick(); G.track(`Tail Chase started level ${game.level}`); }
+function tick() {
+  clearTimeout(timer);
+  if (game.state !== "running") return;
+  if (game.roll > 0) {   // rolling about on catnip: the cat stays put for this step
+    game.roll--; spin = {at: performance.now(), ms: stepMs()}; spinLoop();
+    timer = setTimeout(tick, stepMs()); return;
+  }
+  if (game.queue.length) game.dir = game.queue.shift();
+  const [dx, dy] = DIRS[game.dir], [hx, hy] = game.snake[0], nx = hx + dx, ny = hy + dy;
+  const eats = game.toy && nx === game.toy.x && ny === game.toy.y;
+  if (!eats) game.snake.pop();   // the end of the yarn moves on, so the cat can follow its own tail
+  if (!free(nx, ny)) { if (!eats) game.snake.push(game.snake[game.snake.length - 1]); tangle(nx, ny); return; }
+  game.snake.unshift([nx, ny]);
+  if (game.nip.some(([a, b]) => a === nx && b === ny)) { game.roll = 2; G.note("Catnip! The cat stops to roll about.", 2000); }
+  if (eats) {
+    game.caught++;
+    if (game.caught >= game.target) { game.toy = null; status(); paint(); win(); return; }
+    placeToy();
+  }
+  status(); paint();
+  timer = setTimeout(tick, stepMs());
+}
+function pause() { if (game && game.state === "running") { game.state = "paused"; clearTimeout(timer); $("tapgo").hidden = false; $("tapgo").textContent = "Paused · tap to go on"; status(); } }
+function resume() { if (game && game.state === "paused") { game.state = "running"; $("tapgo").hidden = true; status(); timer = setTimeout(tick, 250); } }
+$("pauseBtn").onclick = () => game && (game.state === "paused" ? resume() : pause());
+document.addEventListener("visibilitychange", () => { if (document.hidden) pause(); });
+
+/* ---------- drawing ---------- */
+const cv = $("cv"), ctx = cv.getContext("2d");
+let bump = null, spin = null;  // spin: the cat rolling about on catnip, {at, ms}
+const spinAngle = () => { if (!spin) return 0; const t = (performance.now() - spin.at) / spin.ms; return t >= 1 ? 0 : t * 2 * Math.PI; };
+function spinLoop() { if (!spin) return; paint(); if (performance.now() - spin.at < spin.ms) requestAnimationFrame(spinLoop); else { spin = null; paint(); } }  // where the cat ran into something, drawn as a little star
+function paint() {
+  if (!game) return;
+  const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  if (cv.width !== Math.round(r.width * dpr)) { cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr); }
+  const N = game.N, c = cv.width / N;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  // the rug: soft stripes and a faint grid of the weave
+  ctx.fillStyle = "#E9D3B4"; ctx.fillRect(0, 0, cv.width, cv.height);
+  for (let y = 0; y < N; y++) if (y % 2) { ctx.fillStyle = "rgba(201,154,107,.18)"; ctx.fillRect(0, y * c, cv.width, c); }
+  ctx.strokeStyle = "rgba(140,90,60,.08)"; ctx.lineWidth = 1 * dpr;
+  for (let i = 1; i < N; i++) { ctx.beginPath(); ctx.moveTo(i * c, 0); ctx.lineTo(i * c, cv.height); ctx.stroke(); }
+  const at = ([x, y]) => [(x + .5) * c, (y + .5) * c];
+  // catnip, drawn into the rug under everything
+  for (const xy of game.nip) { const im = pic(NIP_PIC), [tx, ty] = at(xy); if (im.complete && im.naturalWidth) ctx.drawImage(im, tx - c * .55, ty - c * .55, c * 1.1, c * 1.1); }
+  // things in the way
+  for (const [x, y, k] of game.sleepers) {
+    const im = pic(thingPic(k));
+    if (im.complete && im.naturalWidth) { const [tx, ty] = at([x, y]), tape = k === "t" || k === "T"; tape ? (ctx.save(), ctx.shadowColor = "rgba(90,55,30,.45)", ctx.shadowBlur = c * .12, ctx.drawImage(im, tx - c / 2, ty - c / 2, c, c), ctx.restore()) : ctx.drawImage(im, tx - c * .55, ty - c * .6, c * 1.1, c * 1.1); }
+  }
+  // the toy, bobbing a little
+  if (game.toy) {
+    const im = pic(toySrc(game.toy.f)), [tx, ty] = at([game.toy.x, game.toy.y]), s = c * (.9 + .06 * Math.sin(Date.now() / 200));
+    if (im.complete && im.naturalWidth) ctx.drawImage(im, tx - s / 2, ty - s / 2, s, s);
+  }
+  // the yarn: a shadow, the strand, a stitched highlight, and a ball of yarn at the end
+  const pts = game.snake.map(at);
+  const strand = (style, w, dash) => { ctx.save(); ctx.strokeStyle = style; ctx.lineWidth = w; ctx.lineCap = "round"; ctx.lineJoin = "round"; if (dash) ctx.setLineDash(dash);
+    ctx.beginPath(); pts.forEach(([x, y], k) => k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke(); ctx.restore(); };
+  strand("rgba(42,37,48,.25)", c * .22); strand(game.color, c * .15); strand("rgba(255,255,255,.5)", c * .045, [c * .07, c * .07]);
+  const [ex, ey] = pts[pts.length - 1];
+  ctx.fillStyle = game.color; ctx.strokeStyle = "#2A2530"; ctx.lineWidth = c * .04;
+  ctx.beginPath(); ctx.arc(ex, ey, c * .19, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = "rgba(255,255,255,.5)"; ctx.lineWidth = c * .03;
+  for (const k of [-.12, .05, .2]) { ctx.beginPath(); ctx.ellipse(ex, ey, c * .17, c * (.06 + Math.abs(k) * .5), .6 + k * 3, 0, 7); ctx.stroke(); }
+  // the cat, from above as in Knock It Off, turned to face the way it's going (its own tail is the yarn)
+  const [hx, hy] = pts[0], ang = {up: 0, right: 90, down: 180, left: 270}[game.dir] * Math.PI / 180 + spinAngle(), im = pic(CAT_PIC);
+  if (im.complete && im.naturalWidth) { ctx.save(); ctx.translate(hx, hy); ctx.rotate(ang); ctx.drawImage(im, -c * .62, -c * .55, c * 1.24, c * 1.24); ctx.restore(); }
+  if (bump) { const [bx, by] = at(bump); ctx.font = `${c * .9}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("💥", bx, by); }
+}
+addEventListener("resize", paint);
+// keep the toy bobbing while the cat waits
+setInterval(() => { if (game && game.state !== "running") paint(); }, 120);
+
+/* ---------- controls ---------- */
+// Swipe anywhere on the rug (one swipe can turn several times), or tap beside the cat to turn towards the tap.
+let swipe = null;
+$("board").addEventListener("pointerdown", e => { swipe = {x: e.clientX, y: e.clientY, moved: false}; $("board").setPointerCapture(e.pointerId); });
+$("board").addEventListener("pointermove", e => {
+  if (!swipe) return;
+  const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+  if (Math.hypot(dx, dy) < 22) return;
+  steer(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up"));
+  swipe = {x: e.clientX, y: e.clientY, moved: true};
+});
+$("board").addEventListener("pointerup", e => {
+  if (swipe && !swipe.moved && game) {
+    if (game.state === "paused") resume();   // a tap on the rug carries on after a pause
+  }
+  swipe = null;
+});
+for (const b of document.querySelectorAll("#dpad button")) {
+  b.addEventListener("pointerdown", e => {
+    e.preventDefault(); b.classList.add("down"); setTimeout(() => b.classList.remove("down"), 150);
+    if (game && game.state === "ready") game.started = true;
+    steer(b.dataset.d);
+  });
+}
+addEventListener("keydown", e => {
+  const d = {ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", w: "up", s: "down", a: "left", d: "right", W: "up", S: "down", A: "left", D: "right"}[e.key];
+  if (d) { e.preventDefault(); steer(d); }
+  else if (e.key === " " && game && ["running", "paused"].includes(game.state)) { e.preventDefault(); game.state === "paused" ? resume() : pause(); }
+});
+
+/* ---------- endings ---------- */
+function tangle(x, y) {
+  game.state = "tangled"; clearTimeout(timer);
+  bump = [x, y]; status(); paint();
+  settings.tries[game.level] = (settings.tries[game.level] || 0) + 1; save();
+  const what = x < 0 || y < 0 || x >= game.N || y >= game.N ? "ran off the rug" : game.sleepers.some(([a, b]) => a === x && b === y) ? (k => k === "t" || k === "T" ? "refused to step on the tape" : `bumped into ${THINGS[k]}`)(game.sleepers.find(([a, b]) => a === x && b === y)[2]) : "got tangled in the yarn";
+  G.track(`Tail Chase tangled on level ${game.level}`);
+  const g = game;
+  setTimeout(() => {
+    if (game !== g) return;
+    G.openCard("Tangled!", `The cat ${what}, after ${game.caught} of ${game.target} toys.`,
+      [["Try again", () => { bump = null; G.closeCard(); newRun(game.level); }, true], ["Admire the mess", () => { G.closeCard(); G.note("Tap Restart level to try again.", 0); }]],
+      null, G.otherSize($("levelSel"), game.level, startLevel, "Or play a different level:"));
+  }, 700);
+}
+function win() {
+  game.state = "won"; clearTimeout(timer); G.finishClock(game);
+  const first = !settings.tries[game.level], next = Math.min(MAX_LEVEL, game.level + 1);
+  settings.tries[game.level] = 0; settings.level = next; $("levelSel").value = next; save(); status();
+  G.track(`Tail Chase won level ${game.level}`);
+  const g = game;
+  setTimeout(() => {
+    if (game !== g) return;
+    const text = `The cat caught all ${game.target} toys.` + (game.level === MAX_LEVEL ? " That's the hardest level; here it is again." : ` Next up: level ${next}.`);
+    G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the yarn", game.result,
+      {title: "All caught!", gold: first, goldWhy: "First try!", next: `Next: level ${next}`, after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+  }, 800);
+}
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); bump = null; G.closeCard(); newRun(n); }
+$("restartBtn").onclick = () => { if (game) { if (game.state === "running" || game.state === "paused") { settings.tries[game.level] = (settings.tries[game.level] || 0) + 1; save(); } bump = null; G.closeCard(); newRun(game.level); } };
+
+/* ---------- how to play ---------- */
+function showHelp() { settings.seenHelp = false; helpOnFirstVisit(); }
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || game.state !== "ready" || document.querySelector(".spot")) return;
+  const N = game.N, all = []; for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) all.push([x, y]);
+  const steps = [
+    {say: "Steer with the arrow buttons, or by swiping", lit: game.snake.map(([x, y]) => [x, y])},
+    {say: "Catch the toys. Each one makes the yarn longer", lit: [[game.toy.x, game.toy.y]]},
+    ...(game.nip.length ? [{say: "Catnip! The cat stops to roll about on it", lit: game.nip.map(([x, y]) => [x, y])}] : []),
+    {say: "Don't run into the edge, the yarn" + (game.sleepers.length ? ", lemons, books or tape" : ""), lit: all, tone: "ok"},
+  ];
+  G.spotlight({grid: $("board"), w: N, h: N, steps, done: () => { settings.seenHelp = true; save(); }});
+}
+$("helpBtn").onclick = () => { if (game && game.state !== "ready") { G.note("Start the level again, then tap How to play.", 4000); return; } showHelp(); };
+
+/* ---------- choosing toys ---------- */
+$("toysBtn").onclick = () => { pause(); G.toyPicker({kinds: KINDS, off: offToys, min: 1, src: toySrc, save: off => { offToys = off; G.saveToys(off); G.note("Saved. Your toys show up from the next one.", 3500); }}); };
+
+/* ---------- start ---------- */
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", "") + (n === MAX_LEVEL ? " (hardest)" : ""), n));
+$("levelSel").onchange = e => { startLevel(+e.target.value); $("levelSel").blur(); };
+G.nav("tailchase");
+G.setupTimer({name: "tailchase", game: () => game, playing: g => g.state === "running", save, label: levelName, noun: "level",
+  emptyText: "Catch every toy on a level and your times will show up here. They're kept on this device only."});
+$("bestBtn").onclick = () => { pause(); G.showBests("Best times", game ? game.level : settings.level); };
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+newRun(settings.level);
+setTimeout(helpOnFirstVisit, 300);
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
