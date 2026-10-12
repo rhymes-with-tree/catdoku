@@ -84,8 +84,7 @@
 .hintbtns button{background:#D9D0EA;border-color:#2A2530;font-weight:500}
 .hintbtns button b{font-weight:800}
 .hintbtns button[aria-pressed=true]{background:#8D78AD;color:#fff}
-.hintcost{grid-column:1/-1;margin:-4px 0 0;font-size:13px;color:var(--ink-soft);text-align:center}
-.hintcost:empty{display:none}
+.reveal{grid-column:1/-1;justify-self:center;background:none;border:none;padding:2px 6px;font-size:15px;color:var(--ink-soft);text-decoration:underline;text-underline-offset:3px}
 .side{width:var(--board);background:var(--panel);border:2px solid var(--ink);border-radius:clamp(22px,6vw,64px);padding:clamp(16px,3vw,30px) clamp(16px,3vw,36px)}
 .sidehead{font-weight:600;text-align:center;margin:0 0 14px}
 .chips{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:0 0 18px}
@@ -100,6 +99,10 @@
 .none{margin:0;column-span:all;text-align:center;color:var(--ink-soft);font-size:17px;font-weight:500}
 .words .smash{color:#C9773F}
 .words .rare{color:var(--ink-soft);font-style:italic}
+.words a{color:inherit;text-decoration:none}
+.words a:hover{text-decoration:underline;text-decoration-thickness:2px}
+/* words you didn't find, once revealed */
+.words .missed{color:#B4473A;font-weight:500;font-style:italic}
 /* highlights: an ending more words share (yellow), a word that starts a longer one (orange), a word whose letters
    make another (violet) */
 .words mark{background:#FBE38A;color:inherit;border-radius:3px;padding:0 1px}
@@ -137,7 +140,7 @@
   </section>
   </div>
   <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
-  <p class="help">Word list from <a href="https://wordlist.aspell.net/">SCOWL</a>, © Kevin Atkinson.</p>
+  <p class="help">Words from <a href="https://wordlist.aspell.net/">SCOWL</a>, © Kevin Atkinson, and ENABLE.</p>
 </main>
 
 <script src="../games.js?v=2026-10-12.7"></script>
@@ -158,14 +161,14 @@ function answersFor(keys, centre) {
 const RANKS = [["Kitten", 0], ["Curious", .02], ["Playful", .05], ["Pouncer", .1], ["Mouser", .2], ["Prowler", .3], ["Clever Cat", .45], ["Genius Cat", .7], ["Top Cat", 1]];
 
 /* ---------- game ---------- */
-// game: {id (index into puzzles), daily (the day number, or null), keys, centre, found (words), hinted, won,
+// game: {id (index into puzzles), daily (the day number, or null), keys, centre, found (words), revealed, won,
 //   hints: which hints are on, {left, pairs, marks}}
 const STORE = "catdoku.keyboardcat.v1", ROWS = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
 const $ = G.$;
 let state = G.load(STORE);
 let saved = Object.assign({seenHelp: false, games: {}}, state);
 let game = null, typed = "", answers = [], extras = [], max = 0;
-const save = () => { if (game) saved.games[game.id] = {found: game.found, hinted: game.hinted, won: game.won, hints: game.hints, t: Date.now()}; prune(); G.save(STORE, saved); };
+const save = () => { if (game) saved.games[game.id] = {found: game.found, revealed: game.revealed, won: game.won, hints: game.hints, t: Date.now()}; prune(); G.save(STORE, saved); };
 // keep the last 40 keyboards played
 function prune() { const ids = Object.keys(saved.games).sort((a, b) => (saved.games[a].t || 0) - (saved.games[b].t || 0)); for (const id of ids.slice(0, Math.max(0, ids.length - 40))) delete saved.games[id]; }
 // Today's keyboard: the same for everyone on the same date, picked from the list in a scattered order.
@@ -176,7 +179,7 @@ const dailyId = day => ((day * 7919 + 1234) % W.puzzles.length + W.puzzles.lengt
 const lettersFor = id => typeof id === "string" ? id.slice(2) : W.puzzles[id];
 function openKeyboard(id, daily) {
   const p = lettersFor(id), keys = p.slice(0, 7), centre = p[7], was = saved.games[id] || {};
-  game = {id, daily, keys, centre, found: was.found || [], hinted: !!was.hinted, won: !!was.won, hints: Object.assign({}, was.hints)};
+  game = {id, daily, keys, centre, found: was.found || [], revealed: !!was.revealed, won: !!was.won, hints: Object.assign({}, was.hints)};
   ({answers, extra: extras} = answersFor(keys, centre));
   COMMON = new Set(answers); EXTRA = new Set(extras);
   max = answers.reduce((s, w) => s + points(w), 0);
@@ -298,6 +301,7 @@ function nope(text) {
 function submit() {
   const w = typed;
   if (!w) return;
+  if (game.revealed) return nope("The words are showing. Try another keyboard!");
   if (w.length < 4) return nope("Too short");
   if (!w.includes(game.centre)) return nope(`Every word needs the gold ${game.centre.toUpperCase()}`);
   if (game.found.includes(w)) return nope("Already found");
@@ -331,7 +335,7 @@ function drawWords() {
   const n = game.found.length;
   $("foundSum").textContent = n ? `You've found ${n} word${n === 1 ? "" : "s"} (${commonFound()} of ${answers.length} everyday ones)` : "No words yet";
   $("hintbar").innerHTML = HINTS.map(([k, name]) => `<button data-h="${k}" aria-pressed="${!!h[k]}"><b>Hint</b>: ${name}</button>`).join("")
-    + `<p class="hintcost">${game.hinted || game.won ? "" : "Using a hint costs the gold paw."}</p>`;
+    + (game.won || game.revealed || !left.length ? "" : `<button class="reveal" id="revealBtn">Give up and show the words I missed</button>`);
   // what the highlights point at
   const endsLeft = new Set(left.map(suffixOf).filter(Boolean));
   const startsLonger = f => left.some(w => w.length > f.length && w.startsWith(f));
@@ -342,27 +346,39 @@ function drawWords() {
     if (h.marks && rearranges(w)) cls.push("ana");
     if (w === lastWord) cls.push("new");
     const text = x && endsLeft.has(x) ? `${w.slice(0, -x.length)}<mark>${x}</mark>` : w;
-    return `<li><span class="${cls.join(" ").trim()}">${text}</span></li>`;
+    return `<li><span class="${cls.join(" ").trim()}">${link(w, text)}</span></li>`;
   };
+  // every word in the list links to its meaning, to learn the new ones
+  const link = (w, text) => `<a href="https://en.wiktionary.org/wiki/${w}" target="_blank" rel="noopener" title="What does ${w} mean?">${text}</a>`;
+  const missed = w => `<li><span class="missed">${link(w, w)}</span></li>`;
   const blank = w => `<li class="blank" aria-label="${w[0]}, ${w.length} letters">${w[0]}${"<i></i>".repeat(w.length - 1)}</li>`;
   // the two-letter starts (or found words) the words left begin with
   const startOf = w => game.found.filter(f => f.length < w.length && w.startsWith(f)).sort((a, b) => b.length - a.length)[0] || w.slice(0, 2);
   const starts = {};
   for (const w of left) { const s = startOf(w); starts[s] = (starts[s] || 0) + 1; }
   $("chips").innerHTML = h.pairs ? Object.keys(starts).sort().map(s => `<span class="${s.length > 2 ? "more" : ""}"><i>${s}</i><b>${starts[s]}</b></span>`).join("") : "";
-  // one list, by first letter then length: with Words Remaining on, a blank for each word left, found words in
-  // their places among them
-  const shown = h.left ? [...game.found, ...left] : game.found.slice();
-  const order = (a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a.length - b.length || (game.found.includes(b) - game.found.includes(a)) || (a < b ? -1 : 1);
-  $("words").innerHTML = shown.sort(order).map(w => game.found.includes(w) ? word(w) : blank(w)).join("");
+  // One list, by first letter: the words found in alphabetical order, then, with Words Remaining on, a blank for
+  // each word left, shortest first. Once revealed, every word in alphabetical order, the missed ones marked.
+  const found = new Set(game.found);
+  const shown = game.revealed || h.left ? [...game.found, ...left] : game.found.slice();
+  const order = (a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1
+    : game.revealed ? (a < b ? -1 : 1)
+    : (found.has(b) - found.has(a)) || (found.has(a) ? (a < b ? -1 : 1) : a.length - b.length);
+  $("words").innerHTML = shown.sort(order).map(w => found.has(w) ? word(w) : game.revealed ? missed(w) : blank(w)).join("");
   if (!shown.length && !h.pairs) $("words").innerHTML = `<p class="none">Type a word and press Enter.</p>`;
 }
 $("hintbar").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b || !game) return;
+  if (b.id === "revealBtn") return reveal();
   const k = b.dataset.h; game.hints[k] = !game.hints[k];
-  if (game.hints[k] && !game.won) game.hinted = true;
   save(); draw();
 });
+
+// Give up: show the everyday words not found (they can't be scored after that).
+function reveal() {
+  G.openCard("Show the words?", "You'll see every word you missed, and this keyboard ends. Each word links to its meaning.",
+    [["Show them", () => { G.closeCard(); game.revealed = true; save(); draw(); G.track("Keyboard Cat revealed"); }, true], ["Keep looking", G.closeCard]]);
+}
 
 /* ---------- winning ---------- */
 function win() {
@@ -371,7 +387,7 @@ function win() {
   setTimeout(() => {
     const text = `You found all ${answers.length} everyday words${game.found.length > answers.length ? `, and ${game.found.length - answers.length} rare one${game.found.length - answers.length === 1 ? "" : "s"} too` : ""}.`;
     G.winCard(text, () => { G.closeCard(); newKeyboard(); }, "Admire my words", null,
-      {title: "Top Cat!", gold: !game.hinted, goldWhy: "No hints!", next: "Another keyboard"});
+      {title: "Top Cat!", gold: true, goldWhy: "Every everyday word!", next: "Another keyboard"});
   }, 900);
 }
 
