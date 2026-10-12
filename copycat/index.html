@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Copycat</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-11.7"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-11.7">
+<style>
+/* Cardboard boxes on a wooden floor, as in Hide & Seek. Each box hides a toy; open two with the same toy
+   and a cat climbs in and curls up with them. */
+.wrap.floorwrap{height:auto}
+.floor{display:grid;margin:0 auto;background:repeating-linear-gradient(0deg,#C99A6B 0 22px,#B4855A 22px 24px);border:4px solid #7A4E2C;border-radius:10px;
+  padding:4px;gap:4px;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.sq{position:relative;aspect-ratio:1;cursor:pointer;border-radius:6px}
+.sq svg{position:absolute;inset:0;width:100%;height:100%}
+.sq.open,.sq.found{cursor:default}
+.sq .toy{position:absolute;inset:24%;width:52%;height:52%;object-fit:contain;animation:peek .22s ease-out;filter:drop-shadow(0 2px 2px rgba(60,30,10,.3))}
+@keyframes peek{from{transform:translateY(30%) scale(.5);opacity:0}}
+.sq .sleeper{position:absolute;inset:10%;width:80%;height:80%;object-fit:contain;filter:drop-shadow(0 2px 2px rgba(60,30,10,.35));animation:settle .45s ease-out}
+.sq.found .toy{inset:auto 6% 6% auto;width:38%;height:38%;animation:none;z-index:1}
+@keyframes settle{from{transform:scale(.4) rotate(-40deg);opacity:0}}
+.sq.miss{animation:shake .35s}
+@keyframes shake{25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+.sq.hintme{animation:glow .5s ease-in-out 4 alternate}
+@keyframes glow{to{filter:brightness(1.2) drop-shadow(0 0 5px #FFE07A)}}
+.floor.reshuffle .sq{animation:reshuffle .7s ease-in-out var(--d,0s) both}
+@keyframes reshuffle{0%{transform:none}35%{transform:scale(.2) rotate(var(--r,20deg));opacity:0}65%{transform:scale(.2) rotate(calc(var(--r,20deg) * -1));opacity:0}100%{transform:none;opacity:1}}
+.left{display:flex;gap:12px;align-items:center}
+.misses{color:var(--ink-soft)}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Copycat</h1><div class="stripe"></div><p class="tagline">Find the boxes with matching toys</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span class="left"><span id="count"></span><span class="misses" id="misses"></span></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap floorwrap"><div class="floor" id="board" role="grid" aria-label="Boxes, each hiding a toy"></div></div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="restartBtn">Restart</button>
+    <button id="shareBtn">Share</button>
+    <button id="toysBtn">Toys</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New boxes</button>
+  </div>
+</main>
+
+<script src="../games.js?v=2026-10-11.7"></script>
+<script>
+/* ---------- levels ---------- */
+// Columns × rows of boxes; every level is twice as many boxes as pairs.
+const LEVELS = [null, [4, 3], [4, 4], [5, 4], [6, 4], [6, 5], [6, 6]], MAX_LEVEL = LEVELS.length - 1;
+const levelName = n => { const [w, h] = LEVELS[n]; return `Level ${n} · ${w * h / 2} pairs`; };
+
+/* ---------- pictures ---------- */
+const BOX = `<svg viewBox="0 0 100 100" aria-hidden="true">
+  <rect x="3" y="3" width="94" height="94" rx="6" fill="#D9A86C" stroke="#7A4E2C" stroke-width="4"/>
+  <path d="M3 50 H97" stroke="#B98549" stroke-width="4"/><path d="M50 3 V97" stroke="#B98549" stroke-width="3" opacity=".6"/>
+  <rect x="40" y="3" width="20" height="94" fill="#E9C08A" opacity=".55"/><path d="M11 13 L29 13" stroke="#F3D7AE" stroke-width="4" stroke-linecap="round"/></svg>`;
+// An opened box, flaps folded out.
+const OPENBOX = `<svg viewBox="0 0 100 100" aria-hidden="true">
+  <path d="M4 4 L96 4 L80 20 L20 20 Z" fill="#E9C08A" stroke="#7A4E2C" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M4 96 L96 96 L80 80 L20 80 Z" fill="#E9C08A" stroke="#7A4E2C" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M4 4 L20 20 L20 80 L4 96 Z" fill="#DDB27A" stroke="#7A4E2C" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M96 4 L80 20 L80 80 L96 96 Z" fill="#DDB27A" stroke="#7A4E2C" stroke-width="3" stroke-linejoin="round"/>
+  <rect x="20" y="20" width="60" height="60" fill="#E3C394"/><path d="M20 20 L80 20 L80 27 L20 27 Z" fill="#C9A06C" opacity=".7"/></svg>`;
+// The curled-up cats from Sunbeams (../cats/), nearly round, so each fits one box.
+const CURLED = ["c14-36", "c16-5", "c14-34", "c15-6", "c14-35", "c15-5", "c16-3"];
+const CAT_SRC = {};  // filled with embedded pictures when the page is bundled into one file
+const catSrc = f => CAT_SRC[f] || `../cats/${f}.webp`;
+
+/* ---------- toys ---------- */
+// The toy library, one kind per colour (as in Pounce). Every pair is a different picture, so a game uses
+// every look, not one per colour.
+const KINDS = [
+  {c: "#BD5538", looks: [["wiffle-red", "red wiffle ball"], ["swirl-red", "red swirl ball"], ["crochet-stars", "star ball"], ["tinsel", "tinsel ball"]]},
+  {c: "#ECA818", looks: [["wiffle-yellow", "yellow wiffle ball"]]},
+  {c: "#73A7AE", looks: [["wiffle-teal", "teal wiffle ball"], ["fish", "fish"]]},
+  {c: "#6AA673", looks: [["lattice", "lattice ball"]]},
+  {c: "#B3B94B", looks: [["spiky-lime", "spiky pom-pom"]]},
+  {c: "#B94588", looks: [["swirl-purple", "plum swirl ball"], ["bell-purple", "bell ball"]]},
+  {c: "#7885BA", looks: [["spring", "spring"], ["rope-blue", "rope ball"]]},
+  {c: "#825840", looks: [["cork-paw", "cork paw ball"], ["burlap-paws", "burlap ball"], ["rattan", "rattan ball"]]},
+  {c: "#5E5866", looks: [["mouse", "mouse"]]},
+  {c: "#E16A4A", looks: [["felt-rainbow", "rainbow ball"], ["ribbon-tail", "ribbon ball"], ["spiky-rainbow", "spiky ball"]]},
+];
+const ALL_LOOKS = KINDS.flatMap(k => k.looks.map(([f]) => f));
+let offToys = G.toysOff();
+const TOY_SRC = {};  // filled with embedded pictures when the page is bundled into one file
+const toySrc = f => TOY_SRC[f] || `../toys/${f}.webp?v=${window.SITE_BUILD || ""}`;
+const nameOf = f => { for (const k of KINDS) for (const [g, n] of k.looks) if (g === f) return n; return "toy"; };
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+// P different toys, from those not left out first (and then any, if too many are left out).
+function pickToys(P) {
+  const on = shuffle(ALL_LOOKS.filter(f => !offToys.has(f))), off = shuffle(ALL_LOOKS.filter(f => offToys.has(f)));
+  return on.concat(off).slice(0, P);
+}
+
+/* ---------- game ---------- */
+// game: {level, W, H, toys (one picture per pair), deal (the pair in each box), found (pairs found, by pair),
+//        up (boxes open and not yet found, at most two), misses, hinted, restarted, won, cats (a cat per pair)}
+const STORE = "catdoku.copycat.v1";
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1}, state.settings);
+let game = state.game || null, shut = null;  // shut: the timer that closes two boxes that didn't match
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !$("overlay").classList.contains("show");
+
+function deal(n, toys) {
+  const [W, H] = LEVELS[n], P = W * H / 2;
+  toys = toys || pickToys(P);
+  const d = shuffle([...Array(W * H).keys()].map(i => i >> 1));
+  return {level: n, W, H, toys, deal: d, found: Array(P).fill(false), up: [], misses: 0, hinted: false, restarted: false, won: false,
+          cats: toys.map((_, k) => k % CURLED.length + Math.floor(Math.random() * 1e6) * CURLED.length), ...G.freshClock()};
+}
+function newPuzzle() {
+  clearTimeout(shut); G.closeCard();
+  game = deal(settings.level); draw(); save();
+  G.track(`Copycat new puzzle level ${game.level}`);
+}
+function startLevel(n) { settings.level = n; $("levelSel").value = n; newPuzzle(); }
+
+const pairs = () => game.toys.length, foundCount = () => game.found.filter(Boolean).length;
+function boxHTML(i) {
+  const k = game.deal[i], toy = `<img class="toy" src="${toySrc(game.toys[k])}" alt="">`;
+  if (game.found[k]) {
+    const c = game.cats[k], turn = (Math.floor(c / CURLED.length) + i) % 4 * 90;
+    return OPENBOX + `<img class="sleeper" src="${catSrc(CURLED[c % CURLED.length])}" alt="" style="transform:rotate(${turn}deg)">` + toy;
+  }
+  return game.up.includes(i) ? OPENBOX + toy : BOX;
+}
+function draw() {
+  const el = $("board"), {W, H} = game;
+  el.style.gridTemplateColumns = `repeat(${W}, 1fr)`;
+  el.style.width = `min(100%, ${W * 104}px)`;
+  if (el.children.length !== W * H) {
+    el.innerHTML = "";
+    for (let i = 0; i < W * H; i++) { const sq = document.createElement("div"); sq.className = "sq"; sq.dataset.i = i; sq.setAttribute("role", "button"); el.append(sq); }
+  }
+  [...el.children].forEach((sq, i) => {
+    const k = game.deal[i], want = game.found[k] ? "found" : game.up.includes(i) ? "open" : "shut";
+    if (sq.dataset.want !== want) { sq.dataset.want = want; sq.innerHTML = boxHTML(i); }
+    sq.classList.toggle("found", want === "found"); sq.classList.toggle("open", want === "open");
+    sq.setAttribute("aria-label", want === "shut" ? "Closed box" : want === "open" ? `Open box: ${nameOf(game.toys[k])}` : `A cat asleep with the ${nameOf(game.toys[k])}`);
+  });
+  $("count").textContent = game.won ? "All paired up!" : `${foundCount()} of ${pairs()} pairs`;
+  $("misses").textContent = game.misses ? `${game.misses} miss${game.misses === 1 ? "" : "es"}` : "";
+  $("hintBtn").disabled = game.won; $("restartBtn").disabled = game.won || (!game.misses && !foundCount() && !game.up.length);
+}
+
+// Tap a box: open it. The second box open either matches the first (a cat curls up with them) or doesn't
+// (both close again after a moment, or at once when another box is tapped).
+function tap(i) {
+  if (!playing()) return;
+  const k = game.deal[i];
+  if (game.found[k] || game.up.includes(i)) return;
+  if (game.up.length === 2) { clearTimeout(shut); game.up = []; }
+  game.up.push(i);
+  if (game.up.length === 2) {
+    const [a, b] = game.up;
+    if (game.deal[a] === game.deal[b]) {
+      game.found[k] = true; game.up = [];
+      draw(); save();
+      if (game.found.every(Boolean)) win();
+      return;
+    }
+    game.misses++;
+    draw(); save();
+    for (const j of [a, b]) { const sq = $("board").children[j]; sq.classList.remove("miss"); void sq.offsetWidth; sq.classList.add("miss"); }
+    const g = game; shut = setTimeout(() => { if (game === g && game.up.length === 2) { game.up = []; draw(); save(); } }, 1100);
+    return;
+  }
+  draw(); save();
+}
+$("board").addEventListener("click", e => { const sq = e.target.closest(".sq"); if (sq) tap(+sq.dataset.i); });
+
+// Hint: with one box open, its match glows; otherwise both boxes of a pair glow. A hint keeps you on the
+// same level and costs the gold paw.
+function hint() {
+  if (!playing()) return;
+  if (game.up.length === 2) { clearTimeout(shut); game.up = []; draw(); }
+  const open = game.up[0];
+  const k = open !== undefined ? game.deal[open] : shuffle(game.found.map((f, k) => f ? -1 : k).filter(k => k >= 0))[0];
+  const boxes = game.deal.map((p, i) => p === k && i !== open ? i : -1).filter(i => i >= 0);
+  game.hinted = true; save();
+  for (const i of boxes) { const sq = $("board").children[i]; sq.classList.remove("hintme"); void sq.offsetWidth; sq.classList.add("hintme"); }
+  G.note(open !== undefined ? `Its match is the glowing box.` : "Those two glowing boxes match.", 4000);
+}
+$("hintBtn").onclick = hint;
+// Restart: close every box and shuffle the same toys; the misses start again but it costs the gold paw.
+$("restartBtn").onclick = () => {
+  if (!game || game.won) return;
+  clearTimeout(shut);
+  const g = deal(game.level, game.toys);
+  game = Object.assign(g, {hinted: game.hinted, restarted: true, ms: game.ms, started: game.started, timed: game.timed});
+  draw(); save(); reshuffle();
+  G.note("Shuffled. The same toys, in new boxes.", 3000);
+};
+
+/* ---------- winning ---------- */
+// Few misses: no more misses than there are pairs.
+const goldOK = () => !game.hinted && !game.restarted && game.misses <= pairs();
+function win() {
+  game.won = true; G.finishClock(game);
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save(); draw();
+  G.track(`Copycat solved level ${game.level}`);
+  const g = game;
+  setTimeout(() => { if (game === g) finishCard(); }, 900);
+}
+function finishCard() {
+  const next = settings.level, P = pairs();
+  let text = `${P} pairs found with ${game.misses} miss${game.misses === 1 ? "" : "es"}, and ${P} cats napping.`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the biggest level; here's another." : ` Next up: level ${next}.`;
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the cats", game.result,
+    {title: "All paired up!", gold: goldOK(), goldWhy: `${game.misses} miss${game.misses === 1 ? "" : "es"} for ${P} pairs!`, next: `Next: level ${next}`,
+     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- sharing ---------- */
+$("shareBtn").onclick = () => { if (game) G.shareCard({name: "Copycat", won: game.won,
+  puzzle: () => ({g: "copycat", N: game.level, toys: game.toys, deal: game.deal}),
+  progress: () => ({found: game.found, misses: game.misses})}); };
+function openShared(d) {
+  const lv = LEVELS[d.N], P = lv && lv[0] * lv[1] / 2;
+  const ok = lv && Array.isArray(d.toys) && d.toys.length === P && d.toys.every(f => ALL_LOOKS.includes(f)) && new Set(d.toys).size === P &&
+    Array.isArray(d.deal) && d.deal.length === 2 * P && [...Array(P).keys()].every(k => d.deal.filter(x => x === k).length === 2);
+  if (!ok) { G.note("That share link didn't work.", 5000); return; }
+  clearTimeout(shut);
+  game = Object.assign(deal(d.N, d.toys), {deal: d.deal});
+  if (d.p && Array.isArray(d.p.found) && d.p.found.length === P) { game.found = d.p.found.map(Boolean); game.misses = Math.max(0, d.p.misses | 0); game.timed = false; }
+  settings.level = d.N; $("levelSel").value = d.N;
+  draw(); save();
+  if (game.found.every(Boolean)) { game.won = true; draw(); save(); }
+}
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  settings.seenHelp = false; helpOnFirstVisit();
+  if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
+}
+// First visit: walk through the boxes with a made-up example: one box opened, then a pair that matches
+// (shown as a cat curled up) and two that don't. The boxes are shuffled afterwards, so nothing is given away.
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || !playing() || foundCount() || game.up.length || document.querySelector(".spot")) return;
+  const {W, H} = game, xy = i => [i % W, Math.floor(i / W)], all = [...Array(W * H).keys()].map(xy);
+  // two boxes with the same toy and two with different toys, all in the top row where possible
+  const a = 0, b = game.deal.findIndex((p, i) => i !== a && p === game.deal[a]);
+  const c = [...Array(W * H).keys()].find(i => i !== a && i !== b && game.deal[i] !== game.deal[a]);
+  const d = [...Array(W * H).keys()].find(i => ![a, b, c].includes(i) && game.deal[i] !== game.deal[a] && game.deal[i] !== game.deal[c]);
+  const showing = (up, found) => ({enter: () => { game.up = up; if (found !== undefined) game.found[found] = true; draw(); },
+                                   leave: () => { game.up = []; if (found !== undefined) game.found[found] = false; draw(); }});
+  const steps = [
+    {say: "Every box has a cat toy hidden inside", lit: all},
+    {say: "Tap a box to peek inside", lit: [xy(a)], ...showing([a])},
+    {say: "Then tap another. If the two toys match, a cat curls up with them", lit: [xy(a), xy(b)], tone: "ok", ...showing([], game.deal[a])},
+    {say: "If they don't match, both boxes close again. Remember what you saw!", lit: [xy(c), xy(d)], ...showing([c, d])},
+    {say: "Find every pair to fill the floor with napping cats", lit: all, tone: "ok"},
+    {say: "Fewer misses than pairs, with no hint or restart, earns a gold paw", els: [$("count")]},
+    {say: "Stuck? Hint makes a matching box glow", els: [$("hintBtn")]},
+  ];
+  G.spotlight({grid: $("board"), w: W, h: H, steps, map, done: () => { settings.seenHelp = true; save(); reshuffleDeal(); }});
+}
+// The squares sit in a grid with gaps and padding, so work out where they are from the first and last.
+function map() {
+  const sq = $("board").children, n = sq.length, a = sq[0].getBoundingClientRect(), z = sq[n - 1].getBoundingClientRect();
+  const gx = game.W > 1 ? (z.left - a.left) / (game.W - 1) - a.width : 0, gy = game.H > 1 ? (z.top - a.top) / (game.H - 1) - a.height : 0;
+  return {ox: a.left - gx / 2, oy: a.top - gy / 2, cw: a.width + gx, ch: a.height + gy};
+}
+// After the walkthrough, deal the same toys into new boxes, so the example gives nothing away.
+function reshuffleDeal() { if (!game || game.won || foundCount() || game.misses) return; game.deal = shuffle(game.deal); draw(); save(); reshuffle(); }
+function reshuffle() {
+  const fl = $("board");
+  for (const sq of fl.children) { sq.style.setProperty("--d", `${(Math.random() * 0.3).toFixed(2)}s`); sq.style.setProperty("--r", `${Math.round(Math.random() * 60 - 30)}deg`); }
+  fl.classList.remove("reshuffle"); void fl.offsetWidth; fl.classList.add("reshuffle");
+  setTimeout(() => fl.classList.remove("reshuffle"), 1100);
+}
+
+/* ---------- choosing toys ---------- */
+const toyChest = () => ({kinds: KINDS, off: offToys, min: 1, src: toySrc, save: off => {
+  offToys = off; G.saveToys(off);
+  G.note("Saved. Your toys are used from the next boxes.", 3500);
+}});
+$("toysBtn").onclick = () => G.toyPicker(toyChest());
+
+/* ---------- start ---------- */
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", "") + (n === MAX_LEVEL ? " (biggest)" : ""), n));
+$("levelSel").onchange = e => startLevel(+e.target.value);
+$("newBtn").onclick = newPuzzle;
+$("helpBtn").onclick = showHelp;
+
+G.nav("copycat");
+G.checkClock(game);
+G.setupTimer({name: "copycat", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level",
+  emptyText: "Pair up a floor of boxes and your times will show up here. They're kept on this device only."});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+const shared = G.readShare("copycat");
+if (game && Array.isArray(game.deal)) G.reopen(() => {
+    if (!LEVELS[game.level] || game.deal.length !== game.W * game.H) throw new Error("the saved boxes don't fit their level");
+    if (game.up.length === 2) game.up = [];
+    draw();
+    if (game.won) finishCard(); else helpOnFirstVisit();
+  }, why => { game = null; newPuzzle(); G.note(why, 0); });
+else if (!shared) { newPuzzle(); helpOnFirstVisit(); }
+const shareOpts = () => ({name: "Copycat", inProgress: !!(game && !game.won && (foundCount() || game.misses)), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, shareOpts());
+window.addEventListener("hashchange", () => { const d = G.readShare("copycat"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
