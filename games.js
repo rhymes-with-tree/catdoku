@@ -24,7 +24,7 @@ const G = (() => {
     ["Night Light", "nightlight", "Get every cat to close its eyes", "#3A3358"],
     ["Unravel", "unravel", "Cover every line with one strand of yarn", "#E16A4A"],
     ["Tail Chase", "tailchase", "Catch the toys without getting tangled", "#C9773F"],
-    ["Keyboard Cat", "keyboardcat", "Make words from the keys the cat walked on", "#8D78AD"],
+    ["Keyboard Cat", "keyboardcat", "Make words from the keys that still work", "#8D78AD"],
   ];
   const $ = id => document.getElementById(id);
 
