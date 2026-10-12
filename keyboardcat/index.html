@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Keyboard Cat</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-12.7"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-12.7">
+<style>
+/* A cat has walked across the keyboard: paw prints on seven keys, and its paw resting on one. Only those keys
+   work. Make words with them, always using the one under its paw. */
+.rank{width:var(--board);display:flex;flex-direction:column;gap:4px}
+.rankrow{display:flex;justify-content:space-between;align-items:baseline;font-weight:600}
+.rankrow b{font-size:20px}
+.dots{position:relative;height:16px;display:flex;justify-content:space-between;align-items:center}
+.dots::before{content:"";position:absolute;left:0;right:0;top:7px;height:2px;background:var(--line)}
+.dots i{position:relative;width:10px;height:10px;border-radius:50%;background:var(--paper);border:2px solid var(--ink-soft)}
+.dots i.on{background:#ECA818;border-color:#2A2530}
+.entry{width:var(--board);min-height:52px;display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800;letter-spacing:2px;text-transform:uppercase}
+.entry .c{color:#C9773F}
+.entry .caret{display:inline-block;width:3px;height:34px;background:var(--ink);margin-left:3px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.entry.shake{animation:shake .35s}
+@keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.keyboard{width:var(--board);background:#3B3646;border-radius:16px;padding:calc(var(--board) * .16) 6px 8px;display:flex;flex-direction:column;gap:6px;user-select:none;-webkit-user-select:none;touch-action:manipulation;
+  box-shadow:inset 0 -4px 0 rgba(0,0,0,.25)}
+.krow{display:flex;justify-content:center;gap:5px}
+.key{position:relative;flex:0 0 calc((100% - 45px) / 10);aspect-ratio:.9;border-radius:8px;border:none;padding:0;background:#5B556A;color:#8E879C;font-size:20px;font-weight:800;text-transform:uppercase;
+  box-shadow:inset 0 -3px 0 rgba(0,0,0,.3);cursor:default}
+.key.paw{background:#F7F1E4;color:#2A2530;cursor:pointer}
+.key.paw::after{content:"";position:absolute;right:3px;bottom:5px;width:13px;height:13px;opacity:.55;
+  background:no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg fill='%238C5A3C'%3E%3Cellipse cx='10' cy='13.5' rx='5' ry='4'/%3E%3Cellipse cx='4' cy='8' rx='1.9' ry='2.4'/%3E%3Cellipse cx='8' cy='4.5' rx='1.9' ry='2.4'/%3E%3Cellipse cx='12' cy='4.5' rx='1.9' ry='2.4'/%3E%3Cellipse cx='16' cy='8' rx='1.9' ry='2.4'/%3E%3C/g%3E%3C/svg%3E")}
+.key.centre{background:#ECA818;color:#2A2530}
+.key.centre::after{display:none}
+.keyboard{position:relative}
+.catlayer{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:hidden;z-index:2;border-radius:16px}
+.catlayer .leg{filter:drop-shadow(0 3px 3px rgba(0,0,0,.4))}
+.key.unprinted::after{opacity:0}
+.key.paw::after{transition:opacity .15s}
+.key.paw:active,.key.down{transform:translateY(2px);box-shadow:inset 0 -1px 0 rgba(0,0,0,.3)}
+.krow.ctl{gap:8px;margin-top:2px}
+.ctlkey{flex:1 1 0;max-width:46%;height:42px;border-radius:10px;border:none;background:#8D78AD;color:#fff;font-size:16px;font-weight:800;box-shadow:inset 0 -3px 0 rgba(0,0,0,.25);cursor:pointer}
+.ctlkey.enter{background:#6AA673}
+.found{width:var(--board);background:var(--panel);border:2px solid var(--line);border-radius:12px;padding:8px 12px}
+.found summary{cursor:pointer;font-weight:600;list-style:none}
+.found summary::-webkit-details-marker{display:none}
+.found summary::after{content:" ▾";color:var(--ink-soft)}
+.found[open] summary::after{content:" ▴"}
+.words{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:6px;font-weight:600;text-transform:capitalize}
+.words .smash{color:#C9773F}
+.words .rare{color:var(--ink-soft);font-style:italic}
+.words .new{animation:pop .4s ease-out}
+@keyframes pop{from{transform:scale(1.4)}}
+.toast{position:fixed;left:50%;top:22%;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:6px 16px;border-radius:999px;font-weight:700;z-index:5;pointer-events:none;animation:toast 1.4s ease-out forwards}
+@keyframes toast{0%{opacity:0;transform:translate(-50%,6px)}12%,75%{opacity:1;transform:translate(-50%,0)}100%{opacity:0}}
+.which{font-size:15px;color:var(--ink-soft)}
+@media (prefers-reduced-motion:reduce){.entry .caret{animation:none}}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Keyboard Cat</h1><div class="stripe"></div><p class="tagline">Make words from the keys the cat walked on</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="rank"><div class="rankrow"><b id="rankName">Kitten</b><span id="score"></span></div><div class="dots" id="dots"></div></div>
+  <div class="status"><span class="which" id="which"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="entry" id="entry" aria-live="polite"></div>
+  <div class="keyboard" id="board" aria-label="Keyboard"></div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <details class="found" id="found"><summary id="foundSum">No words yet</summary><div class="words" id="words"></div></details>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="shareBtn">Share</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <button id="todayBtn">Today's keyboard</button>
+    <button id="newBtn" class="primary">New keyboard</button>
+  </div>
+  <p class="help">Word list from <a href="https://wordlist.aspell.net/">SCOWL</a>, © Kevin Atkinson.</p>
+</main>
+
+<script src="../games.js?v=2026-10-12.7"></script>
+<script>
+const WORDS_INLINE = null;  // the word list, filled in when the page is bundled into one file
+
+/* ---------- words ---------- */
+// words.json: common (the answers), extra (rarer words that count too) and puzzles (every playable keyboard as
+// 8 letters: the 7 keys, then the one under the cat's paw). See tools/make-words.py.
+let W = null, COMMON = null, EXTRA = null;
+const lettersOf = w => [...new Set(w)].sort().join("");
+const points = w => (w.length === 4 ? 1 : w.length) + (lettersOf(w).length === 7 ? 7 : 0);
+function answersFor(keys, centre) {
+  const ok = w => w.includes(centre) && [...w].every(ch => keys.includes(ch));
+  return {answers: W.common.filter(ok), extra: W.extra.filter(ok)};
+}
+// Ranks, as a share of the points every common answer is worth; Top Cat means every common answer.
+const RANKS = [["Kitten", 0], ["Curious", .02], ["Playful", .05], ["Pouncer", .1], ["Mouser", .2], ["Prowler", .3], ["Clever Cat", .45], ["Genius Cat", .7], ["Top Cat", 1]];
+
+/* ---------- game ---------- */
+// game: {id (index into puzzles), daily (the day number, or null), keys, centre, found (words), hinted, won}
+const STORE = "catdoku.keyboardcat.v1", ROWS = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
+const $ = G.$;
+let state = G.load(STORE);
+let saved = Object.assign({seenHelp: false, games: {}}, state);
+let game = null, typed = "", answers = [], extras = [], max = 0;
+const save = () => { if (game) saved.games[game.id] = {found: game.found, hinted: game.hinted, won: game.won}; prune(); G.save(STORE, saved); };
+// keep the last 40 keyboards played
+function prune() { const ids = Object.keys(saved.games); if (ids.length > 40) for (const id of ids.slice(0, ids.length - 40)) delete saved.games[id]; }
+// Today's keyboard: the same for everyone on the same date, picked from the list in a scattered order.
+const dayNumber = () => { const d = new Date(); return Math.floor((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(2026, 0, 1)) / 864e5); };
+const dailyId = day => ((day * 7919 + 1234) % W.puzzles.length + W.puzzles.length) % W.puzzles.length;
+
+function openKeyboard(id, daily) {
+  const p = W.puzzles[id], keys = p.slice(0, 7), centre = p[7], was = saved.games[id] || {};
+  game = {id, daily, keys, centre, found: was.found || [], hinted: !!was.hinted, won: !!was.won};
+  ({answers, extra: extras} = answersFor(keys, centre));
+  COMMON = new Set(answers); EXTRA = new Set(extras);
+  max = answers.reduce((s, w) => s + points(w), 0);
+  typed = ""; drawKeys(); draw(); save();
+  placeCat({done: () => helpOnFirstVisit()});
+}
+const score = () => game.found.reduce((s, w) => s + points(w), 0);
+const commonFound = () => game.found.filter(w => COMMON.has(w)).length;
+function rankAt(s) { let r = 0; RANKS.forEach(([, f], i) => { if (s >= Math.ceil(f * max) && (i < RANKS.length - 1 || commonFound() === answers.length)) r = i; }); return r; }
+
+function drawKeys() {
+  const kb = $("board"); kb.innerHTML = "";
+  ROWS.forEach(row => {
+    const r = document.createElement("div"); r.className = "krow";
+    for (const ch of row) {
+      const b = document.createElement("button"), on = game.keys.includes(ch);
+      b.className = "key" + (on ? " paw" : "") + (ch === game.centre ? " centre" : ""); b.textContent = ch; b.dataset.k = ch;
+      b.setAttribute("aria-label", on ? (ch === game.centre ? `${ch}, the key the cat's paw is on` : `${ch}, a paw print`) : `${ch}, not used`);
+      if (!on) b.tabIndex = -1;
+      r.append(b);
+    }
+    kb.append(r);
+  });
+  const c = document.createElement("div"); c.className = "krow ctl";
+  c.innerHTML = `<button class="ctlkey" data-k="del">⌫ Delete</button><button class="ctlkey enter" data-k="enter">Enter ⏎</button>`;
+  kb.append(c);
+}
+function draw() {
+  const s = score(), r = rankAt(s);
+  $("rankName").textContent = RANKS[r][0];
+  $("score").textContent = `${s} point${s === 1 ? "" : "s"}`;
+  $("dots").innerHTML = RANKS.map((_, i) => `<i class="${i <= r ? "on" : ""}" title="${RANKS[i][0]}"></i>`).join("");
+  $("which").textContent = game.daily != null ? `Today's keyboard (#${game.daily + 1})` : `Keyboard ${game.id + 1}`;
+  $("entry").innerHTML = [...typed].map(ch => `<span class="${ch === game.centre ? "c" : ""}">${ch}</span>`).join("") + `<span class="caret"></span>`;
+  const n = game.found.length, sorted = game.found.slice().sort();
+  $("foundSum").textContent = n ? `You've found ${n} word${n === 1 ? "" : "s"} (${commonFound()} of ${answers.length} everyday ones)` : "No words yet";
+  $("words").innerHTML = sorted.map(w => `<span class="${lettersOf(w).length === 7 ? "smash" : EXTRA.has(w) ? "rare" : ""}${w === lastWord ? " new" : ""}">${w}</span>`).join("");
+  $("hintBtn").disabled = game.won;
+}
+/* ---------- the cat ---------- */
+// The cat is far too big to fit: a real one is about 46 cm long, the letter keys about 19 cm across. So we only see
+// one of its front legs, reaching in from the edge of the keyboard, its paw (about two keys wide, as a real one is)
+// resting on the key under its paw. Before that, the paw stamps on each of the seven keys, leaving its prints.
+const NS = "http://www.w3.org/2000/svg";
+const svgEl = (tag, attrs, html) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (html) e.innerHTML = html; return e; };
+// The leg and paw, pointing down (+y), the paw's centre at 0,0, one key = 1 unit; the leg runs far up out of sight.
+const PAW = `<rect x="-.78" y="-12" width="1.56" height="12" fill="#E9A15B" stroke="#2A2530" stroke-width=".07"/>
+  <g stroke="#C7793A" stroke-width=".13" stroke-linecap="round" fill="none"><path d="M-.78 -1.6 Q0 -1.35 .78 -1.6 M-.78 -2.6 Q0 -2.35 .78 -2.6 M-.78 -3.6 Q0 -3.35 .78 -3.6 M-.78 -4.6 Q0 -4.35 .78 -4.6"/></g>
+  <ellipse cx="0" cy="0" rx="1" ry=".86" fill="#E9A15B" stroke="#2A2530" stroke-width=".07"/>
+  <g fill="#E9A15B" stroke="#2A2530" stroke-width=".07">${[-.66, -.22, .22, .66].map((x, i) => `<ellipse cx="${x}" cy="${.72 - Math.abs(x) * .28}" rx=".27" ry=".3"/>`).join("")}</g>
+  <path d="M-.4 -.45 Q0 -.3 .4 -.45" fill="none" stroke="#C7793A" stroke-width=".1" stroke-linecap="round"/>`;
+// A paw print stamped on a key, for the stamping before the paw settles (same shape as the prints on the keys).
+const STAMP = `<g fill="#8C5A3C" opacity=".55"><ellipse cx="0" cy=".2" rx=".42" ry=".34"/>${[[-.42, -.18], [-.15, -.42], [.15, -.42], [.42, -.18]].map(([x, y]) => `<ellipse cx="${x}" cy="${y}" rx=".15" ry=".19"/>`).join("")}</g>`;
+
+// The keys, in keyboard pixels.
+function keyBoxes() {
+  const kb = $("board").getBoundingClientRect();
+  return [...$("board").querySelectorAll(".key")].map(el => { const r = el.getBoundingClientRect();
+    return {el, ch: el.dataset.k, on: el.classList.contains("paw"), x: r.left - kb.left, y: r.top - kb.top, w: r.width, h: r.height}; });
+}
+// Where the leg reaches in from: the paw's toes just over the near edge of the key (so its letter shows), the leg
+// running straight back to the edge of the keyboard, and nothing covering another key in use. Tries from above,
+// leaning over more and more, out to the sides.
+function pawSpot(keys) {
+  const kb = $("board").getBoundingClientRect(), c = keys.find(k => k.ch === game.centre), u = c.w, kx = c.x + c.w / 2, ky = c.y + c.h / 2;
+  // straight down first, then leaning further and further over, out to the sides and a little from below
+  const dirs = [0, 15, -15, 30, -30, 45, -45, 60, -60, 75, -75, 90, -90, 105, -105].map(a => [Math.sin(a * Math.PI / 180), Math.cos(a * Math.PI / 180)]);
+  const others = keys.filter(k => k.on && k !== c);
+  let fallback = null;
+  for (const [dx, dy] of dirs) {
+    const px = kx - dx * 1.25 * u, py = ky - dy * 1.25 * u;   // the paw's centre
+    // points on the paw and leg, in keyboard pixels
+    const pts = [];
+    for (let i = -1; i <= 1; i += .25) for (let j = -1; j <= 1; j += .25) if (i * i + j * j <= 1) pts.push([px + (i * dy + j * dx) * u, py + (-i * dx + j * dy) * u * .9]);
+    for (let t = 0; t < 14; t += .3) for (let i = -.75; i <= .75; i += .25) pts.push([px - dx * t * u + i * dy * u, py - dy * t * u - i * dx * u]);
+    const inBoard = ([x, y]) => x > 0 && y > 0 && x < kb.width && y < kb.height;
+    const hit = others.filter(k => pts.some(([x, y]) => inBoard([x, y]) && x > k.x + k.w * .12 && x < k.x + k.w * .88 && y > k.y + k.h * .12 && y < k.y + k.h * .88)).length;
+    const spot = {px, py, ang: Math.atan2(dy, dx) * 180 / Math.PI - 90, u};
+    if (!hit) return spot;
+    if (!fallback || hit < fallback.hit) fallback = {...spot, hit};
+  }
+  return fallback;
+}
+let walking = null;  // the stamping, while it's on
+function placeCat(walk) {
+  const kb = $("board");
+  kb.querySelector(".catlayer")?.remove();
+  if (walking) walking.skip();
+  const layer = svgEl("svg", {class: "catlayer", "aria-hidden": "true"}); kb.append(layer);
+  const keys = keyBoxes(), spot = pawSpot(keys), u = spot.u;
+  const leg = svgEl("g", {class: "leg"}, PAW);
+  const legAt = f => leg.setAttribute("transform", `translate(${spot.px} ${spot.py}) rotate(${spot.ang}) scale(${u}) translate(0 ${-f * 9})`);
+  let me = null;
+  const finish = () => {
+    if (me) { clearTimeout(me.timer); cancelAnimationFrame(me.raf); if (walking === me) walking = null; me = null; }
+    layer.innerHTML = ""; for (const k of keys) k.el.classList.remove("unprinted");
+    legAt(0); layer.append(leg); if (walk && walk.done) walk.done();
+  };
+  if (!walk || matchMedia("(prefers-reduced-motion: reduce)").matches) return finish();
+  // stamp: the paw comes down on each key in turn, left to right, and leaves its print; then the leg slides in
+  const order = keys.filter(k => k.on).sort((a, b) => a.x - b.x || a.y - b.y);
+  for (const k of order) k.el.classList.add("unprinted");
+  me = walking = {skip: finish};
+  let i = 0;
+  const stampNext = () => {
+    if (walking !== me) return;
+    if (i < order.length) {
+      const k = order[i++], g = svgEl("g", {transform: `translate(${k.x + k.w / 2} ${k.y + k.h / 2}) scale(${u * 1.9})`}, STAMP);
+      g.animate([{opacity: 0, transform: `translate(${k.x + k.w / 2}px, ${k.y + k.h / 2}px) scale(${u * 2.4})`}, {opacity: 1, transform: `translate(${k.x + k.w / 2}px, ${k.y + k.h / 2}px) scale(${u * 1.9})`, offset: .4}, {opacity: 0, transform: `translate(${k.x + k.w / 2}px, ${k.y + k.h / 2}px) scale(${u * 1.9})`}], {duration: 420, easing: "ease-out"});
+      layer.append(g); setTimeout(() => { g.remove(); k.el.classList.remove("unprinted"); }, 200);
+      me.timer = setTimeout(stampNext, 190);
+      return;
+    }
+    // the leg slides in from off the edge
+    layer.append(leg);
+    const t0 = performance.now();
+    const slide = now => { if (walking !== me) return; const f = Math.min(1, (now - t0) / 450); legAt(1 - (1 - (1 - f) ** 3)); if (f < 1) me.raf = requestAnimationFrame(slide); else finish(); };
+    me.raf = requestAnimationFrame(slide);
+  };
+  stampNext();
+}
+addEventListener("resize", () => { if (game && !walking) placeCat(); });
+
+/* ---------- typing ---------- */
+let lastWord = null;
+function press(k) {
+  if (!game || $("overlay").classList.contains("show") || document.querySelector(".spot")) return;
+  if (stale !== null) { stale = null; typed = ""; if (k === "del" || k === "enter") { draw(); return; } }
+  if (k === "del") typed = typed.slice(0, -1);
+  else if (k === "enter") return submit();
+  else if (game.keys.includes(k) && typed.length < 19) typed += k;
+  else return;
+  draw();
+}
+$("board").addEventListener("pointerdown", e => {
+  if (walking) { walking.skip(); return; }
+  const b = e.target.closest("button"); if (!b) return;
+  e.preventDefault(); b.classList.add("down"); setTimeout(() => b.classList.remove("down"), 120);
+  press(b.dataset.k);
+});
+addEventListener("keydown", e => {
+  if (e.metaKey || e.ctrlKey || e.altKey || e.target.closest("select,input,textarea")) return;
+  const k = e.key === "Backspace" ? "del" : e.key === "Enter" ? "enter" : e.key.length === 1 ? e.key.toLowerCase() : null;
+  if (!k) return;
+  if (k === "enter" || k === "del" || /^[a-z]$/.test(k)) { e.preventDefault(); press(k); }
+});
+function toast(text) { const t = document.createElement("div"); t.className = "toast"; t.textContent = text; document.body.append(t); setTimeout(() => t.remove(), 1500); }
+// A word that doesn't count shakes and stays up a moment, then clears (at once, if the next key comes sooner).
+let stale = null;
+function nope(text) {
+  toast(text); const e = $("entry"); e.classList.remove("shake"); void e.offsetWidth; e.classList.add("shake");
+  const word = typed; stale = word; setTimeout(() => { if (stale === word && typed === word) { typed = ""; stale = null; draw(); } }, 700);
+}
+function submit() {
+  const w = typed;
+  if (!w) return;
+  if (w.length < 4) return nope("Too short");
+  if (!w.includes(game.centre)) return nope(`Use the ${game.centre.toUpperCase()} under the cat's paw`);
+  if (game.found.includes(w)) return nope("Already found");
+  if (!COMMON.has(w) && !EXTRA.has(w)) return nope("Not in the word list");
+  const before = rankAt(score());
+  game.found.push(w); lastWord = w; typed = "";
+  const smash = lettersOf(w).length === 7, p = points(w);
+  toast(smash ? `Keyboard smash! +${p}` : EXTRA.has(w) ? `A rare one! +${p}` : `${["", "Nice!", "", "", "", "Good!", "Great!", "Purrfect!"][Math.min(7, w.length - 3)] || "Purrfect!"} +${p}`);
+  const after = rankAt(score());
+  draw(); save();
+  if (after > before && after < RANKS.length - 1) setTimeout(() => toast(`You're now ${/^[AEIOU]/.test(RANKS[after][0]) ? "an" : "a"} ${RANKS[after][0]}!`), 1500);
+  if (commonFound() === answers.length && !game.won) win();
+}
+
+/* ---------- hint ---------- */
+// Hint: names a word you haven't found yet by its first two letters and its length (it never types it for you).
+function hint() {
+  if (!game || game.won) return;
+  const left = answers.filter(w => !game.found.includes(w));
+  if (!left.length) return;
+  const w = left[Math.floor(Math.random() * left.length)];
+  game.hinted = true; save();
+  G.note(`Try ${[8, 11, 18].includes(w.length) ? "an" : "a"} ${w.length}-letter word starting ${w.slice(0, 2).toUpperCase()}…`, 8000);
+}
+$("hintBtn").onclick = hint;
+
+/* ---------- winning ---------- */
+function win() {
+  game.won = true; save(); draw();
+  G.track(`Keyboard Cat top cat ${game.daily != null ? "daily" : "practice"}`);
+  setTimeout(() => {
+    const text = `You found all ${answers.length} everyday words${game.found.length > answers.length ? `, and ${game.found.length - answers.length} rare one${game.found.length - answers.length === 1 ? "" : "s"} too` : ""}.`;
+    G.winCard(text, () => { G.closeCard(); newKeyboard(); }, "Admire my words", null,
+      {title: "Top Cat!", gold: !game.hinted, goldWhy: "No hints!", next: "Another keyboard"});
+  }, 900);
+}
+
+/* ---------- choosing keyboards ---------- */
+function today() { const d = dayNumber(); openKeyboard(dailyId(d), d); }
+function newKeyboard() {
+  let id; do id = Math.floor(Math.random() * W.puzzles.length); while (game && id === game.id);
+  openKeyboard(id, null); G.track("Keyboard Cat new keyboard");
+}
+$("todayBtn").onclick = () => { G.closeCard(); today(); };
+$("newBtn").onclick = () => { G.closeCard(); newKeyboard(); };
+$("shareBtn").onclick = () => { if (!game) return;
+  G.shareCard({name: "Keyboard Cat", won: game.won, puzzle: () => ({g: "keyboardcat", N: game.id + 1}), progress: () => ({found: game.found})});
+};
+function openShared(d) {
+  const id = d.N - 1;
+  if (!(id >= 0 && id < W.puzzles.length)) { G.note("That share link didn't work.", 5000); return; }
+  openKeyboard(id, null);
+  if (d.p && Array.isArray(d.p.found)) { for (const w of d.p.found) if (typeof w === "string" && (COMMON.has(w) || EXTRA.has(w)) && !game.found.includes(w)) game.found.push(w); draw(); save(); }
+}
+
+/* ---------- how to play ---------- */
+function showHelp() { saved.seenHelp = false; helpOnFirstVisit(); }
+function helpOnFirstVisit() {
+  if (saved.seenHelp || !game || document.querySelector(".spot")) return;
+  const keyEls = () => [...document.querySelectorAll(".key.paw")], centreEl = () => document.querySelector(".key.centre");
+  const steps = [
+    {say: "The cat walked across the keyboard. Only the keys with paw prints work", els: [keyEls]},
+    {say: "Every word must use the key under the cat's paw", els: [centreEl]},
+    {say: "Make words of 4 letters or more. Keys can be used again", els: [$("entry")]},
+    {say: "Use all 7 keys in one word for a keyboard smash!", els: [keyEls]},
+    {say: "Find every everyday word to become Top Cat", els: [$("dots")]},
+  ];
+  G.spotlight({grid: $("board"), w: 10, h: 4, steps, done: () => { saved.seenHelp = true; save(); }});
+}
+$("helpBtn").onclick = showHelp;
+
+/* ---------- start ---------- */
+G.nav("keyboardcat");
+async function loadWords() {
+  if (WORDS_INLINE) return WORDS_INLINE;
+  const r = await fetch(`words.json?v=${window.SITE_BUILD || ""}`);
+  if (!r.ok) throw new Error("couldn't load the word list");
+  return r.json();
+}
+loadWords().catch(e => { G.note(`The word list didn't load (${e.message}). Check your connection and reload.`, 0); throw e; }).then(w => {
+  W = w;
+  const shared = G.readShare("keyboardcat");
+  today();
+  if (shared) G.offerShare(shared, {name: "Keyboard Cat", inProgress: false, open: openShared});
+  window.addEventListener("hashchange", () => { const d = G.readShare("keyboardcat"); if (d) G.offerShare(d, {name: "Keyboard Cat", inProgress: false, open: openShared}); });
+});
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
