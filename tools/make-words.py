@@ -13,8 +13,9 @@ scowl, enable, out = sys.argv[1:4]
 SLURS = set("""nigger nigga kike gook spic wop spaz honky wetback dago darkie darky jigaboo pickaninny gippo lezzie
 bulldyke trannie""".split())
 # Slurs that also have another meaning (dyke: an embankment; coon: a raccoon). Left out until decided one by one.
-UNDECIDED = set("""dyke fag faggot homo coon poof retard retarded chink coolie gypped cracker paddy mick kraut mongol mong
-gimp cripple midget tranny nancy mulatto octoroon golliwog twink rape raped rapist""".split())
+# (Decided and allowed as ordinary words: dyke, poof, twink, cripple, midget, rape, raped, rapist, cracker.)
+UNDECIDED = set("""fag faggot homo coon retard retarded chink coolie gypped paddy mick kraut mongol mong gimp tranny nancy
+mulatto octoroon golliwog""".split())
 BLOCK = SLURS | UNDECIDED
 # Swear words and crude slang: they count when typed, but are never answers you have to find.
 CRUDE = set("""arse bitch bitched bitchier bitchy bollock bugger buggered butt butthole crap crappier crappy cunt damn damned
