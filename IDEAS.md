@@ -75,7 +75,8 @@ Rows are sorted by group, then status: Yes, Look closer, Option, Idea, Built, No
 | Up & Down Words | Words by meaning | Clued two-word phrases where the second word of each starts the next | Written | — | — | GoComics | No | |
 | Overlapt | Words by meaning | Two unrelated clues share one connecting word | Written | — | — | GoComics | No | |
 | Connections | Words by meaning | Sort 16 words into four groups | Written | — | — | You play, wordleunlimited | No | Needs categories |
-| Murdle, Redactle | Words by meaning | A logic mystery story, and guessing a hidden Wikipedia article | Written | — | — | You play, wordleunlimited | No | Needs written content |
+| Murdle | Words by meaning | Solve a murder mystery story by logic, using a grid of suspects, weapons and places | Written | — | — | You play | No | Needs written stories |
+| Redactle | Words by meaning | Guess the words of a hidden Wikipedia article to reveal its title | Written | — | — | wordleunlimited | No | Needs Wikipedia articles |
 | Toe Beans (Countdown numbers) | Numbers | Combine numbers with + − × ÷ to hit the goal; this was the "Digits" idea | — | — | — | Game Suite chat | Built | |
 | Border ladder | Geography | Get from one country to another through shared borders | None | Medium | — | Word Dictionaries chat | Idea | Recommended first in that chat; needs a saved list of borders |
 | Hidden cat in a painting (Cat Burglar) | Seeking | Find a cat hidden in a famous painting | None | Hard | — | Word Dictionaries chat | Idea | Waiting on where the images come from |
