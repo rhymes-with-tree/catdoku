@@ -13,7 +13,8 @@ scowl, enable, out = sys.argv[1:4]
 SLURS = set("""nigger nigga kike gook spic wop spaz honky wetback dago darkie darky jigaboo pickaninny gippo lezzie
 bulldyke trannie""".split())
 # Slurs that also have another meaning (dyke: an embankment; coon: a raccoon). Left out until decided one by one.
-# (Decided and allowed as ordinary words: dyke, poof, twink, cripple, midget, rape, raped, rapist, cracker.)
+# Decided: cracker is an ordinary word; the ones in ACCEPT_ONLY count when typed but are never answers.
+ACCEPT_ONLY = set("""dyke poof twink cripple midget rape raped rapist""".split())
 UNDECIDED = set("""fag faggot homo coon retard retarded chink coolie gypped paddy mick kraut mongol mong gimp tranny nancy
 mulatto octoroon golliwog""".split())
 BLOCK = SLURS | UNDECIDED
@@ -32,8 +33,9 @@ def scowl_words(top):
         if kind in ("english", "american", "british", "canadian") and "variant" not in name and size <= top:
             words |= {plain(w.strip()) for w in open(f, encoding="latin-1")}
     return {w for w in words if ok(w)}
-common = scowl_words(50) - CRUDE
-extra = (CRUDE & scowl_words(80)) | (scowl_words(80) | {w.strip() for w in open(enable) if ok(w.strip())} | {w for w in ALSO if ok(w)}) - common
+NOT_ANSWERS = CRUDE | ACCEPT_ONLY
+common = scowl_words(50) - NOT_ANSWERS
+extra = (NOT_ANSWERS & scowl_words(80)) | (scowl_words(80) | {w.strip() for w in open(enable) if ok(w.strip())} | {w for w in ALSO if ok(w)}) - common
 json.dump({"common": sorted(common), "extra": sorted(extra)}, open(out, "w"), separators=(",", ":"))
 pangrams = [w for w in common if len(set(w)) == 7]
 print(len(common), "common,", len(extra), "extra,", len(pangrams), "pangram words,", os.path.getsize(out) // 1024, "KB")
