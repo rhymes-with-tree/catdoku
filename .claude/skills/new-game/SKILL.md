@@ -78,7 +78,9 @@ its notes.
   before using it. A puzzle opened with progress isn't timed (`game.timed = false`).
 - **How to play:** a first-visit walkthrough with `G.spotlight({grid, w, h, steps, done})`, and the How
   to play button plays it again. There's no rules card, so every rule, control and tip goes in a step,
-  ending with "Stuck? Hint …" pointing at `hintBtn`. It must work at any point in an unfinished puzzle:
+  ending with "Stuck? Hint …" pointing at `hintBtn`. Keep it succinct: one short line per step (a few
+  words, under about ten), one idea each, and only the steps a new player needs; leave out anything
+  the board already makes obvious. It must work at any point in an unfinished puzzle:
   a step that changes the board for show (`enter`/`leave`) puts back exactly what was there, and once
   the player has started, steps point at their own pieces rather than revealing part of the answer
   (see `copycat/` and `unravel/`). If something is still moving or loading, wait and try again rather
