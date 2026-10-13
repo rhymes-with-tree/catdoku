@@ -43,10 +43,9 @@
 .sitter{pointer-events:none}
 .sitter.settled .breath{animation:breathe 1.8s ease-in-out infinite alternate;transform-box:fill-box;transform-origin:center}
 @keyframes breathe{to{transform:scale(1.03,1.05)}}
-.part.hop{animation:hop .35s ease-out}
-@keyframes hop{50%{opacity:.6}}
 .hintsq{stroke-width:5px}
-@media (prefers-reduced-motion:reduce){.sitter.settled .breath,.part.hop{animation:none}}
+.part.hinted .rim{stroke:#ECA818;stroke-width:.1}
+@media (prefers-reduced-motion:reduce){.sitter.settled .breath{animation:none}}
 </style>
 </head>
 <body>
@@ -214,9 +213,9 @@ const STORE = "catdoku.iffits.v1", MAX_LEVEL = 4;
 const $ = G.$, SET = pieceSet();
 let state = G.load(STORE);
 let settings = Object.assign({level: 1}, state.settings);
-let game = state.game || null, busy = false, hinting = false, sel = -1;
+let game = state.game || null, busy = false, sel = -1;
 const save = () => G.save(STORE, {settings, game});
-const playing = () => game && !game.won && !busy && !hinting && !$("overlay").classList.contains("show");
+const playing = () => game && !game.won && !busy && !$("overlay").classList.contains("show");
 const LEVELS = [null, "Every piece's place shown", "Big pieces' places shown", "Just the outline", "Chunky outlines"];
 const levelName = n => `Level ${n} · ${LEVELS[n]}`;
 const build = G.builder([pieceSet, baseShape, placeX, toXY, polyArea, clipPoly, overlapArea, outlineOf, cornersOf, levelInfo, makePuzzle], "makePuzzle");
@@ -345,7 +344,7 @@ function update() {
   const ok = fits(), n = ok.filter(Boolean).length;
   parts.forEach((g, i) => { g.classList.toggle("in", ok[i]); g.classList.toggle("sel", i === sel); });
   $("count").textContent = game.won ? "The box is built!" : n === 6 ? "One more piece to go" : `${n} of 7 pieces fit`;
-  $("hintBtn").disabled = game.won || hinting;
+  $("hintBtn").disabled = game.won;
   $("undoBtn").disabled = !game.history.length || game.won;
   $("restartBtn").disabled = !game.history.length || game.won;
   $("flipBtn").disabled = game.won || sel < 0;
@@ -468,9 +467,10 @@ $("restartBtn").onclick = () => {
   game.pcs = game.start.map(p => ({...p})); sel = -1; changed();
   G.note("Every piece is back where it started. Undo brings your moves back.", 4000);
 };
-// Hint: a gold outline shows where one piece goes, then the piece moves there. Any piece in its way goes back to wait.
+// Hint: a gold outline shows where one piece goes, and that piece is outlined in gold too; you move it there.
 // A hint keeps you on the same level and costs the gold paw.
 const near = (a, b) => a.length === b.length && a.every(p => b.some(q => Math.hypot(p[0] - q[0], p[1] - q[1]) < 0.05));
+let hintTimer = null;
 $("hintBtn").onclick = () => {
   if (!playing()) return;
   const polys = [0, 1, 2, 3, 4, 5, 6].map(polyOf);
@@ -478,26 +478,16 @@ $("hintBtn").onclick = () => {
   if (!open.length) return;
   // a place next to pieces already in place, if there is one
   const done = target.filter((t, j) => !open.includes(j)), byDone = open.filter(j => done.some(t => outlineOf([t, target[j]]).length < t.length + target[j].length));
-  const j = (byDone.length ? byDone : open)[Math.floor(Math.random() * (byDone.length ? byDone : open).length)];
-  const free = [0, 1, 2, 3, 4, 5, 6].filter(i => SET[i] === SET[j] && !target.some(t => near(polys[i], t)));
-  const i = free[0];
-  game.hinted = true; game.started = true; hinting = true; sel = i; update(); save();
+  const pool = byDone.length ? byDone : open, j = pool[Math.floor(Math.random() * pool.length)];
+  const i = [0, 1, 2, 3, 4, 5, 6].find(i => SET[i] === SET[j] && !target.some(t => near(polys[i], t)));
+  game.hinted = true; game.started = true; sel = i; toFront(i); update(); save();
   const box = $("hintsq"); box.setAttribute("points", pts(target[j])); box.style.display = "";
-  G.note(`The ${PIECENAME[i]} goes in the gold outline.`, 4000);
+  parts.forEach((g, m) => g.classList.toggle("hinted", m === i));
+  const inWay = polys.some((p, m) => m !== i && overlapArea(p, target[j]) > 0.02);
+  G.note(`The gold ${PIECENAME[i]} goes in the gold outline${inWay ? ", once what's in the way is moved" : ""}.`, 6000);
   const g = game;
-  setTimeout(() => {
-    if (game !== g) return;
-    game.history.push(snapshot());
-    // the answer's pose for this place, shifted the same way the shape was
-    const [k, f] = game.sol[j], shape = shapeXY(SET[i], k, f, 0, 0), want = target[j];
-    const [ax, ay] = mid(shape), [bx, by] = mid(want);
-    Object.assign(game.pcs[i], {k, f, x: bx - ax, y: by - ay}); toFront(i);
-    // pieces in the way go back to wait
-    for (let m = 0; m < 7; m++) if (m !== i && overlapArea(polyOf(m), want) > 0.02) game.pcs[m] = {...game.start[m]};
-    parts[i].classList.add("hop"); setTimeout(() => parts[i].classList.remove("hop"), 400);
-    hinting = false; changed();
-    setTimeout(() => { if (game === g) box.style.display = "none"; }, 700);
-  }, 900);
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(() => { if (game === g) { box.style.display = "none"; parts.forEach(p => p.classList.remove("hinted")); } }, 6000);
 };
 const PIECENAME = ["big triangle", "big triangle", "middle triangle", "small triangle", "small triangle", "square", "slanted piece"];
 
@@ -599,7 +589,7 @@ function helpOnFirstVisit() {
     {say: "Flip turns over the last piece you touched. It only matters for the slanted one: see UP printed on it?", els: [$("flipBtn"), () => parts[6]]},
     {say: "Pieces snap into place against the edge of the box and against each other", els: [$("box")]},
     {say: "Fill the whole outline, with no piece sticking out or on top of another, and a cat will come to sit in it 🐈", els: [$("box")], tone: "ok"},
-    {say: "Stuck? Hint shows where a piece goes, then puts it there", els: [$("hintBtn")]},
+    {say: "Stuck? Hint outlines a piece and the place it goes in gold", els: [$("hintBtn")]},
   ];
   G.spotlight({grid: $("grid"), w: 1, h: 1, steps, done: () => { settings.seenHelp = true; save(); }});
 }
