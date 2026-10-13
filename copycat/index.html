@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-12.9"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-13.1"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-12.9">
+<link rel="stylesheet" href="../games.css?v=2026-10-13.1">
 <style>
 /* Cardboard boxes on a wooden floor, as in Hide & Seek. Each box hides a toy; open two with the same toy
    and a cat climbs in and curls up with them. */
@@ -40,8 +40,8 @@
 @keyframes settle{from{transform:scale(.4) rotate(-40deg);opacity:0}}
 .sq.miss{animation:shake .35s}
 @keyframes shake{25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
-.sq.hintme{animation:glow .5s ease-in-out 4 alternate}
-@keyframes glow{to{filter:brightness(1.2) drop-shadow(0 0 5px #FFE07A)}}
+.sq.hintme{border-radius:10px;box-shadow:0 0 0 4px #ECA818,0 0 16px 4px rgba(236,168,24,.6);animation:glow .5s ease-in-out 6 alternate}
+@keyframes glow{to{filter:brightness(1.2);box-shadow:0 0 0 5px #FFD45E,0 0 24px 8px rgba(236,168,24,.8)}}
 .floor.reshuffle .sq{animation:reshuffle .7s ease-in-out var(--d,0s) both}
 @keyframes reshuffle{0%{transform:none}35%{transform:scale(.2) rotate(var(--r,20deg));opacity:0}65%{transform:scale(.2) rotate(calc(var(--r,20deg) * -1));opacity:0}100%{transform:none;opacity:1}}
 .left{display:flex;gap:12px;align-items:center}
@@ -72,7 +72,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-12.9"></script>
+<script src="../games.js?v=2026-10-13.1"></script>
 <script>
 /* ---------- levels ---------- */
 // Columns × rows of boxes; every level is twice as many boxes as pairs.
@@ -211,7 +211,7 @@ function hint() {
   const k = open !== undefined ? game.deal[open] : shuffle(game.found.map((f, k) => f ? -1 : k).filter(k => k >= 0))[0];
   const boxes = game.deal.map((p, i) => p === k && i !== open ? i : -1).filter(i => i >= 0);
   game.hinted = true; save();
-  for (const i of boxes) { const sq = $("board").children[i]; sq.classList.remove("hintme"); void sq.offsetWidth; sq.classList.add("hintme"); }
+  for (const i of boxes) { const sq = $("board").children[i]; sq.classList.remove("hintme"); void sq.offsetWidth; sq.classList.add("hintme"); setTimeout(() => sq.classList.remove("hintme"), 5000); }
   G.note(open !== undefined ? `Its match is the glowing box.` : "Those two glowing boxes match.", 4000);
 }
 $("hintBtn").onclick = hint;
@@ -269,25 +269,32 @@ function showHelp() {
 }
 // First visit: walk through the boxes with a made-up example: one box opened, then a pair that matches
 // (shown as a cat curled up) and two that don't. The boxes are shuffled afterwards, so nothing is given away.
+// Once the game is under way, How to play still walks through it, but opens nothing (and shuffles nothing):
+// it points at boxes, and at a pair already found if there is one.
 function helpOnFirstVisit() {
-  if (settings.seenHelp || !game || !playing() || foundCount() || game.up.length || document.querySelector(".spot")) return;
+  if (settings.seenHelp || !game || !playing() || document.querySelector(".spot")) return;
   const {W, H} = game, xy = i => [i % W, Math.floor(i / W)], all = [...Array(W * H).keys()].map(xy);
+  const fresh = !foundCount() && !game.up.length && !game.misses;
   // two boxes with the same toy and two with different toys, all in the top row where possible
   const a = 0, b = game.deal.findIndex((p, i) => i !== a && p === game.deal[a]);
   const c = [...Array(W * H).keys()].find(i => i !== a && i !== b && game.deal[i] !== game.deal[a]);
   const d = [...Array(W * H).keys()].find(i => ![a, b, c].includes(i) && game.deal[i] !== game.deal[a] && game.deal[i] !== game.deal[c]);
-  const showing = (up, found) => ({enter: () => { game.up = up; if (found !== undefined) game.found[found] = true; draw(); },
-                                   leave: () => { game.up = []; if (found !== undefined) game.found[found] = false; draw(); }});
+  const showing = (up, found) => !fresh ? {} : {enter: () => { game.up = up; if (found !== undefined) game.found[found] = true; draw(); },
+                                   leave: () => { game.up = []; if (found !== undefined) game.found[found] = false; draw(); }};
+  // under way: a pair already found shows a match; any two shut boxes stand in for the rest
+  const closed = [...Array(W * H).keys()].filter(i => !game.found[game.deal[i]] && !game.up.includes(i));
+  const kf = game.found.findIndex(Boolean), pair = kf >= 0 ? game.deal.map((p, i) => p === kf ? i : -1).filter(i => i >= 0) : null;
+  const [ea, eb, ec, ed] = fresh ? [a, b, c, d] : [closed[0] ?? a, pair ? pair[1] : closed[1] ?? b, closed[1] ?? c, closed[2] ?? d];
   const steps = [
     {say: "Every box has a cat toy hidden inside", lit: all},
-    {say: "Tap a box to peek inside", lit: [xy(a)], ...showing([a])},
-    {say: "Then tap another. If the two toys match, a cat curls up with them", lit: [xy(a), xy(b)], tone: "ok", ...showing([], game.deal[a])},
-    {say: "If they don't match, both boxes close again. Remember what you saw!", lit: [xy(c), xy(d)], ...showing([c, d])},
+    {say: "Tap a box to peek inside", lit: [xy(ea)], ...showing([a])},
+    {say: "Then tap another. If the two toys match, a cat curls up with them", lit: pair && !fresh ? pair.map(xy) : [xy(ea), xy(eb)], tone: "ok", ...showing([], game.deal[a])},
+    {say: "If they don't match, both boxes close again. Remember what you saw!", lit: [xy(ec), xy(ed)], ...showing([c, d])},
     {say: "Find every pair to fill the floor with napping cats", lit: all, tone: "ok"},
     {say: "Fewer misses than pairs, with no hint or restart, earns a gold paw", els: [$("count")]},
     {say: "Stuck? Hint makes a matching box glow", els: [$("hintBtn")]},
   ];
-  G.spotlight({grid: $("board"), w: W, h: H, steps, map, done: () => { settings.seenHelp = true; save(); reshuffleDeal(); }});
+  G.spotlight({grid: $("board"), w: W, h: H, steps, map, done: () => { settings.seenHelp = true; save(); if (fresh) reshuffleDeal(); }});
 }
 // The squares sit in a grid with gaps and padding, so work out where they are from the first and last.
 function map() {

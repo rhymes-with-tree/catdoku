@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-12.9";
+  var BUILD = "2026-10-13.1";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-12.9">
+<link rel="stylesheet" href="../games.css?v=2026-10-13.1">
 <style>
 /* Strands of yarn knotted through balls of yarn on a felt mat. Drag the balls until no two strands cross. */
 .mat{width:var(--board);aspect-ratio:1;background:#F3E3C7;border:3px solid #B98C5E;border-radius:18px;position:relative;overflow:hidden;
@@ -38,7 +38,7 @@
 </head>
 <body>
 <main>
-  <header><h1>Tangle</h1><div class="stripe"></div><p class="tagline">The cat got into the yarn. Untangle it!</p></header>
+  <header><h1>Tangle</h1><div class="stripe"></div><p class="tagline">Untangle the yarn the cat got into</p></header>
   <nav class="games" id="games" aria-label="Games"></nav>
 
   <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
@@ -47,6 +47,7 @@
   <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
 
   <div class="actions">
+    <button id="hintBtn">Hint</button>
     <button id="shareBtn">Share</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
@@ -58,8 +59,8 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-12.9"></script>
-<script src="../colorways.js?v=2026-10-12.9"></script>
+<script src="../games.js?v=2026-10-13.1"></script>
+<script src="../colorways.js?v=2026-10-13.1"></script>
 <script>
 /* ---------- levels ---------- */
 // Strands per level, and whether the yarn is ombré. Every two strands meet at one ball, so 4 strands make 6 balls,
@@ -88,7 +89,7 @@ function makeTangle(N) {
     for (let i = 0; i < lines; i++) for (let j = 0; j < i; j++) {
       const A = L[i], B = L[j], den = A.dx * B.dy - A.dy * B.dx;
       const t = ((B.px - A.px) * B.dy - (B.py - A.py) * B.dx) / den, s = ((B.px - A.px) * A.dy - (B.py - A.py) * A.dx) / den;
-      const id = balls.length; balls.push({});
+      const id = balls.length; balls.push({sx: A.px + t * A.dx, sy: A.py + t * A.dy});
       on[i].push([t, id]); on[j].push([s, id]);
     }
     const edges = [];
@@ -106,7 +107,11 @@ function makeTangle(N) {
     on.forEach((list, k) => list.forEach(([, id], m) => { if (!balls[id].color) balls[id].color = paint[k](m / (list.length - 1)); }));
     edges.forEach(e => { const la = on[e.k], n = la.length - 1;
       e.ca = paint[e.k](la.findIndex(x => x[1] === e.a) / n); e.cb = paint[e.k](la.findIndex(x => x[1] === e.b) / n); });
-    if (crossings(balls, edges).length >= Math.max(3, balls.length / 2)) return {balls, edges};
+    // the untangled layout (where the strands meet), stretched to fill the mat, for hints
+    const xs = balls.map(b => b.sx), ys = balls.map(b => b.sy), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+    const sol = balls.map(b => [Math.round(80 + 840 * (b.sx - x0) / (x1 - x0 || 1)), Math.round(80 + 840 * (b.sy - y0) / (y1 - y0 || 1))]);
+    balls.forEach(b => { delete b.sx; delete b.sy; });
+    if (crossings(balls, edges).length >= Math.max(3, balls.length / 2)) return {balls, edges, sol};
   }
 }
 // Where strands cross (strands that share a ball don't count as crossing there).
@@ -179,8 +184,16 @@ function draw() {
     const held = drag && drag.id === id;
     s += `<g class="ball${held ? " drag" : ""}" data-id="${id}" transform="translate(${b.x.toFixed(1)} ${b.y.toFixed(1)}) scale(${held ? r * 1.2 : r})"><g class="hop">${yarnBall(b.color)}</g></g>`;
   });
-  $("svg").innerHTML = `<defs>${BALL_DEFS}${grads}</defs>` + s;
+  // the hint: a gold ring round a ball and a dashed one where it could go, while the balls are where they were
+  let h = "";
+  if (hintMark && hintMark.at === spotsKey() && !drag) {
+    const b = B[hintMark.id];
+    h = `<line class="hintline" x1="${b.x}" y1="${b.y}" x2="${hintMark.x}" y2="${hintMark.y}" stroke-dasharray="4 10"/>
+      <circle class="hintsq" cx="${hintMark.x}" cy="${hintMark.y}" r="${r * 1.25}" stroke-dasharray="8 6"/><circle class="hintsq" cx="${b.x}" cy="${b.y}" r="${r * 1.45}" style="fill:none"/>`;
+  }
+  $("svg").innerHTML = `<defs>${BALL_DEFS}${grads}</defs>` + s + h;
   $("count").textContent = game.won ? `Untangled in ${game.moves} move${game.moves === 1 ? "" : "s"}` : `${X.length} crossing${X.length === 1 ? "" : "s"} left`;
+  $("hintBtn").disabled = game.won;
   return X.length;
 }
 
@@ -209,31 +222,89 @@ function drop() {
 $("svg").addEventListener("pointerup", drop);
 $("svg").addEventListener("pointercancel", drop);
 
+/* ---------- hint ---------- */
+// Hint: show one ball with a dashed ring where it could go (the player drags it). A tangle made here knows its
+// untangled layout, so the ring is that ball's place in it: of the balls not there yet, the one whose move takes
+// away the most crossings. Every ball sent home gets it closer, so following hints always untangles it. A tangle
+// without its layout (from a share link, or saved before hints) looks for the move that takes away the most
+// crossings instead. A hint keeps you on this level and costs the gold paw.
+let hintMark = null;
+const spotsKey = () => game.balls.map(b => `${Math.round(b.x)},${Math.round(b.y)}`).join(" ");
+function crossesAt(B, E, id, x, y) {
+  const was = B[id], at = {x, y}; B[id] = at;
+  const mine = E.filter(e => e.a === id || e.b === id);
+  let n = 0;
+  for (const e of mine) for (const f of E) {
+    if (f === e || f.a === e.a || f.a === e.b || f.b === e.a || f.b === e.b) continue;
+    const p = B[e.a], q = B[e.b], r = B[f.a], s = B[f.b];
+    const d = (q.x - p.x) * (s.y - r.y) - (q.y - p.y) * (s.x - r.x);
+    if (Math.abs(d) < 1e-9) continue;
+    const t = ((r.x - p.x) * (s.y - r.y) - (r.y - p.y) * (s.x - r.x)) / d, u = ((r.x - p.x) * (q.y - p.y) - (r.y - p.y) * (q.x - p.x)) / d;
+    if (t > 0 && t < 1 && u > 0 && u < 1) n++;
+  }
+  B[id] = was; return n;
+}
+function hint() {
+  if (!playing() || drag) return;
+  const B = game.balls, E = game.edges, r = sizeOf(B.length), m = r + 6;
+  if (!crossings(B, E).length) return;
+  // too close to another ball, or sitting on a strand it isn't part of, would only look tangled
+  const clear = (id, x, y) => B.every((b, j) => j === id || Math.hypot(b.x - x, b.y - y) > r * 2.6) &&
+    E.every(e => { if (e.a === id || e.b === id) return true; const p = B[e.a], q = B[e.b], dx = q.x - p.x, dy = q.y - p.y, L = dx * dx + dy * dy;
+      const t = Math.max(0, Math.min(1, ((x - p.x) * dx + (y - p.y) * dy) / L)); return Math.hypot(p.x + t * dx - x, p.y + t * dy - y) > r * 1.3; });
+  let best = null, worst = null;
+  if (game.sol && game.sol.length === B.length) {
+    B.forEach((b, id) => {
+      const [x, y] = game.sol[id];
+      if (Math.hypot(b.x - x, b.y - y) < 2) return;
+      const gain = crossesAt(B, E, id, b.x, b.y) - crossesAt(B, E, id, x, y), d = Math.hypot(x - b.x, y - b.y);
+      if (!best || gain > best.gain || (gain === best.gain && d > best.d)) best = {id, x, y, gain, d};
+    });
+  } else B.forEach((b, id) => {
+    const now = crossesAt(B, E, id, b.x, b.y);
+    if (!worst || now > worst.n) worst = {id, n: now};
+    if (!now) return;
+    for (let gy = 0; gy <= 24; gy++) for (let gx = 0; gx <= 24; gx++) {
+      const x = m + gx * (1000 - 2 * m) / 24, y = m + gy * (1000 - 2 * m) / 24, gain = now - crossesAt(B, E, id, x, y);
+      if (gain > 0 && (!best || gain > best.gain || (gain === best.gain && Math.hypot(x - b.x, y - b.y) < best.d)) && clear(id, x, y))
+        best = {id, x, y, gain, d: Math.hypot(x - b.x, y - b.y)};
+    }
+  });
+  if (!game.hinted) { game.hinted = true; save(); }
+  if (!best && !worst) return;
+  const b = best || {id: worst.id, x: B[worst.id].x, y: B[worst.id].y};
+  hintMark = {at: spotsKey(), id: b.id, x: b.x, y: b.y}; draw();
+  G.note(!best ? "The glowing ball is in the most crossings. Try moving it, or its neighbours."
+    : best.gain > 0 ? `Drag the glowing ball to the dashed ring: ${best.gain} fewer crossing${best.gain === 1 ? "" : "s"}.` : "Drag the glowing ball to the dashed ring. It makes room to untangle the rest.", 6000);
+  const mk = hintMark; setTimeout(() => { if (hintMark === mk) { hintMark = null; draw(); } }, 6000);
+}
+$("hintBtn").onclick = hint;
+
 /* ---------- endings ---------- */
 function win() {
   game.won = true; G.finishClock(game);
-  const next = Math.min(MAX_LEVEL, game.N + 1);
+  const next = game.hinted ? game.N : Math.min(MAX_LEVEL, game.N + 1);
   settings.level = next; $("levelSel").value = next; save(); draw();
   G.track(`Tangle untangled level ${game.N}`);
   $("board").classList.remove("won"); $("board").getBoundingClientRect(); $("board").classList.add("won");
   const g = game;
   setTimeout(() => { if (game === g) finishCard(); }, 900);   // a moment to see the yarn hop
 }
-// Tangle has no Undo, so its gold paw is for beating your best time at the level.
+// Tangle has no Undo, so its gold paw is for beating your best time at the level (with no hint).
 const beatBest = () => { const r = game.result; return !!(r && r.ms != null && r.best != null && r.isBest); };
 function finishCard() {
   const next = settings.level, N = game.N;
   let text = `You untangled ${game.balls.length} balls of yarn in ${game.moves} move${game.moves === 1 ? "" : "s"}, and the cat pounced on it.`;
-  text += N === MAX_LEVEL ? " That's the hardest level; next up is another one." : ` Next up: level ${next}.`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : N === MAX_LEVEL ? " That's the hardest level; next up is another one." : ` Next up: level ${next}.`;
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my yarn", game.result,
-    {title: "Untangled!", gold: beatBest(), goldWhy: "A new best time!", next: `Next: level ${next}`, after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+    {title: "Untangled!", gold: beatBest() && !game.hinted, goldWhy: "A new best time!", next: `Next: level ${next}`, after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
 }
 
 /* ---------- new tangles ---------- */
 function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newTangle(); }
 function newTangle() {
   const N = settings.level, t = makeTangle(N);
-  game = {N, balls: t.balls, edges: t.edges, moves: 0, won: false, ...G.freshClock()};
+  game = {N, balls: t.balls, edges: t.edges, sol: t.sol, moves: 0, won: false, ...G.freshClock()};
   game.start = game.balls.map(b => [Math.round(b.x), Math.round(b.y)]);   // where the balls began, for sharing
   $("board").classList.remove("won"); G.closeCard(); G.note("");
   draw(); save();
@@ -244,14 +315,14 @@ function newTangle() {
 const spots = () => game.balls.map(b => [Math.round(b.x), Math.round(b.y)]);
 $("shareBtn").onclick = () => { if (game) G.shareCard({name: "Tangle", won: game.won,
   puzzle: () => ({g: "tangle", N: game.N, at: game.start || spots(), colors: game.balls.map(b => b.color),
-                  edges: game.edges.map(e => [e.a, e.b, e.k, e.ca, e.cb])}),
+                  edges: game.edges.map(e => [e.a, e.b, e.k, e.ca, e.cb]), ...(game.sol ? {sol: game.sol} : {})}),
   progress: () => ({at: spots()})}); };
 // A tangle from a share link, with the balls where they'd got to if that was sent (that isn't timed).
 function openShared(d) {
   if (!(d.N >= 1 && d.N <= MAX_LEVEL) || !Array.isArray(d.at) || !Array.isArray(d.edges)) { G.note("That share link didn't work.", 5000); return; }
   const at = d.p && Array.isArray(d.p.at) && d.p.at.length === d.at.length ? d.p.at : d.at;
   game = {N: d.N, balls: at.map(([x, y], i) => ({x, y, color: (d.colors || [])[i]})), edges: d.edges.map(([a, b, k, ca, cb]) => ({a, b, k, ca, cb})),
-          start: d.at, moves: 0, won: false, ...G.freshClock()};
+          start: d.at, ...(Array.isArray(d.sol) && d.sol.length === d.at.length ? {sol: d.sol} : {}), moves: 0, won: false, ...G.freshClock()};
   if (d.p) game.timed = false;
   settings.level = d.N; $("levelSel").value = d.N;
   $("board").classList.remove("won");
@@ -288,6 +359,7 @@ function helpOnFirstVisit() {
     {say: "Untangle the mess by dragging the yarn balls until no two strands cross",
      shapes: () => [ring(B[pick].x, B[pick].y, r * 1.2), {arrow: page(B[pick].x, B[pick].y - r * 1.3), from: [0, -1], size: 46}]},
     {say: "The count shows how many crossings are left", els: [$("count")]},
+    {say: "Stuck? Hint shows a ball to move, and where", els: [$("hintBtn")]},
   ];
   if (LEVELS[game.N - 1][1]) steps.splice(2, 0, {say: "Each strand shades through many colors, so follow the strands, not the colors", shapes: mat});
   G.spotlight({grid: $("svg"), w: 1, h: 1, steps, done: () => { settings.seenHelp = true; save(); }});

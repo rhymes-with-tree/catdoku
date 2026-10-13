@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-12.9"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-13.1"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-12.9">
+<link rel="stylesheet" href="../games.css?v=2026-10-13.1">
 <style>
 /* Two toys share out a grid in the toy box: every line holds as many of one as the other, no three alike in a row,
    and = / × signs between squares say whether neighbours match. */
@@ -49,14 +49,14 @@
 .sq.guess.bad{box-shadow:inset 0 0 0 3px #E16251,0 0 0 2px #8A5CC7,0 0 14px 4px rgba(138,92,199,.8)}
 .tray.guessing{box-shadow:0 0 0 3px #8A5CC7}
 /* Hint: a toy it puts down glows gold; a wrong toy it finds flashes red */
-.sq.hinted{animation:hinted 1.6s ease-out 2}
-.sq.hintBad{animation:hintBad 1.6s ease-out}
-@keyframes hinted{0%,40%{box-shadow:inset 0 0 0 4px #ECA818;background-color:#FFE9A8}}
-@keyframes hintBad{0%,20%,50%{box-shadow:inset 0 0 0 4px #C8392B}35%,65%{box-shadow:none}}
+.sq.hinted{box-shadow:inset 0 0 0 4px #ECA818;background-color:#FFE9A8;animation:hinted .8s ease-in-out 4 alternate}
+.sq.hintBad{box-shadow:inset 0 0 0 4px #C8392B;animation:hintBad .8s ease-in-out 4 alternate}
+@keyframes hinted{to{box-shadow:inset 0 0 0 7px #ECA818}}
+@keyframes hintBad{to{box-shadow:inset 0 0 0 7px #C8392B}}
 .tray.marking .sq{cursor:crosshair}
 .won .sq img{animation:hop .5s ease-out}
 @keyframes hop{40%{transform:translateY(-8px) scale(1.1)}}
-@media (prefers-reduced-motion:reduce){.sq img,.won .sq img{animation:none}.sq.hinted{animation:none;box-shadow:inset 0 0 0 4px #ECA818}}
+@media (prefers-reduced-motion:reduce){.sq img,.won .sq img{animation:none}}
 </style>
 </head>
 <body>
@@ -64,20 +64,20 @@
   <header><h1>Fair Play</h1><div class="stripe"></div><p class="tagline">Share two toys out fairly</p></header>
   <nav class="games" id="games" aria-label="Games"></nav>
 
-  <div class="key" id="key"></div>
   <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
 
   <div class="tray" id="board" aria-label="Squares to fill with toys"><div class="squares" id="squares"></div></div>
   <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+  <div class="key" id="key"></div>
 
   <div class="actions">
     <button id="hintBtn">Hint</button>
     <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
     <button id="guessBtn" aria-pressed="false">Guess</button>
     <button id="backBtn" hidden>Undo to guess</button>
-    <button id="clearBtn">Clear</button>
-    <button id="shareBtn">Share</button>
     <button id="markBtn" aria-pressed="false">Mark = ×</button>
+    <button id="shareBtn">Share</button>
     <button id="toysBtn">Toys</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
@@ -89,7 +89,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-12.9"></script>
+<script src="../games.js?v=2026-10-13.1"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // A grid of N × N squares, each 0 or 1 (the two toys). Every row and column has N/2 of each, no three the same
@@ -286,7 +286,7 @@ function draw() {
     : `<span>Tap once: ${img(game.toys[0])}</span><span>Twice: ${img(game.toys[1])}</span>`;
   const empty = game.grid.filter(v => v === -1).length;
   $("count").textContent = game.won ? "Solved!" : empty ? `${empty} square${empty === 1 ? "" : "s"} to fill` : bad.size ? "Something's not right" : "";
-  $("undoBtn").disabled = !game.history.length || game.won; $("clearBtn").disabled = !game.history.length || game.won;
+  $("undoBtn").disabled = !game.history.length || game.won; $("restartBtn").disabled = !game.history.length || game.won;
   $("hintBtn").disabled = game.won; $("guessBtn").disabled = game.won; $("backBtn").hidden = !guesses.length || game.won;
 }
 // Undo steps keep the toys, the player's own signs and their guesses (older saves kept just the toys).
@@ -332,7 +332,8 @@ $("squares").addEventListener("click", e => {
   if (!game.grid.includes(-1) && !problems().bad.size) win(); else { draw(); save(); }
 });
 $("undoBtn").onclick = () => { if (playing() && game.history.length) { game.undid = true; restore(game.history.pop()); draw(); save(); } };
-$("clearBtn").onclick = () => { if (playing() && game.history.length) { game.undid = true; snapshot(); game.grid = game.givens.slice(); game.notes = []; game.guesses = []; draw(); save(); G.note("Back to the start. Undo brings your toys back.", 3500); } };
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !$("undoBtn").disabled) { e.preventDefault(); $("undoBtn").click(); } });
+$("restartBtn").onclick = () => { if (playing() && game.history.length) { game.undid = true; snapshot(); game.grid = game.givens.slice(); game.notes = []; game.guesses = []; draw(); save(); G.note("Back to the start. Undo brings your toys back.", 3500); } };
 // Guess: the next square you fill glows until it's undone. Undo to guess undoes everything back to just before
 // the latest guess in one go (it counts as an Undo for the gold paw).
 $("guessBtn").onclick = () => {
@@ -378,7 +379,7 @@ function forcedSquare() {
 function hint() {
   if (!playing()) return;
   const sol = solution(), g = game.grid;
-  if (!sol) return;
+  if (!sol) { G.note("Couldn't work out a hint for this puzzle. Try Undo, or check for a wrong toy.", 4000); return; }
   game.hinted = true; guessing = false; marking = false;
   const wrong = g.map((v, i) => v !== -1 && v !== sol[i] ? i : -1).filter(i => i >= 0);
   if (wrong.length) {

@@ -612,7 +612,8 @@ const G = (() => {
 
   // How to play plays a game's walkthrough on its board. When there's no puzzle out to show it on (it's
   // finished), say how to get one.
-  function helpLater() { note($("newBtn") ? `Tap ${$("newBtn").textContent.trim()}, then How to play.` : "Pick a level, then tap How to play.", 4000); }
+  // Games with no new-puzzle button start the level again with Restart instead.
+  function helpLater() { const b = $("newBtn") || $("restartBtn"); note(b ? `Tap ${b.textContent.trim()}, then How to play.` : "Pick a level, then tap How to play.", 4000); }
 
   let msgTimer = null;
   function note(text, ms) {
