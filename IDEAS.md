@@ -82,7 +82,6 @@ Rows are sorted by group, then status: Yes, Look closer, Option, Idea, Built, No
 | Hidden cat in a painting (Cat Burglar) | Seeking | Find a cat hidden in a famous painting | None | Hard | — | Word Dictionaries chat | Idea | Waiting on where the images come from |
 | Spot the Difference | Seeking | Find the changes between two pictures | None | — | — | GoComics | No | Never |
 | Switch Spots | Colour | Flip dots until all their colours match in as few moves as you can; arrows set what each flip does | None | Easy | Night Light | GoComics | Yes | Keep Night Light's theme and look |
-| Lights Out with colours (Eyka) | Colour | Each tap moves a block and its neighbours on through a set of colours | None | Easy | Night Light | Possible suites | Idea | |
 | Flood | Colour | Change the corner's colour to flood the board one colour within a set number of moves | None | Easy | — | Tatham | Idea | |
 | Minimum-colours map | Colour | Colour a map with as few colours as you can | None | Easy | Patches | Word Dictionaries and Kakuro chats | Idea | |
 | Kaleidocat (Colorscope-style) | Colour | Rebuild a target pattern from a few mirrored pieces whose overlapping colours blend | None | Medium | Pawlette | Possible suites | Idea | The saved name Kaleidocat could fit |
