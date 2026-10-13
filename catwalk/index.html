@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-12.9";
+  var BUILD = "2026-10-13.1";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-12.9">
+<link rel="stylesheet" href="../games.css?v=2026-10-13.1">
 <style>
 /* A gigantic cat tower: numbered carpeted perches on a papered wall, linked by sisal-wrapped catwalks. */
 .wall{width:var(--board);aspect-ratio:1;background:#EBDDCB;border:3px solid #A98663;border-radius:16px;overflow:hidden;touch-action:manipulation;user-select:none;-webkit-user-select:none}
@@ -44,7 +44,7 @@
 </head>
 <body>
 <main>
-  <header><h1>Catwalk</h1><div class="stripe"></div><p class="tagline">Build a gigantic cat tower: link every perch with catwalks</p></header>
+  <header><h1>Catwalk</h1><div class="stripe"></div><p class="tagline">Link the perches of a giant cat tower</p></header>
   <nav class="games" id="games" aria-label="Games"></nav>
 
   <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
@@ -53,6 +53,7 @@
   <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
 
   <div class="actions">
+    <button id="hintBtn">Hint</button>
     <button id="undoBtn">Undo</button>
     <button id="restartBtn">Restart</button>
     <button id="shareBtn">Share</button>
@@ -66,7 +67,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-12.9"></script>
+<script src="../games.js?v=2026-10-13.1"></script>
 <script>
 /* ---------- the puzzle ---------- */
 // A perch: {x, y, n}. Catwalks run from a perch to the nearest perch straight across or up and down (and on the
@@ -256,6 +257,12 @@ function draw(flash) {
     let g = v === 1 ? ropeBridge(x1, y1, x2, y2, 0) : v === 2 ? ropeBridge(x1, y1, x2, y2, -13) + ropeBridge(x1, y1, x2, y2, 13) : "";
     s += `<g class="lane${flash === k ? " no" : ""}">${g}</g>`;
   });
+  // under the perches, the hint: a gold catwalk to build (red: one to take away) and its two perches, while the catwalks are as they were
+  if (hintMark && hintMark.at === val.join()) {
+    const l = lanes[hintMark.k], A = isles[l.a], B = isles[l.b], c = hintMark.bad ? " bad" : "";
+    s += `<line class="hintline${c}" x1="${A.x * U + U / 2}" y1="${A.y * U + U / 2}" x2="${B.x * U + U / 2}" y2="${B.y * U + U / 2}"/>`;
+    for (const P of [A, B]) s += `<circle class="hintsq${c}" cx="${P.x * U + U / 2}" cy="${P.y * U + U / 2}" r="${U * .5}"/>`;
+  }
   isles.forEach((p, i) => {
     const cx = p.x * U + U / 2, cy = p.y * U + U / 2, done = have[i] === p.n, over = have[i] > p.n, look = pieceOf(p);
     // the perch itself, a cat settled on it once it has all its catwalks, and its number on a badge
@@ -271,6 +278,7 @@ function draw(flash) {
   const left = isles.filter((p, i) => have[i] !== p.n).length;
   $("count").textContent = game.won ? "Tower built!" : `${left} perch${left === 1 ? "" : "es"} to go`;
   $("undoBtn").disabled = !game.history.length || game.won; $("restartBtn").disabled = !game.history.length || game.won;
+  $("hintBtn").disabled = game.won;
 }
 // Built: every perch has its number of catwalks, none cross, and they all join into one tower.
 const crossing = () => lanes.some((l, k) => game.val[k] && l.cross.some(q => game.val[q]));
@@ -310,12 +318,34 @@ $("svg").addEventListener("click", e => {
   if (game.isles.every((p, i) => have[i] === p.n)) G.note("Every perch is right, but the tower is in pieces.", 0);
 });
 $("undoBtn").onclick = () => { if (playing() && game.history.length) { game.undid = true; game.val = game.history.pop(); sel = -1; draw(); save(); } };
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !$("undoBtn").disabled) { e.preventDefault(); $("undoBtn").click(); } });
 $("restartBtn").onclick = () => { if (playing() && game.history.length) { game.undid = true; game.history.push(game.val.slice()); game.val = game.val.map(() => 0); sel = -1; draw(); save(); G.note("Back to bare perches. Undo brings your catwalks back.", 3500); } };
+
+// Hint: the tower has one answer. A catwalk that shouldn't be there (or one too many) shows in red; otherwise a
+// catwalk still to build glows gold between its two perches. The player builds it. A hint keeps the next
+// tower the same size and costs the gold paw.
+let hintMark = null, answer = null;
+function hint() {
+  if (!playing()) return;
+  if (!answer || answer.g !== game) { countSolutions(game.isles, lanes, 1); answer = {g: game, sol: (countSolutions.sols || [])[0]}; }
+  const sol = answer.sol;
+  if (!sol) { G.note("Couldn't work out a hint for this tower. Try Undo.", 4000); return; }
+  game.hinted = true; save();
+  const over = lanes.map((_, k) => k).filter(k => game.val[k] > sol[k]);
+  const have = totals(), short = k => game.isles[lanes[k].a].n - have[lanes[k].a] + game.isles[lanes[k].b].n - have[lanes[k].b];
+  const k = over.length ? over[0] : lanes.map((_, k) => k).filter(k => game.val[k] < sol[k]).sort((a, b) => short(a) - short(b))[0];
+  if (k === undefined) return;
+  hintMark = {at: game.val.join(), k, bad: over.length > 0}; sel = -1; draw();
+  G.note(over.length ? (sol[k] ? "One catwalk too many between the red perches." : "The red catwalk shouldn't be there.")
+    : game.val[k] ? "Add a second catwalk between the glowing perches." : sol[k] === 2 ? "The glowing perches need two catwalks between them." : "Add a catwalk between the glowing perches.", 5000);
+  const m = hintMark; setTimeout(() => { if (hintMark === m) { hintMark = null; draw(); } }, 5000);
+}
+$("hintBtn").onclick = hint;
 
 /* ---------- endings ---------- */
 function win() {
   game.won = true; G.finishClock(game);
-  settings.size = G.sizeUp(game.N, $("size")); $("size").value = settings.size; save();
+  settings.size = game.hinted ? game.N : G.sizeUp(game.N, $("size")); $("size").value = settings.size; save();
   $("board").classList.remove("won"); $("board").getBoundingClientRect(); $("board").classList.add("won"); draw();
   G.track(`Catwalk built ${sizeLabel(game.N)}`);
   const g = game;
@@ -324,9 +354,9 @@ function win() {
 function finishCard() {
   const next = settings.size;
   let text = `All ${game.isles.length} perches are linked, and the cats can climb the whole tower.`;
-  text += next > game.N ? ` Next up: ${sizeLabel(next)}.` : " That's the biggest tower; here's another.";
+  text += game.hinted ? ` You had a hint, so here's another ${sizeLabel(next)}.` : next > game.N ? ` Next up: ${sizeLabel(next)}.` : " That's the biggest tower; here's another.";
   G.winCard(text, () => { G.closeCard(); startSize(next); }, "Admire my tower", game.result,
-    {title: "Tower built!", gold: !game.undid, goldWhy: "No undos!", next: `Next: ${SIZES[next][0]} × ${SIZES[next][0]}`, after: G.otherSize($("size"), next, startSize)});
+    {title: "Tower built!", gold: !game.undid && !game.hinted, goldWhy: "No undos or hints!", next: `Next: ${SIZES[next][0]} × ${SIZES[next][0]}`, after: G.otherSize($("size"), next, startSize)});
 }
 
 /* ---------- new towers ---------- */
@@ -474,7 +504,8 @@ function helpOnFirstVisit() {
     steps.push({say: "Catwalks can't cross", lit: ca, outline: [ca], lines: [{edges: [[mx + 0.5, my - 1, mx + 0.5, my + 2]]}], marks: [[mx, my, "❌", 0.9]],
                 enter: () => { was = game.val.slice(); game.val[across] = 1; draw(); }, leave: () => { game.val = was; draw(); }});
   }
-  steps.push({say: "When you're done, every perch must join into one tower", lit: all, outline: all.map(c => [c]), tone: "ok"});
+  steps.push({say: "When you're done, every perch must join into one tower", lit: all, outline: all.map(c => [c]), tone: "ok"},
+             {say: "Stuck? Hint shows a catwalk to build, or a wrong one", els: [$("hintBtn")]});
   G.spotlight({grid: $("svg"), w: W, h: W, map, steps, done: () => { settings.seenHelp = true; if (SIZES[game.N][2]) settings.seenDiag = true; save(); }});
 }
 

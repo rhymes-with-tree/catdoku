@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-12.9";
+  var BUILD = "2026-10-13.1";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-12.9">
+<link rel="stylesheet" href="../games.css?v=2026-10-13.1">
 <style>
 /* Six number tiles up top, then one outlined paw: its four toe beans are + − × ÷ and its main pad holds the goal.
    An exact hit fills every pad at once in gold; the paw's own pad colour (--pc, with --pt for text on it) is
@@ -90,6 +90,7 @@
   <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
 
   <div class="actions">
+    <button id="hintBtn">Hint</button>
     <button id="undoBtn">Undo</button>
     <button id="finishBtn">Finish here</button>
     <button id="shareBtn">Share</button>
@@ -103,7 +104,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-12.9"></script>
+<script src="../games.js?v=2026-10-13.1"></script>
 <script>
 /* ---------- puzzles ---------- */
 // Each level: [fewest steps the goal needs, lowest goal, highest goal, the big numbers that can be dealt].
@@ -212,6 +213,22 @@ function tapBean(i) {
 function tapToe(o) { if (!playing() || pick === null) return; op = op === o ? null : o; render(); }
 function undo() { if (!playing() || !game.history.length) return; game.beans = game.history.pop(); pick = null; op = null; render(); save(); }
 
+// Hint: the first step of a shortest way to the goal from the numbers left: its two numbers and its toe bean glow,
+// and the note says the sum. The player taps it in. If the goal can't be made from here, it says to undo.
+// A hint keeps you on this level and costs the gold paw.
+let hintMark = null;
+function hint() {
+  if (!playing()) return;
+  const left = game.beans.filter(v => v !== null), way = oneWay(left, game.goal);
+  game.hinted = true; save();
+  if (!way) { G.note(game.history.length ? "The goal can't be made from these numbers. Try Undo." : "Couldn't find a way to the goal.", 5000); return; }
+  if (!way.length) return;
+  const [a, o, b] = way[0], i = game.beans.indexOf(a), j = game.beans.findIndex((v, k) => v === b && k !== i);
+  pick = null; op = null;
+  hintMark = {at: game.beans.join(), i, j, op: o}; render();
+  G.note(`Try ${a} ${SIGN[o]} ${b}: tap ${a}, then ${SIGN[o]}, then ${b}.`, 6000);
+  const m = hintMark; setTimeout(() => { if (hintMark === m) { hintMark = null; render(); } }, 6000);
+}
 function remember(score) {
   settings.recent = settings.recent.concat({c: game.pads[0], s: score}).slice(-5);
 }
@@ -220,7 +237,7 @@ function remember(score) {
 const levelPick = (current, text) => G.otherSize($("levelSel"), current, startLevel, text || "Or play a different level:");
 function win() {
   game.won = true; G.finishClock(game); remember(2);
-  const next = Math.min(MAX_LEVEL, game.N + 1);
+  const next = game.hinted ? game.N : Math.min(MAX_LEVEL, game.N + 1);
   settings.level = next; $("levelSel").value = next; save(); render();
   G.track(`Toe Beans solved level ${game.N}`);
   build.prefetch(next);
@@ -229,10 +246,11 @@ function win() {
 }
 function finishCard() {
   const next = settings.level, top = game.N === MAX_LEVEL;
-  const text = top ? `${game.goal} exactly. That's the hardest level, so the next one is level ${MAX_LEVEL} again.`
+  const text = game.hinted ? `${game.goal} exactly. You had a hint, so here's another at level ${next}.`
+    : top ? `${game.goal} exactly. That's the hardest level, so the next one is level ${MAX_LEVEL} again.`
     : `${game.goal} exactly. Level ${game.N} done; next up is level ${next}.`;
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my paw", game.result,
-    {title: "Got it!", gold: true, goldWhy: "Exactly right!", next: `Next: level ${next}`, after: levelPick(next)});
+    {title: "Got it!", gold: !game.hinted, goldWhy: "Exactly right, with no hints!", next: `Next: level ${next}`, after: levelPick(next)});
 }
 
 // Finishing without the goal: within 10 keeps your level, further off moves you back one.
@@ -316,8 +334,10 @@ function render() {
   paw.classList.toggle("won", game.won);
   $("goal").textContent = game.goal;
   $("goalLabel").textContent = game.won ? "Got it!" : `Level ${game.N}`;
+  const hm = hintMark && hintMark.at === game.beans.join() && playing() ? hintMark : null;
   document.querySelectorAll(".toe").forEach(t => {
     t.disabled = !playing() || pick === null;
+    t.classList.toggle("hintcell", !!hm && t.dataset.op === hm.op);
     t.setAttribute("aria-pressed", String(op === t.dataset.op));
   });
   beans.innerHTML = "";
@@ -332,13 +352,14 @@ function render() {
       if (pick !== null && op !== null && i !== pick && opResult(game.beans[pick], op, v) === null) b.classList.add("dim");
     }
     if (i === popped) b.classList.add("pop");
+    if (hm && (i === hm.i || i === hm.j)) b.classList.add("hintcell");
     b.setAttribute("aria-pressed", String(i === pick));
     b.onclick = () => tapBean(i);
     beans.append(b);
   });
   popped = -1;
   $("undoBtn").disabled = !playing() || !game.history.length;
-  $("finishBtn").disabled = !playing();
+  $("finishBtn").disabled = !playing(); $("hintBtn").disabled = !playing();
   drawRecent();
   if (game.won) G.note("Exactly right!", 0);
   else if (game.over) G.note(`Finished ${Math.abs(game.closest - game.goal)} away.`, 0);
@@ -353,6 +374,7 @@ $("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
 document.querySelectorAll(".toe").forEach(t => t.onclick = () => tapToe(t.dataset.op));
 $("newBtn").onclick = newPuzzle;
 $("undoBtn").onclick = undo;
+$("hintBtn").onclick = hint;
 $("finishBtn").onclick = finishHere;
 $("helpBtn").onclick = showHelp;
 document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); } });
@@ -384,6 +406,7 @@ function helpOnFirstVisit() {
      enter: () => { was = game.beans.slice(); game.beans[0] = null; game.beans[1] = sum; render(); },
      leave: () => { game.beans = was; render(); }},
     {say: "You don't have to use every number", els: [all]},
+    {say: "Stuck? Hint shows a step towards the goal", els: [$("hintBtn")]},
     {say: "Press Finish here when you're done", els: [$("finishBtn")]},
     {say: "If you finish within 10, you win the board", els: [$("recent")]},
     {say: "Further off than 10, you go back a level", els: [$("levelSel")]},
