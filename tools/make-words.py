@@ -6,11 +6,22 @@ SCOWL is (c) Kevin Atkinson; its notice is in keyboardcat/WORDS-LICENSE.txt and 
 common (the answers): SCOWL sizes 10-50 (American, British, Canadian and shared English spellings).
 extra (accepted too): SCOWL up to size 80, everything in ENABLE, and a few newer words SCOWL and ENABLE don't have.
 Accents are dropped (épée counts as epee). Only a-z words of 4+ letters, with at most 7 different letters and no
-'s' (as in Spelling Bee, so plurals don't double every list), and nothing on the blocklist."""
+'s' (as in Spelling Bee, so plurals don't double every list), and no slurs. Swear words count but are never answers."""
 import json, sys, os, glob, unicodedata
 scowl, enable, out = sys.argv[1:4]
-# Words left out on purpose: rude or hurtful ones that shouldn't turn up in a cat game.
-BLOCK = set("""anal anus arse bitch bitched bitchier bitchy bollock boner booby boob bugger buggered butt butthole cock cocky coon crap crappier crappy cunt damn damned dick dickhead dildo dyke fart farted fatso faggot fag fuck fucked fucker gook hell homo honky horny hump humped jerkoff jizz kike kink kinky knob lech lechery lewd naked nigga nigger nude orgy pecker penile penis perv pervert piddle piss pissed poof poop porn porno prick pube pubic puke queer rape raped rapist rectum retard retarded semen sex sexed sexier sexy shag shit shitty slag slut sodomy spaz sperm spic tart teat tit titty tits turd twat urine vagina vulva wank wanker whore wop""".split())
+# Slurs, left out: words whose only meaning is a slur.
+SLURS = set("""nigger nigga kike gook spic wop spaz honky wetback dago darkie darky jigaboo pickaninny gippo lezzie
+bulldyke trannie""".split())
+# Slurs that also have another meaning (dyke: an embankment; coon: a raccoon). Left out until decided one by one.
+# Decided: cracker is an ordinary word; the ones in ACCEPT_ONLY count when typed but are never answers.
+ACCEPT_ONLY = set("""dyke poof twink cripple midget rape raped rapist""".split())
+UNDECIDED = set("""fag faggot homo coon retard retarded chink coolie gypped paddy mick kraut mongol mong gimp tranny nancy
+mulatto octoroon golliwog""".split())
+BLOCK = SLURS | UNDECIDED
+# Swear words and crude slang: they count when typed, but are never answers you have to find.
+CRUDE = set("""arse bitch bitched bitchier bitchy bollock bugger buggered butt butthole crap crappier crappy cunt damn damned
+dick dickhead dildo fart farted fuck fucked fucker jerkoff jizz piss pissed shit shitty tit tits titty turd twat wank
+wanker boner boob booby porn porno perv fatso slut whore""".split())
 # Newer words neither list has yet.
 ALSO = set("empath empathic vlog vlogger glamping matcha".split())
 def ok(w): return len(w) >= 4 and w.isascii() and w.isalpha() and w.islower() and "s" not in w and len(set(w)) <= 7 and w not in BLOCK
@@ -22,8 +33,9 @@ def scowl_words(top):
         if kind in ("english", "american", "british", "canadian") and "variant" not in name and size <= top:
             words |= {plain(w.strip()) for w in open(f, encoding="latin-1")}
     return {w for w in words if ok(w)}
-common = scowl_words(50)
-extra = (scowl_words(80) | {w.strip() for w in open(enable) if ok(w.strip())} | {w for w in ALSO if ok(w)}) - common
+NOT_ANSWERS = CRUDE | ACCEPT_ONLY
+common = scowl_words(50) - NOT_ANSWERS
+extra = (NOT_ANSWERS & scowl_words(80)) | (scowl_words(80) | {w.strip() for w in open(enable) if ok(w.strip())} | {w for w in ALSO if ok(w)}) - common
 json.dump({"common": sorted(common), "extra": sorted(extra)}, open(out, "w"), separators=(",", ":"))
 pangrams = [w for w in common if len(set(w)) == 7]
 print(len(common), "common,", len(extra), "extra,", len(pangrams), "pangram words,", os.path.getsize(out) // 1024, "KB")
