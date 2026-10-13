@@ -25,6 +25,7 @@ const G = (() => {
     ["Unravel", "unravel", "Cover every line with one strand of yarn", "#E16A4A"],
     ["Tail Chase", "tailchase", "Catch the toys without getting tangled", "#C9773F"],
     ["Keyboard Cat", "keyboardcat", "Make words from the keys that still work", "#8D78AD"],
+    ["If It Fits", "iffits", "Build the box, and a cat comes to sit in it", "#C4925C"],
   ];
   const $ = id => document.getElementById(id);
 

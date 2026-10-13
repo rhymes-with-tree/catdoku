@@ -79,9 +79,10 @@ Copy the structure of `tunnelrun/` or `opendoor/`: the head (BUILD check script,
 
 ### Hints
 
-Highlight what a hint will change and describe it in the message line, then make the change, and keep
-the highlight up a moment so a hint that finishes the puzzle still shows what it did. Tunnel Run waits
-0.9 s before turning the piece and clears the highlight 0.7 s after. Draw the highlight on top.
+A hint shows; it never makes the move (README, "Across every game"). Mark what to look at (gold for where
+to go, red for a mistake), say in the message line what to do there, and leave the player to do it. Keep
+the mark up for a few seconds rather than only flashing it, so it shows with reduced motion too, and draw
+it on top. Tunnel Run puts a box round a piece that's the wrong way round and says so for 3.5 s.
 
 ## 4. Housekeeping
 

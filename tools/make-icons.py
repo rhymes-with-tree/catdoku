@@ -367,10 +367,22 @@ def keyboardcat():
     return frame("#ECEEE7", out)
 
 
+# If It Fits: an odd-shaped box built from tangram pieces of cardboard, with a cat sitting in it.
+def iffits():
+    pieces = [((18, 80), (50, 48), (50, 80), "#D6AB74"), ((50, 48), (82, 80), (50, 80), "#CB9C63"),
+              ((50, 48), (66, 32), (82, 48), (66, 64), "#C4925C"), ((34, 32), (50, 48), (34, 48), "#DDB685"),
+              ((18, 48), (34, 32), (34, 48), "#D2A570")]
+    out = ""
+    for *pts, c in pieces:
+        out += f'<polygon points="{" ".join(f"{x},{y}" for x, y in pts)}" fill="{c}" stroke="#8E6534" stroke-width="2" stroke-linejoin="round"/>'
+    out += catface(44, 58, 11, "#8C98AA")
+    return frame("#E8DCC4", out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")

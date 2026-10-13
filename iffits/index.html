@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>If It Fits</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-13.2"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-13.2">
+<style>
+/* A floor with the outline of an odd-shaped box pencilled on it, and seven pieces of cardboard (the tangram
+   pieces) to build it from. When it's built, a cat comes over and sits in it. */
+.floor{--spot:#DCCFB6; --spot-edge:#8F7B5E; --floor:#E8DCC4;
+  height:auto;aspect-ratio:9/11.4;background:var(--floor);border:3px solid var(--ink);border-radius:10px;overflow:hidden;
+  touch-action:none;user-select:none;-webkit-user-select:none}
+.floor .grid{position:absolute;inset:0}
+.floor svg{display:block;width:100%;height:100%;outline:none}
+.spotEdge{fill:none;stroke:var(--spot-edge);stroke-width:.06;stroke-dasharray:.16 .1;stroke-linecap:round}
+.spotFill{fill:var(--spot);stroke:var(--spot);stroke-width:.03;stroke-linejoin:round}
+.spotLine{fill:none;stroke:var(--spot-edge);stroke-width:.03;stroke-dasharray:.09 .07;opacity:.8}
+.trayLine{stroke:var(--spot-edge);stroke-width:.025;stroke-dasharray:.12 .1;opacity:.5}
+.part{cursor:grab}
+.part .art{pointer-events:none}
+.part.lift{filter:drop-shadow(0 .12px .18px rgba(42,37,48,.45));cursor:grabbing}
+.part.sel .rim{stroke:#4F8FA0;stroke-width:.08}
+.sitter{pointer-events:none}
+.sitter.settled .breath{animation:breathe 1.8s ease-in-out infinite alternate;transform-box:fill-box;transform-origin:center}
+@keyframes breathe{to{transform:scale(1.03,1.05)}}
+.hintsq{stroke-width:5px}
+.part.hinted .rim{stroke:#ECA818;stroke-width:.1}
+@media (prefers-reduced-motion:reduce){.sitter.settled .breath{animation:none}}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>If It Fits</h1><div class="stripe"></div><p class="tagline">Build the box. If it fits, a cat sits</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap floor" id="board"><div class="grid" id="grid"><svg id="svg" tabindex="0" role="application" aria-label="The outline of a box and seven pieces of cardboard to build it. Drag a piece to move it, tap it to turn it. Keys: Tab picks a piece, arrows move it, R turns it, F flips it."></svg></div></div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="flipBtn">Flip</button>
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="shareBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New box</button>
+  </div>
+</main>
+
+<script src="../games.js?v=2026-10-13.2"></script>
+<script>
+/* ---------- shapes (plain functions, also run in a background worker) ---------- */
+// The seven cats are the seven tangram pieces: two big triangles (L), a middle one (M), two small ones (S),
+// a square (Q) and a parallelogram (P). Lengths are in small-triangle legs; y runs down the screen.
+// A point is kept exactly as [a, b, c, d]: x = a + b·√½, y = c + d·√½, so pieces turned 45° still line up exactly.
+function pieceSet() { return ["L", "L", "M", "S", "S", "Q", "P"]; }
+function baseShape(t) {
+  return {L: [[0,0],[2,0],[0,2]], M: [[0,0],[2,0],[1,1]], S: [[0,0],[1,0],[0,1]], Q: [[0,0],[1,0],[1,1],[0,1]], P: [[0,0],[1,0],[2,1],[1,1]]}[t];
+}
+// A piece turned k eighths of a turn clockwise, flipped first if f, with its own corner (0, 0) at exact point o.
+function placeX(t, k, f, o) {
+  k = ((k % 8) + 8) % 8;
+  const pts = baseShape(t).map(([u, v]) => {
+    if (f) u = -u;
+    // turning by a quarter turn q, then by 45° if k is odd
+    let x = u, y = v;
+    for (let q = 0; q < k >> 1; q++) [x, y] = [-y, x];
+    const p = k & 1 ? [0, x - y, 0, x + y] : [x, 0, y, 0];
+    return [p[0] + o[0], p[1] + o[1], p[2] + o[2], p[3] + o[3]];
+  });
+  if (f) pts.reverse();   // keep every outline running the same way round
+  return pts;
+}
+function toXY(p) { const r = Math.SQRT1_2; return [p[0] + p[1] * r, p[2] + p[3] * r]; }
+function polyArea(p) { let s = 0; for (let i = 0; i < p.length; i++) { const a = p[i], b = p[(i + 1) % p.length]; s += a[0] * b[1] - a[1] * b[0]; } return s / 2; }
+// The part of polygon a inside convex polygon b (every piece is convex), by Sutherland–Hodgman.
+function clipPoly(a, b) {
+  let out = a;
+  for (let i = 0; i < b.length && out.length; i++) {
+    const A = b[i], B = b[(i + 1) % b.length], inp = out; out = [];
+    const side = P => (B[0] - A[0]) * (P[1] - A[1]) - (B[1] - A[1]) * (P[0] - A[0]);
+    for (let j = 0; j < inp.length; j++) {
+      const P = inp[j], Q = inp[(j + 1) % inp.length], sp = side(P), sq = side(Q);
+      if (sp >= 0) out.push(P);
+      if ((sp >= 0) !== (sq >= 0)) { const t = sp / (sp - sq); out.push([P[0] + t * (Q[0] - P[0]), P[1] + t * (Q[1] - P[1])]); }
+    }
+  }
+  return out;
+}
+function overlapArea(a, b) { return Math.abs(polyArea(clipPoly(a, b))); }
+// The outline of pieces laid edge to edge: every piece edge, less the stretches another piece's edge runs back along.
+// Returns segments [[x1, y1], [x2, y2]] running round the shape.
+function outlineOf(polys) {
+  const segs = [];
+  polys.forEach((p, i) => p.forEach((A, j) => {
+    const B = p[(j + 1) % p.length], len = Math.hypot(B[0] - A[0], B[1] - A[1]), ux = (B[0] - A[0]) / len, uy = (B[1] - A[1]) / len;
+    let cuts = [];   // stretches of this edge, as [from, to] along it, that touch another piece
+    polys.forEach((q, i2) => { if (i2 !== i) q.forEach((C, j2) => {
+      const D = q[(j2 + 1) % q.length];
+      // the other edge must run back along the same line
+      const off = Math.abs((C[0] - A[0]) * uy - (C[1] - A[1]) * ux) + Math.abs((D[0] - A[0]) * uy - (D[1] - A[1]) * ux);
+      if (off > 1e-6) return;
+      const tc = (C[0] - A[0]) * ux + (C[1] - A[1]) * uy, td = (D[0] - A[0]) * ux + (D[1] - A[1]) * uy;
+      if (td >= tc) return;
+      const lo = Math.max(0, td), hi = Math.min(len, tc);
+      if (hi - lo > 1e-6) cuts.push([lo, hi]);
+    }); });
+    cuts.sort((a, b) => a[0] - b[0]);
+    let t = 0;
+    const at = s => [A[0] + ux * s, A[1] + uy * s];
+    for (const [lo, hi] of cuts) { if (lo - t > 1e-6) segs.push([at(t), at(lo)]); t = Math.max(t, hi); }
+    if (len - t > 1e-6) segs.push([at(t), at(len)]);
+  }));
+  return segs;
+}
+// The outline's corners (where it turns), and how many separate loops it has (more than one means a hole).
+function cornersOf(segs) {
+  const key = p => p[0].toFixed(5) + "," + p[1].toFixed(5), from = new Map();
+  for (const s of segs) { const k = key(s[0]); if (!from.has(k)) from.set(k, []); from.get(k).push(s); }
+  const corners = [];
+  for (const s of segs) for (const n of from.get(key(s[1])) || []) {
+    const cross = (s[1][0] - s[0][0]) * (n[1][1] - n[0][1]) - (s[1][1] - s[0][1]) * (n[1][0] - n[0][0]);
+    if (Math.abs(cross) > 1e-6 && !corners.some(c => Math.hypot(c[0] - s[1][0], c[1] - s[1][1]) < 1e-6)) corners.push(s[1]);
+  }
+  // loops: join the segments end to end
+  const seen = new Set(); let loops = 0;
+  segs.forEach((s, i) => {
+    if (seen.has(i)) return; loops++;
+    const stack = [i];
+    while (stack.length) { const j = stack.pop(); if (seen.has(j)) continue; seen.add(j);
+      for (const k2 of [key(segs[j][0]), key(segs[j][1])]) segs.forEach((t, m) => { if (!seen.has(m) && (key(t[0]) === k2 || key(t[1]) === k2)) stack.push(m); }); }
+  });
+  return {corners, loops};
+}
+// Lay the seven pieces down one by one, each sharing a stretch of edge with one already down, then keep the
+// shape if it suits the level: no holes, not too big for the board, and (at the hardest level) compact.
+function levelInfo(n) { return [null, {lines: "all"}, {lines: "big"}, {lines: "none"}, {lines: "none", compact: true}][n]; }
+function makePuzzle(level) {
+  const info = levelInfo(level), set = pieceSet(), rnd = n => Math.floor(Math.random() * n);
+  for (let attempt = 0; attempt < 2000; attempt++) {
+    const order = set.map((t, i) => i).sort(() => Math.random() - 0.5), sol = new Array(7), polys = [];
+    const first = order[0];
+    sol[first] = [rnd(8), set[first] === "P" ? rnd(2) : 0, [0, 0, 0, 0]];
+    polys.push(placeX(set[first], sol[first][0], sol[first][1], sol[first][2]));
+    let ok = true;
+    for (let n = 1; n < 7 && ok; n++) {
+      const i = order[n], t = set[i];
+      let placed = false;
+      for (let tries = 0; tries < 60 && !placed; tries++) {
+        const host = polys[rnd(polys.length)], e = rnd(host.length), A = host[e], B = host[(e + 1) % host.length];
+        const k = rnd(8), f = t === "P" ? rnd(2) : 0, shape = placeX(t, k, f, [0, 0, 0, 0]), e2 = rnd(shape.length);
+        const C = shape[e2], D = shape[(e2 + 1) % shape.length];
+        // the new edge C->D must run back along B->A
+        const ab = toXY([B[0] - A[0], B[1] - A[1], B[2] - A[2], B[3] - A[3]]), cd = toXY([D[0] - C[0], D[1] - C[1], D[2] - C[2], D[3] - C[3]]);
+        const lab = Math.hypot(...ab), lcd = Math.hypot(...cd);
+        if (Math.abs(ab[0] / lab + cd[0] / lcd) > 1e-6 || Math.abs(ab[1] / lab + cd[1] / lcd) > 1e-6) continue;
+        // line up one end: C on B, or D on A
+        const [P, Q] = rnd(2) ? [B, C] : [A, D];
+        const o = [P[0] - Q[0], P[1] - Q[1], P[2] - Q[2], P[3] - Q[3]];
+        const poly = placeX(t, k, f, o), xy = poly.map(toXY);
+        if (polys.some(p => overlapArea(xy, p.map(toXY)) > 1e-6)) continue;
+        sol[i] = [k, f, o]; polys.push(poly); placed = true;
+      }
+      ok = placed;
+    }
+    if (!ok) continue;
+    const xy = polys.map(p => p.map(toXY)), all = xy.flat();
+    const minX = Math.min(...all.map(p => p[0])), maxX = Math.max(...all.map(p => p[0])), minY = Math.min(...all.map(p => p[1])), maxY = Math.max(...all.map(p => p[1]));
+    if (maxX - minX > 6.2 || maxY - minY > 5.2) continue;
+    const segs = outlineOf(xy), {corners, loops} = cornersOf(segs);
+    if (loops !== 1) continue;
+    const perim = segs.reduce((s, [a, b]) => s + Math.hypot(b[0] - a[0], b[1] - a[1]), 0);
+    // perimeter² ÷ area: the tangram square scores 16, a long thin shape 40 or more
+    const spread = perim * perim / 8;
+    if (info.compact ? spread > 24 : spread > 34) continue;
+    if (corners.length > 16) continue;
+    // move the shape so its top-left is at (0, 0)
+    const ia = Math.floor(minX), ic = Math.floor(minY);
+    for (const s of sol) { s[2][0] -= ia; s[2][2] -= ic; }
+    return {level, sol: sol.map(([k, f, o]) => [k, f, ...o])};
+  }
+  return null;
+}
+
+/* ---------- game state ---------- */
+const STORE = "catdoku.iffits.v1", MAX_LEVEL = 4;
+const $ = G.$, SET = pieceSet();
+let state = G.load(STORE);
+let settings = Object.assign({level: 1}, state.settings);
+let game = state.game || null, busy = false, sel = -1;
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !busy && !$("overlay").classList.contains("show");
+const LEVELS = [null, "Every piece's place shown", "Big pieces' places shown", "Just the outline", "Chunky outlines"];
+const levelName = n => `Level ${n} · ${LEVELS[n]}`;
+const build = G.builder([pieceSet, baseShape, placeX, toXY, polyArea, clipPoly, overlapArea, outlineOf, cornersOf, levelInfo, makePuzzle], "makePuzzle");
+
+/* ---------- the floor ---------- */
+// The floor is 9 wide: the box to build at the top, and the pieces waiting below it.
+const VW = 9, VH = 11.4, TOP = 6.1;
+// Where each piece waits: the two big ones and the middle one on the first row, the rest below.
+const HOME = [[1.55, 7.45], [4.5, 7.45], [7.45, 7.45], [1.0, 9.95], [2.85, 9.95], [4.75, 9.95], [7.2, 9.95]];
+const shapeXY = (t, k, f, x, y) => placeX(t, k, f, [0, 0, 0, 0]).map(toXY).map(([a, b]) => [a + x, b + y]);
+const polyOf = i => { const p = game.pcs[i]; return shapeXY(SET[i], p.k, p.f, p.x, p.y); };
+const mid = poly => [poly.reduce((s, q) => s + q[0], 0) / poly.length, poly.reduce((s, q) => s + q[1], 0) / poly.length];
+// The answer's pieces, moved so the box sits in the middle of the space above the pieces.
+let target = [], outline = [], corners = [];
+function layOut() {
+  const raw = game.sol.map(([k, f, a, b, c, d], i) => placeX(SET[i], k, f, [a, b, c, d]).map(toXY)), all = raw.flat();
+  const x0 = Math.min(...all.map(p => p[0])), x1 = Math.max(...all.map(p => p[0])), y0 = Math.min(...all.map(p => p[1])), y1 = Math.max(...all.map(p => p[1]));
+  const dx = (VW - (x1 - x0)) / 2 - x0, dy = (TOP - (y1 - y0)) / 2 - y0;
+  target = raw.map(p => p.map(([x, y]) => [x + dx, y + dy]));
+  outline = outlineOf(target); corners = cornersOf(outline).corners;
+}
+// A piece's pose that puts its middle at (cx, cy).
+function poseAt(i, k, f, cx, cy) { const [mx, my] = mid(shapeXY(SET[i], k, f, 0, 0)); return {k, f, x: cx - mx, y: cy - my}; }
+function homePose(i, k, f) { return poseAt(i, k, f, HOME[i][0], HOME[i][1]); }
+
+/* ---------- drawing ---------- */
+// The pieces are flattened cardboard in a few shades, ridged inside, some with a bit of tape. The slanted
+// piece has UP printed on it, so you can see when it's been flipped over.
+const BOARD = [["#D6AB74", "#9E7440"], ["#CB9C63", "#916635"], ["#DDB685", "#A27A48"], ["#C99862", "#8E6534"],
+  ["#D2A570", "#996E3C"], ["#C4925C", "#8A5F30"], ["#D9B07C", "#9F7644"]];
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+const pts = poly => poly.map(p => p.map(v => +v.toFixed(4)).join(",")).join(" ");
+function drawPart(i, g) {
+  const t = SET[i], base = baseShape(t), [fill, edge] = BOARD[i];
+  const defs = el("defs", {}, g), cp = el("clipPath", {id: "clip" + i}, defs);
+  el("polygon", {points: pts(base)}, cp);
+  el("polygon", {points: pts(base), fill, class: "face"}, g);
+  const art = el("g", {"clip-path": `url(#clip${i})`, class: "art"}, g);
+  // ridges running along the first edge
+  let d = ""; for (let y = 0.11; y < 2; y += 0.14) d += `M-1 ${y.toFixed(2)}H3`;
+  el("path", {d, stroke: edge, "stroke-width": 0.018, opacity: 0.35}, art);
+  if (t === "L") el("rect", {x: -0.2, y: 0.42 + 0.3 * (i % 2), width: 3, height: 0.28, fill: "#E9DDB8", opacity: 0.75, transform: "rotate(-45 1 1)"}, art);
+  if (t === "Q") el("rect", {x: 0.36, y: -0.2, width: 0.28, height: 1.4, fill: "#E9DDB8", opacity: 0.75}, art);
+  if (t === "P") {
+    el("path", {d: "M0.92 0.8V0.3M0.79 0.44L0.92 0.3L1.05 0.44", stroke: "#5B3F22", "stroke-width": 0.06, fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round"}, art);
+    const up = el("text", {x: 1.04, y: 0.66, "font-size": 0.26, "font-weight": 800, fill: "#5B3F22", "font-family": "Baloo 2, sans-serif"}, art); up.textContent = "UP";
+  }
+  el("polygon", {points: pts(base), fill: "none", class: "rim", stroke: edge, "stroke-width": 0.05, "stroke-linejoin": "round"}, g);
+}
+// The cat that comes to sit in the finished box is one of Sunbeams' sleeping cats: [picture, length ÷ width].
+const SLEEPERS = [
+  ["c14-36",1.1], ["c16-5",1.11], ["c14-34",1.14], ["c15-6",1.17], ["c14-35",1.19], ["c15-5",1.28],
+  ["c16-3",1.31], ["c16-4",1.44], ["c15-4",1.64], ["c15-2",1.65], ["c14-33",1.86], ["c14-29",1.87],
+  ["c16-2",1.92], ["c14-28",2.1], ["c14-30",2.11], ["c14-31",2.11], ["c14-32",2.27], ["c15-3",2.55],
+  ["c15-36",2.96], ["c16-16",3.0], ["c16-14",3.36], ["c15-33",3.72], ["c15-32",3.78], ["c15-35",3.78],
+  ["c16-13",3.82], ["c16-15",3.93], ["c14-53",4.12], ["c16-1",4.2], ["c14-52",4.29], ["c15-37",4.33],
+  ["c14-55",4.57], ["c14-59",4.62], ["c14-57",4.67], ["c15-1",5.06], ["c14-58",5.32], ["c15-34",5.38]];
+const CAT_DIR = "../cats/", CAT_SRC = window.CAT_SRC || {};   // CAT_SRC can hold embedded pictures, for a copy of the page bundled into one file
+// Where the cat lies: the biggest oval (a sleeping cat's outline, more or less) that fits in the box, lying
+// lengthwise, across or on a slant, then a cat of about that shape, stretched a little to fill it.
+function settleSpot() {
+  const inside = (x, y) => target.some(p => p.every((a, m) => { const b = p[(m + 1) % p.length]; return (b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0]) >= -1e-9; }));
+  const all = target.flat(), xs = all.map(p => p[0]), ys = all.map(p => p[1]);
+  const shapes = [...new Set(SLEEPERS.map(c => Math.round(c[1] * 4) / 4))], RIM = 20;
+  const fits = (cx, cy, ang, ratio, T) => {
+    const c = Math.cos(ang), sn = Math.sin(ang), a = T * ratio / 2 * 0.92, b = T / 2 * 0.92;
+    for (let m = 0; m < RIM; m++) { const u = a * Math.cos(m / RIM * 2 * Math.PI), v = b * Math.sin(m / RIM * 2 * Math.PI); if (!inside(cx + u * c - v * sn, cy + u * sn + v * c)) return false; }
+    return true;
+  };
+  let best = {room: 0};
+  for (let cx = Math.min(...xs) + 0.1; cx < Math.max(...xs); cx += 0.15) for (let cy = Math.min(...ys) + 0.1; cy < Math.max(...ys); cy += 0.15) {
+    if (!inside(cx, cy)) continue;
+    for (const ang of [0, Math.PI / 4, Math.PI / 2, 3 * Math.PI / 4]) for (const ratio of shapes) {
+      // the widest cat of this shape that fits here, if it beats the best so far
+      let lo = Math.sqrt(best.room / ratio), hi = 3;
+      if (!fits(cx, cy, ang, ratio, lo + 0.01)) continue;
+      for (let n = 0; n < 9; n++) { const T = (lo + hi) / 2; if (fits(cx, cy, ang, ratio, T)) lo = T; else hi = T; }
+      if (lo * lo * ratio > best.room) best = {room: lo * lo * ratio, cx, cy, ang, ratio, T: lo};
+    }
+  }
+  const near = SLEEPERS.filter(c => Math.abs(Math.log(c[1] / best.ratio)) < 0.12), pick = near.length ? near : SLEEPERS;
+  const [name, ratio] = pick[Math.floor(Math.random() * pick.length)];
+  const r = Math.min(Math.max(best.ratio, ratio / 1.12), ratio * 1.12), w = Math.min(best.T * best.ratio, best.T * r);
+  return {name, x: best.cx, y: best.cy, w, h: w / r, deg: best.ang * 180 / Math.PI, flip: Math.random() < 0.5 ? -1 : 1};
+}
+let parts = [];
+function draw() {
+  layOut();
+  const svg = $("svg"); svg.innerHTML = ""; svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+  const spot = el("g", {id: "box"}, svg);
+  for (const p of target) el("polygon", {points: pts(p), class: "spotFill"}, spot);
+  el("path", {d: outline.map(([a, b]) => `M${a[0].toFixed(4)} ${a[1].toFixed(4)}L${b[0].toFixed(4)} ${b[1].toFixed(4)}`).join(""), class: "spotEdge"}, spot);
+  const info = levelInfo(game.level);
+  target.forEach((p, i) => { if (info.lines === "all" || (info.lines === "big" && SET[i] === "L")) el("polygon", {points: pts(p), class: "spotLine"}, spot); });
+  el("line", {x1: 0.3, x2: VW - 0.3, y1: TOP + 0.05, y2: TOP + 0.05, class: "trayLine"}, svg);
+  parts = [];
+  for (let i = 0; i < 7; i++) { const g = el("g", {class: "part", "data-i": i}, svg); drawPart(i, g); parts.push(g); }
+  el("polygon", {points: "", class: "hintsq", id: "hintsq", style: "display:none"}, svg);
+  // draw parts in the order they were last touched, so the one you just moved is on top
+  for (const i of game.order) svg.insertBefore(parts[i], $("hintsq"));
+  for (let i = 0; i < 7; i++) place(i);
+  update();
+}
+function place(i) {
+  const p = game.pcs[i];
+  parts[i].setAttribute("transform", `translate(${p.x.toFixed(4)} ${p.y.toFixed(4)}) rotate(${p.k * 45}) scale(${p.f ? -1 : 1} 1)`);
+}
+function toFront(i) {
+  game.order = game.order.filter(j => j !== i).concat(i);
+  $("svg").insertBefore(parts[i], $("hintsq"));
+}
+
+/* ---------- fitting ---------- */
+// A piece fits when it's all inside the box's outline and not on top of another piece; all seven fitting builds the box.
+function fits() {
+  const polys = [0, 1, 2, 3, 4, 5, 6].map(polyOf), ok = [];
+  for (let i = 0; i < 7; i++) {
+    const a = Math.abs(polyArea(polys[i])), inside = target.reduce((s, t) => s + overlapArea(polys[i], t), 0);
+    let on = 0; for (let j = 0; j < 7; j++) if (j !== i) on += overlapArea(polys[i], polys[j]);
+    ok.push(a - inside < 0.02 && on < 0.02);
+  }
+  return ok;
+}
+function update() {
+  const ok = fits(), n = ok.filter(Boolean).length;
+  parts.forEach((g, i) => { g.classList.toggle("in", ok[i]); g.classList.toggle("sel", i === sel); });
+  $("count").textContent = game.won ? "The box is built!" : n === 6 ? "One more piece to go" : `${n} of 7 pieces fit`;
+  $("hintBtn").disabled = game.won;
+  $("undoBtn").disabled = !game.history.length || game.won;
+  $("restartBtn").disabled = !game.history.length || game.won;
+  $("flipBtn").disabled = game.won || sel < 0;
+  return n === 7;
+}
+// Snapping: a corner that ends up near a corner of the box or of another piece jumps onto it; failing that,
+// an edge near an edge of the box or another piece slides flush against it.
+function snap(i) {
+  const me = polyOf(i), pts = [...corners], edges = outline.slice(), info = levelInfo(game.level);
+  target.forEach((p, j) => { if (info.lines === "all" || (info.lines === "big" && SET[j] === "L")) p.forEach((q, m) => { pts.push(q); edges.push([q, p[(m + 1) % p.length]]); }); });
+  for (let j = 0; j < 7; j++) if (j !== i) { const p = polyOf(j); p.forEach((q, m) => { pts.push(q); edges.push([q, p[(m + 1) % p.length]]); }); }
+  let best = null, bd = 0.34;
+  for (const v of me) for (const q of pts) { const d = Math.hypot(q[0] - v[0], q[1] - v[1]); if (d < bd) { bd = d; best = [q[0] - v[0], q[1] - v[1]]; } }
+  if (!best) {
+    bd = 0.22;
+    me.forEach((v, m) => {
+      const w = me[(m + 1) % me.length], ex = w[0] - v[0], ey = w[1] - v[1], el2 = Math.hypot(ex, ey);
+      for (const [A, B] of edges) {
+        const bx = B[0] - A[0], by = B[1] - A[1], bl = Math.hypot(bx, by);
+        if (Math.abs(ex * by - ey * bx) / (el2 * bl) > 1e-3) continue;   // only edges lying the same way
+        const nx = -by / bl, ny = bx / bl, d = (v[0] - A[0]) * nx + (v[1] - A[1]) * ny;
+        // the two edges must overlap along their length
+        const t1 = ((v[0] - A[0]) * bx + (v[1] - A[1]) * by) / bl, t2 = ((w[0] - A[0]) * bx + (w[1] - A[1]) * by) / bl;
+        if (Math.max(t1, t2) < 0.05 || Math.min(t1, t2) > bl - 0.05) continue;
+        if (Math.abs(d) < bd) { bd = Math.abs(d); best = [-d * nx, -d * ny]; }
+      }
+    });
+  }
+  if (best) { game.pcs[i].x += best[0]; game.pcs[i].y += best[1]; }
+}
+// Keep a piece's middle on the board.
+function keepOn(i) {
+  const [cx, cy] = mid(polyOf(i)), p = game.pcs[i];
+  p.x += Math.min(Math.max(cx, 0.35), VW - 0.35) - cx; p.y += Math.min(Math.max(cy, 0.35), VH - 0.35) - cy;
+}
+const snapshot = () => game.pcs.map(p => ({...p}));
+function changed() {
+  for (let i = 0; i < 7; i++) place(i);
+  if (update()) { win(); return; }
+  save();
+}
+
+/* ---------- playing ---------- */
+// Drag a piece to move it; tap it to turn it an eighth of a turn; hold it (or right-click) to turn it back.
+function turn(i, dir, record = true) {
+  if (record) game.history.push(snapshot());
+  const p = game.pcs[i], [cx, cy] = mid(polyOf(i));
+  Object.assign(p, poseAt(i, p.k + dir, p.f, cx, cy)); p.k = ((p.k % 8) + 8) % 8;
+  snap(i); keepOn(i);
+}
+function flip(i) {
+  game.history.push(snapshot());
+  const p = game.pcs[i], [cx, cy] = mid(polyOf(i));
+  Object.assign(p, poseAt(i, p.k, p.f ^ 1, cx, cy));
+  snap(i); keepOn(i);
+}
+const svgPt = e => { const m = $("svg").getScreenCTM().inverse(); return [e.clientX * m.a + e.clientY * m.c + m.e, e.clientX * m.b + e.clientY * m.d + m.f]; };
+let drag = null;
+$("svg").addEventListener("pointerdown", e => {
+  const g = e.target.closest(".part"); if (!g || !playing() || drag) return;
+  e.preventDefault();
+  const i = +g.dataset.i, [x, y] = svgPt(e), before = snapshot();
+  sel = i; toFront(i); game.started = true; update();
+  $("svg").setPointerCapture(e.pointerId);
+  drag = {i, id: e.pointerId, x, y, px: game.pcs[i].x, py: game.pcs[i].y, moved: false, before, held: false,
+    t: setTimeout(() => { if (drag && !drag.moved) { drag.held = true; game.history.push(before); turn(i, -1, false); changed(); } }, 450)};
+});
+$("svg").addEventListener("pointermove", e => {
+  if (!drag || e.pointerId !== drag.id || drag.held) return;
+  const [x, y] = svgPt(e);
+  if (!drag.moved && Math.hypot(x - drag.x, y - drag.y) < 0.12) return;
+  drag.moved = true; clearTimeout(drag.t);
+  const p = game.pcs[drag.i]; p.x = drag.px + x - drag.x; p.y = drag.py + y - drag.y;
+  place(drag.i); parts[drag.i].classList.add("lift");
+});
+function endDrag(e) {
+  if (!drag || e.pointerId !== drag.id) return;
+  const d = drag; drag = null; clearTimeout(d.t); parts[d.i].classList.remove("lift");
+  if (d.held) return;
+  if (d.moved) { game.history.push(d.before); snap(d.i); keepOn(d.i); changed(); }
+  else if (e.type === "pointerup") { turn(d.i, 1); changed(); }
+}
+$("svg").addEventListener("pointerup", endDrag);
+$("svg").addEventListener("pointercancel", endDrag);
+$("svg").addEventListener("contextmenu", e => {
+  e.preventDefault();
+  const g = e.target.closest(".part"); if (!g || !playing()) return;
+  if (drag) { clearTimeout(drag.t); drag = null; }
+  turn(+g.dataset.i, -1); changed();
+});
+$("flipBtn").onclick = () => { if (playing() && sel >= 0) { game.started = true; flip(sel); changed(); } };
+// Keys: Tab picks a piece, arrows nudge it, R or Space turns it (Shift turns it back), F flips it.
+$("svg").addEventListener("keydown", e => {
+  if (!playing() || e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (k === "tab") {   // the next piece; past the last one, Tab leaves the board as usual
+    const to = sel + (e.shiftKey ? -1 : 1);
+    if (to < 0 || to > 6) { sel = -1; update(); return; }
+    sel = to; toFront(sel); update(); e.preventDefault(); return;
+  }
+  if (sel < 0) sel = 0;
+  const step = e.shiftKey ? 0.5 : 0.25, mv = {arrowup: [0, -step], arrowdown: [0, step], arrowleft: [-step, 0], arrowright: [step, 0]}[k];
+  game.started = true;
+  if (mv) { game.history.push(snapshot()); game.pcs[sel].x += mv[0]; game.pcs[sel].y += mv[1]; snap(sel); keepOn(sel); }
+  else if (k === "r" || k === " ") turn(sel, e.shiftKey ? -1 : 1);
+  else if (k === "f") flip(sel);
+  else return;
+  e.preventDefault(); changed();
+});
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
+
+function undo() {
+  if (!playing() || !game.history.length) return;
+  game.undid = true; game.pcs = game.history.pop(); changed();
+}
+$("undoBtn").onclick = undo;
+$("restartBtn").onclick = () => {
+  if (!playing() || !game.history.length) return;
+  game.undid = true; game.history.push(snapshot());
+  game.pcs = game.start.map(p => ({...p})); sel = -1; changed();
+  G.note("Every piece is back where it started. Undo brings your moves back.", 4000);
+};
+// Hint: a gold outline shows where one piece goes, and that piece is outlined in gold too; you move it there.
+// A hint keeps you on the same level and costs the gold paw.
+const near = (a, b) => a.length === b.length && a.every(p => b.some(q => Math.hypot(p[0] - q[0], p[1] - q[1]) < 0.05));
+let hintTimer = null;
+$("hintBtn").onclick = () => {
+  if (!playing()) return;
+  const polys = [0, 1, 2, 3, 4, 5, 6].map(polyOf);
+  const open = target.map((t, j) => j).filter(j => !polys.some((p, i) => SET[i] === SET[j] && near(p, target[j])));
+  if (!open.length) return;
+  // a place next to pieces already in place, if there is one
+  const done = target.filter((t, j) => !open.includes(j)), byDone = open.filter(j => done.some(t => outlineOf([t, target[j]]).length < t.length + target[j].length));
+  const pool = byDone.length ? byDone : open, j = pool[Math.floor(Math.random() * pool.length)];
+  const i = [0, 1, 2, 3, 4, 5, 6].find(i => SET[i] === SET[j] && !target.some(t => near(polys[i], t)));
+  game.hinted = true; game.started = true; sel = i; toFront(i); update(); save();
+  const box = $("hintsq"); box.setAttribute("points", pts(target[j])); box.style.display = "";
+  parts.forEach((g, m) => g.classList.toggle("hinted", m === i));
+  const inWay = polys.some((p, m) => m !== i && overlapArea(p, target[j]) > 0.02);
+  G.note(`The gold ${PIECENAME[i]} goes in the gold outline${inWay ? ", once what's in the way is moved" : ""}.`, 6000);
+  const g = game;
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(() => { if (game === g) { box.style.display = "none"; parts.forEach(p => p.classList.remove("hinted")); } }, 6000);
+};
+const PIECENAME = ["big triangle", "big triangle", "middle triangle", "small triangle", "small triangle", "square", "slanted piece"];
+
+/* ---------- endings ---------- */
+function win() {
+  game.won = true; G.finishClock(game); sel = -1;
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save();
+  update();
+  G.track(`If It Fits solved level ${game.level}`);
+  build.prefetch(next);
+  const g = game; busy = true;
+  sitCat(true, () => { busy = false; if (game === g) finishCard(); });
+}
+// A cat comes along, sees the box, hops in and curls up in its roomiest part.
+function sitCat(walk, then) {
+  if (!game.sitter) { game.sitter = settleSpot(); save(); }
+  const c = game.sitter, cat = el("g", {class: "sitter"}, $("svg")), lie = el("g", {transform: `rotate(${c.deg.toFixed(1)}) scale(${c.flip} 1)`}, cat);
+  el("image", {href: CAT_SRC[c.name] || CAT_DIR + c.name + ".webp", x: -c.w / 2, y: -c.h / 2, width: c.w, height: c.h, preserveAspectRatio: "none", class: "breath"}, lie);
+  const pose = (dy, sc, op) => { cat.setAttribute("transform", `translate(${c.x.toFixed(3)} ${(c.y + dy).toFixed(3)}) scale(${sc.toFixed(3)})`); cat.setAttribute("opacity", op.toFixed(2)); };
+  if (!walk || matchMedia("(prefers-reduced-motion: reduce)").matches) { pose(0, 1, 1); cat.classList.add("settled"); setTimeout(then, walk ? 900 : 0); return; }
+  const t0 = performance.now(), g = game, HOP = 700;
+  (function frame(now) {
+    if (game !== g) { cat.remove(); return; }
+    const f = Math.min(1, (now - t0) / HOP);
+    // dropping in from above, landing with a little squash
+    pose(-1.6 * (1 - f) * (1 - f), f < 0.85 ? 1.12 - 0.12 * f : 1 + Math.sin((f - 0.85) / 0.15 * Math.PI) * 0.04, Math.min(1, f * 3));
+    if (f < 1) requestAnimationFrame(frame); else { cat.classList.add("settled"); setTimeout(then, 800); }
+  })(t0);
+}
+function finishCard() {
+  const next = settings.level;
+  let text = "The box is built, and a cat came by. It fits, so it sits.";
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my box", game.result,
+    {title: "It fits, so it sits!", gold: !game.undid && !game.hinted, goldWhy: "No hints or undos!", next: `Next: level ${next}`, after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- a new box ---------- */
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
+// The pieces start in a muddle: each turned some way it isn't in the answer, waiting below the box.
+function begin(p, level, start) {
+  const rnd = n => Math.floor(Math.random() * n);
+  start = start || p.sol.map(([k, f], i) => {
+    let k2, f2 = SET[i] === "P" ? rnd(2) : 0;
+    do k2 = SET[i] === "L" ? 2 * rnd(4) : rnd(8); while (k2 === k && f2 === f);
+    return homePose(i, k2, f2);
+  });
+  game = {level, sol: p.sol, start: start.map(q => ({...q})), pcs: start.map(q => ({...q})), order: [0, 1, 2, 3, 4, 5, 6], history: [], won: false, ...G.freshClock()};
+  sel = -1;
+}
+async function newPuzzle() {
+  if (busy) return;
+  busy = true;
+  const n = settings.level;
+  G.openCard("Drawing a box…", "", []);
+  const p = await build.take(n);
+  begin(p, n);
+  busy = false; G.closeCard(); G.note("");
+  draw(); save();
+  build.prefetch(n);
+  G.track(`If It Fits new puzzle level ${n}`);
+}
+
+/* ---------- sharing ---------- */
+// The answer as each piece's turn, flip and exact place; with progress, where each piece is now.
+$("shareBtn").onclick = () => { if (game && !busy) G.shareCard({name: "If It Fits", won: game.won,
+  puzzle: () => ({g: "iffits", N: game.level, s: game.sol.map(q => q.join(".")).join("_")}),
+  progress: () => game.pcs.map(q => [q.k, q.f, q.x.toFixed(3), q.y.toFixed(3)].join(".")).join("_")}); };
+function openShared(d) {
+  const sol = typeof d.s === "string" ? d.s.split("_").map(q => q.split(".").map(Number)) : null;
+  const ok = sol && sol.length === 7 && sol.every(q => q.length === 6 && q.every(Number.isInteger) && q[0] >= 0 && q[0] < 8 && (q[1] === 0 || q[1] === 1) && q.slice(2).every(v => Math.abs(v) < 40));
+  if (!ok || !levelInfo(d.N)) { G.note("That share link didn't work.", 5000); return; }
+  const polys = sol.map(([k, f, a, b, c, e], i) => placeX(SET[i], k, f, [a, b, c, e]).map(toXY));
+  if (polys.some((p, i) => polys.some((q, j) => j > i && overlapArea(p, q) > 1e-6))) { G.note("That share link didn't work.", 5000); return; }
+  begin({sol}, d.N);
+  if (typeof d.p === "string") {
+    const parts = d.p.split("_").map(q => { const m = q.match(/^([0-7])\.([01])\.(-?\d+(?:\.\d+)?)\.(-?\d+(?:\.\d+)?)$/); return m && {k: +m[1], f: +m[2], x: +m[3], y: +m[4]}; });
+    if (parts.length === 7 && parts.every(Boolean)) { game.pcs = parts; game.timed = false; }
+  }
+  settings.level = d.N; $("levelSel").value = d.N;
+  draw(); save(); build.prefetch(d.N);
+  if (d.p && fits().every(Boolean)) win();
+}
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  settings.seenHelp = false; helpOnFirstVisit();
+  if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
+}
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || !playing() || document.querySelector(".spot")) return;
+  // a piece still waiting below, to show moving and turning
+  const one = [5, 2, 0, 1, 3, 4, 6].find(i => !fits()[i]) ?? 5;
+  const steps = [
+    {say: "Build this box from the seven pieces of cardboard 📦", els: [$("box")]},
+    {say: "Drag a piece to move it", els: [() => parts[one]]},
+    {say: "Tap a piece to turn it. Hold it to turn it back", els: [() => parts[one]]},
+    {say: "Flip turns over the last piece you touched. It only matters for the slanted one: see UP printed on it?", els: [$("flipBtn"), () => parts[6]]},
+    {say: "Pieces snap into place against the edge of the box and against each other", els: [$("box")]},
+    {say: "Fill the whole outline, with no piece sticking out or on top of another, and a cat will come to sit in it 🐈", els: [$("box")], tone: "ok"},
+    {say: "Stuck? Hint outlines a piece and the place it goes in gold", els: [$("hintBtn")]},
+  ];
+  G.spotlight({grid: $("grid"), w: 1, h: 1, steps, done: () => { settings.seenHelp = true; save(); }});
+}
+
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", "") + (n === MAX_LEVEL ? " (hardest)" : ""), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
+$("helpBtn").onclick = showHelp;
+
+G.nav("iffits");
+G.checkClock(game);
+G.setupTimer({name: "iffits", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+const shared = G.readShare("iffits");
+if (game && Array.isArray(game.sol) && Array.isArray(game.pcs)) G.reopen(() => {
+    if (!levelInfo(game.level) || game.sol.length !== 7 || game.pcs.length !== 7) throw new Error("the saved pieces don't fit their level");
+    if (!Array.isArray(game.order) || game.order.length !== 7) game.order = [0, 1, 2, 3, 4, 5, 6];
+    draw();
+    if (game.won) { sitCat(false, () => {}); finishCard(); }
+    build.prefetch(settings.level); helpOnFirstVisit();
+  }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
+else if (!shared) newPuzzle().then(helpOnFirstVisit);
+const shareOpts = () => ({name: "If It Fits", inProgress: !!(game && !game.won && game.history.length), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, shareOpts());
+window.addEventListener("hashchange", () => { const d = G.readShare("iffits"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
