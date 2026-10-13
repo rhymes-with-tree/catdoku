@@ -41,7 +41,6 @@ Rows are sorted by group, then status: Yes, Look closer, Option, Idea, Built, No
 | Masyu (Pearl) | Lines and connections | Draw a loop through every pearl; it turns on black pearls and goes straight through white ones | None | Medium | — | Tatham | Idea | |
 | Tracks | Lines and connections | Lay one train track between two stations to match row and column counts | None | Medium | Tunnel Run | Tatham | Idea | |
 | Signpost | Lines and connections | Link the squares into one numbered path where each square's arrow points to the next | None | Medium | Yarn | Tatham | Idea | |
-| Zoomies | Lines and connections | Run through every room without using a doorway twice, against the clock | None | Easy | Unravel | Fair Play chat | Idea | Unravel's generator could make the houses |
 | Laser Pointer | Lines and connections | Turn mirrors so a laser dot visits every cat, maybe in a set order | None | Easy | Tunnel Run | Idea list, Bubbles and Game Suite chats | Idea | Named in three places. Light tracing is new to the suite, and it's easy to check a puzzle has one solution |
 | Yarn (Zip) | Lines and connections | One strand through every square, balls of yarn in order | — | — | — | Catdoku setup chat | Built | |
 | Catwalk (Bridges) | Lines and connections | Link cat-tower perches with catwalks to match their numbers | — | — | — | Game Suite chat, Tatham | Built | |
@@ -81,20 +80,19 @@ Rows are sorted by group, then status: Yes, Look closer, Option, Idea, Built, No
 | Border ladder | Geography | Get from one country to another through shared borders | None | Medium | — | Word Dictionaries chat | Idea | Recommended first in that chat; needs a saved list of borders |
 | Hidden cat in a painting (Cat Burglar) | Seeking | Find a cat hidden in a famous painting | None | Hard | — | Word Dictionaries chat | Idea | Waiting on where the images come from |
 | Spot the Difference | Seeking | Find the changes between two pictures | None | — | — | GoComics | No | Never |
-| Switch Spots | Colour | Flip dots until all their colours match in as few moves as you can; arrows set what each flip does | None | Easy | Night Light | GoComics | Yes | Keep Night Light's theme and look |
 | Flood | Colour | Change the corner's colour to flood the board one colour within a set number of moves | None | Easy | — | Tatham | Idea | |
-| Minimum-colours map | Colour | Colour a map with as few colours as you can | None | Easy | Patches | Word Dictionaries and Kakuro chats | Idea | |
 | Kaleidocat (Colorscope-style) | Colour | Rebuild a target pattern from a few mirrored pieces whose overlapping colours blend | None | Medium | Pawlette | Possible suites | Idea | The saved name Kaleidocat could fit |
+| Night Light Arrows mode (Switch Spots) | Colour | Put every cat to sleep in the fewest taps; each cat's own arrows say which others blink with it | — | — | — | GoComics | Built | A mode in Night Light |
 | Pawlette | Colour | Mix colours like paint; Swipe mode clears lines | — | — | — | Game Suite chat | Built | |
 | Bed Hog (Klotski, Rush Hour) | Moving and planning | Slide sprawled cats around the bed until there's room for the human | None | Medium | Knock It Off | Fair Play chat, idea list | Idea | Once ruled out; reconsider. You play Klotski |
 | Warm Seat | Moving and planning | When someone gets up, plan which cat slides where to take the warm seat | None | Medium | Bed Hog | Fair Play chat | Idea | |
 | Special Delivery | Moving and planning | Carry each gift to the right person's shoes by the shortest route, avoiding the dog | None | Medium | Knock It Off | Fair Play chat | Idea | |
 | Ribbon pick-up sticks | Moving and planning | Pull only a ribbon with nothing on top of it | None | Medium | Twirl | Merge-3 chat | Idea | |
 | Fifteen, Sixteen, Twiddle | Moving and planning | Put numbered tiles in order: slide one into the gap, shift whole rows and columns, or turn 2×2 blocks | None | Easy | — | Tatham | Idea | |
-| Netslide | Moving and planning | Tunnel Run, but you slide whole rows and columns instead of turning pieces | None | Easy | Tunnel Run | Tatham | Idea | |
 | Inertia | Moving and planning | Steer a ball that rolls until it hits something; collect every gem and avoid the mines | None | Medium | Tail Chase | Tatham | Idea | |
 | Cube | Moving and planning | Roll a cube around a grid to pick up every blue square on its faces | None | Medium | — | Tatham | Idea | |
 | Peg solitaire (Pegs) | Moving and planning | Jump pegs over each other until one is left | None | Easy | — | Tatham | Idea | |
+| Tunnel Run Slide mode (Netslide) | Moving and planning | Tunnel Run, but you slide whole rows and columns instead of turning pieces | — | — | — | Tatham | Built | A mode in Tunnel Run |
 | Knock It Off | Moving and planning | Push things off the table without knocking off your food bowl | — | — | — | Game Suite chat | Built | |
 | Twirl | Moving and planning | Slide ribbons off the mat when nothing is in the way | — | — | — | Merge-3 chat | Built | |
 | Tangle (Untangle) | Moving and planning | Drag balls of yarn until no strands cross; this was the "Untie the rope" idea | — | — | — | Game Suite chat, Tatham | Built | |
