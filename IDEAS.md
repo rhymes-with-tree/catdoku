@@ -82,7 +82,7 @@ Rows are sorted by group, then status: Yes, Look closer, Option, Idea, Built, No
 | Spot the Difference | Seeking | Find the changes between two pictures | None | — | — | GoComics | No | Never |
 | Flood | Colour | Change the corner's colour to flood the board one colour within a set number of moves | None | Easy | — | Tatham | Idea | |
 | Kaleidocat (Colorscope-style) | Colour | Rebuild a target pattern from a few mirrored pieces whose overlapping colours blend | None | Medium | Pawlette | Possible suites | Idea | The saved name Kaleidocat could fit |
-| Night Light Arrows mode (Switch Spots) | Colour | Put every cat to sleep in the fewest taps; each cat's own arrows say which others blink with it | — | — | — | GoComics | Built | A mode in Night Light |
+| Night Light arrows (Switch Spots) | Colour | Put every cat to sleep in the fewest taps; each cat's arrows say which others blink with it | — | — | — | GoComics | Built | From level 3 of Night Light, some cats point their own way |
 | Pawlette | Colour | Mix colours like paint; Swipe mode clears lines | — | — | — | Game Suite chat | Built | |
 | Bed Hog (Klotski, Rush Hour) | Moving and planning | Slide sprawled cats around the bed until there's room for the human | None | Medium | Knock It Off | Fair Play chat, idea list | Idea | Once ruled out; reconsider. You play Klotski |
 | Warm Seat | Moving and planning | When someone gets up, plan which cat slides where to take the warm seat | None | Medium | Bed Hog | Fair Play chat | Idea | |
@@ -92,7 +92,7 @@ Rows are sorted by group, then status: Yes, Look closer, Option, Idea, Built, No
 | Inertia | Moving and planning | Steer a ball that rolls until it hits something; collect every gem and avoid the mines | None | Medium | Tail Chase | Tatham | Idea | |
 | Cube | Moving and planning | Roll a cube around a grid to pick up every blue square on its faces | None | Medium | — | Tatham | Idea | |
 | Peg solitaire (Pegs) | Moving and planning | Jump pegs over each other until one is left | None | Easy | — | Tatham | Idea | |
-| Tunnel Run Slide mode (Netslide) | Moving and planning | Tunnel Run, but you slide whole rows and columns instead of turning pieces | — | — | — | Tatham | Built | A mode in Tunnel Run |
+| Tunnel Run sliding tracks (Netslide) | Moving and planning | Tunnel Run, but some rows and columns slide instead of their pieces turning; on the top levels everything slides | — | — | — | Tatham | Built | Levels 4–10 of Tunnel Run |
 | Knock It Off | Moving and planning | Push things off the table without knocking off your food bowl | — | — | — | Game Suite chat | Built | |
 | Twirl | Moving and planning | Slide ribbons off the mat when nothing is in the way | — | — | — | Merge-3 chat | Built | |
 | Tangle (Untangle) | Moving and planning | Drag balls of yarn until no strands cross; this was the "Untie the rope" idea | — | — | — | Game Suite chat, Tatham | Built | |

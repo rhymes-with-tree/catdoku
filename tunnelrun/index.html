@@ -34,7 +34,6 @@
 .rug .grid{position:absolute;inset:0}
 .rug svg{display:block;width:100%;height:100%;outline:none}
 .piece{cursor:pointer;transform-box:view-box;transition:transform .16s ease-out}
-.piece.fixed{cursor:default}
 .tube{stroke:var(--off);transition:stroke .2s}
 .hub{fill:var(--off);transition:fill .2s}
 .ring{stroke:transparent;transition:stroke .2s}
@@ -49,13 +48,15 @@
 @keyframes glow{to{stroke-opacity:.35}}
 .cursor{fill:none;stroke:#73A7AE;stroke-width:6;pointer-events:none}
 .cat{font-size:54px;pointer-events:none}
-/* Slide mode: arrows round the rug slide each row and column, and dragging a line slides it too */
-.rug.slide,.rug.slide svg{touch-action:none}
-.rug.slide .piece{cursor:grab}
+/* Sliding tracks: striped grooves across the rug, with arrows round the edge; drag a track or tap an arrow */
+.rug.tracks,.rug.tracks svg{touch-action:none}
+.floor{fill:#E8DCC4;stroke:#CDBC9C;stroke-width:3}
+.groove{fill:#D8C6A2;stroke:#BBA57C;stroke-width:2;stroke-dasharray:10 8}
+.spin{transform-box:fill-box;transform-origin:center;transition:transform .16s ease-out}
 .slider{cursor:pointer}
 .slider path{fill:var(--edge);opacity:.4;transition:opacity .15s}
 .slider:hover path{opacity:.8}
-@media (prefers-reduced-motion:reduce){.piece,.tube,.hub,.ring{transition:none}.hintbox,.lost .tube{animation:none}.lost .tube{stroke:#E16A4A}}
+@media (prefers-reduced-motion:reduce){.piece,.spin,.tube,.hub,.ring{transition:none}.hintbox,.lost .tube{animation:none}.lost .tube{stroke:#E16A4A}}
 </style>
 </head>
 <body>
@@ -80,9 +81,6 @@
     <label>Level <select id="levelSel" aria-label="Level"></select></label>
     <button id="newBtn" class="primary">New tunnels</button>
   </div>
-  <div class="bar toggles">
-    <div class="opt"><label>Mode <select id="modeSel" aria-label="Mode"><option value="turn">Turn</option><option value="slide">Slide</option></select></label><span class="hint">Turn spins one piece; Slide moves a whole row or column</span></div>
-  </div>
 
 </main>
 
@@ -91,7 +89,15 @@
 /* ---------- tunnel networks (plain functions, also run in a background worker) ---------- */
 // A piece's tunnels are a 4-bit mask of the sides they open onto: 1 up, 2 right, 4 down, 8 left.
 // Every network is a tree grown from the bed in the middle, so it joins every piece with no loops.
-function levelSize(n) { return [null, 5, 6, 7, 8, 9, 10, 11][n]; }
+// Levels: the rug's size, and its sliding tracks. Pieces on a track already lie the right way and can't be
+// turned, but the whole row or column slides round (what slides off one end comes back on the other). Levels
+// 1–3 have no tracks, 4–8 a few (never through the bed), and on 9 and 10 every row and column slides and
+// nothing turns, after S slides.
+function levelSpec(n) {
+  return [null, {N: 5, rows: 0, cols: 0}, {N: 6, rows: 0, cols: 0}, {N: 7, rows: 0, cols: 0}, {N: 6, rows: 1, cols: 0},
+    {N: 6, rows: 1, cols: 1}, {N: 7, rows: 2, cols: 1}, {N: 8, rows: 2, cols: 2}, {N: 8, rows: 3, cols: 2},
+    {N: 6, all: true, S: 4}, {N: 7, all: true, S: 6}][n];
+}
 function rot(m) { return ((m << 1) | (m >> 3)) & 15; }   // a quarter turn clockwise
 function opp(d) { return ((d << 2) | (d >> 2)) & 15; }   // the side facing it
 function bits(m) { return (m & 1) + (m >> 1 & 1) + (m >> 2 & 1) + (m >> 3 & 1); }
@@ -125,14 +131,16 @@ function growTree(N) {
   }
 }
 
-// Find the answers to a set of pieces, stopping at `limit`. The bed's piece (fixed, if given) never turns.
+// Find the answers to a set of pieces, stopping at `limit`. Pieces listed in `fixed` (the bed's, and any on a
+// track) never turn.
 // Each piece keeps a set of ways it could lie; a side every way opens (or none does) settles the neighbour's
 // side too. Then: no loop among the tunnels that are certain, everything still able to join up, and two dead
 // ends never face each other (they'd be cut off). Where that runs out, try each way for the most settled piece.
 function solveNet(N, pieces, limit, fixed) {
-  const n = N * N, dom = new Array(n), D = [1, 2, 4, 8];
+  const n = N * N, dom = new Array(n), D = [1, 2, 4, 8], isFixed = new Uint8Array(n);
+  for (const i of [].concat(fixed)) isFixed[i] = 1;
   for (let i = 0; i < n; i++) {
-    let s = i === fixed ? 1 << pieces[i] : turnsOf(pieces[i]);
+    let s = isFixed[i] ? 1 << pieces[i] : turnsOf(pieces[i]);
     for (let m = 0; m < 16; m++) if (s >> m & 1) {
       for (const d of D) if ((m & d) && nbr(N, i, d) < 0) { s &= ~(1 << m); break; }
       if (bits(pieces[i]) === 1 && n > 2) { const j = nbr(N, i, m); if (j >= 0 && bits(pieces[j]) === 1) s &= ~(1 << m); }
@@ -207,14 +215,14 @@ function reroute(N, tree, i) {
   t[c] |= e; t[k] |= opp(e);
   return t;
 }
-// A network with exactly one answer: while a second answer turns up, re-route a tunnel where the two differ.
-function makePuzzle(level) {
-  const N = levelSize(level), bed = (N >> 1) * N + (N >> 1);
+// A network whose turning pieces have exactly one answer: while a second answer turns up, re-route a tunnel
+// where the two differ.
+function makeTree(N, fixed) {
   for (;;) {
     let tree = growTree(N);
     for (let tries = 0; tries < 400; tries++) {
-      const sols = solveNet(N, tree, 2, bed);
-      if (sols.length === 1) return {N, sol: tree};
+      const sols = solveNet(N, tree, 2, fixed);
+      if (sols.length === 1) return tree;
       const diff = [];
       for (let i = 0; i < N * N; i++) if (sols[0][i] !== sols[1][i]) diff.push(i);
       tree = reroute(N, tree, diff[Math.floor(Math.random() * diff.length)]) || tree;
@@ -222,9 +230,6 @@ function makePuzzle(level) {
   }
 }
 
-// Slide mode (Netslide): every piece already lies the right way, but whole rows and columns have been slid
-// round, wrapping at the ends. Levels: [size, slides].
-function slideLevel(n) { return [null, [4, 2], [4, 3], [5, 3], [5, 4], [6, 4], [6, 5], [7, 6]][n]; }
 // A slide is [axis, line, k]: axis 0 slides row `line` k squares right, axis 1 slides column `line` k squares down.
 // `pos` lists which piece (by its square in the answer) is on each square.
 function applySlide(N, pos, m) {
@@ -248,143 +253,146 @@ function addSlide(N, trail, m) {
   return t;
 }
 function posOf(N, trail) { let pos = [...Array(N * N).keys()]; for (const m of trail) pos = applySlide(N, pos, m); return pos; }
-function allSlides(N) { const out = []; for (let a = 0; a < 2; a++) for (let l = 0; l < N; l++) for (let k = 1; k < N; k++) out.push([a, l, k]); return out; }
+// Every slide of the tracks.
+function slidesOn(N, rows, cols) {
+  const out = [];
+  for (const [a, ls] of [[0, rows], [1, cols]]) for (const l of ls) for (let k = 1; k < N; k++) out.push([a, l, k]);
+  return out;
+}
 // The first slide of a way to put `masks` (the tunnels on each square) back as `goal` in at most two slides, or null.
-function shortcut(N, masks, goal) {
-  const same = a => a.every((v, i) => v === goal[i]), moves = allSlides(N);
+function shortcut(N, masks, goal, moves) {
+  const same = a => a.every((v, i) => v === goal[i]);
   for (const m of moves) if (same(applySlide(N, masks, m))) return m;
   for (const m of moves) { const b = applySlide(N, masks, m); for (const m2 of moves) if (same(applySlide(N, b, m2))) return m; }
   return null;
 }
-// A network slid about the level's number of times. Every slide changes how the rug looks, and none of the
-// rugs can be put back in fewer than two slides less than were made (or in one, on the smallest levels).
-function makeSlide(n) {
-  const [N, S] = slideLevel(n), sol = growTree(N), moves = allSlides(N);
-  let trail = [], tries = 0;
-  const look = t => posOf(N, t).map(p => sol[p]);
-  while (trail.length < S && tries++ < 200) {
-    const m = moves[Math.floor(Math.random() * moves.length)], t = addSlide(N, trail, m);
-    if (t.length <= trail.length) continue;
-    const before = look(trail), after = look(t);
-    if (after.every((v, i) => v === before[i])) continue;
-    trail = t;
+// A rug for level n: {N, sol (the answer), rows and cols (the tracks), turns (quarter turns each piece starts
+// away from its answer), trail (the slides that muddled the tracks)}.
+// With tracks: pick them away from the bed, make a network whose turning pieces have one answer, turn every
+// one of those away from it, and slide each track once (so the rug looks different). With every line sliding:
+// slide it S times, each slide changing how the rug looks, and keep it only if it can't be put back in fewer
+// than two slides less.
+function makeRug(n) {
+  const spec = levelSpec(n), N = spec.N, bed = (N >> 1) * N + (N >> 1), mid = N >> 1;
+  const pick = k => { const ls = [...Array(N).keys()].filter(l => l !== mid); const out = []; while (out.length < k) out.push(ls.splice(Math.floor(Math.random() * ls.length), 1)[0]); return out.sort((a, b) => a - b); };
+  const rows = spec.all ? [...Array(N).keys()] : pick(spec.rows), cols = spec.all ? [...Array(N).keys()] : pick(spec.cols);
+  const onTrack = i => rows.includes(Math.floor(i / N)) || cols.includes(i % N);
+  const sol = spec.all ? growTree(N) : makeTree(N, [...Array(N * N).keys()].filter(i => i === bed || onTrack(i)));
+  const turns = sol.map((m, i) => {
+    if (i === bed || onTrack(i)) return 0;
+    const ks = [1, 2, 3].filter(k => { let r = m; for (let j = 0; j < k; j++) r = rot(r); return r !== m; });
+    return ks[Math.floor(Math.random() * ks.length)];
+  });
+  const look = t => posOf(N, t).map(p => sol[p]), moves = slidesOn(N, rows, cols);
+  let trail = [];
+  if (spec.all) {
+    let tries = 0;
+    while (trail.length < spec.S && tries++ < 200) {
+      const m = moves[Math.floor(Math.random() * moves.length)], t = addSlide(N, trail, m);
+      if (t.length <= trail.length || look(t).join() === look(trail).join()) continue;
+      trail = t;
+    }
+    if (trail.length < spec.S) return null;
+  } else {
+    const lines = [...rows.map(l => [0, l]), ...cols.map(l => [1, l])].sort(() => Math.random() - 0.5);
+    for (const [a, l] of lines) {
+      const ks = [...Array(N - 1).keys()].map(k => k + 1).sort(() => Math.random() - 0.5);
+      const k = ks.find(k => look(addSlide(N, trail, [a, l, k])).join() !== look(trail).join());
+      if (!k) return null;
+      trail = addSlide(N, trail, [a, l, k]);
+    }
   }
-  if (trail.length < S) return null;
   const masks = look(trail);
-  if (masks.every((v, i) => v === sol[i])) return null;
-  if (S > 2 && shortcut(N, masks, sol)) return null;
-  for (const m of moves) if (applySlide(N, masks, m).every((v, i) => v === sol[i])) return null;
-  return {N, sol, trail};
+  if (moves.length && masks.every((v, i) => v === sol[i])) return null;
+  if (spec.all && spec.S > 2 && shortcut(N, masks, sol, moves)) return null;
+  return {N, sol, rows, cols, turns, trail};
 }
-// Levels 1–7 are Turn mode, 11–17 Slide mode.
-function makeAny(code) { return code > 10 ? makeSlide(code - 10) : makePuzzle(code); }
 
 /* ---------- game state ---------- */
-// Levels are numbered 1–7 in Turn mode and 11–17 in Slide mode, so best times, share links and the
-// puzzle maker keep the two apart.
-const STORE = "catdoku.tunnelrun.v1", MAX_LEVEL = 7;
+// game: {level, N, sol (the answer), rows and cols (the tracks), turns (quarter turns clockwise each piece lies
+//        from its answer, by the piece's square in the answer), trail (the slides from the answer to now),
+//        pos (which piece is on each square, worked out from trail), start {turns, trail}, history, won…}
+const STORE = "catdoku.tunnelrun.v1", MAX_LEVEL = 10;
 const $ = G.$;
 let state = G.load(STORE);
-let settings = Object.assign({level: 1, otherLevel: 11}, state.settings);
-// game: the rug out now; parked: the other mode's rug, kept for switching back.
-let game = state.game || null, parked = state.parked || null, busy = false, running = false, hinting = false, cursor = -1;
-const save = () => G.save(STORE, {settings, game, parked});
+let settings = Object.assign({level: 1}, state.settings);
+let game = state.game || null, busy = false, running = false, hinting = false, cursor = -1;
+const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
-const isSlide = code => code > 10;
-const sizeOf = code => isSlide(code) ? slideLevel(code - 10)[0] : levelSize(code);
-const okLevel = code => { const n = isSlide(code) ? code - 10 : code; return n >= 1 && n <= MAX_LEVEL; };
-const levelName = code => { const N = sizeOf(code); return `${isSlide(code) ? "Slide level" : "Level"} ${isSlide(code) ? code - 10 : code} · ${N} × ${N}`; };
-const build = G.builder([levelSize, rot, opp, bits, nbr, turnsOf, growTree, solveNet, reroute, makePuzzle,
-  slideLevel, applySlide, addSlide, posOf, allSlides, shortcut, makeSlide, makeAny], "makeAny");
+const tracksOf = n => { const s = levelSpec(n); return s.all ? "all slide" : s.rows + s.cols ? `${s.rows + s.cols} track${s.rows + s.cols > 1 ? "s" : ""}` : ""; };
+const levelName = n => { const N = levelSpec(n).N, t = tracksOf(n); return `Level ${n} · ${N} × ${N}${t ? ", " + t : ""}`; };
+const build = G.builder([levelSpec, rot, opp, bits, nbr, turnsOf, growTree, solveNet, reroute, makeTree,
+  applySlide, addSlide, posOf, slidesOn, shortcut, makeRug], "makeRug");
 const bedOf = N => (N >> 1) * N + (N >> 1);
 const rotN = (m, k) => { for (k = ((k % 4) + 4) % 4; k > 0; k--) m = rot(m); return m; };
-const sliding = () => game && game.mode === "slide";
-// How a piece lies now: in Turn mode its answer turned a quarter turn clockwise game.turns[i] times; in Slide
-// mode the piece that's been slid onto square i.
-const cur = i => sliding() ? game.sol[game.pos[i]] : rotN(game.sol[i], game.turns[i]);
-// The square the bed is on (it slides with its row and column in Slide mode).
-const bedAt = () => sliding() ? game.pos.indexOf(bedOf(game.N)) : bedOf(game.N);
+const hasTracks = () => game.rows.length + game.cols.length > 0;
+const onTrack = i => game.rows.includes(Math.floor(i / game.N)) || game.cols.includes(i % game.N);
+const allSlide = () => game.rows.length === game.N && game.cols.length === game.N;
+// How a piece lies now: the piece on square i, turned from its answer.
+const cur = i => { const p = game.pos[i]; return rotN(game.sol[p], game.turns[p]); };
+const bedAt = () => game.pos.indexOf(bedOf(game.N));
+const turnable = i => !onTrack(i) && i !== bedAt();
 
 /* ---------- drawing ---------- */
-// Each piece is drawn the way its answer lies and turned as a whole, so turning it animates.
-// `angle` keeps adding up, so a piece always turns the way it was tapped.
-// In Slide mode each piece is drawn at the top left and moved to its square, and arrows round the edge slide
-// each row and column.
-const NS = "http://www.w3.org/2000/svg", M = 44;   // M: the strip round the rug for the arrows
+// Each piece is drawn the way its answer lies, at the top left, then moved to its square and turned as a
+// whole, so turning and sliding animate. `angle` keeps adding up, so a piece always turns the way it was tapped.
+// With tracks, a strip round the rug holds an arrow at each end of every track.
+const NS = "http://www.w3.org/2000/svg", M = 44;
 const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
-let pieces = [], angle = [];
-function drawPiece(g, x, y, m) {
-  const cx = x + 50, cy = y + 50;
-  el("rect", {x, y, width: 100, height: 100, fill: "transparent"}, g);
-  const path = [1, 2, 4, 8].filter(d => m & d).map(d => `M${cx} ${cy}L${d === 2 ? x + 100 : d === 8 ? x : cx} ${d === 1 ? y : d === 4 ? y + 100 : cy}`).join("");
-  el("circle", {cx, cy, r: 24, class: "edgehub"}, g);
+let pieces = [], spins = [], angle = [], placed = [];
+function drawPiece(g, m) {
+  el("rect", {x: 0, y: 0, width: 100, height: 100, fill: "transparent"}, g);
+  const path = [1, 2, 4, 8].filter(d => m & d).map(d => `M50 50L${d === 2 ? 100 : d === 8 ? 0 : 50} ${d === 1 ? 0 : d === 4 ? 100 : 50}`).join("");
+  el("circle", {cx: 50, cy: 50, r: 24, class: "edgehub"}, g);
   el("path", {d: path, class: "edge", "stroke-width": 48, fill: "none"}, g);
-  el("circle", {cx, cy, r: 20, class: "hub"}, g);
+  el("circle", {cx: 50, cy: 50, r: 20, class: "hub"}, g);
   el("path", {d: path, class: "tube", "stroke-width": 40, fill: "none"}, g);
   // the crinkly ribs, shown once a piece is joined to the bed
   el("path", {d: path, class: "ring", "stroke-width": 40, fill: "none", "stroke-dasharray": "4 10", "stroke-dashoffset": -24}, g);
-  el("circle", {cx, cy, r: 20, class: "hub"}, g);
-  if (bits(m) === 1) el("circle", {cx, cy, r: 13, class: "mouth"}, g);   // a dead end: the tunnel's open mouth
+  el("circle", {cx: 50, cy: 50, r: 20, class: "hub"}, g);
+  if (bits(m) === 1) el("circle", {cx: 50, cy: 50, r: 13, class: "mouth"}, g);   // a dead end: the tunnel's open mouth
 }
-const bedRect = (g, x, y) => el("rect", {x: x + 4, y: y + 4, width: 92, height: 92, rx: 30, fill: "#E7A9A0", stroke: "#C98378", "stroke-width": 5}, g);
 function draw() {
-  const svg = $("svg"), N = game.N, bed = bedOf(N), S = N * 100;
-  svg.innerHTML = ""; pieces = []; angle = [];
-  $("board").classList.toggle("slide", sliding());
-  if (sliding()) {
-    svg.setAttribute("viewBox", `${-M} ${-M} ${S + 2 * M} ${S + 2 * M}`);
-    el("rect", {x: 0, y: 0, width: S, height: S, fill: "#E8DCC4", stroke: "#CDBC9C", "stroke-width": 3}, svg);
-    const clip = el("clipPath", {id: "rugclip"}, el("defs", {}, svg));
-    el("rect", {x: 0, y: 0, width: S, height: S}, clip);
-    const tiles = el("g", {"clip-path": "url(#rugclip)", id: "tiles"}, svg);
-    for (let p = 0; p < N * N; p++) {
-      const g = el("g", {class: "piece", "data-p": p}, tiles);
-      if (p === bed) bedRect(g, 0, 0);
-      drawPiece(g, 0, 0, game.sol[p]);
-      if (p === bed) {
-        const cat = el("text", {x: 50, y: 54, "text-anchor": "middle", "dominant-baseline": "middle", class: "cat", id: "cat"}, g);
-        cat.textContent = "🐈";
-      }
-      pieces.push(g);
-    }
-    // an arrow at each end of every row and column; tapping one slides the line a square that way
-    const arrow = (cx, cy, dx, dy, a, l, k) => {
-      const g = el("g", {class: "slider", "data-a": a, "data-l": l, "data-k": k, role: "button",
-        "aria-label": `Slide ${a ? "column" : "row"} ${l + 1} ${a ? (k === 1 ? "down" : "up") : (k === 1 ? "right" : "left")}`}, svg);
-      el("rect", {x: cx - M / 2, y: cy - M / 2, width: M, height: M, fill: "transparent"}, g);
-      const px = -dy, py = dx;   // across the arrow
-      el("path", {d: `M${cx + dx * 13} ${cy + dy * 13}L${cx - dx * 9 + px * 14} ${cy - dy * 9 + py * 14}L${cx - dx * 9 - px * 14} ${cy - dy * 9 - py * 14}Z`}, g);
-    };
-    for (let t = 0; t < N; t++) {
-      const c = t * 100 + 50;
-      arrow(-M / 2, c, -1, 0, 0, t, N - 1); arrow(S + M / 2, c, 1, 0, 0, t, 1);
-      arrow(c, -M / 2, 0, -1, 1, t, N - 1); arrow(c, S + M / 2, 0, 1, 1, t, 1);
-    }
-    placeAll(false);
-  } else {
-    svg.setAttribute("viewBox", `0 0 ${S} ${S}`);
-    const bx = bed % N * 100 + 50, by = Math.floor(bed / N) * 100 + 50;
-    bedRect(svg, bx - 50, by - 50);
-    for (let i = 0; i < N * N; i++) {
-      const x = i % N * 100, y = Math.floor(i / N) * 100;
-      const g = el("g", {class: "piece" + (i === bed ? " fixed" : ""), "data-i": i}, svg);
-      g.style.transformOrigin = `${x + 50}px ${y + 50}px`;
-      drawPiece(g, x, y, game.sol[i]);
-      angle[i] = game.turns[i] * 90;
-      g.style.transform = `rotate(${angle[i]}deg)`;
-      pieces.push(g);
-    }
-    const cat = el("text", {x: bx, y: by + 4, "text-anchor": "middle", "dominant-baseline": "middle", class: "cat", id: "cat"}, svg);
-    cat.textContent = "🐈";
+  const svg = $("svg"), N = game.N, bed = bedOf(N), S = N * 100, tracks = hasTracks();
+  svg.innerHTML = ""; pieces = []; spins = []; angle = []; placed = [];
+  $("board").classList.toggle("tracks", tracks);
+  svg.setAttribute("viewBox", tracks ? `${-M} ${-M} ${S + 2 * M} ${S + 2 * M}` : `0 0 ${S} ${S}`);
+  if (tracks) {
+    el("rect", {x: 0, y: 0, width: S, height: S, class: "floor"}, svg);
+    // each track is a striped groove across the rug
+    for (const l of game.rows) el("rect", {x: 0, y: l * 100, width: S, height: 100, class: "groove"}, svg);
+    for (const l of game.cols) el("rect", {x: l * 100, y: 0, width: 100, height: S, class: "groove"}, svg);
   }
+  const clip = el("clipPath", {id: "rugclip"}, el("defs", {}, svg));
+  el("rect", {x: 0, y: 0, width: S, height: S}, clip);
+  const tiles = el("g", {"clip-path": "url(#rugclip)", id: "tiles"}, svg);
+  for (let p = 0; p < N * N; p++) {
+    const g = el("g", {class: "piece", "data-p": p}, tiles);
+    if (p === bed) el("rect", {x: 4, y: 4, width: 92, height: 92, rx: 30, fill: "#E7A9A0", stroke: "#C98378", "stroke-width": 5}, g);
+    const spin = el("g", {class: "spin"}, g);
+    drawPiece(spin, game.sol[p]);
+    angle[p] = game.turns[p] * 90; spin.style.transform = `rotate(${angle[p]}deg)`;
+    if (p === bed) { const cat = el("text", {x: 50, y: 54, "text-anchor": "middle", "dominant-baseline": "middle", class: "cat", id: "cat"}, g); cat.textContent = "🐈"; }
+    pieces.push(g); spins.push(spin);
+  }
+  // an arrow at each end of every track; tapping one slides the track a square that way
+  const arrow = (cx, cy, dx, dy, a, l, k) => {
+    const g = el("g", {class: "slider", "data-a": a, "data-l": l, "data-k": k, role: "button",
+      "aria-label": `Slide ${a ? "column" : "row"} ${l + 1} ${a ? (k === 1 ? "down" : "up") : (k === 1 ? "right" : "left")}`}, svg);
+    el("rect", {x: cx - M / 2, y: cy - M / 2, width: M, height: M, fill: "transparent"}, g);
+    const px = -dy, py = dx;   // across the arrow
+    el("path", {d: `M${cx + dx * 13} ${cy + dy * 13}L${cx - dx * 9 + px * 14} ${cy - dy * 9 + py * 14}L${cx - dx * 9 - px * 14} ${cy - dy * 9 - py * 14}Z`}, g);
+  };
+  for (const l of game.rows) { const c = l * 100 + 50; arrow(-M / 2, c, -1, 0, 0, l, N - 1); arrow(S + M / 2, c, 1, 0, 0, l, 1); }
+  for (const l of game.cols) { const c = l * 100 + 50; arrow(c, -M / 2, 0, -1, 1, l, N - 1); arrow(c, S + M / 2, 0, 1, 1, l, 1); }
+  placeAll(false);
   el("rect", {x: -200, y: -200, width: 92, height: 92, rx: 10, class: "cursor", id: "cursor"}, svg);
   el("rect", {x: -200, y: -200, width: 88, height: 88, rx: 14, class: "hintbox", id: "hintbox"}, svg);
   el("rect", {x: -2000, y: -2000, width: 10, height: 10, rx: 14, class: "hintsq", id: "hintline"}, svg);
   showCursor(); update();
 }
-// Slide mode: put each piece on its square. With `glide`, pieces slide there, except any that wrap round
-// from one end of their line to the other, which just appear.
-let placed = [];
+// Put each piece on its square. With `glide`, pieces slide there, except any that wrap round from one end of
+// their track to the other, which just appear.
 function placeAll(glide) {
   const N = game.N;
   game.pos.forEach((p, i) => {
@@ -409,7 +417,7 @@ function joined() {
   return {lit, count};
 }
 // The piece drawn on square i.
-const pieceAt = i => pieces[sliding() ? game.pos[i] : i];
+const pieceAt = i => pieces[game.pos[i]];
 function update() {
   const N = game.N, all = N * N, {lit, count} = joined();
   for (let i = 0; i < all; i++) pieceAt(i).classList.toggle("lit", !!lit[i]);
@@ -426,37 +434,41 @@ function update() {
   if (hintShown && hintShown.key !== boardKey()) clearHint();
   return count === all;
 }
-// Turn the pictures to match game.turns (after Undo or Restart), each the short way round.
+// Turn and move the pictures to match the game (after Undo or Restart), each the short way round.
 function lineUp() {
-  if (sliding()) { placeAll(true); return; }
-  pieces.forEach((g, i) => {
-    let a = game.turns[i] * 90;
-    while (a - angle[i] > 180) a -= 360;
-    while (angle[i] - a > 180) a += 360;
-    angle[i] = a; g.style.transform = `rotate(${a}deg)`;
+  placeAll(true);
+  spins.forEach((g, p) => {
+    let a = game.turns[p] * 90;
+    while (a - angle[p] > 180) a -= 360;
+    while (angle[p] - a > 180) a += 360;
+    angle[p] = a; g.style.transform = `rotate(${a}deg)`;
   });
 }
 
 /* ---------- playing ---------- */
+// Turn the piece on square i (one off the tracks; those pieces never move).
 function turn(i, dir) {
-  if (!playing() || sliding() || i === bedOf(game.N)) return;
+  if (!playing() || !turnable(i)) return;
   game.started = true;
-  game.turns[i] = (game.turns[i] + dir + 4) % 4;
-  angle[i] += dir * 90; pieces[i].style.transform = `rotate(${angle[i]}deg)`;
+  const p = game.pos[i];
+  game.turns[p] = (game.turns[p] + dir + 4) % 4;
+  angle[p] += dir * 90; spins[p].style.transform = `rotate(${angle[p]}deg)`;
   game.history.push([i, dir]);
   if (update()) { win(); return; }
   save();
 }
-// Slide mode: slide a row (axis 0, k squares right) or column (axis 1, k squares down), wrapping round.
+// Slide a track: a row (axis 0, k squares right) or column (axis 1, k squares down), wrapping round.
+const isTrack = (a, l) => (a ? game.cols : game.rows).includes(l);
 function slide(m, glide = true) {
-  if (!playing() || !sliding()) return;
-  game.started = true;
-  m = [m[0], m[1], ((m[2] % game.N) + game.N) % game.N];
+  if (!playing() || !isTrack(m[0], m[1])) return;
+  const N = game.N;
+  m = [m[0], m[1], ((m[2] % N) + N) % N];
   if (!m[2]) return;
-  game.pos = applySlide(game.N, game.pos, m);
-  game.trail = addSlide(game.N, game.trail, m);
+  game.started = true;
+  game.pos = applySlide(N, game.pos, m);
+  game.trail = addSlide(N, game.trail, m);
   game.history.push(m);
-  if (cursor >= 0) { const N = game.N, x = cursor % N, y = Math.floor(cursor / N);
+  if (cursor >= 0) { const x = cursor % N, y = Math.floor(cursor / N);
     if (m[0] === 0 && y === m[1]) cursor = y * N + (x + m[2]) % N;
     if (m[0] === 1 && x === m[1]) cursor = ((y + m[2]) % N) * N + x;
     showCursor(); }
@@ -464,36 +476,36 @@ function slide(m, glide = true) {
   if (update()) { win(); return; }
   save();
 }
-// Tap turns a piece clockwise; press and hold (or right-click) turns it back.
-// In Slide mode, drag a row or column (or tap an arrow) to slide it.
+// Tap turns a piece clockwise; press and hold (or right-click) turns it back. Drag a track (or tap an arrow)
+// to slide it.
 let press = null, drag = null;
 const svgPoint = e => { const p = $("svg").createSVGPoint(); p.x = e.clientX; p.y = e.clientY; return p.matrixTransform($("svg").getScreenCTM().inverse()); };
+const cellOf = e => { const pt = svgPoint(e), N = game.N, x = Math.floor(pt.x / 100), y = Math.floor(pt.y / 100); return x < 0 || y < 0 || x >= N || y >= N ? -1 : y * N + x; };
 $("svg").addEventListener("pointerdown", e => {
   if (!playing()) return;
-  if (sliding()) {
-    const a = e.target.closest(".slider");
-    if (a) { slide([+a.dataset.a, +a.dataset.l, +a.dataset.k]); return; }
-    const pt = svgPoint(e), N = game.N, x = Math.floor(pt.x / 100), y = Math.floor(pt.y / 100);
-    if (x < 0 || y < 0 || x >= N || y >= N) return;
-    drag = {x0: pt.x, y0: pt.y, x, y, axis: -1, off: 0, ghosts: []};
+  const a = e.target.closest(".slider");
+  if (a) { slide([+a.dataset.a, +a.dataset.l, +a.dataset.k]); return; }
+  const i = cellOf(e); if (i < 0) return;
+  if (onTrack(i)) {
+    const pt = svgPoint(e), N = game.N, x = i % N, y = Math.floor(i / N);
+    drag = {x0: pt.x, y0: pt.y, x, y, rowOK: game.rows.includes(y), colOK: game.cols.includes(x), axis: -1, off: 0, ghosts: []};
     $("svg").setPointerCapture(e.pointerId);
     return;
   }
-  const g = e.target.closest(".piece"); if (!g) return;
-  const i = +g.dataset.i;
+  if (!turnable(i)) return;
   press = {i, held: false, t: setTimeout(() => { press.held = true; turn(i, -1); }, 450)};
 });
-// The squares in the line being dragged, in order.
+// The squares along a line, in order.
 const lineCells = (axis, l) => [...Array(game.N).keys()].map(t => axis === 0 ? l * game.N + t : t * game.N + l);
 $("svg").addEventListener("pointermove", e => {
   if (!drag || !playing()) return;
   const pt = svgPoint(e), dx = pt.x - drag.x0, dy = pt.y - drag.y0, N = game.N, S = N * 100;
   if (drag.axis < 0) {
     if (Math.max(Math.abs(dx), Math.abs(dy)) < 14) return;
-    drag.axis = Math.abs(dx) > Math.abs(dy) ? 0 : 1;
-    // a copy of each piece in the line, one whole rug-width behind, so the line wraps round as it moves
+    drag.axis = drag.rowOK && drag.colOK ? (Math.abs(dx) > Math.abs(dy) ? 0 : 1) : drag.rowOK ? 0 : 1;
+    // a copy of each piece on the track, one whole rug-width behind, so the track wraps round as it moves
     for (const i of lineCells(drag.axis, drag.axis ? drag.x : drag.y)) {
-      const g = pieceAt(i), c = g.cloneNode(true); c.removeAttribute("id");
+      const g = pieceAt(i), c = g.cloneNode(true);
       c.querySelectorAll("[id]").forEach(n => n.removeAttribute("id"));
       g.parentNode.appendChild(c); drag.ghosts.push([g, c, i]);
       g.style.transition = c.style.transition = "none";
@@ -510,7 +522,7 @@ function endDrag() {
   if (!drag) return;
   const d = drag; drag = null;
   for (const [g, c] of d.ghosts) { c.remove(); g.style.transition = ""; }
-  if (d.axis < 0) return;
+  if (d.axis < 0) { G.note("Pieces on a track slide: drag the track, or tap its arrows.", 3500); return; }
   const k = Math.round(d.off / 100);
   for (const [g] of d.ghosts) placed[+g.dataset.p] = null;   // already moved by hand: no gliding
   if (k % game.N) slide([d.axis, d.axis ? d.x : d.y, k], false); else placeAll(false);
@@ -519,18 +531,17 @@ $("svg").addEventListener("pointerup", e => {
   if (drag) { endDrag(); return; }
   if (!press) return;
   clearTimeout(press.t);
-  const g = e.target.closest(".piece");
-  if (!press.held && g && +g.dataset.i === press.i) turn(press.i, 1);
+  if (!press.held && cellOf(e) === press.i) turn(press.i, 1);
   press = null;
 });
 $("svg").addEventListener("pointercancel", () => { if (drag) endDrag(); });
 for (const ev of ["pointercancel", "pointerleave"]) $("svg").addEventListener(ev, () => { if (press) { clearTimeout(press.t); press = null; } });
 $("svg").addEventListener("contextmenu", e => {
   e.preventDefault(); if (press) { clearTimeout(press.t); press = null; }
-  const g = e.target.closest(".piece"); if (g && !sliding()) turn(+g.dataset.i, -1);
+  const i = cellOf(e); if (i >= 0) turn(i, -1);
 });
-// Keys: arrows move a cursor round the rug, Space or Enter turns (with Shift, turns back).
-// In Slide mode, Shift and an arrow slides the cursor's row or column.
+// Keys: arrows move a cursor round the rug, Space or Enter turns (with Shift, turns back), and Shift with an
+// arrow slides the cursor's track.
 function showCursor() {
   const c = $("cursor"); if (!c || !game) return;
   if (cursor < 0) { c.setAttribute("x", -200); return; }
@@ -541,12 +552,12 @@ $("svg").addEventListener("keydown", e => {
   const N = game.N; if (cursor < 0) cursor = bedAt();
   const x = cursor % N, y = Math.floor(cursor / N), to = (nx, ny) => { cursor = Math.max(0, Math.min(N - 1, ny)) * N + Math.max(0, Math.min(N - 1, nx)); };
   const dirs = {ArrowUp: [1, x, N - 1], ArrowDown: [1, x, 1], ArrowLeft: [0, y, N - 1], ArrowRight: [0, y, 1]};
-  if (sliding() && e.shiftKey && dirs[e.key]) slide(dirs[e.key]);
+  if (e.shiftKey && dirs[e.key]) slide(dirs[e.key]);
   else if (e.key === "ArrowUp") to(x, y - 1);
   else if (e.key === "ArrowDown") to(x, y + 1);
   else if (e.key === "ArrowLeft") to(x - 1, y);
   else if (e.key === "ArrowRight") to(x + 1, y);
-  else if ((e.key === " " || e.key === "Enter") && !sliding()) turn(cursor, e.shiftKey ? -1 : 1);
+  else if (e.key === " " || e.key === "Enter") turn(cursor, e.shiftKey ? -1 : 1);
   else return;
   e.preventDefault(); showCursor();
 });
@@ -557,33 +568,33 @@ document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.ke
 function undo() {
   if (!playing() || !game.history.length) return;
   game.undid = true;
-  const h = game.history.pop();
-  if (sliding()) {
-    if (Array.isArray(h)) { const back = [h[0], h[1], game.N - h[2]]; game.pos = applySlide(game.N, game.pos, back); game.trail = addSlide(game.N, game.trail, back); }
-    else { game.trail = h.trail; game.pos = posOf(game.N, game.trail); }
-  } else if (Array.isArray(h)) game.turns[h[0]] = (game.turns[h[0]] - h[1] + 4) % 4; else game.turns = h.turns;
+  const h = game.history.pop(), N = game.N;
+  if (!Array.isArray(h)) { game.turns = h.turns; game.trail = h.trail || game.trail; game.pos = posOf(N, game.trail); }
+  else if (h.length === 3) { const back = [h[0], h[1], N - h[2]]; game.pos = applySlide(N, game.pos, back); game.trail = addSlide(N, game.trail, back); }
+  else { const p = game.pos[h[0]]; game.turns[p] = (game.turns[p] - h[1] + 4) % 4; }
   lineUp(); update(); save();
 }
 $("undoBtn").onclick = undo;
 $("restartBtn").onclick = () => {
   if (!playing() || !game.history.length) return;
   game.undid = true;
-  if (sliding()) { game.history.push({trail: game.trail}); game.trail = game.start.slice(); game.pos = posOf(game.N, game.trail); }
-  else { game.history.push({turns: game.turns.slice()}); game.turns = game.start.slice(); }
+  game.history.push({turns: game.turns.slice(), trail: game.trail});
+  game.turns = game.start.turns.slice(); game.trail = game.start.trail.slice(); game.pos = posOf(game.N, game.trail);
   lineUp(); update(); save();
-  G.note(`Back to how the tunnels started. Undo brings your ${sliding() ? "slides" : "turns"} back.`, 4000);
+  G.note("Back to how the tunnels started. Undo brings your moves back.", 4000);
 };
-// Hint: a green box shows a piece that's the wrong way round (the player turns it). It picks one next to the
-// joined part where it can. In Slide mode a gold box goes round a row or column to slide, and the message says
-// which way. A hint keeps you on the same level and costs the gold paw.
+// Hint: while a track is out of place, a gold box goes round a track to slide and the message says which way.
+// Then a green box shows a piece that's the wrong way round (next to the joined part where it can). The player
+// makes the move. A hint keeps you on the same level and costs the gold paw.
 let hintTimer = null, hintShown = null;
-const boardKey = () => sliding() ? game.pos.join() : game.turns.join();
+const boardKey = () => game.pos.join() + "/" + game.turns.join();
 function clearHint() { hintShown = null; const b = $("hintline"); if (b) b.setAttribute("x", -2000); }
 // The next slide back towards the answer: one that gets there in two or fewer if there is one, otherwise the
 // last slide still to undo (skipping any that don't change how the rug looks).
 function nextSlide() {
   const N = game.N, look = pos => pos.map(p => game.sol[p]);
-  const quick = shortcut(N, look(game.pos), game.sol);
+  if (look(game.pos).every((v, i) => v === game.sol[i])) return null;
+  const quick = shortcut(N, look(game.pos), game.sol, slidesOn(N, game.rows, game.cols));
   if (quick) return quick;
   let pos = [...Array(N * N).keys()], last = null;
   for (const m of game.trail) { const p2 = applySlide(N, pos, m); if (look(p2).join() !== look(pos).join()) last = m; pos = p2; }
@@ -591,9 +602,9 @@ function nextSlide() {
 }
 $("hintBtn").onclick = () => {
   if (!playing()) return;
-  const N = game.N;
-  if (sliding()) {
-    const m = nextSlide(); if (!m) return;
+  const N = game.N, m = nextSlide(), g = game;
+  clearTimeout(hintTimer);
+  if (m) {
     game.hinted = true; game.started = true; update(); save();
     const [a, l, k] = m, b = $("hintline"), back = k > N / 2, n = back ? N - k : k;
     b.setAttribute("x", a ? l * 100 + 4 : 4); b.setAttribute("y", a ? 4 : l * 100 + 4);
@@ -601,31 +612,28 @@ $("hintBtn").onclick = () => {
     hintShown = {key: boardKey()};
     const way = a ? (back ? "up" : "down") : (back ? "left" : "right");
     G.note(`Slide the ${a ? "column" : "row"} in the gold box ${n === 1 ? "one square" : `${n} squares`} ${way}.`, 5000);
-    clearTimeout(hintTimer);
-    const g = game; hintTimer = setTimeout(() => { if (game === g) clearHint(); }, 5000);
+    hintTimer = setTimeout(() => { if (game === g) clearHint(); }, 5000);
     return;
   }
-  const {lit} = joined(), wrong = [...Array(N * N).keys()].filter(i => cur(i) !== game.sol[i]);
+  const {lit} = joined(), wrong = [...Array(N * N).keys()].filter(i => turnable(i) && cur(i) !== game.sol[i]);
   if (!wrong.length) return;
   const near = wrong.filter(i => lit[i] || [1, 2, 4, 8].some(d => { const j = nbr(N, i, d); return j >= 0 && lit[j]; }));
   const pool = near.length ? near : wrong, i = pool[Math.floor(Math.random() * pool.length)];
   game.hinted = true; game.started = true; update(); save();
-  const box = $("hintbox"), g = game;
+  const box = $("hintbox");
   box.setAttribute("x", i % N * 100 + 6); box.setAttribute("y", Math.floor(i / N) * 100 + 6);
   G.note("The piece in the green box is the wrong way round.", 5000);
-  clearTimeout(hintTimer);
   hintTimer = setTimeout(() => { if (game === g) box.setAttribute("x", -200); }, 3500);
 };
 
 /* ---------- endings ---------- */
 // Every piece joined: the cat runs out along every branch and back, the tunnels turning gold as it goes.
-const topLevel = () => sliding() ? MAX_LEVEL + 10 : MAX_LEVEL;
 function win() {
   game.won = true; G.finishClock(game); cursor = -1; showCursor(); clearHint();
-  const next = game.hinted ? game.level : Math.min(topLevel(), game.level + 1);
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
   settings.level = next; $("levelSel").value = next; save();
   update();
-  G.track(`Tunnel Run solved ${sliding() ? "slide " : ""}level ${sliding() ? game.level - 10 : game.level}`);
+  G.track(`Tunnel Run solved level ${game.level}`);
   build.prefetch(next);
   running = true;
   const g = game, done = () => { running = false; if (game === g) finishCard(); };
@@ -633,7 +641,7 @@ function win() {
   const N = game.N, path = [], seen = new Uint8Array(N * N);
   (function walk(i) { seen[i] = 1; path.push(i); for (const d of [1, 2, 4, 8]) if (cur(i) & d) { const j = nbr(N, i, d); if (!seen[j]) { walk(j); path.push(i); } } })(bedAt());
   const cat = $("cat"), step = Math.max(28, Math.min(110, 4500 / path.length)), t0 = performance.now();
-  $("svg").appendChild(cat);   // in Slide mode the cat sits in its bed's piece; let it out to run
+  $("svg").appendChild(cat);   // the cat sits in its bed's piece; let it out to run
   let k = 0;
   (function frame(now) {
     if (game !== g) return;
@@ -648,26 +656,19 @@ function win() {
   })(t0);
 }
 function finishCard() {
-  const next = settings.level, N = game.N, nextN = isSlide(next) ? next - 10 : next;
+  const next = settings.level, N = game.N;
   let text = `The cat zoomed through every tunnel on the ${N} × ${N} rug.`;
-  text += game.hinted ? ` You had a hint, so here's another at level ${nextN}.` : game.level === topLevel() ? " That's the hardest level; here's another." : ` Next up: level ${nextN}.`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my tunnels", game.result,
-    {title: "Zoom!", gold: !game.undid && !game.hinted, goldWhy: "No hints or undos!", next: `Next: level ${nextN}`, after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+    {title: "Zoom!", gold: !game.undid && !game.hinted, goldWhy: "No hints or undos!", next: `Next: level ${next}`, after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
 }
 
 /* ---------- new tunnels ---------- */
 function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
-// Turn mode: every piece but the bed's starts turned away from its answer (a straight piece has only one other
-// way to lie). Slide mode: the rows and columns start slid by p.trail.
-function begin(p, level, turns) {
-  const base = {level, N: p.N, sol: p.sol, history: [], won: false, ...G.freshClock()};
-  if (isSlide(level)) game = {...base, mode: "slide", start: p.trail.slice(), trail: p.trail.slice(), pos: posOf(p.N, p.trail)};
-  else {
-    const bed = bedOf(p.N);
-    turns = turns || p.sol.map((m, i) => { if (i === bed) return 0; const ks = [1, 2, 3].filter(k => rotN(m, k) !== m); return ks[Math.floor(Math.random() * ks.length)]; });
-    game = {...base, mode: "turn", start: turns.slice(), turns: turns.slice()};
-  }
-  cursor = -1; placed = []; clearHint();
+function begin(p, level) {
+  game = {level, N: p.N, sol: p.sol, rows: p.rows.slice(), cols: p.cols.slice(), turns: p.turns.slice(), trail: p.trail.slice(),
+    pos: posOf(p.N, p.trail), start: {turns: p.turns.slice(), trail: p.trail.slice()}, history: [], won: false, ...G.freshClock()};
+  cursor = -1; clearHint();
 }
 async function newPuzzle() {
   if (busy) return;
@@ -679,29 +680,13 @@ async function newPuzzle() {
   busy = false; G.closeCard(); G.note("");
   draw(); save();
   build.prefetch(n);
-  G.track(`Tunnel Run new puzzle ${isSlide(n) ? "slide " : ""}level ${isSlide(n) ? n - 10 : n}`);
+  G.track(`Tunnel Run new puzzle level ${n}`);
+  helpOnFirstVisit();   // the first rug with tracks (and the first where everything slides) says so
 }
-
-/* ---------- Turn or Slide ---------- */
-// Each mode keeps its own level and its own rug, so switching back carries on where you were.
-function fillLevels() {
-  const sel = $("levelSel"), slide = isSlide(settings.level); sel.innerHTML = "";
-  for (let n = 1; n <= MAX_LEVEL; n++) { const N = slide ? slideLevel(n)[0] : levelSize(n); sel.append(new Option(`${n} · ${N} × ${N}${n === MAX_LEVEL ? " (hardest)" : ""}`, slide ? n + 10 : n)); }
-  sel.value = settings.level; $("modeSel").value = slide ? "slide" : "turn";
-}
-$("modeSel").onchange = e => {
-  if (busy || (e.target.value === "slide") === isSlide(settings.level)) return;
-  G.closeCard(); clearHint();
-  [settings.level, settings.otherLevel] = [settings.otherLevel, settings.level];
-  [game, parked] = [parked, game];
-  fillLevels(); save();
-  if (game && !game.won && isSlide(game.level) === isSlide(settings.level)) { cursor = -1; placed = []; draw(); helpOnFirstVisit(); }
-  else newPuzzle().then(helpOnFirstVisit);
-};
 
 /* ---------- sharing ---------- */
-// The answer and how the pieces started, each as one hex digit per square; with progress, how they lie now.
-// Slide mode sends the slides from the answer (start, and now), as "axis line k" digits.
+// The answer and how each piece started turned, each one hex digit per square; the tracks' rows and columns;
+// and the slides from the answer to the start, as "axis line k" digits. With progress, the turns and slides now.
 const hex = a => a.map(v => v.toString(16)).join("");
 const slidesOut = t => t.map(m => m.map(v => v.toString(16)).join("")).join("");
 const slidesIn = (s, N) => {
@@ -710,8 +695,8 @@ const slidesIn = (s, N) => {
   return t;
 };
 $("shareBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Tunnel Run", won: game.won,
-  puzzle: () => sliding() ? {g: "tunnelrun", N: game.level, s: hex(game.sol), m: slidesOut(game.start)} : {g: "tunnelrun", N: game.level, s: hex(game.sol), t: game.start.join("")},
-  progress: () => sliding() ? slidesOut(game.trail) : game.turns.join("")}); };
+  puzzle: () => ({g: "tunnelrun", N: game.level, s: hex(game.sol), t: game.start.turns.join(""), m: slidesOut(game.start.trail), r: hex(game.rows), c: hex(game.cols)}),
+  progress: () => ({t: game.turns.join(""), m: slidesOut(game.trail)})}); };
 // A network: every piece joined to the bed with no loops and nothing running off the edge.
 function isNet(N, sol) {
   const seen = new Uint8Array(N * N), stack = [bedOf(N)]; seen[bedOf(N)] = 1; let count = 1, ends = 0;
@@ -720,26 +705,27 @@ function isNet(N, sol) {
   return count === N * N && ends === 2 * (N * N - 1);
 }
 function openShared(d) {
-  const code = d.N, N = okLevel(code) ? sizeOf(code) : 0, ok = s => typeof s === "string" && s.length === N * N;
+  const spec = levelSpec(d.N), N = spec ? spec.N : 0, ok = s => typeof s === "string" && s.length === N * N;
+  const fail = () => G.note("That share link didn't work.", 5000);
   const sol = N && ok(d.s) && /^[0-9a-f]+$/.test(d.s) ? [...d.s].map(c => parseInt(c, 16)) : null;
-  const fail = () => G.note("That share link didn't work.", 5000), was = game;
-  if (!sol) { fail(); return; }
-  if (isSlide(code)) {
-    const start = slidesIn(d.m, N);
-    if (!start || !start.length || !isNet(N, sol)) { fail(); return; }
-    begin({N, sol, trail: start}, code);
-    const now = d.p !== undefined && slidesIn(d.p, N);
-    if (now) { game.trail = now; game.pos = posOf(N, now); game.timed = false; }
-  } else {
-    const start = ok(d.t) && /^[0-3]+$/.test(d.t) ? [...d.t].map(Number) : null;
-    if (!start || start[bedOf(N)] || solveNet(N, sol, 2, bedOf(N)).length !== 1) { fail(); return; }
-    begin({N, sol}, code, start);
-    if (ok(d.p) && /^[0-3]+$/.test(d.p) && d.p[bedOf(N)] === "0") { game.turns = [...d.p].map(Number); game.timed = false; }
-  }
-  if (isSlide(code) !== isSlide(settings.level)) { [settings.level, settings.otherLevel] = [settings.otherLevel, settings.level]; parked = was; }
-  settings.level = code; fillLevels();
-  draw(); save(); build.prefetch(code);
-  if (d.p && joined().count === N * N) win();
+  const lines = (s, k) => { if (spec.all) return [...Array(N).keys()]; if (!k) return s === undefined || s === "" ? [] : null;
+    const ls = typeof s === "string" && /^[0-9a-f]+$/.test(s) ? [...s].map(c => parseInt(c, 16)) : [];
+    return ls.length === k && new Set(ls).size === k && ls.every(l => l < N && l !== N >> 1) ? ls : null; };
+  const rows = sol && lines(d.r, spec.rows), cols = sol && lines(d.c, spec.cols);
+  if (!sol || !rows || !cols || !isNet(N, sol)) { fail(); return; }
+  const fixedOK = t => t.every((v, i) => !v || (i !== bedOf(N) && !rows.includes(Math.floor(i / N)) && !cols.includes(i % N)));
+  const turnsIn = s => { const t = ok(s) && /^[0-3]+$/.test(s) ? [...s].map(Number) : null; return t && fixedOK(t) ? t : null; };
+  // the slides may only move tracks
+  const trailIn = s => { if (s === undefined) return []; const t = slidesIn(s, N); return t && t.every(m => (m[0] ? cols : rows).includes(m[1])) ? t : null; };
+  const turns = d.t === undefined && spec.all ? new Array(N * N).fill(0) : turnsIn(d.t), trail = trailIn(d.m);
+  if (!turns || !trail) { fail(); return; }
+  begin({N, sol, rows, cols, turns, trail}, d.N);
+  // progress: the turns and slides now (links from before tracks sent just the turns)
+  const p = typeof d.p === "string" ? {t: d.p} : d.p;
+  if (p) { const t = turnsIn(p.t), m = trailIn(p.m); if (t && m) { game.turns = t; game.trail = m; game.pos = posOf(N, m); game.timed = false; } }
+  settings.level = d.N; $("levelSel").value = d.N;
+  draw(); save(); build.prefetch(d.N);
+  if (p && joined().count === N * N) win();
 }
 
 /* ---------- how to play ---------- */
@@ -748,50 +734,51 @@ function showHelp() {
   settings.seenHelp = false; helpOnFirstVisit();
   if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
 }
-// Where the squares are, in Slide mode (the arrows take a strip round the rug).
-function slideMap() {
-  const r = $("svg").getBoundingClientRect(), S = game.N * 100, k = r.width / (S + 2 * M);
-  return {ox: r.left + M * k, oy: r.top + M * k, cw: 100 * k, ch: 100 * k};
+// Where the squares are (with tracks, the arrows take a strip round the rug).
+function map() {
+  const r = $("svg").getBoundingClientRect(), S = game.N * 100, m = hasTracks() ? M : 0, k = r.width / (S + 2 * m);
+  return {ox: r.left + m * k, oy: r.top + m * k, cw: 100 * k, ch: 100 * k};
 }
-// First visit (once for each mode): walk through the rug that's out.
+// First visit: walk through the rug that's out, with steps for tracks if it has them. After that, the first
+// rug with tracks, and the first where every row and column slides, get a few steps of their own.
 function helpOnFirstVisit() {
-  const seen = sliding() ? "seenSlideHelp" : "seenHelp";
-  if (settings[seen] || !game || !playing() || document.querySelector(".spot")) return;
+  if (!game || !playing() || document.querySelector(".spot")) return;
   const N = game.N, bed = bedAt(), xy = i => [i % N, Math.floor(i / N)], all = [...Array(N * N).keys()].map(xy);
   const {lit} = joined(), litNow = all.filter(([x, y]) => lit[y * N + x]);
-  const done = () => { settings[seen] = true; save(); };
-  if (sliding()) {
-    const by = Math.floor(bed / N), row = all.filter(([, y]) => y === by);
-    const steps = [
-      {say: "The cat's tunnels are all muddled up 🐈", lit: all},
-      {say: "Drag a row or column to slide it, or tap its arrows", lit: row},
-      {say: "What slides off one end comes back on the other", lit: row},
-      {say: "Pieces joined to the cat's bed turn purple", lit: litNow, tone: "ok"},
-      {say: "Join every piece and the cat runs through them all!", lit: all, tone: "ok"},
-      {say: "Stuck? Hint shows a row or column to slide", els: [$("hintBtn")]},
-    ];
-    G.spotlight({grid: $("grid"), w: N, h: N, steps, map: slideMap, done});
+  const trackCells = all.filter(([x, y]) => onTrack(y * N + x));
+  const oneTrack = game.rows.length ? all.filter(([, y]) => y === game.rows[0]) : all.filter(([x]) => x === game.cols[0]);
+  // a piece next to the bed to show turning
+  const by = [1, 2, 4, 8].map(d => nbr(N, bed, d)).filter(j => j >= 0 && turnable(j));
+  const one = by.length ? xy(by.find(j => cur(j) !== game.sol[j]) ?? by[0]) : null;
+  const trackSteps = allSlide() ? [
+    {say: "Now every row and column slides, and nothing turns", lit: all},
+    {say: "Drag a row or column, or tap its arrows", lit: oneTrack},
+    {say: "The cat's bed slides too", lit: [xy(bed)]},
+  ] : hasTracks() ? [
+    {say: "Pieces on a striped track can't turn", lit: trackCells},
+    {say: "Drag a track to slide it, or tap its arrows", lit: oneTrack},
+    {say: "What slides off one end comes back on the other", lit: oneTrack},
+  ] : [];
+  const tip = allSlide() ? "seenAllSlide" : hasTracks() ? "seenTracks" : null;
+  const done = () => { settings.seenHelp = true; if (tip) settings[tip] = true; save(); };
+  if (settings.seenHelp) {
+    if (tip && !settings[tip]) G.spotlight({grid: $("grid"), w: N, h: N, steps: trackSteps, map, finish: false, done});
     return;
   }
-  // a piece next to the bed to show turning
-  const by = [1, 2, 4, 8].map(d => nbr(N, bed, d)).filter(j => j >= 0 && cur(j) !== game.sol[j]);
-  const one = xy(by.length ? by[0] : nbr(N, bed, 1));
   const steps = [
     {say: "The cat's tunnels are all muddled up 🐈", lit: all},
-    {say: "Tap a piece to turn it", lit: [one]},
-    {say: "Hold a piece to turn it back", lit: [one]},
+    ...(one ? [{say: "Tap a piece to turn it", lit: [one]}, {say: "Hold a piece to turn it back", lit: [one]}] : []),
+    ...trackSteps,
     {say: "Pieces joined to the cat's bed turn purple", lit: litNow, tone: "ok"},
-    {say: "The bed's own tunnel never turns", lit: [xy(bed)]},
+    ...(allSlide() ? [] : [{say: "The bed's own tunnel never turns", lit: [xy(bed)]}]),
     {say: "Tunnels never run off the edge of the rug", lit: all.filter(([x, y]) => !x || !y || x === N - 1 || y === N - 1)},
     {say: "Join every piece, with no tunnel left open, and the cat runs through them all!", lit: all, tone: "ok"},
-    {say: "Stuck? Hint shows a piece to turn", els: [$("hintBtn")]},
+    {say: `Stuck? Hint shows a ${hasTracks() ? "track to slide or a " : ""}piece to turn`, els: [$("hintBtn")]},
   ];
-  G.spotlight({grid: $("grid"), w: N, h: N, steps, done});
+  G.spotlight({grid: $("grid"), w: N, h: N, steps, map, done});
 }
 
-if (!okLevel(settings.level)) settings.level = 1;
-if (!okLevel(settings.otherLevel) || isSlide(settings.otherLevel) === isSlide(settings.level)) settings.otherLevel = isSlide(settings.level) ? 1 : 11;
-fillLevels();
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", ""), n));
 $("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
 $("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
 $("helpBtn").onclick = showHelp;
@@ -801,17 +788,25 @@ G.checkClock(game);
 G.setupTimer({name: "tunnelrun", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
 $("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
 
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+// A rug saved before tracks: levels 1–3 are the same, so carry on with it; any other starts afresh.
+if (game && !Array.isArray(game.rows)) {
+  const old = game, N = old.N;
+  game = levelSpec(old.level) && old.level <= 3 && levelSpec(old.level).N === N && Array.isArray(old.turns) && Array.isArray(old.start) && old.turns.length === N * N
+    ? {...old, rows: [], cols: [], trail: [], pos: [...Array(N * N).keys()], start: {turns: old.start, trail: []}} : null;
+  if (!game) settings.level = Math.min(settings.level, 3);
+}
 const shared = G.readShare("tunnelrun");
-if (game && Array.isArray(game.sol) && (Array.isArray(game.turns) || Array.isArray(game.trail))) G.reopen(() => {
-    if (!game.mode) game.mode = "turn";   // saved before Slide mode
-    if (!okLevel(game.level) || isSlide(game.level) !== (game.mode === "slide") || isSlide(game.level) !== isSlide(settings.level) || sizeOf(game.level) !== game.N || game.sol.length !== game.N * game.N) throw new Error("the saved tunnels don't fit their level");
-    if (sliding()) game.pos = posOf(game.N, game.trail);
-    else if (game.turns.length !== game.N * game.N) throw new Error("the saved tunnels don't fit their level");
+if (game) G.reopen(() => {
+    const spec = levelSpec(game.level);
+    if (!spec || spec.N !== game.N || game.sol.length !== game.N * game.N || game.turns.length !== game.N * game.N) throw new Error("the saved tunnels don't fit their level");
+    game.pos = posOf(game.N, game.trail);
     draw();
     if (game.won) { pieces.forEach(p => p.classList.add("zoomed")); finishCard(); }
     build.prefetch(settings.level); helpOnFirstVisit();
   }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
-else if (!shared) newPuzzle().then(helpOnFirstVisit);
+else if (!shared) newPuzzle();
 const shareOpts = () => ({name: "Tunnel Run", inProgress: !!(game && !game.won && game.history.length), open: openShared, after: helpOnFirstVisit});
 if (shared) G.offerShare(shared, shareOpts());
 // A share link opened while this page is already showing only changes the address, so watch for it.

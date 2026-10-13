@@ -43,9 +43,9 @@
 .cat.asleep .shut{opacity:1}
 .cat.hintme{background:rgba(255,224,122,.25);box-shadow:0 0 0 3px #FFE07A,0 0 18px 5px rgba(255,224,122,.55);animation:glow .45s ease-in-out 8 alternate}
 @keyframes glow{to{box-shadow:0 0 0 4px #FFF1B8,0 0 26px 9px rgba(255,224,122,.8)}}
-/* Arrows mode: a smaller head, with arrowheads round it for the cats a tap blinks */
-.room.arrows .cat{background:rgba(182,168,232,.07)}
-.room.arrows .cat .body{transform:scale(.64);transform-origin:50px 50px}
+/* a smaller head, with arrowheads round it for the cats a tap blinks */
+.room .cat{background:rgba(182,168,232,.07)}
+.room .cat .body{transform:scale(.64);transform-origin:50px 50px}
 .cat .arw{fill:#B6A8E8;stroke:#0F0C1C;stroke-width:1.5;stroke-linejoin:round}
 .room.dark{background:radial-gradient(ellipse at 50% 0%,#221D36 0%,#100D1D 70%)}
 .left{display:flex;gap:12px;align-items:center}
@@ -75,27 +75,30 @@
     <label>Level <select id="levelSel" aria-label="Level"></select></label>
     <button id="newBtn" class="primary">New room</button>
   </div>
-  <div class="bar toggles">
-    <div class="opt"><label>Mode <select id="modeSel" aria-label="Mode"><option value="classic">Classic</option><option value="arrows">Arrows</option></select></label><span class="hint">Arrows: each cat wakes only the cats it points at</span></div>
-  </div>
 </main>
 
 <script src="../games.js?v=2026-10-13.4"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
-// Levels: [columns, rows, taps the answer takes]. Levels 1–7 are Classic; 11–17 are Arrows, where each cat
-// has its own arrows and a tap blinks it and the cats they point at (not the cats beside it).
+// Every cat has arrows, and a tap blinks the cat and the cats its arrows point at. Most cats point at the four
+// beside them; from level 3, some point their own way. Levels: [columns, rows, taps the answer takes, how many
+// cats point their own way].
 function levelOf(n) {
-  if (n > 10) return [null, [3, 3, 3], [4, 4, 4], [4, 4, 6], [5, 5, 7], [5, 5, 9], [6, 6, 11], [7, 7, 13]][n - 10];
-  return [null, [3, 3, 3], [4, 4, 4], [4, 4, 6], [5, 5, 7], [5, 5, 10], [6, 6, 12], [7, 7, 15]][n];
+  return [null, [3, 3, 3, 0], [4, 4, 4, 0], [4, 4, 5, 3], [5, 5, 6, 5], [5, 5, 7, 12], [5, 5, 8, 25],
+    [6, 6, 9, 18], [6, 6, 11, 36], [7, 7, 12, 49], [7, 7, 14, 49]][n];
 }
 // The eight ways an arrow can point, as bits of a cat's arrows: up, up-right, right, … clockwise.
 function arrowDirs() { return [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]]; }
-// The cats a tap on cat i blinks: itself and the four beside it, or (with arrows) itself and the ones its arrows point at.
+// The arrows that point at a cat in the room: all eight, or (plain) up, right, down and left.
+function inRoom(W, H, i, plain) {
+  const x = i % W, y = Math.floor(i / W); let a = 0;
+  arrowDirs().forEach(([dx, dy], k) => { if ((!plain || k % 2 === 0) && x + dx >= 0 && x + dx < W && y + dy >= 0 && y + dy < H) a |= 1 << k; });
+  return a;
+}
+// The cats a tap on cat i blinks: itself and the ones its arrows point at.
 function blinks(W, H, i, arrows) {
   const x = i % W, y = Math.floor(i / W), out = [i];
-  const ds = arrows ? arrowDirs().filter((_, k) => arrows[i] >> k & 1) : [[0, -1], [1, 0], [0, 1], [-1, 0]];
-  for (const [dx, dy] of ds) if (x + dx >= 0 && x + dx < W && y + dy >= 0 && y + dy < H) out.push(i + dy * W + dx);
+  arrowDirs().forEach(([dx, dy], k) => { if (arrows[i] >> k & 1) out.push((y + dy) * W + x + dx); });
   return out;
 }
 // The fewest taps that put every cat to sleep from `awake` (a 0/1 list), as a list of squares, or null if
@@ -131,27 +134,30 @@ function fewestTaps(W, H, awake, arrows, most = 14) {
   }
   return best;
 }
-// Arrows for every cat: one to three, each pointing at a cat in the room.
-function makeArrows(W, H) {
-  return Array.from({length: W * H}, (_, i) => {
-    const x = i % W, y = Math.floor(i / W), ok = [];
-    arrowDirs().forEach(([dx, dy], k) => { if (x + dx >= 0 && x + dx < W && y + dy >= 0 && y + dy < H) ok.push(k); });
-    const want = 1 + Math.floor(Math.random() * 3); let a = 0;
-    for (let n = 0; n < want && ok.length; n++) a |= 1 << ok.splice(Math.floor(Math.random() * ok.length), 1)[0];
-    return a;
-  });
+// Arrows for every cat: the plain four, except `own` cats that get one to three of their own (never the plain set).
+function makeArrows(W, H, own) {
+  const arrows = Array.from({length: W * H}, (_, i) => inRoom(W, H, i, true));
+  const cats = [...Array(W * H).keys()];
+  for (let n = 0; n < own; n++) {
+    const i = cats.splice(Math.floor(Math.random() * cats.length), 1)[0], all = inRoom(W, H, i, false);
+    for (;;) {
+      const ok = [0, 1, 2, 3, 4, 5, 6, 7].filter(k => all >> k & 1), want = 1 + Math.floor(Math.random() * 3); let a = 0;
+      for (let m = 0; m < want && ok.length; m++) a |= 1 << ok.splice(Math.floor(Math.random() * ok.length), 1)[0];
+      if (a !== arrows[i]) { arrows[i] = a; break; }
+    }
+  }
+  return arrows;
 }
 // A room: tap a few random cats in a dark room (in reverse, that's the answer), and keep it if no shorter
 // answer exists, so the fewest taps is exactly the level's number.
 function makeRoom(n) {
-  const [W, H, T] = levelOf(n), N = W * H, awake = new Array(N).fill(0), picks = [];
-  const arrows = n > 10 ? makeArrows(W, H) : null;
-  const all = [...Array(N).keys()];
+  const [W, H, T, own] = levelOf(n), N = W * H, awake = new Array(N).fill(0), picks = [];
+  const arrows = makeArrows(W, H, own), all = [...Array(N).keys()];
   for (let k = 0; k < T; k++) picks.push(all.splice(Math.floor(Math.random() * all.length), 1)[0]);
   for (const i of picks) for (const j of blinks(W, H, i, arrows)) awake[j] ^= 1;
   const best = fewestTaps(W, H, awake, arrows, 10);
   if (!best || best.length !== T) return null;
-  return arrows ? {W, H, awake, par: T, arrows} : {W, H, awake, par: T};
+  return {W, H, awake, par: T, arrows};
 }
 
 /* ---------- pictures ---------- */
@@ -162,7 +168,7 @@ const CAT = `<svg viewBox="0 0 100 100" aria-hidden="true"><g class="body">
   <ellipse class="eye" cx="36" cy="57" rx="9" ry="7.5"/><ellipse class="eye" cx="64" cy="57" rx="9" ry="7.5"/>
   <ellipse class="pupil" cx="36" cy="57" rx="2.2" ry="6.5"/><ellipse class="pupil" cx="64" cy="57" rx="2.2" ry="6.5"/>
   <path class="shut" d="M27 57 Q36 64 45 57 M55 57 Q64 64 73 57"/></g></svg>`;
-// Arrows mode: a little arrowhead at the edge (or corner) of the square for each way the cat points.
+// A little arrowhead at the edge (or corner) of the square for each way the cat points.
 function arrowMarks(a) {
   return arrowDirs().map(([dx, dy], k) => {
     if (!(a >> k & 1)) return "";
@@ -173,38 +179,38 @@ function arrowMarks(a) {
 
 /* ---------- game ---------- */
 // game: {level, W, H, start (awake at the start), awake, par (fewest taps), taps (every tap counts, even ones
-//        undone), history (undo steps), hinted, won, arrows (Arrows mode: each cat's arrows, as bits)}
-// parked: the other mode's room, kept for switching back.
-const STORE = "catdoku.nightlight.v1", MAX_LEVEL = 7;
+//        undone), history (undo steps), hinted, won, arrows (each cat's arrows, as bits)}
+const STORE = "catdoku.nightlight.v1", MAX_LEVEL = 10;
 const $ = G.$;
 let state = G.load(STORE);
-let settings = Object.assign({level: 1, otherLevel: 11}, state.settings);
-let game = state.game || null, parked = state.parked || null, busy = false, lit = -1;
-const save = () => G.save(STORE, {settings, game, parked});
+let settings = Object.assign({level: 1}, state.settings);
+let game = state.game || null, busy = false, lit = -1;
+const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !busy && !$("overlay").classList.contains("show");
-const isArrows = code => code > 10;
-const okLevel = code => { const n = isArrows(code) ? code - 10 : code; return n >= 1 && n <= MAX_LEVEL; };
-const levelName = n => { const [W, H, T] = levelOf(n); return `${isArrows(n) ? "Arrows level " + (n - 10) : "Level " + n} · ${W} × ${H}, ${T} taps`; };
-const build = G.builder([levelOf, arrowDirs, blinks, fewestTaps, makeArrows, makeRoom], "makeRoom");
+const levelName = n => { const [W, H, T] = levelOf(n); return `Level ${n} · ${W} × ${H}, ${T} taps`; };
+const build = G.builder([levelOf, arrowDirs, inRoom, blinks, fewestTaps, makeArrows, makeRoom], "makeRoom");
+const plainArrows = (W, H) => Array.from({length: W * H}, (_, i) => inRoom(W, H, i, true));
 const awakeCount = () => game.awake.filter(Boolean).length;
 const around = i => blinks(game.W, game.H, i, game.arrows);
+// The cats that point their own way rather than at the four beside them.
+const ownWay = () => game.arrows.map((a, i) => a !== inRoom(game.W, game.H, i, true) ? i : -1).filter(i => i >= 0);
+const WAYS = ["up", "up right", "right", "down right", "down", "down left", "left", "up left"];
 
 function draw() {
-  const el = $("board"), {W, H} = game, key = `${W}x${H}:${game.arrows ? game.arrows.join() : ""}`;
+  const el = $("board"), {W, H} = game, key = `${W}x${H}:${game.arrows.join()}`;
   el.style.gridTemplateColumns = `repeat(${W}, 1fr)`;
   el.style.width = `min(100%, ${W * 96}px)`;
-  el.classList.toggle("arrows", !!game.arrows);
   if (el.dataset.key !== key) {
     el.innerHTML = ""; el.dataset.key = key;
     for (let i = 0; i < W * H; i++) {
       const c = document.createElement("div"); c.className = "cat"; c.dataset.i = i; c.setAttribute("role", "button"); c.innerHTML = CAT;
-      if (game.arrows) c.querySelector("svg").insertAdjacentHTML("beforeend", arrowMarks(game.arrows[i]));
+      c.querySelector("svg").insertAdjacentHTML("beforeend", arrowMarks(game.arrows[i]));
       el.append(c);
     }
   }
   [...el.children].forEach((c, i) => {
     c.classList.toggle("asleep", !game.awake[i]);
-    c.setAttribute("aria-label", (game.awake[i] ? "Awake cat" : "Sleeping cat") + (game.arrows ? `, pointing ${arrowDirs().map((_, k) => game.arrows[i] >> k & 1 ? ["up", "up right", "right", "down right", "down", "down left", "left", "up left"][k] : "").filter(Boolean).join(", ")}` : ""));
+    c.setAttribute("aria-label", `${game.awake[i] ? "Awake cat" : "Sleeping cat"}, pointing ${WAYS.filter((_, k) => game.arrows[i] >> k & 1).join(", ")}`);
   });
   el.classList.toggle("dark", !!game.won);
   const n = awakeCount();
@@ -246,13 +252,11 @@ $("hintBtn").onclick = hint;
 
 /* ---------- endings ---------- */
 const goldOK = () => !game.hinted && game.taps <= game.par;
-const topLevel = () => isArrows(game.level) ? MAX_LEVEL + 10 : MAX_LEVEL;
-const shown = n => isArrows(n) ? n - 10 : n;
 function win() {
   game.won = true; G.finishClock(game);
-  const next = game.hinted ? game.level : Math.min(topLevel(), game.level + 1);
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
   settings.level = next; $("levelSel").value = next; save(); draw();
-  G.track(`Night Light solved ${isArrows(game.level) ? "arrows " : ""}level ${shown(game.level)}`);
+  G.track(`Night Light solved level ${game.level}`);
   build.prefetch(next);
   const g = game;
   setTimeout(() => { if (game === g) finishCard(); }, 1300);
@@ -260,19 +264,15 @@ function win() {
 function finishCard() {
   const next = settings.level;
   let text = `Every cat's asleep, in ${game.taps} tap${game.taps === 1 ? "" : "s"} (the fewest is ${game.par}).`;
-  text += game.hinted ? ` You had a hint, so here's another at level ${shown(next)}.` : game.level === topLevel() ? " That's the hardest level; here's another." : ` Next up: level ${shown(next)}.`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the dark", game.result,
-    {title: "Goodnight!", gold: goldOK(), goldWhy: "The fewest taps, and no hint!", next: `Next: level ${shown(next)}`,
+    {title: "Goodnight!", gold: goldOK(), goldWhy: "The fewest taps, and no hint!", next: `Next: level ${next}`,
      after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
 }
 
 /* ---------- new rooms ---------- */
 function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
-function fresh(n, p) {
-  const g = {level: n, W: p.W, H: p.H, start: p.awake.slice(), awake: p.awake.slice(), par: p.par, taps: 0, history: [], hinted: false, won: false, ...G.freshClock()};
-  if (p.arrows) g.arrows = p.arrows.slice();
-  return g;
-}
+function fresh(n, p) { return {level: n, W: p.W, H: p.H, start: p.awake.slice(), awake: p.awake.slice(), par: p.par, arrows: p.arrows.slice(), taps: 0, history: [], hinted: false, won: false, ...G.freshClock()}; }
 async function newPuzzle() {
   if (busy) return;
   busy = true;
@@ -281,66 +281,55 @@ async function newPuzzle() {
   game = fresh(n, p);
   busy = false; G.closeCard(); G.note(""); draw(); save();
   build.prefetch(n);
-  G.track(`Night Light new puzzle ${isArrows(n) ? "arrows " : ""}level ${shown(n)}`);
+  G.track(`Night Light new puzzle level ${n}`);
+  helpOnFirstVisit();   // the first room with cats that point their own way says so
 }
-
-/* ---------- Classic or Arrows ---------- */
-// Each mode keeps its own level and its own room, so switching back carries on where you were.
-function fillLevels() {
-  const sel = $("levelSel"), base = isArrows(settings.level) ? 10 : 0; sel.innerHTML = "";
-  for (let n = 1; n <= MAX_LEVEL; n++) sel.append(new Option(levelName(n + base).replace(/^\w+ level |^Level /i, "") + (n === MAX_LEVEL ? " (hardest)" : ""), n + base));
-  sel.value = settings.level; $("modeSel").value = base ? "arrows" : "classic";
-}
-$("modeSel").onchange = e => {
-  if (busy || (e.target.value === "arrows") === isArrows(settings.level)) return;
-  G.closeCard();
-  [settings.level, settings.otherLevel] = [settings.otherLevel, settings.level];
-  [game, parked] = [parked, game];
-  fillLevels(); save();
-  if (game && !game.won && isArrows(game.level) === isArrows(settings.level)) { draw(); helpOnFirstVisit(); }
-  else newPuzzle().then(helpOnFirstVisit);
-};
 
 /* ---------- sharing ---------- */
 $("shareBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Night Light", won: game.won,
-  puzzle: () => game.arrows ? {g: "nightlight", N: game.level, awake: game.start, a: game.arrows} : {g: "nightlight", N: game.level, awake: game.start},
+  puzzle: () => ({g: "nightlight", N: game.level, awake: game.start, a: game.arrows}),
   progress: () => ({awake: game.awake, taps: game.taps})}); };
 function openShared(d) {
-  const lv = okLevel(d.N) && levelOf(d.N), ok = a => Array.isArray(a) && lv && a.length === lv[0] * lv[1] && a.every(v => v === 0 || v === 1);
-  // every arrow has to point at a cat in the room
-  const arrows = lv && isArrows(d.N) ? (Array.isArray(d.a) && d.a.length === lv[0] * lv[1] && d.a.every((v, i) => Number.isInteger(v) && v > 0 && v < 256 && blinks(lv[0], lv[1], i, d.a).length === 1 + arrowDirs().filter((_, k) => v >> k & 1).length) ? d.a : false) : null;
-  const best = arrows !== false && ok(d.awake) && fewestTaps(lv[0], lv[1], d.awake, arrows);
+  const lv = levelOf(d.N), size = lv && lv[0] * lv[1], ok = a => Array.isArray(a) && lv && a.length === size && a.every(v => v === 0 || v === 1);
+  // every arrow has to point at a cat in the room; links from before arrows have none, and point the plain way
+  const arrows = !lv ? null : d.a === undefined ? plainArrows(lv[0], lv[1])
+    : Array.isArray(d.a) && d.a.length === size && d.a.every((v, i) => Number.isInteger(v) && v > 0 && (v & inRoom(lv[0], lv[1], i, false)) === v) ? d.a : null;
+  const best = arrows && ok(d.awake) && fewestTaps(lv[0], lv[1], d.awake, arrows);
   if (!best || !best.length) { G.note("That share link didn't work.", 5000); return; }
-  const was = game;
   game = fresh(d.N, {W: lv[0], H: lv[1], awake: d.awake, par: best.length, arrows});
   if (d.p && ok(d.p.awake) && fewestTaps(lv[0], lv[1], d.p.awake, arrows)) { game.awake = d.p.awake.slice(); game.taps = Math.max(0, d.p.taps | 0); game.timed = false; }
-  if (isArrows(d.N) !== isArrows(settings.level)) { [settings.level, settings.otherLevel] = [settings.otherLevel, settings.level]; parked = was; }
-  settings.level = d.N; fillLevels();
+  settings.level = d.N; $("levelSel").value = d.N;
   draw(); save(); build.prefetch(d.N);
   if (!awakeCount()) { game.won = true; draw(); save(); }
 }
 
 /* ---------- how to play ---------- */
 function showHelp() {
-  settings[game && game.arrows ? "seenArrowsHelp" : "seenHelp"] = false; helpOnFirstVisit();
-  if (!document.querySelector(".spot")) { settings[game && game.arrows ? "seenArrowsHelp" : "seenHelp"] = true; G.helpLater(); }
+  settings.seenHelp = false; helpOnFirstVisit();
+  if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
 }
-// First visit to each mode (or How to play, at any point): show what a tap does on a cat in the middle (just
-// while the step is up; the room goes back as it was), then the goal and Hint.
+// First visit (or How to play, at any point): show what a tap does on a cat in the middle (just while the
+// step is up; the room goes back as it was), then the goal and Hint. When a room has cats that point their
+// own way, a step shows one of them too; the first room like that gets that step on its own.
 function helpOnFirstVisit() {
-  const seen = game && game.arrows ? "seenArrowsHelp" : "seenHelp";
-  if (settings[seen] || !game || !playing() || document.querySelector(".spot")) return;
+  if (!game || !playing() || document.querySelector(".spot")) return;
   const {W, H} = game, xy = i => [i % W, Math.floor(i / W)], all = [...Array(W * H).keys()].map(xy);
-  const mid = Math.floor(H / 2) * W + Math.floor(W / 2), awakeOnes = all.filter((_, i) => game.awake[i]);
+  const mid = Math.floor(H / 2) * W + Math.floor(W / 2), awakeOnes = all.filter((_, i) => game.awake[i]), own = ownWay();
   const showing = change => { let was; return {enter: () => { was = game.awake.slice(); change(); draw(); }, leave: () => { game.awake = was; draw(); }}; };
+  const odd = own.length ? own[Math.floor(own.length / 2)] : -1;
+  const ownStep = odd >= 0 && {say: "Some cats point their own way", lit: around(odd).map(xy), ...showing(() => flip(odd))};
+  if (settings.seenHelp) {
+    if (ownStep && !settings.seenOwnWay) G.spotlight({grid: $("board"), w: W, h: H, steps: [ownStep], map, finish: false, done: () => { settings.seenOwnWay = true; save(); }});
+    return;
+  }
   const steps = [
     {say: "Glowing eyes mean a cat is awake", lit: awakeOnes.length ? awakeOnes : all},
-    game.arrows ? {say: "Tap a cat: it and the cats its arrows point at blink", lit: around(mid).map(xy), ...showing(() => flip(mid))}
-      : {say: "Tap a cat: it and the cats next to it blink", lit: around(mid).map(xy), ...showing(() => flip(mid))},
+    {say: "Tap a cat: it and the cats its arrows point at blink", lit: around(mid).map(xy), ...showing(() => flip(mid))},
+    ...(ownStep ? [ownStep] : []),
     {say: "Put every cat to sleep", lit: all, tone: "ok", ...showing(() => { game.awake = game.awake.map(() => 0); })},
     {say: "Stuck? Hint makes a cat to tap glow", els: [$("hintBtn")]},
   ];
-  G.spotlight({grid: $("board"), w: W, h: H, steps, map, done: () => { settings[seen] = true; save(); }});
+  G.spotlight({grid: $("board"), w: W, h: H, steps, map, done: () => { settings.seenHelp = true; if (ownStep) settings.seenOwnWay = true; save(); }});
 }
 function map() {
   const sq = $("board").children, n = game.W * game.H, a = sq[0].getBoundingClientRect(), z = sq[n - 1].getBoundingClientRect();
@@ -349,9 +338,7 @@ function map() {
 }
 
 /* ---------- start ---------- */
-if (!okLevel(settings.level)) settings.level = 1;
-if (!okLevel(settings.otherLevel) || isArrows(settings.otherLevel) === isArrows(settings.level)) settings.otherLevel = isArrows(settings.level) ? 1 : 11;
-fillLevels();
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", "") + (n === MAX_LEVEL ? " (hardest)" : ""), n));
 $("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
 $("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
 $("helpBtn").onclick = showHelp;
@@ -362,9 +349,12 @@ G.setupTimer({name: "nightlight", game: () => game, playing: g => !g.won, save, 
   emptyText: "Put a room of cats to sleep and your times will show up here. They're kept on this device only."});
 $("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
 
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
 const shared = G.readShare("nightlight");
 if (game && Array.isArray(game.awake)) G.reopen(() => {
-    if (!okLevel(game.level) || isArrows(game.level) !== isArrows(settings.level) || isArrows(game.level) !== Array.isArray(game.arrows) || game.awake.length !== game.W * game.H) throw new Error("the saved room doesn't fit its level");
+    if (!levelOf(game.level) || game.awake.length !== game.W * game.H) throw new Error("the saved room doesn't fit its level");
+    if (!Array.isArray(game.arrows)) game.arrows = plainArrows(game.W, game.H);   // saved before arrows: the plain four
     draw();
     if (game.won) finishCard(); else helpOnFirstVisit();
     build.prefetch(settings.level);
