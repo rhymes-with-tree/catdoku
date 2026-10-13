@@ -11,7 +11,8 @@ The front page and every game's menu list the games in `G.GAMES`.
 ## 1. Theme
 
 Check the README's game sections and `G.GAMES`; if an existing game already uses the same mechanic,
-say which. Offer a few cat themes for the user's idea and recommend one.
+say which. Look the idea up in `IDEAS.md`, the list of every puzzle considered, and use its row (rules,
+what it's close to, theme notes). Offer a few cat themes for the user's idea and recommend one.
 
 ## 2. Preview
 
@@ -92,6 +93,8 @@ the highlight up a moment so a hint that finishes the puzzle still shows what it
   <genre>: …": rules, controls, how puzzles are made, levels, hint/Undo/gold paw, timer, share link and
   cat photo. Add the game to the Gold paw and Share lists under "Across every game", and to Help if its
   rule differs.
+- **Ideas list:** in `IDEAS.md`, set the game's row to Built, name it "<Game> (<puzzle it's based on>)",
+  and move it below the Idea rows of its group; add a row if the game wasn't listed.
 - **Build:** replace the current build string (`YYYY-MM-DD.N`) everywhere it appears (`version.txt`,
   every page's BUILD, every `?v=`) with a new one: today's date with `.1`, or the next number if the
   current string is already today's. Pages reload when `version.txt` doesn't match their BUILD.

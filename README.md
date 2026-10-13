@@ -143,6 +143,10 @@ A twenty-second game in `keyboardcat/`, and the first word game: as a keyboard o
 
 `toys/` holds 32 cat toy pictures for any game to use: 256 × 256 WebP with a clear background, named by what they are (`wiffle-red`, `fish`, `cork-paw`…). The ones in `toys/` are recoloured to the games' palette; `toys/original/` has the same toys in their first colours, and `toys/earlier/` an earlier set.
 
+## Ideas
+
+[IDEAS.md](IDEAS.md) lists every puzzle considered for the site, built or not, with how it plays, how easy it would be to add, and whether it's wanted.
+
 ## License
 
 The code is under the [MIT License](LICENSE), so you're welcome to learn from it and reuse it.
