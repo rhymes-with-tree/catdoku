@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-14.5"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-14.6"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,10 +23,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-14.5">
+<link rel="stylesheet" href="../games.css?v=2026-10-14.6">
 <style>
-/* Columns of letters slide up and down; line them up so the bar across the middle spells a word. Seven words a
-   round, against the clock. Each column is a hanging pompom toy with a letter on every pompom; the toys hang a little crooked, as if
+/* Columns of letters slide up and down; line them up so the bar across the middle spells a word. One word a
+   level. Each column is a hanging pompom toy with a letter on every pompom; the toys hang a little crooked, as if
    a cat's been batting at them, and swing when they're moved. */
 .lines{position:relative;width:var(--board);margin:0 auto;border:3px solid var(--ink);border-radius:12px;overflow:hidden;
   touch-action:none;user-select:none;-webkit-user-select:none}
@@ -45,6 +45,11 @@
 @keyframes wigback{0%{transform:rotate(-16deg)}25%{transform:rotate(11deg)}50%{transform:rotate(-6deg)}75%{transform:rotate(3deg)}100%{transform:rotate(0)}}
 @keyframes swing{0%{transform:rotate(calc(var(--tilt) + 9deg))}25%{transform:rotate(calc(var(--tilt) - 6deg))}50%{transform:rotate(calc(var(--tilt) + 3deg))}75%{transform:rotate(calc(var(--tilt) - 1.5deg))}100%{transform:rotate(var(--tilt))}}
 @keyframes swingback{0%{transform:rotate(calc(var(--tilt) - 9deg))}25%{transform:rotate(calc(var(--tilt) + 6deg))}50%{transform:rotate(calc(var(--tilt) - 3deg))}75%{transform:rotate(calc(var(--tilt) + 1.5deg))}100%{transform:rotate(var(--tilt))}}
+/* the cat trotting past bats each toy as it goes, so it swings off to the right and its tail flies */
+.sway.bat{animation:bat 1.6s ease-out}
+.tail.bat{animation:battail 1.3s ease-out}
+@keyframes bat{0%{transform:rotate(var(--tilt))}15%{transform:rotate(calc(var(--tilt) - 13deg))}40%{transform:rotate(calc(var(--tilt) + 8deg))}62%{transform:rotate(calc(var(--tilt) - 4deg))}82%{transform:rotate(calc(var(--tilt) + 1.5deg))}100%{transform:rotate(var(--tilt))}}
+@keyframes battail{0%{transform:rotate(0)}15%{transform:rotate(-24deg)}40%{transform:rotate(14deg)}62%{transform:rotate(-7deg)}82%{transform:rotate(3deg)}100%{transform:rotate(0)}}
 .col.dragging{transition:none}
 .tile text{font-weight:800;text-anchor:middle;dominant-baseline:central;pointer-events:none}
 .tile .ltr{font-size:52px;fill:var(--ink)}
@@ -66,6 +71,7 @@
 
   <div class="actions">
     <button id="hintBtn">Hint</button>
+    <button id="giveUpBtn">Give up</button>
     <button id="shareBtn">Share</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
@@ -76,8 +82,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-14.5"></script>
-<script src="../walkcat.js?v=2026-10-14.5"></script>
+<script src="../games.js?v=2026-10-14.6"></script>
+<script src="../walkcat.js?v=2026-10-14.6"></script>
 <script>
 /* ---------- words ---------- */
 // The words come from Keyboard Cat's list (keyboardcat/words.json): answers from its common words, and any word
@@ -120,7 +126,8 @@ function makeRound(n) {
 
 /* ---------- game state ---------- */
 // game: {level, lines: [{w (the answer), cols (each toy's letters, top to bottom), pos (which letter of each toy is
-//        on the bar)}] (one line a level), at (always 0), found (the word lined up, once it is), hinted, won}
+//        on the bar)}] (one line a level), at (always 0), found (the word lined up, once it is), hinted, won,
+//        gaveUp (the toys were pulled to the answer for you: the level's over, with no time and no gold paw)}
 const STORE = "catdoku.fuzzyspelling.v1", MAX_LEVEL = 20;
 const $ = G.$;
 let state = G.load(STORE);
@@ -181,7 +188,7 @@ function draw(found) {
   svg.setAttribute("viewBox", `0 ${-TOP} ${W} ${H + TOP + BOT}`);
   let s = `<defs>${pomFilters()}</defs>`;
   // the bar: a band of gold outlined in ink across the board, brighter when it spells a word
-  s += `<rect class="barband${found ? " found" : ""}" x="-10" y="${bar + 2}" width="${W + 20}" height="${U - 4}" rx="8"/>`;
+  s += `<rect class="barband${found || game.gaveUp ? " found" : ""}" x="-10" y="${bar + 2}" width="${W + 20}" height="${U - 4}" rx="8"/>`;
   for (let i = 0; i < L; i++) {
     const x = i * U, shift = (K - 1 - Ln.pos[i]) * U;
     // each toy hangs a little crooked from its own spot at the top, and swings when it's just been moved
@@ -199,20 +206,27 @@ function draw(found) {
   if (cursor >= 0 && keyed && document.activeElement === svg) s += `<rect x="${cursor * U + 3}" y="3" width="94" height="${H - 6}" rx="12" fill="none" stroke="#73A7AE" stroke-width="6"/>`;
   svg.innerHTML = s; swing = new Set(); wiggle = new Set();
   if (found && !still()) trot(W, H + BOT);
-  $("count").textContent = game.found.length ? `${game.found[0].toUpperCase()}!` : `Level ${game.level} · ${L} letters`;
-  $("hintBtn").disabled = game.won;
+  $("count").textContent = game.gaveUp ? `It was ${Ln.w.toUpperCase()}` : game.found.length ? `${game.found[0].toUpperCase()}!` : `Level ${game.level} · ${L} letters`;
+  $("hintBtn").disabled = $("giveUpBtn").disabled = game.won;
 }
 
 /* ---------- the cat ---------- */
 // Keyboard Cat's cat (walkcat.js) trots along the bottom of the board, below the toys' tails, when a word's made,
-// so the word stays in view.
+// so the word stays in view. It bats each toy as its nose reaches it, and the toy swings away.
 function trot(W, floor) {
   const cat = WALKCAT.make(), len = 270, y0 = floor - 120 * len / 300 - 4, from = -len, to = W + 20, ms = 1600, t0 = performance.now();
-  $("svg").append(cat.g);
+  const svg = $("svg"), batted = new Set();
+  svg.append(cat.g);
+  const bat = i => {
+    batted.add(i);
+    for (const el of [svg.querySelectorAll(".sway")[i], svg.querySelectorAll(".tail")[i]]) if (el) {
+      el.classList.remove("swing", "wig", "back", "bat"); void el.getBoundingClientRect(); el.classList.add("bat"); }
+  };
   const frame = now => {
     if (!cat.g.isConnected) return;
-    const f = Math.min(1, (now - t0) / ms);
-    WALKCAT.pose(cat, from + (to - from) * f, y0, len, now - t0);
+    const f = Math.min(1, (now - t0) / ms), x = from + (to - from) * f;
+    WALKCAT.pose(cat, x, y0, len, now - t0);
+    for (let i = 0; i * U < W; i++) if (!batted.has(i) && x + len * .9 >= i * U + 50) bat(i);
     if (f < 1) requestAnimationFrame(frame); else cat.g.remove();
   };
   requestAnimationFrame(frame);
@@ -299,6 +313,30 @@ $("hintBtn").onclick = () => {
   hintTimer = setTimeout(() => { if (hintMark === m) { hintMark = null; if (game) draw(); } }, 5000);
 };
 
+// Give up: the toys pull themselves round to spell the answer, and the next round is the same level.
+$("giveUpBtn").onclick = () => {
+  if (!playing()) return;
+  G.openCard("Give up?", `The toys will spell the word for you, and you'll get another level ${game.level}.`,
+    [["Show me the word", () => { G.closeCard(); giveUp(); }, true], ["Keep trying", G.closeCard]]);
+};
+function giveUp() {
+  const Ln = line();
+  Ln.pos = Ln.cols.map((c, i) => c.indexOf(Ln.w[i]));
+  game.won = true; game.gaveUp = true; game.result = {ms: null, n: game.level};
+  settings.level = game.level; hintMark = null; pause = true;
+  swing = new Set(Ln.cols.keys()); draw(); save();
+  G.track(`Fuzzy Spelling gave up level ${game.level}`);
+  const g = game;
+  setTimeout(() => { pause = false; if (game === g) gaveUpCard(); }, 1500);   // time to see the word before the card
+}
+function gaveUpCard() {
+  const n = game.level;
+  G.openCard(`It was ${line().w.toUpperCase()}`, `Here's another level ${n} to try.`,
+    [[`Next: level ${n}`, () => { G.closeCard(); startLevel(n); }, true],
+     ["Look at my toys", () => { G.closeCard(); G.note("Tap New round when you're ready for another.", 0); }]],
+    null, G.otherSize($("levelSel"), n, startLevel, "Or play a different level:"));
+}
+
 /* ---------- endings ---------- */
 function win() {
   game.won = true; G.finishClock(game);
@@ -361,6 +399,7 @@ function helpOnFirstVisit() {
     {say: "Drag a column up or down, or tap a letter", lit: col},
     {say: "Any real word counts!", lit: barRow, tone: "ok"},
     {say: "Stuck? Hint shows a letter to move", els: [$("hintBtn")]},
+    {say: "Or give up to see the word", els: [$("giveUpBtn")]},
   ];
   const map = () => { const r = $("svg").getBoundingClientRect(), k = r.width / (L * U); return {ox: r.left, oy: r.top + TOP * k, cw: U * k, ch: U * k}; };
   G.spotlight({grid: $("grid"), w: L, h: 2 * K - 1, steps, map, done: () => { settings.seenHelp = true; save(); }});
@@ -382,7 +421,7 @@ const shared = G.readShare("fuzzyspelling");
 loadWords().then(() => {
   if (game && Array.isArray(game.lines) && game.lines.length === 1 && levelOf(game.level)) G.reopen(() => {
       if (game.lines[0].cols.length !== levelOf(game.level).L) throw new Error("the saved toys don't fit their level");
-      draw(); if (game.won) finishCard(); else helpOnFirstVisit();
+      draw(); if (game.gaveUp) gaveUpCard(); else if (game.won) finishCard(); else helpOnFirstVisit();
     }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
   else if (!shared) newPuzzle().then(helpOnFirstVisit);
   if (shared) G.offerShare(shared, shareOpts());
