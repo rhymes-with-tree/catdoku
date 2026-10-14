@@ -34,7 +34,7 @@ anywhere, but keep track of who they are, because they'll be featured in games o
   of Knock It Off. `kitten-star.webp`, the kitten freed in Bubbles, is Fred too
   (sometimes called Fred Kitten).
 - **Bugsy** (`bugsy-…`, fluffy brown and white) and **Bowtie** (`bowtie-…`, tuxedo) will be the
-  mascots of Twirl and Tunnel Run, and will nap in Sunbeams. `bowtie-7` is Bowtie in a cat
-  tunnel, with a second Bowtie rolling over beside it. The pictures of the two together are
+  mascots of Twirl and Tunnel Run, and will nap in Sunbeams. `bowtie-tunnel` is Bowtie in a cat
+  tunnel (for Tunnel Run); `bowtie-7` is the same tunnel with a second Bowtie rolling over beside it. The pictures of the two together are
   `bugsy-bowtie-window`, `bugsy-bowtie-rug` and `bugsy-bowtie-boxes`.
 - **Crunch** (`crunch-…`, grey tabby with green eyes) will be the star of Pounce.
