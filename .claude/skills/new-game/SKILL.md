@@ -14,6 +14,10 @@ Check the README's game sections and `G.GAMES`; if an existing game already uses
 say which. Look the idea up in `IDEAS.md`, the list of every puzzle considered, and use its row (rules,
 what it's close to, theme notes). Offer a few cat themes for the user's idea and recommend one.
 
+Ask whether there's a particular cat the user wants as the game's mascot or star. The named cats and the
+games they're meant for are in `ARTWORK.md` ("Who's who in `cats/`"); Bowtie in Tunnel Run is the example
+to follow (the cat in the game, its run, the gold-paw card, the tagline and the front-page icon).
+
 Look for art the site already has before drawing anything new, and say what you'd reuse:
 
 - **Shared files:** `cats/` (photos and the curled-up napping cats from Sunbeams), `toys/` (the toy library),
@@ -171,4 +175,5 @@ Don't use `pkill -f`: the pattern matches the shell running the command and kill
 
 Branch `claude/<slug>` from `main`, unless the session names a branch to use. One commit, described
 like the earlier game commits (what the game is, how puzzles are made, levels, features, build bump).
-Push and open a PR. Don't subscribe to or watch it; the user merges when ready.
+Push and open a PR, and give the user the link. That's the end: nobody else reviews or comments, and the
+user approves and merges it. Don't offer to watch it, subscribe to it or schedule check-ins.
