@@ -14,6 +14,15 @@ Check the README's game sections and `G.GAMES`; if an existing game already uses
 say which. Look the idea up in `IDEAS.md`, the list of every puzzle considered, and use its row (rules,
 what it's close to, theme notes). Offer a few cat themes for the user's idea and recommend one.
 
+Look for art the site already has before drawing anything new, and say what you'd reuse:
+
+- **Shared files:** `cats/` (photos and the curled-up napping cats from Sunbeams), `toys/` (the toy library),
+  `colorways.js` (Yarn's and Twirl's colourways) and `cattower.js` (carpet colours, perch pieces, sisal posts
+  and napping cats, from Catwalk and High Perch).
+- **Other games' pages:** drawings that live in one page, such as Night Light's cat heads, Open the Door!'s
+  running cat, Tunnel Run's tunnels or Knock It Off's table things. When a new game wants one, move it into a
+  shared file (as `cattower.js` was) and point both games at it, rather than copying it.
+
 ## 2. Preview
 
 Build a standalone page in the scratchpad and publish it as an artifact before changing the repo. Load
@@ -122,8 +131,11 @@ Tunnel Run puts a box round a piece that's the wrong way round and says so for 3
   <genre>: …": rules, controls, how puzzles are made, levels, hint/Undo/gold paw, timer, share link and
   cat photo. Add the game to the Gold paw and Share lists under "Across every game", and to Help if its
   rule differs.
-- **Ideas list:** in `IDEAS.md`, set the game's row to Built, name it "<Game> (<puzzle it's based on>)",
-  and move it below the Idea rows of its group; add a row if the game wasn't listed.
+- **Ideas list:** keep `IDEAS.md` up to date with every decision, in the same PR. Set the game's row to
+  Built, name it "<Game> (<puzzle it's based on>)", and move it below the Idea rows of its group; add a row
+  if the game wasn't listed. When two ideas become one game, merge their rows; when an idea becomes a mode
+  or levels of an existing game, mark it Built and say where (Notes); drop rows the user rules out; and note
+  new ideas, themes or changes of plan that come up while talking it through.
 - **Build:** replace the current build string (`YYYY-MM-DD.N`) everywhere it appears (`version.txt`,
   every page's BUILD, every `?v=`) with a new one: today's date with `.1`, or the next number if the
   current string is already today's. Pages reload when `version.txt` doesn't match their BUILD.
