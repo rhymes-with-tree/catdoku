@@ -379,10 +379,32 @@ def iffits():
     return frame("#E8DCC4", out)
 
 
+# High Perch: a 3 × 3 floor of cat trees of different heights, an arrow pointing down to the shorter tree, and a
+# lookout cat at the end of a row.
+def highperch():
+    s, o = 20, 29
+    out = f'<rect x="{o}" y="{o}" width="{3*s}" height="{3*s}" fill="#F7EFE1" stroke="{INK}" stroke-width="2"/>'
+    out += "".join(f'<path d="M{o+k*s} {o}V{o+3*s}M{o} {o+k*s}H{o+3*s}" stroke="{INK}" stroke-opacity=".18" stroke-width="1.2"/>' for k in (1, 2))
+    for k, h in enumerate([3, 1, 2, 2, 3, 1, 1, 2, 3]):
+        x, y = o + k % 3 * s, o + k // 3 * s
+        cx, base, top = x + s * .55, y + s - 2.5, y + s - 2.5 - h * 4.9
+        out += f'<rect x="{cx-1.6}" y="{top}" width="3.2" height="{base-top}" fill="#C9A574"/>'
+        out += f'<rect x="{cx-7}" y="{base-1.6}" width="14" height="2.6" rx="1.2" fill="#A9805A"/>'
+        out += f'<rect x="{cx-6.5}" y="{top-2}" width="13" height="3.4" rx="1.6" fill="#8E5E3E"/>'
+        out += text(x + 5.5, y + 6.5, h, 8)
+    # an arrow between the first two trees, pointing at the shorter
+    ax, ay = o + s, o + s / 2
+    out += f'<circle cx="{ax}" cy="{ay}" r="4.2" fill="#F7EFE1" stroke="{INK}" stroke-opacity=".3" stroke-width="1"/>'
+    out += f'<path d="M{ax-1.8} {ay-2.6}L{ax+1.8} {ay}L{ax-1.8} {ay+2.6}" fill="none" stroke="{INK}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'
+    # a lookout cat left of the middle row, seeing two trees
+    out += catface(o - 13, o + s * 1.5, 6.5, "#5A4A6E") + text(o - 13, o + s * 1.5 + 2, 2, 7, "#FFF4D2")
+    return frame("#F1E7D6", out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")

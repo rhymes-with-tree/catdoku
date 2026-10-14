@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>High Perch</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-14.1"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-14.1">
+<style>
+/* A cattery floor of cat trees, 1 to N perches tall: one of each height in every row and column. Arrows between
+   trees point down to the shorter one, and lookout cats round the walls count the trees they can see. When
+   every tree is right, a cat curls up on each top perch. */
+.floorwrap{background:#F1E7D6;border:3px solid var(--ink);border-radius:10px;overflow:hidden;
+  user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.floorwrap .grid{position:absolute;inset:0}
+.floorwrap svg{display:block;width:100%;height:100%;outline:none}
+.sq{fill:#F7EFE1;stroke:rgba(42,37,48,.16);stroke-width:2;cursor:pointer}
+.sq.peer{fill:#EFE6F2}
+.sq.sel{fill:#E3D6EE}
+.sq.given{fill:#EADBC2}
+.tree{pointer-events:none}
+.tree .post{fill:#C9A574}
+.tree .perch{fill:#A9805A}
+.tree .top{fill:#8E5E3E}
+.ht{font-size:36px;font-weight:800;fill:var(--ink);text-anchor:middle;dominant-baseline:central;paint-order:stroke fill;stroke:#F7EFE1;stroke-width:7px;stroke-linejoin:round;pointer-events:none}
+.given .ht,.ht.given{stroke:#EADBC2}
+.ht.given{fill:#5A4632}
+.ht.clash{fill:#C8392B}
+.nt{font-size:21px;font-weight:600;fill:var(--ink-soft);text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.sign{fill:none;stroke:var(--ink);stroke-width:5;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.signbg{fill:#F7EFE1;stroke:rgba(42,37,48,.16);stroke-width:2;pointer-events:none}
+.sign.wrong{stroke:#C8392B}
+.look .face{fill:#5A4A6E}
+.look .ear{fill:#5A4A6E}
+.look text{font-size:36px;font-weight:800;fill:#FFF4D2;text-anchor:middle;dominant-baseline:central}
+.look.ok .face,.look.ok .ear{fill:#4FA060}
+.look.bad .face,.look.bad .ear{fill:#C8392B}
+.sleeper{font-size:34px;pointer-events:none}
+.pad{width:var(--board);display:flex;gap:6px;justify-content:center}
+.pad button{flex:1 1 0;max-width:58px;padding:6px 0;font-size:22px;font-weight:800;line-height:1.1}
+.pad button.erase{font-size:18px}
+.pad.noting button:not(.erase){border-style:dashed;color:#3C8681}
+.key{width:var(--board);text-align:center;font-weight:600;font-size:15px;color:var(--ink-soft);margin-top:-6px;min-height:1.4em}
+@keyframes curl{from{opacity:0;transform:translateY(-12px)}}
+.sleeper{animation:curl .4s ease-out backwards}
+@media (prefers-reduced-motion:reduce){.sleeper{animation:none}}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>High Perch</h1><div class="stripe"></div><p class="tagline">Raise every cat tree to just the right height</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap floorwrap" id="board"><div class="grid" id="grid"><svg id="svg" tabindex="0" role="application" aria-label="A floor of cat trees. Tap a square, then a height."></svg></div></div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+  <div class="pad" id="pad" aria-label="Heights"></div>
+  <div class="key" id="key"></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="notesBtn" aria-pressed="false">Notes</button>
+    <button id="allNotesBtn">All notes</button>
+    <button id="shareBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New floor</button>
+  </div>
+</main>
+
+<script src="../games.js?v=2026-10-14.1"></script>
+<script>
+/* ---------- puzzles (plain functions, also run in a background worker) ---------- */
+// An N × N floor of cat trees, 1 to N perches tall: every row and column has one tree of each height.
+// Clues: trees already standing (givens), arrows between neighbours pointing down to the shorter tree (signs,
+// as in Futoshiki), and lookout cats round the edge, each saying how many trees it can see along its row or
+// column, since a taller tree hides the shorter ones behind it (looks, as in Skyscrapers).
+// Levels: the size, which clues it uses (G givens, S signs, L lookouts), and how many spare clues it keeps
+// beyond the fewest that still make the puzzle work out.
+function levelOf(n) {
+  return [null, {N: 4, t: "G", extra: 3}, {N: 5, t: "G", extra: 3}, {N: 4, t: "GS", extra: 2}, {N: 5, t: "GS", extra: 1},
+    {N: 4, t: "GL", extra: 2}, {N: 5, t: "GL", extra: 1}, {N: 6, t: "GSL", extra: 2}, {N: 6, t: "GSL", extra: 0},
+    {N: 7, t: "GSL", extra: 0}, {N: 7, t: "SL", extra: 0}][n];
+}
+// A random full grid: fill square by square with numbers in a random order, backing up when stuck.
+function randomLatin(N) {
+  for (;;) {
+    const g = new Array(N * N).fill(0), rows = new Array(N).fill(0), cols = new Array(N).fill(0);
+    let steps = 0;
+    const fill = i => {
+      if (i === N * N) return true;
+      if (++steps > 20000) return false;
+      const r = Math.floor(i / N), c = i % N, vs = [];
+      for (let v = 1; v <= N; v++) if (!(rows[r] >> v & 1) && !(cols[c] >> v & 1)) vs.push(v);
+      for (let k = vs.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [vs[k], vs[j]] = [vs[j], vs[k]]; }
+      for (const v of vs) {
+        g[i] = v; rows[r] |= 1 << v; cols[c] |= 1 << v;
+        if (fill(i + 1)) return true;
+        rows[r] &= ~(1 << v); cols[c] &= ~(1 << v);
+      }
+      g[i] = 0; return false;
+    };
+    if (fill(0)) return g;
+  }
+}
+// The squares a lookout sees, nearest first. Sides: 0 top (looking down column l), 1 right (looking left
+// along row l), 2 bottom (looking up), 3 left (looking right).
+function viewCells(N, side, l) {
+  const out = [];
+  for (let t = 0; t < N; t++) out.push(side === 0 ? t * N + l : side === 1 ? l * N + (N - 1 - t) : side === 2 ? (N - 1 - t) * N + l : l * N + t);
+  return out;
+}
+// How many trees you see looking along heights in order: each one taller than all before it.
+function seen(hs) { let top = 0, n = 0; for (const h of hs) if (h > top) { top = h; n++; } return n; }
+// Every order of 1..N (for the lines a lookout watches).
+function perms(N) {
+  const out = [], a = [...Array(N).keys()].map(v => v + 1);
+  const go = k => { if (k === N) { out.push(a.slice()); return; } for (let j = k; j < N; j++) { [a[k], a[j]] = [a[j], a[k]]; go(k + 1); [a[k], a[j]] = [a[j], a[k]]; } };
+  go(0); return out;
+}
+// Work the puzzle out by reasoning alone, without guessing: each square keeps the heights it could be, and
+// they're ruled out by rows and columns (a height that's placed, or has only one place left), by arrows (a
+// tree taller than its neighbour can't be the shortest it could be, and so on), and by lookouts (only the
+// orders of a line that show each of its lookouts the right number stay). Returns the finished grid, or null
+// if it gets stuck or finds a contradiction. clues: {givens: [[i, h]], signs: [[taller, shorter]], looks: [[side, line, count]]}.
+function reason(N, clues, all) {
+  const full = (1 << (N + 1)) - 2, dom = new Array(N * N).fill(full), bit = v => 1 << v;
+  const ones = m => { let c = 0; while (m) { m &= m - 1; c++; } return c; };
+  const lo = m => 31 - Math.clz32(m & -m), hi = m => 31 - Math.clz32(m);
+  for (const [i, h] of clues.givens) dom[i] &= bit(h);
+  // lines with lookouts: the orders still possible, as [cells (left to right or top to bottom), orders]
+  const lines = [];
+  for (const [a, l] of [...new Set(clues.looks.map(([s, l]) => (s % 2 ? "r" : "c") + l))].map(k => [k[0], +k.slice(1)])) {
+    const cells = a === "r" ? viewCells(N, 3, l) : viewCells(N, 0, l), mine = clues.looks.filter(([s, ll]) => ll === l && (s % 2 ? "r" : "c") === a);
+    lines.push([cells, all.filter(p => mine.every(([s, , c]) => seen(s === 0 || s === 3 ? p : p.slice().reverse()) === c))]);
+  }
+  for (let changed = true; changed;) {
+    changed = false;
+    const set = (i, m) => { if (m !== dom[i]) { dom[i] = m; changed = true; } return m; };
+    for (let i = 0; i < N * N; i++) {
+      if (!dom[i]) return null;
+      if (ones(dom[i]) !== 1) continue;
+      const r = Math.floor(i / N), c = i % N;
+      for (let j = 0; j < N; j++) for (const p of [r * N + j, j * N + c]) if (p !== i && dom[p] & dom[i]) { if (!set(p, dom[p] & ~dom[i])) return null; }
+    }
+    for (let a = 0; a < N; a++) for (const line of [0, 1]) for (let v = 1; v <= N; v++) {
+      let where = -1, n = 0;
+      for (let b = 0; b < N; b++) { const p = line ? b * N + a : a * N + b; if (dom[p] & bit(v)) { where = p; n++; } }
+      if (!n) return null;
+      if (n === 1) set(where, bit(v));
+    }
+    for (const [t, s] of clues.signs) {
+      if (!dom[t] || !dom[s]) return null;
+      let mt = dom[t], ms = dom[s];
+      for (let v = 1; v <= N; v++) { if (v <= lo(dom[s])) mt &= ~bit(v); if (v >= hi(dom[t])) ms &= ~bit(v); }
+      if (!set(t, mt) || !set(s, ms)) return null;
+    }
+    for (const ln of lines) {
+      const [cells, ps] = ln, keep = [], seenAt = new Array(N).fill(0);
+      for (const p of ps) {
+        let ok = true;
+        for (let q = 0; q < N; q++) if (!(dom[cells[q]] & bit(p[q]))) { ok = false; break; }
+        if (ok) { keep.push(p); for (let q = 0; q < N; q++) seenAt[q] |= bit(p[q]); }
+      }
+      if (!keep.length) return null;
+      ln[1] = keep;
+      for (let q = 0; q < N; q++) if (!set(cells[q], dom[cells[q]] & seenAt[q])) return null;
+    }
+  }
+  return dom.every(m => ones(m) === 1) ? dom.map(m => lo(m)) : null;
+}
+// A floor for level n: a full grid, then every clue the level uses; take clues away one at a time (trees
+// already standing first, so the arrows and lookouts do the work), keeping each one that's needed for the
+// puzzle to work out by reasoning alone, then put back the level's spare clues. Working out by reasoning
+// alone also means there's exactly one answer.
+function makeFloor(n) {
+  const {N, t, extra} = levelOf(n), sol = randomLatin(N), all = t.includes("L") ? perms(N) : [];
+  const shuffle = a => { for (let k = a.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [a[k], a[j]] = [a[j], a[k]]; } return a; };
+  const givens = shuffle([...Array(N * N).keys()].map(i => ["g", [i, sol[i]]]));
+  const others = [];
+  if (t.includes("S")) for (let i = 0; i < N * N; i++) for (const j of [i % N < N - 1 ? i + 1 : -1, i + N < N * N ? i + N : -1]) if (j >= 0) others.push(["s", sol[i] > sol[j] ? [i, j] : [j, i]]);
+  if (t.includes("L")) for (let s = 0; s < 4; s++) for (let l = 0; l < N; l++) others.push(["l", [s, l, seen(viewCells(N, s, l).map(i => sol[i]))]]);
+  shuffle(others);
+  // with no trees standing at the start, the arrows and lookouts have to do it all
+  let have = t.includes("G") ? givens.concat(others) : others;
+  const pack = list => ({givens: list.filter(c => c[0] === "g").map(c => c[1]), signs: list.filter(c => c[0] === "s").map(c => c[1]), looks: list.filter(c => c[0] === "l").map(c => c[1])});
+  if (!reason(N, pack(have), all)) return null;
+  const gone = [];
+  for (const c of have.slice()) {
+    const without = have.filter(x => x !== c);
+    if (reason(N, pack(without), all)) { have = without; gone.push(c); }
+  }
+  shuffle(gone);
+  have = have.concat(gone.slice(0, extra));
+  return {N, sol, ...pack(have)};
+}
+
+/* ---------- game state ---------- */
+// game: {level, N, sol, givens, signs, looks (the clues, as makeFloor returns them), grid (0 for empty),
+//        notes (bit v set: v jotted down), history (undo steps), hinted, undid, won}
+const STORE = "catdoku.highperch.v1", MAX_LEVEL = 10;
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1}, state.settings);
+let game = state.game || null, busy = false, running = false, sel = -1, noting = false;
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
+const CLUES = {G: "", GS: "arrows", GL: "lookouts", GSL: "arrows and lookouts", SL: "arrows and lookouts only"};
+const levelName = n => { const {N, t} = levelOf(n); return `Level ${n} · ${N} × ${N}${CLUES[t] ? ", " + CLUES[t] : ""}`; };
+const build = G.builder([levelOf, randomLatin, viewCells, seen, perms, reason, makeFloor], "makeFloor");
+const M = () => game.looks.length ? 70 : 0;   // the strip round the floor where lookout cats sit
+const isGiven = i => game.givens.some(([g]) => g === i);
+
+/* ---------- drawing ---------- */
+const NS = "http://www.w3.org/2000/svg";
+// A cat tree h perches tall, drawn faintly behind its number: a sisal post with a perch at each level,
+// left and right in turn, and a bigger one on top.
+function treeSvg(x, y, h, N) {
+  const step = 78 / N, top = 95 - h * step, cx = x + 58;
+  let s = `<g class="tree"><rect class="post" x="${cx - 6}" y="${y + top}" width="12" height="${95 - top}" rx="3"/>`;
+  s += `<rect class="perch" x="${cx - 28}" y="${y + 89}" width="56" height="8" rx="4"/>`;
+  for (let k = 1; k < h; k++) { const py = y + 95 - k * step; s += `<rect class="perch" x="${k % 2 ? cx - 30 : cx}" y="${py - 3.5}" width="30" height="7" rx="3.5"/>`; }
+  s += `<rect class="top" x="${cx - 26}" y="${y + top - 6}" width="52" height="11" rx="5.5"/></g>`;
+  return s;
+}
+// Rows and columns with a height twice, arrows the wrong way round, and lookouts whose line is full but
+// shows them the wrong number (or the right one).
+function check() {
+  const N = game.N, g = game.grid, clash = new Set();
+  for (let a = 0; a < N; a++) for (const line of [0, 1]) {
+    const at = {};
+    for (let b = 0; b < N; b++) { const i = line ? b * N + a : a * N + b; if (g[i]) (at[g[i]] = at[g[i]] || []).push(i); }
+    for (const v in at) if (at[v].length > 1) at[v].forEach(i => clash.add(i));
+  }
+  const badSign = game.signs.map(([t, s]) => g[t] && g[s] && g[t] <= g[s]);
+  const lookState = game.looks.map(([side, l, c]) => { const hs = viewCells(N, side, l).map(i => g[i]); return hs.every(Boolean) ? (seen(hs) === c ? "ok" : "bad") : ""; });
+  return {clash, badSign, lookState};
+}
+let hintMark = null;   // {i, bad, key}: a square to look at, while the grid is as it was
+function draw() {
+  const N = game.N, m = M(), S = N * 100, svg = $("svg"), g = game.grid, {clash, badSign, lookState} = check();
+  svg.setAttribute("viewBox", `${-m} ${-m} ${S + 2 * m} ${S + 2 * m}`);
+  const sr = sel >= 0 ? Math.floor(sel / N) : -1, sc = sel >= 0 ? sel % N : -1;
+  let out = "";
+  for (let i = 0; i < N * N; i++) {
+    const x = i % N * 100, y = Math.floor(i / N) * 100, r = Math.floor(i / N), c = i % N, given = isGiven(i);
+    const cls = ["sq", i === sel ? "sel" : sel >= 0 && (r === sr || c === sc) ? "peer" : "", given ? "given" : ""].filter(Boolean).join(" ");
+    out += `<rect class="${cls}" data-i="${i}" x="${x}" y="${y}" width="100" height="100"/>`;
+    if (g[i]) {
+      out += treeSvg(x, y, g[i], N);
+      out += `<text class="ht${given ? " given" : ""}${clash.has(i) ? " clash" : ""}" x="${x + 20}" y="${y + 24}">${g[i]}</text>`;
+    } else if (game.notes[i]) {
+      const cols = Math.ceil(Math.sqrt(N));
+      for (let v = 1; v <= N; v++) if (game.notes[i] >> v & 1) {
+        const k = v - 1, cx = x + 20 + (k % cols) * (60 / (cols - 1 || 1)), cy = y + 22 + Math.floor(k / cols) * 28;
+        out += `<text class="nt" x="${cx}" y="${cy}">${v}</text>`;
+      }
+    }
+  }
+  // arrows between neighbours: the point faces the shorter tree
+  game.signs.forEach(([t, s], k) => {
+    const tx = t % N, ty = Math.floor(t / N), sx = s % N, sy = Math.floor(s / N);
+    const cx = (tx + sx) * 50 + 50, cy = (ty + sy) * 50 + 50, dx = sx - tx, dy = sy - ty;
+    out += `<circle class="signbg" cx="${cx}" cy="${cy}" r="15"/>`;
+    out += `<path class="sign${badSign[k] ? " wrong" : ""}" d="M${cx - dx * 6 - dy * 9} ${cy - dy * 6 - dx * 9}L${cx + dx * 6} ${cy + dy * 6}L${cx - dx * 6 + dy * 9} ${cy - dy * 6 + dx * 9}"/>`;
+  });
+  // lookout cats: a cat's head with the number of trees it sees
+  game.looks.forEach(([side, l, c], k) => {
+    const cx = side === 0 || side === 2 ? l * 100 + 50 : side === 1 ? S + m / 2 : -m / 2;
+    const cy = side === 1 || side === 3 ? l * 100 + 50 : side === 2 ? S + m / 2 : -m / 2;
+    out += `<g class="look ${lookState[k]}" role="img" aria-label="A lookout cat that sees ${c} tree${c > 1 ? "s" : ""}">
+      <path class="ear" d="M${cx - 27} ${cy - 4}L${cx - 24} ${cy - 33}L${cx - 5} ${cy - 21}Z M${cx + 27} ${cy - 4}L${cx + 24} ${cy - 33}L${cx + 5} ${cy - 21}Z"/>
+      <circle class="face" cx="${cx}" cy="${cy + 3}" r="27"/><text x="${cx}" y="${cy + 5}">${c}</text></g>`;
+  });
+  if (hintMark && hintMark.key === g.join()) {
+    const i = hintMark.i;
+    out += `<rect class="hintsq${hintMark.bad ? " bad" : ""}" x="${i % N * 100 + 5}" y="${Math.floor(i / N) * 100 + 5}" width="90" height="90" rx="10"/>`;
+  }
+  if (game.won) game.grid.forEach((h, i) => {
+    const x = i % N * 100, y = Math.floor(i / N) * 100, top = 95 - h * 78 / N;
+    out += `<text class="sleeper" x="${x + 58}" y="${y + top - 10}" text-anchor="middle" style="animation-delay:${(running ? i * 40 : 0)}ms">🐈</text>`;
+  });
+  svg.innerHTML = out;
+  $("pad").classList.toggle("noting", noting);
+  $("notesBtn").setAttribute("aria-pressed", String(noting));
+  const filled = g.filter(Boolean).length;
+  $("count").textContent = game.won ? "Every tree is up!" : `${filled} of ${N * N} trees`;
+  $("key").textContent = game.won ? "" : noting ? "Notes: tap heights to jot them down as maybes" : sel < 0 ? "Tap a square, then a height" : isGiven(sel) ? "That tree was already standing" : "";
+  $("hintBtn").disabled = game.won; $("allNotesBtn").disabled = game.won;
+  $("undoBtn").disabled = !game.history.length || game.won; $("restartBtn").disabled = !game.history.length || game.won;
+}
+
+/* ---------- playing ---------- */
+const snapshot = () => game.history.push({grid: game.grid.slice(), notes: game.notes.slice()});
+function put(v) {
+  if (!playing() || sel < 0 || isGiven(sel)) return;
+  game.started = true;
+  snapshot();
+  if (noting && v) {
+    if (game.grid[sel]) game.grid[sel] = 0;
+    game.notes[sel] ^= 1 << v;
+  } else {
+    game.grid[sel] = v && game.grid[sel] !== v ? v : 0;
+    // a height put down comes off the notes in its row and column
+    if (game.grid[sel]) { const N = game.N, r = Math.floor(sel / N), c = sel % N; for (let j = 0; j < N; j++) { game.notes[r * N + j] &= ~(1 << v); game.notes[j * N + c] &= ~(1 << v); } }
+    else if (!v) game.notes[sel] = 0;
+  }
+  if (game.grid.every((h, i) => h === game.sol[i])) { win(); return; }
+  draw(); save();
+}
+$("svg").addEventListener("click", e => {
+  if (!playing()) return;
+  const r = e.target.closest(".sq"); if (!r) return;
+  sel = +r.dataset.i === sel ? -1 : +r.dataset.i; draw();
+});
+function makePad() {
+  const pad = $("pad"); pad.innerHTML = "";
+  for (let v = 1; v <= game.N; v++) { const b = document.createElement("button"); b.textContent = v; b.onclick = () => put(v); pad.append(b); }
+  const er = document.createElement("button"); er.className = "erase"; er.textContent = "⌫"; er.setAttribute("aria-label", "Erase"); er.onclick = () => put(0); pad.append(er);
+}
+$("notesBtn").onclick = () => { if (!game || game.won) return; noting = !noting; draw(); };
+// All notes: every empty square gets every height from 1 to N as a note, ready to cross off. Undo takes them away.
+$("allNotesBtn").onclick = () => {
+  if (!playing()) return;
+  const full = (1 << (game.N + 1)) - 2;
+  if (game.grid.every((v, i) => v || game.notes[i] === full)) { G.note("They're all there already", 3000); return; }
+  snapshot();
+  game.notes = game.notes.map((m, i) => game.grid[i] ? m : full);
+  game.started = true; draw(); save();
+  G.note(`Notes 1 to ${game.N} in every empty square`, 3000);
+};
+document.addEventListener("keydown", e => {
+  if (!playing() || document.querySelector(".spot") || e.target.tagName === "SELECT" || e.ctrlKey || e.metaKey || e.altKey) return;
+  const N = game.N, k = e.key;
+  if (/^[1-9]$/.test(k) && +k <= N) { if (sel < 0) sel = 0; put(+k); e.preventDefault(); return; }
+  if (k === "Backspace" || k === "Delete" || k === "0") { put(0); e.preventDefault(); return; }
+  if (k === "n" || k === "N") { noting = !noting; draw(); return; }
+  const mv = {ArrowUp: -N, ArrowDown: N, ArrowLeft: -1, ArrowRight: 1}[k];
+  if (mv !== undefined) {
+    e.preventDefault();
+    if (sel < 0) sel = 0;
+    else if (!((k === "ArrowLeft" && sel % N === 0) || (k === "ArrowRight" && sel % N === N - 1) || sel + mv < 0 || sel + mv >= N * N)) sel += mv;
+    draw();
+  }
+});
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
+function undo() { if (playing() && game.history.length) { game.undid = true; const h = game.history.pop(); game.grid = h.grid; game.notes = h.notes; draw(); save(); } }
+$("undoBtn").onclick = undo;
+$("restartBtn").onclick = () => {
+  if (!playing() || !game.history.length) return;
+  game.undid = true; snapshot();
+  game.grid = game.grid.map((v, i) => isGiven(i) ? v : 0); game.notes = game.notes.map(() => 0);
+  draw(); save(); G.note("Back to the bare floor. Undo brings your trees back.", 3500);
+};
+// Hint: first a tree that's the wrong height, in red. Otherwise a gold box round an empty square (one with the
+// fewest heights its row and column leave open), and the message says its height.
+// The player puts it in. A hint keeps you on the same level and costs the gold paw.
+let hintTimer = null;
+function hint() {
+  if (!playing()) return;
+  const N = game.N, g = game.grid, wrong = g.map((v, i) => v && v !== game.sol[i] ? i : -1).filter(i => i >= 0);
+  let i, bad = false;
+  if (wrong.length) { i = wrong.includes(sel) ? sel : wrong[0]; bad = true; }
+  else {
+    const empty = g.map((v, k) => v ? -1 : k).filter(k => k >= 0);
+    if (!empty.length) return;
+    const ones = m => { let c = 0; while (m) { m &= m - 1; c++; } return c; };
+    const choices = k => { let m = 0; const r = Math.floor(k / N), c = k % N; for (let v = 1; v <= N; v++) { let ok = true; for (let j = 0; j < N; j++) if (g[r * N + j] === v || g[j * N + c] === v) ok = false; if (ok) m |= 1 << v; } return ones(m); };
+    empty.sort((a, b) => choices(a) - choices(b) || a - b);
+    i = empty.includes(sel) && choices(sel) === choices(empty[0]) ? sel : empty[0];
+  }
+  game.hinted = true; game.started = true; sel = i;
+  hintMark = {i, bad, key: g.join()};
+  draw(); save();
+  G.note(bad ? (wrong.length > 1 ? `That tree's the wrong height (and ${wrong.length - 1} more)` : "That tree's the wrong height") : `The square in the gold box is a ${game.sol[i]}.`, 5000);
+  clearTimeout(hintTimer);
+  const mark = hintMark; hintTimer = setTimeout(() => { if (hintMark === mark) { hintMark = null; if (game) draw(); } }, 5000);
+}
+$("hintBtn").onclick = hint;
+
+/* ---------- endings ---------- */
+// Every tree right: a cat curls up on each top perch, one after another, then the finishing card.
+function win() {
+  game.won = true; G.finishClock(game); sel = -1; noting = false; hintMark = null;
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save();
+  G.track(`High Perch solved level ${game.level}`);
+  build.prefetch(next);
+  running = true; draw();
+  const g = game, still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  setTimeout(() => { running = false; if (game === g) finishCard(); }, still ? 900 : 900 + game.N * game.N * 40);
+}
+function finishCard() {
+  const next = settings.level, N = game.N;
+  let text = `Every cat on the ${N} × ${N} floor has a perch.`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my trees", game.result,
+    {title: "Purrfect!", gold: !game.undid && !game.hinted, goldWhy: "No hints or undos!", next: `Next: level ${next}`, after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- new floors ---------- */
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
+function begin(p, level) {
+  const grid = new Array(p.N * p.N).fill(0);
+  for (const [i, h] of p.givens) grid[i] = h;
+  game = {level, N: p.N, sol: p.sol, givens: p.givens, signs: p.signs, looks: p.looks, grid, notes: new Array(p.N * p.N).fill(0), history: [], won: false, ...G.freshClock()};
+  sel = -1; noting = false; hintMark = null; makePad();
+}
+async function newPuzzle() {
+  if (busy) return;
+  busy = true;
+  const n = settings.level;
+  G.openCard("Putting up the trees…", n >= 9 ? "Big floors can take a second or two." : "", []);
+  const p = await build.take(n);
+  begin(p, n);
+  busy = false; G.closeCard(); G.note("");
+  draw(); save();
+  build.prefetch(n);
+  G.track(`High Perch new puzzle level ${n}`);
+  helpOnFirstVisit();   // the first floor with arrows (and with lookouts) says what they mean
+}
+
+/* ---------- sharing ---------- */
+// The clues travel in the link; the answer is worked out again from them.
+$("shareBtn").onclick = () => { if (game && !busy) G.shareCard({name: "High Perch", won: game.won,
+  puzzle: () => ({g: "highperch", N: game.level, gv: game.givens, sg: game.signs, lk: game.looks}),
+  progress: () => ({grid: game.grid, notes: game.notes})}); };
+function openShared(d) {
+  const lv = levelOf(d.N), N = lv && lv.N, int = (v, a, b) => Number.isInteger(v) && v >= a && v <= b;
+  const list = (a, ok) => Array.isArray(a) && a.every(x => Array.isArray(x) && ok(x));
+  const adj = (a, b) => (Math.abs(a - b) === 1 && Math.floor(a / N) === Math.floor(b / N)) || Math.abs(a - b) === N;
+  const good = lv && list(d.gv, ([i, h]) => int(i, 0, N * N - 1) && int(h, 1, N)) && list(d.sg, ([a, b]) => int(a, 0, N * N - 1) && int(b, 0, N * N - 1) && adj(a, b))
+    && list(d.lk, ([s, l, c]) => int(s, 0, 3) && int(l, 0, N - 1) && int(c, 1, N));
+  const sol = good && reason(N, {givens: d.gv, signs: d.sg, looks: d.lk}, d.lk.length ? perms(N) : []);
+  if (!sol) { G.note("That share link didn't work.", 5000); return; }
+  begin({N, sol, givens: d.gv, signs: d.sg, looks: d.lk}, d.N);
+  if (d.p && Array.isArray(d.p.grid) && d.p.grid.length === N * N) {
+    game.grid = d.p.grid.map((v, i) => isGiven(i) ? game.grid[i] : int(+v, 0, N) ? +v : 0);
+    if (Array.isArray(d.p.notes) && d.p.notes.length === N * N) game.notes = d.p.notes.map(v => +v || 0);
+    game.timed = false;
+  }
+  settings.level = d.N; $("levelSel").value = d.N;
+  draw(); save(); build.prefetch(d.N);
+  if (game.grid.every((h, i) => h === game.sol[i])) win();
+}
+
+/* ---------- how to play ---------- */
+// How to play plays the walkthrough on the board (there's no rules card).
+function showHelp() {
+  settings.seenHelp = false; helpOnFirstVisit();
+  if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
+}
+// Where the squares are (lookout cats take a strip round the floor).
+function map() {
+  const r = $("svg").getBoundingClientRect(), S = game.N * 100, m = M(), k = r.width / (S + 2 * m);
+  return {ox: r.left + m * k, oy: r.top + m * k, cw: 100 * k, ch: 100 * k};
+}
+// First visit: walk through the floor that's out, with steps for its arrows and lookouts if it has them.
+// After that, the first floor with arrows, and the first with lookouts, get those steps on their own.
+function helpOnFirstVisit() {
+  if (!game || !playing() || document.querySelector(".spot")) return;
+  const N = game.N, xy = i => [i % N, Math.floor(i / N)], all = [...Array(N * N).keys()].map(xy);
+  const row = r => [...Array(N).keys()].map(c => [c, r]), col = c => [...Array(N).keys()].map(r => [c, r]);
+  const signSteps = game.signs.length ? (() => { const [t, s] = game.signs[0];
+    return [{say: "Arrows point down to the shorter tree", lit: [xy(t), xy(s)]}]; })() : [];
+  const lookSteps = game.looks.length ? (() => { const [side, l, c] = game.looks[0], line = viewCells(N, side, l).map(xy);
+    return [{say: `The lookout cat at the end of this ${side % 2 ? "row" : "column"} sees ${c} tree${c > 1 ? "s" : ""}`, lit: line},
+      {say: "Taller trees hide shorter ones behind them", lit: line}]; })() : [];
+  const tips = [["seenSigns", signSteps], ["seenLooks", lookSteps]].filter(([k, s]) => s.length && !settings[k]);
+  const done = () => { settings.seenHelp = true; for (const [k, s] of [["seenSigns", signSteps], ["seenLooks", lookSteps]]) if (s.length) settings[k] = true; save(); };
+  if (settings.seenHelp) {
+    if (tips.length) G.spotlight({grid: $("grid"), w: N, h: N, steps: tips.flatMap(([, s]) => s), map, finish: false, done});
+    return;
+  }
+  const givens = game.givens.map(([i]) => xy(i));
+  const steps = [
+    {say: `Put up a cat tree in every square, 1 to ${N} perches tall`, lit: all},
+    {say: "Every row has one tree of each height", lit: row(Math.floor(N / 2))},
+    {say: "So does every column", lit: col(Math.floor(N / 2))},
+    ...(givens.length ? [{say: "Some trees are already standing", lit: givens}] : []),
+    ...signSteps, ...lookSteps,
+    {say: "Tap a square, then a height", els: [$("pad")]},
+    {say: "Notes let you jot down maybes", els: [$("notesBtn")]},
+    {say: "Stuck? Hint shows a wrong tree, or a height to put up", els: [$("hintBtn")]},
+  ];
+  G.spotlight({grid: $("grid"), w: N, h: N, steps, map, done});
+}
+
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", ""), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
+$("helpBtn").onclick = showHelp;
+
+G.nav("highperch");
+G.checkClock(game);
+G.setupTimer({name: "highperch", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+const shared = G.readShare("highperch");
+if (game && Array.isArray(game.grid)) G.reopen(() => {
+    if (!levelOf(game.level) || game.grid.length !== game.N * game.N || game.sol.length !== game.N * game.N) throw new Error("the saved floor doesn't fit its level");
+    makePad(); draw();
+    if (game.won) finishCard();
+    build.prefetch(settings.level); helpOnFirstVisit();
+  }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
+else if (!shared) newPuzzle();
+const shareOpts = () => ({name: "High Perch", inProgress: !!(game && !game.won && game.history.length), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, shareOpts());
+// A share link opened while this page is already showing only changes the address, so watch for it.
+window.addEventListener("hashchange", () => { const d = G.readShare("highperch"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
