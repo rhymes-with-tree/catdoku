@@ -17,3 +17,20 @@ under the MIT License with your own pictures in their place.
 Not part of this repository: the cat photos on the "Solved!" cards come from
 TheCatAPI and Cataas while you play, and the Baloo 2 font is loaded from Google Fonts
 under the SIL Open Font License.
+
+## Who's who in `cats/`
+
+Most of the cats are just cats, and any game can use them. The `c14-…`, `c15-…` and `c16-…`
+pictures (and any later numbered ones) are these general cats. A few cats have names, and each
+has its own files (`name-1.webp`, `name-2.webp`, …):
+
+- **Higgins** (tabby) and **Jan Brady** (fluffy black and white) are one-of-a-kind characters,
+  not stand-ins for "a tabby" or "a fluffy cat". Use their pictures for them only.
+- **Fred** (`fred-…`, white with tabby patches, blue collar with a star tag) will be the mascot
+  of Knock It Off. `kitten-star.webp`, the kitten freed in Bubbles, is Fred too.
+- **Bugsy** (`bugsy-…`, fluffy brown and white) and **Bowtie** (`bowtie-…`, tuxedo) will be the
+  mascots of Twirl and Tunnel Run, and will nap in Sunbeams. The pictures of the two together are
+  `bugsy-bowtie-window`, `bugsy-bowtie-rug` and `bugsy-bowtie-boxes`.
+- **Crunch** (`crunch-…`, grey tabby with green eyes) will be the star of Pounce.
+
+Fred, Bugsy, Bowtie and Crunch can also turn up anywhere else as ordinary cats.
