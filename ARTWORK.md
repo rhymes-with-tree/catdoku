@@ -9,6 +9,7 @@ This covers:
 - the cats beside the boards in `patches/` and `yarn/`
 - the cat toy pictures in `toys/`
 - the pompom, googly eye and jingle bell pictures in `fuzzyspelling/`
+- Bowtie's tunnel pictures in `tunnelrun/`
 - the app icons: `favicon.png`, `apple-touch-icon.png`, `icon-192.png` and `icon-512.png`
 
 Please don't copy or reuse them without permission. You're welcome to use the code
@@ -34,7 +35,9 @@ anywhere, but keep track of who they are, because they'll be featured in games o
   of Knock It Off. `kitten-star.webp`, the kitten freed in Bubbles, is Fred too
   (sometimes called Fred Kitten).
 - **Bugsy** (`bugsy-…`, fluffy brown and white) and **Bowtie** (`bowtie-…`, tuxedo) will be the
-  mascots of Twirl and Tunnel Run, and will nap in Sunbeams. `bowtie-tunnel` is Bowtie in a cat
+  mascots of Twirl and Tunnel Run, and will nap in Sunbeams. In Tunnel Run now, Bowtie looks out of the
+  tunnel in the middle of the rug and does the winning run (`bowtie-6`), and Bugsy leans in over the rug
+  (`bugsy-2`). `bowtie-tunnel` is Bowtie in a cat
   tunnel (for Tunnel Run); `bowtie-7` is the same tunnel with a second Bowtie rolling over beside
   it. The pictures of the two together are `bugsy-bowtie-window`, `bugsy-bowtie-rug` and
   `bugsy-bowtie-boxes`.

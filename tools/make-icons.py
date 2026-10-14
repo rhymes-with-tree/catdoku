@@ -31,6 +31,14 @@ def catface(x, y, s, fill="#fff"):
             f'<circle cx="{x-s*.38}" cy="{y+s*.1}" r="{s*.13}" fill="{INK}"/><circle cx="{x+s*.38}" cy="{y+s*.1}" r="{s*.13}" fill="{INK}"/>')
 
 
+def tuxface(x, y, s):
+    """Bowtie: a black cat face with a white blaze and chin, and yellow eyes."""
+    return (catface(x, y, s, "#221E26").split("<circle")[0]
+            + f'<path d="M{x-s*.55} {y+s}Q{x} {y+s*.05} {x+s*.55} {y+s}Z" fill="#fff"/>'
+            f'<path d="M{x} {y-s*.55}L{x} {y+s*.2}" stroke="#fff" stroke-width="{s*.12}"/>'
+            f'<circle cx="{x-s*.38}" cy="{y+s*.1}" r="{s*.16}" fill="#E8C547"/><circle cx="{x+s*.38}" cy="{y+s*.1}" r="{s*.16}" fill="#E8C547"/>')
+
+
 # Catdoku: colour regions on a grid, a cat in each, none touching.
 def catdoku():
     regions = ["AABB", "ACCB", "DCCB", "DDCB"]
@@ -266,7 +274,7 @@ def tunnelrun():
     PURPLE, RIB, GREY, EDGE = "#9874CA", "#7C5AB0", "#8C98AA", "#3E3848"
     # each square: the sides its tunnel opens onto (u r d l), and whether it's joined yet
     tiles = [("rd", 1), ("rdl", 1), ("l", 1), ("ud", 1), ("u", 1), ("ud", 0), ("ur", 1), ("rl", 1), ("l", 1)]
-    out = f'<rect x="{o+s+3}" y="{o+s+3}" width="{s-6}" height="{s-6}" rx="7" fill="#E7A9A0" stroke="#C98378" stroke-width="1.5"/>'
+    out = ""
     for layer in ("edge", "tube", "rib"):
         for k, (sides, on) in enumerate(tiles):
             cx, cy = o + k % 3 * s + s / 2, o + k // 3 * s + s / 2
@@ -281,7 +289,10 @@ def tunnelrun():
                     out += f'<circle cx="{cx}" cy="{cy}" r="3.2" fill="#3A2F45"/>'
             elif on and len(sides) > 1:
                 out += f'<path d="{d}" stroke="{RIB}" stroke-width="10" stroke-dasharray="1.2 2.6" fill="none" opacity=".8"/>'
-    out += catface(o + s * 1.5, o + s * 1.5 + 1, 6.5)   # the cat on its bed
+    # Bowtie looking out of the tunnel in the middle
+    out += f'<circle cx="{o + s * 1.5}" cy="{o + s * 1.5}" r="11" fill="#4A2F86" stroke="{PURPLE}" stroke-width="4"/>'
+    out += f'<circle cx="{o + s * 1.5}" cy="{o + s * 1.5}" r="13" fill="none" stroke="{EDGE}" stroke-width="1.5"/>'
+    out += tuxface(o + s * 1.5, o + s * 1.5 + 1, 6.5)
     return frame("#E8DCC4", out)
 
 
