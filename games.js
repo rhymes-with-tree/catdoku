@@ -11,7 +11,7 @@ const G = (() => {
     ["Pounce", "pounce", "Swap toys and line up three of a kind", "#6AA673"],
     ["Twirl", "twirl", "Send every ribbon off the mat", "#B94588"],
     ["Toe Beans", "toebeans", "Make the number on the big pad", "#DD9DAD"],
-    ["Knock It Off", "knockitoff", "Push everything off the table", "#7885BA"],
+    ["Knock It Off", "knockitoff", "Help Fred push everything off the table", "#7885BA"],
     ["Hide & Seek", "hideseek", "Find every cat hiding in the boxes", "#C9A26B"],
     ["Pawlette", "pawlette", "Mix colours: zen out, or swipe and line them up", "#9874CA"],
     ["Tangle", "tangle", "Untangle the yarn the cat got into", "#3C8681"],

@@ -32,8 +32,9 @@ anywhere, but keep track of who they are, because they'll be featured in games o
 - **Higgins** (`higgins-…`, brown tabby) is a one-of-a-kind character too, and the mascot of
   Catdoku: `higgins-1` sits beside the title, `higgins-face` (cut from it) is every cat on the board, in the counter, the walkthrough and the cat facts, and `higgins-2` stretches out on the gold-paw card.
   The other tabbies on the Higgins sheet (`c20-…`) are general cats.
-- **Fred** (`fred-…`, white with tabby patches, blue collar with a star tag) will be the mascot
-  of Knock It Off. `kitten-star.webp`, the kitten freed in Bubbles, is Fred too
+- **Fred** (`fred-…`, white with tabby patches, blue collar with a star tag) is the mascot
+  of Knock It Off: `fred-1` sits beside the title, `fred-14` bats a toy mouse on the gold-paw
+  card, and the cat on the table is Fred drawn from above. `kitten-star.webp`, the kitten freed in Bubbles, is Fred too
   (sometimes called Fred Kitten).
 - **Bugsy** (`bugsy-…`, fluffy brown and white) and **Bowtie** (`bowtie-…`, tuxedo) will be the
   mascots of Twirl and Tunnel Run, and will nap in Sunbeams. In Tunnel Run now, Bowtie looks out of the

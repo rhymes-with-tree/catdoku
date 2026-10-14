@@ -47,6 +47,17 @@ def tabbyface(x, y, s):
             f'<circle cx="{x-s*.38}" cy="{y+s*.1}" r="{s*.16}" fill="{LIME}"/><circle cx="{x+s*.38}" cy="{y+s*.1}" r="{s*.16}" fill="{LIME}"/>')
 
 
+def fredface(x, y, s):
+    """Fred: a white face with tabby ears and cap, green eyes, and a blue collar."""
+    return (f'<path d="M{x-s*.62} {y+s*.95}Q{x} {y+s*1.35} {x+s*.62} {y+s*.95}" fill="none" stroke="{INK}" stroke-width="{s*.42}" stroke-linecap="round"/>'
+            f'<path d="M{x-s*.62} {y+s*.95}Q{x} {y+s*1.35} {x+s*.62} {y+s*.95}" fill="none" stroke="{TEAL}" stroke-width="{s*.22}" stroke-linecap="round"/>'
+            + catface(x, y, s, "#FBF8F0").split("<circle")[0]
+            + f'<path d="M{x-s*.92} {y-s*.95}L{x-s*.38} {y-s*.55}L{x+s*.38} {y-s*.55}L{x+s*.92} {y-s*.95}L{x+s*.96} {y-s*.15}'
+            f'Q{x+s*.5} {y} {x} {y-s*.3}Q{x-s*.5} {y} {x-s*.96} {y-s*.15}Z" fill="#9C8877"/>'
+            + catface(x, y, s, "none").split("<circle")[0]
+            + f'<circle cx="{x-s*.38}" cy="{y+s*.1}" r="{s*.16}" fill="{GREEN}"/><circle cx="{x+s*.38}" cy="{y+s*.1}" r="{s*.16}" fill="{GREEN}"/>')
+
+
 # Catdoku: colour regions on a grid, a cat in each, none touching.
 def catdoku():
     regions = ["AABB", "ACCB", "DCCB", "DDCB"]
@@ -164,7 +175,7 @@ def knockitoff():
     out += (f'<g transform="rotate(24 80 40)"><rect x="72" y="30" width="15" height="17" rx="3" fill="#fff" stroke="{INK}" stroke-width="2.5"/>'
             f'<rect x="72" y="35" width="15" height="4" fill="{RED}"/><path d="M87 34Q93 38 87 43" fill="none" stroke="{INK}" stroke-width="2.5"/></g>')
     out += f'<path d="M58 50Q62 46 66 50M58 56Q63 53 68 56" fill="none" stroke="{INK}" stroke-width="2" stroke-linecap="round" opacity=".5"/>'
-    out += catface(38, 62, 11, ORANGE)
+    out += fredface(38, 62, 11)   # Fred
     return frame(PAPER, out)
 
 
