@@ -34,7 +34,8 @@ anywhere, but keep track of who they are, because they'll be featured in games o
   The other tabbies on the Higgins sheet (`c20-…`) are general cats.
 - **Fred** (`fred-…`, white with tabby patches, blue collar with a star tag) is the mascot
   of Knock It Off: `fred-1` sits beside the title, `fred-14` bats a toy mouse on the gold-paw
-  card, and the cat on the table is Fred drawn from above. `kitten-star.webp`, the kitten freed in Bubbles, is Fred too
+  card, and the cat on the table is Fred drawn from above (slender and white, with a tabby cap split by a white
+  blaze, white ears, one tabby patch behind the left shoulder and a sky-blue collar, as in photos of him). `kitten-star.webp`, the kitten freed in Bubbles, is Fred too
   (sometimes called Fred Kitten).
 - **Bugsy** (`bugsy-…`, fluffy brown and white) and **Bowtie** (`bowtie-…`, tuxedo) will be the
   mascots of Twirl and Tunnel Run, and will nap in Sunbeams. In Tunnel Run now, Bowtie looks out of the

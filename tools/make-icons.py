@@ -48,12 +48,13 @@ def tabbyface(x, y, s):
 
 
 def fredface(x, y, s):
-    """Fred: a white face with tabby ears and cap, green eyes, and a blue collar."""
+    """Fred: a white face and ears, a tabby cap split by a white blaze, green eyes, and a sky-blue collar."""
     return (f'<path d="M{x-s*.62} {y+s*.95}Q{x} {y+s*1.35} {x+s*.62} {y+s*.95}" fill="none" stroke="{INK}" stroke-width="{s*.42}" stroke-linecap="round"/>'
-            f'<path d="M{x-s*.62} {y+s*.95}Q{x} {y+s*1.35} {x+s*.62} {y+s*.95}" fill="none" stroke="{TEAL}" stroke-width="{s*.22}" stroke-linecap="round"/>'
+            f'<path d="M{x-s*.62} {y+s*.95}Q{x} {y+s*1.35} {x+s*.62} {y+s*.95}" fill="none" stroke="#9FC7DB" stroke-width="{s*.22}" stroke-linecap="round"/>'
             + catface(x, y, s, "#FBF8F0").split("<circle")[0]
-            + f'<path d="M{x-s*.92} {y-s*.95}L{x-s*.38} {y-s*.55}L{x+s*.38} {y-s*.55}L{x+s*.92} {y-s*.95}L{x+s*.96} {y-s*.15}'
-            f'Q{x+s*.5} {y} {x} {y-s*.3}Q{x-s*.5} {y} {x-s*.96} {y-s*.15}Z" fill="#9C8877"/>'
+            + f'<path d="M{x-s*.78} {y-s*.8}L{x-s*.45} {y-s*.58}L{x-s*.82} {y-s*.25}Z M{x+s*.78} {y-s*.8}L{x+s*.45} {y-s*.58}L{x+s*.82} {y-s*.25}Z" fill="#EDB9B0"/>'
+            f'<path d="M{x-s*.45} {y-s*.58}L{x+s*.45} {y-s*.58}L{x+s*.92} {y-s*.2}L{x+s*.95} {y+s*.02}Q{x+s*.4} {y+s*.08} {x+s*.12} {y-s*.12}'
+            f'L{x} {y-s*.5}L{x-s*.12} {y-s*.12}Q{x-s*.4} {y+s*.08} {x-s*.95} {y+s*.02}L{x-s*.92} {y-s*.2}Z" fill="#9C8877"/>'
             + catface(x, y, s, "none").split("<circle")[0]
             + f'<circle cx="{x-s*.38}" cy="{y+s*.1}" r="{s*.16}" fill="{GREEN}"/><circle cx="{x+s*.38}" cy="{y+s*.1}" r="{s*.16}" fill="{GREEN}"/>')
 
