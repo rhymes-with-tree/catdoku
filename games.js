@@ -3,7 +3,7 @@
 const G = (() => {
   // Every game: name, folder, one line about it, and its colour in the games menu.
   const GAMES = [
-    ["Catdoku", "catdoku", "One cat in every row, column and region", "#BD5538"],
+    ["Catdoku", "catdoku", "Help Higgins give every cat its own territory", "#BD5538"],
     ["Yarn", "yarn", "Lead one strand through every ball", "#E16A4A"],
     ["Patches", "patches", "Sew a four-fabric quilt", "#73A7AE"],
     ["Sunbeams", "sunbeams", "Every cat gets a warm spot", "#ECA818"],
@@ -218,6 +218,7 @@ const G = (() => {
     .spot .say b{font-size:clamp(24px,7vw,36px);font-weight:800;line-height:1.1;color:#FFF4D2;-webkit-text-stroke:6px var(--ink);paint-order:stroke fill;text-wrap:balance}
     .spot .say small{font-size:15px;font-weight:600;color:#FFF4D2;-webkit-text-stroke:3px var(--ink);paint-order:stroke fill;opacity:.9;animation:spotTap 1.6s ease-in-out infinite}
     .spot .say b .w{white-space:nowrap}
+    .spot .say b .emo img{display:inline-block;width:1.15em;height:1.15em;vertical-align:-.2em}
     .spot .say b .emo{-webkit-text-stroke:0;display:inline-block;background:#FFF4D2;border:3px solid var(--ink);border-radius:999px;padding:0 .12em;margin:0 .04em;line-height:1.15;font-size:.85em;vertical-align:.06em}
     .spotGo{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;pointer-events:none;animation:spotGo 1.3s ease-out forwards}
     .spotGo b{font-size:clamp(34px,10vw,52px);font-weight:800;color:#FFF4D2;-webkit-text-stroke:7px var(--ink);paint-order:stroke fill}
@@ -441,8 +442,9 @@ const G = (() => {
   /* ---------- first-time spotlight ---------- */
   // Teach a game on its own board: each step dims the whole screen except some squares (and, if it
   // names them, other things on the page such as a key above the board), outlines them in red, can
-  // put marks on squares (a 🐱, ❌…; a list of marks takes turns), and says one line over the board.
+  // put marks on squares (a 🐱, ❌…, or a picture's file; a list of marks takes turns), and says one line over the board.
   // A tap or Space shows the next step; after the last, "Let's Play!" shows and `done` runs.
+  // `pics` ({"🐱": "file.webp"}) shows a picture in place of that emoji in what the steps say.
   // `grid` is the element the squares fill, `w` × `h` squares; each step is
   // {say, lit: [[x, y]…], outline (default: lit), tone ("ok" outlines green, not red), marks: [[x, y, mark, size]…],
   // arrows: [{to: [x, y] (a corner between squares), from: [dx, dy] (the way the arrow comes in), size}],
@@ -514,9 +516,15 @@ const G = (() => {
         svg.append(svgEl("path", {d: e, class: "edge" + (ln.tone === "ok" ? " ok" : ""), "stroke-width": sw * 1.4}));
       }
       for (const [x, y, m, size] of st.marks || []) {   // x, y can fall between squares; size is in squares
+        const v = Array.isArray(m) ? m[frame % m.length] : m;
+        if (/\.(webp|png|svg)$/.test(v)) {   // a picture, such as Catdoku's Higgins
+          const d = cw * (size || 0.72);
+          svg.append(svgEl("image", {href: v, x: X(x + 0.5) - d / 2, y: Y(y + 0.5) - d / 2, width: d, height: d}));
+          continue;
+        }
         const t = svgEl("text", {x: X(x + 0.5), y: Y(y + 0.56), "text-anchor": "middle", "dominant-baseline": "middle",
-          "font-size": cw * (size || (m === "❌" ? 0.42 : 0.56))});
-        t.textContent = Array.isArray(m) ? m[frame % m.length] : m; svg.append(t);
+          "font-size": cw * (size || (v === "❌" ? 0.42 : 0.56))});
+        t.textContent = v; svg.append(t);
       }
       // a bold arrow with its tip at (ax, ay), coming in from direction (dx, dy); size is a square's width
       const arrow = (ax, ay, dx, dy, size) => {
@@ -574,7 +582,12 @@ const G = (() => {
         const w = document.createElement("span"); w.className = "w";
         for (const bit of part.split(/(\p{Extended_Pictographic}(?:\uFE0F)?)/u)) {
           if (!bit) continue;
-          if (/\p{Extended_Pictographic}/u.test(bit)) { const e = document.createElement("span"); e.className = "emo"; e.textContent = bit; w.append(e); }
+          if (/\p{Extended_Pictographic}/u.test(bit)) {
+            const e = document.createElement("span"); e.className = "emo";
+            if (o.pics && o.pics[bit]) { const im = document.createElement("img"); im.src = o.pics[bit]; im.alt = bit; e.append(im); }   // a picture in place of this emoji
+            else e.textContent = bit;
+            w.append(e);
+          }
           else w.append(bit);
         }
         if (el.childNodes.length) {
