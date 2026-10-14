@@ -20,17 +20,19 @@ under the SIL Open Font License.
 
 ## Who's who in `cats/`
 
-Most of the cats are just cats, and any game can use them. The `c14-…`, `c15-…` and `c16-…`
-pictures (and any later numbered ones) are these general cats. A few cats have names, and each
-has its own files (`name-1.webp`, `name-2.webp`, …):
+Most of the cats are just cats, and any game can use them. The `c14-…` and `c15-…` pictures
+(and any later numbered ones) are these general cats. A few cats have names, and most have their
+own files (`name-1.webp`, `name-2.webp`, …). Every named cat can also be used as an ordinary cat
+anywhere, but keep track of who they are, because they'll be featured in games of their own.
 
-- **Higgins** (tabby) and **Jan Brady** (fluffy black and white) are one-of-a-kind characters,
-  not stand-ins for "a tabby" or "a fluffy cat". Use their pictures for them only.
+- **Jan Brady** (fluffy black and white, long dark tail) is a one-of-a-kind character. The `c16-…`
+  pictures, the fluffy black and white cats napping in Sunbeams, are Jan Brady (they keep their
+  numbered names because the games already use them).
+- **Higgins** (brown tabby) is a one-of-a-kind character too.
 - **Fred** (`fred-…`, white with tabby patches, blue collar with a star tag) will be the mascot
-  of Knock It Off. `kitten-star.webp`, the kitten freed in Bubbles, is Fred too.
+  of Knock It Off. `kitten-star.webp`, the kitten freed in Bubbles, is Fred too
+  (sometimes called Fred Kitten).
 - **Bugsy** (`bugsy-…`, fluffy brown and white) and **Bowtie** (`bowtie-…`, tuxedo) will be the
   mascots of Twirl and Tunnel Run, and will nap in Sunbeams. The pictures of the two together are
   `bugsy-bowtie-window`, `bugsy-bowtie-rug` and `bugsy-bowtie-boxes`.
 - **Crunch** (`crunch-…`, grey tabby with green eyes) will be the star of Pounce.
-
-Fred, Bugsy, Bowtie and Crunch can also turn up anywhere else as ordinary cats.
