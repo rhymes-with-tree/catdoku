@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-14.6"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-14.7"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-14.6">
+<link rel="stylesheet" href="../games.css?v=2026-10-14.7">
 <style>
 /* A rug covered in pieces of cat tunnel, with the cat's bed in the middle. Turn the pieces until they all join
    into one network; pieces joined to the bed turn purple and crinkly, and when every one is joined the cat runs
@@ -47,7 +47,17 @@
 .hintbox{fill:none;stroke:#6AA673;stroke-width:8;pointer-events:none;animation:glow .45s ease-in-out infinite alternate}
 @keyframes glow{to{stroke-opacity:.35}}
 .cursor{fill:none;stroke:#73A7AE;stroke-width:6;pointer-events:none}
-.cat{font-size:54px;pointer-events:none}
+/* The bed is Bowtie's own tunnel, its outside purple like the joined tunnels (gold once Bowtie has run);
+   Bowtie climbs out for the winning run and back in at the end. */
+.bed,.cat{pointer-events:none}
+/* A gold-paw win shows Bowtie in place of the random cat photo */
+.card img.bowtiepic{display:block;width:58%;max-width:230px;height:auto;margin:0 auto 14px}
+/* Bugsy leans in from the side of the screen, chest hidden behind the top of the rug */
+.rugbox{position:relative;width:var(--board);--bw:min(calc(var(--board) * .3), 150px);padding-top:calc(var(--bw) * .66)}
+@media (max-height:760px){.rugbox{--bw:min(calc(var(--board) * .2), 96px)}}
+.rugbox .rug{z-index:1}
+.bugsy{position:absolute;top:0;right:calc(-1 * min(3vw, 20px));width:var(--bw);height:auto;pointer-events:none;user-select:none;
+  -webkit-mask-image:linear-gradient(to left,transparent,#000 14%);mask-image:linear-gradient(to left,transparent,#000 14%)}
 /* Sliding tracks: striped grooves across the rug, with arrows round the edge; drag a track or tap an arrow */
 .rug.tracks,.rug.tracks svg{touch-action:none}
 .floor{fill:#E8DCC4;stroke:#CDBC9C;stroke-width:3}
@@ -61,12 +71,15 @@
 </head>
 <body>
 <main>
-  <header><h1>Tunnel Run</h1><div class="stripe"></div><p class="tagline">Assemble the tunnels for the cat to run through</p></header>
+  <header><h1>Tunnel Run</h1><div class="stripe"></div><p class="tagline">Assemble the tunnels for Bowtie to run through</p></header>
   <nav class="games" id="games" aria-label="Games"></nav>
 
   <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
 
-  <div class="wrap rug" id="board"><div class="grid" id="grid"><svg id="svg" tabindex="0" role="application" aria-label="Tunnel pieces on a rug. Tap a piece to turn it; arrow keys and Space work too."></svg></div></div>
+  <div class="rugbox">
+    <img class="bugsy" src="../cats/bugsy-2.webp" alt="" aria-hidden="true">
+    <div class="wrap rug" id="board"><div class="grid" id="grid"><svg id="svg" tabindex="0" role="application" aria-label="Tunnel pieces on a rug. Tap a piece to turn it; arrow keys and Space work too."></svg></div></div>
+  </div>
   <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
 
   <div class="actions">
@@ -84,7 +97,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-14.6"></script>
+<script src="../games.js?v=2026-10-14.7"></script>
 <script>
 /* ---------- tunnel networks (plain functions, also run in a background worker) ---------- */
 // A piece's tunnels are a 4-bit mask of the sides they open onto: 1 up, 2 right, 4 down, 8 left.
@@ -324,6 +337,9 @@ const levelName = n => { const N = levelSpec(n).N, t = tracksOf(n); return `Leve
 const build = G.builder([levelSpec, rot, opp, bits, nbr, turnsOf, growTree, solveNet, reroute, makeTree,
   applySlide, addSlide, posOf, slidesOn, shortcut, makeRug], "makeRug");
 const bedOf = N => (N >> 1) * N + (N >> 1);
+// Bowtie's tunnel: purple while you play, empty while Bowtie runs, gold once Bowtie's been everywhere
+const BED = {play: "bowtie-bed.webp", run: "bowtie-bed-empty.webp", won: "bowtie-bed-gold.webp"};
+const bedLook = k => $("bedpic").setAttribute("href", BED[k]);
 const rotN = (m, k) => { for (k = ((k % 4) + 4) % 4; k > 0; k--) m = rot(m); return m; };
 const hasTracks = () => game.rows.length + game.cols.length > 0;
 const onTrack = i => game.rows.includes(Math.floor(i / game.N)) || game.cols.includes(i % game.N);
@@ -368,13 +384,19 @@ function draw() {
   const tiles = el("g", {"clip-path": "url(#rugclip)", id: "tiles"}, svg);
   for (let p = 0; p < N * N; p++) {
     const g = el("g", {class: "piece", "data-p": p}, tiles);
-    if (p === bed) el("rect", {x: 4, y: 4, width: 92, height: 92, rx: 30, fill: "#E7A9A0", stroke: "#C98378", "stroke-width": 5}, g);
     const spin = el("g", {class: "spin"}, g);
     drawPiece(spin, game.sol[p]);
     angle[p] = game.turns[p] * 90; spin.style.transform = `rotate(${angle[p]}deg)`;
-    if (p === bed) { const cat = el("text", {x: 50, y: 54, "text-anchor": "middle", "dominant-baseline": "middle", class: "cat", id: "cat"}, g); cat.textContent = "🐈"; }
+    if (p === bed) {
+      // Bowtie's tunnel, a little bigger than its square so the tunnels round it run into its rim
+      el("image", {href: BED[game.won ? "won" : "play"], x: -6, y: -8.5, width: 112, height: 117, class: "bed", id: "bedpic"}, g);
+      // Bowtie, out of the tunnel for the winning run
+      const cat = el("svg", {x: 50, y: 54, overflow: "visible", display: "none", class: "cat", id: "cat"}, g);
+      el("image", {href: "../cats/bowtie-6.webp", x: -36, y: -62, width: 72, height: 97}, cat);
+    }
     pieces.push(g); spins.push(spin);
   }
+  tiles.appendChild(pieces[bed]);   // on top, so the tunnel's rim overlaps its neighbours
   // an arrow at each end of every track; tapping one slides the track a square that way
   const arrow = (cx, cy, dx, dy, a, l, k) => {
     const g = el("g", {class: "slider", "data-a": a, "data-l": l, "data-k": k, role: "button",
@@ -637,11 +659,12 @@ function win() {
   build.prefetch(next);
   running = true;
   const g = game, done = () => { running = false; if (game === g) finishCard(); };
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches) { pieces.forEach(p => p.classList.add("zoomed")); setTimeout(done, 800); return; }
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) { pieces.forEach(p => p.classList.add("zoomed")); bedLook("won"); setTimeout(done, 800); return; }
   const N = game.N, path = [], seen = new Uint8Array(N * N);
   (function walk(i) { seen[i] = 1; path.push(i); for (const d of [1, 2, 4, 8]) if (cur(i) & d) { const j = nbr(N, i, d); if (!seen[j]) { walk(j); path.push(i); } } })(bedAt());
   const cat = $("cat"), step = Math.max(28, Math.min(110, 4500 / path.length)), t0 = performance.now();
-  $("svg").appendChild(cat);   // the cat sits in its bed's piece; let it out to run
+  $("svg").appendChild(cat);   // Bowtie climbs out of the tunnel to run
+  cat.removeAttribute("display"); bedLook("run");
   let k = 0;
   (function frame(now) {
     if (game !== g) return;
@@ -650,17 +673,19 @@ function win() {
     const ax = path[a] % N * 100 + 50, ay = Math.floor(path[a] / N) * 100 + 50, bx = path[b] % N * 100 + 50, by = Math.floor(path[b] / N) * 100 + 50;
     const x = ax + (bx - ax) * f, y = ay + (by - ay) * f;
     cat.setAttribute("x", x); cat.setAttribute("y", y + 4);
-    // the cat faces left, so it's flipped to run right
-    cat.setAttribute("transform", bx > ax ? `translate(${2 * x} 0) scale(-1 1)` : "");
-    if (a < path.length - 1) requestAnimationFrame(frame); else { cat.removeAttribute("transform"); setTimeout(done, 500); }
+    // back at the start, Bowtie climbs into the tunnel again, now gold
+    if (a < path.length - 1) requestAnimationFrame(frame); else { cat.setAttribute("display", "none"); bedLook("won"); setTimeout(done, 500); }
   })(t0);
 }
 function finishCard() {
-  const next = settings.level, N = game.N;
-  let text = `The cat zoomed through every tunnel on the ${N} × ${N} rug.`;
+  const next = settings.level, N = game.N, gold = !game.undid && !game.hinted;
+  let text = `${gold ? "Bowtie" : "The cat"} zoomed through every tunnel on the ${N} × ${N} rug.`;
   text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  // a gold paw gets Bowtie in the (gold) tunnel in place of the random cat photo
+  const pic = new Image(); pic.className = "bowtiepic"; pic.src = BED.won; pic.alt = "Bowtie in a gold and purple cat tunnel";
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my tunnels", game.result,
-    {title: "Zoom!", gold: !game.undid && !game.hinted, goldWhy: "No hints or undos!", next: `Next: level ${next}`, after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+    {title: "Zoom!", gold, goldWhy: "No hints or undos!", goldTitle: "Zoom, Bowtie!", goldPic: [pic],
+     next: `Next: level ${next}`, after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
 }
 
 /* ---------- new tunnels ---------- */

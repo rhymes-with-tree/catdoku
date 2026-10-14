@@ -19,7 +19,7 @@ const G = (() => {
     ["Fair Play", "tango", "Share two toys out fairly", "#B94588"],
     ["Bubbles", "bubbles", "Bat bubbles up and pop three of a kind", "#5FA0C8"],
     ["Open the Door!", "opendoor", "Solve the puzzle so the cat can get through!", "#4E577D"],
-    ["Tunnel Run", "tunnelrun", "Assemble the tunnels for the cat to run through", "#7E63B8"],
+    ["Tunnel Run", "tunnelrun", "Assemble the tunnels for Bowtie to run through", "#7E63B8"],
     ["Copycat", "copycat", "Find the boxes with matching toys", "#D08A4E"],
     ["Night Light", "nightlight", "Get every cat to close its eyes", "#3A3358"],
     ["Unravel", "unravel", "Cover every line with one strand of yarn", "#E16A4A"],
@@ -146,7 +146,8 @@ const G = (() => {
   // After admiring, point to the page's own new-puzzle button (New floor, New table…), or the level list.
   const admireNote = () => $("newBtn") ? `Done! Tap ${$("newBtn").textContent.trim()} when you're ready for another.` : "Done! Pick a level when you're ready for another.";
   // A perfect clear (no help, nothing lost, no undo) earns a gold paw: o.gold puts one on the win card,
-  // with o.goldWhy saying what earned it.
+  // with o.goldWhy saying what earned it, o.goldTitle in place of "Gold paw!", and o.goldPic (a picture
+  // and its caption) in place of the random cat photo and name.
   const PAW = "M100 6 C126 6 141 28 153 46 C172 50 197 70 195 101 C193 133 166 147 140 141 C125 138 112 131 100 131 C88 131 75 138 60 141 C34 147 7 133 5 101 C3 70 28 50 47 46 C59 28 74 6 100 6Z";
   function goldPaw() {
     const box = document.createElement("div");
@@ -164,11 +165,11 @@ const G = (() => {
     name.textContent = `Meet ${NAMES[Math.floor(Math.random() * NAMES.length)]}!`;
     const tl = timeLineEl(result); if (tl) media.append(tl);
     media.append(p);
-    media.append(catPhoto(), name);
+    if (o.gold && o.goldPic) media.append(...o.goldPic); else media.append(catPhoto(), name);
     const btns = [[o.next || "New puzzle", onNext, true]];
     if (admire !== null) btns.push([admire, () => { closeCard(); note(admireNote(), 0); }]);
     btns.push(["Share my result", e => shareResult(result, o.gold, e.currentTarget)]);
-    openCard(o.gold ? "Gold paw!" : o.title || "Solved!", "", btns, media, o.after);
+    openCard(o.gold ? o.goldTitle || "Gold paw!" : o.title || "Solved!", "", btns, media, o.after);
   }
 
   // Count a moment in the game (a puzzle started or solved) on the GoatCounter dashboard.
