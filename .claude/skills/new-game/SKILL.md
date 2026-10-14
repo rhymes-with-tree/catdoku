@@ -19,6 +19,10 @@ Look for art the site already has before drawing anything new, and say what you'
 - **Shared files:** `cats/` (photos and the curled-up napping cats from Sunbeams), `toys/` (the toy library),
   `colorways.js` (Yarn's and Twirl's colourways) and `cattower.js` (carpet colours, perch pieces, sisal posts
   and napping cats, from Catwalk and High Perch).
+- **Colours:** use the site's palette for anything new: the colours in `games.css` (`:root`, and the seven in
+  `--gradient`: brick, coral, gold, lime, sage, pacific blue and plum, plus periwinkle, spring blue and
+  lavender), or tints and shades of them (`color-mix` with white or ink). `colorways.js` and the toys are
+  drawn from it too. Don't bring in new hues; a soft or pastel version is a tint of a palette colour.
 - **Other games' pages:** drawings that live in one page, such as Night Light's cat heads, Open the Door!'s
   running cat, Tunnel Run's tunnels or Knock It Off's table things. When a new game wants one, move it into a
   shared file (as `cattower.js` was) and point both games at it, rather than copying it.
