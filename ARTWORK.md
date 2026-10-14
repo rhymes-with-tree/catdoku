@@ -8,6 +8,7 @@ This covers:
 - the cat pictures in `cats/`
 - the cats beside the boards in `patches/` and `yarn/`
 - the cat toy pictures in `toys/`
+- the pompom, googly eye and jingle bell pictures in `fuzzyspelling/`
 - the app icons: `favicon.png`, `apple-touch-icon.png`, `icon-192.png` and `icon-512.png`
 
 Please don't copy or reuse them without permission. You're welcome to use the code

@@ -401,10 +401,27 @@ def highperch():
     return frame("#F1E7D6", out)
 
 
+# Fuzzy Spelling: three pompom toys hanging on strings, each a googly-eyed head above its letter (the last with one
+# more pompom below), lined up across the gold bar so it spells CAT, with yarn tails underneath.
+def fuzzyspelling():
+    out = f'<rect x="8" y="44" width="84" height="22" rx="4" fill="#F6DFA6" stroke="{INK}" stroke-width="2"/>'
+    for cx, col, ch, extra in [(28, "#E16A4A", "C", 0), (50, "#7885BA", "A", 0), (72, "#6AA673", "T", 1)]:
+        balls = [(33, None), (55, ch)] + [(77, None)] * extra
+        out += f'<path d="M{cx} 8V{balls[-1][0]}" stroke="#ECA818" stroke-width="1.6"/>'
+        for y, letter in balls:
+            out += f'<circle cx="{cx}" cy="{y}" r="9.5" fill="{col}" stroke="{INK}" stroke-width="1.4"/>'
+            if letter: out += text(cx, y + 1, letter, 12, "#FFF4D2")
+            elif y == 33:   # the head's googly eyes
+                out += "".join(f'<circle cx="{cx + dx}" cy="{y - 1}" r="2.6" fill="#fff" stroke="{INK}" stroke-width=".8"/><circle cx="{cx + dx + .5}" cy="{y}" r="1.2" fill="{INK}"/>' for dx in (-3.5, 3.5))
+        tail = balls[-1][0] + 10
+        for t, c2 in zip((-4, -1.5, 1.5, 4), ("#ECA818", "#B94588", "#73A7AE", "#B3B94B")):
+            out += f'<path d="M{cx} {tail}q{t} 6 {t * 1.6} 12" fill="none" stroke="{c2}" stroke-width="1.8" stroke-linecap="round"/>'
+    return frame("#EEF1EA", out)
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")
