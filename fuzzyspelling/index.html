@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fuzzy Spelling</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-14.5"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-14.5">
+<style>
+/* Columns of letters slide up and down; line them up so the bar across the middle spells a word. Seven words a
+   round, against the clock. Each column is a hanging pompom toy with a letter on every pompom; the toys hang a little crooked, as if
+   a cat's been batting at them, and swing when they're moved. */
+.lines{position:relative;width:var(--board);margin:0 auto;border:3px solid var(--ink);border-radius:12px;overflow:hidden;
+  touch-action:none;user-select:none;-webkit-user-select:none}
+.lines{background:#EEF1EA}
+.lines .ltr{paint-order:stroke fill;stroke:rgba(255,255,255,.85);stroke-width:7px;stroke-linejoin:round}
+.lines svg{display:block;width:100%;height:100%;outline:none}
+.col{transition:transform .18s ease-out}
+/* batted at: a toy swings on its string and settles back to its own slight tilt */
+.sway{transform-box:view-box}
+.sway.swing{animation:swing 1.3s ease-out}
+.sway.swing.back{animation-name:swingback}
+.tail{transform-box:fill-box;transform-origin:50% 0}
+.tail.wig{animation:wig 1s ease-out}
+.tail.wig.back{animation-name:wigback}
+@keyframes wig{0%{transform:rotate(16deg)}25%{transform:rotate(-11deg)}50%{transform:rotate(6deg)}75%{transform:rotate(-3deg)}100%{transform:rotate(0)}}
+@keyframes wigback{0%{transform:rotate(-16deg)}25%{transform:rotate(11deg)}50%{transform:rotate(-6deg)}75%{transform:rotate(3deg)}100%{transform:rotate(0)}}
+@keyframes swing{0%{transform:rotate(calc(var(--tilt) + 9deg))}25%{transform:rotate(calc(var(--tilt) - 6deg))}50%{transform:rotate(calc(var(--tilt) + 3deg))}75%{transform:rotate(calc(var(--tilt) - 1.5deg))}100%{transform:rotate(var(--tilt))}}
+@keyframes swingback{0%{transform:rotate(calc(var(--tilt) - 9deg))}25%{transform:rotate(calc(var(--tilt) + 6deg))}50%{transform:rotate(calc(var(--tilt) - 3deg))}75%{transform:rotate(calc(var(--tilt) + 1.5deg))}100%{transform:rotate(var(--tilt))}}
+.col.dragging{transition:none}
+.tile text{font-weight:800;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.tile .ltr{font-size:52px;fill:var(--ink)}
+.tile .pts{font-size:17px;fill:#6B5536}
+.barband{fill:rgba(236,168,24,.24);stroke:var(--ink);stroke-width:4}
+.barband.found{fill:rgba(236,168,24,.6)}
+@media (prefers-reduced-motion:reduce){.col{transition:none}.sway.swing,.tail.wig{animation:none}}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Fuzzy Spelling</h1><div class="stripe"></div><p class="tagline">Slide the letters until the bar spells a word</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="lines" id="board"><div class="grid" id="grid" style="position:absolute;inset:0"><svg id="svg" tabindex="0" role="application" aria-label="Columns of letters. Drag a column up or down, or tap a letter to bring it to the bar."></svg></div></div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="shareBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New round</button>
+  </div>
+</main>
+
+<script src="../games.js?v=2026-10-14.5"></script>
+<script src="../walkcat.js?v=2026-10-14.5"></script>
+<script>
+/* ---------- words ---------- */
+// The words come from Keyboard Cat's list (keyboardcat/words.json): answers from its common words, and any word
+// in the list counts if it lines up on the bar. It has no words with an s in them.
+// Levels: one word each, {L: letters in the word, lo and hi: how few and how many letters a toy can have}. They
+// get longer words and more letters on each toy as they go. A toy with one letter just hangs there, showing it.
+function levelOf(n) {
+  return [null, [5, 1, 3], [5, 2, 3], [5, 2, 4], [5, 3, 4], [6, 2, 4], [6, 3, 4], [6, 3, 5], [6, 4, 5], [7, 3, 4], [7, 3, 5],
+    [7, 4, 5], [7, 4, 6], [7, 5, 6], [8, 3, 5], [8, 4, 5], [8, 4, 6], [8, 5, 6], [8, 5, 6], [8, 6, 6], [8, 6, 6]].map(v => v && {L: v[0], lo: v[1], hi: v[2]})[n];
+}
+// Decoy letters, drawn roughly as often as letters turn up in English so the columns look like words.
+const FREQ = "eeeeeeeeeeeeaaaaaaaaarrrrrrrriiiiiiiiooooooootttttttnnnnnnnlllllccccuuuudddpppmmmhhhggbbffyywkvxzjq";
+let WORDS = null, ACCEPT = {};
+function loadWords() {
+  if (window.PURR_WORDS) { WORDS = window.PURR_WORDS; return Promise.resolve(); }
+  return fetch("../keyboardcat/words.json?v=" + (window.SITE_BUILD || "")).then(r => r.json()).then(d => { WORDS = d; });
+}
+const accepts = L => ACCEPT[L] || (ACCEPT[L] = new Set(WORDS.common.concat(WORDS.extra).filter(w => w.length === L)));
+// One word's toys: each has its letter and some decoys (lo to hi letters in all), in a random order, pulled so
+// the bar doesn't already spell a word.
+function makeLine(w, lo, hi) {
+  for (;;) {
+    const cols = [...w].map(ch => {
+      const K = lo + Math.floor(Math.random() * (hi - lo + 1)), set = new Set([ch]);
+      while (set.size < K) set.add(FREQ[Math.floor(Math.random() * FREQ.length)]);
+      const a = [...set]; for (let k = a.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [a[k], a[j]] = [a[j], a[k]]; }
+      return a.join("");
+    });
+    for (let tries = 0; tries < 50; tries++) {
+      const pos = cols.map(c => Math.floor(Math.random() * c.length));
+      if (!accepts(w.length).has(cols.map((c, i) => c[pos[i]]).join(""))) return {w, cols, pos};
+    }
+  }
+}
+// A level's puzzle: one answer of its length, and its toys.
+function makeRound(n) {
+  const {L, lo, hi} = levelOf(n), pool = WORDS.common.filter(w => w.length === L);
+  return [makeLine(pool[Math.floor(Math.random() * pool.length)], lo, hi)];
+}
+
+/* ---------- game state ---------- */
+// game: {level, lines: [{w (the answer), cols (each toy's letters, top to bottom), pos (which letter of each toy is
+//        on the bar)}] (one line a level), at (always 0), found (the word lined up, once it is), hinted, won}
+const STORE = "catdoku.fuzzyspelling.v1", MAX_LEVEL = 20;
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1, }, state.settings);
+let game = state.game || null, busy = false, pause = false, drag = null, cursor = 0, keyed = false;   // keyed: the arrow keys are in use, so show which toy they're on
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !busy && !pause && !$("overlay").classList.contains("show");
+const levelName = n => `Level ${n} · ${levelOf(n).L} letters`;
+// the board is as tall as the level's longest toy can reach, above and below the bar
+const reach = () => levelOf(game.level).hi;
+const line = () => game.lines[game.at];
+const barWord = () => line().cols.map((c, i) => c[line().pos[i]]).join("");
+
+/* ---------- drawing ---------- */
+const U = 100, TOP = 110, BOT = 125;
+const still = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+let swing = new Set(), wiggle = new Set();   // this draw: whole toys to swing (a new word), tails to wiggle (a toy just moved)
+let hintMark = null;   // {c, j, key}: the letter to bring to the bar, while the columns are as they were
+// Each pompom is the same picture (pompom.webp: a pompom with its colour taken out, keeping its shading and
+// fibres), tinted to one of the site's colours (games.css) and turned its own way, so no two look alike.
+const POM_SRC = window.POM_SRC || "pompom.webp";
+const EYE_SRC = window.EYE_SRC || "eye.webp", BELL_SRC = window.BELL_SRC || "bell.webp";
+const BRIGHT = ["#E16A4A", "#ECA818", "#6AA673", "#B94588", "#7885BA", "#B3B94B", "#73A7AE", "#BD5538", "#8D78AD", "#4E577D"];
+// each toy is one colour all the way down, so it reads as one thing as it moves; neighbours differ
+const toyColour = c => (c * 3 + 1) % BRIGHT.length;
+// the tints, one filter per colour: the photo's light times the colour
+const pomFilters = () => BRIGHT.map((h, k) => { const [r, g, b] = [1, 3, 5].map(i => Math.min(1, parseInt(h.slice(i, i + 2), 16) / 255 * 1.22));
+  return `<filter id="pc${k}" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="${r} 0 0 0 0  0 ${g} 0 0 0  0 0 ${b} 0 0  0 0 0 1 0"/></filter>`; }).join("");
+const pomSvg = (cx, cy, k, turn) => `<image href="${POM_SRC}" x="${cx - 46}" y="${cy - 46}" width="92" height="92" transform="rotate(${turn} ${cx} ${cy})" filter="url(#pc${k})"/>`;
+function tileSvg(x, y, ch, c) {
+  return `<g class="tile">${pomSvg(x + 50, y + 50, toyColour(c), (c * 7 + y / U * 13) * 47 % 360)}<text class="ltr" x="${x + 50}" y="${y + 50}">${ch.toUpperCase()}</text></g>`;
+}
+// The rest of a pompom toy, moving with its balls: the string it hangs from (with a bell on some), the thread
+// running down through every ball, a head with googly eyes above the first, and a tuft of coloured yarn
+// below the last.
+function toyEnds(x, c, K, wiggle) {
+  const cx = x + 50;
+  let s = `<path d="M${cx} -3000 V-60" stroke="#ECA818" stroke-width="5"/>`;
+  // a jingle bell hung by its own loop from a short tie, on some toys
+  if (c % 3 === 0) s += `<path d="M${cx} -132 q9 1 14 8" fill="none" stroke="#ECA818" stroke-width="3"/><image href="${BELL_SRC}" x="${cx - 4}" y="-127" width="36" height="36" transform="rotate(${c * 23 % 30 - 15} ${cx + 14} -125)"/>`;
+  s += `<path d="M${cx} -50 V${K * U + 24}" stroke="#ECA818" stroke-width="4"/>`;
+  s += pomSvg(cx, -50, toyColour(c), c * 61 % 360);
+  // googly eyes, each turned its own way so the pupils look wherever they like
+  for (const dx of [-17, 17]) s += `<image href="${EYE_SRC}" x="${cx + dx - 14}" y="-68" width="28" height="28" transform="rotate(${(c * 97 + dx * 13) % 360} ${cx + dx} -54)"/>`;
+  const y = K * U;
+  // the tail: a bound tuft of yarn strands, fanning out and curling, each strand its own colour; it wiggles when
+  // the toy's just been moved
+  s += `<g class="tail${wiggle ? ((c % 2) ? " wig back" : " wig") : ""}"><path d="M${cx} ${y} V${y + 22}" stroke="#ECA818" stroke-width="10"/><path d="M${cx - 5} ${y + 8} H${cx + 5} M${cx - 5} ${y + 14} H${cx + 5}" stroke="#8A6410" stroke-width="1.5"/>`;
+  for (let k = -3; k <= 3; k++) { const d = `M${cx} ${y + 22} q${k * 10} 30 ${k * 6 + (k % 2 ? 8 : -8)} 92`;
+    s += `<path d="${d}" fill="none" stroke="rgba(42,37,48,.3)" stroke-width="${9 - Math.abs(k)}" stroke-linecap="round"/><path d="${d}" fill="none" stroke="${BRIGHT[(k + 3 + c * 2) % BRIGHT.length]}" stroke-width="${7 - Math.abs(k)}" stroke-linecap="round"/>`; }
+  s += `</g>`;
+  return s;
+}
+function draw(found) {
+  const {L} = levelOf(game.level), K = reach(), Ln = line(), svg = $("svg"), W = L * U, H = (2 * K - 1) * U, bar = (K - 1) * U;
+  // room above and below the letters, so a toy's head and tail stay in sight wherever it's pulled to
+  $("board").style.aspectRatio = `${W} / ${H + TOP + BOT}`;
+  svg.setAttribute("viewBox", `0 ${-TOP} ${W} ${H + TOP + BOT}`);
+  let s = `<defs>${pomFilters()}</defs>`;
+  // the bar: a band of gold outlined in ink across the board, brighter when it spells a word
+  s += `<rect class="barband${found ? " found" : ""}" x="-10" y="${bar + 2}" width="${W + 20}" height="${U - 4}" rx="8"/>`;
+  for (let i = 0; i < L; i++) {
+    const x = i * U, shift = (K - 1 - Ln.pos[i]) * U;
+    // each toy hangs a little crooked from its own spot at the top, and swings when it's just been moved
+    const tilt = ((i * 37 + game.level * 11) % 5 - 2) / 2 * (L <= 5 ? 1.6 : L === 6 ? 1 : .6),   // less on wide boards, so toys don't bump
+      sw = swing.has(i) && !still() ? ` swing${(i + game.level) % 2 ? " back" : ""}` : "";
+    s += `<g class="sway${sw}" style="transform-origin:${x + 50}px 0px;--tilt:${tilt}deg;transform:rotate(${tilt}deg)">`;
+    s += `<g class="col${drag && drag.c === i ? " dragging" : ""}" data-c="${i}" style="transform:translateY(${shift + (drag && drag.c === i ? drag.dy : 0)}px)">`;
+    s += toyEnds(x, i, Ln.cols[i].length, wiggle.has(i) && !still());
+    [...Ln.cols[i]].forEach((ch, j) => {
+      s += tileSvg(x, j * U, ch, i);
+      if (hintMark && hintMark.key === Ln.pos.join() && hintMark.c === i && hintMark.j === j) s += `<rect class="hintsq" x="${x + 6}" y="${j * U + 4}" width="88" height="92" rx="14"/>`;
+    });
+    s += `</g></g>`;
+  }
+  if (cursor >= 0 && keyed && document.activeElement === svg) s += `<rect x="${cursor * U + 3}" y="3" width="94" height="${H - 6}" rx="12" fill="none" stroke="#73A7AE" stroke-width="6"/>`;
+  svg.innerHTML = s; swing = new Set(); wiggle = new Set();
+  if (found && !still()) trot(W, H + BOT);
+  $("count").textContent = game.found.length ? `${game.found[0].toUpperCase()}!` : `Level ${game.level} · ${L} letters`;
+  $("hintBtn").disabled = game.won;
+}
+
+/* ---------- the cat ---------- */
+// Keyboard Cat's cat (walkcat.js) trots along the bottom of the board, below the toys' tails, when a word's made,
+// so the word stays in view.
+function trot(W, floor) {
+  const cat = WALKCAT.make(), len = 270, y0 = floor - 120 * len / 300 - 4, from = -len, to = W + 20, ms = 1600, t0 = performance.now();
+  $("svg").append(cat.g);
+  const frame = now => {
+    if (!cat.g.isConnected) return;
+    const f = Math.min(1, (now - t0) / ms);
+    WALKCAT.pose(cat, from + (to - from) * f, y0, len, now - t0);
+    if (f < 1) requestAnimationFrame(frame); else cat.g.remove();
+  };
+  requestAnimationFrame(frame);
+}
+
+/* ---------- playing ---------- */
+// Drag a column up or down (it snaps to a letter), or tap a letter to bring it to the bar.
+const svgPt = e => { const p = $("svg").createSVGPoint(); p.x = e.clientX; p.y = e.clientY; return p.matrixTransform($("svg").getScreenCTM().inverse()); };
+$("svg").addEventListener("pointerdown", e => {
+  if (!playing()) return;
+  keyed = false;
+  // the toy under the pointer (they hang crooked, so go by the pompom touched, else by the column)
+  const pt = svgPt(e), hit = e.target.closest(".col"), c = hit ? +hit.dataset.c : Math.floor(pt.x / U);
+  if (c < 0 || c >= line().cols.length) return;
+  drag = {c, y0: pt.y, dy: 0, moved: false};
+  $("svg").setPointerCapture(e.pointerId);
+});
+$("svg").addEventListener("pointermove", e => {
+  if (!drag) return;
+  const K = reach(), n = line().cols[drag.c].length, dy = svgPt(e).y - drag.y0, p = line().pos[drag.c];
+  // as far as the top or bottom letter can reach the bar, and a little give past it
+  drag.dy = Math.max(-(n - 1 - p) * U - 30, Math.min(p * U + 30, dy));
+  if (Math.abs(dy) > 10) drag.moved = true;
+  const g = $("svg").querySelector(`.col[data-c="${drag.c}"]`);
+  if (g) { g.classList.add("dragging"); g.style.transform = `translateY(${(K - 1 - p) * U + drag.dy}px)`; }
+});
+function endDrag(e) {
+  if (!drag) return;
+  const d = drag, K = line().cols[d.c].length; drag = null;
+  let to;
+  if (d.moved) to = Math.max(0, Math.min(K - 1, line().pos[d.c] - Math.round(d.dy / U)));
+  else {
+    // a tap: the pompom under it, in the toy's own (tilted, slid) coordinates
+    const g = $("svg").querySelector(`.col[data-c="${d.c}"]`), p = $("svg").createSVGPoint(); p.x = e.clientX; p.y = e.clientY;
+    to = Math.floor(p.matrixTransform(g.getScreenCTM().inverse()).y / U); if (to < 0 || to >= K) to = line().pos[d.c];
+  }
+  setPos(d.c, to);
+}
+$("svg").addEventListener("pointerup", endDrag);
+$("svg").addEventListener("pointercancel", () => { drag = null; draw(); });
+function setPos(c, to) {
+  game.started = true; cursor = c;
+  line().pos[c] = to; wiggle.add(c);
+  if (accepts(line().w.length).has(barWord())) { lined(); return; }
+  draw(); save();
+}
+// Keys: left and right pick a column, up and down slide it.
+$("svg").addEventListener("keydown", e => {
+  if (!playing() || e.ctrlKey || e.metaKey || e.altKey) return;
+  keyed = true;
+  const n = line().cols.length, K = line().cols[cursor].length;
+  if (e.key === "ArrowLeft") cursor = Math.max(0, cursor - 1);
+  else if (e.key === "ArrowRight") cursor = Math.min(n - 1, cursor + 1);
+  else if (e.key === "ArrowUp") { if (line().pos[cursor] < K - 1) { setPos(cursor, line().pos[cursor] + 1); e.preventDefault(); return; } }
+  else if (e.key === "ArrowDown") { if (line().pos[cursor] > 0) { setPos(cursor, line().pos[cursor] - 1); e.preventDefault(); return; } }
+  else return;
+  e.preventDefault(); draw();
+});
+$("svg").addEventListener("focus", () => { if (game) draw(); });
+$("svg").addEventListener("blur", () => { if (game) draw(); });
+// A word on the bar: it lights up and Keyboard Cat's cat trots across below the toys, then the level's done.
+function lined() {
+  const w = barWord();
+  game.found.push(w); hintMark = null;
+  G.note(w === line().w ? `${w.toUpperCase()}!` : `${w.toUpperCase()}! That counts too.`, 1500);
+  pause = true; draw(true); save();
+  const g = game;
+  setTimeout(() => {
+    pause = false; if (game !== g) return;
+    win();
+  }, 2600);   // time to enjoy the word (and the cat) before the card
+}
+// Hint: a gold box round a letter to bring to the bar (in the first column that's wrong), for the player to move.
+// A hint keeps you on the same level and costs the gold paw.
+let hintTimer = null;
+$("hintBtn").onclick = () => {
+  if (!playing()) return;
+  const Ln = line(), c = Ln.cols.findIndex((col, i) => col[Ln.pos[i]] !== Ln.w[i]);
+  if (c < 0) return;
+  hintMark = {c, j: Ln.cols[c].indexOf(Ln.w[c]), key: Ln.pos.join()};
+  game.hinted = true; game.started = true; draw(); save();
+  G.note(`Bring the letter in the gold box to the bar.`, 5000);
+  clearTimeout(hintTimer); const m = hintMark;
+  hintTimer = setTimeout(() => { if (hintMark === m) { hintMark = null; if (game) draw(); } }, 5000);
+};
+
+/* ---------- endings ---------- */
+function win() {
+  game.won = true; G.finishClock(game);
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save(); draw();
+  G.track(`Fuzzy Spelling solved level ${game.level}`);
+  finishCard();
+}
+function finishCard() {
+  const next = settings.level;
+  let text = `You lined up ${game.found[0].toUpperCase()}${game.found[0] === line().w ? "" : ` (the toys were hiding ${line().w.toUpperCase()} too)`}.`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my toys", game.result,
+    {title: "Purrfect!", gold: !game.hinted, goldWhy: "No hints!", next: `Next: level ${next}`, after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- new rounds ---------- */
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
+async function newPuzzle() {
+  if (busy) return;
+  busy = true;
+  if (!WORDS) { G.openCard("Fetching the words…", "", []); await loadWords(); G.closeCard(); }
+  const n = settings.level;
+  game = {level: n, lines: makeRound(n), at: 0, found: [], won: false, ...G.freshClock()};
+  game.lines[0].start = game.lines[0].pos.slice();
+  busy = false; cursor = 0; hintMark = null; G.note(""); swing = new Set(game.lines[0].cols.keys()); draw(); save();
+  G.track(`Fuzzy Spelling new puzzle level ${n}`);
+}
+
+/* ---------- sharing ---------- */
+// The answer, each toy's letters (top to bottom, split by "."), and which letter of each was on the bar at the
+// start; with progress, which is on the bar now.
+$("shareBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Fuzzy Spelling", won: game.won,
+  puzzle: () => ({g: "fuzzyspelling", N: game.level, w: line().w, c: line().cols.join("."), s: (line().start || line().pos).join("")}),
+  progress: () => line().pos.join("")}); };
+function openShared(d) {
+  const lv = levelOf(d.N), w = d.w, cols = typeof d.c === "string" ? d.c.split(".") : null;
+  const posOk = p => typeof p === "string" && p.length === cols.length && [...p].every((ch, i) => /[0-9]/.test(ch) && +ch < cols[i].length);
+  const ok = lv && typeof w === "string" && /^[a-z]+$/.test(w) && w.length === lv.L && cols && cols.length === lv.L
+    && cols.every((c, i) => /^[a-z]{1,6}$/.test(c) && new Set(c).size === c.length && c.includes(w[i])) && posOk(d.s);
+  if (!ok) { G.note("That share link didn't work.", 5000); return; }
+  const start = [...d.s].map(Number);
+  game = {level: d.N, lines: [{w, cols, pos: start.slice(), start}], at: 0, found: [], won: false, ...G.freshClock()};
+  if (posOk(d.p)) { line().pos = [...d.p].map(Number); game.timed = false; }
+  settings.level = d.N; $("levelSel").value = d.N;
+  cursor = 0; hintMark = null; swing = new Set(cols.keys()); draw(); save();
+  if (accepts(w.length).has(barWord())) { game.found.push(barWord()); win(); }
+}
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  settings.seenHelp = false; helpOnFirstVisit();
+  if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
+}
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || !playing() || document.querySelector(".spot")) return;
+  const {L} = levelOf(game.level), K = reach(), barRow = [...Array(L).keys()].map(x => [x, K - 1]), col = [...Array(2 * K - 1).keys()].map(y => [0, y]);
+  const steps = [
+    {say: "Line the letters up so the bar spells a word", lit: barRow},
+    {say: "Drag a column up or down, or tap a letter", lit: col},
+    {say: "Any real word counts!", lit: barRow, tone: "ok"},
+    {say: "Stuck? Hint shows a letter to move", els: [$("hintBtn")]},
+  ];
+  const map = () => { const r = $("svg").getBoundingClientRect(), k = r.width / (L * U); return {ox: r.left, oy: r.top + TOP * k, cw: U * k, ch: U * k}; };
+  G.spotlight({grid: $("grid"), w: L, h: 2 * K - 1, steps, map, done: () => { settings.seenHelp = true; save(); }});
+}
+
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", ""), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
+$("helpBtn").onclick = showHelp;
+
+G.nav("fuzzyspelling");
+G.checkClock(game);
+G.setupTimer({name: "fuzzyspelling", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+const shared = G.readShare("fuzzyspelling");
+loadWords().then(() => {
+  if (game && Array.isArray(game.lines) && game.lines.length === 1 && levelOf(game.level)) G.reopen(() => {
+      if (game.lines[0].cols.length !== levelOf(game.level).L) throw new Error("the saved toys don't fit their level");
+      draw(); if (game.won) finishCard(); else helpOnFirstVisit();
+    }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
+  else if (!shared) newPuzzle().then(helpOnFirstVisit);
+  if (shared) G.offerShare(shared, shareOpts());
+});
+const shareOpts = () => ({name: "Fuzzy Spelling", inProgress: !!(game && !game.won && game.started), open: openShared, after: helpOnFirstVisit});
+// A share link opened while this page is already showing only changes the address, so watch for it.
+window.addEventListener("hashchange", () => { const d = G.readShare("fuzzyspelling"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>

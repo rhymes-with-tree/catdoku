@@ -27,6 +27,7 @@ const G = (() => {
     ["Keyboard Cat", "keyboardcat", "Make words from the keys that still work", "#8D78AD"],
     ["If It Fits", "iffits", "Build the box, and a cat comes to sit in it", "#C4925C"],
     ["High Perch", "highperch", "Raise every cat tree to just the right height", "#8E5E3E"],
+    ["Fuzzy Spelling", "fuzzyspelling", "Slide the letters until the bar spells a word", "#B94588"],
   ];
   const $ = id => document.getElementById(id);
 

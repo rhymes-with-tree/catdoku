@@ -46,10 +46,10 @@ Rows are sorted by group, then status: Yes, Look closer, Option, Idea, Built, No
 | Tunnel Run (Net) | Lines and connections | Turn tunnel pieces until they all join the cat's bed | — | — | — | Game inventory chat, Tatham | Built | |
 | Unravel (One Line) | Lines and connections | Cover every line of a shape with one strand of yarn | — | — | — | Fair Play chat, you play | Built | |
 | Unolingo | Word logic | A clueless crossword: fill the grid using each of the 26 letters once | None | Medium | — | You play, GoComics | Yes | |
-| ThruLine | Word logic | Columns of letters (five to nine or more, one per letter of the word) slide up and down like a slot machine; line them up so the middle bar spells a word, seven words against the clock | None | Easy | — | You play, GoComics | Yes | Needs only a word list |
 | PlayFour! | Word logic | A 4×4 grid where every row and column is a clued word | Definitions | Medium | — | GoComics | Option | |
 | Waffle | Word logic | A waffle-shaped grid of six words with the letters scrambled; swap letters to fix every word within a limited number of swaps | None | Medium | — | You play, wordleunlimited | Idea | |
 | Fliptogram | Word logic | Every letter is secretly paired with another; flip split-flap tiles to their partners until every row spells a word, in as few flips as you can | None | Medium | — | GoComics | Idea | |
+| Fuzzy Spelling (ThruLine) | Word logic | Pompom cat toys with a letter on each pompom hang on strings; pull them up and down until the bar spells a word, one word a level | — | — | — | You play, GoComics | Built | Toys of 1 to 6 letters; looks tried: scratching posts and yarn with letter tiles |
 | Squared Away | Word logic | Two mini crosswords side by side with their clues mixed together | Written | — | — | GoComics | No | |
 | Crosswords | Word logic | Daily Commuter, LA Times, NetWord, Universal, USA TODAY | Written | — | — | GoComics | No | |
 | Rootonym | Make and find words | Given a word root and its meaning, fill in words that contain it from their definitions | Definitions | Medium | Keyboard Cat's Origin clues | GoComics | Look closer | |

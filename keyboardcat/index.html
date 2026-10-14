@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-14.4"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-14.5"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-14.4">
+<link rel="stylesheet" href="../games.css?v=2026-10-14.5">
 <style>
 /* A cat has walked across the keyboard and broken it. Only seven keys still work. Make words with them, always
    using the gold one. */
@@ -184,7 +184,8 @@
   <p class="help">Words from <a href="https://wordlist.aspell.net/">SCOWL</a>, © Kevin Atkinson, and ENABLE.</p>
 </main>
 
-<script src="../games.js?v=2026-10-14.4"></script>
+<script src="../games.js?v=2026-10-14.5"></script>
+<script src="../walkcat.js?v=2026-10-14.5"></script>
 <script>
 const WORDS_INLINE = null;  // the word list, filled in when the page is bundled into one file
 
@@ -269,15 +270,7 @@ function draw() {
 // so it's drawn bigger than the keyboard: about one and a half times its width.)
 const NS = "http://www.w3.org/2000/svg";
 const svgEl = (tag, attrs, html) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (html) e.innerHTML = html; return e; };
-// From above, facing right, in a 300 × 120 box: the tail, four paws (drawn separately so they can step), the body
-// and the head, as Knock It Off's cat.
-const BODY = `<path d="M70 60 C40 60 26 40 6 46" fill="none" stroke="#2A2530" stroke-width="15" stroke-linecap="round"/><path d="M70 60 C40 60 26 40 6 46" fill="none" stroke="#E9A15B" stroke-width="9" stroke-linecap="round"/>
-  <ellipse cx="150" cy="60" rx="95" ry="40" fill="#E9A15B" stroke="#2A2530" stroke-width="4"/>
-  <path d="M100 26 Q110 60 100 94 M130 21 Q140 60 130 99 M160 21 Q170 60 160 99 M190 26 Q200 60 190 94" fill="none" stroke="#C7793A" stroke-width="6" stroke-linecap="round"/>
-  <path d="M262 36 L284 30 L272 50 Z M262 84 L284 90 L272 70 Z" fill="#E9A15B" stroke="#2A2530" stroke-width="4" stroke-linejoin="round"/>
-  <circle cx="258" cy="60" r="30" fill="#E9A15B" stroke="#2A2530" stroke-width="4"/>
-  <path d="M244 52 L254 55 M242 60 L253 60 M244 68 L254 65" stroke="#C7793A" stroke-width="4" stroke-linecap="round"/>`;
-const PAWS = [[205, 22], [205, 98], [95, 24], [95, 96]];   // front left, front right, back left, back right
+// The cat itself (seen from above, facing right) is in walkcat.js, shared with Fuzzy Spelling.
 let walking = null;  // the walk, while it's on
 function placeCat(walk) {
   const kb = $("board");
@@ -288,10 +281,7 @@ function placeCat(walk) {
   if (!walk || matchMedia("(prefers-reduced-motion: reduce)").matches) return done();
   const box = kb.getBoundingClientRect(), len = box.width * 1.5, h = len * 120 / 300, layer = svgEl("svg", {class: "catlayer", "aria-hidden": "true"});
   kb.append(layer);
-  // each paw: a pad, and four toes forward
-  const FOOT = `<path d="M-14 0 C-14 -9 -7 -12 -1 -9 C3 -7 4 -3 4 0 C4 3 3 7 -1 9 C-7 12 -14 9 -14 0 Z"/>${[[7, -10], [11, -3.5], [11, 3.5], [7, 10]].map(([x, y]) => `<ellipse cx="${x}" cy="${y}" rx="4.6" ry="3.9"/>`).join("")}`;
-  const paws = PAWS.map(() => svgEl("g", {fill: "#F2C49B", stroke: "#2A2530", "stroke-width": 3}, FOOT));
-  const cat = svgEl("g", {}); cat.append(...paws); cat.insertAdjacentHTML("beforeend", BODY); layer.append(cat);
+  const cat = WALKCAT.make(); layer.append(cat.g);
   for (const k of keys) k.classList.add("intact");
   const xs = keys.map(k => { const r = k.getBoundingClientRect(); return r.left + r.width / 2 - box.left; });
   const y0 = box.height / 2 - h / 2, from = -len, to = box.width + len * .1, ms = 900, t0 = performance.now();
@@ -300,10 +290,8 @@ function placeCat(walk) {
   me = walking = {skip: finish};
   const frame = now => {
     if (walking !== me) return;
-    const f = Math.min(1, (now - t0) / ms), x = from + (to - from) * f, step = (now - t0) / 70;
-    // a trot: diagonal pairs of paws reach forward together
-    PAWS.forEach(([px, py], i) => { const swing = Math.sin(step + (i === 0 || i === 3 ? 0 : Math.PI)) * 18; paws[i].setAttribute("transform", `translate(${px + swing} ${py})`); });
-    cat.setAttribute("transform", `translate(${x} ${y0 + Math.sin(step * 2) * 2}) scale(${len / 300})`);
+    const f = Math.min(1, (now - t0) / ms), x = from + (to - from) * f;
+    WALKCAT.pose(cat, x, y0, len, now - t0);
     // each key breaks as the front paws come down on it
     const front = x + len * 205 / 300;
     keys.forEach((k, i) => { if (front >= xs[i]) k.classList.remove("intact"); });
