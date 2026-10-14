@@ -402,21 +402,28 @@ def highperch():
 
 
 # Fuzzy Spelling: three pompom toys hanging on strings, each a googly-eyed head above its letter (the last with one
-# more pompom below), lined up across the gold bar so it spells CAT, with yarn tails underneath.
+# more pompom below), lined up across the gold bar so it spells CAT, with yarn tails underneath. All palette colours:
+# the toys in the game's first three toy colours (gold, periwinkle, brick), the bar a tint of gold outlined in ink,
+# on a tint of pacific blue.
+def tint(c, f):
+    return "#" + "".join(f"{round(int(c[k:k + 2], 16) * f + 255 * (1 - f)):02X}" for k in (1, 3, 5))
+
+
 def fuzzyspelling():
-    out = f'<rect x="8" y="44" width="84" height="22" rx="4" fill="#F6DFA6" stroke="{INK}" stroke-width="2"/>'
-    for cx, col, ch, extra in [(28, "#E16A4A", "C", 0), (50, "#7885BA", "A", 0), (72, "#6AA673", "T", 1)]:
+    out = f'<rect x="8" y="44" width="84" height="22" rx="4" fill="{tint(YELLOW, .45)}" stroke="{INK}" stroke-width="2"/>'
+    for cx, col, ch, extra in [(28, YELLOW, "C", 0), (50, PERI, "A", 0), (72, RED, "T", 1)]:
         balls = [(33, None), (55, ch)] + [(77, None)] * extra
-        out += f'<path d="M{cx} 8V{balls[-1][0]}" stroke="#ECA818" stroke-width="1.6"/>'
+        out += f'<path d="M{cx} 8V{balls[-1][0]}" stroke="{YELLOW}" stroke-width="1.6"/>'
         for y, letter in balls:
             out += f'<circle cx="{cx}" cy="{y}" r="9.5" fill="{col}" stroke="{INK}" stroke-width="1.4"/>'
-            if letter: out += text(cx, y + 1, letter, 12, "#FFF4D2")
+            if letter:   # ink with a white halo, as on the game's pompoms
+                out += f'<text x="{cx}" y="{y + 1}" font-size="12" fill="{INK}" stroke="#fff" stroke-width="2.4" paint-order="stroke" stroke-linejoin="round" {FONT}>{letter}</text>'
             elif y == 33:   # the head's googly eyes
                 out += "".join(f'<circle cx="{cx + dx}" cy="{y - 1}" r="2.6" fill="#fff" stroke="{INK}" stroke-width=".8"/><circle cx="{cx + dx + .5}" cy="{y}" r="1.2" fill="{INK}"/>' for dx in (-3.5, 3.5))
         tail = balls[-1][0] + 10
-        for t, c2 in zip((-4, -1.5, 1.5, 4), ("#ECA818", "#B94588", "#73A7AE", "#B3B94B")):
+        for t, c2 in zip((-4, -1.5, 1.5, 4), (ORANGE, PLUM, TEAL, LIME)):
             out += f'<path d="M{cx} {tail}q{t} 6 {t * 1.6} 12" fill="none" stroke="{c2}" stroke-width="1.8" stroke-linecap="round"/>'
-    return frame("#EEF1EA", out)
+    return frame(tint(TEAL, .22), out)
 
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
