@@ -441,7 +441,7 @@ const G = (() => {
   /* ---------- first-time spotlight ---------- */
   // Teach a game on its own board: each step dims the whole screen except some squares (and, if it
   // names them, other things on the page such as a key above the board), outlines them in red, can
-  // put marks on squares (a 🐱, ❌…; a list of marks takes turns), and says one line over the board.
+  // put marks on squares (a 🐱, ❌…, or a picture's file; a list of marks takes turns), and says one line over the board.
   // A tap or Space shows the next step; after the last, "Let's Play!" shows and `done` runs.
   // `grid` is the element the squares fill, `w` × `h` squares; each step is
   // {say, lit: [[x, y]…], outline (default: lit), tone ("ok" outlines green, not red), marks: [[x, y, mark, size]…],
@@ -514,9 +514,15 @@ const G = (() => {
         svg.append(svgEl("path", {d: e, class: "edge" + (ln.tone === "ok" ? " ok" : ""), "stroke-width": sw * 1.4}));
       }
       for (const [x, y, m, size] of st.marks || []) {   // x, y can fall between squares; size is in squares
+        const v = Array.isArray(m) ? m[frame % m.length] : m;
+        if (/\.(webp|png|svg)$/.test(v)) {   // a picture, such as Catdoku's Higgins
+          const d = cw * (size || 0.72);
+          svg.append(svgEl("image", {href: v, x: X(x + 0.5) - d / 2, y: Y(y + 0.5) - d / 2, width: d, height: d}));
+          continue;
+        }
         const t = svgEl("text", {x: X(x + 0.5), y: Y(y + 0.56), "text-anchor": "middle", "dominant-baseline": "middle",
-          "font-size": cw * (size || (m === "❌" ? 0.42 : 0.56))});
-        t.textContent = Array.isArray(m) ? m[frame % m.length] : m; svg.append(t);
+          "font-size": cw * (size || (v === "❌" ? 0.42 : 0.56))});
+        t.textContent = v; svg.append(t);
       }
       // a bold arrow with its tip at (ax, ay), coming in from direction (dx, dy); size is a square's width
       const arrow = (ax, ay, dx, dy, size) => {
