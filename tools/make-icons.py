@@ -39,6 +39,14 @@ def tuxface(x, y, s):
             f'<circle cx="{x-s*.38}" cy="{y+s*.1}" r="{s*.16}" fill="#E8C547"/><circle cx="{x+s*.38}" cy="{y+s*.1}" r="{s*.16}" fill="#E8C547"/>')
 
 
+def tabbyface(x, y, s):
+    """Higgins: a brown tabby face with an M of stripes on the forehead and green eyes."""
+    return (catface(x, y, s, "#A98663").split("<circle")[0]
+            + f'<path d="M{x-s*.42} {y-s*.2}L{x-s*.3} {y-s*.5}L{x} {y-s*.3}L{x+s*.3} {y-s*.5}L{x+s*.42} {y-s*.2}'
+            f'M{x-s} {y+s*.25}L{x-s*.65} {y+s*.3}M{x+s} {y+s*.25}L{x+s*.65} {y+s*.3}" stroke="#825840" stroke-width="{s*.14}" fill="none" stroke-linecap="round"/>'
+            f'<circle cx="{x-s*.38}" cy="{y+s*.1}" r="{s*.16}" fill="{LIME}"/><circle cx="{x+s*.38}" cy="{y+s*.1}" r="{s*.16}" fill="{LIME}"/>')
+
+
 # Catdoku: colour regions on a grid, a cat in each, none touching.
 def catdoku():
     regions = ["AABB", "ACCB", "DCCB", "DDCB"]
@@ -54,8 +62,8 @@ def catdoku():
                 wall = regions[r][c] != regions[r2][c2]
                 out += f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{INK}" stroke-width="{3 if wall else .8}" opacity="{1 if wall else .35}"/>'
     out += f'<rect x="{o}" y="{o}" width="{4*s}" height="{4*s}" fill="none" stroke="{INK}" stroke-width="3" rx="2"/>'
-    for c, r in ((1, 0), (3, 1), (0, 2), (2, 3)):   # one per row, column and region, none touching
-        out += catface(o + (c + .5) * s, o + (r + .55) * s, 6)
+    for c, r in ((1, 0), (3, 1), (0, 2), (2, 3)):   # one per row, column and region, none touching; Higgins is the tabby
+        out += (tabbyface if (c, r) == (1, 0) else catface)(o + (c + .5) * s, o + (r + .55) * s, 6)
     return frame(PAPER, out)
 
 

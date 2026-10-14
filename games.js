@@ -3,7 +3,7 @@
 const G = (() => {
   // Every game: name, folder, one line about it, and its colour in the games menu.
   const GAMES = [
-    ["Catdoku", "catdoku", "One cat in every row, column and region", "#BD5538"],
+    ["Catdoku", "catdoku", "Help Higgins give every cat its own territory", "#BD5538"],
     ["Yarn", "yarn", "Lead one strand through every ball", "#E16A4A"],
     ["Patches", "patches", "Sew a four-fabric quilt", "#73A7AE"],
     ["Sunbeams", "sunbeams", "Every cat gets a warm spot", "#ECA818"],

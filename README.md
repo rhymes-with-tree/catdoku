@@ -23,7 +23,8 @@ Open `index.html` in any modern browser: the front page has a tile for every gam
 - Auto grade and auto exclude toggles
 - Paw marks (🐾) by tapping or dragging, with an erase mode
 - Undo, restart, audit, and lives with revives
-- Wins move you up a size; a win that needed Audit or a revive, or running out of lives, keeps you at the same size; a win without losing a life earns a gold paw
+- Wins move you up a size; a win that needed Audit or a revive, or running out of lives, keeps you at the same size; a win without losing a life earns a gold paw, with Higgins stretched out on the win card in place of the cat photo
+- Higgins, a brown tabby, is Catdoku's mascot: Higgins sits beside the title and is the tabby on the front-page icon
 - Progress saved in `localStorage`
 - Cat photos, facts, and breeds from public cat APIs (all optional; the game works offline)
 
