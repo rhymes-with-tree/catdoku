@@ -29,7 +29,7 @@ anywhere, but keep track of who they are, because they'll be featured in games o
 - **Jan Brady** (`jan-brady-…`, fluffy black and white, long dark tail; he's a he) is a one-of-a-kind
   character. The `c16-…` pictures, the fluffy black and white cats napping in Sunbeams, are
   Jan Brady too (they keep their numbered names because the games already use them). He's the
-  mascot of Tail Chase (drawn from above as the runner, `jan-brady-14` crouched beside the title,
+  mascot of Tail Chase (`jan-brady-face`, cut from `jan-brady-27`, is the runner at the head of the yarn, `jan-brady-14` crouched beside the title,
   `jan-brady-34` leaping on the gold-paw card) and of Hide & Seek (he hides among the cats in the
   boxes as `c16-3`, `c16-5`, `jan-brady-15` and `jan-brady-33`, his tail is up beside the title in
   `jan-brady-22`, and `jan-brady-31` looks up from the gold-paw card).

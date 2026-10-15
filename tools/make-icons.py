@@ -214,9 +214,9 @@ def hideseek():
             else:
                 out += (f'<rect x="{x}" y="{y}" width="22" height="22" rx="2" fill="#D9B680" stroke="{INK}" stroke-width="2"/>'
                         f'<line x1="{x+11}" y1="{y}" x2="{x+11}" y2="{y+8}" stroke="{INK}" stroke-width="1.5" opacity=".5"/>')
-    # Jan Brady's big dark tail sticking up out of a box: it gives him away
-    out += (f'<path d="M74 64C71 57 80 55 79 48C78.5 44 75 43 74 45.5" fill="none" stroke="{INK}" stroke-width="10" stroke-linecap="round"/>'
-            f'<path d="M74 64C71 57 80 55 79 48C78.5 44 75 43 74 45.5" fill="none" stroke="#3A3440" stroke-width="7" stroke-linecap="round"/>')
+    # Jan Brady's ears peeking out of a box: black with pink insides
+    out += (f'<path d="M64 64L68 50L75 60ZM76 60L83 50L87 64Z" fill="#3A3440" stroke="{INK}" stroke-width="2" stroke-linejoin="round"/>'
+            f'<path d="M67.3 61L69 54.5L72.2 59.4ZM78.8 59.4L82 54.5L83.7 61Z" fill="#E7A9A5"/>')
     return frame("#C9A26B", out)
 
 
