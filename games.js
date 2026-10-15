@@ -9,7 +9,7 @@ const G = (() => {
     ["Sunbeams", "sunbeams", "Every cat gets a warm spot", "#ECA818"],
     ["Toy Box", "toybox", "Put every toy back in its basket", "#B3B94B"],
     ["Pounce", "pounce", "Line up three of a kind for Crunch to pounce on", "#6AA673"],
-    ["Twirl", "twirl", "Send every ribbon off the mat", "#B94588"],
+    ["Twirl", "twirl", "Clear every ribbon off the mat so Bugsy can nap", "#B94588"],
     ["Toe Beans", "toebeans", "Make the number on the big pad", "#DD9DAD"],
     ["Knock It Off", "knockitoff", "Help Fred push everything off the table", "#7885BA"],
     ["Hide & Seek", "hideseek", "Find every cat hiding in the boxes", "#C9A26B"],

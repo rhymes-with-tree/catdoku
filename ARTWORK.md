@@ -37,8 +37,10 @@ anywhere, but keep track of who they are, because they'll be featured in games o
   card, and the cat on the table is Fred drawn from above (slender and white, with a tabby cap split by a white
   blaze, white ears, one tabby patch behind the left shoulder and a sky-blue collar, as in photos of him). `kitten-star.webp`, the kitten freed in Bubbles, is Fred too
   (sometimes called Fred Kitten).
-- **Bugsy** (`bugsy-…`, fluffy brown and white) and **Bowtie** (`bowtie-…`, tuxedo) will be the
-  mascots of Twirl and Tunnel Run, and will nap in Sunbeams. In Tunnel Run now, Bowtie looks out of the
+- **Bugsy** (`bugsy-…`, fluffy brown and white) and **Bowtie** (`bowtie-…`, tuxedo) are the
+  mascots of Twirl and Tunnel Run, and will nap in Sunbeams. In Twirl, `bugsy-6` curls up beside the
+  title, `bugsy-5` peeks over the top corner of the mat with its chin on the edge, and `bugsy-4`
+  dozes in a box on the gold-paw card. In Tunnel Run, Bowtie looks out of the
   tunnel in the middle of the rug and does the winning run (`bowtie-6`), and Bugsy leans in over the rug
   (`bugsy-2`). `bowtie-tunnel` is Bowtie in a cat
   tunnel (for Tunnel Run); `bowtie-7` is the same tunnel with a second Bowtie rolling over beside
