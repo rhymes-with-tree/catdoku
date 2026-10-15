@@ -21,7 +21,7 @@ const G = (() => {
     ["Open the Door!", "opendoor", "Solve the puzzle so the cat can get through!", "#4E577D"],
     ["Tunnel Run", "tunnelrun", "Assemble the tunnels for Bowtie to run through", "#7E63B8"],
     ["Copycat", "copycat", "Find the boxes with matching toys", "#D08A4E"],
-    ["Night Light", "nightlight", "Get every cat to close its eyes", "#3A3358"],
+    ["Night Light", "nightlight", "Help Dottie get every cat to close its eyes", "#3A3358"],
     ["Unravel", "unravel", "Cover every line with one strand of yarn", "#E16A4A"],
     ["Tail Chase", "tailchase", "Catch the toys without getting tangled", "#C9773F"],
     ["Keyboard Cat", "keyboardcat", "Make words from the keys that still work", "#8D78AD"],
