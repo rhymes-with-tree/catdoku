@@ -52,6 +52,6 @@ anywhere, but keep track of who they are, because they'll be featured in games o
 - **Dottie** (Dottie Dietrich, `dottie-…`, all-black shorthair with yellow-green eyes, sometimes a purple
   collar or a teal bow) is the mascot of Night Light: `dottie-1` peeks from under the red blanket beside
   the title, every cat in the room is one of the `dottie-face-…` pictures (cut from `dottie-10`, `-16`,
-  `-23` and `-14`; they go dark when a cat's asleep), and `dottie-2` sleeps on the gold-paw card. A few poses come with things: peeking from
+  `-18` and `-14`; they go dark when a cat's asleep), and `dottie-2` sleeps on the gold-paw card. A few poses come with things: peeking from
   under a red blanket (`dottie-1`), hanging from a green toothbrush (`dottie-9`), hugging a blue blanket
   (`dottie-22`) and sitting on a cat-tree perch (`dottie-24`).
