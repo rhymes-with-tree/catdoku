@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Laser Pointer</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-15.11"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-15.11">
+<style>
+/* A room seen from above: a wooden floor inside a wall, with a laser pointer poking in at one edge. Cats sit on
+   some squares and mirrors stand on others; tap a mirror to tip it the other way. The red dot runs straight and
+   bounces off the mirrors, and every cat it passes opens its eyes and watches it. */
+.room{--floor:#E8DCC4; --plank:#D9C7A3; --wall:#B9A27E; --wall-in:#A68E69; --beam:#E16A4A; --dot:#C8392B;
+  --stand:#D8C6A2; --stand-ring:#BBA57C; --glass:#4E577D;
+  background:var(--wall);border:3px solid var(--ink);border-radius:10px;overflow:hidden;
+  touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.room .grid{position:absolute;inset:0}
+.room svg{display:block;width:100%;height:100%;outline:none}
+.floor{fill:var(--floor)}
+.plank{stroke:var(--plank);stroke-width:2;fill:none}
+.skirting{fill:none;stroke:var(--wall-in);stroke-width:6}
+.stand{fill:var(--stand);stroke:var(--stand-ring);stroke-width:3}
+.mirror{cursor:pointer}
+.mirror .tilt{transform-box:view-box;transition:transform .18s ease-out}
+.mirror .pane{fill:url(#glass);stroke:var(--glass);stroke-width:3}
+.mirror .glint{stroke:#fff;stroke-width:3;stroke-linecap:round;opacity:.9}
+.mirror .pin{fill:var(--glass)}
+.beam{fill:none;stroke:var(--beam);stroke-width:7;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.beamglow{fill:none;stroke:var(--beam);stroke-width:22;stroke-linecap:round;stroke-linejoin:round;opacity:.22;pointer-events:none}
+.dot{fill:var(--dot);pointer-events:none}
+.dotglow{fill:var(--beam);opacity:.35;pointer-events:none}
+.pen .body{fill:#3E3848}
+.pen .tip{fill:#C9CED8;stroke:#3E3848;stroke-width:2}
+.pen .button{fill:var(--beam)}
+/* cats: eyes shut until the dot runs past, then wide open and watching it */
+.cat{pointer-events:none}
+.cat .open{display:none}
+.cat.lit .open{display:inline} .cat.lit .shut{display:none}
+.cat .hop{transform-box:fill-box;transform-origin:50% 100%}
+.cat.pounce .hop{animation:pounce .42s ease-out}
+@keyframes pounce{30%{transform:translateY(-12px) scale(1.08,.94)}60%{transform:translateY(0) scale(.96,1.06)}}
+.badge circle{fill:#fff;stroke:var(--ink);stroke-width:3}
+.badge text{font:800 22px var(--font);fill:var(--ink);text-anchor:middle;dominant-baseline:central}
+.cat.inorder .badge circle{fill:#6AA673} .cat.inorder .badge text{fill:#fff}
+.cat.tooSoon .badge circle{fill:#C8392B} .cat.tooSoon .badge text{fill:#fff}
+/* once solved, toys fly in */
+.toy{pointer-events:none}
+.toyshadow{fill:#2A2530}
+/* the win card's tip for real cats */
+.card p.psa{font-size:14px;line-height:1.3;color:var(--ink);background:#F3E6D9;border:2px solid #E8956F;border-radius:10px;padding:8px 10px;margin:0 0 14px;text-align:left}
+.cursor{fill:none;stroke:#73A7AE;stroke-width:6;pointer-events:none}
+@media (prefers-reduced-motion:reduce){.mirror .tilt{transition:none}}
+/* the level names are long, so the picker's text is a little smaller to keep New room beside it */
+#levelSel{font-size:15px;padding:4px 6px}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Laser Pointer</h1><div class="stripe"></div><p class="tagline">Bounce the dot past every cat</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap room" id="board"><div class="grid" id="grid"><svg id="svg" tabindex="0" role="application" aria-label="A room with cats and mirrors. Tap a mirror to tip it the other way; arrow keys and Space work too."></svg></div></div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="shareBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New room</button>
+  </div>
+
+</main>
+
+<script src="../games.js?v=2026-10-15.11"></script>
+<script>
+/* ---------- laser puzzles (plain functions, also run in a background worker) ---------- */
+// The room is N × N squares. The laser pointer sits just off one edge and shines in along a row or column.
+// A square is floor, a cat or a mirror. Mirrors stand at a slant, / (0) or \ (1), and a tap tips one over to
+// the other slant; both faces reflect. The dot runs straight over floor and cats and bounces off mirrors, and
+// since every bounce can be run backwards it can't go round in a loop: it always leaves the room.
+// Win: the dot passes every cat (from level 6, in the order of the cats' numbers).
+// Levels: the room's size, how many mirrors the dot uses, how many it doesn't (spares), the fewest cats and
+// whether order counts. From level 11 the laser is live: the dot sets off when you switch it on, taking `live` ms
+// a square, and the mirrors can only be tipped while it's on its way.
+function levelSpec(n) {
+  return [null, {N: 5, use: 3, spare: 0, cats: 3}, {N: 5, use: 4, spare: 1, cats: 3}, {N: 6, use: 5, spare: 2, cats: 4},
+    {N: 6, use: 7, spare: 2, cats: 4}, {N: 7, use: 8, spare: 3, cats: 5}, {N: 6, use: 6, spare: 2, cats: 4, order: true},
+    {N: 7, use: 8, spare: 3, cats: 5, order: true}, {N: 7, use: 10, spare: 4, cats: 5, order: true},
+    {N: 8, use: 12, spare: 4, cats: 6, order: true}, {N: 8, use: 14, spare: 6, cats: 6, order: true},
+    {N: 5, use: 4, spare: 1, cats: 3, live: 650}, {N: 6, use: 5, spare: 2, cats: 4, live: 600},
+    {N: 6, use: 7, spare: 2, cats: 4, live: 560}, {N: 7, use: 8, spare: 3, cats: 5, live: 520, order: true},
+    {N: 7, use: 10, spare: 4, cats: 5, live: 480, order: true}][n];
+}
+// Directions: 0 up, 1 right, 2 down, 3 left. A / sends right↔up and left↔down; a \ sends right↔down and left↔up.
+function bounce(d, m) { return m ? 3 - d : d ^ 1; }
+function step(N, i, d) {
+  const x = i % N, y = (i - x) / N;
+  if (d === 0) return y > 0 ? i - N : -1;
+  if (d === 2) return y < N - 1 ? i + N : -1;
+  if (d === 3) return x > 0 ? i - 1 : -1;
+  return x < N - 1 ? i + 1 : -1;
+}
+// The dot's run with the mirrors as they are: the squares it crosses in order, each with the way it leaves,
+// ending with the square it leaves the room from. mir[i] is -1 for no mirror, else 0 or 1.
+function trace(N, mir, start, dir) {
+  const path = [];
+  let i = start, d = dir;
+  for (let k = 0; k < 4 * N * N + 4 && i >= 0; k++) {
+    if (mir[i] >= 0) d = bounce(d, mir[i]);
+    path.push([i, d]);
+    i = step(N, i, d);
+  }
+  return path;
+}
+// Every way of setting the mirrors the dot meets that walks it past every cat (in order, if order counts), up
+// to `limit`. cat[i] is 0 or the cat's number. Mirrors the dot never meets don't count. Returns the settings
+// (-1 for a mirror the dot doesn't use) and the squares the dot crosses.
+function solve(N, isMir, cat, start, dir, order, limit) {
+  const cats = cat.filter(c => c).length, set = new Array(N * N).fill(-1), seen = new Uint8Array(N * N), out = [];
+  // marks: the cats this call has seen first, to forget again when it returns
+  (function go(i, d, got, next, path) {
+    const marks = [];
+    const done = () => { for (const j of marks) seen[j] = 0; };
+    while (i >= 0) {
+      if (isMir[i]) {
+        if (set[i] < 0) {
+          for (const m of [0, 1]) {
+            if (out.length >= limit) break;
+            set[i] = m; go(i, d, got, next, path.slice()); set[i] = -1;
+          }
+          return done();
+        }
+        d = bounce(d, set[i]);
+      } else if (cat[i] && !seen[i]) {
+        if (order && cat[i] !== next) return done();
+        seen[i] = 1; marks.push(i); got++; next++;
+      }
+      path.push(i);
+      i = step(N, i, d);
+    }
+    if (got === cats) out.push({set: set.slice(), path});
+    done();
+  })(start, dir, 0, 1, []);
+  return out;
+}
+function shuffle(a) { for (let k = a.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [a[k], a[j]] = [a[j], a[k]]; } return a; }
+// Scatter mirrors, shine the laser, keep the mirrors the dot uses (and a few spares), then sit cats on squares
+// along its run until that's the only run that passes them all.
+function makeRoom(n) {
+  const spec = levelSpec(n), N = spec.N, NN = N * N;
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const mir = new Array(NN).fill(-1);
+    for (const i of shuffle([...Array(NN).keys()]).slice(0, Math.round(NN * (0.3 + Math.random() * 0.15)))) mir[i] = Math.random() < 0.5 ? 0 : 1;
+    // the laser: any square on the edge, shining inwards
+    const side = Math.floor(Math.random() * 4), k = Math.floor(Math.random() * N);
+    const start = [k, (N - 1) * N + k, k * N + N - 1, k * N][side], dir = [2, 0, 3, 1][side];
+    if (mir[start] >= 0) continue;
+    const path = trace(N, mir, start, dir), used = new Set(path.map(([i]) => i).filter(i => mir[i] >= 0));
+    if (used.size !== spec.use) continue;
+    // a mirror hit from both faces is fine; the floor the dot crosses
+    const floor = [...new Set(path.map(([i]) => i).filter(i => mir[i] < 0))];
+    const spare = shuffle([...Array(NN).keys()].filter(i => mir[i] >= 0 && !used.has(i))).slice(0, spec.spare);
+    if (spare.length < spec.spare) continue;
+    const isMir = new Array(NN).fill(0); for (const i of used) isMir[i] = 1; for (const i of spare) isMir[i] = 1;
+    // cats: start with the level's fewest along the run, then add one wherever another run gets by without it
+    const order = floor;   // squares in the order the dot first reaches them
+    if (order.length < spec.cats + 3) continue;
+    const catAt = new Set(shuffle(order.slice(1)).slice(0, spec.cats));
+    const numbered = () => { const c = new Array(NN).fill(0); let k = 0; for (const i of order) if (catAt.has(i)) c[i] = ++k; return c; };
+    let ok = false;
+    for (let tries = 0; tries < 12; tries++) {
+      const sols = solve(N, isMir, numbered(), start, dir, spec.order, 2);
+      if (sols.length === 1) { ok = true; break; }
+      const other = sols.find(s => s.path.length !== path.length || s.path.some((v, j) => v !== path[j][0]));
+      const off = new Set(other ? other.path : []), miss = order.filter(i => !off.has(i) && !catAt.has(i));
+      if (!other || !miss.length) break;
+      catAt.add(miss[Math.floor(Math.random() * miss.length)]);
+    }
+    if (!ok) continue;
+    // drop any cat that isn't needed
+    for (const i of shuffle([...catAt])) {
+      if (catAt.size <= spec.cats) break;
+      catAt.delete(i);
+      if (solve(N, isMir, numbered(), start, dir, spec.order, 2).length !== 1) catAt.add(i);
+    }
+    if (catAt.size > spec.cats + 2) continue;
+    const cat = numbered(), sol = isMir.map((m, i) => m ? (used.has(i) ? mir[i] : -1) : -1);
+    // the starting slants: random, but never already solved, and at least half the used mirrors wrong
+    let tilt;
+    for (let t = 0; t < 50; t++) {
+      tilt = isMir.map((m, i) => m ? (Math.random() < 0.5 ? 0 : 1) : -1);
+      const wrong = [...used].filter(i => tilt[i] !== mir[i]).length;
+      if (wrong * 2 >= used.size && !wins(N, tilt, cat, start, dir, spec.order)) break;
+      tilt = null;
+    }
+    if (!tilt) continue;
+    return {N, start, dir, cat, sol, tilt};
+  }
+  return null;
+}
+// Is the room solved: does the dot, with the mirrors as they are, pass every cat (in order if it counts)?
+function wins(N, mir, cat, start, dir, order) {
+  const cats = cat.filter(c => c).length, seen = new Set(); let next = 1;
+  for (const [i] of trace(N, mir, start, dir)) if (cat[i] && !seen.has(i)) {
+    if (order && cat[i] !== next) return false;
+    seen.add(i); next++;
+  }
+  return seen.size === cats;
+}
+
+/* ---------- game state ---------- */
+// game: {level, N, start and dir (where the laser shines in, and which way), cat (0 or each cat's number, by
+//        square), sol (each mirror's answer: 0 /, 1 \, -1 for a spare or no mirror), tilt (how each mirror
+//        stands now, -1 for no mirror), first (how they stood at the start), history (squares tapped, or
+//        {tilt} for a Restart), won, hinted, undid…}
+const STORE = "catdoku.laserpointer.v1", MAX_LEVEL = 15, M = 56, NS = "http://www.w3.org/2000/svg";
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1}, state.settings);
+let game = state.game || null, busy = false, running = false, cursor = -1;
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
+const levelName = n => { const s = levelSpec(n); return `Level ${n} · ${s.N} × ${s.N}${s.live ? ", moving" : ""}${s.order ? ", in order" : ""}`; };
+const build = G.builder([levelSpec, bounce, step, trace, solve, shuffle, wins, makeRoom], "makeRoom");
+const order = () => levelSpec(game.level).order;
+const isLive = () => !!levelSpec(game.level).live;
+const el = (t, a, parent) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (parent) parent.append(e); return e; };
+const DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
+const centre = i => [i % game.N * 100 + 50, Math.floor(i / game.N) * 100 + 50];
+
+/* ---------- drawing ---------- */
+// Coats for the cats: ginger, grey, black, cream, tabby and white, all tints of the site's colours.
+const COATS = [["#E8956F", "#2A2530"], ["#A39EAB", "#2A2530"], ["#3E3848", "#F7F8F3"], ["#EBD39A", "#2A2530"], ["#B08A66", "#2A2530"], ["#F7F8F3", "#2A2530"]];
+let mirrors = [], cats = [], beamPts = [], catAt = [];
+function drawCat(g, coat, num) {
+  const [fur, line] = COATS[coat], dark = coat === 2;
+  const hop = el("g", {class: "hop"}, g);
+  // ears, head, eyes (shut and open), nose and whiskers, drawn round the middle of the square
+  for (const s of [-1, 1]) {
+    el("path", {d: `M${s * 28} -2 L${s * 24} -38 L${s * 4} -22 Z`, fill: fur, stroke: "#2A2530", "stroke-width": 3, "stroke-linejoin": "round"}, hop);
+    el("path", {d: `M${s * 23} -8 L${s * 21} -29 L${s * 10} -20 Z`, fill: "#DD9DAD"}, hop);
+  }
+  el("ellipse", {cx: 0, cy: 2, rx: 31, ry: 26, fill: fur, stroke: "#2A2530", "stroke-width": 3}, hop);
+  const shut = el("g", {class: "shut", fill: "none", stroke: line, "stroke-width": 3, "stroke-linecap": "round"}, hop);
+  for (const s of [-1, 1]) el("path", {d: `M${s * 18} -1 q${-s * 7} 6 ${-s * 13} 0`}, shut);
+  const open = el("g", {class: "open"}, hop);
+  for (const s of [-1, 1]) {
+    el("ellipse", {cx: s * 11, cy: -2, rx: 8, ry: 9, fill: dark ? "#ECE07A" : "#fff", stroke: "#2A2530", "stroke-width": 2}, open);
+    el("ellipse", {class: "pupil", cx: s * 11, cy: -2, rx: 3.4, ry: 6, fill: "#2A2530"}, open);
+  }
+  el("path", {d: "M-5 9 L5 9 L0 15 Z", fill: "#DD9DAD"}, hop);
+  el("path", {d: "M0 15 q-4 5 -9 2 M0 15 q4 5 9 2", fill: "none", stroke: line, "stroke-width": 2.2, "stroke-linecap": "round"}, hop);
+  el("path", {d: "M-14 12 L-36 9 M-14 16 L-35 19 M14 12 L36 9 M14 16 L35 19", stroke: line, "stroke-width": 1.6, opacity: .7}, hop);
+  if (num) {
+    const b = el("g", {class: "badge", transform: "translate(30 -30)"}, hop);
+    el("circle", {r: 15}, b);
+    el("text", {y: 1}, b).textContent = num;
+  }
+}
+function draw() {
+  const N = game.N, S = N * 100, svg = $("svg");
+  svg.innerHTML = "";
+  svg.setAttribute("viewBox", `${-M} ${-M} ${S + 2 * M} ${S + 2 * M}`);
+  const defs = el("defs", {}, svg), grad = el("linearGradient", {id: "glass", x1: 0, y1: 0, x2: 0, y2: 1}, defs);
+  el("stop", {offset: 0, "stop-color": "#F7F8F3"}, grad); el("stop", {offset: 1, "stop-color": "#B4BDD6"}, grad);
+  // floorboards, staggered from row to row
+  el("rect", {class: "floor", x: 0, y: 0, width: S, height: S}, svg);
+  let d = "";
+  for (let y = 50; y < S; y += 50) d += `M0 ${y}H${S}`;
+  for (let r = 0; r < 2 * N; r++) for (let x = (r % 3) * 70 + 40; x < S; x += 210) d += `M${x} ${r * 50}v50`;
+  el("path", {class: "plank", d}, svg);
+  el("rect", {class: "skirting", x: -3, y: -3, width: S + 6, height: S + 6}, svg);
+  // the beam goes under the cats and mirrors; the dot runs over everything
+  el("path", {class: "beamglow", id: "beamglow"}, svg);
+  el("path", {class: "beam", id: "beam"}, svg);
+  mirrors = []; cats = []; catAt = []; lookAt = {};
+  for (let i = 0; i < N * N; i++) {
+    const [cx, cy] = centre(i);
+    if (game.tilt[i] >= 0) {
+      const g = el("g", {class: "mirror", transform: `translate(${cx} ${cy})`}, svg);
+      el("rect", {x: -50, y: -50, width: 100, height: 100, fill: "transparent"}, g);
+      el("circle", {class: "stand", r: 30}, g);
+      const t = el("g", {class: "tilt"}, g);
+      el("rect", {class: "pane", x: -46, y: -8, width: 92, height: 16, rx: 6}, t);
+      el("path", {class: "glint", d: "M-36 -3 H10"}, t);
+      el("circle", {class: "pin", r: 4.5}, g);
+      mirrors[i] = t;
+    } else if (game.cat[i]) {
+      const g = el("g", {class: "cat", transform: `translate(${cx} ${cy + 6})`}, svg);
+      drawCat(g, (i * 7 + game.N) % COATS.length, order() ? game.cat[i] : 0);
+      cats[i] = g; catAt.push(i);
+    }
+  }
+  // the laser pointer, in the wall just outside the square it shines into
+  const [sx, sy] = centre(game.start), dx = DX[game.dir], dy = DY[game.dir], px = sx - dx * 50, py = sy - dy * 50;
+  el("rect", {id: "startsq", x: sx - 50, y: sy - 50, width: 100, height: 100, fill: "none"}, svg);
+  const pen = el("g", {id: "pen", class: "pen", transform: `translate(${px} ${py}) rotate(${game.dir * 90})`}, svg);
+  el("rect", {class: "body", x: -9, y: 8, width: 18, height: 44, rx: 7}, pen);
+  el("path", {class: "tip", d: "M-9 10 L-6 0 H6 L9 10 Z"}, pen);
+  el("circle", {class: "button", cx: 0, cy: 26, r: 4}, pen);
+  el("circle", {class: "dotglow", id: "dotglow", r: 16}, svg);
+  el("circle", {class: "dot", id: "dot", r: 8}, svg);
+  el("rect", {class: "hintsq", id: "hintsq", x: -400, y: 0, width: 92, height: 92, rx: 10}, svg);
+  el("rect", {class: "cursor", id: "cursor", x: -400, y: 0, width: 92, height: 92, rx: 10}, svg);
+  for (const i in mirrors) setTilt(+i, false);
+  update();
+}
+function setTilt(i, animate = true) {
+  const t = mirrors[i]; if (!t) return;
+  if (!animate) t.style.transition = "none";
+  t.style.transform = `rotate(${game.tilt[i] ? 45 : -45}deg)`;
+  if (!animate) { t.getBoundingClientRect(); t.style.transition = ""; }
+}
+
+/* ---------- the dot's run ---------- */
+// Trace the beam with the mirrors as they stand, light the cats it passes and say how many are left.
+// On a live level the beam only reaches as far as the dot has got (live.dist along the run), and the mirrors it
+// has already passed can't be tipped, so the run behind the dot never changes.
+let runLen = 0, catDist = [], mirDist = [], dotT0 = 0, live = {on: false, dist: 0};
+const passed = at => isLive() && (live.on || game.won) && at - 30 <= live.dist;   // with a little room, so a late tap can't land mid-bounce
+const locked = i => mirDist.some(([j, at]) => j === i && passed(at));
+function update() {
+  const N = game.N, path = trace(N, game.tilt, game.start, game.dir);
+  const [sx, sy] = centre(game.start), last = path[path.length - 1], [lx, ly] = centre(last[0]);
+  beamPts = [[sx - DX[game.dir] * 50, sy - DY[game.dir] * 50]];
+  for (const [i] of path) beamPts.push(centre(i));
+  beamPts.push([lx + DX[last[1]] * 62, ly + DY[last[1]] * 62]);
+  drawBeam();
+  runLen = 0; const along = [0];
+  for (let k = 1; k < beamPts.length; k++) along.push(runLen += Math.hypot(beamPts[k][0] - beamPts[k - 1][0], beamPts[k][1] - beamPts[k - 1][1]));
+  // which cats see it, and in what order
+  const seen = new Set(); let next = 1, broken = false, tooSoon = 0;
+  catDist = []; mirDist = [];
+  path.forEach(([i], k) => {
+    if (game.tilt[i] >= 0 && !mirDist.some(([j]) => j === i)) mirDist.push([i, along[k + 1]]);
+    if (!game.cat[i] || seen.has(i) || (isLive() && !passed(along[k + 1]))) return;
+    seen.add(i); catDist.push([i, along[k + 1]]);
+    const ok = !broken && (!order() || game.cat[i] === next);
+    if (ok) next++; else { if (!broken) tooSoon = game.cat[i]; broken = true; }
+    cats[i].classList.toggle("inorder", ok && order()); cats[i].classList.toggle("tooSoon", !ok);
+  });
+  for (const i of catAt) { cats[i].classList.toggle("lit", seen.has(i)); if (!seen.has(i)) cats[i].classList.remove("inorder", "tooSoon"); }
+  const left = catAt.length - seen.size;
+  $("count").textContent = game.won ? `All ${catAt.length} cats` : `${seen.size} of ${catAt.length} cats`;
+  if (order() && tooSoon && !game.won && !isLive()) G.note(`Cat ${tooSoon} saw the dot before cat ${next}.`, 2500);
+  $("undoBtn").disabled = !game.history.length || game.won;
+  $("restartBtn").disabled = !(game.history.length || live.on) || game.won;
+  $("hintBtn").disabled = game.won;
+  if (hintShown && hintShown !== tiltKey()) clearHint();
+  if (isLive()) { drawBeam(); return false; }
+  dotT0 = performance.now();
+  return !left && !broken;
+}
+// The beam drawn as far as `dist` along the run (all of it when no dist is given).
+function drawBeam(dist) {
+  let pts = beamPts;
+  if (isLive()) {
+    dist = Math.max(0, live.dist); pts = [beamPts[0]];
+    for (let k = 1; k < beamPts.length && dist > 0; k++) {
+      const [ax, ay] = beamPts[k - 1], [bx, by] = beamPts[k], len = Math.hypot(bx - ax, by - ay), f = Math.min(1, dist / len);
+      pts.push([ax + (bx - ax) * f, ay + (by - ay) * f]); dist -= len;
+    }
+  }
+  const d = pts.length > 1 ? pts.map(([x, y], k) => `${k ? "L" : "M"}${x} ${y}`).join("") : "";
+  $("beam").setAttribute("d", d); $("beamglow").setAttribute("d", d);
+}
+const tiltKey = () => game.tilt.join("");
+
+// The dot runs along the beam over and over (once it's solved, just once more, to the end), and every cat it passes
+// watches it go and gives a little pounce. With reduced motion the dot sits still at the end of the beam. On a
+// live level the dot only moves while the laser's on, and each frame takes it further along the run.
+function dotAt(dist) {
+  for (let k = 1; k < beamPts.length; k++) {
+    const [ax, ay] = beamPts[k - 1], [bx, by] = beamPts[k], len = Math.hypot(bx - ax, by - ay);
+    if (dist <= len || k === beamPts.length - 1) { const f = len ? Math.min(1, dist / len) : 0; return [ax + (bx - ax) * f, ay + (by - ay) * f]; }
+    dist -= len;
+  }
+  return beamPts[0];
+}
+let lastDist = 0, lookAt = {}, lastNow = 0;
+const runSpeed = () => Math.max(0.5, runLen / 4000);   // units a millisecond, so a run takes about 4 s at most
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(100, now - (lastNow || now)); lastNow = now;
+  if (!game || !beamPts.length || !$("dot")) return;
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let dist;
+  if (isLive()) {
+    if (live.on && !game.won && !$("overlay").classList.contains("show") && !document.querySelector(".spot")) {
+      live.dist += dt * 100 / levelSpec(game.level).live;
+      drawBeam(); liveCheck();
+    }
+    dist = Math.max(0, Math.min(runLen, live.dist));
+  } else {
+    const speed = runSpeed(), period = runLen / speed + 600;
+    const t = still ? runLen / speed : game.won ? now - dotT0 : (now - dotT0) % period;
+    dist = Math.min(runLen, t * speed);
+  }
+  const [x, y] = dotAt(dist);
+  for (const id of ["dot", "dotglow"]) { $(id).setAttribute("cx", x); $(id).setAttribute("cy", y); }
+  for (const [i, at] of catDist) {
+    const [tx, ty] = lookAt[i] || [x, y];
+    const [cx, cy] = centre(i), a = Math.atan2(ty - cy, tx - cx), r = Math.min(1, Math.hypot(tx - cx, ty - cy) / 40);
+    for (const p of cats[i].querySelectorAll(".pupil")) { p.setAttribute("transform", `translate(${Math.cos(a) * 3.6 * r} ${Math.sin(a) * 3.2 * r})`); }
+    if (!still && lastDist < at && dist >= at) { const c = cats[i]; c.classList.remove("pounce"); c.getBoundingClientRect(); c.classList.add("pounce"); }
+  }
+  lastDist = dist;
+}
+requestAnimationFrame(frame);
+
+/* ---------- the live levels ---------- */
+// As the dot reaches each cat it lights up; a cat seen out of turn, or the dot leaving the room before every cat
+// has seen it, ends the run. A run that catches every cat wins.
+function liveCheck() {
+  const before = catAt.filter(i => cats[i].classList.contains("lit")).length;
+  update();
+  const seenNow = catDist.filter(([, at]) => passed(at)), bad = catAt.find(i => cats[i].classList.contains("tooSoon"));
+  if (seenNow.length !== before) save();
+  if (bad !== undefined) return liveFail(`Cat ${game.cat[bad]} saw the dot too soon!`);
+  if (live.dist >= runLen) {
+    if (seenNow.length === catAt.length) { live.on = false; win(); }
+    else liveFail("The dot got away before every cat saw it.");
+  }
+}
+// A missed run: the laser goes off, the mirrors go back to how they started, and the next tap goes again.
+function liveFail(why) {
+  live.on = false;
+  G.note(why, 1600);
+  const g = game;
+  running = true;
+  setTimeout(() => {
+    running = false; if (game !== g) return;
+    game.tilt = game.first.slice(); game.history = []; live.dist = 0;
+    for (const i in mirrors) setTilt(+i);
+    update(); save();
+    G.note("Tap the room to switch the laser on again.", 0);
+  }, 1600);
+}
+// Switch the laser on: the dot waits a moment at the pointer, then sets off.
+function liveStart() {
+  live.on = true; live.dist = -60; game.started = true;
+  G.note("");
+  update();
+}
+
+/* ---------- playing ---------- */
+function cellOf(e) {
+  const pt = $("svg").createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+  const p = pt.matrixTransform($("svg").getScreenCTM().inverse()), x = Math.floor(p.x / 100), y = Math.floor(p.y / 100);
+  return x >= 0 && y >= 0 && x < game.N && y < game.N ? y * game.N + x : -1;
+}
+function tip(i) {
+  if (!playing()) return;
+  if (isLive() && !live.on) { liveStart(); return; }
+  if (game.tilt[i] < 0) return;
+  if (locked(i)) { G.note("The dot's been past that mirror already.", 2500); return; }
+  game.tilt[i] ^= 1; game.history.push(i); game.started = true;
+  setTilt(i);
+  if (update()) win(); else save();
+}
+$("svg").addEventListener("pointerdown", e => { if (!playing()) return; const i = cellOf(e); if (i >= 0 || (isLive() && !live.on)) { e.preventDefault(); tip(i); } });
+function showCursor() {
+  const c = $("cursor"); if (!c || !game) return;
+  if (cursor < 0) { c.setAttribute("x", -400); return; }
+  const [x, y] = centre(cursor); c.setAttribute("x", x - 46); c.setAttribute("y", y - 46);
+}
+$("svg").addEventListener("keydown", e => {
+  if (!playing() || e.ctrlKey || e.metaKey || e.altKey) return;
+  const N = game.N; if (cursor < 0) cursor = game.tilt.findIndex(t => t >= 0);
+  const x = cursor % N, y = Math.floor(cursor / N), to = (nx, ny) => { cursor = Math.max(0, Math.min(N - 1, ny)) * N + Math.max(0, Math.min(N - 1, nx)); };
+  if (e.key === "ArrowUp") to(x, y - 1);
+  else if (e.key === "ArrowDown") to(x, y + 1);
+  else if (e.key === "ArrowLeft") to(x - 1, y);
+  else if (e.key === "ArrowRight") to(x + 1, y);
+  else if (e.key === " " || e.key === "Enter") tip(cursor);
+  else return;
+  e.preventDefault(); showCursor();
+});
+$("svg").addEventListener("blur", () => { cursor = -1; showCursor(); });
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
+
+// Undo takes back a tap, or a Restart.
+function undo() {
+  if (!playing() || !game.history.length) return;
+  game.undid = true;
+  if (typeof game.history[game.history.length - 1] === "number" && locked(game.history[game.history.length - 1])) { G.note("The dot's been past that mirror already.", 2500); return; }
+  const h = game.history.pop();
+  if (typeof h === "number") { game.tilt[h] ^= 1; setTilt(h); }
+  else { game.tilt = h.tilt; for (const i in mirrors) setTilt(+i); }
+  update(); save();
+}
+$("undoBtn").onclick = undo;
+$("restartBtn").onclick = () => {
+  if (!playing()) return;
+  if (isLive()) {   // the laser goes off and the mirrors go back, ready for another run
+    if (!game.history.length && !live.on) return;
+    game.undid = true; live.on = false; live.dist = 0; game.history = []; game.tilt = game.first.slice();
+    for (const i in mirrors) setTilt(+i);
+    update(); save();
+    G.note("Back to how the mirrors started. Tap the room to switch the laser on.", 0);
+    return;
+  }
+  if (!game.history.length) return;
+  game.undid = true;
+  game.history.push({tilt: game.tilt.slice()});
+  game.tilt = game.first.slice();
+  for (const i in mirrors) setTilt(+i);
+  update(); save();
+  G.note("Back to how the mirrors started. Undo brings your moves back.", 4000);
+};
+// Hint: a gold box round the first mirror along the answer's run that's tipped the wrong way. (That's also the
+// first wrong one the dot meets now: up to it, the dot is on the answer's run.) On a live level, if the dot has
+// already been past a wrong one, this run can't win.
+let hintShown = null, hintTimer = 0;
+function clearHint() { hintShown = null; clearTimeout(hintTimer); const h = $("hintsq"); if (h) h.setAttribute("x", -400); }
+$("hintBtn").onclick = () => {
+  if (!playing()) return;
+  const answer = game.sol.map((v, i) => v >= 0 ? v : game.tilt[i]);
+  const wrong = trace(game.N, answer, game.start, game.dir).map(([i]) => i).find(i => game.tilt[i] >= 0 && game.tilt[i] !== game.sol[i]);
+  if (wrong === undefined) { G.note("Every mirror the dot meets is right already.", 4000); return; }
+  if (locked(wrong)) { G.note("The dot's already been past a mirror that's the wrong way, so this run can't catch every cat.", 5000); return; }
+  game.hinted = true; game.started = true; save();
+  clearHint();
+  const [x, y] = centre(wrong); $("hintsq").setAttribute("x", x - 46); $("hintsq").setAttribute("y", y - 46);
+  hintShown = tiltKey();
+  G.note("Tip the mirror in the gold box the other way.", 5000);
+  hintTimer = setTimeout(clearHint, 5000);
+};
+
+/* ---------- endings ---------- */
+function win() {
+  game.won = true; G.finishClock(game); cursor = -1; showCursor(); clearHint();
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save();
+  update();
+  G.track(`Laser Pointer solved level ${game.level}`);
+  build.prefetch(next);
+  // the dot runs on to the end of the beam (which stays lit to show the way it went), then real toys come flying
+  // in for the cats to catch; then the card
+  running = true;
+  const g = game, still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  setTimeout(() => { if (game === g) tossToys(() => { running = false; if (game === g) finishCard(); }); },
+    isLive() || still ? 300 : runLen / runSpeed() + 200);
+}
+// Toys to throw: from the toy library, leaving out any the player has switched off in another game.
+const TOSS = ["mouse", "fish", "feather-rainbow", "wiffle-red", "spiky-lime", "crochet-stars", "fluffy-bell", "swirl-purple", "tennis", "wiffle-teal", "bell-purple", "ribbon-tail"];
+const toySrc = f => (window.TOY_SRC || {})[f] || `../toys/${f}.webp?v=${window.SITE_BUILD || ""}`;
+// Each cat gets a toy that lands right by its paws (the cat pounces on it and keeps watching it), and a few more
+// land about the floor. Seen from above, a toy grows as it flies up and shrinks as it comes down, landing at half
+// the size it was thrown at, with its shadow sliding along the floor beneath it. With reduced motion they're
+// simply there.
+function tossToys(done) {
+  const N = game.N, S = N * 100, svg = $("svg");
+  const off = G.toysOff(), pool = TOSS.filter(f => !off.has(f)), kinds = shuffle((pool.length ? pool : TOSS).slice());
+  const spots = catAt.map(i => { const [x, y] = centre(i); return {x: x + (Math.random() < 0.5 ? -24 : 24), y: y + 34, cat: i}; });
+  const free = shuffle([...Array(N * N).keys()].filter(i => game.tilt[i] < 0 && !game.cat[i]));
+  for (const i of free.slice(0, Math.min(4, Math.ceil(N / 2)))) { const [x, y] = centre(i); spots.push({x: x + Math.random() * 40 - 20, y: y + Math.random() * 40 - 20}); }
+  const layer = el("g", {id: "toys"}, svg);
+  svg.insertBefore(layer, $("dotglow"));
+  const toys = spots.map((sp, k) => {
+    const g = el("g", {class: "toy"}, layer), sh = el("ellipse", {class: "toyshadow", rx: 22, ry: 9}, g);
+    const im = el("image", {href: toySrc(kinds[k % kinds.length]), x: -29, y: -29, width: 58, height: 58}, g);
+    // thrown in from the bottom edge, where the player is
+    return {...sp, g, sh, im, fx: S / 2 + (Math.random() - 0.5) * S * 0.6, fy: S + M, t0: k * 110 + Math.random() * 120, spin: (Math.random() - 0.5) * 900, landed: false};
+  });
+  const place = (t, f) => {
+    // full size as it leaves the hand, half size once it's down on the floor
+    const x = t.fx + (t.x - t.fx) * f, y = t.fy + (t.y - t.fy) * f, h = Math.sin(Math.PI * f), size = 1 - f / 2, sc = size + h * 0.9;
+    t.sh.setAttribute("cx", x); t.sh.setAttribute("cy", y + 24 * size); t.sh.setAttribute("opacity", 0.35 - h * 0.2);
+    t.sh.setAttribute("rx", 22 * size); t.sh.setAttribute("ry", 9 * size);
+    t.im.setAttribute("transform", `translate(${x} ${y - h * 60}) rotate(${t.spin * f}) scale(${sc})`);
+  };
+  const land = t => {
+    t.landed = true; place(t, 1);
+    if (t.cat !== undefined) { lookAt[t.cat] = [t.x, t.y]; const c = cats[t.cat]; c.classList.remove("pounce"); c.getBoundingClientRect(); c.classList.add("pounce"); }
+  };
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) { toys.forEach(land); setTimeout(done, 900); return; }
+  const FLY = 850, t0 = performance.now(), end = Math.max(...toys.map(t => t.t0)) + FLY;
+  (function step(now) {
+    if (!layer.isConnected) return;
+    const t = now - t0;
+    for (const toy of toys) if (!toy.landed) {
+      const f = (t - toy.t0) / FLY;
+      if (f >= 1) land(toy); else if (f > 0) place(toy, f); else place(toy, 0);
+    }
+    if (t < end) requestAnimationFrame(step); else setTimeout(done, 900);
+  })(t0);
+}
+function finishCard() {
+  const next = settings.level, gold = !game.undid && !game.hinted;
+  let text = `The dot ran past all ${catAt.length} cats${order() ? " in order" : ""} in the ${game.N} × ${game.N} room.`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my room", game.result,
+    {title: "Got it!", gold, goldWhy: "No hints or undos!", next: `Next: level ${next}`,
+     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+  // a word for the humans, just above the buttons
+  const psa = document.createElement("p"); psa.className = "psa";
+  psa.innerHTML = "<b>Playing laser with a real cat?</b> A dot can never be caught, so finish with a toy they can pounce on and catch.";
+  $("card").querySelector(".btns").before(psa);
+}
+
+/* ---------- new rooms ---------- */
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
+function begin(p, level) {
+  game = {level, N: p.N, start: p.start, dir: p.dir, cat: p.cat, sol: p.sol, tilt: p.tilt.slice(), first: p.tilt.slice(),
+    history: [], won: false, ...G.freshClock()};
+  cursor = -1; clearHint(); live = {on: false, dist: 0};
+}
+async function newPuzzle() {
+  if (busy) return;
+  busy = true;
+  const n = settings.level;
+  G.openCard("Setting up the mirrors…", "", []);
+  const p = await build.take(n);
+  begin(p, n);
+  busy = false; G.closeCard(); G.note("");
+  draw(); save();
+  if (isLive()) G.note("Tap the room to switch the laser on.", 0);
+  build.prefetch(n);
+  G.track(`Laser Pointer new puzzle level ${n}`);
+  helpOnFirstVisit();
+}
+
+/* ---------- sharing ---------- */
+// One letter per square: "." floor, 1–9 a cat, and for a mirror its answer and how it started, a–f
+// (a/b a spare standing / or \, c/d an answer of / standing / or \, e/f an answer of \). With progress,
+// how every mirror stands now, 0 or 1 each in order.
+const roomOut = (tilt) => game.cat.map((c, i) => game.tilt[i] < 0 ? (c ? String(c) : ".") : "abcdef"[(game.sol[i] + 1) * 2 + tilt[i]]).join("");
+$("shareBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Laser Pointer", won: game.won,
+  puzzle: () => ({g: "laserpointer", N: game.level, r: roomOut(game.first), e: game.start * 4 + game.dir}),
+  progress: () => game.tilt.filter(t => t >= 0).join("")}); };
+function openShared(d) {
+  const spec = levelSpec(d.N), N = spec ? spec.N : 0, fail = () => G.note("That share link didn't work.", 5000);
+  if (!N || typeof d.r !== "string" || d.r.length !== N * N || !/^[.1-9a-f]+$/.test(d.r) || !Number.isInteger(d.e)) return fail();
+  const start = d.e >> 2, dir = d.e & 3, sx = start % N, sy = Math.floor(start / N);
+  // the laser must sit at the edge it shines in from
+  if (start >= N * N || ![sy === N - 1, sx === 0, sy === 0, sx === N - 1][dir]) return fail();
+  const cat = [], sol = [], tilt = [];
+  for (const ch of d.r) {
+    const k = "abcdef".indexOf(ch);
+    cat.push(k < 0 && ch !== "." ? +ch : 0); sol.push(k < 0 ? -1 : (k >> 1) - 1); tilt.push(k < 0 ? -1 : k & 1);
+  }
+  if (tilt[start] >= 0) return fail();
+  const nums = cat.filter(c => c).sort((a, b) => a - b);
+  if (nums.length < 1 || nums.some((c, k) => c !== k + 1)) return fail();
+  const m = sol.map((v, i) => v >= 0 ? v : tilt[i]);
+  if (!wins(N, m, cat, start, dir, spec.order)) return fail();
+  begin({N, start, dir, cat, sol, tilt}, d.N);
+  if (typeof d.p === "string" && d.p.length === tilt.filter(t => t >= 0).length && /^[01]*$/.test(d.p)) {
+    let k = 0; game.tilt = tilt.map(t => t < 0 ? -1 : +d.p[k++]); game.timed = false;
+  }
+  settings.level = d.N; $("levelSel").value = d.N;
+  draw(); save(); build.prefetch(d.N);
+  if (update() && game.timed === false) win();
+}
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  settings.seenHelp = false; helpOnFirstVisit();
+  if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
+}
+// Where the squares are: the room has a strip of wall all round.
+function map() {
+  const r = $("svg").getBoundingClientRect(), S = game.N * 100, k = r.width / (S + 2 * M);
+  return {ox: r.left + M * k, oy: r.top + M * k, cw: 100 * k, ch: 100 * k};
+}
+// First visit: walk through the room that's out. The first level where order counts gets a tip of its own.
+function helpOnFirstVisit() {
+  if (!game || !playing() || document.querySelector(".spot")) return;
+  const N = game.N, xy = i => [i % N, Math.floor(i / N)], all = [...Array(N * N).keys()];
+  const mirs = all.filter(i => game.tilt[i] >= 0), path = trace(N, game.tilt, game.start, game.dir).map(([i]) => i);
+  const onPath = mirs.filter(i => path.includes(i)), lit = catAt.filter(i => path.includes(i));
+  const orderSteps = order() ? [
+    {say: "Now the cats have numbers", lit: catAt.map(xy)},
+    {say: "The dot must pass them in order: 1, 2, 3…", lit: catAt.map(xy)},
+  ] : [];
+  const liveSteps = isLive() ? [
+    {say: "Now the laser starts switched off", els: [() => [$("pen"), $("startsq")]]},
+    {say: "Tap the room to switch it on", lit: all.map(xy)},
+    {say: "Then tip mirrors before the dot gets there", lit: mirs.map(xy)},
+    {say: "Once the dot's been past a mirror, it stays put", lit: mirs.map(xy)},
+  ] : [];
+  const done = () => { settings.seenHelp = true; if (order()) settings.seenOrder = true; if (isLive()) settings.seenLive = true; save(); };
+  if (settings.seenHelp) {
+    const tips = [...(isLive() && !settings.seenLive ? liveSteps : []), ...(order() && !settings.seenOrder ? orderSteps : [])];
+    if (tips.length) G.spotlight({grid: $("grid"), w: N, h: N, steps: tips, map, finish: false, done});
+    return;
+  }
+  const steps = [
+    {say: "The cats want to chase the laser dot", lit: all.map(xy)},
+    {say: "The laser shines in here", els: [() => [$("pen"), $("startsq")]]},
+    {say: "The dot bounces off mirrors", lit: mirs.map(xy)},
+    {say: "Tap a mirror to tip it the other way", lit: [xy(onPath[0] ?? mirs[0])]},
+    ...(lit.length ? [{say: "Cats the dot passes open their eyes", lit: lit.map(xy), tone: "ok"}] : []),
+    ...orderSteps,
+    ...liveSteps,
+    ...(levelSpec(game.level).spare ? [{say: "You won't need every mirror", lit: mirs.map(xy)}] : []),
+    {say: "Get the dot past every cat!", lit: catAt.map(xy), tone: "ok"},
+    {say: "Stuck? Hint shows a mirror to tip", els: [$("hintBtn")]},
+  ];
+  G.spotlight({grid: $("grid"), w: N, h: N, steps, map, done});
+}
+
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", ""), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
+$("helpBtn").onclick = showHelp;
+
+G.nav("laserpointer");
+G.checkClock(game);
+G.setupTimer({name: "laserpointer", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+const shared = G.readShare("laserpointer");
+if (game) G.reopen(() => {
+    const spec = levelSpec(game.level), NN = game.N * game.N;
+    if (!spec || spec.N !== game.N || game.tilt.length !== NN || game.sol.length !== NN || game.cat.length !== NN) throw new Error("the saved room doesn't fit its level");
+    live = {on: false, dist: 0};
+    if (isLive() && !game.won) { game.tilt = game.first.slice(); game.history = []; }
+    draw();
+    if (game.won) finishCard();
+    else if (isLive()) G.note("Tap the room to switch the laser on.", 0);
+    build.prefetch(settings.level); helpOnFirstVisit();
+  }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
+else if (!shared) newPuzzle();
+const shareOpts = () => ({name: "Laser Pointer", inProgress: !!(game && !game.won && game.history.length), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, shareOpts());
+window.addEventListener("hashchange", () => { const d = G.readShare("laserpointer"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>

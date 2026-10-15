@@ -511,10 +511,24 @@ def catastrophe():
     return frame(PAPER, out)
 
 
+def laserpointer():
+    # a beam from the pointer at the bottom, bouncing off two mirrors and past a cat to the dot on the wall
+    out = f'<rect x="14" y="14" width="72" height="72" rx="6" fill="#E8DCC4" stroke="{INK}" stroke-width="2.5"/>'
+    beam = "M30 88V30H70V62H88"
+    out += f'<path d="{beam}" fill="none" stroke="{ORANGE}" stroke-width="9" stroke-linejoin="round" opacity=".25"/>'
+    out += f'<path d="{beam}" fill="none" stroke="{ORANGE}" stroke-width="3.5" stroke-linejoin="round"/>'
+    for x, y, a in ((30, 30, -45), (70, 30, 45), (70, 62, 45)):
+        out += (f'<g transform="translate({x} {y}) rotate({a})"><rect x="-9" y="-3" width="18" height="6" rx="2.5" fill="#E4E8F0" stroke="{PERI}" stroke-width="2"/></g>')
+    out += f'<rect x="25.5" y="84" width="9" height="13" rx="3" fill="#3E3848"/>'
+    out += circle(88, 62, 4.5, "#C8392B", 1.5)
+    out += catface(50, 31, 9, "#E8956F")
+    return frame(PAPER, out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")
