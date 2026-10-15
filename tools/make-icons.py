@@ -59,6 +59,14 @@ def fredface(x, y, s):
             + f'<circle cx="{x-s*.38}" cy="{y+s*.1}" r="{s*.16}" fill="{GREEN}"/><circle cx="{x+s*.38}" cy="{y+s*.1}" r="{s*.16}" fill="{GREEN}"/>')
 
 
+def crunchface(x, y, s):
+    """Crunch: a grey tabby face with stripes on the forehead and cheeks, and green eyes."""
+    return (catface(x, y, s, "#8E8794").split("<circle")[0]
+            + f'<path d="M{x-s*.3} {y-s*.5}L{x-s*.22} {y-s*.2}M{x} {y-s*.55}L{x} {y-s*.22}M{x+s*.3} {y-s*.5}L{x+s*.22} {y-s*.2}'
+            f'M{x-s} {y+s*.3}L{x-s*.65} {y+s*.35}M{x+s} {y+s*.3}L{x+s*.65} {y+s*.35}" stroke="#5E5866" stroke-width="{s*.13}" fill="none" stroke-linecap="round"/>'
+            f'<circle cx="{x-s*.38}" cy="{y+s*.1}" r="{s*.17}" fill="{GREEN}"/><circle cx="{x+s*.38}" cy="{y+s*.1}" r="{s*.17}" fill="{GREEN}"/>')
+
+
 # Catdoku: colour regions on a grid, a cat in each, none touching.
 def catdoku():
     regions = ["AABB", "ACCB", "DCCB", "DDCB"]
@@ -141,6 +149,8 @@ def pounce():
     for r in range(3):
         for c in range(3):
             x, y, k = 26 + c * 24, 26 + r * 24, cols[r][c]
+            if (r, c) == (2, 2):   # Crunch, eyeing the line of three
+                out += crunchface(x, y + 1, 9.5); continue
             out += circle(x, y, 9, k, 2.2) + f'<path d="M{x-5} {y-1}Q{x} {y-6} {x+5} {y-1}" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".7"/>'
     return frame(PAPER, out)
 

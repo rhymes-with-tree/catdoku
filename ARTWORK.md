@@ -44,4 +44,6 @@ anywhere, but keep track of who they are, because they'll be featured in games o
   tunnel (for Tunnel Run); `bowtie-7` is the same tunnel with a second Bowtie rolling over beside
   it. The pictures of the two together are `bugsy-bowtie-window`, `bugsy-bowtie-rug` and
   `bugsy-bowtie-boxes`.
-- **Crunch** (`crunch-…`, grey tabby with green eyes) will be the star of Pounce.
+- **Crunch** (`crunch-…`, grey tabby with green eyes) is the star of Pounce: `crunch-3` sits beside
+  the title, `crunch-1` creeps up from the corner of the mat to cheer a chain of matches, and
+  `crunch-6` rolls about on the gold-paw card.
