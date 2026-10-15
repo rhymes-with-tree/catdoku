@@ -362,9 +362,8 @@ def nightlight():
             x, y = 30 + c * 40, 32 + r * 38
             out += (f'<path d="M{x-14} {y+8}C{x-16} {y-2} {x-15} {y-8} {x-13} {y-12}L{x-12} {y-22}L{x-5} {y-14}C{x-2} {y-15} {x+2} {y-15} {x+5} {y-14}'
                     f'L{x+12} {y-22}L{x+13} {y-12}C{x+15} {y-8} {x+16} {y-2} {x+14} {y+8}C{x+10} {y+16} {x-10} {y+16} {x-14} {y+8}Z" fill="#0F0C1C" stroke="#6E6590" stroke-width="1.5"/>')
-            if (r, c) == (0, 1):   # Dottie, still awake: yellow-green eyes and her purple collar
-                out += (f'<path d="M{x-9} {y+13}Q{x} {y+17} {x+9} {y+13}" fill="none" stroke="#8D78AD" stroke-width="3" stroke-linecap="round"/><circle cx="{x}" cy="{y+16.5}" r="1.8" fill="#E8C547"/>'
-                        f'<ellipse cx="{x-6}" cy="{y}" rx="4.5" ry="3.8" fill="#D4DB5E"/><ellipse cx="{x+6}" cy="{y}" rx="4.5" ry="3.8" fill="#D4DB5E"/>'
+            if (r, c) == (0, 1):   # Dottie, still awake, with her yellow-green eyes
+                out += (f'<ellipse cx="{x-6}" cy="{y}" rx="4.5" ry="3.8" fill="#D4DB5E"/><ellipse cx="{x+6}" cy="{y}" rx="4.5" ry="3.8" fill="#D4DB5E"/>'
                         f'<ellipse cx="{x-6}" cy="{y}" rx="1.1" ry="3.2" fill="#0F0C1C"/><ellipse cx="{x+6}" cy="{y}" rx="1.1" ry="3.2" fill="#0F0C1C"/>')
             else:
                 out += f'<path d="M{x-10} {y}Q{x-6} {y+3} {x-2} {y}M{x+2} {y}Q{x+6} {y+3} {x+10} {y}" fill="none" stroke="#8C82B4" stroke-width="1.8" stroke-linecap="round"/>'
