@@ -23,7 +23,7 @@ const G = (() => {
     ["Copycat", "copycat", "Find the boxes with matching toys", "#D08A4E"],
     ["Night Light", "nightlight", "Help Dottie get every cat to close its eyes", "#3A3358"],
     ["Unravel", "unravel", "Cover every line with one strand of yarn", "#E16A4A"],
-    ["Tail Chase", "tailchase", "Catch the toys without getting tangled", "#C9773F"],
+    ["Tail Chase", "tailchase", "Help Jan Brady catch the toys without getting tangled", "#C9773F"],
     ["Keyboard Cat", "keyboardcat", "Make words from the keys that still work", "#8D78AD"],
     ["If It Fits", "iffits", "Build the box, and a cat comes to sit in it", "#C4925C"],
     ["High Perch", "highperch", "Raise every cat tree to just the right height", "#8E5E3E"],
