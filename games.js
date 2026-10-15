@@ -29,6 +29,7 @@ const G = (() => {
     ["High Perch", "highperch", "Raise every cat tree to just the right height", "#8E5E3E"],
     ["Fuzzy Spelling", "fuzzyspelling", "Slide the letters until the bar spells a word", "#B94588"],
     ["Cat-astrophe", "catastrophe", "Help Crunch dye the whole rug one colour", "#73A7AE"],
+    ["Laser Pointer", "laserpointer", "Bounce the dot past every cat", "#E16A4A"],
   ];
   const $ = id => document.getElementById(id);
 
