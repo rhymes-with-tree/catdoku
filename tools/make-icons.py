@@ -525,10 +525,27 @@ def laserpointer():
     return frame(PAPER, out)
 
 
+def treattime():
+    # a tray of fish-shaped treats with numbers, one put back
+    out = f'<rect x="10" y="30" width="62" height="56" rx="6" fill="#F3E6D9" stroke="{INK}" stroke-width="2.5"/>'
+    def fish(x, y, n, gone=False):
+        o = .25 if gone else 1
+        s = (f'<g opacity="{o}"><path d="M{x-12} {y}C{x-8} {y-8} {x+2} {y-9} {x+6} {y-3}L{x+12} {y-7}C{x+11} {y-2} {x+11} {y+2} {x+12} {y+7}L{x+6} {y+3}C{x+2} {y+9} {x-8} {y+8} {x-12} {y}Z" '
+             f'fill="#E8B35A" stroke="#B9822E" stroke-width="1.5"/>' + text(x - 2, y + 1, n, 12) + '</g>')
+        if gone: s += f'<path d="M{x-9} {y+6}L{x+9} {y-6}" stroke="{INK}" stroke-width="2" stroke-linecap="round" opacity=".6"/>'
+        return s
+    for (x, y, n, g) in ((26, 44, 3, False), (55, 44, 5, True), (26, 71, 6, False), (55, 71, 2, False)):
+        out += fish(x, y, n, g)
+    # Higgins by the top row, whose bowl is just right: 3, with the 5 put back
+    out += tabbyface(84, 23, 9)
+    out += f'<path d="M74 38H94L91 49H77Z" fill="{GREEN}" stroke="{INK}" stroke-width="2.2" stroke-linejoin="round"/>' + text(84, 43, 3, 10, "#fff")
+    return frame(PAPER, out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")

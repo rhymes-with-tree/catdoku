@@ -35,7 +35,8 @@ anywhere, but keep track of who they are, because they'll be featured in games o
   `jan-brady-22`, and `jan-brady-31` looks up from the gold-paw card).
 - **Higgins** (`higgins-…`, brown tabby) is a one-of-a-kind character too, and the mascot of
   Catdoku: `higgins-1` sits beside the title, `higgins-face` (cut from it) is every cat on the board, in the counter, the walkthrough and the cat facts, and `higgins-2` stretches out on the gold-paw card.
-  The other tabbies on the Higgins sheet (`c20-…`) are general cats.
+  The other tabbies on the Higgins sheet (`c20-…`) are general cats. Higgins hosts Treat Time too: `higgins-1` sits beside its title,
+  the hungry cats at the ends of the rows and columns are the sitting tabbies from the sheet, and `c20-3` sleeps it off on the gold-paw card.
 - **Fred** (`fred-…`, white with tabby patches, blue collar with a star tag) is the mascot
   of Knock It Off: `fred-1` sits beside the title, `fred-14` bats a toy mouse on the gold-paw
   card, and the cat on the table is Fred drawn from above (slender and white, with a tabby cap split by a white

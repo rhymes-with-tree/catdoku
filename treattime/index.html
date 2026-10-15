@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Treat Time</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-15.12"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-15.12">
+<style>
+/* A tray of treat piles, each with a number. A tabby from Higgins's gang sits at the end of every row and column
+   with a bowl showing how many treats it wants. Tap a pile to put it back in the jar; the piles left in a cat's
+   line must add up to exactly its number, and its bowl turns green when they do. */
+.title{display:flex;align-items:flex-end;gap:6px}
+.higgins{display:block;height:60px;width:auto;margin-bottom:-6px}
+@media (max-height:760px){.higgins{height:44px;margin-bottom:-4px}}
+.tray{--tray:#F3E6D9; --treat:#E8B35A; --treat-edge:#B9822E; --ok:#6AA673; --short:#C8392B;
+  background:var(--tray);border:3px solid var(--ink);border-radius:12px;overflow:hidden}
+.tray .board{border:none;border-radius:0;gap:0}
+.cell{position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer}
+/* a treat: a little fish-shaped biscuit with the pile's number on it */
+.treat{position:relative;width:86%;height:74%;display:flex;align-items:center;justify-content:center;
+  transition:transform .15s,opacity .15s}
+.treat svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.treat .fish{fill:var(--treat);stroke:var(--treat-edge);stroke-width:3}
+.treat .fin{fill:var(--treat-edge);opacity:.35}
+.treat b{position:relative;font-weight:800;font-size:calc(var(--cs) * .42);line-height:1;color:var(--ink);margin-left:-8%}
+/* put back in the jar: faded and struck through */
+/* on trays of 6 × 6 and up the numbers matter more than the biscuits: big numbers on a faint outline of a fish */
+.board.big .treat .fish{fill:none;stroke:var(--treat-edge);stroke-width:2.5;opacity:.4}
+.board.big .treat .fin,.board.big .treat circle{opacity:.25}
+.board.big .treat b{font-size:calc(var(--cs) * .62);margin-left:0}
+.cell.gone .treat{opacity:.22;transform:scale(.8)}
+.cell.gone::after{content:"";position:absolute;left:18%;right:18%;top:50%;height:3px;border-radius:2px;background:var(--ink);opacity:.55;transform:rotate(-35deg)}
+/* marked to stay: a green ring */
+.cell.keep .treat::before{content:"";position:absolute;inset:-6% -2%;border:3px solid var(--ok);border-radius:999px}
+/* the cats and their bowls, down the right side and along the bottom */
+.eater{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;pointer-events:none;padding-bottom:4%}
+.eater img{position:absolute;bottom:34%;left:50%;transform:translateX(-50%);height:66%;width:auto;max-width:100%;object-fit:contain}
+.eater .bowl{position:relative;min-width:70%;padding:0 5px;border-radius:6px 6px 14px 14px;background:#fff;border:2.5px solid var(--ink);
+  font-weight:800;font-size:calc(var(--cs) * .32);line-height:1.25;text-align:center;transition:background .2s,color .2s}
+.eater.fed .bowl{background:var(--ok);color:#fff}
+.eater.short .bowl{background:var(--short);color:#fff}
+.eater .hop{transform-origin:50% 100%}
+.eater.yum img{animation:yum .45s ease-out}
+@keyframes yum{40%{transform:translateX(-50%) translateY(-14%)}}
+.cell.eaten .treat{animation:eaten .35s ease-in forwards}
+@keyframes eaten{to{transform:scale(0);opacity:0}}
+.cell.cursor{box-shadow:inset 0 0 0 3px #73A7AE}
+.card img.tabbypic{display:block;width:70%;max-width:250px;height:auto;margin:0 auto 6px}
+@media (prefers-reduced-motion:reduce){.treat{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <header><div class="title"><h1>Treat Time</h1><img class="higgins" id="higgins" src="../cats/higgins-1.webp" alt="Higgins, a brown tabby cat"></div><div class="stripe"></div><p class="tagline">Help Higgins give every cat just enough treats</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap tray" id="wrap"><div class="board" id="board" tabindex="0" role="grid" aria-label="Treat piles. Tap a pile to put it back in the jar; hold it, or use Keep, to mark it to stay."></div></div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="keepBtn" aria-pressed="false">Keep</button>
+    <button id="shareBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New tray</button>
+  </div>
+
+</main>
+
+<script src="../games.js?v=2026-10-15.12"></script>
+<script>
+/* ---------- treat puzzles (plain functions, also run in a background worker) ---------- */
+// An N × N tray of treat piles, each with a number. Some piles go back in the jar; the rest stay. The cat at the
+// end of each row and column wants exactly its number: the piles that stay in its line must add up to it.
+// Levels: the tray's size and the biggest pile.
+function levelSpec(n) {
+  return [null, {N: 3, top: 5}, {N: 4, top: 6}, {N: 4, top: 9}, {N: 5, top: 9}, {N: 6, top: 7},
+    {N: 6, top: 9}, {N: 7, top: 7}, {N: 7, top: 9}, {N: 8, top: 9}, {N: 9, top: 9}][n];
+}
+// Every way of keeping piles that feeds every cat exactly, up to `limit` of them (each a 0/1 list, 1 = stays),
+// or null if that takes too long to find out.
+// Row by row, it tries each set of piles that adds up to the row's number, keeping the columns' running totals
+// no more than their numbers and never so short that what's left below can't make them up.
+function solveTray(N, nums, rowT, colT, limit) {
+  const opts = [];
+  for (let r = 0; r < N; r++) {
+    const o = [];
+    for (let m = 0; m < 1 << N; m++) {
+      let s = 0; for (let c = 0; c < N; c++) if (m >> c & 1) s += nums[r * N + c];
+      if (s === rowT[r]) o.push(m);
+    }
+    if (!o.length) return [];
+    opts.push(o);
+  }
+  // rows with the fewest choices first; below[k][c]: what's still to come in column c after the k-th row tried
+  const order = [...Array(N).keys()].sort((a, b) => opts[a].length - opts[b].length);
+  const below = [];
+  for (let k = N; k >= 0; k--) below[k] = new Array(N).fill(0).map((_, c) => k === N ? 0 : below[k + 1][c] + nums[order[k] * N + c]);
+  const col = new Array(N).fill(0), pick = new Array(N), out = [];
+  let steps = 0;
+  (function go(k) {
+    if (out.length >= limit || ++steps > 200000) return;
+    if (k === N) {
+      if (col.every((s, c) => s === colT[c])) { const keep = []; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) keep.push(pick[r] >> c & 1); out.push(keep); }
+      return;
+    }
+    const r = order[k];
+    for (const m of opts[r]) {
+      let ok = true;
+      for (let c = 0; c < N; c++) {
+        const s = col[c] + (m >> c & 1 ? nums[r * N + c] : 0);
+        if (s > colT[c] || s + below[k + 1][c] < colT[c]) { ok = false; break; }
+      }
+      if (!ok) continue;
+      for (let c = 0; c < N; c++) if (m >> c & 1) col[c] += nums[r * N + c];
+      pick[r] = m; go(k + 1);
+      for (let c = 0; c < N; c++) if (m >> c & 1) col[c] -= nums[r * N + c];
+    }
+  })(0);
+  return steps > 200000 ? null : out;
+}
+// Random piles and a random answer (about four in ten piles go back, and every cat keeps at least one); while
+// another answer feeds the cats too, a pile where the two differ gets a new number. Kept if that settles it.
+function makeTray(n) {
+  const {N, top} = levelSpec(n), NN = N * N;
+  const rnd = k => 1 + Math.floor(Math.random() * k);
+  const nums = Array.from({length: NN}, () => rnd(top));
+  let keep;
+  for (;;) {
+    keep = Array.from({length: NN}, () => Math.random() < 0.6 ? 1 : 0);
+    let ok = true;
+    for (let r = 0; r < N && ok; r++) { let k = 0, g = 0; for (let c = 0; c < N; c++) { k += keep[r * N + c]; g += 1 - keep[r * N + c]; } ok = k > 0 && (N < 3 || g > 0); }
+    for (let c = 0; c < N && ok; c++) { let k = 0; for (let r = 0; r < N; r++) k += keep[r * N + c]; ok = k > 0; }
+    if (ok) break;
+  }
+  const targets = () => {
+    const rowT = new Array(N).fill(0), colT = new Array(N).fill(0);
+    for (let i = 0; i < NN; i++) if (keep[i]) { rowT[Math.floor(i / N)] += nums[i]; colT[i % N] += nums[i]; }
+    return [rowT, colT];
+  };
+  for (let tries = 0; tries < 60; tries++) {
+    const [rowT, colT] = targets(), sols = solveTray(N, nums, rowT, colT, 2);
+    if (!sols) return null;
+    if (sols.length === 1) return {N, nums, keep, rowT, colT};
+    const other = sols.find(s => s.some((v, i) => v !== keep[i]));
+    const diff = [...Array(NN).keys()].filter(i => other[i] !== keep[i]);
+    const i = diff[Math.floor(Math.random() * diff.length)];
+    nums[i] = rnd(top);
+  }
+  return null;
+}
+
+/* ---------- game state ---------- */
+// game: {level, N, nums (each pile's number), keep (the answer: 1 stays, 0 goes back), rowT and colT (what each
+//        cat wants), mark (each pile now: 0 untouched, 1 back in the jar, 2 marked to stay), history ([square,
+//        mark before] pairs, or {mark} for a Restart), won, hinted, undid…}
+const STORE = "catdoku.treattime.v1", MAX_LEVEL = 10;
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1}, state.settings);
+let game = state.game || null, busy = false, running = false, keepMode = false, cursor = -1;
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
+const levelName = n => { const s = levelSpec(n); return `Level ${n} · ${s.N} × ${s.N}, piles up to ${s.top}`; };
+const build = G.builder([levelSpec, solveTray, makeTray], "makeTray");
+// The cats: tabbies from Higgins's gang, sitting up to wait for their treats.
+const TABBIES = ["c20-1", "c20-17", "c20-18", "c20-30", "c20-2", "c20-19", "c20-23", "c20-16", "c20-20"];
+const catSrc = f => (window.CAT_SRC || {})[f] || `../cats/${f}.webp`;
+const FISH = '<svg viewBox="0 0 100 60" aria-hidden="true"><path class="fish" d="M8 30C20 8 52 4 72 22L92 8C88 22 88 38 92 52L72 38C52 56 20 52 8 30Z"/><path class="fin" d="M38 16Q48 8 58 15Q48 20 38 16Z"/><circle cx="22" cy="26" r="3.2" fill="#2A2530"/></svg>';
+
+/* ---------- drawing ---------- */
+let cells = [], eaters = [];
+function draw() {
+  const N = game.N, b = $("board");
+  b.innerHTML = ""; cells = []; eaters = [];
+  b.style.gridTemplateColumns = `repeat(${N + 1}, 1fr)`; b.style.gridTemplateRows = `repeat(${N + 1}, 1fr)`;
+  b.style.setProperty("--cs", `calc(var(--board) / ${N + 1})`);
+  b.classList.toggle("big", N >= 6);
+  const eater = (k, want) => {
+    const e = document.createElement("div"); e.className = "eater";
+    const img = new Image(); img.src = catSrc(TABBIES[(k * 5 + N) % TABBIES.length]); img.alt = ""; img.draggable = false;
+    const bowl = document.createElement("span"); bowl.className = "bowl"; bowl.textContent = want;
+    e.append(img, bowl); eaters.push(e); return e;
+  };
+  for (let r = 0; r <= N; r++) for (let c = 0; c <= N; c++) {
+    if (r < N && c < N) {
+      const i = r * N + c, d = document.createElement("div");
+      d.className = "cell"; d.dataset.i = i;
+      d.innerHTML = `<div class="treat">${FISH}<b>${game.nums[i]}</b></div>`;
+      cells.push(d); b.append(d);
+    } else if (r < N) b.append(eater(r, game.rowT[r]));          // eaters 0…N-1: rows
+    else if (c < N) b.append(eater(N + c, game.colT[c]));        // eaters N…2N-1: columns
+    else b.append(document.createElement("div"));
+  }
+  update();
+}
+// What's left in each cat's line, and whether that's just right (green) or already too little (red).
+function lineSums() {
+  const N = game.N, row = new Array(N).fill(0), col = new Array(N).fill(0);
+  game.nums.forEach((v, i) => { if (game.mark[i] !== 1) { row[Math.floor(i / N)] += v; col[i % N] += v; } });
+  return {row, col};
+}
+function update() {
+  const N = game.N, {row, col} = lineSums();
+  cells.forEach((d, i) => { d.classList.toggle("gone", game.mark[i] === 1); d.classList.toggle("keep", game.mark[i] === 2); });
+  let fed = 0;
+  for (let k = 0; k < 2 * N; k++) {
+    const have = k < N ? row[k] : col[k - N], want = k < N ? game.rowT[k] : game.colT[k - N];
+    eaters[k].classList.toggle("fed", have === want); eaters[k].classList.toggle("short", have < want);
+    if (have === want) fed++;
+  }
+  $("count").textContent = `${fed} of ${2 * N} cats fed`;
+  $("undoBtn").disabled = !game.history.length || game.won;
+  $("restartBtn").disabled = !game.history.length || game.won;
+  $("hintBtn").disabled = game.won;
+  $("keepBtn").setAttribute("aria-pressed", keepMode);
+  if (hintShown && hintShown !== game.mark.join("")) clearHint();
+  showCursor();
+  return fed === 2 * N;
+}
+
+/* ---------- playing ---------- */
+// A tap puts a pile back in the jar (or takes it out again); with Keep on, or a long press or right-click, it
+// marks the pile to stay instead.
+function setMark(i, m) {
+  if (!playing() || game.mark[i] === m) return;
+  game.history.push([i, game.mark[i]]); game.mark[i] = m; game.started = true;
+  if (update()) win(); else save();
+}
+const tapPile = (i, keep) => setMark(i, keep ? (game.mark[i] === 2 ? 0 : 2) : (game.mark[i] === 1 ? 0 : 1));
+let press = null;
+$("board").addEventListener("pointerdown", e => {
+  const d = e.target.closest(".cell"); if (!d || !playing()) return;
+  e.preventDefault();
+  const i = +d.dataset.i;
+  press = {i, t: setTimeout(() => { if (press) { tapPile(i, true); press = null; } }, 450)};
+});
+$("board").addEventListener("pointerup", () => { if (!press) return; clearTimeout(press.t); tapPile(press.i, keepMode); press = null; });
+for (const ev of ["pointercancel", "pointerleave"]) $("board").addEventListener(ev, () => { if (press) { clearTimeout(press.t); press = null; } });
+$("board").addEventListener("contextmenu", e => {
+  e.preventDefault(); if (press) { clearTimeout(press.t); press = null; }
+  const d = e.target.closest(".cell"); if (d) tapPile(+d.dataset.i, true);
+});
+$("keepBtn").onclick = () => { keepMode = !keepMode; $("keepBtn").setAttribute("aria-pressed", keepMode); };
+// Keys: arrows move a cursor, Space puts a pile back (or takes it out), K or Enter marks it to stay.
+function showCursor() { cells.forEach((d, i) => d.classList.toggle("cursor", i === cursor)); }
+$("board").addEventListener("keydown", e => {
+  if (!playing() || e.ctrlKey || e.metaKey || e.altKey) return;
+  const N = game.N; if (cursor < 0) cursor = 0;
+  const x = cursor % N, y = Math.floor(cursor / N), to = (nx, ny) => { cursor = Math.max(0, Math.min(N - 1, ny)) * N + Math.max(0, Math.min(N - 1, nx)); };
+  if (e.key === "ArrowUp") to(x, y - 1);
+  else if (e.key === "ArrowDown") to(x, y + 1);
+  else if (e.key === "ArrowLeft") to(x - 1, y);
+  else if (e.key === "ArrowRight") to(x + 1, y);
+  else if (e.key === " ") tapPile(cursor, keepMode);
+  else if (e.key === "Enter" || e.key.toLowerCase() === "k") tapPile(cursor, true);
+  else return;
+  e.preventDefault(); showCursor();
+});
+$("board").addEventListener("blur", () => { cursor = -1; showCursor(); });
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
+
+// Undo takes back a tap, or a Restart.
+function undo() {
+  if (!playing() || !game.history.length) return;
+  game.undid = true;
+  const h = game.history.pop();
+  if (Array.isArray(h)) game.mark[h[0]] = h[1]; else game.mark = h.mark;
+  update(); save();
+}
+$("undoBtn").onclick = undo;
+$("restartBtn").onclick = () => {
+  if (!playing() || !game.history.length) return;
+  game.undid = true;
+  game.history.push({mark: game.mark.slice()});
+  game.mark = new Array(game.N * game.N).fill(0);
+  update(); save();
+  G.note("Every pile's back on the tray. Undo brings your moves back.", 4000);
+};
+// Hint: first a mistake, in red (a pile put back that should stay, or marked to stay that should go back);
+// otherwise, in gold, a pile to put back, from the line with the fewest left to put back.
+let hintShown = null, hintTimer = 0;
+function clearHint() { hintShown = null; clearTimeout(hintTimer); cells.forEach(d => d.classList.remove("hintcell", "bad")); }
+$("hintBtn").onclick = () => {
+  if (!playing()) return;
+  const N = game.N, all = [...Array(N * N).keys()];
+  const wrong = all.filter(i => (game.mark[i] === 1 && game.keep[i]) || (game.mark[i] === 2 && !game.keep[i]));
+  let i, bad = false, say;
+  if (wrong.length) { i = wrong[0]; bad = true; say = game.mark[i] === 1 ? "The red pile should stay on the tray." : "The red pile goes back in the jar."; }
+  else {
+    const todo = all.filter(j => !game.keep[j] && game.mark[j] !== 1);
+    if (!todo.length) { G.note("Every pile that goes back is back already.", 4000); return; }
+    const left = j => { const r = Math.floor(j / N), c = j % N; return Math.min(todo.filter(k => Math.floor(k / N) === r).length, todo.filter(k => k % N === c).length); };
+    i = todo.reduce((a, b) => left(b) < left(a) ? b : a);
+    say = "Put the gold pile back in the jar.";
+  }
+  game.hinted = true; game.started = true; save();
+  clearHint();
+  cells[i].classList.add("hintcell"); if (bad) cells[i].classList.add("bad");
+  hintShown = game.mark.join("");
+  G.note(say, 5000);
+  hintTimer = setTimeout(clearHint, 5000);
+};
+
+/* ---------- endings ---------- */
+// Every cat fed: the piles left on the tray are eaten one by one, and the cats bob as they eat.
+function win() {
+  game.won = true; G.finishClock(game); cursor = -1; clearHint();
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save();
+  update();
+  G.track(`Treat Time solved level ${game.level}`);
+  build.prefetch(next);
+  running = true;
+  const g = game, done = () => { running = false; if (game === g) finishCard(); };
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) { setTimeout(done, 600); return; }
+  const left = cells.filter((d, i) => game.mark[i] !== 1), step = Math.max(40, Math.min(140, 2000 / left.length));
+  left.forEach((d, k) => setTimeout(() => { if (game === g) d.classList.add("eaten"); }, k * step));
+  eaters.forEach((e, k) => setTimeout(() => { if (game === g) e.classList.add("yum"); }, 200 + k * 60));
+  setTimeout(done, left.length * step + 700);
+}
+function finishCard() {
+  const next = settings.level, gold = !game.undid && !game.hinted;
+  let text = `All ${2 * game.N} cats got just enough treats.`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  // a gold paw: a tabby curled up asleep with a full tummy, in place of the random cat photo
+  const pic = new Image(); pic.className = "tabbypic"; pic.src = catSrc("c20-3"); pic.alt = "A tabby curled up asleep";
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my tray", game.result,
+    {title: "All fed!", gold, goldWhy: "No hints or undos!", goldTitle: "Purr-fect!", goldPic: [pic], next: `Next: level ${next}`,
+     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- new trays ---------- */
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
+function begin(p, level) {
+  game = {level, N: p.N, nums: p.nums, keep: p.keep, rowT: p.rowT, colT: p.colT, mark: new Array(p.N * p.N).fill(0),
+    history: [], won: false, ...G.freshClock()};
+  cursor = -1; clearHint();
+}
+async function newPuzzle() {
+  if (busy) return;
+  busy = true;
+  const n = settings.level;
+  G.openCard("Setting out the treats…", "", []);
+  const p = await build.take(n);
+  begin(p, n);
+  busy = false; G.closeCard(); G.note("");
+  draw(); save();
+  build.prefetch(n);
+  G.track(`Treat Time new puzzle level ${n}`);
+  helpOnFirstVisit();
+}
+
+/* ---------- sharing ---------- */
+// The piles' numbers, one digit each, and the answer as 0s and 1s; with progress, each pile's mark (0, 1 or 2).
+$("shareBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Treat Time", won: game.won,
+  puzzle: () => ({g: "treattime", N: game.level, n: game.nums.join(""), k: game.keep.join("")}),
+  progress: () => game.mark.join("")}); };
+function openShared(d) {
+  const spec = levelSpec(d.N), N = spec ? spec.N : 0, fail = () => G.note("That share link didn't work.", 5000);
+  const ok = (s, re) => typeof s === "string" && s.length === N * N && re.test(s);
+  if (!N || !ok(d.n, /^[1-9]+$/) || !ok(d.k, /^[01]+$/)) return fail();
+  const nums = [...d.n].map(Number), keep = [...d.k].map(Number);
+  const rowT = new Array(N).fill(0), colT = new Array(N).fill(0);
+  nums.forEach((v, i) => { if (keep[i]) { rowT[Math.floor(i / N)] += v; colT[i % N] += v; } });
+  if (rowT.some(t => !t) || colT.some(t => !t)) return fail();
+  const sols = solveTray(N, nums, rowT, colT, 2);
+  if (!sols || sols.length !== 1) return fail();
+  begin({N, nums, keep, rowT, colT}, d.N);
+  if (ok(d.p, /^[012]+$/)) { game.mark = [...d.p].map(Number); game.timed = false; }
+  settings.level = d.N; $("levelSel").value = d.N;
+  draw(); save(); build.prefetch(d.N);
+  if (game.timed === false && update()) win();
+}
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  settings.seenHelp = false; helpOnFirstVisit();
+  if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
+}
+// First visit: walk through the tray that's out. Squares are the tray plus the row of cats on the right and
+// along the bottom.
+function helpOnFirstVisit() {
+  if (!game || !playing() || document.querySelector(".spot") || settings.seenHelp) return;
+  const N = game.N, row0 = [...Array(N).keys()].map(c => [c, 0]);
+  const catsAt = [...[...Array(N).keys()].map(r => [N, r]), ...[...Array(N).keys()].map(c => [c, N])];
+  // a pile to show tapping on: an untouched one if there is one
+  const free = game.mark.findIndex(m => m === 0), one = free >= 0 ? [free % N, Math.floor(free / N)] : [0, 0];
+  const steps = [
+    {say: "Higgins's gang are waiting for treats", lit: catsAt},
+    {say: "Each cat wants exactly the number on its bowl", lit: [[N, 0]]},
+    {say: "The piles left in its row must add up to that", lit: [...row0, [N, 0]]},
+    {say: "Columns work the same way", lit: [...[...Array(N).keys()].map(r => [0, r]), [0, N]]},
+    {say: "Tap a pile to put it back in the jar", lit: [one]},
+    {say: "Hold a pile, or use Keep, to mark one that stays", lit: [one], els: [$("keepBtn")]},
+    {say: "A bowl turns green when it's just right, red when it's short", lit: catsAt},
+    {say: "Feed every cat just enough!", lit: catsAt, tone: "ok"},
+    {say: "Stuck? Hint shows a pile to put back", els: [$("hintBtn")]},
+  ];
+  G.spotlight({grid: $("board"), w: N + 1, h: N + 1, steps, done: () => { settings.seenHelp = true; save(); }});
+}
+
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", ""), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
+$("helpBtn").onclick = showHelp;
+$("higgins").src = catSrc("higgins-1");
+
+G.nav("treattime");
+G.checkClock(game);
+G.setupTimer({name: "treattime", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+const shared = G.readShare("treattime");
+if (game) G.reopen(() => {
+    const spec = levelSpec(game.level), NN = game.N * game.N;
+    if (!spec || spec.N !== game.N || game.nums.length !== NN || game.mark.length !== NN || game.keep.length !== NN) throw new Error("the saved tray doesn't fit its level");
+    draw();
+    if (game.won) finishCard();
+    build.prefetch(settings.level); helpOnFirstVisit();
+  }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
+else if (!shared) newPuzzle();
+const shareOpts = () => ({name: "Treat Time", inProgress: !!(game && !game.won && game.history.length), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, shareOpts());
+window.addEventListener("hashchange", () => { const d = G.readShare("treattime"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
