@@ -59,3 +59,7 @@ anywhere, but keep track of who they are, because they'll be featured in games o
   `-18` and `-14`; they go dark when a cat's asleep), and `dottie-2` sleeps on the gold-paw card. A few poses come with things: peeking from
   under a red blanket (`dottie-1`), hanging from a green toothbrush (`dottie-9`), hugging a blue blanket
   (`dottie-22`) and sitting on a cat-tree perch (`dottie-24`).
+- **Laya** (`laya-…`, smooth grey with brown eyes) is the star of Toy Box: `laya-5` sits beside the
+  title, `laya-9` (her whole body, lying down) lies on the rug inside the ball track whenever no
+  basket needs the space, and `laya-3` struts off, tail up, on the gold-paw card. `laya-1` and
+  `laya-8` have a hand in them, and `laya-1`, `laya-6` and `laya-7` are cut off partway.
