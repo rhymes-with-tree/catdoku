@@ -67,6 +67,16 @@ def crunchface(x, y, s):
             f'<circle cx="{x-s*.38}" cy="{y+s*.1}" r="{s*.17}" fill="{GREEN}"/><circle cx="{x+s*.38}" cy="{y+s*.1}" r="{s*.17}" fill="{GREEN}"/>')
 
 
+def bugsyface(x, y, s):
+    """Bugsy: a fluffy white face with brown patches over the ears and one eye, eyes shut in a nap."""
+    return (catface(x, y, s, "#FBF8F0").split("<circle")[0]
+            + f'<path d="M{x-s*.92} {y-s*.95}L{x-s*.35} {y-s*.55}L{x+s*.05} {y-s*.55}Q{x+s*.05} {y-s*.1} {x-s*.2} {y+s*.25}Q{x-s*.6} {y+s*.35} {x-s*.98} {y+s*.1}Z'
+            f'M{x+s*.92} {y-s*.95}L{x+s*.5} {y-s*.55}Q{x+s*.75} {y-s*.3} {x+s*.97} {y-s*.2}Z" fill="#8A6A52"/>'
+            + catface(x, y, s, "none").split("<circle")[0]
+            + f'<path d="M{x-s*.55} {y+s*.1}Q{x-s*.38} {y+s*.25} {x-s*.21} {y+s*.1}M{x+s*.21} {y+s*.1}Q{x+s*.38} {y+s*.25} {x+s*.55} {y+s*.1}" '
+            f'stroke="{INK}" stroke-width="{s*.11}" fill="none" stroke-linecap="round"/>')
+
+
 # Catdoku: colour regions on a grid, a cat in each, none touching.
 def catdoku():
     regions = ["AABB", "ACCB", "DCCB", "DDCB"]
@@ -167,6 +177,7 @@ def twirl():
     out += ribbon("M20 30Q30 20 40 30T60 30T74 30", PLUM, (76, 30), 0)
     out += ribbon("M28 82V66Q28 58 36 58H50", TEAL, (52, 58), 0)
     out += ribbon("M74 84Q64 76 74 68T74 52", ORANGE, (74, 48), -90)
+    out += bugsyface(50, 78, 9)   # Bugsy, napping on a clear bit of mat
     return frame(PAPER, out)
 
 
