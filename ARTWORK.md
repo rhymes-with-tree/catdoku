@@ -26,9 +26,13 @@ Most of the cats are just cats, and any game can use them. The `c14-…`, `c15-�
 have names, and most have their own files (`name-1.webp`, `name-2.webp`, …). Every named cat can also be used as an ordinary cat
 anywhere, but keep track of who they are, because they'll be featured in games of their own.
 
-- **Jan Brady** (`jan-brady-…`, fluffy black and white, long dark tail) is a one-of-a-kind
+- **Jan Brady** (`jan-brady-…`, fluffy black and white, long dark tail; he's a he) is a one-of-a-kind
   character. The `c16-…` pictures, the fluffy black and white cats napping in Sunbeams, are
-  Jan Brady too (they keep their numbered names because the games already use them).
+  Jan Brady too (they keep their numbered names because the games already use them). He's the
+  mascot of Tail Chase (drawn from above as the runner, `jan-brady-14` crouched beside the title,
+  `jan-brady-34` leaping on the gold-paw card) and of Hide & Seek (he hides among the cats in the
+  boxes as `c16-3`, `c16-5`, `jan-brady-15` and `jan-brady-33`, his tail is up beside the title in
+  `jan-brady-22`, and `jan-brady-31` looks up from the gold-paw card).
 - **Higgins** (`higgins-…`, brown tabby) is a one-of-a-kind character too, and the mascot of
   Catdoku: `higgins-1` sits beside the title, `higgins-face` (cut from it) is every cat on the board, in the counter, the walkthrough and the cat facts, and `higgins-2` stretches out on the gold-paw card.
   The other tabbies on the Higgins sheet (`c20-…`) are general cats.
