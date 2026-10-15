@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cat-astrophe</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-15.10"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-15.10">
+<style>
+/* A rug, and a cat sitting at its top corner beside a pot of dye. Each square of the rug is a tuft of pile in
+   its colour, with a woven texture laid over the whole rug; fringe hangs off both ends. Knock a pot over and
+   the dye runs out from the corner. */
+.wrap.rugwrap{height:auto}
+.rug{display:block;width:100%;height:auto;user-select:none;-webkit-user-select:none;touch-action:manipulation;overflow:visible}
+.rug .edge{fill:none;stroke:var(--ink);stroke-width:3;vector-effect:non-scaling-stroke}
+.rug .binding{fill:none;stroke:#F7F1E1;stroke-width:5;vector-effect:non-scaling-stroke}
+.rug .fringe{stroke:#F7F1E1;stroke-width:2.2;stroke-linecap:round}
+.rug .fringeInk{stroke:#2A2530;stroke-width:4;stroke-linecap:round}
+.sq{cursor:pointer;fill:var(--c);transition:fill .35s var(--d,0s)}
+.weave{pointer-events:none}
+/* the dyed part, from the corner: a dashed line round it */
+.dyed{fill:none;stroke:#fff;stroke-width:2px;stroke-dasharray:4 4;vector-effect:non-scaling-stroke;opacity:.85;pointer-events:none}
+/* the cat and its pot */
+.pot{transform-box:view-box;transform-origin:49.5px 0px;transition:transform .28s cubic-bezier(.5,0,.8,.4)}
+.pot.tipped{transform:rotate(-100deg)}
+.spill{opacity:0;transition:opacity .15s}
+.spill.on{opacity:1;transition:opacity .08s .2s}
+.cat{transition:transform .14s ease-out}
+.cat{transform-box:view-box;transform-origin:119px 0px}
+.cat.swat{transform:rotate(-4deg) translateX(-3px)}
+.nap{opacity:0;transition:opacity .9s .5s;pointer-events:none}
+.nap.on{opacity:1}
+/* the dye pots to knock over */
+/* up to six pots, always in one row: narrower on a narrow phone */
+.pots{width:var(--board);display:flex;justify-content:center;gap:min(8px,1.6vw);flex-wrap:nowrap}
+.pots button{padding:4px 2px 2px;width:min(58px,calc((var(--board) - 50px) / 6));flex:none;border-radius:12px;display:flex;flex-direction:column;align-items:center;line-height:1}
+.pots button svg{width:min(42px,100%);height:auto;aspect-ratio:1;display:block}
+.pots button small{font-size:12px;font-weight:600;color:var(--ink-soft);margin-top:1px}
+.pots button.here{border-style:dashed;background:none}
+.pots button.here svg{opacity:.45}
+.pots button:disabled{opacity:.4}
+.pots button.here:disabled{opacity:1}
+.left{display:flex;gap:12px;align-items:center}
+.par{color:var(--ink-soft)}
+#count.over{color:#B23A28}
+/* Crunch on the gold-paw card */
+.card img.crunchpic{display:block;width:66%;max-width:230px;height:auto;margin:0 auto 14px}
+@media (prefers-reduced-motion:reduce){.sq{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Cat-astrophe</h1><div class="stripe"></div><p class="tagline">Help Crunch dye the whole rug one colour</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span class="left"><span id="count"></span><span class="par" id="par"></span></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap rugwrap"><svg class="rug" id="board" viewBox="-14 -66 328 368" role="group" aria-label="A rug"></svg></div>
+  <div class="pots" id="pots" aria-label="Dye pots"></div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="shareBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New rug</button>
+  </div>
+</main>
+
+<script src="../games.js?v=2026-10-15.10"></script>
+<script>
+/* ---------- puzzles (plain functions, also run in a background worker) ---------- */
+// Levels: [columns, rows, colours, spare pots on top of the fewest the solver finds].
+function levelOf(n) {
+  return [null, [6, 6, 3, 3], [7, 7, 4, 3], [8, 8, 4, 3], [9, 9, 5, 3], [10, 10, 5, 2], [11, 11, 6, 2],
+    [12, 12, 6, 2], [13, 13, 6, 1], [14, 14, 6, 1], [16, 16, 6, 1]][n];
+}
+// The rug as patches: each run of touching same-colour squares is one patch. Returns each square's
+// patch (of), each patch's colour and size, and its neighbours as bitsets (nbr) of `words` 32-bit words.
+function patchesOf(W, H, cells) {
+  const N = W * H, of = new Int32Array(N).fill(-1), colour = [], size = [];
+  for (let s = 0; s < N; s++) {
+    if (of[s] >= 0) continue;
+    const p = colour.length, stack = [s]; of[s] = p; colour.push(cells[s]); let n = 0;
+    while (stack.length) {
+      const i = stack.pop(), x = i % W, y = (i - x) / W; n++;
+      for (const j of [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, y > 0 ? i - W : -1, y < H - 1 ? i + W : -1])
+        if (j >= 0 && of[j] < 0 && cells[j] === cells[s]) { of[j] = p; stack.push(j); }
+    }
+    size.push(n);
+  }
+  const P = colour.length, words = (P + 31) >> 5, nbr = [];
+  for (let p = 0; p < P; p++) nbr.push(new Uint32Array(words));
+  for (let i = 0; i < N; i++) {
+    const x = i % W;
+    for (const j of [x < W - 1 ? i + 1 : -1, i + W < N ? i + W : -1]) if (j >= 0 && of[j] !== of[i]) {
+      nbr[of[i]][of[j] >> 5] |= 1 << (of[j] & 31); nbr[of[j]][of[i] >> 5] |= 1 << (of[i] & 31);
+    }
+  }
+  return {of, colour, size, nbr, words, P};
+}
+// A short way to dye the whole rug one colour from here (the corner's patch is the dyed part), as a
+// list of colours, or [] if it's done. Finding the very shortest is too slow, so this is a beam search:
+// keep the `width` most promising rugs at each step, ranked by how many colours are left outside the
+// dyed part, then by how much is dyed.
+function bestPots(W, H, cells, K, width) {
+  const {colour, size, nbr, words, P} = patchesOf(W, H, cells);
+  const masks = []; for (let c = 0; c < K; c++) masks.push(new Uint32Array(words));
+  for (let p = 0; p < P; p++) masks[colour[p]][p >> 5] |= 1 << (p & 31);
+  const start = {m: new Uint32Array(words), f: nbr[0].slice(), n: size[0], path: []};
+  start.m[0] |= 1;
+  if (start.n === W * H) return [];
+  const left = m => { let k = 0; for (let c = 0; c < K; c++) for (let w = 0; w < words; w++) if (masks[c][w] & ~m[w]) { k++; break; } return k; };
+  let beam = [start];
+  for (let step = 0; step < W * H; step++) {
+    const next = [], seen = new Set();
+    for (const st of beam) for (let c = 0; c < K; c++) {
+      const mk = masks[c], add = new Uint32Array(words); let any = false;
+      for (let w = 0; w < words; w++) if ((add[w] = st.f[w] & mk[w])) any = true;
+      if (!any) continue;
+      const m = st.m.slice(), f = st.f.slice(); let n = st.n;
+      for (let w = 0; w < words; w++) m[w] |= add[w];
+      for (let w = 0; w < words; w++) for (let b = add[w]; b; b &= b - 1) {
+        const p = (w << 5) + 31 - Math.clz32(b & -b), nb = nbr[p]; n += size[p];
+        for (let v = 0; v < words; v++) f[v] |= nb[v];
+      }
+      for (let w = 0; w < words; w++) f[w] &= ~m[w];
+      const key = m.join(); if (seen.has(key)) continue; seen.add(key);
+      const path = st.path.concat(c);
+      if (n === W * H) return path;
+      next.push({m, f, n, path, left: left(m)});
+    }
+    next.sort((a, b) => a.left - b.left || b.n - a.n);
+    beam = next.slice(0, width);
+  }
+  return null;
+}
+// A rug: random squares in K colours. Par is the fewest pots the solver finds; the level allows a few more.
+function makeRug(n) {
+  const [W, H, K, spare] = levelOf(n), cells = [];
+  for (let i = 0; i < W * H; i++) cells.push(Math.floor(Math.random() * K));
+  const best = bestPots(W, H, cells, K, 400);
+  if (!best || best.length < K + 1) return null;
+  return {W, H, K, cells, par: best.length, pots: best.length + spare};
+}
+
+/* ---------- pictures ---------- */
+// Dyes from the site's palette, in the order levels bring them in (lightness spread out, so they tell apart).
+const DYES = [["#E16A4A", "coral"], ["#73A7AE", "sea blue"], ["#ECA818", "gold"], ["#B94588", "plum"],
+  ["#6AA673", "sage"], ["#4E577D", "midnight"]];
+const INK = `stroke="#2A2530" stroke-width="2.5" stroke-linejoin="round"`;
+// A dye pot: a little tin bucket with a wire handle, full of dye to the brim.
+const potArt = (c, x = 0, y = 0, k = 1) => `<g transform="translate(${x} ${y}) scale(${k})">
+  <path d="M3 -24 Q14 -40 25 -24" fill="none" stroke="#2A2530" stroke-width="2"/>
+  <path d="M2 -22 L5 0 L23 0 L26 -22 Z" fill="#C9CCD6" ${INK}/>
+  <path d="M3.4 -12 L24.6 -12 L23.4 -3 L4.6 -3 Z" fill="${c}"/>
+  <path d="M2 -22 L5 0 L23 0 L26 -22 Z" fill="none" ${INK}/>
+  <ellipse cx="14" cy="-22" rx="12" ry="3.6" fill="${c}" ${INK}/>
+  <path d="M8 -20 C8 -16 7 -14 8.5 -13 C10 -14 9.5 -16 10 -20 Z" fill="${c}" stroke="#2A2530" stroke-width="1.2"/></g>`;
+// Crunch (crunch-7, flipped to face the pot) stands at the corner of the rug batting at a big pot of dye,
+// and curls up for a nap on the finished rug (crunch-4).
+const CAT_SRC = {};   // filled with embedded pictures when the page is bundled into one file
+const catSrc = name => CAT_SRC[name] || `../cats/${name}.webp`;
+const catArt = () => `<g class="cat"><image href="${catSrc("crunch-7")}" x="87" y="-62" width="64" height="64" transform="translate(238 0) scale(-1 1)"/></g>`;
+
+/* ---------- game ---------- */
+// game: {level, W, H, K, start (each square's colour at the start), cells (now), par (fewest pots the solver
+//        found), pots (pots allowed), history (the colour of each pot knocked over), hinted, undid, won}
+const STORE = "catdoku.catastrophe.v1", MAX_LEVEL = 10, SVGNS = "http://www.w3.org/2000/svg";
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1}, state.settings);
+let game = state.game || null, busy = false, hintMark = null;
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !busy && !$("overlay").classList.contains("show");
+const levelName = n => { const [W, H, K] = levelOf(n); return `Level ${n} · ${W} × ${H}, ${K} colours`; };
+const build = G.builder([levelOf, patchesOf, bestPots, makeRug], "makeRug");
+const used = () => game.history.length;
+const potsLeft = () => game.pots - used();
+const cellPx = () => 300 / game.W;
+
+// The dyed part: the corner square and every square joined to it in its colour, with how far each is
+// from the corner (for the dye running out).
+function dyedPart(cells) {
+  const {W, H} = game, far = new Map([[0, 0]]), queue = [0];
+  for (let q = 0; q < queue.length; q++) {
+    const i = queue[q], x = i % W, y = (i - x) / W;
+    for (const j of [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, y > 0 ? i - W : -1, y < H - 1 ? i + W : -1])
+      if (j >= 0 && !far.has(j) && cells[j] === cells[0]) { far.set(j, far.get(i) + 1); queue.push(j); }
+  }
+  return far;
+}
+// Knock over the pot of colour c: the dyed part takes it, and joins up with the squares of that colour it touches.
+function dye(cells, c) { const out = cells.slice(); for (const i of dyedPart(cells).keys()) out[i] = c; return out; }
+const replay = () => game.history.reduce(dye, game.start);
+const done = cells => cells.every(c => c === cells[0]);
+
+// The pile laid over the whole rug: fine slanting tufts, some lit and some in shadow, so it reads as rug
+// rather than tiles whatever size the squares are.
+const weave = () => `<pattern id="pile" width="5" height="4" patternUnits="userSpaceOnUse">
+  <path d="M.5 3.2 L1.6 .8 M3 3.6 L4.1 1.2" stroke="rgba(255,255,255,.22)" stroke-width=".9" stroke-linecap="round"/>
+  <path d="M1.7 3.4 L2.6 1.4 M4.2 3.8 L5 2" stroke="rgba(42,37,48,.16)" stroke-width=".9" stroke-linecap="round"/></pattern>`;
+// Fringe off the left and right ends of the rug, H rows of squares tall at s each.
+function fringeArt(H, s) {
+  let ink = "", cream = "";
+  for (let y = 3; y < H * s - 1; y += 5) for (const [x, dx] of [[0, -11], [300, 11]]) {
+    const d = `M${x} ${y}q${dx / 2} ${(y * 7) % 3 - 1} ${dx} ${(y * 13) % 5 - 2}`;
+    ink += `<path class="fringeInk" d="${d}"/>`; cream += `<path class="fringe" d="${d}"/>`;
+  }
+  return ink + cream;
+}
+function draw(ripple) {
+  const el = $("board"), {W, H} = game, s = cellPx(), key = `${W}x${H}`;
+  if (el.dataset.key !== key) {
+    el.dataset.key = key;
+    let h = `<defs>${weave()}</defs><g fill="none">${fringeArt(H, s)}</g><g id="squares">`;
+    for (let i = 0; i < W * H; i++) h += `<rect class="sq" data-i="${i}" x="${(i % W) * s}" y="${Math.floor(i / W) * s}" width="${s + .4}" height="${s + .4}"/>`;
+    h += `</g><rect class="weave" x="0" y="0" width="300" height="${H * s}" fill="url(#pile)"/>
+      <path class="dyed" id="dyedEdge"/><rect class="binding" x="1.5" y="1.5" width="297" height="${H * s - 3}" rx="3"/><rect class="edge" x="0" y="0" width="300" height="${H * s}" rx="4"/>
+      <g id="hintLayer"></g>
+      <image class="nap" id="nap" x="85" y="${H * s / 2 - 73}" width="130" height="146"/>
+      <path class="spill" id="spill" d=""/>
+      ${catArt()}<g class="pot" id="pot"></g>`;
+    el.innerHTML = h;
+    el.setAttribute("viewBox", `-14 -66 328 ${H * s + 70}`);
+  }
+  const far = dyedPart(game.cells), sts = el.querySelector("#squares").children;
+  for (let i = 0; i < W * H; i++) {
+    const g = sts[i];
+    g.style.setProperty("--c", DYES[game.cells[i]][0]);
+    g.style.setProperty("--d", ripple && far.has(i) ? `${Math.min(far.get(i) * 28, 900)}ms` : "0s");
+    g.setAttribute("aria-label", `${DYES[game.cells[i]][1]} square${far.has(i) ? ", dyed" : ""}`);
+  }
+  // a dashed line round the dyed part, along its outside edges
+  let d = "";
+  for (const i of far.keys()) {
+    const x = (i % W) * s, y = Math.floor(i / W) * s, X = i % W, Y = Math.floor(i / W);
+    if (Y > 0 && !far.has(i - W)) d += `M${x} ${y}h${s}`;
+    if (Y < H - 1 && !far.has(i + W)) d += `M${x} ${y + s}h${s}`;
+    if (X > 0 && !far.has(i - 1)) d += `M${x} ${y}v${s}`;
+    if (X < W - 1 && !far.has(i + 1)) d += `M${x + s} ${y}v${s}`;
+  }
+  el.querySelector("#dyedEdge").setAttribute("d", game.won ? "" : d);
+  el.querySelector("#pot").innerHTML = potArt(DYES[game.cells[0]][0], 40, 0, 1.9);
+  const nap = el.querySelector("#nap");
+  if (game.won) nap.setAttribute("href", catSrc("crunch-4"));
+  nap.classList.toggle("on", !!game.won);
+  drawHint();
+  // the pots under the rug
+  const pots = $("pots");
+  if (pots.children.length !== game.K) {
+    pots.innerHTML = "";
+    for (let c = 0; c < game.K; c++) {
+      const b = document.createElement("button"); b.dataset.c = c;
+      b.innerHTML = `<svg viewBox="-2 -42 32 44" aria-hidden="true">${potArt(DYES[c][0])}</svg><small>${c + 1}</small>`;
+      pots.append(b);
+    }
+  }
+  [...pots.children].forEach((b, c) => {
+    const here = game.cells[0] === c;
+    b.classList.toggle("here", here);
+    b.disabled = here || game.won;
+    b.setAttribute("aria-label", here ? `${DYES[c][1]} (on the rug already)` : `Knock over the ${DYES[c][1]} dye`);
+  });
+  const left = potsLeft();
+  // past the last pot the count goes on, as pots over: no gold paw, but the rug can still be finished
+  $("count").textContent = game.won ? "All one colour!" : left > 0 ? `${left} pot${left === 1 ? "" : "s"} left`
+    : left === 0 ? "No pots left" : `${-left} pot${left === -1 ? "" : "s"} over`;
+  $("count").classList.toggle("over", left < 0 && !game.won);
+  $("par").textContent = `${used()} used · best ${game.par}`;
+  $("undoBtn").disabled = !used() || game.won; $("restartBtn").disabled = !used() || game.won;
+  $("hintBtn").disabled = game.won;
+}
+
+// The cat swats the pot over: it tips, dye pours onto the corner, and runs out across the dyed part.
+let tipTimer = null;
+function knock(c) {
+  if (!playing() || c === game.cells[0]) return;
+  game.started = true;
+  const el = $("board"), pot = el.querySelector("#pot"), paw = el.querySelector(".cat"), spill = el.querySelector("#spill");
+  pot.innerHTML = potArt(DYES[c][0], 40, 0, 1.9);
+  spill.setAttribute("d", "M2 -3 C-2 6 4 18 16 18 C28 18 34 10 30 2 C26 -3 10 -5 2 -3 Z");
+  spill.style.fill = DYES[c][0];
+  paw.classList.add("swat"); pot.classList.add("tipped"); spill.classList.add("on");
+  clearTimeout(tipTimer);
+  tipTimer = setTimeout(() => { paw.classList.remove("swat"); pot.classList.remove("tipped"); spill.classList.remove("on"); }, 650);
+  game.history.push(c); game.cells = dye(game.cells, c);
+  hintMark = null;
+  draw(true); save();
+  if (done(game.cells)) win();
+  else if (potsLeft() === 0) G.note("That was the last pot. Keep going, but there's no gold paw this time.", 6000);
+}
+$("pots").addEventListener("click", e => { const b = e.target.closest("button"); if (b && !b.disabled) knock(+b.dataset.c); });
+// Tapping a square knocks over its colour.
+$("board").addEventListener("click", e => { const g = e.target.closest(".sq"); if (g && game) knock(game.cells[+g.dataset.i]); });
+document.addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !$("undoBtn").disabled) { e.preventDefault(); $("undoBtn").click(); return; }
+  if (game && /^[1-9]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey && +e.key <= game.K && !document.querySelector(".spot")) knock(+e.key - 1);
+});
+
+function undo() {
+  if (!game || game.won || !used()) return;
+  G.closeCard();
+  game.history.pop(); game.undid = true; game.cells = replay(); hintMark = null; draw(); save();
+}
+$("undoBtn").onclick = () => { if (playing() || $("overlay").classList.contains("show")) undo(); };
+function restart() {
+  if (!game || game.won || !used()) return;
+  G.closeCard();
+  game.history = []; game.undid = true; game.cells = game.start.slice(); hintMark = null; draw(); save();
+  G.note("Back to the start.", 3000);
+}
+$("restartBtn").onclick = restart;
+
+// Hint: work out a short way from here, and mark the next pot and the squares it would soak into, for the
+// player to knock over.
+function hint() {
+  if (!playing()) return;
+  const way = bestPots(game.W, game.H, game.cells, game.K, 400);
+  if (!way || !way.length) { G.note("No hint can be found for this rug.", 4000); return; }
+  game.hinted = true; save();
+  const c = way[0], before = dyedPart(game.cells), after = dyedPart(dye(game.cells, c)), left = potsLeft();
+  hintMark = {key: game.history.join(), cells: [...after.keys()].filter(i => !before.has(i)), pot: c, until: Date.now() + 5000};
+  G.note(`Knock over the ${DYES[c][1]} dye: it soaks into the marked squares.${way.length > left && left >= 0 ? ` About ${way.length} more to go, so you'll run over.` : ""}`, 5000);
+  drawHint(); setTimeout(drawHint, 5100);
+}
+function drawHint() {
+  const layer = $("board").querySelector("#hintLayer"); if (!layer) return;
+  const on = hintMark && game && hintMark.key === game.history.join() && Date.now() < hintMark.until;
+  const s = cellPx();
+  layer.innerHTML = on ? hintMark.cells.map(i => `<rect class="hintsq" x="${(i % game.W) * s + 1}" y="${Math.floor(i / game.W) * s + 1}" width="${s - 2}" height="${s - 2}" rx="2"/>`).join("") : "";
+  [...$("pots").children].forEach((b, c) => b.classList.toggle("hintcell", !!(on && hintMark.pot === c)));
+}
+$("hintBtn").onclick = hint;
+
+/* ---------- endings ---------- */
+const goldOK = () => !game.hinted && !game.undid && used() <= game.par;
+function win() {
+  game.won = true;
+  G.finishClock(game);
+  // a hint, or running over the pots, keeps you on the same level
+  const next = game.hinted || used() > game.pots ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save();
+  setTimeout(() => { if (game.won) draw(); }, 600);
+  G.track(`Cat-astrophe solved level ${game.level}`);
+  build.prefetch(next);
+  const g = game;
+  setTimeout(() => { if (game === g) finishCard(); }, 2200);
+}
+function crunchPic() { const im = new Image(); im.className = "crunchpic"; im.src = catSrc("crunch-2"); im.alt = "Crunch, a grey tabby, lounging on the arm of a chair"; return im; }
+function finishCard() {
+  const next = settings.level, u = used();
+  let text = u > game.pots ? `Dyed in ${u} pots, ${u - game.pots} over the ${game.pots} you had (our best is ${game.par}).`
+    : `Dyed in ${u} pot${u === 1 ? "" : "s"}${u < game.par ? `, fewer than our best of ${game.par}!` : u === game.par ? ", as few as our best." : ` (our best is ${game.par}).`}`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : u > game.pots ? ` Here's another at level ${next}, to try within the pots.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the rug", game.result,
+    {title: "One colour!", gold: goldOK(), goldWhy: u < game.par ? "Better than our best, with no hint or undo!" : "Our best, with no hint or undo!", goldTitle: "Nice dye job, Crunch!", goldPic: [crunchPic()], next: `Next: level ${next}`,
+     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- new rugs ---------- */
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
+function fresh(n, p) {
+  return {level: n, W: p.W, H: p.H, K: p.K, start: p.cells.slice(), cells: p.cells.slice(), par: p.par, pots: p.pots,
+    history: [], hinted: false, undid: false, won: false, ...G.freshClock()};
+}
+async function newPuzzle() {
+  if (busy) return;
+  busy = true;
+  const n = settings.level;
+  const p = await build.take(n);
+  game = fresh(n, p); hintMark = null;
+  busy = false; G.closeCard(); G.note(""); draw(); save();
+  build.prefetch(n);
+  G.track(`Cat-astrophe new puzzle level ${n}`);
+}
+
+/* ---------- sharing ---------- */
+$("shareBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Cat-astrophe", won: game.won,
+  puzzle: () => ({g: "catastrophe", N: game.level, c: game.start.join("")}),
+  progress: () => ({h: game.history.join("")})}); };
+function openShared(d) {
+  const lv = levelOf(d.N), ok = (s, len) => typeof s === "string" && (len < 0 || s.length === len) && [...s].every(ch => /[0-9]/.test(ch) && +ch < lv[2]);
+  if (!lv || !ok(d.c, lv[0] * lv[1])) { G.note("That share link didn't work.", 5000); return; }
+  const cells = [...d.c].map(Number), best = bestPots(lv[0], lv[1], cells, lv[2], 400);
+  if (!best || !best.length) { G.note("That share link didn't work.", 5000); return; }
+  game = fresh(d.N, {W: lv[0], H: lv[1], K: lv[2], cells, par: best.length, pots: best.length + lv[3]});
+  if (d.p && ok(d.p.h, -1) && d.p.h.length <= 4 * game.W * game.H) { game.history = [...d.p.h].map(Number); game.cells = replay(); game.timed = false; }
+  settings.level = d.N; $("levelSel").value = d.N; hintMark = null;
+  draw(); save(); build.prefetch(d.N);
+  if (done(game.cells)) { game.won = true; draw(); save(); }
+}
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  settings.seenHelp = false; helpOnFirstVisit();
+  if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
+}
+// First visit (or How to play, at any point): the dyed corner, the pots, what a pot does (shown on the
+// board just while the step is up), the goal and Hint.
+function helpOnFirstVisit() {
+  if (!game || !playing() || settings.seenHelp || document.querySelector(".spot")) return;
+  const {W, H} = game, xy = i => [i % W, Math.floor(i / W)], all = [...Array(W * H).keys()];
+  const before = dyedPart(game.cells), way = bestPots(W, H, game.cells, game.K, 60) || [], c = way[0];
+  const after = c === undefined ? before : dyedPart(dye(game.cells, c));
+  let was;
+  const steps = [
+    {say: "The cat's corner: the dashed line marks what's dyed", lit: [...before.keys()].map(xy)},
+    {say: "Tap a pot and the cat knocks it over", els: [$("pots")]},
+    ...(c === undefined ? [] : [{say: "The dye soaks into touching squares of its colour", lit: [...after.keys()].map(xy),
+      enter: () => { was = game.cells; game.cells = dye(was, c); draw(true); }, leave: () => { game.cells = was; draw(); }}]),
+    {say: "Dye it all one colour before the pots run out", lit: all.map(xy), tone: "ok", els: [$("count")]},
+    {say: "Stuck? Hint marks the next pot", els: [$("hintBtn")]},
+  ];
+  G.spotlight({grid: $("board"), w: W, h: H, steps, map, done: () => { settings.seenHelp = true; save(); }});
+}
+// Where the squares are on the page: the rug fills the board's width, below the strip the cat sits in.
+function map() {
+  const r = $("board").getBoundingClientRect(), k = r.width / 328;
+  return {ox: r.left + 14 * k, oy: r.top + 66 * k, cw: cellPx() * k, ch: cellPx() * k};
+}
+
+/* ---------- start ---------- */
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", "") + (n === MAX_LEVEL ? " (hardest)" : ""), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
+$("helpBtn").onclick = showHelp;
+
+G.nav("catastrophe");
+G.checkClock(game);
+G.setupTimer({name: "catastrophe", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level",
+  emptyText: "Dye a rug one colour and your times will show up here. They're kept on this device only."});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+const shared = G.readShare("catastrophe");
+if (game && Array.isArray(game.start)) G.reopen(() => {
+    const lv = levelOf(game.level);
+    if (!lv || game.start.length !== game.W * game.H || game.W !== lv[0]) throw new Error("the saved rug doesn't fit its level");
+    game.cells = replay();
+    draw();
+    if (game.won) finishCard(); else helpOnFirstVisit();
+    build.prefetch(settings.level);
+  }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
+else if (!shared) newPuzzle().then(helpOnFirstVisit);
+const shareOpts = () => ({name: "Cat-astrophe", inProgress: !!(game && !game.won && used()), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, shareOpts());
+window.addEventListener("hashchange", () => { const d = G.readShare("catastrophe"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>

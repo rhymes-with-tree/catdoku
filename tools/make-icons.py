@@ -492,10 +492,29 @@ def fuzzyspelling():
             out += f'<path d="M{cx} {tail}q{t} 6 {t * 1.6} 12" fill="none" stroke="{c2}" stroke-width="1.8" stroke-linecap="round"/>'
     return frame(tint(TEAL, .22), out)
 
+# Cat-astrophe: a fringed rug of coloured squares, the top corner already flooded one colour, a pot of dye
+# tipped over at the corner and Crunch's face beside it.
+def catastrophe():
+    rows = ["TTTYO", "TTYOP", "YTOOY", "OPYTO"]
+    cols = {"T": TEAL, "Y": YELLOW, "O": ORANGE, "P": PLUM}
+    x0, y0, s = 17, 38, 13.2
+    out = "".join(f'<path d="M{x} {y0 + 3}V{y0 + 4 * s - 3}" stroke="{INK}" stroke-width="1.6" stroke-dasharray="1.6 2.4"/>' for x in (x0 - 4, x0 + 5 * s + 4))
+    for r, row in enumerate(rows):
+        for c, ch in enumerate(row):
+            out += f'<rect x="{x0 + c * s}" y="{y0 + r * s}" width="{s + .3}" height="{s + .3}" fill="{cols[ch]}"/>'
+    out += f'<rect x="{x0}" y="{y0}" width="{5 * s}" height="{4 * s}" rx="2" fill="none" stroke="{INK}" stroke-width="3"/>'
+    # the pot, knocked over at the corner with its mouth to the rug, and a splash of dye under it
+    out += f'<ellipse cx="{x0 + 14}" cy="{y0 + 3}" rx="11" ry="5" fill="{TEAL}" stroke="{INK}" stroke-width="2"/>'
+    out += (f'<g transform="translate(19 25) rotate(125) scale(.62) translate(-33 -26)"><path d="M18 15L21 37L45 37L48 15Z" fill="#C9CCD6" stroke="{INK}" stroke-width="3.5" stroke-linejoin="round"/>'
+            f'<path d="M20 26H46L45 33H21Z" fill="{TEAL}"/><ellipse cx="33" cy="15" rx="15" ry="4.5" fill="{TEAL}" stroke="{INK}" stroke-width="3.5"/></g>')
+    out += crunchface(70, 24, 13)
+    return frame(PAPER, out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")

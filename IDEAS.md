@@ -79,8 +79,8 @@ Rows are sorted by group, then status: Yes, Look closer, Option, Idea, Built, No
 | Border ladder | Geography | Get from one country to another through shared borders | None | Medium | — | Word Dictionaries chat | Idea | Recommended first in that chat; needs a saved list of borders |
 | Hidden cat in a painting (Cat Burglar) | Seeking | Find a cat hidden in a famous painting | None | Hard | — | Word Dictionaries chat | Idea | Waiting on where the images come from |
 | Spot the Difference | Seeking | Find the changes between two pictures | None | — | — | GoComics | No | Never |
-| Flood | Colour | Change the corner's colour to flood the board one colour within a set number of moves | None | Easy | — | Tatham | Idea | |
 | Kaleidocat (Colorscope-style) | Colour | Rebuild a target pattern from a few mirrored pieces whose overlapping colours blend | None | Medium | Pawlette | Possible suites | Idea | The saved name Kaleidocat could fit |
+| Cat-astrophe (Flood) | Colour | Crunch knocks pots of dye over at the corner of a rug; the dye floods the joined squares of the colour it touches, until the rug's one colour | — | — | — | Tatham | Built | Began as a knitted blanket called Dye Job. Going over the pots is allowed, without a gold paw, and keeps you on the same level |
 | Night Light arrows (Switch Spots) | Colour | Put every cat to sleep in the fewest taps; each cat's arrows say which others blink with it | — | — | — | GoComics | Built | From level 3 of Night Light, some cats point their own way |
 | Pawlette | Colour | Mix colours like paint; Swipe mode clears lines | — | — | — | Game Suite chat | Built | |
 | Bed Hog (Klotski, Rush Hour) | Moving and planning | Slide sprawled cats around the bed until there's room for the human | None | Medium | Knock It Off | Fair Play chat, idea list | Idea | Once ruled out; reconsider. You play Klotski |
