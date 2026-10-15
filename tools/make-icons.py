@@ -214,7 +214,9 @@ def hideseek():
             else:
                 out += (f'<rect x="{x}" y="{y}" width="22" height="22" rx="2" fill="#D9B680" stroke="{INK}" stroke-width="2"/>'
                         f'<line x1="{x+11}" y1="{y}" x2="{x+11}" y2="{y+8}" stroke="{INK}" stroke-width="1.5" opacity=".5"/>')
-    out += f'<path d="M66 63L69 55L73 61M78 61L82 55L85 63" fill="#8E8794" stroke="{INK}" stroke-width="2" stroke-linejoin="round"/>'
+    # Jan Brady's ears peeking out of a box: black with pink insides
+    out += (f'<path d="M64 64L68 50L75 60ZM76 60L83 50L87 64Z" fill="#3A3440" stroke="{INK}" stroke-width="2" stroke-linejoin="round"/>'
+            f'<path d="M67.3 61L69 54.5L72.2 59.4ZM78.8 59.4L82 54.5L83.7 61Z" fill="#E7A9A5"/>')
     return frame("#C9A26B", out)
 
 
@@ -395,9 +397,12 @@ def tailchase():
     out += f'<path d="M24 76 L24 52 L56 52 L56 34" fill="none" stroke="{INK}" stroke-opacity=".25" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>'
     out += f'<path d="M24 76 L24 52 L56 52 L56 34" fill="none" stroke="{PLUM}" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>'
     out += circle(24, 78, 5, PLUM, 2)
-    out += (f'<g transform="translate(56 30)"><ellipse cx="0" cy="6" rx="7.5" ry="9" fill="#E9A15B" stroke="{INK}" stroke-width="2"/>'
-            f'<path d="M-5.5 -9 L-5 -16 L-1 -12 Z M5.5 -9 L5 -16 L1 -12 Z" fill="#E9A15B" stroke="{INK}" stroke-width="1.6" stroke-linejoin="round"/>'
-            f'<circle cx="0" cy="-6" r="6" fill="#E9A15B" stroke="{INK}" stroke-width="2"/></g>')
+    # Jan Brady from above: white and fluffy with a black saddle, a black head with a white blaze, and his big dark tail
+    out += (f'<g transform="translate(56 30)"><path d="M2 13 C4 20 11 20 13 14" fill="none" stroke="{INK}" stroke-width="7" stroke-linecap="round"/>'
+            f'<path d="M2 13 C4 20 11 20 13 14" fill="none" stroke="#3A3440" stroke-width="4" stroke-linecap="round"/>'
+            f'<ellipse cx="0" cy="6" rx="7" ry="9" fill="#FBF8F0" stroke="{INK}" stroke-width="2"/><ellipse cx="0" cy="3" rx="5.5" ry="2.5" fill="#3A3440"/>'
+            f'<path d="M-5.5 -9 L-5 -16 L-1 -12 Z M5.5 -9 L5 -16 L1 -12 Z" fill="#3A3440" stroke="{INK}" stroke-width="1.6" stroke-linejoin="round"/>'
+            f'<circle cx="0" cy="-6" r="6" fill="#3A3440" stroke="{INK}" stroke-width="2"/><path d="M-1.5 -11.6 L0 -5.5 L1.5 -11.6Z" fill="#FBF8F0"/></g>')
     out += yarnball(78, 24, 7, TEAL)
     return frame("#E9D3B4", out)
 
