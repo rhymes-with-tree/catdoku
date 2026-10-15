@@ -77,6 +77,15 @@ def bugsyface(x, y, s):
             f'stroke="{INK}" stroke-width="{s*.11}" fill="none" stroke-linecap="round"/>')
 
 
+def layaface(x, y, s):
+    """Laya: a smooth grey face with pinkish ears and big brown eyes."""
+    return (catface(x, y, s, "#77706B").split("<circle")[0]
+            + f'<path d="M{x-s*.82} {y-s*.8}L{x-s*.45} {y-s*.58}L{x-s*.86} {y-s*.2}ZM{x+s*.82} {y-s*.8}L{x+s*.45} {y-s*.58}L{x+s*.86} {y-s*.2}Z" fill="#C9A29A"/>'
+            + catface(x, y, s, "none").split("<circle")[0]
+            + f'<circle cx="{x-s*.38}" cy="{y+s*.1}" r="{s*.19}" fill="#6B3A22"/><circle cx="{x+s*.38}" cy="{y+s*.1}" r="{s*.19}" fill="#6B3A22"/>'
+            f'<circle cx="{x-s*.32}" cy="{y+s*.03}" r="{s*.06}" fill="#fff"/><circle cx="{x+s*.44}" cy="{y+s*.03}" r="{s*.06}" fill="#fff"/>')
+
+
 # Catdoku: colour regions on a grid, a cat in each, none touching.
 def catdoku():
     regions = ["AABB", "ACCB", "DCCB", "DDCB"]
@@ -149,6 +158,7 @@ def toybox():
         out += f'<rect x="{x}" y="10" width="13" height="24" rx="3" fill="#F3EBDD" stroke="{INK}" stroke-width="2"/>'
         out += circle(x + 6.5, 16.5, 3.8, cs[0], 1.4) + circle(x + 6.5, 26.5, 3.8, cs[1], 1.4)
     out += circle(34, 40, 3.8, LIME, 1.4) + circle(66, 82, 3.8, PLUM, 1.4)
+    out += layaface(50, 62, 10)   # Laya, on the rug inside the track
     return frame("#C9A26B", out)
 
 
