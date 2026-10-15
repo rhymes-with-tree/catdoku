@@ -49,3 +49,7 @@ anywhere, but keep track of who they are, because they'll be featured in games o
 - **Crunch** (`crunch-…`, grey tabby with green eyes) is the star of Pounce: `crunch-3` sits beside
   the title, `crunch-1` creeps up from the corner of the mat to cheer a chain of matches, and
   `crunch-6` rolls about on the gold-paw card.
+- **Dottie** (Dottie Dietrich, `dottie-…`, all-black shorthair with yellow-green eyes, sometimes a purple
+  collar or a teal bow) will be the mascot of a game soon. A few poses come with things: peeking from
+  under a red blanket (`dottie-1`), hanging from a green toothbrush (`dottie-9`), hugging a blue blanket
+  (`dottie-22`) and sitting on a cat-tree perch (`dottie-24`).
