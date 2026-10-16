@@ -5,6 +5,7 @@ Every puzzle considered for the site, one row each with variants grouped: ideas 
 Rows are sorted by group, then status: Yes, Look closer, Option, Idea, Built, No. When a game ships, set its row to Built (or add a row) in the same PR.
 
 - **Clues?** None; Definitions (dictionary definitions would do); Written (needs clues or categories someone writes, which rules it out).
+- **Status** only sorts the rows; it doesn't mean approved. Nothing here is approved or requested until the owner asks for that game, and an idea named in several chats or lists is not a request because of that.
 - **Ease** of adding it: Easy = a simple generator, or mostly reuses a game already on the site; Medium = a new generator plus a solver to guarantee one answer; Hard = needs new art, physics, split-second timing or a big data file.
 
 | Puzzle | Group | How it plays | Clues? | Ease | Close to | From | Status | Notes |
