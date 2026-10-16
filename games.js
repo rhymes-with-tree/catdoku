@@ -39,8 +39,8 @@ const G = (() => {
   const GROUPS = [
     ["logic", "Cat Logic", "Fill the grid by its rules; every puzzle has one answer"],
     ["numbers", "Cat Math", "Sums and arithmetic"],
-    ["lines", "Cat's Cradle", "Join, link and route things"],
-    ["words", "Cat Chat", "Spell, find and climb words"],
+    ["lines", "Cat Trails", "Join, link and route things"],
+    ["words", "Cat Spells", "Spell, find and climb words"],
     ["teasers", "Curious Cat", "Moves to plan and shapes to fit"],
     ["quick", "Kitten Play", "Match, pop, sort and chase"],
   ];
