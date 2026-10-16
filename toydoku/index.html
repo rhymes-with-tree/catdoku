@@ -36,6 +36,9 @@
 .sq.given.peer{fill:#DCD6E6}
 .sq.same{fill:#B9DADF}
 .sq.sel{fill:#CBBCE6}
+/* a guess glows violet until it's undone, so Undo to guess can take you back to just before it */
+.guess{fill:#EFE4FA;stroke:#8A5CC7;stroke-width:6;pointer-events:none}
+.gridwrap.guessing{box-shadow:0 0 0 3px #8A5CC7}
 .thin{stroke:rgba(42,37,48,.2);stroke-width:2;pointer-events:none}
 .thick{stroke:var(--ink);stroke-width:5;stroke-linecap:round;pointer-events:none}
 .toy{pointer-events:none}
@@ -82,6 +85,8 @@
     <button id="restartBtn">Restart</button>
     <button id="notesBtn" aria-pressed="false">Pencil</button>
     <button id="allNotesBtn">Pencil all</button>
+    <button id="guessBtn" aria-pressed="false">Guess</button>
+    <button id="backBtn" hidden>Undo to guess</button>
     <button id="shareBtn">Share</button>
     <button id="toysBtn">Toys</button>
     <button id="bestBtn">Best times</button>
@@ -320,7 +325,8 @@ function pickToys(N) {
 
 /* ---------- game state ---------- */
 // game: {level, N, bw, bh, sol, givens (the grid as dealt, 0 for empty), toys (picture for toys 1 to N, as
-//        toys[v - 1]), grid (0 for empty), notes (bit v set: v jotted down), history (undo steps), hinted, undid, won}
+//        toys[v - 1]), grid (0 for empty), notes (bit v set: v jotted down), guesses (squares filled as guesses, oldest
+//        first), history (undo steps), hinted, undid, won}
 const STORE = "catdoku.toydoku.v1", MAX_LEVEL = 11;
 const $ = G.$;
 let state = G.load(STORE);
@@ -329,6 +335,7 @@ let game = state.game || null, busy = false, running = false, sel = -1, noting =
 // armed: a toy (or 0, erase) picked on the pad, {v, sticky}: tapped, it goes in the next square tapped; held
 // down, it sticks and goes in every square tapped until another is picked.
 let armed = null;
+let guessing = false;   // the next toy put out is a guess
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
 const HOW = [null, "", "", "", "a head start", "", "", "tricky", "fiendish", "diabolical", "insane", "nightmare"];
@@ -362,6 +369,7 @@ function draw() {
     const cls = ["sq", isGiven(i) ? "given" : "", i === sel ? "sel" : sv && g[i] === sv ? "same" : peer ? "peer" : ""].filter(Boolean).join(" ");
     out += `<rect class="${cls}" data-i="${i}" x="${x}" y="${y}" width="100" height="100"/>`;
   }
+  for (const i of game.guesses || []) { const [r, c] = rc(i); out += `<rect class="guess" x="${c * 100 + 4}" y="${r * 100 + 4}" width="92" height="92" rx="12"/>`; }
   for (let k = 1; k < N; k++) {
     out += `<line class="thin" x1="${k * 100}" y1="0" x2="${k * 100}" y2="${S}"/><line class="thin" x1="0" y1="${k * 100}" x2="${S}" y2="${k * 100}"/>`;
   }
@@ -391,12 +399,15 @@ function draw() {
   svg.innerHTML = out;
   svg.classList.toggle("won", !!game.won && running);
   $("pad").classList.toggle("noting", noting);
+  $("board").classList.toggle("guessing", guessing);
+  $("guessBtn").setAttribute("aria-pressed", String(guessing));
+  $("guessBtn").disabled = game.won; $("backBtn").hidden = !(game.guesses || []).length || game.won;
   [...$("pad").children].forEach(b => { const v = +b.dataset.v, on = armed && armed.v === v; b.classList.toggle("armed", !!on && !armed.sticky); b.classList.toggle("sticky", !!on && armed.sticky); });
   $("notesBtn").setAttribute("aria-pressed", String(noting));
   const filled = g.filter(Boolean).length;
   $("count").textContent = game.won ? "Every toy's in place!" : `${filled} of ${N * N} ${nums ? "squares" : "toys"}`;
   const what = nums ? "number" : "toy", it = armed && (armed.v ? (nums ? armed.v : "the " + toyName(armed.v)) : "the eraser");
-  $("key").textContent = game.won ? "" : armed ? (armed.sticky ? `${it[0].toUpperCase() + it.slice(1)} sticks: tap squares${noting && armed.v ? " to pencil it in" : ""}` : `Tap a square for ${it}${noting && armed.v ? " (in pencil)" : ""}`)
+  $("key").textContent = game.won ? "" : guessing ? `Guess: the next ${what} you put out glows until you undo it` : armed ? (armed.sticky ? `${it[0].toUpperCase() + it.slice(1)} sticks: tap squares${noting && armed.v ? " to pencil it in" : ""}` : `Tap a square for ${it}${noting && armed.v ? " (in pencil)" : ""}`)
     : sel >= 0 && isGiven(sel) ? "That one was already out" : noting ? `Pencil: ${what}s go in as maybes` : sel < 0 ? `Tap a ${what}, then squares (hold it down to keep it)` : "";
   $("hintBtn").disabled = game.won; $("allNotesBtn").disabled = game.won;
   $("undoBtn").disabled = !game.history.length || game.won; $("restartBtn").disabled = !game.history.length || game.won;
@@ -435,7 +446,8 @@ function padButton(b, v) {
 }
 
 /* ---------- playing ---------- */
-const snapshot = () => game.history.push({grid: game.grid.slice(), notes: game.notes.slice()});
+const snapshot = () => game.history.push({grid: game.grid.slice(), notes: game.notes.slice(), guesses: (game.guesses || []).slice()});
+function restore(h) { game.grid = h.grid; game.notes = h.notes; game.guesses = h.guesses || []; }
 // Put toy v in square i (0 erases; the same toy again takes it off). In pencil, v is jotted down or crossed off.
 function put(i, v) {
   if (!playing() || i < 0 || isGiven(i)) return;
@@ -449,6 +461,9 @@ function put(i, v) {
     // a toy put out comes off the pencil marks in its row, column and box
     if (game.grid[i]) { for (const u of unitsNow()) if (u.includes(i)) for (const p of u) game.notes[p] &= ~(1 << v); }
     else if (!v) game.notes[i] = 0;
+    const guesses = game.guesses || (game.guesses = []);
+    if (game.grid[i] && guessing) { guessing = false; if (!guesses.includes(i)) guesses.push(i); }
+    else if (!game.grid[i] && guesses.includes(i)) guesses.splice(guesses.indexOf(i), 1);  // emptied, so it's no longer a guess
   }
   if (game.grid.every((h, i) => h === game.sol[i])) { win(); return; }
   draw(); save();
@@ -479,7 +494,7 @@ $("allNotesBtn").onclick = () => {
 document.addEventListener("keydown", e => {
   if (!playing() || document.querySelector(".spot") || e.target.tagName === "SELECT" || e.target.tagName === "INPUT" || e.ctrlKey || e.metaKey || e.altKey) return;
   const N = game.N, k = e.key;
-  if (k === "Escape") { armed = null; sel = -1; draw(); return; }
+  if (k === "Escape") { armed = null; sel = -1; guessing = false; draw(); return; }
   if (/^[1-9]$/.test(k) && +k <= N) { armed = null; if (sel < 0) sel = 0; put(sel, +k); e.preventDefault(); return; }
   if (k === "Backspace" || k === "Delete" || k === "0") { put(sel, 0); e.preventDefault(); return; }
   if (k === "n" || k === "N") { noting = !noting; draw(); return; }
@@ -493,12 +508,22 @@ document.addEventListener("keydown", e => {
   }
 });
 document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
-function undo() { if (playing() && game.history.length) { game.undid = true; const h = game.history.pop(); game.grid = h.grid; game.notes = h.notes; draw(); save(); } }
+function undo() { if (playing() && game.history.length) { game.undid = true; restore(game.history.pop()); draw(); save(); } }
 $("undoBtn").onclick = undo;
+// Guess: the next toy put out glows until it's undone. Undo to guess takes everything back to just before the
+// latest guess in one go, pencil marks and all (it counts as an Undo for the gold paw).
+$("guessBtn").onclick = () => { if (!playing()) return; guessing = !guessing; draw(); };
+$("backBtn").onclick = () => {
+  if (!playing() || !(game.guesses || []).length) return;
+  const had = game.guesses.length;
+  while (game.history.length && (game.guesses || []).length >= had) restore(game.history.pop());
+  game.undid = true; guessing = false; draw(); save();
+  G.note("Back to just before your guess.", 3000);
+};
 $("restartBtn").onclick = () => {
   if (!playing() || !game.history.length) return;
   game.undid = true; snapshot();
-  game.grid = game.givens.slice(); game.notes = game.notes.map(() => 0);
+  game.grid = game.givens.slice(); game.notes = game.notes.map(() => 0); game.guesses = []; guessing = false;
   draw(); save(); G.note("Back to the start. Undo brings your toys back.", 3500);
 };
 $("numTgl").onchange = e => { settings.numbers = e.target.checked; save(); if (game) { makePad(); draw(); } };
@@ -512,7 +537,7 @@ function hint() {
   if (!playing()) return;
   const N = game.N, g = game.grid, U = unitsNow(), wrong = g.map((v, i) => v && v !== game.sol[i] ? i : -1).filter(i => i >= 0);
   let i, bad = false, say;
-  if (wrong.length) { i = wrong.includes(sel) ? sel : wrong[0]; bad = true; say = wrong.length > 1 ? `That ${settings.numbers ? "number" : "toy"}'s wrong (and ${wrong.length - 1} more)` : `That ${settings.numbers ? "number" : "toy"}'s wrong`; }
+  if (wrong.length) { i = wrong.includes(sel) ? sel : wrong.find(k => !(game.guesses || []).includes(k)) ?? wrong[0]; bad = true; say = wrong.length > 1 ? `That ${settings.numbers ? "number" : "toy"}'s wrong (and ${wrong.length - 1} more)` : `That ${settings.numbers ? "number" : "toy"}'s wrong`; }
   else {
     const open = k => { if (g[k]) return 0; let m = (1 << (N + 1)) - 2; for (const u of U) if (u.includes(k)) for (const p of u) if (g[p]) m &= ~(1 << g[p]); return m; };
     const ones = m => { let c = 0; while (m) { m &= m - 1; c++; } return c; };
@@ -548,7 +573,7 @@ $("hintBtn").onclick = hint;
 /* ---------- endings ---------- */
 // Every toy right: the toys hop in a wave across the grid, then the finishing card.
 function win() {
-  game.won = true; G.finishClock(game); G.note(""); clearTimeout(hintTimer); sel = -1; noting = false; armed = null; hintMark = null;
+  game.won = true; guessing = false; G.finishClock(game); G.note(""); clearTimeout(hintTimer); sel = -1; noting = false; armed = null; hintMark = null;
   const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
   settings.level = next; $("levelSel").value = next; save();
   G.track(`Toydoku solved level ${game.level}`);
@@ -570,9 +595,9 @@ function finishCard() {
 /* ---------- new puzzles ---------- */
 function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
 function begin(p, level, toys) {
-  game = {level, N: p.N, bw: p.bw, bh: p.bh, sol: p.sol, givens: p.givens, toys: toys || pickToys(p.N), grid: p.givens.slice(),
+  game = {level, N: p.N, bw: p.bw, bh: p.bh, sol: p.sol, givens: p.givens, toys: toys || pickToys(p.N), grid: p.givens.slice(), guesses: [],
     notes: new Array(p.N * p.N).fill(0), history: [], won: false, ...G.freshClock()};
-  sel = -1; noting = false; armed = null; hintMark = null; makePad();
+  sel = -1; noting = false; armed = null; guessing = false; hintMark = null; makePad();
 }
 async function newPuzzle() {
   if (busy) return;
@@ -637,6 +662,7 @@ function helpOnFirstVisit() {
     {say: `Tap a ${what}, then a square`, els: [$("pad")]},
     {say: `Hold a ${what} down to put it in square after square`, els: [$("pad")]},
     {say: "Pencil jots down maybes", els: [$("notesBtn")]},
+    {say: "Not sure? Guess, and Undo to guess takes you back", els: [$("guessBtn")]},
     {say: settings.numbers ? "Turn Numbers off for toys" : "Prefer numbers? Switch them on", els: [$("numOpt")]},
     {say: `Stuck? Hint shows a wrong ${what}, or where one goes`, els: [$("hintBtn")]},
   ];
