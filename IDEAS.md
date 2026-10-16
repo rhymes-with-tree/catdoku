@@ -11,7 +11,6 @@ Rows are sorted by group, then status: Yes, Look closer, Option, Idea, Built, No
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Sudoku (Solo) | Logic grids | Fill the grid so every row, column and box has each number once; variants are 6×6, 16×16 with letters, and with the diagonals counting too | None | Easy | Open the Door! | You play, GoComics, Tatham | Yes | Can share Open the Door!'s code |
 | Kakuro | Logic grids | Fill runs of squares with digits that add up to each run's sum, with no repeats | None | Easy | Open the Door! | Kakuro chat | Idea | Already built as the Kakuro Cross Sums artifact |
-| Sumplete | Logic grids | Cross out numbers so each row and column adds up to its target | None | Easy | Toe Beans | wordleunlimited | Idea | |
 | Mastermind (Guess) | Logic grids | Guess a hidden row of colours from feedback on each guess | None | Easy | — | Tatham | Idea | |
 | Scratch That (Light Up) | Logic grids | Place scratching posts so every sofa and chair is guarded; a post covers its line of sight until a wall | None | Medium | Catdoku | Fair Play chat, Tatham | Idea | Recommended second in the Fair Play chat |
 | Tents | Logic grids | Place a tent beside each tree to match row and column counts; tents never touch | None | Medium | Catdoku | Tatham | Idea | Once ruled out; reconsider. Theme: each cat needs its own bed beside it |
@@ -28,6 +27,7 @@ Rows are sorted by group, then status: Yes, Look closer, Option, Idea, Built, No
 | Slant | Logic grids | Draw a diagonal in every square; numbers count the lines meeting at each corner, with no loops | None | Medium | — | Tatham | Idea | |
 | Undead | Logic grids | Place ghosts, vampires and zombies so the counts seen along each line, through mirrors, match | None | Medium | — | Tatham | Idea | |
 | Black Box | Logic grids | Fire rays into a box and find the hidden balls from where the rays come out | None | Medium | — | Tatham | Idea | |
+| Treat Time (Sumplete) | Logic grids | Put treat piles back in the jar until the piles left in every row and column add up to what that line's cat wants | — | — | — | wordleunlimited | Built | Hosted by Higgins, with the tabbies from the Higgins sheet as the hungry cats; on trays of 6 × 6 and up the numbers are bigger and the fish just a faint outline |
 | High Perch (Skyscrapers, Futoshiki, Towers, High Rise, Unequal) | Logic grids | Cat trees 1 to N perches tall, one of each height per row and column; arrows point down to the shorter tree and lookout cats count the trees they can see | — | — | — | You play, Tatham | Built | One ladder: trees standing, then arrows, then lookouts |
 | Catdoku (Queens) | Logic grids | One cat in every row, column and colour region, with no two touching | — | — | — | The first game | Built | |
 | Fair Play (Tango, Unruly) | Logic grids | Fill the grid with two toys, half of each per line, no three in a row | — | — | — | Game Suite chat, Tatham | Built | |
