@@ -542,10 +542,29 @@ def treattime():
     return frame(PAPER, out)
 
 
+def dottieface(x, y, s):
+    """Dottie: an all-black cat face with yellow-green eyes."""
+    return (catface(x, y, s, "#221E26").split("<circle")[0]
+            + f'<circle cx="{x-s*.38}" cy="{y+s*.1}" r="{s*.17}" fill="#C9D35A"/><circle cx="{x+s*.38}" cy="{y+s*.1}" r="{s*.17}" fill="#C9D35A"/>')
+
+
+def upatree():
+    # a cat tree of three perches climbing CAT, COT, DOT, with Dottie at the top and the feather above her
+    out = f'<rect x="47" y="30" width="6" height="58" fill="#C99A62" stroke="#5A3D25" stroke-width="1.5"/>'
+    for y, word, c in ((80, "CAT", "#C9B9D6"), (60, "COT", "#E3B9A9"), (40, "DOT", "#B7C8BC")):
+        out += f'<ellipse cx="50" cy="{y + 3}" rx="30" ry="5" fill="{c}" stroke="{INK}" stroke-width="2"/>'
+        for i, ch in enumerate(word):
+            changed = (word == "COT" and i == 1) or (word == "DOT" and i == 0)
+            out += f'<rect x="{31 + i * 13}" y="{y - 11}" width="12" height="12" rx="2.5" fill="{"#DCEBD9" if changed else "#fff"}" stroke="{INK}" stroke-width="1.5"/>' + text(37 + i * 13, y - 4.6, ch, 9)
+    out += f'<path d="M72 6V12" stroke="#5E5866" stroke-width="1.5"/><path d="M72 12l-4 7M72 12l4 7M72 12v9" stroke="{PLUM}" stroke-width="3" stroke-linecap="round"/>'
+    out += dottieface(86, 33, 7)
+    return frame(PAPER, out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")
