@@ -561,10 +561,29 @@ def upatree():
     return frame(PAPER, out)
 
 
+# Toydoku: a 4 × 4 Sudoku of toys in 2 × 2 boxes, a few squares still to fill, and Laya looking on.
+def toydoku():
+    grid = ["ABCD", "C.AB", "B.D.", "DCB."]
+    col = {"A": RED, "B": TEAL, "C": YELLOW, "D": PLUM}
+    s, o, out = 18, 14, ""
+    out += f'<rect x="{o}" y="{o}" width="{4*s}" height="{4*s}" fill="#FBF6EC"/>'
+    for k in (1, 3):
+        out += f'<line x1="{o+k*s}" y1="{o}" x2="{o+k*s}" y2="{o+4*s}" stroke="{INK}" stroke-width=".8" opacity=".35"/><line x1="{o}" y1="{o+k*s}" x2="{o+4*s}" y2="{o+k*s}" stroke="{INK}" stroke-width=".8" opacity=".35"/>'
+    out += f'<line x1="{o+2*s}" y1="{o}" x2="{o+2*s}" y2="{o+4*s}" stroke="{INK}" stroke-width="3"/><line x1="{o}" y1="{o+2*s}" x2="{o+4*s}" y2="{o+2*s}" stroke="{INK}" stroke-width="3"/>'
+    for r in range(4):
+        for c in range(4):
+            v = grid[r][c]
+            if v != ".":
+                out += yarnball(o + (c + .5) * s, o + (r + .5) * s, 6.2, col[v])
+    out += f'<rect x="{o}" y="{o}" width="{4*s}" height="{4*s}" fill="none" stroke="{INK}" stroke-width="3" rx="2"/>'
+    out += layaface(o + 3.5 * s, o + 3.55 * s, 7.5)   # Laya, in the last empty square
+    return frame("#B3B94B", out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")

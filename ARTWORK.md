@@ -66,5 +66,6 @@ anywhere, but keep track of who they are, because they'll be featured in games o
   `dottie-12` reaches up on her back legs on the gold-paw card.
 - **Laya** (`laya-…`, smooth grey with brown eyes) is the star of Toy Box: `laya-5` sits beside the
   title, `laya-9` (her whole body, lying down) lies on the rug inside the ball track whenever no
-  basket needs the space, and `laya-3` struts off, tail up, on the gold-paw card. `laya-1` and
+  basket needs the space, and `laya-3` struts off, tail up, on the gold-paw card. Laya is the star of Toydoku too: `laya-2` looks up from beside the title, `laya-4` lies on the
+  gold-paw card, and her face sits in the last empty square of its front-page icon. `laya-1` and
   `laya-8` have a hand in them, and `laya-1`, `laya-6` and `laya-7` are cut off partway.
