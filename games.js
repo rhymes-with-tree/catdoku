@@ -1,39 +1,60 @@
 /* Shared helpers for the Catdoku family of games: links between games,
    saved progress, background puzzle building, and the win card. */
 const G = (() => {
-  // Every game: name, folder, one line about it, and its colour in the games menu.
+  // Every game: name, folder, one line about it, its colour in the games menu, its shelf (see GROUPS) and
+  // words to find it by in search (the puzzle it's based on and what it's like).
   const GAMES = [
-    ["Catdoku", "catdoku", "Help Higgins give every cat its own territory", "#BD5538"],
-    ["Yarn", "yarn", "Lead one strand through every ball", "#E16A4A"],
-    ["Patches", "patches", "Sew a four-fabric quilt", "#73A7AE"],
-    ["Sunbeams", "sunbeams", "Every cat gets a warm spot", "#ECA818"],
-    ["Toy Box", "toybox", "Help Laya put every toy back in its basket", "#B3B94B"],
-    ["Pounce", "pounce", "Line up three of a kind for Crunch to pounce on", "#6AA673"],
-    ["Twirl", "twirl", "Clear every ribbon off the mat so Bugsy can nap", "#B94588"],
-    ["Toe Beans", "toebeans", "Make the number on the big pad", "#DD9DAD"],
-    ["Knock It Off", "knockitoff", "Help Fred push everything off the table", "#7885BA"],
-    ["Hide & Seek", "hideseek", "Find Jan Brady and friends hiding in the boxes", "#C9A26B"],
-    ["Pawlette", "pawlette", "Mix colours: zen out, or swipe and line them up", "#9874CA"],
-    ["Tangle", "tangle", "Untangle the yarn the cat got into", "#3C8681"],
-    ["Catwalk", "catwalk", "Link the perches of a giant cat tower", "#A98663"],
-    ["Fair Play", "tango", "Share two toys out fairly", "#B94588"],
-    ["Bubbles", "bubbles", "Bat bubbles up and pop three of a kind", "#5FA0C8"],
-    ["Open the Door!", "opendoor", "Solve the puzzle so the cat can get through!", "#4E577D"],
-    ["Tunnel Run", "tunnelrun", "Assemble the tunnels for Bowtie to run through", "#7E63B8"],
-    ["Copycat", "copycat", "Find the boxes with matching toys", "#D08A4E"],
-    ["Night Light", "nightlight", "Help Dottie get every cat to close its eyes", "#3A3358"],
-    ["Unravel", "unravel", "Cover every line with one strand of yarn", "#E16A4A"],
-    ["Tail Chase", "tailchase", "Help Jan Brady catch the toys without getting tangled", "#C9773F"],
-    ["Keyboard Cat", "keyboardcat", "Make words from the keys that still work", "#8D78AD"],
-    ["If It Fits", "iffits", "Build the box, and a cat comes to sit in it", "#C4925C"],
-    ["High Perch", "highperch", "Raise every cat tree to just the right height", "#8E5E3E"],
-    ["Fuzzy Spelling", "fuzzyspelling", "Slide the letters until the bar spells a word", "#B94588"],
-    ["Cat-astrophe", "catastrophe", "Help Crunch dye the whole rug one colour", "#73A7AE"],
-    ["Laser Pointer", "laserpointer", "Bounce the dot past every cat", "#E16A4A"],
-    ["Treat Time", "treattime", "Help Higgins give every cat just enough treats", "#ECA818"],
-    ["Up a Tree", "upatree", "Help Dottie climb the cat tree, one letter at a time", "#6AA673"],
+    ["Catdoku", "catdoku", "Help Higgins give every cat its own territory", "#BD5538", "logic", "queens star battle"],
+    ["Yarn", "yarn", "Lead one strand through every ball", "#E16A4A", "lines", "zip path"],
+    ["Patches", "patches", "Sew a four-fabric quilt", "#73A7AE", "logic", "map four colour color quilt"],
+    ["Sunbeams", "sunbeams", "Every cat gets a warm spot", "#ECA818", "logic", "shikaku rectangles"],
+    ["Toy Box", "toybox", "Help Laya put every toy back in its basket", "#B3B94B", "quick", "sort ball sort"],
+    ["Pounce", "pounce", "Line up three of a kind for Crunch to pounce on", "#6AA673", "quick", "match 3 match-3 three in a row"],
+    ["Twirl", "twirl", "Clear every ribbon off the mat so Bugsy can nap", "#B94588", "teasers", "ribbons unblock"],
+    ["Toe Beans", "toebeans", "Make the number on the big pad", "#DD9DAD", "numbers", "countdown 24 sums arithmetic maths math"],
+    ["Knock It Off", "knockitoff", "Help Fred push everything off the table", "#7885BA", "teasers", "push sokoban table"],
+    ["Hide & Seek", "hideseek", "Find Jan Brady and friends hiding in the boxes", "#C9A26B", "logic", "minesweeper mines boxes"],
+    ["Pawlette", "pawlette", "Mix colours: zen out, or swipe and line them up", "#9874CA", "quick", "colour color mixing paint zen"],
+    ["Tangle", "tangle", "Untangle the yarn the cat got into", "#3C8681", "lines", "untangle planarity knots"],
+    ["Catwalk", "catwalk", "Link the perches of a giant cat tower", "#A98663", "lines", "bridges hashi"],
+    ["Fair Play", "tango", "Share two toys out fairly", "#B94588", "logic", "tango binary takuzu unruly"],
+    ["Bubbles", "bubbles", "Bat bubbles up and pop three of a kind", "#5FA0C8", "quick", "bubble shooter pop"],
+    ["Open the Door!", "opendoor", "Solve the puzzle so the cat can get through!", "#4E577D", "numbers", "kenken calcudoku keen sums sudoku"],
+    ["Tunnel Run", "tunnelrun", "Assemble the tunnels for Bowtie to run through", "#7E63B8", "lines", "net pipes netslide"],
+    ["Copycat", "copycat", "Find the boxes with matching toys", "#D08A4E", "quick", "memory pairs concentration"],
+    ["Night Light", "nightlight", "Help Dottie get every cat to close its eyes", "#3A3358", "teasers", "lights out flip"],
+    ["Unravel", "unravel", "Cover every line with one strand of yarn", "#E16A4A", "lines", "one line euler draw"],
+    ["Tail Chase", "tailchase", "Help Jan Brady catch the toys without getting tangled", "#C9773F", "quick", "snake action"],
+    ["Keyboard Cat", "keyboardcat", "Make words from the keys that still work", "#8D78AD", "words", "spelling bee"],
+    ["If It Fits", "iffits", "Build the box, and a cat comes to sit in it", "#C4925C", "teasers", "tangram shapes"],
+    ["High Perch", "highperch", "Raise every cat tree to just the right height", "#8E5E3E", "logic", "skyscrapers towers futoshiki sudoku latin square"],
+    ["Fuzzy Spelling", "fuzzyspelling", "Slide the letters until the bar spells a word", "#B94588", "words", "thruline"],
+    ["Cat-astrophe", "catastrophe", "Help Crunch dye the whole rug one colour", "#73A7AE", "teasers", "flood fill colour color"],
+    ["Laser Pointer", "laserpointer", "Bounce the dot past every cat", "#E16A4A", "lines", "mirrors laser light"],
+    ["Treat Time", "treattime", "Help Higgins give every cat just enough treats", "#ECA818", "numbers", "sumplete sums"],
+    ["Up a Tree", "upatree", "Help Dottie climb the cat tree, one letter at a time", "#6AA673", "words", "word ladder weaver doublets"],
+  ];
+  // The shelves the front page and the games menu sort the games onto, in order: key, heading, one line.
+  const GROUPS = [
+    ["logic", "Logic grids", "Fill the grid by its rules; every puzzle has one answer"],
+    ["numbers", "Numbers", "Sums and arithmetic"],
+    ["lines", "Lines and paths", "Join, link and route things"],
+    ["words", "Words", "Spell, find and climb words"],
+    ["teasers", "Brain teasers", "Moves to plan and shapes to fit"],
+    ["quick", "Quick play", "Match, pop, sort and chase"],
   ];
   const $ = id => document.getElementById(id);
+
+  // The games played on this device, most recent first, for the front page's and the menu's Keep playing row.
+  const RECENT = "catdoku.recent.v1";
+  const recent = () => { const r = load(RECENT).games; return Array.isArray(r) ? r.filter(s => GAMES.some(g => g[1] === s)) : []; };
+  const played = slug => save(RECENT, {games: [slug, ...recent().filter(s => s !== slug)].slice(0, 8)});
+  // Whether a game matches what's typed in a search box: every word typed is found in its name, line, shelf or
+  // search words.
+  const matches = (g, q) => {
+    const hay = [g[0], g[2], g[5], (GROUPS.find(x => x[0] === g[4]) || [])[1]].join(" ").toLowerCase().replace(/[^a-z0-9 ]/g, "");
+    return q.toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter(Boolean).every(w => hay.includes(w));
+  };
 
   // The games menu: an "All games" button that opens a grid of every game, with this one marked.
   // Game pages sit one folder below the front page, so links start with ../ unless `base` says otherwise.
@@ -48,17 +69,42 @@ const G = (() => {
     const home = document.createElement("a");
     home.className = "gameTile home"; home.href = base || "./";
     home.innerHTML = "<b>Front page</b><small>Every game at a glance</small>";
-    panel.append(home);
-    for (const [name, slug, blurb, color] of GAMES) {
-      const a = document.createElement("a");
+    // a search box, then the games played lately, then every game on its shelf
+    const search = document.createElement("input");
+    search.type = "search"; search.className = "gamesSearch"; search.placeholder = "Search games (try “word” or “sudoku”)";
+    search.setAttribute("aria-label", "Search games");
+    const tile = g => {
+      const [name, slug, blurb, color] = g, a = document.createElement("a");
       a.className = "gameTile"; a.style.setProperty("--tile", color);
-      a.href = `${base}${slug}/`;
+      a.href = `${base}${slug}/`; a.dataset.slug = slug;
       if (slug === current) a.setAttribute("aria-current", "page");
       const b = document.createElement("b"); b.textContent = name;
       const sm = document.createElement("small"); sm.textContent = slug === current ? "You're here" : blurb;
-      a.append(b, sm); panel.append(a);
-    }
+      a.append(b, sm); return a;
+    };
+    const section = (title, games) => {
+      const sec = document.createElement("section"); sec.className = "gamesGroup";
+      const h = document.createElement("h3"); h.textContent = title;
+      const grid = document.createElement("div"); grid.className = "gamesGrid";
+      grid.append(...games.map(tile)); sec.append(h, grid); return sec;
+    };
+    const lately = recent().filter(s => s !== current).slice(0, 4).map(s => GAMES.find(g => g[1] === s));
+    const keep = lately.length ? section("Keep playing", lately) : null;
+    const shelves = GROUPS.map(([key, title]) => section(title, GAMES.filter(g => g[4] === key)));
+    const none = document.createElement("p"); none.className = "gamesNone"; none.hidden = true; none.textContent = "No games match that.";
+    panel.append(home, search, ...(keep ? [keep] : []), ...shelves, none);
+    search.oninput = () => {
+      const q = search.value.trim();
+      if (keep) keep.hidden = !!q;
+      for (const sec of shelves) {
+        let any = false;
+        for (const a of sec.querySelectorAll(".gameTile")) { const hit = !q || matches(GAMES.find(g => g[1] === a.dataset.slug), q); a.hidden = !hit; any = any || hit; }
+        sec.hidden = !any;
+      }
+      none.hidden = !q || shelves.some(sec => !sec.hidden);
+    };
     const show = open => { panel.hidden = !open; btn.setAttribute("aria-expanded", String(open)); };
+    if (current) played(current);
     btn.onclick = e => { e.stopPropagation(); show(panel.hidden); };
     document.addEventListener("click", e => { if (!panel.hidden && !el.contains(e.target)) show(false); });
     document.addEventListener("keydown", e => { if (e.key === "Escape" && !panel.hidden) { show(false); btn.focus(); } });
@@ -667,6 +713,6 @@ const G = (() => {
     }
   }
 
-  return {GAMES, $, nav, load, save, builder, openCard, closeCard, winCard, sizeUp, otherSize, note, helpLater, cellAt, track, reopen,
+  return {GAMES, GROUPS, recent, matches, $, nav, load, save, builder, openCard, closeCard, winCard, sizeUp, otherSize, note, helpLater, cellAt, track, reopen,
           setupTimer, freshClock, spotlight, toysOff, saveToys, needToys, goldPaw, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, toyPicker, pickLook};
 })();
