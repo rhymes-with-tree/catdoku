@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Up a Tree</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-16.2"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-16.2">
+<style>
+/* A cat tree: the start word on the bottom perch, the goal word on the top one, and empty perches between. Each
+   word changes one letter of the word below it. Type a word and it goes on the next perch up, and the cat climbs
+   to it; reach the top and the cat gets the feather toy hanging there. */
+/* Dottie, on a perch of her own, beside the title */
+.title{display:flex;align-items:flex-end;gap:6px}
+.dottie{display:block;height:64px;width:auto;margin-bottom:-6px}
+@media (max-height:760px){.dottie{height:46px;margin-bottom:-4px}}
+.treebox{position:relative;width:var(--board);height:clamp(260px,calc(var(--tall) - 360px),calc(var(--board) * 1.1));
+  background:linear-gradient(#F3EEE4,#E9E1D0);border:3px solid var(--ink);border-radius:12px;overflow:hidden;touch-action:manipulation}
+.treebox .grid{position:absolute;inset:0}
+.treebox svg{display:block;width:100%;height:100%}
+.tile{fill:#fff;stroke:#2A2530;stroke-width:2.5}
+.tile.blank{fill:rgba(255,255,255,.55);stroke-dasharray:5 4}
+.tile.goal{fill:#FBEFD3}
+.tile.typing{fill:#fff;stroke:#73A7AE;stroke-width:3.5}
+.tile.changed{fill:#DCEBD9}
+.tile.sel{fill:#FFF6DA;stroke:#ECA818;stroke-width:4}
+.word rect[data-i]{cursor:pointer}
+.letter{font:800 26px var(--font);fill:#2A2530;text-anchor:middle;dominant-baseline:central;text-transform:uppercase;pointer-events:none}
+.letter.soft{fill:#8A8494}
+.climber{transition:transform .35s cubic-bezier(.3,1.4,.6,1)}
+.toy{transform-box:fill-box;transform-origin:50% 0;animation:swing 2.4s ease-in-out infinite alternate}
+@keyframes swing{from{transform:rotate(-6deg)}to{transform:rotate(6deg)}}
+.won .toy{animation:batted .5s ease-out 3}
+@keyframes batted{40%{transform:rotate(22deg)}}
+.rowshake{animation:shake .35s}
+@keyframes shake{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+/* the keyboard */
+.keys{width:var(--board);display:flex;flex-direction:column;gap:6px;user-select:none;-webkit-user-select:none}
+.keys .row{display:flex;gap:5px;justify-content:center}
+.keys button{flex:1 1 0;min-width:0;padding:10px 0;border-radius:8px;font-weight:800;font-size:18px;text-transform:uppercase;touch-action:manipulation}
+.keys button.wide{flex:1.6 1 0;font-size:15px;text-transform:none}
+.card img.leappic{display:block;width:46%;max-width:180px;height:auto;margin:0 auto 6px}
+@media (prefers-reduced-motion:reduce){.climber{transition:none}.toy{animation:none}}
+</style>
+</head>
+<body>
+<main>
+  <header><div class="title"><h1>Up a Tree</h1><img class="dottie" id="dottie" src="../cats/dottie-24.webp" alt="Dottie, a black cat, on a cat-tree perch"></div><div class="stripe"></div><p class="tagline">Help Dottie climb the cat tree, one letter at a time</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap treebox" id="board" tabindex="0"><div class="grid" id="grid"><svg id="svg" role="img" aria-label="A cat tree with a word on each perch"></svg></div></div>
+  <div class="keys" id="keys" aria-label="Keyboard"></div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="shareBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New tree</button>
+  </div>
+
+</main>
+
+<script src="../games.js?v=2026-10-16.2"></script>
+<script src="../cattower.js?v=2026-10-16.2"></script>
+<script>
+/* ---------- ladders ---------- */
+// Words come from the shared list (words/words.json): starts and goals are familiar words, par is the shortest
+// way between them through everyday (common) words, and any word in the list counts as a rung.
+// Two words are neighbours when they differ in exactly one letter.
+// Levels: the words' length and how many changes par is.
+function levelSpec(n) {
+  return [null, {L: 3, d: [2, 3]}, {L: 3, d: [3, 4]}, {L: 4, d: [3, 3]}, {L: 4, d: [4, 4]}, {L: 4, d: [5, 5]},
+    {L: 5, d: [3, 4]}, {L: 4, d: [6, 6]}, {L: 5, d: [5, 5]}, {L: 5, d: [6, 6]}, {L: 5, d: [7, 8]}][n];
+}
+// The words of one length and a way to find each one's neighbours: words sharing a pattern with one letter
+// blanked out ("c_t") are neighbours.
+function wordGraph(words) {
+  const set = new Set(words), buckets = new Map();
+  const keys = w => [...w].map((_, i) => w.slice(0, i) + "_" + w.slice(i + 1));
+  for (const w of words) for (const k of keys(w)) { if (!buckets.has(k)) buckets.set(k, []); buckets.get(k).push(w); }
+  const nbrs = w => { const out = []; for (const k of keys(w)) for (const v of buckets.get(k) || []) if (v !== w) out.push(v); return out; };
+  return {set, nbrs};
+}
+// Shortest climbs from `from` over a graph: each word's step count and the word before it.
+function climbs(g, from) {
+  const dist = new Map([[from, 0]]), prev = new Map(), q = [from];
+  for (let h = 0; h < q.length; h++) for (const v of g.nbrs(q[h])) if (!dist.has(v)) { dist.set(v, dist.get(q[h]) + 1); prev.set(v, q[h]); q.push(v); }
+  return {dist, prev};
+}
+// A climb for level n: a random familiar start and a familiar goal the level's number of steps away through
+// common words.
+function makeClimb(n, G4) {
+  const {L, d: [lo, hi]} = levelSpec(n), g = G4[L], pool = g.familiar;
+  for (let t = 0; t < 400; t++) {
+    const start = pool[Math.floor(Math.random() * pool.length)], {dist} = climbs(g.common, start);
+    const goals = pool.filter(w => { const k = dist.get(w); return k >= lo && k <= hi; });
+    if (!goals.length) continue;
+    const goal = goals[Math.floor(Math.random() * goals.length)];
+    return {L, start, goal, par: dist.get(goal)};
+  }
+  return null;
+}
+
+/* ---------- game state ---------- */
+// sel: the letter picked to change (tapped on the next perch or the word below it), or -1.
+let sel = -1;
+// game: {level, L, start, goal, par, rungs (the words climbed so far, after the start), typing (letters typed
+//        for the next perch), history (rungs before each change, for Undo), won, hinted, undid…}
+const STORE = "catdoku.upatree.v1", MAX_LEVEL = 10, NS = "http://www.w3.org/2000/svg";
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1}, state.settings);
+let game = state.game || null, busy = false, running = false, W = null, GR = null;
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
+const levelName = n => { const s = levelSpec(n); return `Level ${n} · ${s.L} letters, ${s.d[0]}${s.d[1] > s.d[0] ? "–" + s.d[1] : ""} steps`; };
+const catSrc = f => (window.CAT_SRC || {})[f] || `../cats/${f}.webp`;
+const toySrc = f => (window.TOY_SRC || {})[f] || `../toys/${f}.webp?v=${window.SITE_BUILD || ""}`;
+const el = (t, a, parent) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (parent) parent.append(e); return e; };
+const isWord = w => GR[w.length] && GR[w.length].all.set.has(w);
+const oneOff = (a, b) => a.length === b.length && [...a].filter((c, i) => c !== b[i]).length === 1;
+const topWord = () => game.rungs.length ? game.rungs[game.rungs.length - 1] : game.start;
+
+/* ---------- words ---------- */
+// The shared list, split by length: familiar words (starts and goals), a graph of common words (par) and a graph
+// of every word (what counts, and hints from wherever you've got to).
+async function loadWords() {
+  const w = window.WORDS_INLINE || await fetch(`../words/words.json?v=${window.SITE_BUILD || ""}`).then(r => { if (!r.ok) throw new Error("couldn't load the word list"); return r.json(); });
+  const familiar = w.familiar.split(" "), common = familiar.concat(w.common.split(" ")), all = common.concat(w.more.split(" "));
+  W = w; GR = {};
+  for (const L of [3, 4, 5]) {
+    const of = list => list.filter(x => x.length === L);
+    GR[L] = {familiar: of(familiar), common: wordGraph(of(common)), all: wordGraph(of(all))};
+  }
+}
+
+/* ---------- drawing ---------- */
+// The tree: perches from the bottom (the start) to the top (the goal), as many as par needs (more if you take
+// more), zigzagging either side of a sisal post. Each perch carries its word in letter tiles.
+const ROW = 92, TOPM = 70, BASE = 34, VW = 400;
+let perchY = [], perches = 0;
+function draw(catFrom) {
+  const svg = $("svg"), L = game.L, n = Math.max(game.par + 1, game.rungs.length + 2 + (game.won ? -1 : 0));
+  perches = n;
+  const H = TOPM + n * ROW + BASE;
+  svg.setAttribute("viewBox", `0 0 ${VW} ${H}`);
+  svg.setAttribute("preserveAspectRatio", "xMidYMax meet");
+  svg.innerHTML = "";
+  perchY = [...Array(n).keys()].map(k => H - BASE - k * ROW - 26);   // each perch's carpet, bottom (0) to top
+  const xOf = k => VW / 2 + (k % 2 ? 14 : -14);
+  // the post, the base, and the toy hanging over the top perch
+  svg.insertAdjacentHTML("beforeend", TOWER.post(VW / 2, perchY[n - 1], H - BASE + 6, 26));
+  el("rect", {x: VW / 2 - 110, y: H - BASE + 2, width: 220, height: 20, rx: 8, fill: TOWER.CARPETS[0], stroke: "#2A2530", "stroke-width": 3.5}, svg);
+  const toy = el("g", {class: "toy", id: "toy"}, svg), tx = VW / 2 + 120;
+  el("path", {d: `M${tx} 0V${perchY[n - 1] - 58}`, stroke: "#5E5866", "stroke-width": 2}, toy);
+  el("image", {href: toySrc("feather-rainbow"), x: tx - 22, y: perchY[n - 1] - 64, width: 44, height: 44}, toy);
+  const words = [game.start, ...game.rungs];
+  for (let k = 0; k < n; k++) {
+    const y = perchY[k], x = xOf(k), c = TOWER.CARPETS[(k + 1) % TOWER.CARPETS.length];
+    const g = el("g", {transform: `translate(${x} ${y}) scale(2.55 1.4) translate(${-x} ${-y})`}, svg);
+    g.innerHTML = TOWER.PIECES.platform(x, y, c);
+    // the word on it: a climbed word, the goal at the top, the letters being typed on the next perch, or blanks
+    const isGoal = k === n - 1, w = isGoal ? game.goal : words[k], typing = !game.won && k === words.length && !isGoal;
+    const row = el("g", {class: "word", "data-k": k}, svg), tw = 36, gap = 5, x0 = x - (L * tw + (L - 1) * gap) / 2;
+    for (let i = 0; i < L; i++) {
+      const cx = x0 + i * (tw + gap);
+      // the next perch shows what's being typed, or else the word below in grey, ready to tap a letter to change
+      const guide = typing && !game.typing;
+      let ch = w ? w[i] : typing ? game.typing[i] || (guide ? words[k - 1][i] : "") : "", cls = "tile";
+      if (isGoal && !(game.won)) cls += " goal";
+      else if (!w && !typing) cls += " blank";
+      if (typing) cls += " typing";
+      if (typing && i === sel) cls += " sel";
+      const below = isGoal ? (game.won ? topWord() : null) : words[k - 1];
+      if (w && k > 0 && below && w[i] !== below[i]) cls += " changed";
+      el("rect", {class: cls, x: cx, y: y - 52, width: tw, height: 40, rx: 7, "data-i": i}, row);
+      if (ch) el("text", {class: "letter" + ((isGoal && !game.won) || (guide && i !== sel) ? " soft" : ""), x: cx + tw / 2, y: y - 31}, row).textContent = guide && i === sel ? "?" : ch;
+    }
+  }
+  // Dottie, sitting at the end of the highest word so far (or, if she's about to climb, the one below)
+  el("image", {class: "climber", id: "cat", href: catSrc("dottie-18"), width: 62, height: 74, x: 0, y: 0}, svg);
+  placeCat(false, catFrom);
+  update();
+}
+// Dottie at the end of perch k's word (the highest word so far unless told otherwise), on the side away from the post.
+const catPerch = () => game.won ? perches - 1 : game.rungs.length;
+function placeCat(animate = true, k = catPerch()) {
+  const x = VW / 2 + (k % 2 ? 14 : -14), y = perchY[k], half = (game.L * 36 + (game.L - 1) * 5) / 2, cx = k % 2 ? x - half - 66 : x + half + 4;
+  const cat = $("cat"); if (!cat) return;
+  if (!animate) cat.style.transition = "none";
+  cat.style.transform = `translate(${cx}px, ${y - 78}px)`;
+  if (!animate) { cat.getBoundingClientRect(); cat.style.transition = ""; }
+}
+function update() {
+  $("count").textContent = game.won ? `Climbed in ${game.rungs.length + 1} · par ${game.par}` : `Par ${game.par} · ${game.rungs.length} so far`;
+  $("undoBtn").disabled = !game.history.length || game.won;
+  $("restartBtn").disabled = !game.history.length || game.won;
+  $("hintBtn").disabled = game.won;
+  if (hintShown && hintShown !== game.rungs.join(",")) clearHint();
+}
+
+/* ---------- the keyboard ---------- */
+const ROWS = ["qwertyuiop", "asdfghjkl", "⏎zxcvbnm⌫"];
+for (const r of ROWS) {
+  const row = document.createElement("div"); row.className = "row";
+  for (const ch of r) {
+    const b = document.createElement("button"); b.type = "button";
+    if (ch === "⏎") { b.textContent = "Enter"; b.className = "wide"; b.onclick = () => enter(); }
+    else if (ch === "⌫") { b.textContent = "⌫"; b.className = "wide"; b.setAttribute("aria-label", "Delete"); b.onclick = () => back(); }
+    else { b.textContent = ch; b.onclick = () => type(ch); }
+    row.append(b);
+  }
+  $("keys").append(row);
+}
+document.addEventListener("keydown", e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } return; }
+  if (!playing() || document.querySelector(".spot") || /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
+  if (/^[a-z]$/i.test(e.key)) { type(e.key.toLowerCase()); e.preventDefault(); }
+  else if (e.key === "Backspace") { back(); e.preventDefault(); }
+  else if (e.key === "Enter") { enter(); e.preventDefault(); }
+});
+// With a letter picked, a key changes it and the word goes straight up (if it counts); otherwise keys type a
+// whole word, for Enter.
+function type(ch) {
+  if (!playing()) return;
+  game.started = true;
+  if (sel >= 0) {
+    const below = topWord();
+    if (below[sel] === ch) return;
+    game.typing = below.slice(0, sel) + ch + below.slice(sel + 1);
+    if (!enter()) { game.typing = ""; draw(); }
+    return;
+  }
+  if (game.typing.length >= game.L) return;
+  game.typing += ch; draw(); save();
+}
+function back() {
+  if (!playing()) return;
+  if (sel >= 0) { sel = -1; draw(); return; }
+  if (!game.typing) return;
+  game.typing = game.typing.slice(0, -1); draw(); save();
+}
+// Tap a letter on the next perch (or on the word below it) to pick it; tap it again to put it down.
+$("svg").addEventListener("pointerdown", e => {
+  if (!playing()) return;
+  const t = e.target.closest("rect[data-i]"), row = t && t.closest(".word"), k = row ? +row.dataset.k : -1;
+  if (!t || (k !== game.rungs.length && k !== game.rungs.length + 1) || k === perches - 1) return;
+  e.preventDefault();
+  const i = +t.dataset.i;
+  sel = sel === i ? -1 : i; game.typing = ""; game.started = true;
+  draw();
+});
+function shake(why) {
+  G.note(why, 3000);
+  const row = document.querySelector(`.word[data-k="${game.rungs.length + 1}"]`);
+  if (row) { row.classList.remove("rowshake"); row.getBoundingClientRect(); row.classList.add("rowshake"); }
+  return false;
+}
+// Enter: the word must be a word, change just one letter of the word below, and not have been climbed already.
+function enter() {
+  if (!playing()) return;
+  const w = game.typing, below = topWord();
+  if (w.length < game.L) return shake(`Type ${game.L} letters.`);
+  if (!oneOff(w, below)) return shake(w === below ? "Change one letter." : `Change just one letter of ${below.toUpperCase()}.`);
+  if (!isWord(w)) return shake(`${w.toUpperCase()} isn't in the word list.`);
+  if (w === game.start || game.rungs.includes(w)) return shake(`You've climbed past ${w.toUpperCase()} already.`);
+  game.history.push(game.rungs.slice());
+  game.rungs.push(w); game.typing = ""; game.started = true; sel = -1;
+  if (w === game.goal) { game.rungs.pop(); win(); return true; }
+  if (oneOff(w, game.goal)) { win(); return true; }   // one letter from the top: the goal word goes up by itself
+  draw(game.rungs.length - 1); placeCat(true);   // Dottie hops up from the perch below
+  save();
+  return true;
+}
+
+// Undo takes back the last word (or a Restart).
+function undo() {
+  if (!playing() || !game.history.length) return;
+  game.undid = true; game.rungs = game.history.pop(); game.typing = ""; sel = -1;
+  draw(); save();
+}
+$("undoBtn").onclick = undo;
+$("restartBtn").onclick = () => {
+  if (!playing() || !game.history.length) return;
+  game.undid = true; game.history.push(game.rungs.slice()); game.rungs = []; game.typing = ""; sel = -1;
+  draw(); save();
+  G.note("Back to the bottom perch. Undo brings your words back.", 4000);
+};
+// Hint, on the highest word so far: if that word didn't get you any closer to the top (or there's no way up from
+// it at all), its changed letter goes red, to Undo; otherwise a gold box goes on the letter to change next, for the
+// shortest way up from there (going by every word).
+let hintShown = null, hintTimer = 0;
+function clearHint() { hintShown = null; clearTimeout(hintTimer); document.querySelectorAll(".hintsq").forEach(e => e.remove()); }
+$("hintBtn").onclick = () => {
+  if (!playing()) return;
+  const w = topWord(), g = GR[game.L], {dist, prev} = climbs(g.all, game.goal);
+  game.hinted = true; game.started = true; save();
+  clearHint();
+  // the highest word is on perch rungs.length
+  const box = (i, bad) => {
+    const t = document.querySelector(`.word[data-k="${game.rungs.length}"] rect[data-i="${i}"]`);
+    el("rect", {class: "hintsq" + (bad ? " bad" : ""), x: +t.getAttribute("x") - 4, y: +t.getAttribute("y") - 4, width: 44, height: 48, rx: 9}, $("svg"));
+  };
+  hintShown = game.rungs.join(",");
+  const below = game.rungs.length > 1 ? game.rungs[game.rungs.length - 2] : game.start;
+  if (game.rungs.length && (!dist.has(w) || dist.get(w) >= dist.get(below))) {
+    box([...w].findIndex((c, j) => c !== below[j]), true);
+    G.note(dist.has(w) ? `${w.toUpperCase()} doesn't get Dottie any closer. Undo it and change another letter of ${below.toUpperCase()}.`
+      : `There's no way up from ${w.toUpperCase()}. Undo it and try another word.`, 5000);
+  } else {
+    const next = prev.get(w), i = [...w].findIndex((c, j) => c !== next[j]);
+    box(i, false);
+    G.note(`Change the gold letter of ${w.toUpperCase()} to make the next word.`, 5000);
+  }
+  hintTimer = setTimeout(clearHint, 5000);
+};
+
+/* ---------- endings ---------- */
+// The goal word goes on the top perch, and Dottie climbs up and bats the feather.
+function win() {
+  game.won = true; G.finishClock(game); clearHint();
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save();
+  draw(game.rungs.length); placeCat(true);   // Dottie climbs from the highest word to the top
+  $("board").classList.add("won");
+  G.track(`Up a Tree solved level ${game.level}`);
+  running = true;
+  const g = game;
+  setTimeout(() => { running = false; $("board").classList.remove("won"); if (game === g) finishCard(); }, matchMedia("(prefers-reduced-motion: reduce)").matches ? 500 : 1900);
+}
+function finishCard() {
+  const next = settings.level, steps = game.rungs.length + 1, gold = !game.undid && !game.hinted && steps <= game.par;
+  let text = `${game.start.toUpperCase()} to ${game.goal.toUpperCase()} in ${steps} step${steps > 1 ? "s" : ""}${steps <= game.par ? ", as few as it can be done in" : `; it can be done in ${game.par}`}.`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  // a gold paw: Dottie up on her back legs, reaching, in place of the random cat photo
+  const pic = new Image(); pic.className = "leappic"; pic.src = catSrc("dottie-12"); pic.alt = "Dottie up on her back legs, reaching";
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my tree", game.result,
+    {title: "Top of the tree!", goldTitle: "Top cat, Dottie!", gold, goldWhy: "Fewest steps, no hints or undos!", goldPic: [pic], next: `Next: level ${next}`,
+     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- new trees ---------- */
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
+function begin(p, level) {
+  game = {level, L: p.L, start: p.start, goal: p.goal, par: p.par, rungs: [], typing: "", history: [], won: false, ...G.freshClock()};
+  clearHint(); sel = -1;
+}
+function newPuzzle() {
+  const n = settings.level, p = makeClimb(n, GR);
+  if (!p) return G.note("Couldn't find a climb; try again.", 4000);
+  begin(p, n);
+  G.closeCard(); G.note("");
+  draw(); save();
+  G.track(`Up a Tree new puzzle level ${n}`);
+  helpOnFirstVisit();
+}
+
+/* ---------- sharing ---------- */
+$("shareBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Up a Tree", won: game.won,
+  puzzle: () => ({g: "upatree", N: game.level, s: game.start, e: game.goal}),
+  progress: () => game.rungs.join(",")}); };
+function openShared(d) {
+  const spec = levelSpec(d.N), fail = () => G.note("That share link didn't work.", 5000);
+  const ok = w => typeof w === "string" && spec && w.length === spec.L && GR[spec.L].common.set.has(w);
+  if (!ok(d.s) || !ok(d.e) || d.s === d.e) return fail();
+  const par = climbs(GR[spec.L].common, d.s).dist.get(d.e);
+  if (!par) return fail();
+  begin({L: spec.L, start: d.s, goal: d.e, par}, d.N);
+  if (typeof d.p === "string" && d.p) {
+    const rungs = d.p.split(","), chain = [d.s, ...rungs];
+    if (rungs.every((w, i) => isWord(w) && w !== d.e && oneOff(w, chain[i])) && new Set(chain).size === chain.length) { game.rungs = rungs; game.timed = false; }
+  }
+  settings.level = d.N; $("levelSel").value = d.N;
+  draw(); save();
+}
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  settings.seenHelp = false; helpOnFirstVisit();
+  if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
+}
+// The perches as rows, the bottom one last.
+function map() {
+  const r = $("svg").getBoundingClientRect(), vb = $("svg").viewBox.baseVal, k = Math.min(r.width / vb.width, r.height / vb.height);
+  const ox = r.left + (r.width - vb.width * k) / 2, oy = r.top + (r.height - vb.height * k);
+  return {ox, oy: oy + (perchY[perches - 1] - 66) * k, cw: vb.width * k, ch: ROW * k};
+}
+function helpOnFirstVisit() {
+  if (!game || !playing() || document.querySelector(".spot") || settings.seenHelp) return;
+  const n = perches, row = k => [0, n - 1 - k];   // perch k, counted from the bottom
+  const steps = [
+    {say: "Dottie wants the feather at the top", lit: [row(n - 1)]},
+    {say: `It starts down here, on ${game.start.toUpperCase()}`, lit: [row(0)]},
+    {say: `Each perch up changes one letter`, lit: [row(Math.min(game.rungs.length + 1, n - 2))]},
+    {say: "Tap the letter to change, then its new letter", lit: [row(Math.min(game.rungs.length + 1, n - 2))]},
+    {say: "Or type the whole word and press Enter", els: [$("keys")]},
+    {say: `Reach ${game.goal.toUpperCase()} to get her to the top`, lit: [row(n - 1)], tone: "ok"},
+    {say: `It takes ${game.par} steps; can you do it in ${game.par}?`, lit: [...Array(n).keys()].map(row)},
+    {say: "Stuck? Hint shows a letter to change", els: [$("hintBtn")]},
+  ];
+  G.spotlight({grid: $("grid"), w: 1, h: n, steps, map, done: () => { settings.seenHelp = true; save(); }});
+}
+
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", ""), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
+$("helpBtn").onclick = showHelp;
+$("dottie").src = catSrc("dottie-24");
+
+G.nav("upatree");
+G.checkClock(game);
+G.setupTimer({name: "upatree", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+
+G.note("Fetching the words…", 0);
+loadWords().catch(e => { G.note(`The word list didn't load (${e.message}). Check your connection and reload.`, 0); throw e; }).then(() => {
+  G.note("");
+  const shared = G.readShare("upatree");
+  if (game) G.reopen(() => {
+      const spec = levelSpec(game.level);
+      if (!spec || spec.L !== game.L || !isWord(game.start) || !isWord(game.goal) || !Array.isArray(game.rungs)) throw new Error("the saved tree doesn't fit its level");
+      draw();
+      if (game.won) finishCard();
+      helpOnFirstVisit();
+    }, why => { game = null; newPuzzle(); G.note(why, 0); });
+  else if (!shared) newPuzzle();
+  const shareOpts = () => ({name: "Up a Tree", inProgress: !!(game && !game.won && game.rungs.length), open: openShared, after: helpOnFirstVisit});
+  if (shared) G.offerShare(shared, shareOpts());
+  window.addEventListener("hashchange", () => { const d = G.readShare("upatree"); if (d) G.offerShare(d, shareOpts()); });
+});
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>

@@ -67,8 +67,8 @@ Rows are sorted by group, then status: Yes, Look closer, Option, Idea, Built, No
 | Keyboard Cat (Spelling Bee) | Make and find words | Make words from the seven keys the cat didn't break | — | — | — | Fair Play chat | Built | |
 | Jumble | Make and find words | Unscramble four words; circled letters spell a cartoon's pun | Written | — | Anagram | GoComics | No | The pun is a clue |
 | Word Roundup | Make and find words | A word search given only categories, not the words | Written | — | Word search | GoComics | No | |
-| Word ladder (Weaver) | Words by meaning | Change one letter at a time to get from one word to another | None | Easy | — | Idea list, Word Dictionaries chat, wordleunlimited | Idea | |
 | Meaning-guessing (Contexto, Semantle, Dowsle) | Words by meaning | Guess a secret word, told how close in meaning each guess is | None | Hard | — | You play, Word Dictionaries chat | Idea | Needs a large word-meaning data file |
+| Up a Tree (Word ladder, Weaver) | Words by meaning | Change one letter at a time to climb a cat tree from the start word to the goal word at the top, where a feather toy hangs | — | — | — | Idea list, Word Dictionaries chat, wordleunlimited | Built | Tap the letter to change, then its new letter (or type the word); the goal goes up by itself from one letter away. Brought in a shared word list (`words/`) with S words and American spellings, which Fuzzy Spelling now uses too. Starring Dottie (the icon climbs CAT, COT, DOT) |
 | Thematik | Words by meaning | One clue to a theme word and six related words; guess letters until you can solve it | Written | — | — | GoComics | No | |
 | Up & Down Words | Words by meaning | Clued two-word phrases where the second word of each starts the next | Written | — | — | GoComics | No | |
 | Overlapt | Words by meaning | Two unrelated clues share one connecting word | Written | — | — | GoComics | No | |
