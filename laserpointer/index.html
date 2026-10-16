@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-15.12"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-16.1"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-15.12">
+<link rel="stylesheet" href="../games.css?v=2026-10-16.1">
 <style>
 /* A room seen from above: a wooden floor inside a wall, with a laser pointer poking in at one edge. Cats sit on
    some squares and mirrors stand on others; tap a mirror to tip it the other way. The red dot runs straight and
@@ -45,6 +45,8 @@
 .mirror .pin{fill:var(--glass)}
 .beam{fill:none;stroke:var(--beam);stroke-width:7;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
 .beamglow{fill:none;stroke:var(--beam);stroke-width:22;stroke-linecap:round;stroke-linejoin:round;opacity:.22;pointer-events:none}
+/* on a moving level, a faint dashed line shows where the dot would go from here with the mirrors as they stand */
+.ahead{fill:none;stroke:var(--beam);stroke-width:4;stroke-dasharray:4 10;stroke-linecap:round;opacity:.45;pointer-events:none}
 .dot{fill:var(--dot);pointer-events:none}
 .dotglow{fill:var(--beam);opacity:.35;pointer-events:none}
 .pen .body{fill:#3E3848}
@@ -97,7 +99,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-15.12"></script>
+<script src="../games.js?v=2026-10-16.1"></script>
 <script>
 /* ---------- laser puzzles (plain functions, also run in a background worker) ---------- */
 // The room is N × N squares. The laser pointer sits just off one edge and shines in along a row or column.
@@ -174,6 +176,7 @@ function shuffle(a) { for (let k = a.length - 1; k > 0; k--) { const j = Math.fl
 // along its run until that's the only run that passes them all.
 function makeRoom(n) {
   const spec = levelSpec(n), N = spec.N, NN = N * N;
+  if (spec.live) return makeLiveRoom(n);
   for (let attempt = 0; attempt < 200; attempt++) {
     const mir = new Array(NN).fill(-1);
     for (const i of shuffle([...Array(NN).keys()]).slice(0, Math.round(NN * (0.3 + Math.random() * 0.15)))) mir[i] = Math.random() < 0.5 ? 0 : 1;
@@ -233,6 +236,102 @@ function wins(N, mir, cat, start, dir, order) {
   }
   return seen.size === cats;
 }
+// The moving levels: the dot can meet a mirror twice, and the mirror can be tipped between the two visits.
+// Every way of running the dot past every cat (in order, if order counts), up to `limit`, where each visit to a
+// mirror picks its own slant and no mirror is met more than twice. Each is the visits, [square, slant] in order,
+// and the floor squares the dot crosses. Null if that takes too long to find out.
+function solveLive(N, isMir, cat, start, dir, order, limit) {
+  const NN = N * N, cats = cat.filter(c => c).length, visits = new Uint8Array(NN), seen = new Uint8Array(NN), out = [];
+  let work = 0;
+  (function go(i, d, got, next, seq, floor) {
+    const marks = [], done = () => { for (const j of marks) seen[j] = 0; };
+    while (i >= 0) {
+      if (++work > 300000 || floor.length > 4 * NN) return done();
+      if (isMir[i]) {
+        if (visits[i] >= 2) return done();
+        visits[i]++;
+        for (const m of [0, 1]) {
+          if (out.length >= limit) break;
+          seq.push([i, m]); const nd = bounce(d, m);
+          go(step(N, i, nd), nd, got, next, seq, floor.slice()); seq.pop();
+        }
+        visits[i]--;
+        return done();
+      }
+      if (cat[i] && !seen[i]) {
+        if (order && cat[i] !== next) return done();
+        seen[i] = 1; marks.push(i); got++; next++;
+      }
+      floor.push(i);
+      i = step(N, i, d);
+    }
+    if (got === cats) out.push({seq: seq.slice(), floor});
+    done();
+  })(start, dir, 0, 1, [], []);
+  return work > 300000 ? null : out;
+}
+// A moving room: scatter mirrors and run the dot with a random slant at each visit, keeping a run that meets some
+// mirror twice at different slants with floor squares between the visits. Cats go on the run (one between those
+// two visits, so the mirror has to be tipped after that cat sees the dot) until it's the only run that passes
+// them all, so tipping a mirror mid-run is the only way to win.
+function makeLiveRoom(n) {
+  const spec = levelSpec(n), N = spec.N, NN = N * N;
+  for (let attempt = 0; attempt < 400; attempt++) {
+    const isMir = new Array(NN).fill(0);
+    for (const i of shuffle([...Array(NN).keys()]).slice(0, Math.round(NN * (0.3 + Math.random() * 0.15)))) isMir[i] = 1;
+    const side = Math.floor(Math.random() * 4), k = Math.floor(Math.random() * N);
+    const start = [k, (N - 1) * N + k, k * N + N - 1, k * N][side], dir = [2, 0, 3, 1][side];
+    if (isMir[start]) continue;
+    // the run
+    const seq = [], floor = [], visits = new Array(NN).fill(0);
+    let i = start, d = dir, ok = true;
+    while (i >= 0 && ok) {
+      if (isMir[i]) { if (++visits[i] > 2) { ok = false; break; } const m = Math.random() < 0.5 ? 0 : 1; seq.push([i, m, floor.length]); d = bounce(d, m); }
+      else floor.push(i);
+      i = step(N, i, d);
+      if (floor.length > 3 * NN) ok = false;
+    }
+    if (!ok) continue;
+    // a mirror met twice at different slants, with floor between
+    const flips = [];
+    seq.forEach(([j, m, at], a) => { const b = seq.findIndex(([j2, m2], c) => c > a && j2 === j && m2 !== m); if (b >= 0 && seq[b][2] > at) flips.push([at, seq[b][2]]); });
+    if (!flips.length) continue;
+    const used = new Set(seq.map(([j]) => j));
+    if (used.size < spec.use - 1 || used.size > spec.use + 2) continue;
+    const order = [...new Set(floor)];
+    if (order.length < spec.cats + 3) continue;
+    // keep the used mirrors and some spares
+    const spare = shuffle([...Array(NN).keys()].filter(j => isMir[j] && !used.has(j))).slice(0, spec.spare);
+    for (let j = 0; j < NN; j++) isMir[j] = used.has(j) || spare.includes(j) ? 1 : 0;
+    // cats: one between the two visits of a flipped mirror, the rest along the run
+    const [fa, fb] = flips[0], between = [...new Set(floor.slice(fa, fb))];
+    const catAt = new Set([between[Math.floor(Math.random() * between.length)]]);
+    for (const j of shuffle(order.slice(1))) { if (catAt.size >= spec.cats) break; catAt.add(j); }
+    const numbered = () => { const c = new Array(NN).fill(0); let q = 0; for (const j of order) if (catAt.has(j)) c[j] = ++q; return c; };
+    const same = s => s.seq.length === seq.length && s.seq.every(([j, m], q) => j === seq[q][0] && m === seq[q][1]);
+    let unique = false;
+    for (let tries = 0; tries < 12; tries++) {
+      const sols = solveLive(N, isMir, numbered(), start, dir, spec.order, 2);
+      if (!sols || !sols.length) break;
+      if (sols.length === 1) { unique = same(sols[0]); break; }
+      const other = sols.find(s => !same(s)), off = new Set(other.floor), miss = order.filter(j => !off.has(j) && !catAt.has(j));
+      if (!miss.length) break;
+      catAt.add(miss[Math.floor(Math.random() * miss.length)]);
+    }
+    if (!unique || catAt.size > spec.cats + 2) continue;
+    const cat = numbered();
+    // the mirrors start at random, at least half of the ones the dot first meets the wrong way
+    const first = {}; for (const [j, m] of seq) if (!(j in first)) first[j] = m;
+    let tilt = null;
+    for (let t = 0; t < 30 && !tilt; t++) {
+      const tl = isMir.map(m => m ? (Math.random() < 0.5 ? 0 : 1) : -1), wrong = Object.keys(first).filter(j => tl[j] !== first[j]).length;
+      if (wrong * 2 >= used.size) tilt = tl;
+    }
+    if (!tilt) continue;
+    return {N, start, dir, cat, sol: isMir.map(m => m ? -1 : -1), seq: seq.map(([j, m]) => [j, m]), tilt};
+  }
+  return null;
+}
 
 /* ---------- game state ---------- */
 // game: {level, N, start and dir (where the laser shines in, and which way), cat (0 or each cat's number, by
@@ -247,7 +346,7 @@ let game = state.game || null, busy = false, running = false, cursor = -1;
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
 const levelName = n => { const s = levelSpec(n); return `Level ${n} · ${s.N} × ${s.N}${s.live ? ", moving" : ""}${s.order ? ", in order" : ""}`; };
-const build = G.builder([levelSpec, bounce, step, trace, solve, shuffle, wins, makeRoom], "makeRoom");
+const build = G.builder([levelSpec, bounce, step, trace, solve, shuffle, wins, solveLive, makeLiveRoom, makeRoom], "makeRoom");
 const order = () => levelSpec(game.level).order;
 const isLive = () => !!levelSpec(game.level).live;
 const el = (t, a, parent) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (parent) parent.append(e); return e; };
@@ -299,6 +398,7 @@ function draw() {
   // the beam goes under the cats and mirrors; the dot runs over everything
   el("path", {class: "beamglow", id: "beamglow"}, svg);
   el("path", {class: "beam", id: "beam"}, svg);
+  el("path", {class: "ahead", id: "ahead"}, svg);
   mirrors = []; cats = []; catAt = []; lookAt = {};
   for (let i = 0; i < N * N; i++) {
     const [cx, cy] = centre(i);
@@ -329,6 +429,7 @@ function draw() {
   el("rect", {class: "hintsq", id: "hintsq", x: -400, y: 0, width: 92, height: 92, rx: 10}, svg);
   el("rect", {class: "cursor", id: "cursor", x: -400, y: 0, width: 92, height: 92, rx: 10}, svg);
   for (const i in mirrors) setTilt(+i, false);
+  if (isLive() && !live) liveReset();
   update();
 }
 function setTilt(i, animate = true) {
@@ -339,27 +440,25 @@ function setTilt(i, animate = true) {
 }
 
 /* ---------- the dot's run ---------- */
-// Trace the beam with the mirrors as they stand, light the cats it passes and say how many are left.
-// On a live level the beam only reaches as far as the dot has got (live.dist along the run), and the mirrors it
-// has already passed can't be tipped, so the run behind the dot never changes.
-let runLen = 0, catDist = [], mirDist = [], dotT0 = 0, live = {on: false, dist: 0};
-const passed = at => isLive() && (live.on || game.won) && at - 30 <= live.dist;   // with a little room, so a late tap can't land mid-bounce
-const locked = i => mirDist.some(([j, at]) => j === i && passed(at));
+// Trace the beam with the mirrors as they stand, light the cats it passes and say how many are left. On a moving
+// level the dot's own trail is drawn instead (see the moving levels below), with a faint line showing where
+// it would go from here with the mirrors as they stand.
+let runLen = 0, catDist = [], dotT0 = 0, live = null;
 function update() {
+  if (isLive()) return liveUpdate();
   const N = game.N, path = trace(N, game.tilt, game.start, game.dir);
   const [sx, sy] = centre(game.start), last = path[path.length - 1], [lx, ly] = centre(last[0]);
   beamPts = [[sx - DX[game.dir] * 50, sy - DY[game.dir] * 50]];
   for (const [i] of path) beamPts.push(centre(i));
   beamPts.push([lx + DX[last[1]] * 62, ly + DY[last[1]] * 62]);
-  drawBeam();
+  drawPath("beam", beamPts); drawPath("beamglow", beamPts);
   runLen = 0; const along = [0];
   for (let k = 1; k < beamPts.length; k++) along.push(runLen += Math.hypot(beamPts[k][0] - beamPts[k - 1][0], beamPts[k][1] - beamPts[k - 1][1]));
   // which cats see it, and in what order
   const seen = new Set(); let next = 1, broken = false, tooSoon = 0;
-  catDist = []; mirDist = [];
+  catDist = [];
   path.forEach(([i], k) => {
-    if (game.tilt[i] >= 0 && !mirDist.some(([j]) => j === i)) mirDist.push([i, along[k + 1]]);
-    if (!game.cat[i] || seen.has(i) || (isLive() && !passed(along[k + 1]))) return;
+    if (!game.cat[i] || seen.has(i)) return;
     seen.add(i); catDist.push([i, along[k + 1]]);
     const ok = !broken && (!order() || game.cat[i] === next);
     if (ok) next++; else { if (!broken) tooSoon = game.cat[i]; broken = true; }
@@ -367,34 +466,24 @@ function update() {
   });
   for (const i of catAt) { cats[i].classList.toggle("lit", seen.has(i)); if (!seen.has(i)) cats[i].classList.remove("inorder", "tooSoon"); }
   const left = catAt.length - seen.size;
-  $("count").textContent = game.won ? `All ${catAt.length} cats` : `${seen.size} of ${catAt.length} cats`;
-  if (order() && tooSoon && !game.won && !isLive()) G.note(`Cat ${tooSoon} saw the dot before cat ${next}.`, 2500);
-  $("undoBtn").disabled = !game.history.length || game.won;
-  $("restartBtn").disabled = !(game.history.length || live.on) || game.won;
-  $("hintBtn").disabled = game.won;
-  if (hintShown && hintShown !== tiltKey()) clearHint();
-  if (isLive()) { drawBeam(); return false; }
+  if (order() && tooSoon && !game.won) G.note(`Cat ${tooSoon} saw the dot before cat ${next}.`, 2500);
+  buttons(seen.size);
   dotT0 = performance.now();
   return !left && !broken;
 }
-// The beam drawn as far as `dist` along the run (all of it when no dist is given).
-function drawBeam(dist) {
-  let pts = beamPts;
-  if (isLive()) {
-    dist = Math.max(0, live.dist); pts = [beamPts[0]];
-    for (let k = 1; k < beamPts.length && dist > 0; k++) {
-      const [ax, ay] = beamPts[k - 1], [bx, by] = beamPts[k], len = Math.hypot(bx - ax, by - ay), f = Math.min(1, dist / len);
-      pts.push([ax + (bx - ax) * f, ay + (by - ay) * f]); dist -= len;
-    }
-  }
-  const d = pts.length > 1 ? pts.map(([x, y], k) => `${k ? "L" : "M"}${x} ${y}`).join("") : "";
-  $("beam").setAttribute("d", d); $("beamglow").setAttribute("d", d);
+function buttons(seen) {
+  $("count").textContent = game.won ? `All ${catAt.length} cats` : `${seen} of ${catAt.length} cats`;
+  $("undoBtn").disabled = !game.history.length || game.won;
+  $("restartBtn").disabled = !(game.history.length || (live && live.on)) || game.won;
+  $("hintBtn").disabled = game.won;
+  if (hintShown && hintShown !== tiltKey()) clearHint();
 }
-const tiltKey = () => game.tilt.join("");
+const drawPath = (id, pts) => $(id).setAttribute("d", pts.length > 1 ? pts.map(([x, y], k) => `${k ? "L" : "M"}${x} ${y}`).join("") : "");
+const tiltKey = () => game.tilt.join("") + (live ? live.visits.length : "");
 
 // The dot runs along the beam over and over (once it's solved, just once more, to the end), and every cat it passes
 // watches it go and gives a little pounce. With reduced motion the dot sits still at the end of the beam. On a
-// live level the dot only moves while the laser's on, and each frame takes it further along the run.
+// moving level the dot only moves while the laser's on.
 function dotAt(dist) {
   for (let k = 1; k < beamPts.length; k++) {
     const [ax, ay] = beamPts[k - 1], [bx, by] = beamPts[k], len = Math.hypot(bx - ax, by - ay);
@@ -405,48 +494,87 @@ function dotAt(dist) {
 }
 let lastDist = 0, lookAt = {}, lastNow = 0;
 const runSpeed = () => Math.max(0.5, runLen / 4000);   // units a millisecond, so a run takes about 4 s at most
+const pounce = i => { const c = cats[i]; c.classList.remove("pounce"); c.getBoundingClientRect(); c.classList.add("pounce"); };
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(100, now - (lastNow || now)); lastNow = now;
-  if (!game || !beamPts.length || !$("dot")) return;
+  if (!game || !$("dot") || (!isLive() && !beamPts.length)) return;
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  let dist;
+  let x, y;
   if (isLive()) {
-    if (live.on && !game.won && !$("overlay").classList.contains("show") && !document.querySelector(".spot")) {
-      live.dist += dt * 100 / levelSpec(game.level).live;
-      drawBeam(); liveCheck();
-    }
-    dist = Math.max(0, Math.min(runLen, live.dist));
+    if (live.on && !game.won && !$("overlay").classList.contains("show") && !document.querySelector(".spot")) liveStep(dt);
+    [x, y] = liveDot();
   } else {
     const speed = runSpeed(), period = runLen / speed + 600;
-    const t = still ? runLen / speed : game.won ? now - dotT0 : (now - dotT0) % period;
-    dist = Math.min(runLen, t * speed);
+    const t = still ? runLen / speed : game.won ? now - dotT0 : (now - dotT0) % period, dist = Math.min(runLen, t * speed);
+    [x, y] = dotAt(dist);
+    for (const [i, at] of catDist) if (!still && lastDist < at && dist >= at) pounce(i);
+    lastDist = dist;
   }
-  const [x, y] = dotAt(dist);
   for (const id of ["dot", "dotglow"]) { $(id).setAttribute("cx", x); $(id).setAttribute("cy", y); }
-  for (const [i, at] of catDist) {
+  for (const i of catAt) if (cats[i].classList.contains("lit")) {
     const [tx, ty] = lookAt[i] || [x, y];
     const [cx, cy] = centre(i), a = Math.atan2(ty - cy, tx - cx), r = Math.min(1, Math.hypot(tx - cx, ty - cy) / 40);
-    for (const p of cats[i].querySelectorAll(".pupil")) { p.setAttribute("transform", `translate(${Math.cos(a) * 3.6 * r} ${Math.sin(a) * 3.2 * r})`); }
-    if (!still && lastDist < at && dist >= at) { const c = cats[i]; c.classList.remove("pounce"); c.getBoundingClientRect(); c.classList.add("pounce"); }
+    for (const p of cats[i].querySelectorAll(".pupil")) p.setAttribute("transform", `translate(${Math.cos(a) * 3.6 * r} ${Math.sin(a) * 3.2 * r})`);
   }
-  lastDist = dist;
 }
 requestAnimationFrame(frame);
 
-/* ---------- the live levels ---------- */
-// As the dot reaches each cat it lights up; a cat seen out of turn, or the dot leaving the room before every cat
-// has seen it, ends the run. A run that catches every cat wins.
-function liveCheck() {
-  const before = catAt.filter(i => cats[i].classList.contains("lit")).length;
-  update();
-  const seenNow = catDist.filter(([, at]) => passed(at)), bad = catAt.find(i => cats[i].classList.contains("tooSoon"));
-  if (seenNow.length !== before) save();
-  if (bad !== undefined) return liveFail(`Cat ${game.cat[bad]} saw the dot too soon!`);
-  if (live.dist >= runLen) {
-    if (seenNow.length === catAt.length) { live.on = false; win(); }
-    else liveFail("The dot got away before every cat saw it.");
+/* ---------- the moving levels ---------- */
+// The dot sets off when the laser's switched on and goes square by square, bouncing off each mirror as it stands
+// when the dot gets there, so a mirror can be tipped after the dot has bounced off it, ready for the next time.
+// live: {on, wait (ms before the dot sets off), at (the square it's heading for, -1 for the wall), d (its way),
+// from and to (the stretch it's on), f (how far along), trail (the corners so far), seen (cats), next (the number
+// due next), visits ([square, slant] for each bounce so far), steps}.
+function liveReset() {
+  const [sx, sy] = centre(game.start), pen = [sx - DX[game.dir] * 50, sy - DY[game.dir] * 50];
+  live = {on: false, wait: 0, at: game.start, d: game.dir, from: pen, to: [sx, sy], f: 0, trail: [pen], seen: new Set(), next: 1, visits: [], steps: 0};
+}
+const liveDot = () => { const {from: [ax, ay], to: [bx, by], f} = live; return [ax + (bx - ax) * f, ay + (by - ay) * f]; };
+function liveUpdate() {
+  if (!live) liveReset();
+  const here = liveDot();
+  drawPath("beam", [...live.trail, here]); drawPath("beamglow", [...live.trail, here]);
+  // where it would go from here: on to the square it's heading for, then on with the mirrors as they stand
+  const ahead = [here];
+  if (live.at < 0) ahead.push(live.to);
+  else {
+    const path = trace(game.N, game.tilt, live.at, live.d), last = path[path.length - 1], [lx, ly] = centre(last[0]);
+    for (const [i] of path) ahead.push(centre(i));
+    ahead.push([lx + DX[last[1]] * 62, ly + DY[last[1]] * 62]);
   }
+  drawPath("ahead", ahead);
+  for (const i of catAt) { const s = live.seen.has(i); cats[i].classList.toggle("lit", s); cats[i].classList.toggle("inorder", s && order()); cats[i].classList.remove("tooSoon"); }
+  buttons(live.seen.size);
+  return false;
+}
+function liveStep(dt) {
+  if (live.wait > 0) { live.wait -= dt; return; }
+  let move = dt * 100 / levelSpec(game.level).live;
+  while (move > 0 && live.on) {
+    const len = Math.hypot(live.to[0] - live.from[0], live.to[1] - live.from[1]), left = (1 - live.f) * len;
+    if (move < left) { live.f += move / len; move = 0; } else { move -= left; liveArrive(); }
+  }
+  liveUpdate();
+}
+// The dot reaches the middle of a square (or the wall).
+function liveArrive() {
+  const N = game.N;
+  live.trail.push(live.to); live.from = live.to; live.f = 0;
+  if (live.at < 0) {   // out of the room
+    live.on = false;
+    if (live.seen.size === catAt.length) win(); else liveFail("The dot got away before every cat saw it.");
+    return;
+  }
+  const i = live.at;
+  if (game.tilt[i] >= 0) { live.visits.push([i, game.tilt[i]]); live.d = bounce(live.d, game.tilt[i]); }
+  else if (game.cat[i] && !live.seen.has(i)) {
+    if (order() && game.cat[i] !== live.next) { live.on = false; cats[i].classList.add("tooSoon"); liveFail(`Cat ${game.cat[i]} saw the dot too soon!`); return; }
+    live.seen.add(i); live.next++; pounce(i); save();
+  }
+  if (++live.steps > 6 * N * N) { live.on = false; liveFail("The dot ran out of puff."); return; }
+  const j = step(N, i, live.d), [cx, cy] = centre(i);
+  live.at = j; live.to = j < 0 ? [cx + DX[live.d] * 62, cy + DY[live.d] * 62] : centre(j);
 }
 // A missed run: the laser goes off, the mirrors go back to how they started, and the next tap goes again.
 function liveFail(why) {
@@ -456,15 +584,15 @@ function liveFail(why) {
   running = true;
   setTimeout(() => {
     running = false; if (game !== g) return;
-    game.tilt = game.first.slice(); game.history = []; live.dist = 0;
+    game.tilt = game.first.slice(); game.history = [];
     for (const i in mirrors) setTilt(+i);
-    update(); save();
+    liveReset(); update(); save();
     G.note("Tap the room to switch the laser on again.", 0);
   }, 1600);
 }
 // Switch the laser on: the dot waits a moment at the pointer, then sets off.
 function liveStart() {
-  live.on = true; live.dist = -60; game.started = true;
+  liveReset(); live.on = true; live.wait = 500; game.started = true;
   G.note("");
   update();
 }
@@ -479,7 +607,6 @@ function tip(i) {
   if (!playing()) return;
   if (isLive() && !live.on) { liveStart(); return; }
   if (game.tilt[i] < 0) return;
-  if (locked(i)) { G.note("The dot's been past that mirror already.", 2500); return; }
   game.tilt[i] ^= 1; game.history.push(i); game.started = true;
   setTilt(i);
   if (update()) win(); else save();
@@ -509,7 +636,6 @@ document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.ke
 function undo() {
   if (!playing() || !game.history.length) return;
   game.undid = true;
-  if (typeof game.history[game.history.length - 1] === "number" && locked(game.history[game.history.length - 1])) { G.note("The dot's been past that mirror already.", 2500); return; }
   const h = game.history.pop();
   if (typeof h === "number") { game.tilt[h] ^= 1; setTilt(h); }
   else { game.tilt = h.tilt; for (const i in mirrors) setTilt(+i); }
@@ -520,8 +646,9 @@ $("restartBtn").onclick = () => {
   if (!playing()) return;
   if (isLive()) {   // the laser goes off and the mirrors go back, ready for another run
     if (!game.history.length && !live.on) return;
-    game.undid = true; live.on = false; live.dist = 0; game.history = []; game.tilt = game.first.slice();
+    game.undid = true; game.history = []; game.tilt = game.first.slice();
     for (const i in mirrors) setTilt(+i);
+    liveReset();
     update(); save();
     G.note("Back to how the mirrors started. Tap the room to switch the laser on.", 0);
     return;
@@ -535,21 +662,31 @@ $("restartBtn").onclick = () => {
   G.note("Back to how the mirrors started. Undo brings your moves back.", 4000);
 };
 // Hint: a gold box round the first mirror along the answer's run that's tipped the wrong way. (That's also the
-// first wrong one the dot meets now: up to it, the dot is on the answer's run.) On a live level, if the dot has
-// already been past a wrong one, this run can't win.
+// first wrong one the dot meets now: up to it, the dot is on the answer's run.) On a moving level it goes by the
+// answer's bounces still to come: the next one the mirror isn't ready for, which may be a mirror to tip only
+// once the dot has bounced off it; and if the dot has already gone off the answer's way, this run can't win.
 let hintShown = null, hintTimer = 0;
 function clearHint() { hintShown = null; clearTimeout(hintTimer); const h = $("hintsq"); if (h) h.setAttribute("x", -400); }
 $("hintBtn").onclick = () => {
   if (!playing()) return;
-  const answer = game.sol.map((v, i) => v >= 0 ? v : game.tilt[i]);
-  const wrong = trace(game.N, answer, game.start, game.dir).map(([i]) => i).find(i => game.tilt[i] >= 0 && game.tilt[i] !== game.sol[i]);
-  if (wrong === undefined) { G.note("Every mirror the dot meets is right already.", 4000); return; }
-  if (locked(wrong)) { G.note("The dot's already been past a mirror that's the wrong way, so this run can't catch every cat.", 5000); return; }
+  let wrong, say = "Tip the mirror in the gold box the other way.";
+  if (isLive()) {
+    const done = live.visits.length;
+    if (live.visits.some(([i, m], k) => game.seq[k][0] !== i || game.seq[k][1] !== m)) { G.note("The dot's gone the wrong way, so this run can't catch every cat. Restart to try again.", 5000); return; }
+    const k = game.seq.findIndex(([i, m], k) => k >= done && game.tilt[i] !== m);
+    if (k < 0) { G.note("Every mirror is ready for the dot.", 4000); return; }
+    wrong = game.seq[k][0];
+    if (game.seq.slice(done, k).some(([i]) => i === wrong)) say = "Tip the mirror in the gold box once the dot has bounced off it.";
+  } else {
+    const answer = game.sol.map((v, i) => v >= 0 ? v : game.tilt[i]);
+    wrong = trace(game.N, answer, game.start, game.dir).map(([i]) => i).find(i => game.tilt[i] >= 0 && game.tilt[i] !== game.sol[i]);
+    if (wrong === undefined) { G.note("Every mirror the dot meets is right already.", 4000); return; }
+  }
   game.hinted = true; game.started = true; save();
   clearHint();
   const [x, y] = centre(wrong); $("hintsq").setAttribute("x", x - 46); $("hintsq").setAttribute("y", y - 46);
   hintShown = tiltKey();
-  G.note("Tip the mirror in the gold box the other way.", 5000);
+  G.note(say, 5000);
   hintTimer = setTimeout(clearHint, 5000);
 };
 
@@ -630,7 +767,8 @@ function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); ne
 function begin(p, level) {
   game = {level, N: p.N, start: p.start, dir: p.dir, cat: p.cat, sol: p.sol, tilt: p.tilt.slice(), first: p.tilt.slice(),
     history: [], won: false, ...G.freshClock()};
-  cursor = -1; clearHint(); live = {on: false, dist: 0};
+  if (p.seq) game.seq = p.seq;
+  cursor = -1; clearHint(); live = null;
 }
 async function newPuzzle() {
   if (busy) return;
@@ -650,10 +788,12 @@ async function newPuzzle() {
 /* ---------- sharing ---------- */
 // One letter per square: "." floor, 1–9 a cat, and for a mirror its answer and how it started, a–f
 // (a/b a spare standing / or \, c/d an answer of / standing / or \, e/f an answer of \). With progress,
-// how every mirror stands now, 0 or 1 each in order.
+// how every mirror stands now, 0 or 1 each in order. A moving level adds the answer's bounces, each the square in
+// two base-36 digits and the slant.
 const roomOut = (tilt) => game.cat.map((c, i) => game.tilt[i] < 0 ? (c ? String(c) : ".") : "abcdef"[(game.sol[i] + 1) * 2 + tilt[i]]).join("");
 $("shareBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Laser Pointer", won: game.won,
-  puzzle: () => ({g: "laserpointer", N: game.level, r: roomOut(game.first), e: game.start * 4 + game.dir}),
+  puzzle: () => ({g: "laserpointer", N: game.level, r: roomOut(game.first), e: game.start * 4 + game.dir,
+    ...(game.seq ? {q: game.seq.map(([i, m]) => i.toString(36).padStart(2, "0") + m).join("")} : {})}),
   progress: () => game.tilt.filter(t => t >= 0).join("")}); };
 function openShared(d) {
   const spec = levelSpec(d.N), N = spec ? spec.N : 0, fail = () => G.note("That share link didn't work.", 5000);
@@ -669,9 +809,20 @@ function openShared(d) {
   if (tilt[start] >= 0) return fail();
   const nums = cat.filter(c => c).sort((a, b) => a - b);
   if (nums.length < 1 || nums.some((c, k) => c !== k + 1)) return fail();
-  const m = sol.map((v, i) => v >= 0 ? v : tilt[i]);
-  if (!wins(N, m, cat, start, dir, spec.order)) return fail();
-  begin({N, start, dir, cat, sol, tilt}, d.N);
+  let seq = null;
+  if (spec.live) {
+    // the bounces must walk the dot past every cat, in order if it counts, meeting no mirror more than twice
+    if (typeof d.q !== "string" || d.q.length % 3 || !/^([0-9a-z]{2}[01])+$/.test(d.q)) return fail();
+    seq = d.q.match(/.../g).map(t => [parseInt(t.slice(0, 2), 36), +t[2]]);
+    let i = start, dd = dir, k = 0, next = 1, steps = 0; const seen = new Set();
+    while (i >= 0 && steps++ < 6 * N * N) {
+      if (tilt[i] >= 0) { if (!seq[k] || seq[k][0] !== i) return fail(); dd = bounce(dd, seq[k++][1]); }
+      else if (cat[i] && !seen.has(i)) { if (spec.order && cat[i] !== next) return fail(); seen.add(i); next++; }
+      i = step(N, i, dd);
+    }
+    if (i >= 0 || k !== seq.length || seen.size !== nums.length || seq.some(([j]) => seq.filter(([q]) => q === j).length > 2)) return fail();
+  } else if (!wins(N, sol.map((v, i) => v >= 0 ? v : tilt[i]), cat, start, dir, spec.order)) return fail();
+  begin({N, start, dir, cat, sol, tilt, seq}, d.N);
   if (typeof d.p === "string" && d.p.length === tilt.filter(t => t >= 0).length && /^[01]*$/.test(d.p)) {
     let k = 0; game.tilt = tilt.map(t => t < 0 ? -1 : +d.p[k++]); game.timed = false;
   }
@@ -703,8 +854,9 @@ function helpOnFirstVisit() {
   const liveSteps = isLive() ? [
     {say: "Now the laser starts switched off", els: [() => [$("pen"), $("startsq")]]},
     {say: "Tap the room to switch it on", lit: all.map(xy)},
-    {say: "Then tip mirrors before the dot gets there", lit: mirs.map(xy)},
-    {say: "Once the dot's been past a mirror, it stays put", lit: mirs.map(xy)},
+    {say: "Tip mirrors before the dot gets there", lit: mirs.map(xy)},
+    {say: "The dot comes back to some mirrors", lit: mirs.map(xy)},
+    {say: "Tip those again after it bounces, to reach the next cat", lit: mirs.map(xy)},
   ] : [];
   const done = () => { settings.seenHelp = true; if (order()) settings.seenOrder = true; if (isLive()) settings.seenLive = true; save(); };
   if (settings.seenHelp) {
@@ -743,7 +895,7 @@ const shared = G.readShare("laserpointer");
 if (game) G.reopen(() => {
     const spec = levelSpec(game.level), NN = game.N * game.N;
     if (!spec || spec.N !== game.N || game.tilt.length !== NN || game.sol.length !== NN || game.cat.length !== NN) throw new Error("the saved room doesn't fit its level");
-    live = {on: false, dist: 0};
+    live = null;
     if (isLive() && !game.won) { game.tilt = game.first.slice(); game.history = []; }
     draw();
     if (game.won) finishCard();
