@@ -29,6 +29,8 @@
 .gridwrap{background:var(--panel);border:3px solid var(--ink);border-radius:10px;overflow:hidden;
   user-select:none;-webkit-user-select:none;touch-action:manipulation}
 .gridwrap .grid{position:absolute;inset:0}
+/* while a toy is stuck, a finger dragged over the grid paints squares instead of scrolling the page */
+.gridwrap.painting svg{touch-action:none}
 .gridwrap svg{display:block;width:100%;height:100%;outline:none}
 .sq{fill:var(--panel);cursor:pointer}
 .sq.given{fill:#E9EADF}
@@ -411,6 +413,7 @@ function draw() {
   svg.innerHTML = out;
   svg.classList.toggle("won", !!game.won && running);
   $("pad").classList.toggle("noting", noting);
+  $("board").classList.toggle("painting", !!(armed && armed.sticky));
   $("hearts").hidden = !settings.autoGrade;
   $("hearts").innerHTML = Array.from({length: Math.max(HEARTS, game.livesUsed)}, (_, k) => k < game.hearts ? "♥" : '<span class="lost">♥</span>').join("");
   $("hearts").setAttribute("aria-label", `${game.hearts} ${game.hearts === 1 ? "life" : "lives"} left`);
@@ -425,7 +428,7 @@ function draw() {
   const filled = g.filter(Boolean).length;
   $("count").textContent = game.won ? "Every toy's in place!" : `${filled} of ${N * N} ${nums ? "squares" : "toys"}`;
   const what = nums ? "number" : "toy", it = armed ? (armed.v ? (nums ? String(armed.v) : "the " + toyName(armed.v)) : "the eraser") : "";
-  $("key").textContent = game.won ? "" : guessing ? `Guess: the next ${what} you put out glows until you undo it` : armed ? (armed.sticky ? `${it[0].toUpperCase() + it.slice(1)} sticks: tap squares${noting && armed.v ? " to pencil it in" : ""}` : `Tap a square for ${it}${noting && armed.v ? " (in pencil)" : ""}`)
+  $("key").textContent = game.won ? "" : guessing ? `Guess: the next ${what} you put out glows until you undo it` : armed ? (armed.sticky ? `${it[0].toUpperCase() + it.slice(1)} sticks: tap squares${noting && armed.v ? " to pencil it in" : ""} (or drag; tap it for ${noting ? "pen" : "pencil"}, hold to let go)` : `Tap a square for ${it}${noting && armed.v ? " (in pencil)" : ""}`)
     : sel >= 0 && isGiven(sel) ? "That one was already out" : noting ? `Pencil: ${what}s go in as maybes` : sel < 0 ? `Tap a ${what}, then squares (hold it down to keep it)` : "";
   $("hintBtn").disabled = game.won; $("allNotesBtn").disabled = game.won; $("clearNotesBtn").disabled = game.won || !game.notes.some(Boolean);
   $("undoBtn").disabled = !game.history.length || game.won; $("restartBtn").disabled = !game.history.length || game.won;
@@ -443,14 +446,16 @@ function makePad() {
   const er = document.createElement("button"); er.className = "erase"; er.textContent = "⌫"; er.setAttribute("aria-label", "Erase"); padButton(er, 0); pad.append(er);
 }
 // A pad button: a tap puts its toy in the square that's picked, if there is one; otherwise it picks the toy for
-// the next square tapped (or puts it down again). Holding it down makes the toy stick.
+// the next square tapped (or puts it down again). Holding it down makes the toy stick; while it's stuck, a tap
+// switches between pen and pencil, and holding it again lets it go.
 function padButton(b, v) {
   let held = null, long = false;
   b.dataset.v = v;
   const stop = () => { clearTimeout(held); held = null; };
   b.addEventListener("pointerdown", () => {
     long = false; stop();
-    held = setTimeout(() => { held = null; if (!playing()) return; long = true; armed = {v, sticky: true}; sel = -1; draw(); }, 450);
+    // holding a toy that's already stuck lets it go
+    held = setTimeout(() => { held = null; if (!playing()) return; long = true; armed = armed && armed.sticky && armed.v === v ? null : {v, sticky: true}; sel = -1; draw(); }, 450);
   });
   for (const ev of ["pointerup", "pointerleave", "pointercancel"]) b.addEventListener(ev, stop);
   b.addEventListener("contextmenu", e => e.preventDefault());
@@ -458,6 +463,8 @@ function padButton(b, v) {
     if (long) { long = false; return; }
     if (!playing()) return;
     if (sel >= 0 && !isGiven(sel) && !armed) { put(sel, v); return; }
+    // tapping the toy that's stuck switches between pen and pencil, and it stays stuck
+    if (armed && armed.sticky && armed.v === v && v) { noting = !noting; draw(); G.note(noting ? "Pencil" : "Pen", 1500); return; }
     armed = armed && armed.v === v ? null : {v, sticky: false};
     sel = -1; draw();
   };
@@ -467,12 +474,18 @@ function padButton(b, v) {
 const snapshot = () => game.history.push({grid: game.grid.slice(), notes: game.notes.slice(), guesses: (game.guesses || []).slice()});
 function restore(h) { game.grid = h.grid; game.notes = h.notes; game.guesses = h.guesses || []; }
 // Put toy v in square i (0 erases; the same toy again takes it off). In pencil, v is jotted down or crossed off.
-function put(i, v) {
-  if (!playing() || i < 0 || isGiven(i)) return;
+// o.quiet: no undo step of its own (a drag makes one for all its squares). o.mode, in a drag: "add" only puts
+// the toy (or mark) in a square without one, "remove" only takes it off one that has it. Returns whether it did anything.
+function put(i, v, o = {}) {
+  if (!playing() || i < 0 || isGiven(i)) return false;
+  if (o.mode) {
+    const on = noting && v ? !!(game.notes[i] >> v & 1) : v ? game.grid[i] === v : !!(game.grid[i] || game.notes[i]);
+    if (o.mode === "add" ? on || !!game.grid[i] : !on) return false;
+  }
   game.started = true;
-  if (settings.autoGrade && !noting && v && v !== game.sol[i] && game.grid[i] !== v) { miss(i, v); return; }
+  if (settings.autoGrade && !noting && v && v !== game.sol[i] && game.grid[i] !== v) { miss(i, v); return false; }
   game.wrong = (game.wrong || []).filter(k => k !== i);
-  snapshot();
+  if (!o.quiet) snapshot();
   if (noting && v) {
     if (game.grid[i]) game.grid[i] = 0;
     game.notes[i] ^= 1 << v;
@@ -485,11 +498,48 @@ function put(i, v) {
     if (game.grid[i] && guessing) { guessing = false; if (!guesses.includes(i)) guesses.push(i); }
     else if (!game.grid[i] && guesses.includes(i)) guesses.splice(guesses.indexOf(i), 1);  // emptied, so it's no longer a guess
   }
-  if (game.grid.every((h, i) => h === game.sol[i])) { win(); return; }
+  if (game.grid.every((h, i) => h === game.sol[i])) { win(); return true; }
   if (armed && armed.v && !noting && game.grid.filter(x => x === armed.v).length >= game.N) armed = null;  // all out, so put it down
   draw(); save();
+  return true;
 }
+// Painting: with a toy stuck, press on a square and drag across others. The first square says which way it goes:
+// if it gets the toy (or the pencil mark), every square the finger passes gets it too; if it loses it, they all
+// lose it. In pen, a drag only fills empty squares. The whole drag is one Undo.
+let drag = null, skipClick = false;
+const sqAt = e => { const el = document.elementFromPoint(e.clientX, e.clientY); const r = el && el.closest && el.closest("#svg .sq"); return r ? +r.dataset.i : -1; };
+// A square the drag reaches: the first one that isn't a given sets which way the drag goes.
+function paint(i) {
+  if (drag.seen.has(i)) return;
+  drag.seen.add(i);
+  if (isGiven(i)) return;
+  const v = drag.v;
+  if (!drag.mode) drag.mode = (noting && v ? !!(game.notes[i] >> v & 1) : v ? game.grid[i] === v : true) ? "remove" : "add";
+  if (put(i, v, {quiet: true, mode: drag.mode})) drag.changed = true;
+}
+$("svg").addEventListener("pointerdown", e => {
+  if (!playing() || !armed || !armed.sticky) return;
+  const i = sqAt(e); if (i < 0) return;
+  snapshot();
+  drag = {v: armed.v, mode: null, seen: new Set(), changed: false, id: e.pointerId};
+  try { $("svg").setPointerCapture(e.pointerId); } catch (err) {}
+  paint(i);
+  e.preventDefault();
+});
+$("svg").addEventListener("pointermove", e => {
+  if (!drag || e.pointerId !== drag.id || !game || game.won) return;
+  const i = sqAt(e); if (i >= 0) paint(i);
+});
+for (const ev of ["pointerup", "pointercancel"]) $("svg").addEventListener(ev, e => {
+  if (!drag || e.pointerId !== drag.id) return;
+  if (!drag.changed && game && !game.won) {
+    game.history.pop();   // nothing changed, so no undo step
+    if (drag.seen.size === 1 && isGiven([...drag.seen][0])) G.note("That one was already out", 2000);
+  }
+  drag = null; skipClick = true; setTimeout(() => { skipClick = false; }, 400);
+});
 $("svg").addEventListener("click", e => {
+  if (skipClick) { skipClick = false; return; }   // the drag already did it
   if (!playing()) return;
   const r = e.target.closest(".sq"); if (!r) return;
   const i = +r.dataset.i;
