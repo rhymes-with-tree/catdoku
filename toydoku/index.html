@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Toydoku</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-16.3"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-16.3">
+<style>
+/* Sudoku with toys: every row, column and box holds one of each toy. The Numbers switch shows 1 to N instead. */
+.gridwrap{background:var(--panel);border:3px solid var(--ink);border-radius:10px;overflow:hidden;
+  user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.gridwrap .grid{position:absolute;inset:0}
+.gridwrap svg{display:block;width:100%;height:100%;outline:none}
+.sq{fill:var(--panel);cursor:pointer}
+.sq.given{fill:#E9EADF}
+.sq.peer{fill:#E6E0F0}
+.sq.given.peer{fill:#DCD6E6}
+.sq.same{fill:#B9DADF}
+.sq.sel{fill:#CBBCE6}
+.thin{stroke:rgba(42,37,48,.2);stroke-width:2;pointer-events:none}
+.thick{stroke:var(--ink);stroke-width:5;stroke-linecap:round;pointer-events:none}
+.toy{pointer-events:none}
+.ring{fill:none;stroke:#C8392B;stroke-width:6;pointer-events:none}
+.num{font-size:58px;font-weight:600;fill:#4E577D;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.num.given{font-weight:800;fill:var(--ink)}
+.num.clash{fill:#C8392B}
+.nt{font-size:24px;font-weight:600;fill:var(--ink-soft);text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.pad{width:var(--board);display:grid;gap:6px;justify-content:center}
+.pad button{-webkit-touch-callout:none;padding:4px 0;font-size:22px;font-weight:800;line-height:1.1;min-height:44px;display:flex;align-items:center;justify-content:center}
+.pad button img{width:34px;height:34px;display:block}
+.pad button.erase{font-size:18px}
+.pad.noting button:not(.erase){border-style:dashed;color:#3C8681}
+.pad.noting button img{opacity:.75}
+/* a toy picked to put out: once (outlined) or held down to stick (filled) */
+.pad button.armed{box-shadow:0 0 0 3px #ECA818}
+.pad button.sticky{background:#F6DFA6;box-shadow:0 0 0 3px #ECA818}
+.key{width:var(--board);text-align:center;font-weight:600;font-size:15px;color:var(--ink-soft);margin-top:-6px;min-height:1.4em}
+@keyframes hop{50%{transform:translateY(-14px)}}
+.won .toy,.won .num{transform-box:fill-box;transform-origin:50% 100%;animation:hop .45s ease-in-out both}
+@media (prefers-reduced-motion:reduce){.won .toy,.won .num{animation:none}}
+/* Laya beside the title, and on the gold-paw card */
+.title{display:flex;align-items:flex-end;gap:8px}
+.laya{display:block;height:64px;width:auto;margin-bottom:-6px}
+@media (max-height:760px){.laya{height:46px;margin-bottom:-4px}}
+.card img.layapic{display:block;width:62%;max-width:230px;height:auto;margin:0 auto 14px}
+</style>
+</head>
+<body>
+<main>
+  <header><div class="title"><h1>Toydoku</h1><img class="laya" id="layaTitle" src="../cats/laya-2.webp" alt="Laya, a grey cat, looking up"></div><div class="stripe"></div><p class="tagline">Help Laya give every row, column and box one of each toy</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap gridwrap" id="board"><div class="grid" id="grid"><svg id="svg" tabindex="0" role="application" aria-label="A Sudoku grid of toys. Tap a square, then a toy."></svg></div></div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+  <div class="pad" id="pad" aria-label="Toys"></div>
+  <div class="key" id="key"></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="notesBtn" aria-pressed="false">Pencil</button>
+    <button id="allNotesBtn">Pencil all</button>
+    <button id="shareBtn">Share</button>
+    <button id="toysBtn">Toys</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New puzzle</button>
+  </div>
+  <div class="bar toggles">
+    <div class="opt" id="numOpt"><label class="toggle"><input type="checkbox" id="numTgl"><span class="sw"></span>Numbers</label><span class="hint">Shows numbers in place of the toys</span></div>
+  </div>
+</main>
+
+<script src="../games.js?v=2026-10-16.3"></script>
+<script>
+/* ---------- puzzles (plain functions, also run in a background worker) ---------- */
+// An N × N grid in boxes of bw × bh squares: every row, column and box holds each of the N toys once. Toys are
+// 1 to N here; which picture each one is gets picked when the puzzle's dealt.
+// Levels: the size, how hard the reasoning gets (1: a square with only one toy left, or a toy with only one
+// place left in a row, column or box; 2: also needs the ruling-out tricks in reason), and how many spare pairs
+// of toys it puts out beyond the fewest that still let it be worked out.
+function levelOf(n) {
+  return [null, {N: 4, bw: 2, bh: 2, tier: 1, extra: 2}, {N: 6, bw: 3, bh: 2, tier: 1, extra: 4}, {N: 6, bw: 3, bh: 2, tier: 1, extra: 0},
+    {N: 9, bw: 3, bh: 3, tier: 1, extra: 8}, {N: 9, bw: 3, bh: 3, tier: 1, extra: 3}, {N: 9, bw: 3, bh: 3, tier: 1, extra: 0},
+    {N: 9, bw: 3, bh: 3, tier: 2, extra: 0}][n];
+}
+// The rows, columns and boxes, in that order for each a (row a, column a, box a), each a list of squares.
+function units(N, bw, bh) {
+  const out = [];
+  for (let a = 0; a < N; a++) {
+    const row = [], col = [], box = [], br = Math.floor(a / (N / bw)) * bh, bc = a % (N / bw) * bw;
+    for (let b = 0; b < N; b++) { row.push(a * N + b); col.push(b * N + a); box.push((br + Math.floor(b / bw)) * N + bc + b % bw); }
+    out.push(row, col, box);
+  }
+  return out;
+}
+// A random full grid: fill square by square with toys in a random order, backing up when stuck.
+function randomFull(N, bw, bh) {
+  const U = units(N, bw, bh), of = [...Array(N * N)].map(() => []);
+  U.forEach((u, k) => u.forEach(i => of[i].push(k)));
+  for (;;) {
+    const g = new Array(N * N).fill(0), used = new Array(U.length).fill(0);
+    let steps = 0;
+    const fill = i => {
+      if (i === N * N) return true;
+      if (++steps > 50000) return false;
+      const vs = [];
+      for (let v = 1; v <= N; v++) if (of[i].every(k => !(used[k] >> v & 1))) vs.push(v);
+      for (let k = vs.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [vs[k], vs[j]] = [vs[j], vs[k]]; }
+      for (const v of vs) {
+        g[i] = v; of[i].forEach(k => used[k] |= 1 << v);
+        if (fill(i + 1)) return true;
+        of[i].forEach(k => used[k] &= ~(1 << v));
+      }
+      g[i] = 0; return false;
+    };
+    if (fill(0)) return g;
+  }
+}
+// Work the grid out by reasoning alone, without guessing. Each square keeps the toys it could be. Tier 1: a toy
+// placed rules itself out of its row, column and box; a square with one toy left takes it; a toy with one place
+// left in a row, column or box goes there. Tier 2 adds: a toy whose places in one row, column or box all lie
+// in another (a box and a line) is ruled out of the rest of that other one; and two squares of a row, column or
+// box with the same two toys left rule those two out of the rest of it.
+// Returns the finished grid, or null if it gets stuck or finds a contradiction. g: the grid, 0 for empty.
+function reason(N, bw, bh, g, tier) {
+  const U = units(N, bw, bh), full = (1 << (N + 1)) - 2, bit = v => 1 << v;
+  const ones = m => { let c = 0; while (m) { m &= m - 1; c++; } return c; }, lo = m => 31 - Math.clz32(m & -m);
+  const dom = g.map(v => v ? bit(v) : full);
+  const peers = [...Array(N * N)].map(() => new Set());
+  for (const u of U) for (const i of u) for (const j of u) if (i !== j) peers[i].add(j);
+  for (let changed = true; changed;) {
+    changed = false;
+    const set = (i, m) => { if (m !== dom[i]) { dom[i] = m; changed = true; } return m; };
+    for (let i = 0; i < N * N; i++) {
+      if (!dom[i]) return null;
+      if (ones(dom[i]) !== 1) continue;
+      for (const p of peers[i]) if (dom[p] & dom[i]) { if (!set(p, dom[p] & ~dom[i])) return null; }
+    }
+    for (const u of U) for (let v = 1; v <= N; v++) {
+      let where = -1, n = 0;
+      for (const p of u) if (dom[p] & bit(v)) { where = p; n++; }
+      if (!n) return null;
+      if (n === 1) set(where, bit(v));
+    }
+    if (changed || tier < 2) continue;
+    for (const u of U) for (let v = 1; v <= N; v++) {
+      const at = u.filter(p => dom[p] & bit(v) && ones(dom[p]) > 1);
+      if (at.length < 2) continue;
+      for (const w of U) if (w !== u && at.every(p => w.includes(p))) for (const p of w) if (!u.includes(p) && dom[p] & bit(v)) { if (!set(p, dom[p] & ~bit(v))) return null; }
+    }
+    for (const u of U) for (let a = 0; a < N; a++) {
+      const m = dom[u[a]];
+      if (ones(m) !== 2) continue;
+      for (let b = a + 1; b < N; b++) if (dom[u[b]] === m) for (const p of u) if (p !== u[a] && p !== u[b] && dom[p] & m) { if (!set(p, dom[p] & ~m)) return null; }
+    }
+  }
+  return dom.every(m => ones(m) === 1) ? dom.map(lo) : null;
+}
+// A grid for level n: a full grid, then take toys away two at a time (each with its partner turned halfway
+// round, so the gaps make a pattern), keeping each pair whose loss would stop the grid working out by the
+// level's reasoning. Then put back the level's spare pairs. A tier 2 grid also has to need the tier 2 tricks.
+// Working out by reasoning alone means there's exactly one answer.
+function makeGrid(n) {
+  const {N, bw, bh, tier, extra} = levelOf(n), sol = randomFull(N, bw, bh);
+  const shuffle = a => { for (let k = a.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [a[k], a[j]] = [a[j], a[k]]; } return a; };
+  const g = sol.slice(), gone = [];
+  for (const i of shuffle([...Array(Math.ceil(N * N / 2)).keys()])) {
+    const pair = [...new Set([i, N * N - 1 - i])], keep = pair.map(p => g[p]);
+    pair.forEach(p => { g[p] = 0; });
+    if (reason(N, bw, bh, g, tier)) gone.push(pair); else pair.forEach((p, k) => { g[p] = keep[k]; });
+  }
+  if (tier > 1 && reason(N, bw, bh, g, 1)) return null;
+  for (const pair of shuffle(gone).slice(0, extra)) pair.forEach(p => { g[p] = sol[p]; });
+  return {N, bw, bh, sol, givens: g};
+}
+
+/* ---------- toys ---------- */
+// The toy library's kinds, one per colour (as in Toy Box). Each puzzle gives its N toys N different colours, so
+// they're easy to tell apart, and a picture for each from the ones the player hasn't left out.
+const KINDS = [
+  {c: "#BD5538", looks: [["wiffle-red", "red wiffle ball"], ["swirl-red", "red swirl ball"], ["crochet-stars", "star ball"], ["tinsel", "tinsel ball"]]},
+  {c: "#ECA818", looks: [["wiffle-yellow", "yellow wiffle ball"]]},
+  {c: "#73A7AE", looks: [["wiffle-teal", "teal wiffle ball"], ["fish", "fish"]]},
+  {c: "#6AA673", looks: [["lattice", "lattice ball"]]},
+  {c: "#B3B94B", looks: [["spiky-lime", "spiky pom-pom"]]},
+  {c: "#B94588", looks: [["swirl-purple", "plum swirl ball"], ["bell-purple", "bell ball"]]},
+  {c: "#7885BA", looks: [["spring", "spring"], ["rope-blue", "rope ball"]]},
+  {c: "#825840", looks: [["cork-paw", "cork paw ball"], ["burlap-paws", "burlap ball"], ["rattan", "rattan ball"]]},
+  {c: "#5E5866", looks: [["mouse", "mouse"]]},
+  {c: "#E16A4A", looks: [["felt-rainbow", "rainbow ball"], ["ribbon-tail", "ribbon ball"], ["spiky-rainbow", "spiky ball"]]},
+];
+const MIN_COLOURS = 9;
+let offToys = G.toysOff();
+const TOY_SRC = {}, CAT_SRC = {};  // filled with embedded pictures when the page is bundled into one file
+const toySrc = f => TOY_SRC[f] || `../toys/${f}.webp?v=${window.SITE_BUILD || ""}`;  // a new version gets new pictures
+const catSrc = f => CAT_SRC[f] || `../cats/${f}.webp`;
+const nameOf = f => { for (const k of KINDS) for (const [g, n] of k.looks) if (g === f) return n; return "toy"; };
+// N toys in N different colours, from colours with a toy in play first (and then any, if too many are left out).
+function pickToys(N) {
+  const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const on = k => k.looks.some(([f]) => !offToys.has(f));
+  const kinds = shuffle(KINDS.filter(on)).concat(shuffle(KINDS.filter(k => !on(k)))).slice(0, N);
+  return kinds.map(k => k.looks[G.pickLook(k, offToys)][0]);
+}
+
+/* ---------- game state ---------- */
+// game: {level, N, bw, bh, sol, givens (the grid as dealt, 0 for empty), toys (picture for toys 1 to N, as
+//        toys[v - 1]), grid (0 for empty), notes (bit v set: v jotted down), history (undo steps), hinted, undid, won}
+const STORE = "catdoku.toydoku.v1", MAX_LEVEL = 7;
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1, numbers: false}, state.settings);
+let game = state.game || null, busy = false, running = false, sel = -1, noting = false;
+// armed: a toy (or 0, erase) picked on the pad, {v, sticky}: tapped, it goes in the next square tapped; held
+// down, it sticks and goes in every square tapped until another is picked.
+let armed = null;
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
+const HOW = [null, "", "", "", "a head start", "", "", "trickier"];
+const levelName = n => { const {N} = levelOf(n); return `Level ${n} · ${N} × ${N}${HOW[n] ? ", " + HOW[n] : ""}`; };
+const build = G.builder([levelOf, units, randomFull, reason, makeGrid], "makeGrid");
+const isGiven = i => !!game.givens[i];
+const toyName = v => settings.numbers ? String(v) : nameOf(game.toys[v - 1]);
+const unitsNow = () => units(game.N, game.bw, game.bh);
+
+/* ---------- drawing ---------- */
+// Toys twice in a row, column or box.
+function clashes() {
+  const g = game.grid, clash = new Set();
+  for (const u of unitsNow()) {
+    const at = {};
+    for (const i of u) if (g[i]) (at[g[i]] = at[g[i]] || []).push(i);
+    for (const v in at) if (at[v].length > 1) at[v].forEach(i => clash.add(i));
+  }
+  return clash;
+}
+let hintMark = null;   // {i, bad, key}: a square to look at, while the grid is as it was
+function draw() {
+  const {N, bw, bh} = game, S = N * 100, svg = $("svg"), g = game.grid, clash = clashes(), nums = settings.numbers;
+  svg.setAttribute("viewBox", `0 0 ${S} ${S}`);
+  const rc = i => [Math.floor(i / N), i % N], boxOf = i => Math.floor(Math.floor(i / N) / bh) * (N / bw) + Math.floor(i % N / bw);
+  const [sr, sc] = sel >= 0 ? rc(sel) : [-1, -1], sv = armed ? armed.v : sel >= 0 ? g[sel] : 0;
+  let out = "";
+  for (let i = 0; i < N * N; i++) {
+    const [r, c] = rc(i), x = c * 100, y = r * 100;
+    const peer = sel >= 0 && (r === sr || c === sc || boxOf(i) === boxOf(sel));
+    const cls = ["sq", isGiven(i) ? "given" : "", i === sel ? "sel" : sv && g[i] === sv ? "same" : peer ? "peer" : ""].filter(Boolean).join(" ");
+    out += `<rect class="${cls}" data-i="${i}" x="${x}" y="${y}" width="100" height="100"/>`;
+  }
+  for (let k = 1; k < N; k++) {
+    out += `<line class="thin" x1="${k * 100}" y1="0" x2="${k * 100}" y2="${S}"/><line class="thin" x1="0" y1="${k * 100}" x2="${S}" y2="${k * 100}"/>`;
+  }
+  for (let k = bw; k < N; k += bw) out += `<line class="thick" x1="${k * 100}" y1="0" x2="${k * 100}" y2="${S}"/>`;
+  for (let k = bh; k < N; k += bh) out += `<line class="thick" x1="0" y1="${k * 100}" x2="${S}" y2="${k * 100}"/>`;
+  for (let i = 0; i < N * N; i++) {
+    const [r, c] = rc(i), x = c * 100, y = r * 100, v = g[i], delay = game.won && running ? ` style="animation-delay:${(r + c) * 45}ms"` : "";
+    if (v) {
+      if (nums) out += `<text class="num${isGiven(i) ? " given" : ""}${clash.has(i) ? " clash" : ""}" x="${x + 50}" y="${y + 54}"${delay}>${v}</text>`;
+      else {
+        if (clash.has(i)) out += `<circle class="ring" cx="${x + 50}" cy="${y + 50}" r="44"/>`;
+        out += `<image class="toy" href="${toySrc(game.toys[v - 1])}" x="${x + 9}" y="${y + 9}" width="82" height="82"${delay}/>`;
+      }
+    } else if (game.notes[i]) {
+      // notes sit in a little grid the shape of a box
+      const cols = bw, rows = Math.ceil(N / cols), cw = 92 / cols, ch = 92 / rows;
+      for (let n = 1; n <= N; n++) if (game.notes[i] >> n & 1) {
+        const k = n - 1, cx = x + 4 + (k % cols + .5) * cw, cy = y + 4 + (Math.floor(k / cols) + .5) * ch, s = Math.min(cw, ch) * .9;
+        out += nums ? `<text class="nt" x="${cx}" y="${cy}">${n}</text>` : `<image class="toy" href="${toySrc(game.toys[k])}" x="${cx - s / 2}" y="${cy - s / 2}" width="${s}" height="${s}" opacity=".8"/>`;
+      }
+    }
+  }
+  if (hintMark && hintMark.key === g.join()) {
+    const [r, c] = rc(hintMark.i);
+    out += `<rect class="hintsq${hintMark.bad ? " bad" : ""}" x="${c * 100 + 5}" y="${r * 100 + 5}" width="90" height="90" rx="10"/>`;
+  }
+  svg.innerHTML = out;
+  svg.classList.toggle("won", !!game.won && running);
+  $("pad").classList.toggle("noting", noting);
+  [...$("pad").children].forEach(b => { const v = +b.dataset.v, on = armed && armed.v === v; b.classList.toggle("armed", !!on && !armed.sticky); b.classList.toggle("sticky", !!on && armed.sticky); });
+  $("notesBtn").setAttribute("aria-pressed", String(noting));
+  const filled = g.filter(Boolean).length;
+  $("count").textContent = game.won ? "Every toy's in place!" : `${filled} of ${N * N} ${nums ? "squares" : "toys"}`;
+  const what = nums ? "number" : "toy", it = armed && (armed.v ? (nums ? armed.v : "the " + toyName(armed.v)) : "the eraser");
+  $("key").textContent = game.won ? "" : armed ? (armed.sticky ? `${it[0].toUpperCase() + it.slice(1)} sticks: tap squares${noting && armed.v ? " to pencil it in" : ""}` : `Tap a square for ${it}${noting && armed.v ? " (in pencil)" : ""}`)
+    : sel >= 0 && isGiven(sel) ? "That one was already out" : noting ? `Pencil: ${what}s go in as maybes` : sel < 0 ? `Tap a ${what}, then squares (hold it down to keep it)` : "";
+  $("hintBtn").disabled = game.won; $("allNotesBtn").disabled = game.won;
+  $("undoBtn").disabled = !game.history.length || game.won; $("restartBtn").disabled = !game.history.length || game.won;
+}
+// The buttons under the grid: a toy (or number) each, and erase. Nine toys go in two rows of five.
+function makePad() {
+  const pad = $("pad"), N = game.N; pad.innerHTML = "";
+  pad.style.gridTemplateColumns = `repeat(${N === 9 ? 5 : N + 1}, minmax(0, 58px))`;
+  for (let v = 1; v <= N; v++) {
+    const b = document.createElement("button");
+    if (settings.numbers) b.textContent = v;
+    else { const im = document.createElement("img"); im.src = toySrc(game.toys[v - 1]); im.alt = ""; b.append(im); }
+    b.setAttribute("aria-label", toyName(v)); padButton(b, v); pad.append(b);
+  }
+  const er = document.createElement("button"); er.className = "erase"; er.textContent = "⌫"; er.setAttribute("aria-label", "Erase"); padButton(er, 0); pad.append(er);
+}
+// A pad button: a tap puts its toy in the square that's picked, if there is one; otherwise it picks the toy for
+// the next square tapped (or puts it down again). Holding it down makes the toy stick.
+function padButton(b, v) {
+  let held = null, long = false;
+  b.dataset.v = v;
+  const stop = () => { clearTimeout(held); held = null; };
+  b.addEventListener("pointerdown", () => {
+    long = false; stop();
+    held = setTimeout(() => { held = null; if (!playing()) return; long = true; armed = {v, sticky: true}; sel = -1; draw(); }, 450);
+  });
+  for (const ev of ["pointerup", "pointerleave", "pointercancel"]) b.addEventListener(ev, stop);
+  b.addEventListener("contextmenu", e => e.preventDefault());
+  b.onclick = () => {
+    if (long) { long = false; return; }
+    if (!playing()) return;
+    if (sel >= 0 && !isGiven(sel) && !armed) { put(sel, v); return; }
+    armed = armed && armed.v === v ? null : {v, sticky: false};
+    sel = -1; draw();
+  };
+}
+
+/* ---------- playing ---------- */
+const snapshot = () => game.history.push({grid: game.grid.slice(), notes: game.notes.slice()});
+// Put toy v in square i (0 erases; the same toy again takes it off). In pencil, v is jotted down or crossed off.
+function put(i, v) {
+  if (!playing() || i < 0 || isGiven(i)) return;
+  game.started = true;
+  snapshot();
+  if (noting && v) {
+    if (game.grid[i]) game.grid[i] = 0;
+    game.notes[i] ^= 1 << v;
+  } else {
+    game.grid[i] = v && game.grid[i] !== v ? v : 0;
+    // a toy put out comes off the pencil marks in its row, column and box
+    if (game.grid[i]) { for (const u of unitsNow()) if (u.includes(i)) for (const p of u) game.notes[p] &= ~(1 << v); }
+    else if (!v) game.notes[i] = 0;
+  }
+  if (game.grid.every((h, i) => h === game.sol[i])) { win(); return; }
+  draw(); save();
+}
+$("svg").addEventListener("click", e => {
+  if (!playing()) return;
+  const r = e.target.closest(".sq"); if (!r) return;
+  const i = +r.dataset.i;
+  if (armed) {
+    if (isGiven(i)) { G.note("That one was already out", 2000); return; }
+    const v = armed.v;
+    if (!armed.sticky) armed = null;
+    put(i, v); return;
+  }
+  sel = i === sel ? -1 : i; draw();
+});
+$("notesBtn").onclick = () => { if (!game || game.won) return; noting = !noting; draw(); };
+// Pencil all: every empty square gets a mark for each toy its row, column and box still leave open. Undo takes them away.
+$("allNotesBtn").onclick = () => {
+  if (!playing()) return;
+  const N = game.N, g = game.grid, U = unitsNow(), open = i => { let m = (1 << (N + 1)) - 2; for (const u of U) if (u.includes(i)) for (const p of u) if (g[p]) m &= ~(1 << g[p]); return m; };
+  const notes = g.map((v, i) => v ? game.notes[i] : open(i));
+  if (notes.every((m, i) => m === game.notes[i])) { G.note("They're all there already", 3000); return; }
+  snapshot(); game.notes = notes;
+  game.started = true; draw(); save();
+  G.note(`Every empty square has a pencil mark for each ${settings.numbers ? "number" : "toy"} that could go there`, 3500);
+};
+document.addEventListener("keydown", e => {
+  if (!playing() || document.querySelector(".spot") || e.target.tagName === "SELECT" || e.target.tagName === "INPUT" || e.ctrlKey || e.metaKey || e.altKey) return;
+  const N = game.N, k = e.key;
+  if (k === "Escape") { armed = null; sel = -1; draw(); return; }
+  if (/^[1-9]$/.test(k) && +k <= N) { armed = null; if (sel < 0) sel = 0; put(sel, +k); e.preventDefault(); return; }
+  if (k === "Backspace" || k === "Delete" || k === "0") { put(sel, 0); e.preventDefault(); return; }
+  if (k === "n" || k === "N") { noting = !noting; draw(); return; }
+  const mv = {ArrowUp: -N, ArrowDown: N, ArrowLeft: -1, ArrowRight: 1}[k];
+  if (mv !== undefined) {
+    e.preventDefault();
+    armed = null;
+    if (sel < 0) sel = 0;
+    else if (!((k === "ArrowLeft" && sel % N === 0) || (k === "ArrowRight" && sel % N === N - 1) || sel + mv < 0 || sel + mv >= N * N)) sel += mv;
+    draw();
+  }
+});
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
+function undo() { if (playing() && game.history.length) { game.undid = true; const h = game.history.pop(); game.grid = h.grid; game.notes = h.notes; draw(); save(); } }
+$("undoBtn").onclick = undo;
+$("restartBtn").onclick = () => {
+  if (!playing() || !game.history.length) return;
+  game.undid = true; snapshot();
+  game.grid = game.givens.slice(); game.notes = game.notes.map(() => 0);
+  draw(); save(); G.note("Back to the start. Undo brings your toys back.", 3500);
+};
+$("numTgl").onchange = e => { settings.numbers = e.target.checked; save(); if (game) { makePad(); draw(); } };
+
+// Hint: first a toy that's wrong, in red. Otherwise a gold box round a square the board already settles: one
+// with only one toy left that fits, or where a toy has its only place left in a row, column or box. If none,
+// the empty square with the fewest toys left. The message says which toy and why; the player puts it out.
+// A hint keeps you on the same level and costs the gold paw.
+let hintTimer = null;
+function hint() {
+  if (!playing()) return;
+  const N = game.N, g = game.grid, U = unitsNow(), wrong = g.map((v, i) => v && v !== game.sol[i] ? i : -1).filter(i => i >= 0);
+  let i, bad = false, say;
+  if (wrong.length) { i = wrong.includes(sel) ? sel : wrong[0]; bad = true; say = wrong.length > 1 ? `That ${settings.numbers ? "number" : "toy"}'s wrong (and ${wrong.length - 1} more)` : `That ${settings.numbers ? "number" : "toy"}'s wrong`; }
+  else {
+    const open = k => { if (g[k]) return 0; let m = (1 << (N + 1)) - 2; for (const u of U) if (u.includes(k)) for (const p of u) if (g[p]) m &= ~(1 << g[p]); return m; };
+    const ones = m => { let c = 0; while (m) { m &= m - 1; c++; } return c; };
+    const empty = g.map((v, k) => v ? -1 : k).filter(k => k >= 0);
+    if (!empty.length) return;
+    const only = empty.filter(k => ones(open(k)) === 1);
+    const the = v => settings.numbers ? `The ${v}` : `The ${toyName(v)}`;
+    if (only.length) {
+      i = only.includes(sel) ? sel : only[0];
+      say = `Only ${settings.numbers ? "a " + game.sol[i] : "the " + toyName(game.sol[i])} fits in the gold box: its row, column and box have the rest.`;
+    } else {
+      const KIND = ["row", "column", "box"];
+      for (let u = 0; u < U.length && i === undefined; u++) for (let v = 1; v <= N && i === undefined; v++) {
+        if (U[u].some(p => g[p] === v)) continue;
+        const at = U[u].filter(p => open(p) >> v & 1);
+        if (at.length === 1) { i = at[0]; say = `${the(v)} has only one place left in this ${KIND[u % 3]}: the gold box.`; }
+      }
+      if (i === undefined) {
+        empty.sort((a, b) => ones(open(a)) - ones(open(b)) || a - b);
+        i = empty[0]; say = `${the(game.sol[i])} goes in the gold box.`;
+      }
+    }
+  }
+  game.hinted = true; game.started = true; sel = i; armed = null;
+  hintMark = {i, bad, key: g.join()};
+  draw(); save();
+  G.note(say, 5000);
+  clearTimeout(hintTimer);
+  const mark = hintMark; hintTimer = setTimeout(() => { if (hintMark === mark) { hintMark = null; if (game) draw(); } }, 5000);
+}
+$("hintBtn").onclick = hint;
+
+/* ---------- endings ---------- */
+// Every toy right: the toys hop in a wave across the grid, then the finishing card.
+function win() {
+  game.won = true; G.finishClock(game); G.note(""); clearTimeout(hintTimer); sel = -1; noting = false; armed = null; hintMark = null;
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save();
+  G.track(`Toydoku solved level ${game.level}`);
+  build.prefetch(next);
+  running = true; draw();
+  const g = game, still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  setTimeout(() => { running = false; if (game === g) { draw(); finishCard(); } }, still ? 700 : 700 + game.N * 90);
+}
+function layaPic() { const im = new Image(); im.className = "layapic"; im.src = catSrc("laya-4"); im.alt = "Laya lying down, paws out, pleased"; return im; }
+function finishCard() {
+  const next = settings.level, N = game.N;
+  let text = `Every row, column and box of the ${N} × ${N} grid has one of each ${settings.numbers ? "number" : "toy"}.`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my toys", game.result,
+    {title: "All sorted!", gold: !game.undid && !game.hinted, goldWhy: "No hints or undos!", goldTitle: "Gold paw from Laya!", goldPic: [layaPic()],
+     next: `Next: level ${next}`, after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- new puzzles ---------- */
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
+function begin(p, level, toys) {
+  game = {level, N: p.N, bw: p.bw, bh: p.bh, sol: p.sol, givens: p.givens, toys: toys || pickToys(p.N), grid: p.givens.slice(),
+    notes: new Array(p.N * p.N).fill(0), history: [], won: false, ...G.freshClock()};
+  sel = -1; noting = false; armed = null; hintMark = null; makePad();
+}
+async function newPuzzle() {
+  if (busy) return;
+  busy = true;
+  const n = settings.level;
+  G.openCard("Getting the toys out…", "", []);
+  const p = await build.take(n);
+  begin(p, n);
+  busy = false; G.closeCard(); G.note("");
+  draw(); save();
+  build.prefetch(n);
+  G.track(`Toydoku new puzzle level ${n}`);
+  helpOnFirstVisit();
+}
+
+/* ---------- sharing ---------- */
+// The toys put out travel in the link (as digits); the answer is worked out again from them.
+$("shareBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Toydoku", won: game.won,
+  puzzle: () => ({g: "toydoku", N: game.level, gv: game.givens.join(""), toys: game.toys}),
+  progress: () => ({grid: game.grid.join(""), notes: game.notes})}); };
+function openShared(d) {
+  const lv = levelOf(d.N), N = lv && lv.N, digits = s => typeof s === "string" && s.length === N * N && /^\d+$/.test(s) && [...s].every(ch => +ch <= N);
+  const sol = lv && digits(d.gv) && reason(N, lv.bw, lv.bh, [...d.gv].map(Number), 2);
+  if (!sol) { G.note("That share link didn't work.", 5000); return; }
+  const looks = KINDS.flatMap(k => k.looks.map(([f]) => f));
+  const toys = Array.isArray(d.toys) && d.toys.length === N && new Set(d.toys).size === N && d.toys.every(f => looks.includes(f)) ? d.toys : null;
+  begin({N, bw: lv.bw, bh: lv.bh, sol, givens: [...d.gv].map(Number)}, d.N, toys);
+  if (d.p && digits(d.p.grid)) {
+    game.grid = [...d.p.grid].map((v, i) => isGiven(i) ? game.givens[i] : +v);
+    if (Array.isArray(d.p.notes) && d.p.notes.length === N * N) game.notes = d.p.notes.map(v => Number.isInteger(v) && v > 0 && v < 1 << (N + 1) ? v : 0);
+    game.timed = false;
+  }
+  settings.level = d.N; $("levelSel").value = d.N;
+  draw(); save(); build.prefetch(d.N);
+  if (game.grid.every((h, i) => h === game.sol[i])) win();
+}
+
+/* ---------- how to play ---------- */
+// How to play plays the walkthrough on the board (there's no rules card).
+function showHelp() {
+  settings.seenHelp = false; helpOnFirstVisit();
+  if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
+}
+function helpOnFirstVisit() {
+  if (!game || !playing() || settings.seenHelp || document.querySelector(".spot")) return;
+  const {N, bw, bh} = game, xy = i => [i % N, Math.floor(i / N)], U = unitsNow(), mid = Math.floor(N / 2);
+  const what = settings.numbers ? "number" : "toy";
+  const givens = game.givens.map((v, i) => v ? xy(i) : null).filter(Boolean);
+  const steps = [
+    {say: `Put a ${what} in every square`, lit: [...Array(N * N).keys()].map(xy)},
+    {say: `Every row has one of each ${what}`, lit: U[mid * 3].map(xy)},
+    {say: "So does every column", lit: U[mid * 3 + 1].map(xy)},
+    {say: "And every box", lit: U[(N / bw) * Math.floor((N / bh) / 2) * 3 + 2].map(xy)},
+    ...(givens.length ? [{say: `Some ${what}s are already out`, lit: givens}] : []),
+    {say: `Tap a ${what}, then a square`, els: [$("pad")]},
+    {say: `Hold a ${what} down to put it in square after square`, els: [$("pad")]},
+    {say: "Pencil jots down maybes", els: [$("notesBtn")]},
+    {say: settings.numbers ? "Turn Numbers off for toys" : "Prefer numbers? Switch them on", els: [$("numOpt")]},
+    {say: `Stuck? Hint shows a wrong ${what}, or where one goes`, els: [$("hintBtn")]},
+  ];
+  G.spotlight({grid: $("grid"), w: N, h: N, steps, done: () => { settings.seenHelp = true; save(); }});
+}
+
+/* ---------- choosing toys ---------- */
+const toyChest = () => ({kinds: KINDS, off: offToys, min: MIN_COLOURS, src: toySrc, save: off => {
+  offToys = off; G.saveToys(off);
+  // swap in new toys straight away if this puzzle uses one that's been left out
+  if (game && !game.won && game.toys.some(f => off.has(f))) { game.toys = pickToys(game.N); makePad(); draw(); save(); G.note("Here are your toys.", 3000); }
+  else G.note("Saved. Your toys are used from the next puzzle.", 3500);
+}});
+$("toysBtn").onclick = () => G.toyPicker(toyChest());
+G.needToys({...toyChest(), off: () => offToys, game: "Toydoku"});
+
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", ""), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
+$("helpBtn").onclick = showHelp;
+$("numTgl").checked = !!settings.numbers;
+$("layaTitle").src = catSrc("laya-2");
+
+G.nav("toydoku");
+G.checkClock(game);
+G.setupTimer({name: "toydoku", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+const shared = G.readShare("toydoku");
+if (game && Array.isArray(game.grid)) G.reopen(() => {
+    const lv = levelOf(game.level);
+    if (!lv || lv.N !== game.N || game.grid.length !== game.N * game.N || game.sol.length !== game.N * game.N || game.toys.length !== game.N) throw new Error("the saved puzzle doesn't fit its level");
+    makePad(); draw();
+    if (game.won) finishCard();
+    build.prefetch(settings.level); helpOnFirstVisit();
+  }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
+else if (!shared) newPuzzle();
+const shareOpts = () => ({name: "Toydoku", inProgress: !!(game && !game.won && game.history.length), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, shareOpts());
+// A share link opened while this page is already showing only changes the address, so watch for it.
+window.addEventListener("hashchange", () => { const d = G.readShare("toydoku"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
