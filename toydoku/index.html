@@ -101,13 +101,14 @@
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N grid in boxes of bw × bh squares: every row, column and box holds each of the N toys once. Toys are
 // 1 to N here; which picture each one is gets picked when the puzzle's dealt.
-// Levels: the size, how hard the reasoning gets (1: a square with only one toy left, or a toy with only one
-// place left in a row, column or box; 2: also needs the ruling-out tricks in reason), and how many spare pairs
-// of toys it puts out beyond the fewest that still let it be worked out.
+// Levels: the size, how hard the reasoning gets (tier, as in reason), and how many spare pairs of toys it puts
+// out beyond the fewest that still let it be worked out. From tier 3 up, a grid has to need its tier's tricks;
+// past that (tier 4), it needs at least `tries` steps of trial and error (see trials).
 function levelOf(n) {
+  const nine = {N: 9, bw: 3, bh: 3, extra: 0};
   return [null, {N: 4, bw: 2, bh: 2, tier: 1, extra: 2}, {N: 6, bw: 3, bh: 2, tier: 1, extra: 4}, {N: 6, bw: 3, bh: 2, tier: 1, extra: 0},
-    {N: 9, bw: 3, bh: 3, tier: 1, extra: 8}, {N: 9, bw: 3, bh: 3, tier: 1, extra: 3}, {N: 9, bw: 3, bh: 3, tier: 1, extra: 0},
-    {N: 9, bw: 3, bh: 3, tier: 2, extra: 0}][n];
+    {...nine, tier: 1, extra: 8}, {...nine, tier: 1, extra: 3}, {...nine, tier: 1}, {...nine, tier: 2}, {...nine, tier: 3},
+    {...nine, tier: 4, tries: 1}, {...nine, tier: 4, tries: 3}, {...nine, tier: 4, tries: 5}][n];
 }
 // The rows, columns and boxes, in that order for each a (row a, column a, box a), each a list of squares.
 function units(N, bw, bh) {
@@ -142,21 +143,51 @@ function randomFull(N, bw, bh) {
     if (fill(0)) return g;
   }
 }
-// Work the grid out by reasoning alone, without guessing. Each square keeps the toys it could be. Tier 1: a toy
-// placed rules itself out of its row, column and box; a square with one toy left takes it; a toy with one place
-// left in a row, column or box goes there. Tier 2 adds: a toy whose places in one row, column or box all lie
-// in another (a box and a line) is ruled out of the rest of that other one; and two squares of a row, column or
-// box with the same two toys left rule those two out of the rest of it.
+// How many answers the grid has, stopping at 2 (trying the square with the fewest toys left first).
+function countSols(N, bw, bh, g) {
+  const U = units(N, bw, bh), of = [...Array(N * N)].map(() => []);
+  U.forEach((u, k) => u.forEach(i => of[i].push(k)));
+  const used = new Array(U.length).fill(0), a = g.slice(), full = (1 << (N + 1)) - 2;
+  for (let i = 0; i < N * N; i++) if (a[i]) for (const k of of[i]) { if (used[k] >> a[i] & 1) return 0; used[k] |= 1 << a[i]; }
+  let n = 0;
+  const go = () => {
+    let best = -1, bm = 0, bc = 99;
+    for (let i = 0; i < N * N; i++) if (!a[i]) {
+      const m = full & ~(used[of[i][0]] | used[of[i][1]] | used[of[i][2]]);
+      let c = 0, x = m; while (x) { x &= x - 1; c++; }
+      if (c < bc) { bc = c; best = i; bm = m; if (!c) return; }
+    }
+    if (best < 0) { n++; return; }
+    for (let v = 1; v <= N && n < 2; v++) if (bm >> v & 1) {
+      a[best] = v; for (const k of of[best]) used[k] |= 1 << v;
+      go();
+      for (const k of of[best]) used[k] &= ~(1 << v);
+      a[best] = 0;
+    }
+  };
+  go(); return n;
+}
+// Work the grid out by reasoning alone, without guessing. Each square keeps the toys it could be.
+// Tier 1: a toy placed rules itself out of its row, column and box; a square with one toy left takes it; a toy
+//   with one place left in a row, column or box goes there.
+// Tier 2 adds: a toy whose places in one row, column or box all lie in another is ruled out of the rest of that
+//   other one; and two squares of a row, column or box with the same two toys left rule them out of the rest.
+// Tier 3 adds: any 2 to 4 squares of a row, column or box with only that many toys between them (or 2 to 4 toys
+//   with only that many places), fish (X-wing, swordfish, jellyfish) and the XY-wing.
 // Returns the finished grid, or null if it gets stuck or finds a contradiction. g: the grid, 0 for empty.
-function reason(N, bw, bh, g, tier) {
+// With start (each square's toys as bits), it carries on from there and returns them all as far as it gets,
+// or null on a contradiction.
+function reason(N, bw, bh, g, tier, start) {
   const U = units(N, bw, bh), full = (1 << (N + 1)) - 2, bit = v => 1 << v;
   const ones = m => { let c = 0; while (m) { m &= m - 1; c++; } return c; }, lo = m => 31 - Math.clz32(m & -m);
-  const dom = g.map(v => v ? bit(v) : full);
+  const dom = start ? start.slice() : g.map(v => v ? bit(v) : full);
   const peers = [...Array(N * N)].map(() => new Set());
   for (const u of U) for (const i of u) for (const j of u) if (i !== j) peers[i].add(j);
-  for (let changed = true; changed;) {
+  const combos = (arr, k) => { const out = [], c = []; const go = s => { if (c.length === k) { out.push(c.slice()); return; } for (let j = s; j < arr.length; j++) { c.push(arr[j]); go(j + 1); c.pop(); } }; go(0); return out; };
+  let changed = true;
+  const set = (i, m) => { if (m !== dom[i]) { dom[i] = m; changed = true; } return m; };
+  while (changed) {
     changed = false;
-    const set = (i, m) => { if (m !== dom[i]) { dom[i] = m; changed = true; } return m; };
     for (let i = 0; i < N * N; i++) {
       if (!dom[i]) return null;
       if (ones(dom[i]) !== 1) continue;
@@ -170,32 +201,90 @@ function reason(N, bw, bh, g, tier) {
     }
     if (changed || tier < 2) continue;
     for (const u of U) for (let v = 1; v <= N; v++) {
-      const at = u.filter(p => dom[p] & bit(v) && ones(dom[p]) > 1);
+      const at = u.filter(p => dom[p] & bit(v));
       if (at.length < 2) continue;
       for (const w of U) if (w !== u && at.every(p => w.includes(p))) for (const p of w) if (!u.includes(p) && dom[p] & bit(v)) { if (!set(p, dom[p] & ~bit(v))) return null; }
     }
-    for (const u of U) for (let a = 0; a < N; a++) {
-      const m = dom[u[a]];
-      if (ones(m) !== 2) continue;
-      for (let b = a + 1; b < N; b++) if (dom[u[b]] === m) for (const p of u) if (p !== u[a] && p !== u[b] && dom[p] & m) { if (!set(p, dom[p] & ~m)) return null; }
+    if (changed) continue;
+    for (const u of U) {
+      const open = u.filter(p => ones(dom[p]) > 1);
+      for (let k = 2; k <= (tier < 3 ? 2 : 4) && k < open.length; k++) {
+        for (const c of combos(open, k)) {
+          let m = 0; for (const p of c) m |= dom[p];
+          if (ones(m) === k) for (const p of open) if (!c.includes(p) && dom[p] & m) set(p, dom[p] & ~m);
+        }
+        if (tier < 3) continue;
+        let vals = 0; for (const p of open) vals |= dom[p];
+        const vs = []; for (let v = 1; v <= N; v++) if (vals >> v & 1) vs.push(v);
+        for (const c of combos(vs, k)) {
+          let m = 0; for (const v of c) m |= bit(v);
+          const at = u.filter(p => dom[p] & m);
+          if (at.length === k && c.every(v => at.some(p => dom[p] & bit(v)))) for (const p of at) set(p, dom[p] & m);
+        }
+      }
+    }
+    if (changed || tier < 3) continue;
+    // fish: k rows whose places for a toy lie in just k columns rule it out of the rest of those columns (and
+    // the same the other way round)
+    for (const byRow of [true, false]) for (let v = 1; v <= N; v++) {
+      const lines = [];
+      for (let a = 0; a < N; a++) { const where = []; for (let b = 0; b < N; b++) if (dom[byRow ? a * N + b : b * N + a] & bit(v)) where.push(b); if (where.length >= 2) lines.push([a, where]); }
+      for (let k = 2; k <= 4; k++) for (const c of combos(lines.filter(l => l[1].length <= k), k)) {
+        const cross = new Set(c.flatMap(l => l[1]));
+        if (cross.size !== k) continue;
+        const base = new Set(c.map(l => l[0]));
+        for (const b of cross) for (let a = 0; a < N; a++) if (!base.has(a)) { const p = byRow ? a * N + b : b * N + a; if (dom[p] & bit(v)) set(p, dom[p] & ~bit(v)); }
+      }
+    }
+    if (changed) continue;
+    // XY-wing: a square with toys xy seeing one with xz and one with yz; z is ruled out where both of those see
+    const bi = []; for (let i = 0; i < N * N; i++) if (ones(dom[i]) === 2) bi.push(i);
+    for (const piv of bi) for (const a of bi) if (a !== piv && peers[piv].has(a)) for (const b of bi) {
+      if (b === piv || b === a || !peers[piv].has(b)) continue;
+      const x = dom[piv], ma = dom[a], mb = dom[b], z = ma & mb & ~x;
+      if (ones(ma & x) !== 1 || ones(mb & x) !== 1 || (ma & x) === (mb & x) || ones(z) !== 1) continue;
+      for (const p of peers[a]) if (p !== b && p !== piv && peers[b].has(p) && dom[p] & z) set(p, dom[p] & ~z);
     }
   }
+  if (start) return dom;
   return dom.every(m => ones(m) === 1) ? dom.map(lo) : null;
+}
+// For grids past tier 3: put a toy in a square and see if tier 3 reasoning breaks; if it does, rule that toy out
+// there and carry on. Returns how many such tries rule something out before the grid's finished, or Infinity
+// if that isn't enough.
+function trials(N, bw, bh, g) {
+  const ones = m => { let c = 0; while (m) { m &= m - 1; c++; } return c; };
+  let dom = reason(N, bw, bh, g, 3, g.map(v => v ? 1 << v : (1 << (N + 1)) - 2)), n = 0;
+  while (dom && !dom.every(m => ones(m) === 1)) {
+    let hit = false;
+    const open = dom.map((m, i) => i).filter(i => ones(dom[i]) > 1).sort((a, b) => ones(dom[a]) - ones(dom[b]));
+    for (const i of open) {
+      for (let v = 1; v <= N && !hit; v++) if (dom[i] >> v & 1) {
+        const t = dom.slice(); t[i] = 1 << v;
+        if (!reason(N, bw, bh, g, 3, t)) { const d = dom.slice(); d[i] &= ~(1 << v); dom = reason(N, bw, bh, g, 3, d); n++; hit = true; }
+      }
+      if (hit) break;
+    }
+    if (!hit) return Infinity;
+  }
+  return n;
 }
 // A grid for level n: a full grid, then take toys away two at a time (each with its partner turned halfway
 // round, so the gaps make a pattern), keeping each pair whose loss would stop the grid working out by the
-// level's reasoning. Then put back the level's spare pairs. A tier 2 grid also has to need the tier 2 tricks.
-// Working out by reasoning alone means there's exactly one answer.
+// level's reasoning (from tier 3 up: would give it more than one answer). Then put back the level's spare
+// pairs. A grid past tier 1 has to need its tier's tricks. Returns null to be called again if it doesn't.
 function makeGrid(n) {
-  const {N, bw, bh, tier, extra} = levelOf(n), sol = randomFull(N, bw, bh);
+  const {N, bw, bh, tier, tries, extra} = levelOf(n), sol = randomFull(N, bw, bh);
   const shuffle = a => { for (let k = a.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [a[k], a[j]] = [a[j], a[k]]; } return a; };
-  const g = sol.slice(), gone = [];
+  const g = sol.slice(), gone = [], works = tier < 3 ? () => reason(N, bw, bh, g, tier) : () => countSols(N, bw, bh, g) === 1;
   for (const i of shuffle([...Array(Math.ceil(N * N / 2)).keys()])) {
     const pair = [...new Set([i, N * N - 1 - i])], keep = pair.map(p => g[p]);
     pair.forEach(p => { g[p] = 0; });
-    if (reason(N, bw, bh, g, tier)) gone.push(pair); else pair.forEach((p, k) => { g[p] = keep[k]; });
+    if (works()) gone.push(pair); else pair.forEach((p, k) => { g[p] = keep[k]; });
   }
-  if (tier > 1 && reason(N, bw, bh, g, 1)) return null;
+  if (tier > 1 && reason(N, bw, bh, g, Math.min(tier, 4) - 1)) return null;
+  if (tier === 3 && !reason(N, bw, bh, g, 3)) return null;
+  if (tier === 4 && trials(N, bw, bh, g) < tries) return null;
   for (const pair of shuffle(gone).slice(0, extra)) pair.forEach(p => { g[p] = sol[p]; });
   return {N, bw, bh, sol, givens: g};
 }
@@ -232,7 +321,7 @@ function pickToys(N) {
 /* ---------- game state ---------- */
 // game: {level, N, bw, bh, sol, givens (the grid as dealt, 0 for empty), toys (picture for toys 1 to N, as
 //        toys[v - 1]), grid (0 for empty), notes (bit v set: v jotted down), history (undo steps), hinted, undid, won}
-const STORE = "catdoku.toydoku.v1", MAX_LEVEL = 7;
+const STORE = "catdoku.toydoku.v1", MAX_LEVEL = 11;
 const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1, numbers: false}, state.settings);
@@ -242,9 +331,9 @@ let game = state.game || null, busy = false, running = false, sel = -1, noting =
 let armed = null;
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
-const HOW = [null, "", "", "", "a head start", "", "", "trickier"];
+const HOW = [null, "", "", "", "a head start", "", "", "tricky", "fiendish", "diabolical", "insane", "nightmare"];
 const levelName = n => { const {N} = levelOf(n); return `Level ${n} · ${N} × ${N}${HOW[n] ? ", " + HOW[n] : ""}`; };
-const build = G.builder([levelOf, units, randomFull, reason, makeGrid], "makeGrid");
+const build = G.builder([levelOf, units, randomFull, countSols, reason, trials, makeGrid], "makeGrid");
 const isGiven = i => !!game.givens[i];
 const toyName = v => settings.numbers ? String(v) : nameOf(game.toys[v - 1]);
 const unitsNow = () => units(game.N, game.bw, game.bh);
@@ -489,7 +578,7 @@ async function newPuzzle() {
   if (busy) return;
   busy = true;
   const n = settings.level;
-  G.openCard("Getting the toys out…", "", []);
+  G.openCard("Getting the toys out…", n >= 9 ? "The hardest grids can take a few seconds." : "", []);
   const p = await build.take(n);
   begin(p, n);
   busy = false; G.closeCard(); G.note("");
@@ -506,7 +595,7 @@ $("shareBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Toydoku",
   progress: () => ({grid: game.grid.join(""), notes: game.notes})}); };
 function openShared(d) {
   const lv = levelOf(d.N), N = lv && lv.N, digits = s => typeof s === "string" && s.length === N * N && /^\d+$/.test(s) && [...s].every(ch => +ch <= N);
-  const sol = lv && digits(d.gv) && reason(N, lv.bw, lv.bh, [...d.gv].map(Number), 2);
+  const gv = digits(d.gv) && [...d.gv].map(Number), sol = lv && gv && countSols(N, lv.bw, lv.bh, gv) === 1 && answer(N, lv.bw, lv.bh, gv);
   if (!sol) { G.note("That share link didn't work.", 5000); return; }
   const looks = KINDS.flatMap(k => k.looks.map(([f]) => f));
   const toys = Array.isArray(d.toys) && d.toys.length === N && new Set(d.toys).size === N && d.toys.every(f => looks.includes(f)) ? d.toys : null;
@@ -519,6 +608,13 @@ function openShared(d) {
   settings.level = d.N; $("levelSel").value = d.N;
   draw(); save(); build.prefetch(d.N);
   if (game.grid.every((h, i) => h === game.sol[i])) win();
+}
+
+// The one answer of a grid known to have just one, by trying toys square by square.
+function answer(N, bw, bh, g) {
+  const a = g.slice(), U = units(N, bw, bh), ok = (i, v) => U.every(u => !u.includes(i) || u.every(p => a[p] !== v));
+  const go = i => { if (i === N * N) return true; if (a[i]) return go(i + 1); for (let v = 1; v <= N; v++) if (ok(i, v)) { a[i] = v; if (go(i + 1)) return true; } a[i] = 0; return false; };
+  return go(0) ? a : null;
 }
 
 /* ---------- how to play ---------- */
