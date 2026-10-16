@@ -132,7 +132,8 @@ Tunnel Run puts a box round a piece that's the wrong way round and says so for 3
 ## 4. Housekeeping
 
 - **Game list:** add `[name, slug, blurb, colour, shelf, search words]` to `G.GAMES` in `games.js`. The shelf is
-  one of the keys in `G.GROUPS` (logic, numbers, lines, words, teasers, quick); the search words are the puzzle it's
+  one of the keys in `G.GROUPS` (logic, numbers, lines, words, teasers, quick: shown as Cat Logic, Cat Math, Cat's
+  Cradle, Cat Chat, Curious Cat and Kitten Play); the search words are the puzzle it's
   based on and other names for it ("minesweeper mines"), so the search boxes on the front page and in the games menu
   find it.
 - **Icon:** add a function to `tools/make-icons.py` and to its `ICONS` dict, then run

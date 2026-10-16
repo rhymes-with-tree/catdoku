@@ -34,14 +34,15 @@ const G = (() => {
     ["Treat Time", "treattime", "Help Higgins give every cat just enough treats", "#ECA818", "numbers", "sumplete sums"],
     ["Up a Tree", "upatree", "Help Dottie climb the cat tree, one letter at a time", "#6AA673", "words", "word ladder weaver doublets"],
   ];
-  // The shelves the front page and the games menu sort the games onto, in order: key, heading, one line.
+  // The shelves the front page and the games menu sort the games onto, in order: key (also a plain name for it,
+  // for search), heading, one line.
   const GROUPS = [
-    ["logic", "Logic grids", "Fill the grid by its rules; every puzzle has one answer"],
-    ["numbers", "Numbers", "Sums and arithmetic"],
-    ["lines", "Lines and paths", "Join, link and route things"],
-    ["words", "Words", "Spell, find and climb words"],
-    ["teasers", "Brain teasers", "Moves to plan and shapes to fit"],
-    ["quick", "Quick play", "Match, pop, sort and chase"],
+    ["logic", "Cat Logic", "Fill the grid by its rules; every puzzle has one answer"],
+    ["numbers", "Cat Math", "Sums and arithmetic"],
+    ["lines", "Cat's Cradle", "Join, link and route things"],
+    ["words", "Cat Chat", "Spell, find and climb words"],
+    ["teasers", "Curious Cat", "Moves to plan and shapes to fit"],
+    ["quick", "Kitten Play", "Match, pop, sort and chase"],
   ];
   const $ = id => document.getElementById(id);
 
@@ -49,10 +50,10 @@ const G = (() => {
   const RECENT = "catdoku.recent.v1";
   const recent = () => { const r = load(RECENT).games; return Array.isArray(r) ? r.filter(s => GAMES.some(g => g[1] === s)) : []; };
   const played = slug => save(RECENT, {games: [slug, ...recent().filter(s => s !== slug)].slice(0, 8)});
-  // Whether a game matches what's typed in a search box: every word typed is found in its name, line, shelf or
-  // search words.
+  // Whether a game matches what's typed in a search box: every word typed is found in its name, line, shelf (its
+  // heading, plain name or line) or search words.
   const matches = (g, q) => {
-    const hay = [g[0], g[2], g[5], (GROUPS.find(x => x[0] === g[4]) || [])[1]].join(" ").toLowerCase().replace(/[^a-z0-9 ]/g, "");
+    const hay = [g[0], g[2], g[5], ...(GROUPS.find(x => x[0] === g[4]) || [])].join(" ").toLowerCase().replace(/[^a-z0-9 ]/g, "");
     return q.toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter(Boolean).every(w => hay.includes(w));
   };
 
