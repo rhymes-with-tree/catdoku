@@ -4,7 +4,7 @@ A family of cat-themed puzzle games, each a single HTML page. The first, Catdoku
 
 ## Play
 
-Open `index.html` in any modern browser: the front page has a tile for every game, with an icon drawn from its board, a line about it and how many you've solved on this device. No build step or dependencies. (Catdoku used to be the front page; old share links to it are passed on to `catdoku/`.) The icons are in `icons/`, drawn by `tools/make-icons.py` (`python3 tools/make-icons.py` draws them again).
+Open `index.html` in any modern browser: the front page has a tile for every game, with an icon drawn from its board, a line about it and how many you've solved on this device. The tiles are on shelves by kind (Cat Logic for logic grids, Cat Math for numbers, Cat Trails for lines and paths, Cat Spells for words, Curious Cat for brain teasers and Kitten Play for quick games), under a Keep playing row of the last few games played on this device, and a search box narrows them by name, line, shelf (by its name or a plain one, like "logic" or "words") or the puzzle a game is based on ("minesweeper" finds Hide & Seek). Every game's All games menu has the same search box, Keep playing row and shelves. The shelves, search words and recent games are kept in `games.js` (`G.GAMES`, `G.GROUPS`, `G.recent`). No build step or dependencies. (Catdoku used to be the front page; old share links to it are passed on to `catdoku/`.) The icons are in `icons/`, drawn by `tools/make-icons.py` (`python3 tools/make-icons.py` draws them again).
 
 ## Across every game
 
