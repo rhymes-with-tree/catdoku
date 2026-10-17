@@ -79,11 +79,14 @@
 <script src="../games.js?v=2026-10-17.1"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
-// Every cat has arrows, and a tap blinks the cat and the cats its arrows point at. Most cats point at the four
-// beside them; from level 3, some point their own way. Levels: [columns, rows, taps the answer takes, how many
-// cats point their own way].
+// Every cat has arrows, and a tap blinks the cat and the cats its arrows point at. Levels 1 to 9 are plain
+// (every cat points at the four beside it), growing from 3 × 3 to 9 × 9; level 10 starts small again with some
+// cats that point their own way, and 18 and 19 are all such cats. Levels: [columns, rows, taps the answer
+// takes, how many cats point their own way].
 function levelOf(n) {
-  return [null, [3, 3, 3, 0], [4, 4, 4, 0], [4, 4, 5, 3], [5, 5, 6, 5], [5, 5, 7, 12], [5, 5, 8, 25],
+  return [null, [3, 3, 3, 0], [4, 4, 4, 0], [5, 5, 5, 0], [5, 5, 7, 0], [6, 6, 9, 0], [7, 7, 12, 0],
+    [7, 7, 15, 0], [8, 8, 18, 0], [9, 9, 22, 0],
+    [3, 3, 3, 2], [4, 4, 4, 2], [4, 4, 5, 3], [5, 5, 6, 5], [5, 5, 7, 12], [5, 5, 8, 25],
     [6, 6, 9, 18], [6, 6, 11, 36], [7, 7, 12, 49], [7, 7, 14, 49]][n];
 }
 // The eight ways an arrow can point, as bits of a cat's arrows: up, up-right, right, … clockwise.
@@ -177,14 +180,24 @@ function arrowMarks(a) {
 /* ---------- game ---------- */
 // game: {level, W, H, start (awake at the start), awake, par (fewest taps), taps (every tap counts, even ones
 //        undone), history (undo steps), hinted, won, arrows (each cat's arrows, as bits)}
-const STORE = "catdoku.nightlight.v1", MAX_LEVEL = 10;
+const STORE = "catdoku.nightlight.v1", MAX_LEVEL = 19, FIRST_ARROWS = 10;
 const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1}, state.settings);
 let game = state.game || null, busy = false, lit = -1;
 const save = () => G.save(STORE, {settings, game});
+// Until build 2026-10-17.1 there were 10 levels, with arrows from level 3; those are now levels 12 to 19.
+// Saves, best times and share links from then carry their old numbers, so move them up.
+const oldLevel = n => n >= 3 ? n + 9 : n;
+if (settings.levels !== 19) {
+  settings.levels = 19; settings.level = oldLevel(settings.level);
+  if (game && game.level) game.level = oldLevel(game.level);
+  const bests = G.load("catdoku.bests.v1"), mine = bests.nightlight;
+  if (mine) { bests.nightlight = {}; for (const n in mine) bests.nightlight[oldLevel(+n)] = mine[n]; G.save("catdoku.bests.v1", bests); }
+  save();
+}
 const playing = () => game && !game.won && !busy && !$("overlay").classList.contains("show");
-const levelName = n => { const [W, H, T] = levelOf(n); return `Level ${n} · ${W} × ${H}, ${T} taps`; };
+const levelName = n => { const [W, H, T] = levelOf(n); return `Level ${n} · ${W} × ${H}, ${T} taps${n >= FIRST_ARROWS ? ", arrows" : ""}`; };
 const build = G.builder([levelOf, arrowDirs, inRoom, blinks, fewestTaps, makeArrows, makeRoom], "makeRoom");
 const plainArrows = (W, H) => Array.from({length: W * H}, (_, i) => inRoom(W, H, i, true));
 const awakeCount = () => game.awake.filter(Boolean).length;
@@ -286,9 +299,10 @@ async function newPuzzle() {
 
 /* ---------- sharing ---------- */
 $("shareBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Night Light", won: game.won,
-  puzzle: () => ({g: "nightlight", N: game.level, awake: game.start, a: game.arrows}),
+  puzzle: () => ({g: "nightlight", N: game.level, L: 19, awake: game.start, a: game.arrows}),
   progress: () => ({awake: game.awake, taps: game.taps})}); };
 function openShared(d) {
+  if (d.L !== 19) d.N = oldLevel(d.N);   // a link from when there were 10 levels
   const lv = levelOf(d.N), size = lv && lv[0] * lv[1], ok = a => Array.isArray(a) && lv && a.length === size && a.every(v => v === 0 || v === 1);
   // every arrow has to point at a cat in the room; links from before arrows have none, and point the plain way
   const arrows = !lv ? null : d.a === undefined ? plainArrows(lv[0], lv[1])
