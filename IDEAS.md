@@ -76,6 +76,7 @@ Rows are sorted by group, then status: Yes, Look closer, Option, Idea, Built, No
 | Connections | Words by meaning | Sort 16 words into four groups | Written | — | — | You play, wordleunlimited | No | Needs categories |
 | Murdle | Words by meaning | Solve a murder mystery story by logic, using a grid of suspects, weapons and places | Written | — | — | You play | No | Needs written stories |
 | Redactle | Words by meaning | Guess the words of a hidden Wikipedia article to reveal its title | Written | — | — | wordleunlimited | No | Needs Wikipedia articles |
+| Magic squares | Numbers | Fill a grid with the numbers 1 to N² (or a given set), each once, so every row, column and both long diagonals add up to the same total; some numbers start in place | None | Medium | Treat Time, Toydoku | Idea list | Idea | Needs a solver so the numbers given leave only one way to finish |
 | Toe Beans (Countdown numbers) | Numbers | Combine numbers with + − × ÷ to hit the goal; this was the "Digits" idea | — | — | — | Game Suite chat | Built | |
 | Border ladder | Geography | Get from one country to another through shared borders | None | Medium | — | Word Dictionaries chat | Idea | Recommended first in that chat; needs a saved list of borders |
 | Hidden cat in a painting (Cat Burglar) | Seeking | Find a cat hidden in a famous painting | None | Hard | — | Word Dictionaries chat | Idea | Waiting on where the images come from |
