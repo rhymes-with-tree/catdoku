@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-17.4";
+  var BUILD = "2026-10-17.5";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-17.4">
+<link rel="stylesheet" href="../games.css?v=2026-10-17.5">
 <style>
 /* Six number tiles up top, then one outlined paw: its four toe beans are + − × ÷ and its main pad holds the goal.
    An exact hit fills every pad at once in gold; the paw's own pad colour (--pc, with --pt for text on it) is
@@ -61,6 +61,14 @@
 @keyframes pop{50%{transform:scale(1.12)}}
 
 .card .way{font-weight:600;color:var(--ink);margin:0 0 16px;font-variant-numeric:tabular-nums}
+/* Reverse mode: the big pad holds a number to bring down to 0, and can be tapped like a number */
+.paw.rev .pad{cursor:pointer}
+.paw.rev .pad:hover path{fill:var(--tint)}
+.paw.rev .pad.picked path{fill:var(--plum)}
+.paw.rev .pad.picked .goal,.paw.rev .pad.picked .label{color:#fff}
+.paw.rev .pad.dim{opacity:.45;cursor:default}
+.paw.rev .pad.hintcell path{fill:rgba(236,168,24,.55)}
+.paw.rev .pad.pop .goal{animation:pop .3s}
 </style>
 </head>
 <body>
@@ -77,7 +85,7 @@
       <button class="toe" data-op="-" style="left:29%;top:5%;--r:-8deg" aria-label="Subtract"><span>−</span></button>
       <button class="toe" data-op="*" style="left:52%;top:5%;--r:8deg" aria-label="Multiply"><span>×</span></button>
       <button class="toe" data-op="/" style="left:74%;top:23%;--r:24deg" aria-label="Divide"><span>÷</span></button>
-      <div class="pad" id="pad">
+      <div class="pad" id="pad" role="button" aria-label="The big pad">
         <svg viewBox="0 0 200 150" preserveAspectRatio="none" aria-hidden="true">
           <path d="M100 6 C126 6 141 28 153 46 C172 50 197 70 195 101 C193 133 166 147 140 141 C125 138 112 131 100 131 C88 131 75 138 60 141 C34 147 7 133 5 101 C3 70 28 50 47 46 C59 28 74 6 100 6Z"
             stroke="var(--ink)" stroke-width="3" vector-effect="non-scaling-stroke"/>
@@ -101,10 +109,13 @@
     <label>Level <select id="levelSel" aria-label="Level"></select></label>
     <button id="newBtn" class="primary">New puzzle</button>
   </div>
+  <div class="bar toggles">
+    <div class="opt"><label class="toggle"><input type="checkbox" id="revSw"><span class="sw"></span>Reverse</label><span class="hint">Bring the big pad's number down to 0, using it in your sums</span></div>
+  </div>
 
 </main>
 
-<script src="../games.js?v=2026-10-17.4"></script>
+<script src="../games.js?v=2026-10-17.5"></script>
 <script>
 /* ---------- puzzles ---------- */
 // Each level: [fewest steps the goal needs, lowest goal, highest goal, the big numbers that can be dealt].
@@ -174,13 +185,86 @@ function oneWay(nums, goal) {
   return null;
 }
 
+/* ---------- Reverse mode ---------- */
+// The pad starts on a number and comes down to 0. Every step uses up one tile (two tiles combine into one, or the
+// pad combines with a tile and the answer goes on the pad), so a way to 0 takes as many steps as tiles it uses.
+// For each set of tiles (a bitmask m): V[m], the numbers they can make using every one, and Z[m], the pad numbers
+// they can bring to 0 using every one, each remembering how. Numbers above cap are left out.
+function revTable(nums, cap) {
+  const n = nums.length, V = [], Z = [];
+  const bits = m => { let c = 0; for (; m; m &= m - 1) c++; return c; };
+  const masks = [...Array(1 << n).keys()].sort((a, b) => bits(a) - bits(b));
+  for (const m of masks) {
+    const v = new Map(), z = new Map();
+    if (!m) { V[m] = v; z.set(0, null); Z[m] = z; continue; }
+    if (bits(m) === 1) v.set(nums[Math.log2(m)], null);
+    else for (let a = (m - 1) & m; a; a = (a - 1) & m) {
+      const b = m ^ a;
+      for (const x of V[a].keys()) for (const y of V[b].keys()) for (const op of "+-*/") {
+        const r = opResult(x, op, y);
+        if (r !== null && r <= cap && !v.has(r)) v.set(r, [a, x, op, b, y]);
+      }
+    }
+    V[m] = v;
+    // the pad's first step uses a number u made from a group g of the tiles, landing on R, which the rest bring to 0
+    for (let g = m; g; g = (g - 1) & m) for (const R of Z[m ^ g].keys()) for (const u of V[g].keys()) {
+      const ways = R === 0 ? [[u, "-", "pad"]] : [[R - u, "+", "pad"], [R + u, "-", "pad"], [u - R, "-", "tile"],
+        [R % u ? 0 : R / u, "*", "pad"], [R * u, "/", "pad"], [u % R ? 0 : u / R, "/", "tile"]];
+      for (const [Q, op, first] of ways) if (Q > 0 && Q <= cap && !z.has(Q)) z.set(Q, [g, u, op, first, R]);
+    }
+    Z[m] = z;
+  }
+  return {V, Z, masks, bits};
+}
+// Every start number the tiles can bring to 0, with the fewest steps it needs.
+function revStarts(nums, cap) {
+  const {Z, masks, bits} = revTable(nums, cap), best = new Map();
+  for (const m of masks) if (m) for (const Q of Z[m].keys()) if (!best.has(Q)) best.set(Q, bits(m));
+  return best;
+}
+// A Reverse puzzle: numbers dealt as for the usual game, and a start in the level's range needing exactly its steps.
+function makeReverse(level) {
+  const [steps, lo, hi, bigPool] = levelInfo(level);
+  for (let tries = 0; tries < 200; tries++) {
+    const small = new Set(); while (small.size < 4) small.add(1 + Math.floor(Math.random() * 9));
+    const big = new Set(); while (big.size < 2) big.add(bigPool[Math.floor(Math.random() * bigPool.length)]);
+    const nums = [...small, ...big].sort((x, y) => x - y);
+    const fits = [...revStarts(nums, 5000)].filter(([v, s]) => s === steps && v >= lo && v <= hi).map(([v]) => v);
+    if (fits.length) return {nums, start: fits[Math.floor(Math.random() * fits.length)]};
+  }
+  return null;
+}
+// One shortest way to 0 from here, as steps [a, op, b, answer, onPad] in the order they're tapped; [] at 0; null if none.
+function revWay(tiles, pad) {
+  if (pad === 0) return [];
+  const {V, Z, masks} = revTable(tiles, Math.max(5000, pad));
+  const m = masks.find(m => m && Z[m].has(pad));
+  if (m === undefined) return null;
+  const make = (g, u) => { const w = V[g].get(u); if (!w) return []; const [a, x, op, b, y] = w; return [...make(a, x), ...make(b, y), [x, op, y, opResult(x, op, y), false]]; };
+  const steps = [];
+  for (let left = m, Q = pad; Q !== 0;) {
+    const [g, u, op, first, R] = Z[left].get(Q);
+    steps.push(...make(g, u), first === "pad" ? [Q, op, u, R, true] : [u, op, Q, R, true]);
+    left ^= g; Q = R;
+  }
+  return steps;
+}
+// A sum with the pad in it: as opResult, except the pad may come down to exactly 0 (a number take itself).
+const padResult = (a, op, b) => op === "-" && a === b ? 0 : opResult(a, op, b);
+
 /* ---------- game ---------- */
 const STORE = "catdoku.toebeans.v1";
 const $ = G.$;
 let state = G.load(STORE);
-let settings = Object.assign({level: 1, recent: []}, state.settings);
+let settings = Object.assign({level: 1, recent: [], levelRev: 1, recentRev: []}, state.settings);
 let game = state.game || null, busy = false, pick = null, op = null, popped = -1;
 const build = G.builder([levelInfo, opResult, reachable, makeToeBeans], "makeToeBeans");
+const buildRev = G.builder([levelInfo, opResult, revTable, revStarts, makeReverse], "makeReverse");
+// Reverse mode keeps its own level and recent paws; its best times are kept apart under level 100 + N.
+const rev = () => !!settings.rev;
+const builder = () => rev() ? buildRev : build;
+const lvKey = () => rev() ? "levelRev" : "level", recentKey = () => rev() ? "recentRev" : "recent";
+const myLevel = () => settings[lvKey()];
 const save = () => G.save(STORE, {settings, game});
 
 // Real paw pad colours, each with the text colour that reads on it. Each game gets one, never the same twice running.
@@ -190,28 +274,52 @@ function newPads(last) { const from = PADS.filter(p => !last || p[0] !== last[0]
 
 const SIGN = {"+": "+", "-": "−", "*": "×", "/": "÷"};
 const playing = () => game && !game.won && !game.over && !busy;
+const target = () => game.rev ? 0 : game.goal;
 function closest() {
+  if (game.rev) return game.pad;
   let c = null;
   for (const v of game.beans) if (v !== null && (c === null || Math.abs(v - game.goal) < Math.abs(c - game.goal))) c = v;
   return c;
 }
 
+const snap = () => game.rev ? {b: game.beans.slice(), p: game.pad} : game.beans.slice();
 function tapBean(i) {
   if (!playing() || game.beans[i] === null) return;
+  if (pick === "pad" && op !== null) return padStep(game.pad, op, game.beans[i], i);
   if (pick === null || op === null) pick = pick === i ? null : i;
   else if (pick === i) { pick = null; op = null; }
   else {
     const r = opResult(game.beans[pick], op, game.beans[i]);
     if (r === null) return;
-    game.history.push(game.beans.slice());
+    game.history.push(snap());
     game.beans[i] = r; game.beans[pick] = null; pick = null; op = null; popped = i;
     save();
-    if (r === game.goal) return win();
+    if (!game.rev && r === game.goal) return win();
   }
   render();
 }
 function tapToe(o) { if (!playing() || pick === null) return; op = op === o ? null : o; render(); }
-function undo() { if (!playing() || !game.history.length) return; game.beans = game.history.pop(); pick = null; op = null; render(); save(); }
+// Reverse mode: tap the pad, a toe bean and a number, or a number, a toe bean and the pad; the answer goes on the pad.
+function tapPad() {
+  if (!playing() || !game.rev) return;
+  if (pick !== null && pick !== "pad" && op !== null) return padStep(game.beans[pick], op, game.pad, pick);
+  pick = pick === "pad" ? null : "pad"; op = null; render();
+}
+function padStep(a, o, b, tile) {
+  const r = padResult(a, o, b);
+  if (r === null) return;
+  game.history.push(snap());
+  game.pad = r; game.beans[tile] = null; pick = null; op = null; popped = "pad";
+  save();
+  if (r === 0) return win();
+  render();
+}
+function undo() {
+  if (!playing() || !game.history.length) return;
+  const h = game.history.pop();
+  if (game.rev) { game.beans = h.b; game.pad = h.p; } else game.beans = h;
+  pick = null; op = null; render(); save();
+}
 
 // Hint: the first step of a shortest way to the goal from the numbers left: its two numbers and its toe bean glow,
 // and the note says the sum. The player taps it in. If the goal can't be made from here, it says to undo.
@@ -219,6 +327,7 @@ function undo() { if (!playing() || !game.history.length) return; game.beans = g
 let hintMark = null;
 function hint() {
   if (!playing()) return;
+  if (game.rev) return revHint();
   const left = game.beans.filter(v => v !== null), way = oneWay(left, game.goal);
   game.hinted = true; save();
   if (!way) { G.note(game.history.length ? "The goal can't be made from these numbers. Try Undo." : "Couldn't find a way to the goal.", 5000); return; }
@@ -229,8 +338,27 @@ function hint() {
   G.note(`Try ${a} ${SIGN[o]} ${b}: tap ${a}, then ${SIGN[o]}, then ${b}.`, 6000);
   const m = hintMark; setTimeout(() => { if (hintMark === m) { hintMark = null; render(); } }, 6000);
 }
+// Reverse mode's hint: the first step of a shortest way to 0, with the pad glowing if it's in it.
+function revHint() {
+  const left = game.beans.filter(v => v !== null), way = revWay(left, game.pad);
+  game.hinted = true; save();
+  if (!way) { G.note(game.history.length ? "The pad can't get to 0 from here. Try Undo." : "Couldn't find a way to 0.", 5000); return; }
+  if (!way.length) return;
+  const [a, o, b, , onPad] = way[0];
+  let i, j, padFirst = false;
+  if (!onPad) { i = game.beans.indexOf(a); j = game.beans.findIndex((v, k) => v === b && k !== i); }
+  else if (a === game.pad) { padFirst = true; j = game.beans.indexOf(b); }
+  else i = game.beans.indexOf(a);
+  pick = null; op = null;
+  hintMark = {at: game.beans.join() + "|" + game.pad, i, j, op: o, pad: onPad};
+  render();
+  const name = v => v === game.pad && onPad ? "the pad" : v;
+  G.note(onPad ? (padFirst ? `Try ${a} ${SIGN[o]} ${b}: tap the pad, then ${SIGN[o]}, then ${b}.` : `Try ${a} ${SIGN[o]} ${b}: tap ${a}, then ${SIGN[o]}, then the pad.`)
+    : `Try ${a} ${SIGN[o]} ${b}: tap ${a}, then ${SIGN[o]}, then ${b}.`, 6000);
+  const m = hintMark; setTimeout(() => { if (hintMark === m) { hintMark = null; render(); } }, 6000);
+}
 function remember(score) {
-  settings.recent = settings.recent.concat({c: game.pads[0], s: score}).slice(-5);
+  settings[recentKey()] = settings[recentKey()].concat({c: game.pads[0], s: score}).slice(-5);
 }
 
 /* ---------- finishing ---------- */
@@ -238,17 +366,17 @@ const levelPick = (current, text) => G.otherSize($("levelSel"), current, startLe
 function win() {
   game.won = true; G.finishClock(game); remember(2);
   const next = game.hinted ? game.N : Math.min(MAX_LEVEL, game.N + 1);
-  settings.level = next; $("levelSel").value = next; save(); render();
-  G.track(`Toe Beans solved level ${game.N}`);
-  build.prefetch(next);
+  settings[lvKey()] = next; $("levelSel").value = next; save(); render();
+  G.track(`Toe Beans${game.rev ? " reverse" : ""} solved level ${game.N}`);
+  builder().prefetch(next);
   const done = game;   // let the coloured paw show for a moment first
   setTimeout(() => { if (game === done) finishCard(); }, 1200);
 }
 function finishCard() {
-  const next = settings.level, top = game.N === MAX_LEVEL;
-  const text = game.hinted ? `${game.goal} exactly. You had a hint, so here's another at level ${next}.`
-    : top ? `${game.goal} exactly. That's the hardest level, so the next one is level ${MAX_LEVEL} again.`
-    : `${game.goal} exactly. Level ${game.N} done; next up is level ${next}.`;
+  const next = myLevel(), top = game.N === MAX_LEVEL, did = game.rev ? `${game.start} all the way down to 0.` : `${game.goal} exactly.`;
+  const text = game.hinted ? `${did} You had a hint, so here's another at level ${next}.`
+    : top ? `${did} That's the hardest level, so the next one is level ${MAX_LEVEL} again.`
+    : `${did} Level ${game.N} done; next up is level ${next}.`;
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my paw", game.result,
     {title: "Got it!", gold: !game.hinted, goldWhy: "Exactly right, with no hints!", next: `Next: level ${next}`, after: levelPick(next)});
 }
@@ -257,30 +385,30 @@ function finishCard() {
 const nearEnough = d => d <= 10;
 function finishHere() {
   if (!playing()) return;
-  const c = closest(), d = Math.abs(c - game.goal), back = Math.max(1, game.N - 1);
+  const c = closest(), d = Math.abs(c - target()), back = Math.max(1, game.N - 1);
   const result = nearEnough(d) ? `That's close enough to stay on level ${game.N}.`
     : game.N === 1 ? "You'll stay on level 1." : `Finishing now moves you back to level ${back}.`;
-  G.openCard("Finish here?", `Your closest is ${c}, ${d} away from ${game.goal}. ${result}`,
+  G.openCard("Finish here?", game.rev ? `The pad's on ${c}, ${d} away from 0. ${result}` : `Your closest is ${c}, ${d} away from ${game.goal}. ${result}`,
     [["Finish", () => { G.closeCard(); giveUp(); }, true], ["Keep trying", G.closeCard]]);
 }
 function giveUp() {
-  const c = closest(), d = Math.abs(c - game.goal);
+  const c = closest(), d = Math.abs(c - target());
   game.over = true; game.closest = c; remember(nearEnough(d) ? 1 : 0);
-  settings.level = nearEnough(d) ? game.N : Math.max(1, game.N - 1);
-  $("levelSel").value = settings.level; pick = null; op = null;
+  settings[lvKey()] = nearEnough(d) ? game.N : Math.max(1, game.N - 1);
+  $("levelSel").value = myLevel(); pick = null; op = null;
   save(); render();
-  G.track(`Toe Beans finished level ${game.N} ${d} away`);
-  build.prefetch(settings.level);
+  G.track(`Toe Beans${game.rev ? " reverse" : ""} finished level ${game.N} ${d} away`);
+  builder().prefetch(myLevel());
   overCard();
 }
 function overCard() {
-  const d = Math.abs(game.closest - game.goal), next = settings.level;
+  const d = Math.abs(game.closest - target()), next = myLevel();
   const media = document.createElement("div");
   const p = document.createElement("p");
-  p.textContent = `You got to ${game.closest}, ${d} away from ${game.goal}. ` +
+  p.textContent = (game.rev ? `You got the pad down to ${game.closest}. ` : `You got to ${game.closest}, ${d} away from ${game.goal}. `) +
     (next === game.N ? `Next up is another level ${next}.` : `Next up is level ${next}.`);
   media.append(p);
-  const way = oneWay(game.nums, game.goal);
+  const way = game.rev ? revWay(game.nums, game.start) : oneWay(game.nums, game.goal);
   if (way) {
     const w = document.createElement("p"); w.className = "way";
     w.textContent = "One way: " + way.map(([a, o, b, r]) => `${a} ${SIGN[o]} ${b} = ${r}`).join(", then ");
@@ -291,19 +419,20 @@ function overCard() {
 }
 
 /* ---------- new puzzles ---------- */
-function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
+function startLevel(n) { settings[lvKey()] = n; $("levelSel").value = n; save(); newPuzzle(); }
 async function newPuzzle() {
   if (busy) return;
   busy = true;
-  const N = settings.level;
+  const N = myLevel(), r = rev();
   G.openCard("Dealing the numbers…", "", []);
-  const p = await build.take(N);
+  const p = await builder().take(N);
   game = {N, nums: p.nums, goal: p.goal, beans: p.nums.slice(), history: [], won: false, over: false,
           pads: newPads(game && game.pads), ...G.freshClock()};
+  if (r) Object.assign(game, {rev: true, level: 100 + N, start: p.start, pad: p.start});
   busy = false; pick = null; op = null;
   G.closeCard(); render(); save(); G.note("");
-  G.track(`Toe Beans new puzzle level ${N}`);
-  build.prefetch(N);
+  G.track(`Toe Beans${r ? " reverse" : ""} new puzzle level ${N}`);
+  builder().prefetch(N);
 }
 
 /* ---------- drawing ---------- */
@@ -316,7 +445,7 @@ const littlePaw = (fill, opacity) => `<svg viewBox="-3 -3 106 92" aria-hidden="t
 // Your last five games: golden when you hit the goal, faint in that game's pad colour when you finished
 // within 10, an outline when further off, and pale outlines for games not played yet.
 function drawRecent() {
-  const r = settings.recent, out = [];
+  const r = settings[recentKey()], out = [];
   for (let i = 0; i < 5; i++) {
     const x = r[i - (5 - r.length)];
     out.push(!x ? littlePaw("none", .25) : x.s === 2 ? littlePaw(GOLD[0], 1) : x.s === 1 ? littlePaw(x.c, .4) : littlePaw("none", .6));
@@ -332,9 +461,21 @@ function render() {
   const [pc, pt] = game.won || paw.classList.contains("gold") ? GOLD : game.pads;
   for (const el of [paw, beans]) { el.style.setProperty("--pc", pc); el.style.setProperty("--pt", pt); }
   paw.classList.toggle("won", game.won);
-  $("goal").textContent = game.goal;
-  $("goalLabel").textContent = game.won ? "Got it!" : `Level ${game.N}`;
-  const hm = hintMark && hintMark.at === game.beans.join() && playing() ? hintMark : null;
+  paw.classList.toggle("rev", !!game.rev);
+  document.querySelector(".tagline").textContent = game.rev ? "Bring the big pad down to 0" : "Make the number on the big pad";
+  $("goal").textContent = game.rev ? game.pad : game.goal;
+  $("goalLabel").textContent = game.won ? "Got it!" : game.rev ? "Down to 0" : `Level ${game.N}`;
+  const hm = hintMark && hintMark.at === game.beans.join() + (game.rev ? "|" + game.pad : "") && playing() ? hintMark : null;
+  const pad = $("pad");
+  if (game.rev) {
+    pad.classList.toggle("picked", pick === "pad");
+    pad.classList.toggle("dim", pick !== null && pick !== "pad" && op !== null && padResult(game.beans[pick], op, game.pad) === null);
+    pad.classList.toggle("hintcell", !!hm && hm.pad);
+    pad.classList.toggle("pop", popped === "pad");
+    pad.tabIndex = playing() ? 0 : -1;
+    pad.setAttribute("aria-label", `The big pad: ${game.pad}`);
+    pad.setAttribute("aria-pressed", String(pick === "pad"));
+  } else { pad.className = "pad"; pad.tabIndex = -1; pad.removeAttribute("aria-pressed"); }
   document.querySelectorAll(".toe").forEach(t => {
     t.disabled = !playing() || pick === null;
     t.classList.toggle("hintcell", !!hm && t.dataset.op === hm.op);
@@ -349,7 +490,8 @@ function render() {
     else {
       if (String(v).length >= 4) b.classList.add("small");
       if (game.won && v === game.goal) b.classList.add("hit");
-      if (pick !== null && op !== null && i !== pick && opResult(game.beans[pick], op, v) === null) b.classList.add("dim");
+      if (pick === "pad" && op !== null && padResult(game.pad, op, v) === null) b.classList.add("dim");
+      else if (pick !== null && pick !== "pad" && op !== null && i !== pick && opResult(game.beans[pick], op, v) === null) b.classList.add("dim");
     }
     if (i === popped) b.classList.add("pop");
     if (hm && (i === hm.i || i === hm.j)) b.classList.add("hintcell");
@@ -361,14 +503,19 @@ function render() {
   $("undoBtn").disabled = !playing() || !game.history.length;
   $("finishBtn").disabled = !playing(); $("hintBtn").disabled = !playing();
   drawRecent();
-  if (game.won) G.note("Exactly right!", 0);
-  else if (game.over) G.note(`Finished ${Math.abs(game.closest - game.goal)} away.`, 0);
+  if (game.won) G.note(game.rev ? "All the way down to 0!" : "Exactly right!", 0);
+  else if (game.over) G.note(`Finished ${Math.abs(game.closest - target())} away.`, 0);
   else if (pick !== null && op === null) G.note("Now tap a toe bean", 0);
-  else if (op !== null) G.note("Now tap another number", 0);
-  else { const d = Math.abs(closest() - game.goal); G.note(game.history.length && d <= 10 ? `${d} away` : "", 0); }
+  else if (op !== null) G.note(game.rev ? (pick === "pad" ? "Now tap a number" : "Now tap another number, or the pad") : "Now tap another number", 0);
+  else { const d = Math.abs(closest() - target()); G.note(game.history.length && d <= 10 ? `${d} away` : "", 0); }
 }
 
 /* ---------- controls ---------- */
+$("pad").onclick = tapPad;
+$("pad").onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tapPad(); } };
+$("revSw").checked = rev();
+// Switching mode deals a puzzle in the other mode, at that mode's level.
+$("revSw").onchange = e => { if (busy) { e.target.checked = rev(); return; } settings.rev = e.target.checked; $("levelSel").value = myLevel(); save(); G.closeCard(); newPuzzle().then(helpOnFirstVisit); };
 for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(n === MAX_LEVEL ? `${n} (hardest)` : String(n), n));
 $("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
 document.querySelectorAll(".toe").forEach(t => t.onclick = () => tapToe(t.dataset.op));
@@ -382,13 +529,30 @@ document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.ke
 /* ---------- how to play ---------- */
 // How to play plays the walkthrough on the board (there's no rules card).
 function showHelp() {
-  settings.seenHelp = false; helpOnFirstVisit();
-  if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
+  const k = game && game.rev ? "seenRevHelp" : "seenHelp";
+  settings[k] = false; helpOnFirstVisit();
+  if (!document.querySelector(".spot")) { settings[k] = true; G.helpLater(); }
+}
+// Reverse mode's own walkthrough, the first time it's played: it points at the pad and the tiles and changes nothing.
+function revHelp() {
+  if (settings.seenRevHelp || !game || !game.rev || !playing() || document.querySelector(".spot")) return;
+  const all = () => [...$("beans").children], toes = () => [...document.querySelectorAll(".toe")];
+  const steps = [
+    {say: "Bring the number on the big pad down to 0", els: [$("pad")]},
+    {say: "Tap the pad, a toe bean, then a number: the answer goes on the pad", els: [$("pad"), toes, all]},
+    {say: "Or tap a number, a toe bean, then the pad", els: [all, $("pad")]},
+    {say: "Numbers can still combine with each other, too", els: [all]},
+    {say: "You hit 0 by taking away the pad's own number", els: [$("pad")]},
+    {say: "Stuck? Hint shows a step towards 0", els: [$("hintBtn")]},
+    {say: "Finish here within 10 of 0 to keep your level", els: [$("finishBtn")]},
+  ];
+  G.spotlight({grid: $("beans"), w: 1, h: 1, steps, done: () => { settings.seenRevHelp = true; save(); render(); }});
 }
 // First visit only: once the first puzzle is dealt, walk through it on the paw. The tiles are redrawn as
 // the steps go, so the numbers being used look picked; step 5 shows a real sum in the second tile (just
 // while it's up), and everything goes back as it was.
 function helpOnFirstVisit() {
+  if (game && game.rev) return revHelp();
   if (settings.seenHelp || !game || !playing() || document.querySelector(".spot")) return;
   const tile = i => () => $("beans").children[i], toes = () => [...document.querySelectorAll(".toe")], all = () => [...$("beans").children];
   const [a, b] = [game.beans[0], game.beans[1]], sum = opResult(a, "+", b);
@@ -418,19 +582,30 @@ function helpOnFirstVisit() {
 G.nav("toebeans");
 G.checkClock(game);
 G.setupTimer({name: "toebeans", game: () => game, playing: g => !g.won && !g.over, save,
-  label: n => `Level ${n}`, noun: "level", emptyText: "Hit a goal and your times will show up here. They're kept on this device only."});
-$("bestBtn").onclick = () => G.showBests("Best times", game ? game.N : settings.level);
+  label: n => n > 100 ? `Reverse level ${n - 100}` : `Level ${n}`, noun: "level", emptyText: "Hit a goal and your times will show up here. They're kept on this device only."});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? (game.level ?? game.N) : (rev() ? 100 : 0) + myLevel());
 
 /* ---------- sharing ---------- */
 $("shareBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Toe Beans", won: game.won,
-  puzzle: () => ({g: "toebeans", N: game.N, nums: game.nums, goal: game.goal}),
-  progress: () => ({beans: game.beans})}); };
+  puzzle: () => game.rev ? {g: "toebeans", N: game.N, nums: game.nums, start: game.start, rev: 1} : {g: "toebeans", N: game.N, nums: game.nums, goal: game.goal},
+  progress: () => game.rev ? {beans: game.beans, pad: game.pad} : {beans: game.beans}}); };
 // A puzzle from a share link, with its numbers so far if they were sent (that isn't timed).
 function openShared(d) {
   const ok = a => Array.isArray(a) && a.length === 6 && a.every(v => v === null || (Number.isInteger(v) && v > 0));
-  if (!ok(d.nums) || d.nums.includes(null) || !Number.isInteger(d.goal) || !(d.N >= 1 && d.N <= MAX_LEVEL)) {
+  const isRev = !!d.rev;
+  if (!ok(d.nums) || d.nums.includes(null) || !Number.isInteger(isRev ? d.start : d.goal) || (isRev && d.start <= 0) || !(d.N >= 1 && d.N <= MAX_LEVEL)) {
     G.note("That share link didn't work. It may have been cut off.", 6000); return;
   }
+  if (isRev) {
+    const beans = d.p && ok(d.p.beans) ? d.p.beans : d.nums.slice(), pad = d.p && Number.isInteger(d.p.pad) && d.p.pad >= 0 ? d.p.pad : d.start;
+    settings.rev = true; $("revSw").checked = true;
+    game = {N: d.N, level: 100 + d.N, rev: true, nums: d.nums, start: d.start, pad, beans, history: [], won: pad === 0, over: false,
+            pads: newPads(game && game.pads), ...G.freshClock()};
+    if (d.p) game.timed = false;
+    pick = null; op = null; settings.levelRev = d.N; $("levelSel").value = d.N;
+    render(); save(); buildRev.prefetch(d.N); return;
+  }
+  settings.rev = false; $("revSw").checked = false;
   const beans = d.p && ok(d.p.beans) ? d.p.beans : d.nums.slice();
   game = {N: d.N, nums: d.nums, goal: d.goal, beans, history: [], won: beans.includes(d.goal), over: false,
           pads: newPads(game && game.pads), ...G.freshClock()};
@@ -439,11 +614,12 @@ function openShared(d) {
   render(); save(); build.prefetch(d.N);
 }
 const shared = G.readShare("toebeans");
-$("levelSel").value = settings.level;
+if (game && game.nums && !!game.rev !== rev()) game = null;   // a saved puzzle from the other mode
+$("levelSel").value = myLevel();
 if (game && game.nums) G.reopen(() => {
     render();
     if (game.won) finishCard(); else if (game.over) overCard();
-    build.prefetch(settings.level); helpOnFirstVisit();
+    builder().prefetch(myLevel()); helpOnFirstVisit();
   }, why => { game = null; busy = false; newPuzzle().then(() => G.note(why, 0)); });
 else if (!shared) newPuzzle().then(helpOnFirstVisit);
 const shareOpts = () => ({name: "Toe Beans", inProgress: !!(game && playing() && game.history.length), open: openShared, after: helpOnFirstVisit});
