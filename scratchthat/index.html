@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Scratch That</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-17.4"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-17.4">
+<style>
+/* Dottie, the star, beside the title */
+.title{display:flex;align-items:flex-end;gap:8px}
+.dottie{display:block;height:64px;width:auto;margin-bottom:-6px}
+@media (max-height:760px){.dottie{height:46px;margin-bottom:-4px}}
+.card img.dottiepic{display:block;width:60%;max-width:220px;height:auto;margin:0 auto 14px}
+
+/* A living room seen from above: a pale rug floor, with the furniture (sofas and chairs, some with a number)
+   standing on it. Dottie goes for the furniture wherever no scratching post is in sight; a post can be seen
+   along its row and column, up to the furniture, and floor with a post in sight turns warm gold. */
+.wrap.roomwrap{width:min(var(--board),var(--tall));height:min(var(--board),var(--tall))}
+.room{width:100%;height:100%;display:grid;border:3px solid #2A2530;border-radius:8px;overflow:hidden;background:color-mix(in srgb,#73A7AE 45%,#fff);gap:1px;
+  touch-action:none;user-select:none;-webkit-user-select:none;outline:none}
+/* two posts that can see each other: a red line between them */
+.clash{position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);pointer-events:none;z-index:3}
+.clash line{stroke:#C8392B;stroke-width:.12;stroke-linecap:round;opacity:.75}
+/* the square the arrow keys are on */
+.sq.cur{box-shadow:inset 0 0 0 3px #4F8FA0;z-index:2}
+/* Dottie peeking over a sofa she can still get at */
+.peek{position:absolute;right:-2%;top:-4%;width:56%;height:auto;pointer-events:none;z-index:2;animation:peek .35s ease-out both;filter:drop-shadow(0 1px 1px rgba(42,37,48,.35))}
+@keyframes peek{from{transform:translateY(40%);opacity:0}}
+.sq{position:relative;background:color-mix(in srgb,#73A7AE 16%,#fff);cursor:pointer;container-type:size}
+.sq.lit{background:color-mix(in srgb,#ECA818 38%,#fff)}
+.sq svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.sq.wall{cursor:default;z-index:1}
+.sq.wall svg{overflow:visible}  /* a sofa's pieces reach across the gap between squares */
+.num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:50cqh;color:#2A2530;line-height:1}
+.num.back-top{padding-top:26%}
+.num.back-left{padding-left:26%}
+.num.done{opacity:.4}
+.num.over{color:#C8392B}
+.dot{position:absolute;left:50%;top:50%;width:16%;height:16%;border-radius:50%;background:#5E5866;transform:translate(-50%,-50%);opacity:.6}
+.sq.bad svg .ring{display:block}
+.ring{display:none}
+/* once the room's solved, Dottie stretches up to scratch one of the posts */
+.sq.dottiehere{z-index:2}
+.sq .scratcher{position:absolute;right:46%;bottom:4%;height:112%;width:auto;pointer-events:none;animation:stretch .5s ease-out both;filter:drop-shadow(0 2px 2px rgba(42,37,48,.35))}
+@keyframes stretch{from{transform:translateY(25%) scaleY(.7);opacity:0}}
+.claw{opacity:0;animation:claw .3s ease-out forwards}
+@keyframes claw{to{opacity:1}}
+</style>
+</head>
+<body>
+<main>
+  <header><div class="title"><h1>Scratch That</h1><img class="dottie" src="../cats/dottie-6.webp" alt="Dottie, a black cat, reaching up to scratch"></div><div class="stripe"></div><p class="tagline">Save the sofa from Dottie!</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap roomwrap"><div class="room" id="board" role="grid" tabindex="0" aria-label="The room: floor and furniture"></div><svg class="clash" id="clash" aria-hidden="true"></svg></div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="shareBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New room</button>
+  </div>
+  <div class="bar toggles">
+    <div class="opt"><label class="toggle"><input type="checkbox" id="dotSw"><span class="sw"></span>Dot first</label><span class="hint">A tap puts a dot (no post) first, then a post</span></div>
+  </div>
+</main>
+
+<script src="../games.js?v=2026-10-17.4"></script>
+<script src="../cattower.js?v=2026-10-17.4"></script>
+<script>
+/* ---------- rooms ---------- */
+// A room is N × N squares, each floor (-1), furniture (-2) or furniture with a number (0 to 4).
+// The squares a post at i covers: itself, and its row and column out to the furniture or the wall.
+function stSight(N, g, i) {
+  const out = [i], x = i % N, y = Math.floor(i / N);
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]])
+    for (let a = x + dx, b = y + dy; a >= 0 && b >= 0 && a < N && b < N && g[b * N + a] === -1; a += dx, b += dy) out.push(b * N + a);
+  return out;
+}
+function stNear(N, i) {
+  const x = i % N, y = Math.floor(i / N), out = [];
+  if (x > 0) out.push(i - 1); if (x < N - 1) out.push(i + 1); if (y > 0) out.push(i - N); if (y < N - 1) out.push(i + N);
+  return out;
+}
+// Work out the room from what's known, by rules alone. s holds, for each floor square, 1 (a post), 0 (no post)
+// or -1 (not known). Tier 1: a number with all its posts beside it has no more; a number with just room for
+// its posts gets them; a square only one spot can still cover gets a post there; and a post rules out its
+// row and column. Tier 2 also tries a post on each open spot, and rules it out if tier 1 then breaks. Tier 3
+// tries a post and no post on each open spot, working on by tier 2, and keeps whichever doesn't break.
+// Returns {s, ok}: what's settled, and false if the room can't work out from here. `steps` gets each move
+// as [square, 1 or 0, why]: why is ["full" or "room", the number's square], ["only", the square covered],
+// ["sees"] or ["trial"].
+function stDeduce(N, g, s, tier, steps) {
+  s = s.slice();
+  const sight = g.map((v, i) => v === -1 ? stSight(N, g, i) : null);
+  const set = (i, v, why) => {
+    if (s[i] === v) return true;
+    if (s[i] !== -1) return false;
+    s[i] = v; if (steps) steps.push([i, v, why]);
+    if (v === 1) for (const k of sight[i]) if (k !== i) {
+      if (s[k] === 1) return false;
+      if (s[k] === -1) { s[k] = 0; if (steps) steps.push([k, 0, ["sees"]]); }
+    }
+    return true;
+  };
+  function basic() {
+    for (let changed = true; changed;) {
+      changed = false;
+      for (let i = 0; i < N * N; i++) {
+        if (g[i] >= 0) {
+          const nb = stNear(N, i).filter(k => g[k] === -1), on = nb.filter(k => s[k] === 1).length, open = nb.filter(k => s[k] === -1);
+          if (on > g[i] || on + open.length < g[i]) return false;
+          if (open.length && on === g[i]) { for (const k of open) if (!set(k, 0, ["full", i])) return false; changed = true; }
+          else if (open.length && on + open.length === g[i]) { for (const k of open) if (!set(k, 1, ["room", i])) return false; changed = true; }
+        } else if (g[i] === -1 && !sight[i].some(k => s[k] === 1)) {
+          const can = sight[i].filter(k => s[k] === -1);
+          if (!can.length) return false;
+          if (can.length === 1) { if (!set(can[0], 1, ["only", i])) return false; changed = true; }
+        }
+      }
+    }
+    return true;
+  }
+  let ok = basic();
+  for (let again = tier >= 2; again && ok;) {
+    again = false;
+    for (let i = 0; i < N * N && ok; i++) if (g[i] === -1 && s[i] === -1) {
+      const t = s.slice(); t[i] = 1;
+      if (!stDeduce(N, g, t, tier - 1).ok) { ok = set(i, 0, ["trial"]) && basic(); again = true; continue; }
+      if (tier < 3) continue;
+      const u = s.slice(); u[i] = 0;
+      if (!stDeduce(N, g, u, tier - 1).ok) { ok = set(i, 1, ["trial1"]) && basic(); again = true; }
+    }
+  }
+  return {s, ok};
+}
+function stSolved(N, g, s) { return g.every((v, i) => v !== -1 || s[i] !== -1); }
+// The levels: [size, tier, how much furniture].
+function stLevels() { return [null, [6, 1, .2], [7, 1, .2], [8, 1, .2], [8, 2, .2], [10, 1, .2], [10, 2, .2], [11, 2, .2], [10, 3, .18]]; }
+// A new room: furniture placed at random (the same turned halfway round), posts put down at random on
+// squares nothing covers yet until every square is covered, every piece of furniture numbered, then
+// numbers taken away while the room still works out by the level's rules. A tier 2 room must need tier 2.
+function makeRoom(n) {
+  const [N, tier, fill] = stLevels()[n], g = Array(N * N).fill(-1);
+  for (let i = 0; i <= N * N / 2; i++) if (Math.random() < fill) g[i] = g[N * N - 1 - i] = -2;
+  const post = Array(N * N).fill(0), lit = Array(N * N).fill(false);
+  const order = [...Array(N * N).keys()].filter(i => g[i] === -1).sort(() => Math.random() - .5);
+  if (!order.length) return null;
+  for (const i of order) if (!lit[i]) { post[i] = 1; for (const k of stSight(N, g, i)) lit[k] = true; }
+  for (let i = 0; i < N * N; i++) if (g[i] === -2) g[i] = stNear(N, i).filter(k => post[k]).length;
+  const works = (gg, t) => { const r = stDeduce(N, gg, gg.map(() => -1), t); return r.ok && stSolved(N, gg, r.s); };
+  // (cheaper rules first: take away what the room can lose by tier 2, then more by the level's own tier)
+  for (let t = Math.min(2, tier); t <= tier; t++) {
+    if (!works(g, t)) return null;
+    for (const i of [...Array(N * N).keys()].filter(i => g[i] >= 0).sort(() => Math.random() - .5)) {
+      const was = g[i]; g[i] = -2;
+      if (!works(g, t)) g[i] = was;
+    }
+  }
+  if (tier >= 2 && works(g, tier - 1)) return null;
+  return {n, N, g, post};
+}
+const rooms = G.builder([stSight, stNear, stDeduce, stSolved, stLevels, makeRoom], "makeRoom");
+
+/* ---------- levels ---------- */
+const LEVELS = stLevels(), MAX_LEVEL = LEVELS.length - 1;
+const levelName = n => `Level ${n} · ${LEVELS[n][0]} × ${LEVELS[n][0]}${["", "", ", tricky", ", fiendish"][LEVELS[n][1]]}`;
+
+/* ---------- pictures ---------- */
+// A scratching post seen from the front, on a little carpeted base, with a carpeted top (cattower.js parts);
+// scratched, it has claw marks in the sisal and a few frayed strands.
+const postSVG = scratched => `<svg viewBox="0 0 100 100" aria-hidden="true">
+  <circle class="ring" cx="50" cy="50" r="44" fill="rgba(200,57,43,.18)" stroke="#C8392B" stroke-width="6"/>
+  <ellipse cx="50" cy="86" rx="30" ry="9" fill="${TOWER.shade("#C9B9D6")}" stroke="#2A2530" stroke-width="3"/>
+  <ellipse cx="50" cy="83" rx="30" ry="9" fill="#C9B9D6" stroke="#2A2530" stroke-width="3"/>
+  ${TOWER.post(50, 22, 84, 20)}
+  ${scratched ? `<g class="claw" stroke-linecap="round"><path d="M42 38 L57 47 M42 46 L57 55 M42 54 L57 63" stroke="#F3D7AE" stroke-width="2.6"/>
+    <path d="M60 50 q6 2 7 7 M60 58 q5 3 5 8 M40 44 q-6 1 -7 6" fill="none" stroke="#C99A62" stroke-width="2"/></g>` : ""}
+  <ellipse cx="50" cy="22" rx="26" ry="8" fill="#C9B9D6" stroke="#2A2530" stroke-width="3"/></svg>`;
+const POST = postSVG(false), SCRATCHED = postSVG(true);
+// Furniture seen from above. A row of furniture squares is one sofa, with its back along the top, an arm
+// at each end and a seat cushion a square; a column is a sofa on its side, back along the left; a square on
+// its own is an armchair. Each sofa has its own fabric, from the site's colours.
+const FABRICS = ["#7885BA", "#B94588", "#6AA673", "#E16A4A", "#8D78AD", "#4E577D"];
+function furniture() {
+  const {N, g} = game, wall = (x, y) => x >= 0 && y >= 0 && x < N && y < N && g[y * N + x] !== -1;
+  // squares with furniture beside them in the row are row sofas; the rest join up in columns; each sofa gets a fabric
+  const row = g.map((v, i) => v !== -1 && (wall(i % N - 1, Math.floor(i / N)) || wall(i % N + 1, Math.floor(i / N))));
+  const group = g.map(() => -1), step = i => row[i] ? 1 : N;
+  let k = 0;
+  for (let i = 0; i < N * N; i++) if (g[i] !== -1 && group[i] < 0) {
+    for (let j = i; j < N * N && g[j] !== -1 && row[j] === row[i] && group[j] < 0 && (!row[i] || Math.floor(j / N) === Math.floor(i / N)); j += step(i)) group[j] = k;
+    k++;
+  }
+  return g.map((v, i) => {
+    if (v === -1) return null;
+    const x = i % N, y = Math.floor(i / N), same = (a, b) => wall(a, b) && group[b * N + a] === group[i];
+    const col = !row[i] && (same(x, y - 1) || same(x, y + 1));
+    // drawn as a sofa piece with its back along the top: arms where the sofa ends on the left and right
+    // (a column is turned a quarter, so its bottom end is the left)
+    const armL = row[i] ? !same(x - 1, y) : col ? !same(x, y + 1) : true, armR = row[i] ? !same(x + 1, y) : col ? !same(x, y - 1) : true;
+    return {c: FABRICS[group[i] % FABRICS.length], armL, armR, side: col, key: `${group[i] % FABRICS.length}${+armL}${+armR}${+col}`};
+  });
+}
+function sofaSVG(f) {
+  const c = f.c, frame = `color-mix(in srgb,${c} 88%,#fff)`, seat = `color-mix(in srgb,${c} 40%,#fff)`, edge = `color-mix(in srgb,${c} 60%,#2A2530)`;
+  // the frame runs past the square's edge where the sofa carries on, so its pieces join up
+  const l = f.armL ? 3 : -3, r = f.armR ? 97 : 103, sl = f.armL ? 25 : -3, sr = f.armR ? 75 : 103;
+  const s = `<rect x="${l}" y="3" width="${r - l}" height="94" rx="${f.armL && f.armR ? 16 : 0}" fill="${frame}"/>`
+    + (f.armL ? `<path d="M${l + 16} 3 H${l} V97 H${l + 16}" fill="none" stroke="#2A2530" stroke-width="3" stroke-linejoin="round"/>` : "")
+    + (f.armR ? `<path d="M${r - 16} 3 H${r} V97 H${r - 16}" fill="none" stroke="#2A2530" stroke-width="3" stroke-linejoin="round"/>` : "")
+    + `<path d="M${l} 3 H${r} M${l} 97 H${r}" stroke="#2A2530" stroke-width="3"/>`
+    + `<rect x="${sl}" y="30" width="${sr - sl}" height="64" rx="${f.armL || f.armR ? 10 : 0}" fill="${seat}" stroke="${edge}" stroke-width="2.5"/>`
+    + `<path d="M${Math.max(l, 0) + 8} 17 H${Math.min(r, 100) - 8}" stroke="${edge}" stroke-width="2" stroke-linecap="round" opacity=".45"/>`;
+  return `<svg viewBox="0 0 100 100" aria-hidden="true"><g${f.side ? ' transform="rotate(-90 50 50)"' : ""}>${s}</g></svg>`;
+}
+const CAT_SRC = {};  // filled with embedded pictures when the page is bundled into one file
+const catSrc = f => CAT_SRC[f] || `../cats/${f}.webp`;
+
+/* ---------- game ---------- */
+// game: {level, N, g (the room), post (the answer), s (each floor square: 1 post, 0 dot, -1 empty), moves
+//        ([square, what it was]), hinted, undid, restarted, won}
+const STORE = "catdoku.scratchthat.v1";
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1}, state.settings);
+let game = state.game || null, mark = null;  // mark: a hint's squares, while the room is as it was
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !$("overlay").classList.contains("show");
+
+function fresh(r) {
+  return {level: r.n, N: r.N, g: r.g, post: r.post.join ? r.post.join("") : r.post, s: r.g.map(() => -1), moves: [],
+          hinted: false, undid: false, restarted: false, won: false, ...G.freshClock()};
+}
+let asking = 0;
+function newPuzzle() {
+  G.closeCard();
+  const n = settings.level, ask = ++asking;
+  const slow = setTimeout(() => { if (ask === asking) G.note("Arranging the furniture…", 0); }, 400);
+  rooms.take(n).then(r => {
+    clearTimeout(slow);
+    if (ask !== asking) return;
+    G.note("");
+    game = fresh(r); mark = null; draw(); save();
+    rooms.prefetch(n);
+    G.track(`Scratch That new puzzle level ${n}`);
+    helpOnFirstVisit();
+  });
+}
+function startLevel(n) { settings.level = n; $("levelSel").value = n; newPuzzle(); }
+
+// What the room looks like now: which squares are covered, which posts see another, how each number stands.
+function look() {
+  const {N, g, s} = game, lit = g.map(() => false), bad = g.map(() => false);
+  for (let i = 0; i < N * N; i++) if (g[i] === -1 && s[i] === 1)
+    for (const k of stSight(N, g, i)) { lit[k] = true; if (k !== i && s[k] === 1) bad[i] = true; }
+  const num = g.map((v, i) => v < 0 ? null : stNear(N, i).filter(k => g[k] === -1 && s[k] === 1).length);
+  return {lit, bad, num};
+}
+const floorLeft = (l = look()) => game.g.filter((v, i) => v === -1 && !l.lit[i]).length;
+const stateKey = () => game.s.join(",");
+// the post Dottie scratches once the room's solved: the one nearest the middle
+const dottieAt = () => { const {N, s} = game, c = (N - 1) / 2; let best = -1, d = 1e9;
+  s.forEach((v, i) => { const e = Math.hypot(i % N - c, Math.floor(i / N) - c); if (v === 1 && e < d) { d = e; best = i; } }); return best; };
+
+function draw() {
+  const el = $("board"), {N, g, s} = game, l = look(), sofas = furniture(), live = mark && mark.key === stateKey() ? mark : null;
+  el.style.gridTemplateColumns = el.style.gridTemplateRows = `repeat(${N}, 1fr)`;
+  if (el.children.length !== N * N) {
+    el.innerHTML = "";
+    for (let i = 0; i < N * N; i++) { const d = document.createElement("div"); d.dataset.i = i; el.append(d); }
+  }
+  [...el.children].forEach((d, i) => {
+    const want = g[i] === -1 ? (s[i] === 1 ? "post" + (game.won ? i : "") : s[i] === 0 ? "dot" : "") : "wall" + g[i] + sofas[i].key;
+    d.className = "sq" + (g[i] !== -1 ? " wall" : "") + (g[i] === -1 && l.lit[i] ? " lit" : "") + (l.bad[i] ? " bad" : "")
+      + (live && live.cells.includes(i) ? " hintcell" + (live.bad ? " bad" : "") : "");
+    if (d.dataset.want !== want) {
+      d.dataset.want = want;
+      if (g[i] !== -1) d.innerHTML = sofaSVG(sofas[i]) + (g[i] >= 0 ? `<span class="num ${sofas[i].side ? "back-left" : "back-top"}">${g[i]}</span>` : "");
+      else if (s[i] === 1) d.innerHTML = !game.won ? POST : SCRATCHED.replace('class="claw"', `class="claw" style="animation-delay:${(i * 37) % 600}ms"`)
+        + (i === dottieAt() ? `<img class="scratcher" src="${catSrc("dottie-6")}" alt="Dottie scratching the post">` : "");
+      else d.innerHTML = s[i] === 0 ? `<span class="dot"></span>` : "";
+    }
+    d.classList.toggle("dottiehere", game.won && i === dottieAt());
+    if (g[i] >= 0) { const nm = d.querySelector(".num"); nm.classList.toggle("done", l.num[i] === g[i]); nm.classList.toggle("over", l.num[i] > g[i]); }
+    d.setAttribute("role", "gridcell");
+    d.setAttribute("aria-label", g[i] === -2 ? "Furniture" : g[i] >= 0 ? `Furniture wanting ${g[i]} post${g[i] === 1 ? "" : "s"} beside it`
+      : s[i] === 1 ? "Scratching post" : s[i] === 0 ? "No post here" : l.lit[i] ? "Floor with a post in sight" : "Floor with no post in sight");
+  });
+  // a red line between each pair of posts that can see each other
+  const clash = $("clash"); clash.setAttribute("viewBox", `0 0 ${N} ${N}`);
+  let lines = "";
+  for (let i = 0; i < N * N; i++) if (g[i] === -1 && s[i] === 1) for (const k of stSight(N, g, i)) if (k > i && s[k] === 1)
+    lines += `<line x1="${i % N + .5}" y1="${Math.floor(i / N) + .5}" x2="${k % N + .5}" y2="${Math.floor(k / N) + .5}"/>`;
+  clash.innerHTML = lines;
+  // Dottie peeks over a sofa that has floor beside it with no post in sight (one without a number, if she can)
+  const open = game.won ? [] : g.map((v, i) => v !== -1 && stNear(N, i).some(k => g[k] === -1 && !l.lit[k]) ? i : -1).filter(i => i >= 0);
+  const peekAt = open.find(i => g[i] === -2) ?? open[0] ?? -1;
+  [...el.children].forEach((d, i) => {
+    const has = d.querySelector(".peek");
+    if (i === peekAt && !has) d.insertAdjacentHTML("beforeend", `<img class="peek" src="${catSrc("dottie-face-" + (1 + (peekAt % 4)))}" alt="Dottie, eyeing this sofa">`);
+    else if (i !== peekAt && has) has.remove();
+    d.classList.toggle("cur", i === cur && keyed);
+  });
+  const left = floorLeft(l);
+  $("count").textContent = game.won ? "Furniture saved!" : left ? `${left} square${left === 1 ? "" : "s"} with no post in sight` : "A post in sight everywhere";
+  $("hintBtn").disabled = game.won; $("undoBtn").disabled = game.won || !game.moves.length; $("restartBtn").disabled = game.won || !game.moves.length;
+}
+
+/* ---------- playing ---------- */
+// Tap a floor square: a post, then a dot (no post here), then empty again; or with Dot first on, a dot then a post.
+// Every move is a list of [square, what it was], so a drag of dots undoes in one go.
+const nextOf = v => settings.dotFirst ? (v === -1 ? 0 : v === 0 ? 1 : -1) : (v === -1 ? 1 : v === 1 ? 0 : -1);
+function tap(i, to) {
+  if (!playing() || game.g[i] !== -1) return;
+  const was = game.s[i];
+  game.s[i] = to === undefined ? nextOf(was) : to;
+  if (game.s[i] === was) return;
+  game.moves.push([[i, was]]);
+  after();
+}
+function after() {
+  draw(); save();
+  const l = look();
+  if (!floorLeft(l) && !l.bad.some(Boolean) && game.g.every((v, i) => v < 0 || l.num[i] === v)) win();
+  else if (!floorLeft(l) && l.bad.some(Boolean)) G.note("There's a post in sight everywhere, but two posts can see each other.", 4000);
+  else if (!floorLeft(l)) G.note("There's a post in sight everywhere, but a number isn't right yet.", 4000);
+}
+// Drag across the floor to put dots on every empty square passed (or, starting on a dot, to take dots off).
+// A press that stays on one square is a tap.
+let drag = null;
+const sqAt = e => { const d = document.elementFromPoint(e.clientX, e.clientY); const sq = d && d.closest && d.closest("#board .sq"); return sq ? +sq.dataset.i : -1; };
+$("board").addEventListener("pointerdown", e => {
+  const i = sqAt(e);
+  if (!playing() || i < 0 || game.g[i] !== -1) return;
+  keyed = false;
+  drag = {start: i, last: i, on: false, add: game.s[i] !== 0, move: []};
+});
+addEventListener("pointermove", e => {
+  if (!drag) return;
+  const i = sqAt(e);
+  if (i < 0 || i === drag.last || game.g[i] !== -1) return;
+  if (!drag.on) { drag.on = true; dragMark(drag.start); }
+  drag.last = i; dragMark(i);
+});
+function dragMark(i) {
+  const was = game.s[i], to = drag.add ? (was === -1 ? 0 : was) : (was === 0 ? -1 : was);
+  if (to === was) return;
+  game.s[i] = to; drag.move.push([i, was]); draw();
+}
+addEventListener("pointerup", () => {
+  if (!drag) return;
+  const d = drag; drag = null;
+  if (!d.on) tap(d.start);
+  else if (d.move.length) { game.moves.push(d.move); after(); }
+});
+addEventListener("pointercancel", () => { if (drag && drag.move.length) { game.moves.push(drag.move); after(); } drag = null; });
+
+// Keyboard: arrows move round the room, Space or Enter taps, P puts a post, X or . a dot, Backspace clears.
+let cur = 0, keyed = false;
+$("board").addEventListener("keydown", e => {
+  if (!game || e.ctrlKey || e.metaKey || e.altKey) return;
+  const N = game.N, k = e.key, mv = {ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1]}[k];
+  if (mv) { const x = Math.min(N - 1, Math.max(0, cur % N + mv[0])), y = Math.min(N - 1, Math.max(0, Math.floor(cur / N) + mv[1])); cur = y * N + x; }
+  else if (k === " " || k === "Enter") tap(cur);
+  else if (k === "p" || k === "P") tap(cur, game.s[cur] === 1 ? -1 : 1);
+  else if (k === "x" || k === "X" || k === ".") tap(cur, game.s[cur] === 0 ? -1 : 0);
+  else if (k === "Backspace" || k === "Delete") tap(cur, -1);
+  else return;
+  e.preventDefault(); keyed = true; draw();
+});
+
+function undo() {
+  if (!playing() || !game.moves.length) return;
+  const m = game.moves.pop();
+  for (const [i, was] of (typeof m[0] === "number" ? [m] : m).slice().reverse()) game.s[i] = was;
+  game.undid = true;
+  draw(); save(); G.note("");
+}
+$("undoBtn").onclick = undo;
+addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); undo(); } });
+$("restartBtn").onclick = () => {
+  if (!playing() || !game.moves.length) return;
+  game.s = game.g.map(() => -1); game.moves = []; game.restarted = true;
+  draw(); save(); G.note("An empty room again.", 3000);
+};
+
+/* ---------- hints ---------- */
+// First a mistake (a post where none goes, or a dot where one does), in red. Otherwise the next thing the
+// rules settle from your posts and dots, in gold, and why: a post there, or none.
+function hint() {
+  if (!playing()) return;
+  const {N, g, s, post} = game, ans = i => post[i] === "1";
+  let cells = [], bad = false, say;
+  const wrong = g.findIndex((v, i) => v === -1 && (s[i] === 1 && !ans(i) || s[i] === 0 && ans(i)));
+  if (wrong >= 0) {
+    bad = true; cells = [wrong];
+    say = s[wrong] === 1 ? "This post doesn't belong. Take it away." : "A post goes here, not a dot.";
+  } else {
+    const steps = [];
+    stDeduce(N, g, s.map((v, i) => g[i] === -1 ? v : -1), LEVELS[game.level][1], steps);
+    const l = look();
+    const step = steps.find(([i, v, why]) => why[0] !== "sees" && s[i] !== v && (v === 1 || !l.lit[i]));
+    if (step) {
+      const [i, v, why] = step;
+      cells = why[0] === "full" || why[0] === "room" ? [i, why[1]] : why[0] === "only" && why[1] !== i ? [i, why[1]] : [i];
+      const n = why[1] !== undefined ? g[why[1]] : 0;
+      say = why[0] === "full" ? `That ${n} already has its post${n === 1 ? "" : "s"}, so no post here.`
+        : why[0] === "room" ? `That ${n} needs every open spot beside it, so a post goes here.`
+        : why[0] === "only" ? (why[1] === i ? "Nowhere else can a post be seen from this square." : "This is the only spot a post can be seen from the other gold square.")
+        : why[0] === "trial1" ? "Without a post here the room can't be finished, so a post goes here."
+        : "A post here would make the room impossible to finish, so no post here.";
+    } else {
+      const missing = g.findIndex((v, i) => v === -1 && ans(i) && s[i] !== 1);
+      if (missing < 0) { G.note("Nothing to change: check the numbers.", 4000); return; }
+      cells = [missing]; say = "A post goes here.";
+    }
+  }
+  game.hinted = true; save();
+  mark = {key: stateKey(), cells, bad};
+  draw(); G.note(say, 5000);
+  const m = mark; setTimeout(() => { if (mark === m) { mark = null; if (game) draw(); } }, 5000);
+}
+$("hintBtn").onclick = hint;
+
+/* ---------- winning ---------- */
+const goldOK = () => !game.hinted && !game.undid && !game.restarted;
+function win() {
+  game.won = true; G.finishClock(game); G.note("");
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save(); draw();
+  rooms.prefetch(next);
+  G.track(`Scratch That solved level ${game.level}`);
+  const g = game;
+  setTimeout(() => { if (game === g) finishCard(); }, 1300);
+}
+function dottiePic() { const im = new Image(); im.className = "dottiepic"; im.src = catSrc("dottie-5"); im.alt = "Dottie rolling on her back, very pleased"; return im; }
+function finishCard() {
+  const next = settings.level, n = game.s.filter(v => v === 1).length;
+  let text = `${n} posts, all scratched up, and not a scratch on the furniture.`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the biggest room; here's another." : ` Next up: level ${next}.`;
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the room", game.result,
+    {title: "Furniture saved!", gold: goldOK(), goldWhy: "No hints or undos!", goldPic: [dottiePic()], next: `Next: level ${next}`,
+     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- sharing ---------- */
+// The room travels as one character a square: . floor, # furniture, 0 to 4 a number.
+$("shareBtn").onclick = () => { if (game) G.shareCard({name: "Scratch That", won: game.won,
+  puzzle: () => ({g: "scratchthat", N: game.level, room: game.g.map(v => v === -1 ? "." : v === -2 ? "#" : v).join("")}),
+  progress: () => ({s: game.s.map(v => v === 1 ? "p" : v === 0 ? "x" : "-").join("")})}); };
+function openShared(d) {
+  const lv = LEVELS[d.N], N = lv && lv[0];
+  if (!lv || typeof d.room !== "string" || d.room.length !== N * N || !/^[.#0-4]*$/.test(d.room)) { G.note("That share link didn't work.", 5000); return; }
+  const g = [...d.room].map(c => c === "." ? -1 : c === "#" ? -2 : +c);
+  const r = stDeduce(N, g, g.map(() => -1), 2);
+  if (!r.ok || !stSolved(N, g, r.s)) { G.note("That share link didn't work.", 5000); return; }
+  game = fresh({n: d.N, N, g, post: r.s.map((v, i) => g[i] === -1 && v === 1 ? 1 : 0).join("")});
+  if (d.p && typeof d.p.s === "string" && d.p.s.length === N * N && /^[px-]*$/.test(d.p.s)) {
+    game.s = [...d.p.s].map((c, i) => g[i] !== -1 ? -1 : c === "p" ? 1 : c === "x" ? 0 : -1); game.timed = false;
+  }
+  settings.level = d.N; $("levelSel").value = d.N; mark = null;
+  draw(); save();
+  const l = look();
+  if (!floorLeft(l) && !l.bad.some(Boolean) && g.every((v, i) => v < 0 || l.num[i] === v)) { game.won = true; draw(); save(); }
+}
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  settings.seenHelp = false; helpOnFirstVisit();
+  if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
+}
+// On an empty room the walkthrough puts down example posts where none go (so it gives nothing away) and
+// takes them up again; once you've started, it points at your own posts instead and changes nothing.
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || !playing() || document.querySelector(".spot")) return;
+  const {N, g, s, post} = game, xy = i => [i % N, Math.floor(i / N)], all = [...Array(N * N).keys()];
+  const floor = all.filter(i => g[i] === -1), started = game.moves.length > 0 || s.some(v => v !== -1);
+  // an example post: on a square where none goes, covering as much as it can; and a second it can see
+  const notAns = floor.filter(i => post[i] !== "1").sort((a, b) => stSight(N, g, b).length - stSight(N, g, a).length);
+  const own = floor.filter(i => s[i] === 1);
+  const a = started ? own[0] : notAns[0], b = a === undefined ? undefined : started ? undefined : stSight(N, g, a).find(k => k !== a && post[k] !== "1" && notAns.includes(k));
+  const show = list => started ? {} : {enter: () => { for (const k of list) game.s[k] = 1; draw(); }, leave: () => { for (const k of list) game.s[k] = -1; draw(); }};
+  const numbered = all.find(i => g[i] > 0) ?? all.find(i => g[i] >= 0);
+  const steps = [{say: "Lure Dottie away from the sofa to the scratching posts", lit: all.filter(i => g[i] !== -1).map(xy)}];
+  if (a !== undefined) steps.push({say: "She can see a post along its row and column, up to the furniture", lit: stSight(N, g, a).map(xy), tone: "ok", ...show([a])});
+  steps.push({say: "No matter where she is, she should see a post in her row or column", lit: floor.map(xy)});
+  if (b !== undefined) steps.push({say: "Don't waste posts by putting two in line with each other", lit: [xy(a), xy(b)], ...show([a, b])});
+  if (numbered !== undefined) steps.push({say: "Posts beside the furniture save it best: the number says how many", lit: [numbered, ...stNear(N, numbered).filter(k => g[k] === -1)].map(xy)});
+  steps.push(
+    {say: settings.dotFirst ? "Tap for a dot (no post), again for a post, again to clear" : "Tap for a post, again for a dot (no post), again to clear", lit: floor.slice(0, 1).map(xy)},
+    {say: "Drag across the floor to dot lots of squares at once", lit: floor.slice(0, 3).map(xy)},
+    {say: "No hint, Undo or Restart earns a gold paw", els: [$("count")]},
+    {say: "Stuck? Hint shows where a post goes, or can't", els: [$("hintBtn")]},
+  );
+  G.spotlight({grid: $("board"), w: N, h: N, steps, done: () => { settings.seenHelp = true; save(); }});
+}
+
+/* ---------- start ---------- */
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", "") + (n === MAX_LEVEL ? " (biggest)" : ""), n));
+$("levelSel").onchange = e => startLevel(+e.target.value);
+$("newBtn").onclick = newPuzzle;
+$("helpBtn").onclick = showHelp;
+$("dotSw").checked = !!settings.dotFirst;
+$("dotSw").onchange = e => { settings.dotFirst = e.target.checked; save(); };
+
+G.nav("scratchthat");
+G.checkClock(game);
+G.setupTimer({name: "scratchthat", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level",
+  emptyText: "Save the furniture in a room and your times will show up here. They're kept on this device only."});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+const shared = G.readShare("scratchthat");
+if (game && Array.isArray(game.s)) G.reopen(() => {
+    if (!LEVELS[game.level] || game.g.length !== game.N * game.N || game.s.length !== game.g.length) throw new Error("the saved room doesn't fit its level");
+    draw();
+    if (game.won) finishCard(); else helpOnFirstVisit();
+  }, why => { game = null; newPuzzle(); G.note(why, 0); });
+else if (!shared) newPuzzle();
+const shareOpts = () => ({name: "Scratch That", inProgress: !!(game && !game.won && game.moves.length), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, shareOpts());
+window.addEventListener("hashchange", () => { const d = G.readShare("scratchthat"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>

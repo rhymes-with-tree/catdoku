@@ -26,7 +26,7 @@ const G = (() => {
     ["Unravel", "unravel", "Cover every line with one strand of yarn", "#E16A4A", "lines", "one line euler draw"],
     ["Tail Chase", "tailchase", "Help Jan Brady catch the toys without getting tangled", "#C9773F", "quick", "snake action"],
     ["Keyboard Cat", "keyboardcat", "Make words from the keys that still work", "#8D78AD", "words", "spelling bee"],
-    ["If It Fits", "iffits", "Build the box, and a cat comes to sit in it", "#C4925C", "teasers", "tangram shapes"],
+    ["If It Fits", "iffits", "Build the box, and Bugsy comes to sit in it", "#C4925C", "teasers", "tangram shapes"],
     ["High Perch", "highperch", "Raise every cat tree to just the right height", "#8E5E3E", "logic", "skyscrapers towers futoshiki sudoku latin square"],
     ["Fuzzy Spelling", "fuzzyspelling", "Slide the letters until the bar spells a word", "#B94588", "words", "thruline"],
     ["Cat-astrophe", "catastrophe", "Help Crunch dye the whole rug one colour", "#73A7AE", "teasers", "flood fill colour color"],
@@ -34,6 +34,7 @@ const G = (() => {
     ["Treat Time", "treattime", "Help Higgins give every cat just enough treats", "#ECA818", "numbers", "sumplete sums"],
     ["Up a Tree", "upatree", "Help Dottie climb the cat tree, one letter at a time", "#6AA673", "words", "word ladder weaver doublets"],
     ["Toydoku", "toydoku", "Help Laya give every row, column and box one of each toy", "#B3B94B", "logic", "sudoku solo number place latin square"],
+    ["Scratch That", "scratchthat", "Save the sofa from Dottie!", "#8D78AD", "logic", "light up akari lamps lighting scratching posts"],
     ["Pick of the Pile", "pickpile", "Help Fred put the toy blocks away in pairs", "#7885BA", "teasers", "mahjong solitaire mahjongg shanghai tile match pairs"],
   ];
   // The shelves the front page and the games menu sort the games onto, in order: key (also a plain name for it,
