@@ -66,7 +66,9 @@ anywhere, but keep track of who they are, because they'll be featured in games o
   under a red blanket (`dottie-1`), hanging from a green toothbrush (`dottie-9`), hugging a blue blanket
   (`dottie-22`) and sitting on a cat-tree perch (`dottie-24`). Dottie is the star of Up a Tree too (its icon climbs CAT, COT,
   DOT): `dottie-24` sits on her perch beside the title, `dottie-18` sits up on each word as she climbs the cat tree, and
-  `dottie-12` reaches up on her back legs on the gold-paw card.
+  `dottie-12` reaches up on her back legs on the gold-paw card. Dottie is the star of Scratch That too: `dottie-6`
+  (reaching up to scratch) is beside its title and scratches a post once the room is solved, the `dottie-face-…` pictures peek
+  over a sofa she can still get at, and `dottie-5` rolls on her back on the gold-paw card.
 - **Laya** (`laya-…`, smooth grey with brown eyes) is the star of Toy Box: `laya-5` sits beside the
   title, `laya-9` (her whole body, lying down) lies on the rug inside the ball track whenever no
   basket needs the space, and `laya-3` struts off, tail up, on the gold-paw card. Laya is the star of Toydoku too: `laya-2` looks up from beside the title, `laya-4` lies on the

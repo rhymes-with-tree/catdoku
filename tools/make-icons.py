@@ -592,10 +592,33 @@ def pickpile():
     return frame(PAPER, out)
 
 
+# Scratch That: a room from above, a scratching post with the floor it can see in gold, a sofa, and an armchair
+# with a 1 (the post beside it).
+def scratchthat():
+    s, o, out = 18, 14, ""
+    post = (1, 1)
+    seen = {(1, 0), (1, 1), (2, 1), (3, 1), (0, 1)}
+    for r in range(4):
+        for c in range(4):
+            fill = tint(YELLOW, .45) if (c, r) in seen else tint(TEAL, .2)
+            out += f'<rect x="{o+c*s}" y="{o+r*s}" width="{s}" height="{s}" fill="{fill}" stroke="{tint(TEAL, .5)}" stroke-width=".8"/>'
+    # a two-seat sofa along the top right, an armchair with a 1 under the post
+    out += (f'<rect x="{o+2*s+1.5}" y="{o+1.5}" width="{2*s-3}" height="{s-3}" rx="3" fill="{tint(PERI, .9)}" stroke="{INK}" stroke-width="1.8"/>'
+            f'<rect x="{o+2*s+5}" y="{o+6}" width="{s-6}" height="{s-9}" rx="2" fill="{tint(PERI, .4)}"/><rect x="{o+3*s+1}" y="{o+6}" width="{s-6}" height="{s-9}" rx="2" fill="{tint(PERI, .4)}"/>'
+            f'<rect x="{o+s+1.5}" y="{o+2*s+1.5}" width="{s-3}" height="{s-3}" rx="3" fill="{tint(PLUM, .9)}" stroke="{INK}" stroke-width="1.8"/>'
+            f'<rect x="{o+s+5}" y="{o+2*s+6}" width="{s-10}" height="{s-9}" rx="2" fill="{tint(PLUM, .4)}"/>' + text(o + 1.5 * s, o + 2.62 * s, "1", 11))
+    x, y = o + post[0] * s + s / 2, o + post[1] * s
+    out += (f'<ellipse cx="{x}" cy="{y+s-3}" rx="7" ry="2.4" fill="#C9B9D6" stroke="{INK}" stroke-width="1.4"/>'
+            f'<rect x="{x-3}" y="{y+4}" width="6" height="{s-7}" rx="1.5" fill="#C99A62" stroke="#5A3D25" stroke-width="1.2"/>'
+            f'<ellipse cx="{x}" cy="{y+4}" rx="6" ry="2" fill="#C9B9D6" stroke="{INK}" stroke-width="1.4"/>')
+    out += f'<rect x="{o}" y="{o}" width="{4*s}" height="{4*s}" fill="none" stroke="{INK}" stroke-width="3" rx="2"/>'
+    return frame(PAPER, out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")
