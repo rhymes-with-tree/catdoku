@@ -673,6 +673,15 @@ const G = (() => {
       setTimeout(redraw, 350);   // and again once the page has settled (a message line can shift things)
     }
     addEventListener("resize", redraw); addEventListener("scroll", redraw, {passive: true});
+    // The page can also shift under the layer with no scroll or resize (a message line coming or
+    // going above the board), so follow the grid wherever it goes while the layer is up.
+    let was = "";
+    (function follow() {
+      if (!layer.isConnected) return;
+      const g = o.grid.getBoundingClientRect(), now = `${g.left} ${g.top} ${g.width} ${g.height}`;
+      if (was && now !== was) redraw();
+      was = now; requestAnimationFrame(follow);
+    })();
     layer.addEventListener("pointerdown", next);
     layer.addEventListener("keydown", e => { if (e.key === " " || e.key === "Enter" || e.key === "Escape") next(e); });
     ticker = setInterval(() => { const st = o.steps[k]; if (st && (st.marks || []).some(m => Array.isArray(m[2]))) { frame++; show(); } }, 900);
