@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pick of the Pile</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-17.2"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-17.2">
+<style>
+/* Fred, the star, beside the title */
+.title{display:flex;align-items:flex-end;gap:8px}
+.fred{display:block;height:64px;width:auto;margin-bottom:-6px}
+@media (max-height:760px){.fred{height:46px;margin-bottom:-4px}}
+.card img.fredpic{display:block;width:70%;max-width:240px;height:auto;margin:0 auto 14px}
+
+/* A heap of toy blocks on a woven rug. Each layer of the heap has its own colour of block, so you can
+   see what lies on what; a block's sides show below and to the right of its face. */
+.wrap.rugwrap{height:auto}
+.rug{position:relative;margin:0 auto;border-radius:18px;background:
+  repeating-linear-gradient(90deg,transparent 0 9px,rgba(255,255,255,.18) 9px 11px),
+  color-mix(in srgb,#73A7AE 55%,#fff);border:4px solid color-mix(in srgb,#73A7AE 70%,#2A2530);
+  box-shadow:inset 0 0 0 6px color-mix(in srgb,#73A7AE 40%,#fff),inset 0 0 0 8px color-mix(in srgb,#73A7AE 80%,#2A2530);
+  user-select:none;-webkit-user-select:none;touch-action:manipulation;isolation:isolate}  /* the blocks' layers stay inside the rug */
+.blk{position:absolute;cursor:pointer;border-radius:16%;--side:#7885BA;
+  box-shadow:var(--d) var(--d) 0 color-mix(in srgb,var(--side) 80%,#2A2530),calc(var(--d) * (1 + var(--lift,0))) calc(var(--d) * (1.4 + var(--lift,0))) calc(3px + 4px * var(--lift,0)) rgba(42,37,48,.4);
+  transition:transform .12s}
+.blk[data-z="1"]{--side:#6AA673;--lift:1}
+.blk[data-z="2"]{--side:#E16A4A;--lift:1.5}
+.blk[data-z="3"]{--side:#ECA818;--lift:2}
+.face{position:relative;width:100%;height:100%;border-radius:16%;background:color-mix(in srgb,#ECA818 9%,#fff);
+  border:2px solid color-mix(in srgb,var(--side) 75%,#2A2530);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.face img{width:84%;height:auto;aspect-ratio:1;object-fit:contain;pointer-events:none;filter:drop-shadow(0 1px 1px rgba(42,37,48,.3))}
+/* blocks that can't come off yet fade, if Dim stuck blocks is on */
+.dim .blk.stuck .face::after{content:"";position:absolute;inset:0;background:rgba(42,37,48,.30)}
+.dim .blk.stuck{cursor:default}
+.blk.sel{transform:translate(-2px,-5px)}
+.blk.sel .face{background:color-mix(in srgb,#ECA818 45%,#fff);border-color:#ECA818;box-shadow:inset 0 0 0 2px #ECA818}
+.blk.gone{animation:gone .22s ease-in forwards;pointer-events:none}
+@keyframes gone{to{transform:translateY(-30%) scale(.6);opacity:0}}
+.blk.nope{animation:nope .3s}
+@keyframes nope{25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+/* Fred curls up where the pile was */
+.nap{position:absolute;left:50%;top:50%;width:46%;max-width:220px;transform:translate(-50%,-50%);animation:nap .6s ease-out;pointer-events:none}
+@keyframes nap{from{opacity:0;transform:translate(-50%,-40%) scale(.7)}}
+</style>
+</head>
+<body>
+<main>
+  <header><div class="title"><h1>Pick of the Pile</h1><img class="fred" src="../cats/fred-7.webp" alt="Fred, a white cat with tabby patches and a blue collar"></div><div class="stripe"></div><p class="tagline">Help Fred put the toy blocks away in pairs</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap rugwrap"><div class="rug" id="board" role="group" aria-label="A pile of toy blocks"></div></div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="shuffleBtn">Shuffle</button>
+    <button id="shareBtn">Share</button>
+    <button id="toysBtn">Toys</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New pile</button>
+  </div>
+  <div class="bar toggles">
+    <div class="opt"><label class="toggle"><input type="checkbox" id="dimSw"><span class="sw"></span>Dim stuck blocks</label><span class="hint">Fades the blocks that can't come off yet</span></div>
+  </div>
+</main>
+
+<script src="../games.js?v=2026-10-17.2"></script>
+<script>
+/* ---------- piles ---------- */
+// The pile for each level: blocks [x, y, z] in half-block steps, from rectangles [z, x, y, w, h] (x and y in
+// half blocks, w and h in whole blocks). Every level has an even number of blocks.
+function pileLayout(n) {
+  const R = [null,
+    [[0, 0, 0, 4, 3], [1, 2, 1, 2, 2]],
+    [[0, 0, 0, 5, 4], [1, 3, 2, 2, 2]],
+    [[0, 0, 0, 6, 4], [1, 2, 2, 4, 2], [2, 4, 2, 2, 2]],
+    [[0, 0, 0, 6, 5], [1, 2, 2, 4, 3], [2, 4, 3, 2, 2], [0, -2, 4, 1, 1], [0, 12, 4, 1, 1]],
+    [[0, 0, 0, 8, 5], [1, 2, 2, 6, 3], [2, 4, 4, 4, 1], [3, 6, 4, 2, 1]],
+    [[0, 0, 0, 8, 6], [1, 2, 2, 6, 4], [2, 4, 4, 4, 2]],
+    [[0, 0, 0, 8, 6], [1, 2, 2, 6, 4], [2, 4, 4, 4, 2], [3, 6, 5, 2, 1], [0, -2, 5, 1, 1], [0, 16, 5, 1, 1],
+     [1, 0, 0, 1, 1], [1, 14, 0, 1, 1], [1, 0, 10, 1, 1], [1, 14, 10, 1, 1]],
+  ][n];
+  const out = [];
+  for (const [z, x, y, w, h] of R) for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) out.push([x + 2 * i, y + 2 * j, z]);
+  return out;
+}
+// For each block: the blocks lying on it, and those touching its left and right sides.
+function pileLinks(B) {
+  return B.map(([x, y, z]) => ({
+    on: B.map((b, k) => b[2] === z + 1 && Math.abs(b[0] - x) < 2 && Math.abs(b[1] - y) < 2 ? k : -1).filter(k => k >= 0),
+    l: B.map((b, k) => b[2] === z && b[0] === x - 2 && Math.abs(b[1] - y) < 2 ? k : -1).filter(k => k >= 0),
+    r: B.map((b, k) => b[2] === z && b[0] === x + 2 && Math.abs(b[1] - y) < 2 ? k : -1).filter(k => k >= 0),
+  }));
+}
+// A block is free when nothing lies on it and its left side or its right side is open.
+function pileFree(L, left, i) {
+  const there = k => left[k];
+  return !L[i].on.some(there) && (!L[i].l.some(there) || !L[i].r.some(there));
+}
+// Is block a somewhere under block b (b on it, or on something on it)?
+function pileUnder(L, a, b) {
+  const seen = new Set([a]), todo = [a];
+  while (todo.length) for (const k of L[todo.pop()].on) { if (k === b) return true; if (!seen.has(k)) { seen.add(k); todo.push(k); } }
+  return false;
+}
+// Take the blocks off two free ones at a time, at random. The order they came off in is a way to clear
+// the pile, so the two taken together get the same toy. `left` says which blocks are there; null if it got stuck.
+function pileOrder(L, left) {
+  left = left.slice();
+  const pairs = [];
+  let n = left.filter(Boolean).length;
+  while (n) {
+    const free = [];
+    for (let i = 0; i < L.length; i++) if (left[i] && pileFree(L, left, i)) free.push(i);
+    if (free.length < 2) return null;
+    const a = free.splice(Math.floor(Math.random() * free.length), 1)[0], b = free[Math.floor(Math.random() * free.length)];
+    left[a] = left[b] = false; n -= 2; pairs.push([a, b]);
+  }
+  return pairs;
+}
+function makePile(n) {
+  const B = pileLayout(n), L = pileLinks(B), all = B.map(() => true);
+  for (let t = 0; t < 200; t++) { const p = pileOrder(L, all); if (p) return {N: n, sol: p}; }
+  return null;
+}
+// Can the pile be cleared from here? Depth-first over the pairs of free blocks with the same toy, trying
+// first the blocks with the most under them, and remembering piles already found stuck. Some pairs can't
+// hurt to take, so they're taken without trying the others: the last two of a toy, or every one of a toy
+// left when they're all free. The last two of a toy with one under the other can never both come off.
+// Returns a pair to take that still clears the pile ([] when it's clear), null when there's none, or
+// undefined when it gave up looking (after `limit` piles).
+function pileSolve(L, face, left, limit = 20000) {
+  const dead = new Set(), byFace = {};
+  face.forEach((f, i) => (byFace[f] = byFace[f] || []).push(i));
+  const groups = Object.values(byFace), weight = L.map((_, i) => L.filter((_, k) => k !== i && pileUnder(L, k, i)).length);
+  let tries = 0;
+  function go(left, n) {
+    if (!n) return [];
+    const key = left.map(Number).join("");
+    if (dead.has(key)) return null;
+    if (++tries > limit) return undefined;
+    const moves = [];
+    let safe = null;
+    for (const g of groups) {
+      const rem = g.filter(i => left[i]);
+      if (!rem.length) continue;
+      const fr = rem.filter(i => pileFree(L, left, i));
+      if (rem.length === 2 && fr.length < 2 && (pileUnder(L, rem[0], rem[1]) || pileUnder(L, rem[1], rem[0]))) { dead.add(key); return null; }
+      if (fr.length === rem.length && fr.length % 2 === 0 || rem.length === 2 && fr.length === 2) { if (!safe) safe = [fr[0], fr[1]]; continue; }
+      for (let a = 0; a < fr.length; a++) for (let b = a + 1; b < fr.length; b++) moves.push([fr[a], fr[b]]);
+    }
+    if (!safe) moves.sort((p, q) => weight[q[0]] + weight[q[1]] - weight[p[0]] - weight[p[1]]);
+    let unsure = false;
+    for (const [a, b] of safe ? [safe] : moves) {
+      const next = left.slice(); next[a] = next[b] = false;
+      const r = go(next, n - 2);
+      if (r === undefined) { if (tries > limit) return undefined; unsure = true; continue; }
+      if (r) return [a, b];
+    }
+    if (unsure) return undefined;
+    dead.add(key);
+    return null;
+  }
+  return go(left, left.filter(Boolean).length);
+}
+const piles = G.builder([pileLayout, pileLinks, pileFree, pileOrder, makePile], "makePile");
+
+/* ---------- levels ---------- */
+const MAX_LEVEL = 7, LAYOUT = [], LINKS = [];
+for (let n = 1; n <= MAX_LEVEL; n++) { LAYOUT[n] = pileLayout(n); LINKS[n] = pileLinks(LAYOUT[n]); }
+const levelName = n => `Level ${n} · ${LAYOUT[n].length} blocks`;
+
+/* ---------- toys ---------- */
+// The whole toy library, by colour. Look-alikes (the teal and green cages, the two feather balls, the
+// nubby balls) can share a pile: telling them apart is part of the game.
+const KINDS = [
+  {c: "#BD5538", looks: [["wiffle-red", "red wiffle ball"], ["swirl-red", "red swirl ball"], ["crochet-stars", "star ball"], ["tinsel", "tinsel ball"]]},
+  {c: "#ECA818", looks: [["wiffle-yellow", "yellow wiffle ball"], ["tennis", "tennis ball"]]},
+  {c: "#73A7AE", looks: [["wiffle-teal", "teal wiffle ball"], ["fish", "fish"], ["cage-blue", "teal cage ball"], ["crochet-stripe", "striped crochet ball"]]},
+  {c: "#6AA673", looks: [["lattice", "lattice ball"]]},
+  {c: "#B3B94B", looks: [["spiky-lime", "spiky pom-pom"]]},
+  {c: "#B94588", looks: [["swirl-purple", "plum swirl ball"], ["bell-purple", "bell ball"], ["nubby-pink", "pink nubby ball"], ["polka-dot", "polka-dot ball"]]},
+  {c: "#7885BA", looks: [["spring", "spring"], ["rope-blue", "rope ball"]]},
+  {c: "#825840", looks: [["cork-paw", "cork paw ball"], ["burlap-paws", "burlap ball"], ["rattan", "rattan ball"], ["fluffy-bell", "fluffy bell ball"]]},
+  {c: "#5E5866", looks: [["mouse", "mouse"]]},
+  {c: "#E16A4A", looks: [["felt-rainbow", "rainbow ball"], ["ribbon-tail", "ribbon ball"], ["spiky-rainbow", "spiky ball"], ["feather-orange", "orange feather ball"],
+    ["feather-rainbow", "rainbow feather ball"], ["nubby-orange", "orange nubby ball"], ["sisal-stripe", "striped sisal ball"], ["sisal-rainbow", "rainbow sisal ball"], ["wave-stripe", "wavy striped ball"]]},
+];
+const ALL_LOOKS = KINDS.flatMap(k => k.looks.map(([f]) => f));
+let offToys = G.toysOff();
+const TOY_SRC = {};  // filled with embedded pictures when the page is bundled into one file
+const toySrc = f => TOY_SRC[f] || `../toys/${f}.webp?v=${window.SITE_BUILD || ""}`;
+const CAT_SRC = {};
+const catSrc = f => CAT_SRC[f] || `../cats/${f}.webp`;
+const nameOf = f => { for (const k of KINDS) for (const [g, n] of k.looks) if (g === f) return n; return "toy"; };
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+// F different toys, from those not left out first.
+const pickToys = F => shuffle(ALL_LOOKS.filter(f => !offToys.has(f))).concat(shuffle(ALL_LOOKS.filter(f => offToys.has(f)))).slice(0, F);
+
+/* ---------- game ---------- */
+// game: {level, toys (a picture per toy), f (the toy on each block), sol (a way to clear the pile, by pairs),
+//        left (blocks still on the pile), moves (pairs taken, or {shuffle: the toys before}), sel (a block picked, or -1),
+//        hinted, undid, shuffled, restarted, won}
+const STORE = "catdoku.pickpile.v1";
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1, dim: true}, state.settings);
+let game = state.game || null, mark = null;  // mark: a hint's blocks, while the pile is as it was
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !$("overlay").classList.contains("show");
+const B = () => LAYOUT[game.level], Lk = () => LINKS[game.level];
+const isFree = i => pileFree(Lk(), game.left, i);
+const leftCount = () => game.left.filter(Boolean).length;
+
+// Toys for each pair in the order it came off: each toy on two pairs (four blocks), so there's a choice.
+function dealToys(sol, n) {
+  const P = sol.length, toys = pickToys(Math.ceil(P / 2)), f = Array(LAYOUT[n].length);
+  const per = shuffle([...Array(P).keys()].map(k => k % toys.length));
+  sol.forEach(([a, b], k) => f[a] = f[b] = per[k]);
+  return {toys, f};
+}
+function fresh(n, p) {
+  const {toys, f} = dealToys(p.sol, n);
+  return {level: n, toys, f, sol: p.sol, left: f.map(() => true), moves: [], sel: -1, hinted: false, undid: false, shuffled: false, restarted: false, won: false, ...G.freshClock()};
+}
+let asking = 0;
+function newPuzzle() {
+  G.closeCard();
+  const n = settings.level, ask = ++asking;
+  piles.take(n).then(p => {
+    if (ask !== asking) return;
+    game = fresh(n, p); mark = null; draw(); save();
+    piles.prefetch(n);
+    G.track(`Pick of the Pile new puzzle level ${n}`);
+    helpOnFirstVisit();
+  });
+}
+function startLevel(n) { settings.level = n; $("levelSel").value = n; newPuzzle(); }
+
+/* ---------- drawing ---------- */
+let geo = null;  // block size and where the pile sits on the rug
+function layout() {
+  const b = B(), xs = b.map(p => p[0]), ys = b.map(p => p[1]), zmax = Math.max(...b.map(p => p[2]));
+  const x0 = Math.min(...xs), y0 = Math.min(...ys), cols = (Math.max(...xs) - x0) / 2 + 1, rows = (Math.max(...ys) - y0) / 2 + 1;
+  const width = $("board").parentElement.clientWidth, pad = 14, tall = innerHeight * 0.6;
+  // a block is tw wide and 1.2 × tw tall; each layer sits d up and to the left of the one under it
+  let tw = Math.min(64, (width - 2 * pad - 8) / (cols + 0.14 * (zmax + 1)));
+  tw = Math.min(tw, (tall - 2 * pad) / (rows * 1.2 + 0.14 * (zmax + 1)));
+  const th = tw * 1.2, d = tw * 0.14;
+  geo = {tw, th, d, ox: pad + zmax * d - x0 * tw / 2, oy: pad + zmax * d - y0 * th / 2,
+         w: cols * tw + (zmax + 1) * d + 2 * pad, h: rows * th + (zmax + 1) * d + 2 * pad};
+}
+function draw() {
+  const el = $("board");
+  layout();
+  el.style.width = `${geo.w}px`; el.style.height = `${geo.h}px`;
+  el.classList.toggle("dim", !!settings.dim);
+  el.innerHTML = "";
+  const b = B(), live = mark && mark.key === stateKey() ? mark : null;
+  b.forEach(([x, y, z], i) => {
+    if (!game.left[i]) return;
+    const d = document.createElement("div"), free = isFree(i), toy = game.toys[game.f[i]];
+    d.className = "blk" + (free ? "" : " stuck") + (game.sel === i ? " sel" : "");
+    d.dataset.i = i; d.dataset.z = z;
+    d.setAttribute("role", "button");
+    d.setAttribute("aria-label", `${nameOf(toy)}, ${free ? "free" : "stuck"}`);
+    Object.assign(d.style, {left: `${geo.ox + x * geo.tw / 2 - z * geo.d}px`, top: `${geo.oy + y * geo.th / 2 - z * geo.d}px`,
+      width: `${geo.tw}px`, height: `${geo.th}px`, zIndex: z * 1000 + y * 30 + x + 10, "--d": `${geo.d}px`});
+    d.innerHTML = `<div class="face${live && live.blocks.includes(i) ? " hintcell" + (live.bad ? " bad" : "") : ""}"><img src="${toySrc(toy)}" alt=""></div>`;
+    el.append(d);
+  });
+  if (game.won) { const im = new Image(); im.className = "nap"; im.src = catSrc("fred-11"); im.alt = "Fred curled up asleep on the rug"; el.append(im); }
+  const n = leftCount();
+  $("count").textContent = game.won ? "Pile cleared!" : `${n} block${n === 1 ? "" : "s"} left`;
+  $("hintBtn").disabled = game.won; $("undoBtn").disabled = game.won || !game.moves.length;
+  $("restartBtn").disabled = game.won || !game.moves.length; $("shuffleBtn").disabled = game.won;
+}
+const blockEl = i => $("board").querySelector(`.blk[data-i="${i}"]`);
+const stateKey = () => game.left.map(Number).join("") + game.f.join(",");
+addEventListener("resize", () => { if (game) draw(); });
+
+/* ---------- playing ---------- */
+// Tap a free block to pick it, then another free block with the same toy to take both off.
+function tap(i) {
+  if (!playing() || !game.left[i]) return;
+  if (!isFree(i)) {
+    const e = blockEl(i); e.classList.remove("nope"); void e.offsetWidth; e.classList.add("nope");
+    G.note(Lk()[i].on.some(k => game.left[k]) ? "Something's on top of that one." : "That one's hemmed in on both sides.", 2500);
+    return;
+  }
+  if (game.sel === i) { game.sel = -1; draw(); save(); return; }
+  if (game.sel < 0 || game.f[game.sel] !== game.f[i]) { game.sel = i; draw(); save(); return; }
+  const a = game.sel, b = i;
+  game.sel = -1; game.left[a] = game.left[b] = false; game.moves.push([a, b]);
+  save();
+  for (const k of [a, b]) blockEl(k).classList.add("gone");
+  const g = game;
+  setTimeout(() => { if (game !== g) return; draw(); afterMove(); }, 220);
+  if (!leftCount()) win();
+}
+$("board").addEventListener("click", e => { const d = e.target.closest(".blk"); if (d) tap(+d.dataset.i); });
+// Say so when there's no pair left to take.
+function afterMove() {
+  if (game.won) return;
+  const free = game.left.map((l, i) => l && isFree(i) ? game.f[i] : -1).filter(f => f >= 0);
+  if (new Set(free).size === free.length) G.note("No free pairs left. Undo, or Shuffle the toys that are left.", 0);
+}
+
+function undo() {
+  if (!playing() || !game.moves.length) return;
+  const m = game.moves.pop();
+  if (m.shuffle) { game.f = m.shuffle; game.sol = m.sol; }
+  else for (const k of m) game.left[k] = true;
+  game.sel = -1; game.undid = true;
+  draw(); save(); G.note("");
+}
+$("undoBtn").onclick = undo;
+addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); undo(); } });
+$("restartBtn").onclick = () => {
+  if (!playing() || !game.moves.length) return;
+  while (game.moves.length) { const m = game.moves.pop(); if (m.shuffle) { game.f = m.shuffle; game.sol = m.sol; } else for (const k of m) game.left[k] = true; }
+  game.sel = -1; game.restarted = true;
+  draw(); save(); G.note("Back to the whole pile.", 3000);
+};
+// Shuffle: deal the toys left onto the blocks left again, so that there's a way to clear them.
+$("shuffleBtn").onclick = () => {
+  if (!playing()) return;
+  let order = null;
+  for (let t = 0; t < 200 && !order; t++) order = pileOrder(Lk(), game.left);
+  if (!order) { G.note("These blocks can't all come off however the toys lie. Undo a few moves instead.", 5000); return; }
+  const toys = shuffle(game.f.filter((_, i) => game.left[i]).sort((a, b) => a - b).filter((_, k) => k % 2 === 0)), f = game.f.slice();
+  order.forEach(([a, b], k) => f[a] = f[b] = toys[k]);
+  game.moves.push({shuffle: game.f, sol: game.sol});
+  game.f = f; game.sol = order; game.sel = -1; game.shuffled = true;
+  draw(); save(); G.note("Shuffled. There's a way to clear the pile again.", 3500);
+};
+
+/* ---------- hints ---------- */
+// The stored way to clear the pile still works if the pairs taken so far fit it: walk it, letting each
+// block go once its own pair would have, and pairing blocks of the same toy as they're let go.
+function storedHint() {
+  const L = Lk(), left = game.left.slice(), ready = {};
+  let first = null;
+  for (const pair of game.sol) {
+    for (const k of pair) if (left[k]) (ready[game.f[k]] = ready[game.f[k]] || []).push(k);
+    const r = ready[game.f[pair[0]]] || [];
+    while (r.length >= 2) {
+      const [a, b] = r.splice(0, 2);
+      if (!pileFree(L, left, a) || !pileFree(L, left, b)) return null;
+      left[a] = left[b] = false;
+      first = first || [a, b];
+    }
+  }
+  return left.some(Boolean) ? null : first;
+}
+// A hint shows a pair that still leaves a way to clear the pile, or, when there's none, says so (and
+// marks in red two blocks of a toy that can never both come off, if there are some).
+function hint() {
+  if (!playing()) return;
+  const L = Lk();
+  let pair = storedHint(), bad = false, say;
+  if (!pair) {
+    const r = pileSolve(L, game.f, game.left);
+    if (r === null) {
+      bad = true;
+      const byFace = {};
+      game.left.forEach((l, i) => l && (byFace[game.f[i]] = byFace[game.f[i]] || []).push(i));
+      pair = Object.values(byFace).find(g => g.length === 2 && (pileUnder(L, g[0], g[1]) || pileUnder(L, g[1], g[0]))) || [];
+      say = pair.length ? "Those two can never both be free, so the pile can't be cleared now. Undo, or Shuffle." : "There's no way left to clear the pile. Undo a few moves, or Shuffle.";
+    } else if (r === undefined) {
+      const free = game.left.map((l, i) => l && isFree(i) ? i : -1).filter(i => i >= 0);
+      pair = free.flatMap((a, k) => free.slice(k + 1).filter(b => game.f[a] === game.f[b]).map(b => [a, b]))[0];
+      if (!pair) { G.note("No free pairs left. Undo, or Shuffle the toys that are left.", 5000); return; }
+    } else pair = r;
+  }
+  game.hinted = true; save();
+  say = say || (pair.includes(game.sel) || game.sel < 0 ? "Take these two off." : "Try these two instead.");
+  mark = {key: stateKey(), blocks: pair, bad};
+  draw(); G.note(say, 5000);
+  const m = mark; setTimeout(() => { if (mark === m) { mark = null; if (game) draw(); } }, 5000);
+}
+$("hintBtn").onclick = hint;
+
+/* ---------- winning ---------- */
+const goldOK = () => !game.hinted && !game.undid && !game.shuffled && !game.restarted;
+function win() {
+  game.won = true; G.finishClock(game); G.note("");
+  const next = game.hinted || game.shuffled ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save();
+  piles.prefetch(next);
+  G.track(`Pick of the Pile solved level ${game.level}`);
+  const g = game;
+  setTimeout(() => { if (game === g) { draw(); setTimeout(() => { if (game === g) finishCard(); }, 900); } }, 240);
+}
+function fredPic() { const im = new Image(); im.className = "fredpic"; im.src = catSrc("fred-22"); im.alt = "Fred leaping"; return im; }
+function finishCard() {
+  const next = settings.level, n = LAYOUT[game.level].length;
+  let text = `All ${n} blocks put away, and Fred's curled up on the rug.`;
+  text += game.hinted || game.shuffled ? ` You had ${game.hinted ? "a hint" : "a shuffle"}, so here's another at level ${next}.`
+    : game.level === MAX_LEVEL ? " That's the biggest pile; here's another." : ` Next up: level ${next}.`;
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire Fred", game.result,
+    {title: "Pile cleared!", gold: goldOK(), goldWhy: "No hints, undos or shuffles!", goldPic: [fredPic()], next: `Next: level ${next}`,
+     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- sharing ---------- */
+$("shareBtn").onclick = () => { if (game) G.shareCard({name: "Pick of the Pile", won: game.won,
+  puzzle: () => ({g: "pickpile", N: game.level, toys: game.toys, f: firstFaces(), sol: game.moves.some(m => m.shuffle) ? undefined : game.sol}),
+  progress: () => ({left: game.left.map(Number).join(""), f: game.f})}); };
+// The toys as the pile was dealt, before any shuffle.
+const firstFaces = () => { const s = game.moves.find(m => m.shuffle); return s ? s.shuffle : game.f; };
+function openShared(d) {
+  const b = LAYOUT[d.N], nT = Array.isArray(d.toys) ? d.toys.length : 0;
+  const faces = f => Array.isArray(f) && f.length === b.length && f.every(x => Number.isInteger(x) && x >= 0 && x < nT) &&
+    [...Array(nT).keys()].every(k => f.filter(x => x === k).length % 2 === 0);
+  const ok = b && nT && d.toys.every(f => ALL_LOOKS.includes(f)) && new Set(d.toys).size === nT && faces(d.f);
+  if (!ok) { G.note("That share link didn't work.", 5000); return; }
+  const sol = Array.isArray(d.sol) && d.sol.length === b.length / 2 && d.sol.every(p => Array.isArray(p) && p.length === 2 && p.every(i => Number.isInteger(i) && i >= 0 && i < b.length)) && new Set(d.sol.flat()).size === b.length ? d.sol : [];
+  game = {level: d.N, toys: d.toys, f: d.f.slice(), sol, left: b.map(() => true), moves: [], sel: -1, hinted: false, undid: false, shuffled: false, restarted: false, won: false, ...G.freshClock()};
+  const p = d.p;
+  if (p && typeof p.left === "string" && p.left.length === b.length && /^[01]*$/.test(p.left) && faces(p.f)) {
+    game.left = [...p.left].map(c => c === "1"); game.f = p.f.slice(); game.timed = false;
+    if (game.f.join() !== d.f.join()) game.sol = [];
+  }
+  settings.level = d.N; $("levelSel").value = d.N; mark = null;
+  draw(); save();
+  if (!leftCount()) { game.won = true; draw(); save(); }
+}
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  settings.seenHelp = false; helpOnFirstVisit();
+  if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
+}
+// The walkthrough points at blocks on the real pile and changes nothing. On a new pile it shows a pair
+// that's free to take; once you've started, it lights every free block instead, giving nothing away.
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || !playing() || document.querySelector(".spot")) return;
+  const b = B(), L = Lk(), on = game.left.map((l, i) => l ? i : -1).filter(i => i >= 0), free = on.filter(isFree), stuck = on.filter(i => !isFree(i));
+  const top = free.find(i => b[i][2] > 0 && L.some((_, k) => game.left[k] && pileUnder(L, k, i))) ?? free[0];
+  const side = free.find(i => b[i][2] === 0 && L[i].l.concat(L[i].r).some(k => game.left[k])) ?? free[0];
+  const fresh = !game.moves.length;
+  const pair = fresh ? storedHint() || [] : free;
+  // each block lit on its own (looked up as the step shows, in case the pile was redrawn), or the whole pile as one
+  const each = list => list.map(i => () => blockEl(i) || []), els = list => () => list.map(blockEl).filter(Boolean);
+  const steps = [
+    {say: "Put the toy blocks away, two at a time", els: [els(on)]},
+    {say: "A block can come off when nothing's on top of it", els: each([top])},
+    {say: "…and its left or right side is open", els: each([side])},
+    {say: fresh ? "Tap two free blocks with the same toy to take them off" : "Tap two free blocks with the same toy", els: each(pair), tone: "ok"},
+  ];
+  if (settings.dim && stuck.length) steps.push({say: "Faded blocks can't come off yet", els: each(stuck.slice(0, 1))});
+  steps.push(
+    {say: "Pick carefully: four blocks share each toy", els: [els(on)]},
+    {say: "Out of pairs? Undo, or Shuffle the toys left", els: [[$("undoBtn"), $("shuffleBtn")]]},
+    {say: "No hint, Undo, Shuffle or Restart earns a gold paw", els: [$("count")]},
+    {say: "Stuck? Hint marks a pair to take", els: [$("hintBtn")]},
+  );
+  G.spotlight({grid: $("board"), w: 1, h: 1, steps, done: () => { settings.seenHelp = true; save(); }});
+}
+
+/* ---------- choosing toys ---------- */
+$("toysBtn").onclick = () => G.toyPicker({kinds: KINDS, off: offToys, min: 1, src: toySrc, save: off => {
+  offToys = off; G.saveToys(off);
+  G.note("Saved. Your toys are used from the next pile.", 3500);
+}});
+
+/* ---------- start ---------- */
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", "") + (n === MAX_LEVEL ? " (biggest)" : ""), n));
+$("levelSel").onchange = e => startLevel(+e.target.value);
+$("newBtn").onclick = newPuzzle;
+$("helpBtn").onclick = showHelp;
+$("dimSw").checked = !!settings.dim;
+$("dimSw").onchange = e => { settings.dim = e.target.checked; save(); if (game) draw(); };
+
+G.nav("pickpile");
+G.checkClock(game);
+G.setupTimer({name: "pickpile", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level",
+  emptyText: "Clear a pile and your times will show up here. They're kept on this device only."});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+const shared = G.readShare("pickpile");
+if (game && Array.isArray(game.left)) G.reopen(() => {
+    if (!LAYOUT[game.level] || game.left.length !== LAYOUT[game.level].length || game.f.length !== game.left.length) throw new Error("the saved pile doesn't fit its level");
+    game.sel = -1; draw();
+    if (game.won) finishCard(); else { afterMove(); helpOnFirstVisit(); }
+  }, why => { game = null; newPuzzle(); G.note(why, 0); });
+else if (!shared) newPuzzle();
+const shareOpts = () => ({name: "Pick of the Pile", inProgress: !!(game && !game.won && game.moves.length), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, shareOpts());
+window.addEventListener("hashchange", () => { const d = G.readShare("pickpile"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
