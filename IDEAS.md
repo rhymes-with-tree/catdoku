@@ -101,12 +101,13 @@ Rows are sorted by group, then status: Yes, Look closer, Option, Idea, Built, No
 | Block Blast, Blockudoku, Cat Pile, falling blocks | Fitting shapes | Place or drop shapes to fill and clear lines | None | Medium | — | Idea list, Game Suite chat, wordleunlimited | Idea | |
 | If It Fits (Tangram) | Fitting shapes | Build an odd-shaped box from the seven tangram pieces; a cat comes to sit in it | — | — | — | Fair Play chat | Built | Began as packing loaf, curled and stretched-out cats into a box |
 | Same Game | Match and clear | Tap groups of one colour to clear them; bigger groups score more | None | Easy | Pounce | Tatham | Idea | |
-| Mahjong solitaire, tile match | Match and clear | Pick matching free tiles off a stacked layout | None | Medium | Copycat | Idea list, Bubbles and Game Suite chats | Idea | Tile match is named in three places; toys could be the tiles |
+| Tile match (Tile Busters, Triple Tile) | Match and clear | Tap free tiles from a stacked layout into a tray of about 7; three of a kind clear, and a full tray loses | None | Medium | Pick of the Pile | Idea list, Bubbles and Game Suite chats | Idea | Named in three places; could reuse Pick of the Pile's toy blocks and piles |
 | Kolori-style pairing | Match and clear | Tap two same-coloured tiles with a clear straight line between them to clear both | None | Medium | — | Possible suites | Idea | |
 | Suika | Match and clear | Drop toys that merge into a bigger toy when two of a kind touch | None | Hard | — | wordleunlimited | Idea | Needs physics; you play 2048 |
 | Pounce (match-3) | Match and clear | Swap toys to line up three of a kind | — | — | — | Merge-3 chat | Built | |
 | Bubbles (bubble shooter) | Match and clear | Bat bubbles up to pop three of a kind | — | — | — | Bubbles chat | Built | |
 | Toy Box (sort) | Match and clear | Sort toys into baskets along a ball track | — | — | — | Fluid Object Movement chat | Built | |
+| Pick of the Pile (Mahjong solitaire) | Match and clear | Take toy blocks off a heap on the rug in matching pairs; a block is free with nothing on it and its left or right side open | — | — | — | Idea list, Bubbles and Game Suite chats | Built | Starring Fred, who curls up on the rug when the pile is gone. Each toy is on four blocks; look-alike toys can share a pile. Shuffle when out of pairs |
 | Copycat (Memory) | Match and clear | Find the pairs of toys hidden in boxes | — | — | — | Fair Play chat | Built | |
 | Bird Watch | Action | Tap the right window as birds flit past, without waking the human; like whack-a-mole | None | Medium | — | Fair Play chat | Idea | |
 | Making Biscuits | Action | Knead the blanket in time with the purr | None | Hard | — | Fair Play chat | Idea | The site's first rhythm game; needs sound, which the site doesn't have yet |

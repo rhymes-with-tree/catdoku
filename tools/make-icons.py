@@ -580,10 +580,22 @@ def toydoku():
     return frame("#B3B94B", out)
 
 
+# Pick of the Pile: a heap of toy blocks in three layers on a rug, each layer's blocks with their own colour of side.
+def pickpile():
+    w, h, d, out = 22, 26, 4, f'<rect x="10" y="12" width="80" height="76" rx="10" fill="{tint(TEAL, .45)}" stroke="{INK}" stroke-width="2"/>'
+    def block(x, y, side, toy):
+        return (f'<rect x="{x+d}" y="{y+d}" width="{w}" height="{h}" rx="4" fill="{side}" stroke="{INK}" stroke-width="1.6"/>'
+                f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="4" fill="#FDF8EC" stroke="{INK}" stroke-width="1.8"/>' + yarnball(x + w / 2, y + h / 2, 7, toy))
+    for (x, y, side, toy) in [(14, 28, PERI, PLUM), (38, 28, PERI, RED), (62, 28, PERI, YELLOW), (14, 56, PERI, RED), (38, 56, PERI, TEAL),
+                              (62, 56, PERI, PLUM), (22, 38, GREEN, YELLOW), (50, 38, GREEN, TEAL), (36, 22, ORANGE, RED)]:
+        out += block(x, y, side, toy)
+    return frame(PAPER, out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")
