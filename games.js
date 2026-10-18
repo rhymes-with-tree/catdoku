@@ -53,7 +53,7 @@ const G = (() => {
   // The games played on this device, most recent first, for the front page's and the menu's Keep playing row.
   /* ---------- the daily challenge ---------- */
   // One game a day is today's challenge, the same game for everyone on a given date: win any puzzle in it that
-  // day (in Pawlette, finish a Swipe game) to do it. The games come round in cycles: the first, from
+  // day (in Pawlette, clear a line in Swipe) to do it. The games come round in cycles: the first, from
   // DAILY_START, begins with Catdoku and then takes the rest in a shuffled order; each later cycle is shuffled
   // afresh, never the same game two days running. A new game (one with an added date) joins the first cycle
   // that starts at least DAILY_WAIT days after it was added, so it has a few days on the site first.
@@ -89,10 +89,13 @@ const G = (() => {
   }
   const dailyDoneToday = () => dailyDates().includes(today());
   let CURRENT = null;   // the game on this page, from nav
-  // A win on this page: if it's today's challenge, mark it done. Returns the line for the win card, or "".
+  // A win on this page (in Pawlette, a line cleared in Swipe): if it's today's challenge, mark it done. Returns the line for the win card, or "".
   function dailyWon() {
     if (!CURRENT || CURRENT !== daily()) return "";
-    if (!dailyDoneToday()) { save(DAILY, {done: dailyDates().concat(today()).slice(-400)}); track(`Daily challenge done: ${CURRENT}`); }
+    if (!dailyDoneToday()) {
+      save(DAILY, {done: dailyDates().concat(today()).slice(-400)}); track(`Daily challenge done: ${CURRENT}`);
+      const b = $("dailyBadge"); if (b) b.refresh();
+    }
     const k = dailyStreak();
     return `Today's challenge solved! ${k > 1 ? `${k}-day streak!` : "Come back tomorrow for a new challenge!"}`;
   }
@@ -167,7 +170,7 @@ const G = (() => {
     // on today's challenge, a badge under the menu button says so
     if (current && current === dslug) {
       const badge = document.createElement("span"); badge.className = "dailyBadge"; badge.id = "dailyBadge";
-      const set = () => { const done = dailyDoneToday(), k = dailyStreak(); badge.textContent = done ? `Today's challenge: solved!${k > 1 ? ` ${k}-day streak!` : ""}` : current === "pawlette" ? "Today's challenge: can you finish a Swipe game?" : "Today's challenge: can you solve one?"; badge.classList.toggle("done", done); };
+      const set = () => { const done = dailyDoneToday(), k = dailyStreak(); badge.textContent = done ? `Today's challenge: solved!${k > 1 ? ` ${k}-day streak!` : ""}` : current === "pawlette" ? "Today's challenge: can you clear a line in Swipe?" : "Today's challenge: can you solve one?"; badge.classList.toggle("done", done); };
       set(); badge.refresh = set; el.append(badge);
     }
   }
@@ -277,7 +280,7 @@ const G = (() => {
     const tl = timeLineEl(result); if (tl) media.append(tl);
     media.append(p);
     const dl = dailyWon();
-    if (dl) { const d = document.createElement("p"); d.className = "dailyline"; d.textContent = dl; media.append(d); const b = $("dailyBadge"); if (b) b.refresh(); }
+    if (dl) { const d = document.createElement("p"); d.className = "dailyline"; d.textContent = dl; media.append(d); }
     if (o.gold && o.goldPic) media.append(...o.goldPic); else media.append(catPhoto(), name);
     const btns = [[o.next || "New puzzle", onNext, true]];
     if (admire !== null) btns.push([admire, () => { closeCard(); note(admireNote(), 0); }]);
@@ -376,7 +379,7 @@ const G = (() => {
 
   // Call once when a puzzle is solved: records the time and returns what the card shows.
   function finishClock(g) {
-    if (dailyWon()) { const b = $("dailyBadge"); if (b) b.refresh(); }
+    dailyWon();
     const n = g.level ?? g.N;   // bests are kept by level where a game has levels, else by size
     if (!g.timed) return (g.result = {ms: null, n});
     const all = load(BESTS), mine = (all[T.name] = all[T.name] || {}), row = (mine[n] = mine[n] || {solves: 0, times: []});
