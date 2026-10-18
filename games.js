@@ -94,7 +94,7 @@ const G = (() => {
     if (!CURRENT || CURRENT !== daily()) return "";
     if (!dailyDoneToday()) { save(DAILY, {done: dailyDates().concat(today()).slice(-400)}); track(`Daily challenge done: ${CURRENT}`); }
     const k = dailyStreak();
-    return `Today's challenge done!${k > 1 ? ` ${k} days in a row.` : ""}`;
+    return `Today's challenge solved! ${k > 1 ? `${k}-day streak!` : "Come back tomorrow for a new challenge!"}`;
   }
 
   const RECENT = "catdoku.recent.v1";
@@ -167,7 +167,7 @@ const G = (() => {
     // on today's challenge, a badge under the menu button says so
     if (current && current === dslug) {
       const badge = document.createElement("span"); badge.className = "dailyBadge"; badge.id = "dailyBadge";
-      const set = () => { const done = dailyDoneToday(), k = dailyStreak(); badge.textContent = done ? `Today's challenge: done${k > 1 ? ` · ${k} days in a row` : ""}` : "Today's challenge: win one to do it"; badge.classList.toggle("done", done); };
+      const set = () => { const done = dailyDoneToday(), k = dailyStreak(); badge.textContent = done ? `Today's challenge: solved!${k > 1 ? ` ${k}-day streak!` : ""}` : current === "pawlette" ? "Today's challenge: can you finish a Swipe game?" : "Today's challenge: can you solve one?"; badge.classList.toggle("done", done); };
       set(); badge.refresh = set; el.append(badge);
     }
   }
