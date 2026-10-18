@@ -89,13 +89,20 @@ const G = (() => {
   }
   const dailyDoneToday = () => dailyDates().includes(today());
   let CURRENT = null;   // the game on this page, from nav
-  // A win on this page (in Pawlette, 3 lines cleared in one Swipe game): if it's today's challenge, mark it done. Returns the line for the win card, or "".
+  // A win just now on this page (in Pawlette, 3 lines cleared in one Swipe game): if it's today's challenge, mark
+  // it done. Called at the moment of winning (finishClock), never when a solved puzzle is reopened, so an old
+  // win doesn't count for today. Returns the line for the win card, or "".
   function dailyWon() {
     if (!CURRENT || CURRENT !== daily()) return "";
     if (!dailyDoneToday()) {
       save(DAILY, {done: dailyDates().concat(today()).slice(-400)}); track(`Daily challenge done: ${CURRENT}`);
       const b = $("dailyBadge"); if (b) b.refresh();
     }
+    return dailyLine();
+  }
+  // The win card's line, if today's challenge is this page's game and it's done today; otherwise "".
+  function dailyLine() {
+    if (!CURRENT || CURRENT !== daily() || !dailyDoneToday()) return "";
     const k = dailyStreak();
     return `Today's challenge solved! ${k > 1 ? `${k}-day streak!` : "Come back tomorrow for a new challenge!"}`;
   }
@@ -279,7 +286,7 @@ const G = (() => {
     name.textContent = `Meet ${NAMES[Math.floor(Math.random() * NAMES.length)]}!`;
     const tl = timeLineEl(result); if (tl) media.append(tl);
     media.append(p);
-    const dl = dailyWon();
+    const dl = dailyLine();
     if (dl) { const d = document.createElement("p"); d.className = "dailyline"; d.textContent = dl; media.append(d); }
     if (o.gold && o.goldPic) media.append(...o.goldPic); else media.append(catPhoto(), name);
     const btns = [[o.next || "New puzzle", onNext, true]];
@@ -789,6 +796,6 @@ const G = (() => {
     }
   }
 
-  return {GAMES, GROUPS, recent, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, load, save, builder, openCard, closeCard, winCard, sizeUp, otherSize, note, helpLater, cellAt, track, reopen,
+  return {GAMES, GROUPS, recent, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, sizeUp, otherSize, note, helpLater, cellAt, track, reopen,
           setupTimer, freshClock, spotlight, toysOff, saveToys, needToys, goldPaw, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, toyPicker, pickLook};
 })();
