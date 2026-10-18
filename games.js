@@ -92,17 +92,18 @@ const G = (() => {
   // A win just now on this page (in Pawlette, 3 lines cleared in one Swipe game): if it's today's challenge, mark
   // it done. Called at the moment of winning (finishClock), never when a solved puzzle is reopened, so an old
   // win doesn't count for today. Returns the line for the win card, or "".
+  let justDone = false;   // whether the latest win on this page is the one that did today's challenge
   function dailyWon() {
-    if (!CURRENT || CURRENT !== daily()) return "";
-    if (!dailyDoneToday()) {
-      save(DAILY, {done: dailyDates().concat(today()).slice(-400)}); track(`Daily challenge done: ${CURRENT}`);
-      const b = $("dailyBadge"); if (b) b.refresh();
-    }
+    justDone = false;
+    if (!CURRENT || CURRENT !== daily() || dailyDoneToday()) return "";
+    save(DAILY, {done: dailyDates().concat(today()).slice(-400)}); track(`Daily challenge done: ${CURRENT}`);
+    const b = $("dailyBadge"); if (b) b.refresh();
+    justDone = true;
     return dailyLine();
   }
-  // The win card's line, if today's challenge is this page's game and it's done today; otherwise "".
+  // The win card's line, only for the win that did today's challenge (later wins that day leave it to the badge).
   function dailyLine() {
-    if (!CURRENT || CURRENT !== daily() || !dailyDoneToday()) return "";
+    if (!justDone) return "";
     const k = dailyStreak();
     return `Today's challenge solved! ${k > 1 ? `${k}-day streak!` : "Come back tomorrow for a new challenge!"}`;
   }
