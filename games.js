@@ -1,8 +1,9 @@
 /* Shared helpers for the Catdoku family of games: links between games,
    saved progress, background puzzle building, and the win card. */
 const G = (() => {
-  // Every game: name, folder, one line about it, its colour in the games menu, its shelf (see GROUPS) and
-  // words to find it by in search (the puzzle it's based on and what it's like).
+  // Every game: name, folder, one line about it, its colour in the games menu, its shelf (see GROUPS),
+  // words to find it by in search (the puzzle it's based on and what it's like), and for games added from
+  // 2026-10-18 on, the date it was added (so the daily challenge gives it a few days first; see daily).
   const GAMES = [
     ["Catdoku", "catdoku", "Help Higgins give every cat its own territory", "#BD5538", "logic", "queens star battle"],
     ["Yarn", "yarn", "Lead one strand through every ball", "#E16A4A", "lines", "zip path"],
@@ -50,6 +51,55 @@ const G = (() => {
   const $ = id => document.getElementById(id);
 
   // The games played on this device, most recent first, for the front page's and the menu's Keep playing row.
+  /* ---------- the daily challenge ---------- */
+  // One game a day is today's challenge, the same game for everyone on a given date: win any puzzle in it that
+  // day (in Pawlette, clear 3 lines in one Swipe game) to do it. The games come round in cycles: the first, from
+  // DAILY_START, begins with Catdoku and then takes the rest in a shuffled order; each later cycle is shuffled
+  // afresh, never the same game two days running. A new game (one with an added date) joins the first cycle
+  // that starts at least DAILY_WAIT days after it was added, so it has a few days on the site first.
+  const DAILY_START = "2026-10-18", DAILY_WAIT = 3, DAILY = "catdoku.daily.v1";
+  const dayNum = ymd => { const [y, m, d] = ymd.split("-").map(Number); return Math.round(Date.UTC(y, m - 1, d) / 864e5); };
+  const today = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`; };
+  const ymdOf = n => new Date(n * 864e5).toISOString().slice(0, 10);
+  function seeded(seed) { return () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+  // The slug of the challenge on a date (today if none given).
+  function daily(ymd = today()) {
+    const day = dayNum(ymd) - dayNum(DAILY_START);
+    if (day < 0) return GAMES[0][1];
+    let start = 0, last = null;
+    for (let c = 0; ; c++) {
+      const joined = GAMES.filter(g => !g[6] || dayNum(g[6]) + DAILY_WAIT <= dayNum(DAILY_START) + start).map(g => g[1]);
+      const rnd = seeded(c + 1), order = joined.slice();
+      for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+      if (c === 0) { order.splice(order.indexOf(GAMES[0][1]), 1); order.unshift(GAMES[0][1]); }
+      else if (order[0] === last) order.push(order.shift());
+      if (day < start + order.length) return order[day - start];
+      start += order.length; last = order[order.length - 1];
+    }
+  }
+  // The dates the challenge was done on this device, and the streak: days in a row up to today, or up to
+  // yesterday while today's is still to do.
+  const dailyDates = () => { const d = load(DAILY).done; return Array.isArray(d) ? d : []; };
+  function dailyStreak() {
+    const done = new Set(dailyDates());
+    let n = dayNum(today());
+    if (!done.has(ymdOf(n))) n--;
+    let k = 0; while (done.has(ymdOf(n - k))) k++;
+    return k;
+  }
+  const dailyDoneToday = () => dailyDates().includes(today());
+  let CURRENT = null;   // the game on this page, from nav
+  // A win on this page (in Pawlette, 3 lines cleared in one Swipe game): if it's today's challenge, mark it done. Returns the line for the win card, or "".
+  function dailyWon() {
+    if (!CURRENT || CURRENT !== daily()) return "";
+    if (!dailyDoneToday()) {
+      save(DAILY, {done: dailyDates().concat(today()).slice(-400)}); track(`Daily challenge done: ${CURRENT}`);
+      const b = $("dailyBadge"); if (b) b.refresh();
+    }
+    const k = dailyStreak();
+    return `Today's challenge solved! ${k > 1 ? `${k}-day streak!` : "Come back tomorrow for a new challenge!"}`;
+  }
+
   const RECENT = "catdoku.recent.v1";
   const recent = () => { const r = load(RECENT).games; return Array.isArray(r) ? r.filter(s => GAMES.some(g => g[1] === s)) : []; };
   const played = slug => save(RECENT, {games: [slug, ...recent().filter(s => s !== slug)].slice(0, 8)});
@@ -63,6 +113,7 @@ const G = (() => {
   // The games menu: an "All games" button that opens a grid of every game, with this one marked.
   // Game pages sit one folder below the front page, so links start with ../ unless `base` says otherwise.
   function nav(current, base = "../") {
+    CURRENT = current || null;
     const el = $("games"); el.innerHTML = "";
     const btn = document.createElement("button");
     btn.className = "gamesBtn"; btn.type = "button";
@@ -96,10 +147,13 @@ const G = (() => {
     const keep = lately.length ? section("Keep playing", lately) : null;
     const shelves = GROUPS.map(([key, title]) => section(title, GAMES.filter(g => g[4] === key)));
     const none = document.createElement("p"); none.className = "gamesNone"; none.hidden = true; none.textContent = "No games match that.";
-    panel.append(home, search, ...(keep ? [keep] : []), ...shelves, none);
+    const dslug = daily(), dgame = GAMES.find(g => g[1] === dslug);
+    const todays = section(dailyDoneToday() ? "Today's challenge: done" : "Today's challenge", [dgame]);
+    panel.append(home, todays, search, ...(keep ? [keep] : []), ...shelves, none);
     search.oninput = () => {
       const q = search.value.trim();
       if (keep) keep.hidden = !!q;
+      todays.hidden = !!q;
       for (const sec of shelves) {
         let any = false;
         for (const a of sec.querySelectorAll(".gameTile")) { const hit = !q || matches(GAMES.find(g => g[1] === a.dataset.slug), q); a.hidden = !hit; any = any || hit; }
@@ -113,6 +167,12 @@ const G = (() => {
     document.addEventListener("click", e => { if (!panel.hidden && !el.contains(e.target)) show(false); });
     document.addEventListener("keydown", e => { if (e.key === "Escape" && !panel.hidden) { show(false); btn.focus(); } });
     el.append(btn, panel);
+    // on today's challenge, a badge under the menu button says so
+    if (current && current === dslug) {
+      const badge = document.createElement("span"); badge.className = "dailyBadge"; badge.id = "dailyBadge";
+      const set = () => { const done = dailyDoneToday(), k = dailyStreak(); badge.textContent = done ? `Today's challenge: solved!${k > 1 ? ` ${k}-day streak!` : ""}` : current === "pawlette" ? "Today's challenge: can you clear 3 lines in Swipe?" : "Today's challenge: can you solve one?"; badge.classList.toggle("done", done); };
+      set(); badge.refresh = set; el.append(badge);
+    }
   }
 
 
@@ -219,6 +279,8 @@ const G = (() => {
     name.textContent = `Meet ${NAMES[Math.floor(Math.random() * NAMES.length)]}!`;
     const tl = timeLineEl(result); if (tl) media.append(tl);
     media.append(p);
+    const dl = dailyWon();
+    if (dl) { const d = document.createElement("p"); d.className = "dailyline"; d.textContent = dl; media.append(d); }
     if (o.gold && o.goldPic) media.append(...o.goldPic); else media.append(catPhoto(), name);
     const btns = [[o.next || "New puzzle", onNext, true]];
     if (admire !== null) btns.push([admire, () => { closeCard(); note(admireNote(), 0); }]);
@@ -317,6 +379,7 @@ const G = (() => {
 
   // Call once when a puzzle is solved: records the time and returns what the card shows.
   function finishClock(g) {
+    dailyWon();
     const n = g.level ?? g.N;   // bests are kept by level where a game has levels, else by size
     if (!g.timed) return (g.result = {ms: null, n});
     const all = load(BESTS), mine = (all[T.name] = all[T.name] || {}), row = (mine[n] = mine[n] || {solves: 0, times: []});
@@ -726,6 +789,6 @@ const G = (() => {
     }
   }
 
-  return {GAMES, GROUPS, recent, matches, $, nav, load, save, builder, openCard, closeCard, winCard, sizeUp, otherSize, note, helpLater, cellAt, track, reopen,
+  return {GAMES, GROUPS, recent, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, load, save, builder, openCard, closeCard, winCard, sizeUp, otherSize, note, helpLater, cellAt, track, reopen,
           setupTimer, freshClock, spotlight, toysOff, saveToys, needToys, goldPaw, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, toyPicker, pickLook};
 })();
