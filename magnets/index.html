@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fridge Magnets</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-18.3"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-18.3">
+<style>
+/* A fridge door with a crossword of squares on it, and the alphabet magnets Crunch knocked off it on the floor
+   below. Every letter goes back on once, and every line of squares spells a word. */
+/* Crunch, head on one side, beside the title */
+.title{display:flex;align-items:flex-end;gap:6px}
+.crunch{display:block;height:68px;width:auto;margin-bottom:-6px}
+@media (max-height:760px){.crunch{height:48px;margin-bottom:-4px}}
+.kitchen{height:auto;display:flex;flex-direction:column;gap:10px;width:var(--board);touch-action:manipulation;user-select:none;-webkit-user-select:none;outline:none}
+.fridge{position:relative}
+.fridge svg{display:block;width:100%;height:auto;max-height:calc(var(--tall) - 250px);margin:0 auto;overflow:visible}
+.door{fill:#F7F8F3;stroke:#2A2530;stroke-width:3.5}
+.handle{fill:#DCDDD5;stroke:#2A2530;stroke-width:3}
+.slot{fill:transparent;stroke:none}
+.slot.open{fill:rgba(255,255,255,.7);stroke:#A9A4B0;stroke-width:2;stroke-dasharray:6 5}
+.slot.mine{fill:rgba(115,167,174,.1);stroke:#C9C6CE;stroke-width:2;stroke-dasharray:none}
+.slot.word{fill:rgba(115,167,174,.2)}
+.slot.sel{fill:#FFF6DA;stroke:#ECA818;stroke-width:4;stroke-dasharray:none}
+.slot.bad{fill:rgba(200,57,43,.12)}
+[data-k]{cursor:pointer}
+.mag{font:800 46px var(--font);text-anchor:middle;dominant-baseline:central;text-transform:uppercase;stroke:#2A2530;stroke-width:3.5px;
+  paint-order:stroke fill;stroke-linejoin:round;pointer-events:none;filter:drop-shadow(1.5px 2.5px 0 rgba(42,37,48,.22))}
+.won .mag{animation:jig .45s ease-in-out 2 alternate}
+@keyframes jig{to{transform:translateY(-5px)}}
+/* the floor, with every magnet in alphabet order: the ones still down are bright, the ones back up are outlines */
+.floor{display:grid;grid-template-columns:repeat(9,1fr);gap:4px;padding:8px;background:linear-gradient(#EFE6D2,#E4D8BE);
+  border:3px solid var(--ink);border-radius:12px;position:relative}
+.floor button{all:unset;box-sizing:border-box;aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:9px;cursor:pointer;
+  font:800 clamp(24px,7.4vw,36px)/1 var(--font);text-transform:uppercase;color:var(--c);-webkit-text-stroke:2.5px var(--ink);paint-order:stroke fill;
+  text-shadow:1.5px 2.5px 0 rgba(42,37,48,.22);transform:rotate(var(--r));transition:transform .12s}
+.floor button:focus-visible{outline:3px solid var(--pacific-blue)}
+.floor button.up{color:transparent;-webkit-text-stroke:1.5px rgba(42,37,48,.25);text-shadow:none;transform:none;cursor:default}
+.floor button.held{background:#FFF6DA;box-shadow:inset 0 0 0 3px #ECA818;transform:rotate(0) translateY(-3px)}
+.floor img{grid-column:9;grid-row:3;width:118%;height:auto;align-self:end;justify-self:center;transform:scaleX(-1);margin-bottom:-6px;pointer-events:none}
+.floor.won img{display:none}
+.floor .nap{display:none;grid-column:6/10;grid-row:2/4;width:100%;align-self:center;transform:none;margin:0}
+.floor.won .nap{display:block}
+.dragmag{position:fixed;z-index:50;pointer-events:none;font:800 50px/1 var(--font);text-transform:uppercase;color:var(--c);-webkit-text-stroke:3px var(--ink);
+  paint-order:stroke fill;text-shadow:2px 4px 0 rgba(42,37,48,.25);transform:translate(-50%,-70%) rotate(-6deg)}
+.shake{animation:shake .35s}
+@keyframes shake{25%{transform:translateX(-7px)}75%{transform:translateX(7px)}}
+.card img.rollpic{display:block;width:52%;max-width:200px;height:auto;margin:0 auto 6px}
+</style>
+</head>
+<body>
+<main>
+  <header><div class="title"><h1>Fridge Magnets</h1><img class="crunch" id="crunch" src="../cats/crunch-5.webp" alt="Crunch, a grey tabby, with his head on one side"></div><div class="stripe"></div><p class="tagline">Help Crunch put every letter back on the fridge</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap kitchen" id="board" tabindex="0">
+    <div class="fridge" id="grid"><svg id="svg" role="img" aria-label="A fridge door with a crossword of squares"></svg></div>
+    <div class="floor" id="floor" aria-label="Letters on the floor"></div>
+  </div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="shareBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New fridge</button>
+  </div>
+
+</main>
+
+<script src="../games.js?v=2026-10-18.3"></script>
+<script>
+/* ---------- fridges ---------- */
+// A fridge is a crossword with 26 empty squares, and the 26 letters a–z on the floor to fill them, each once.
+// Words cross like the branches of a tree (each new word crosses one already up, and nothing else touches),
+// inside 10 × 10, and the letters already up can be any letters, as many times as the words need. Words come from
+// magnets/words.json (tools/make-magnet-words.py): words a Spelling Bee might ask for, plus words with an S. The
+// empty squares are one square of each letter (a square in two words where there is one), checked to leave just
+// one way to fill them.
+// Levels: lower ones use only everyday words, and the fewer squares a fridge has, the fewer letters are up to help.
+function wordIndex(w) {
+  if (self.MAG_IDX && self.MAG_IDX.src === w.answers.length) return self.MAG_IDX;
+  const day = w.everyday.split(" "), all = new Set(day.concat(w.answers.split(" "))), byLen = {}, byLetter = {}, everyday = new Set(day);
+  for (const x of all) (byLen[x.length] = byLen[x.length] || []).push(x);
+  for (const x of all) { const o = {w: x, f: everyday.has(x)}; for (const ch of new Set(x)) (byLetter[ch] = byLetter[ch] || []).push(o); }
+  return self.MAG_IDX = {src: w.answers.length, byLen, all, byLetter};
+}
+// Words crossing like a tree, together holding every letter a–z, inside S × S: start from a word with a Q, then keep
+// adding a word with the rarest letter not yet up (best if it brings other missing letters too), crossing a letter
+// already up. everyday: only everyday words. Returns {w, h, words: [{r, c, d, w}]} (d: 0 across, 1 down), or null.
+function buildGrid(idx, S, everyday) {
+  const cells = new Map(), words = [], key = (r, c) => r * 64 + c;
+  const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  let r0 = 20, r1 = 20, c0 = 20, c1 = 20;
+  const fits = (w, r, c, dr, dc) => {
+    if (cells.has(key(r - dr, c - dc)) || cells.has(key(r + dr * w.length, c + dc * w.length))) return false;
+    let cross = 0;
+    for (let i = 0; i < w.length; i++) {
+      const rr = r + dr * i, cc = c + dc * i, p = key(rr, cc);
+      if (cells.has(p)) { if (cells.get(p) !== w[i]) return false; cross++; continue; }
+      if (cells.has(key(rr + dc, cc + dr)) || cells.has(key(rr - dc, cc - dr))) return false;
+    }
+    return cross > 0 && Math.max(r1, r + dr * (w.length - 1)) - Math.min(r0, r) < S && Math.max(c1, c + dc * (w.length - 1)) - Math.min(c0, c) < S;
+  };
+  const put = (w, r, c, d) => {
+    for (let i = 0; i < w.length; i++) { const rr = r + d * i, cc = c + (1 - d) * i; cells.set(key(rr, cc), w[i]); r0 = Math.min(r0, rr); r1 = Math.max(r1, rr); c0 = Math.min(c0, cc); c1 = Math.max(c1, cc); }
+    words.push({r, c, d, w});
+  };
+  // A word with letter L: those bringing the most missing letters first, then about 6 letters long, everyday
+  // ones before the rest; crossing a square that's in one word so far, with nothing beside it the other way.
+  const add = L => {
+    const have = new Set(cells.values()), gain = w => new Set([...w].filter(ch => !have.has(ch))).size;
+    const rank = list => list.map(o => [Math.abs(o.w.length - 6) - 2 * gain(o.w) + Math.random() * 2.5, o.w]).sort((a, b) => a[0] - b[0]).map(x => x[1]);
+    const pool = idx.byLetter[L].filter(o => o.w.length <= S);
+    const order = rank(pool.filter(o => o.f)).concat(everyday ? [] : rank(pool.filter(o => !o.f)));
+    const spots = shuffle([...cells.keys()].filter(p => { const r = Math.floor(p / 64), c = p % 64; return !(cells.has(key(r - 1, c)) || cells.has(key(r + 1, c))) || !(cells.has(key(r, c - 1)) || cells.has(key(r, c + 1))); }));
+    let tried = 0;
+    for (const w of order) {
+      if (++tried > 1500) break;
+      if (words.some(x => x.w === w)) continue;
+      for (const p of spots) {
+        const ch = cells.get(p), pr = Math.floor(p / 64), pc = p % 64;
+        for (let i = 0; i < w.length; i++) if (w[i] === ch) for (const d of shuffle([0, 1])) {
+          const r = pr - d * i, c = pc - (1 - d) * i;
+          if (fits(w, r, c, d, 1 - d)) { put(w, r, c, d); return true; }
+        }
+      }
+    }
+    return false;
+  };
+  const q = idx.byLetter.q.filter(o => o.w.length <= S && (o.f || !everyday)), fq = q.filter(o => o.f);
+  put(shuffle(fq.length ? fq : q)[0].w, 20, 20, 0);
+  for (let n = 0; n < 30; n++) {
+    const have = new Set(cells.values()), left = [..."abcdefghijklmnopqrstuvwxyz"].filter(ch => !have.has(ch));
+    if (!left.length) return {w: c1 - c0 + 1, h: r1 - r0 + 1, words: words.map(x => ({r: x.r - r0, c: x.c - c0, d: x.d, w: x.w}))};
+    if (!add(left.sort((a, b) => idx.byLetter[a].length - idx.byLetter[b].length)[0])) return null;
+  }
+  return null;
+}
+// A fridge's squares (square → letter, a square being r × w + c) and each word's squares.
+function gridSquares(g) {
+  const sq = new Map(), slots = [];
+  for (const x of g.words) {
+    const s = [];
+    for (let i = 0; i < x.w.length; i++) { const k = (x.r + x.d * i) * g.w + x.c + (1 - x.d) * i; sq.set(k, x.w[i]); s.push(k); }
+    slots.push(s);
+  }
+  return {sq, slots};
+}
+// How many ways (counting up to `cap`) to fill the `open` squares with different letters so every word counts,
+// the other squares having the letters in `given` ([square, letter] pairs). `found`, if given, collects them
+// (square → letter). Gives up after `budget` steps and says `cap`.
+function countFills(idx, slots, given, open, cap, budget, found) {
+  const at = new Map(given), used = new Set();
+  let n = 0, steps = 0;
+  // each word's choices, going by its letters already up (its empty squares all different letters)
+  const live = slots.map(s => idx.byLen[s.length].filter(w => {
+    let seen = 0;
+    for (let i = 0; i < s.length; i++) {
+      const h = at.get(s[i]);
+      if (h) { if (h !== w[i]) return false; }
+      else { const b = 1 << (w.charCodeAt(i) - 97); if (seen & b) return false; seen |= b; }
+    }
+    return true;
+  }));
+  const fits = (s, w) => { for (let i = 0; i < s.length; i++) { const h = at.get(s[i]); if (h ? h !== w[i] : used.has(w[i])) return false; } return true; };
+  const go = () => {
+    if (++steps > budget) { n = cap; return; }
+    // the word with fewest choices left
+    let best = -1, bestC = null;
+    for (let j = 0; j < slots.length; j++) {
+      if (slots[j].every(k => at.has(k))) continue;
+      const c = live[j].filter(w => fits(slots[j], w));
+      if (best < 0 || c.length < bestC.length) { best = j; bestC = c; if (!c.length) return; }
+    }
+    if (best < 0) { n++; if (found) found.push(new Map(open.map(k => [k, at.get(k)]))); return; }
+    const s = slots[best];
+    for (const w of bestC) {
+      const put = [];
+      for (let i = 0; i < s.length; i++) if (!at.has(s[i])) { at.set(s[i], w[i]); used.add(w[i]); put.push(s[i]); }
+      go();
+      for (const k of put) { used.delete(at.get(k)); at.delete(k); }
+      if (n >= cap) return;
+    }
+  };
+  go();
+  return n;
+}
+// A fridge for a level: req is {level, words (the word list)}. Builds grids until one has a number of squares in
+// the level's range, then picks which square of each letter is empty; while there's another way to fill them,
+// moves one of the letters that way puts somewhere else. Returns {level, w, h, words, open} or null.
+function makeFridge(req) {
+  // [everyday words only, fewest squares, most squares]
+  const LEVELS = [null, [1, 45, 99], [1, 42, 44], [1, 39, 41], [1, 36, 38], [1, 26, 35], [0, 40, 43], [0, 37, 39], [0, 34, 36], [0, 26, 33]];
+  const [everyday, lo, hi] = LEVELS[req.level], idx = wordIndex(req.words);
+  let g = null, sq, slots;
+  for (let t = 0; t < 400 && !g; t++) {
+    g = buildGrid(idx, 10, everyday);
+    if (g) ({sq, slots} = gridSquares(g));
+    if (g && (sq.size < lo || sq.size > hi)) g = null;
+  }
+  if (!g) return null;
+  const cross = new Map(); slots.forEach(s => s.forEach(k => cross.set(k, (cross.get(k) || 0) + 1)));
+  const by = {};
+  for (const [k, ch] of sq) (by[ch] = by[ch] || []).push(k);
+  const pick = ch => { const ks = by[ch], c = ks.filter(k => cross.get(k) > 1), from = c.length && Math.random() < .8 ? c : ks; return from[Math.floor(Math.random() * from.length)]; };
+  const at = {};
+  for (const ch in by) at[ch] = pick(ch);
+  for (let t = 0; t < 25; t++) {
+    const open = Object.values(at), openSet = new Set(open), given = [...sq].filter(([k]) => !openSet.has(k)), found = [];
+    if (countFills(idx, slots, given, open, 2, 20000, found) === 1) return {level: req.level, w: g.w, h: g.h, words: g.words, open: open.sort((a, b) => a - b)};
+    const alt = found.find(f => [...f].some(([k, ch]) => sq.get(k) !== ch));
+    const movable = (alt ? [...alt].filter(([k, ch]) => sq.get(k) !== ch).map(([k]) => sq.get(k)) : Object.keys(at)).filter(ch => by[ch].length > 1);
+    if (!movable.length) return null;
+    const ch = movable[Math.floor(Math.random() * movable.length)], others = by[ch].filter(k => k !== at[ch]);
+    at[ch] = others[Math.floor(Math.random() * others.length)];
+  }
+  return null;
+}
+
+/* ---------- game state ---------- */
+// game: {level, w, h, words, open (the 26 squares to fill), put ({square: letter} for the letters you've put up),
+//        history (put before each change, for Undo), won, hinted, undid…}
+// sel: the square picked (or -1), dir: 0 across or 1 down, for the word it's in; held: a letter picked up
+// from the floor with no square picked.
+const STORE = "catdoku.magnets.v1", MAX_LEVEL = 9, NS = "http://www.w3.org/2000/svg", CS = 54, PADL = 50, PAD = 24;
+const ABC = "abcdefghijklmnopqrstuvwxyz";
+// each letter's colour, from the site's palette, and its tilt lying on the floor
+const PAL = ["#BD5538", "#73A7AE", "#ECA818", "#6AA673", "#B94588", "#7885BA", "#E16A4A", "#B3B94B", "#8D78AD", "#4E577D"];
+const colour = ch => PAL[ABC.indexOf(ch) * 3 % PAL.length];
+const tilt = ch => [-9, 6, -4, 10, -7, 3, 8, -5, 0][ABC.indexOf(ch) % 9];
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1}, state.settings);
+let game = state.game || null, sel = -1, dir = 0, held = null, W = null, IDX = null, F = null;
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !running && !$("overlay").classList.contains("show");
+let running = false;
+const levelName = n => `Level ${n} · ${n <= 5 ? "everyday words" : "harder words"}`;
+const catSrc = f => (window.CAT_SRC || {})[f] || `../cats/${f}.webp`;
+const el = (t, a, parent) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (parent) parent.append(e); return e; };
+
+// What a fridge's words make: F = {sol (square → letter), slots (each word's squares), of (square → its words),
+// open (the empty squares, as a set)}.
+function derive() {
+  const {sq, slots} = gridSquares(game), of = new Map();
+  slots.forEach((s, i) => s.forEach(k => { if (!of.has(k)) of.set(k, []); of.get(k).push(i); }));
+  F = {sol: sq, slots, of, open: new Set(game.open)};
+}
+const letterAt = k => F.open.has(k) ? game.put[k] || "" : F.sol.get(k) || "";
+const upLetters = () => new Set(Object.values(game.put));
+const empties = () => game.open.filter(k => !game.put[k]);
+// A fridge that came from a share link or a save: words that count, every line of two or more squares one of
+// the words, and 26 empty squares, one of each letter.
+function validGrid(g) {
+  if (!(g.w >= 1 && g.w <= 10 && g.h >= 1 && g.h <= 10) || !Array.isArray(g.words) || !g.words.length) return false;
+  const cells = new Map();
+  for (const x of g.words) {
+    if (!x || typeof x.w !== "string" || !IDX.all.has(x.w) || (x.d !== 0 && x.d !== 1) || !(x.r >= 0) || !(x.c >= 0)) return false;
+    for (let i = 0; i < x.w.length; i++) {
+      const r = x.r + x.d * i, c = x.c + (1 - x.d) * i;
+      if (r >= g.h || c >= g.w) return false;
+      const k = r * g.w + c;
+      if (cells.has(k) && cells.get(k) !== x.w[i]) return false;
+      cells.set(k, x.w[i]);
+    }
+  }
+  const runs = new Set(g.words.map(x => `${x.r},${x.c},${x.d}`));
+  for (const d of [0, 1]) for (let a = 0; a < (d ? g.w : g.h); a++) {
+    let start = -1;
+    for (let b = 0; b <= (d ? g.h : g.w); b++) {
+      const r = d ? b : a, c = d ? a : b, on = b < (d ? g.h : g.w) && cells.has(r * g.w + c);
+      if (on && start < 0) start = b;
+      if (!on && start >= 0) { if (b - start > 1 && !runs.has(d ? `${start},${a},1` : `${a},${start},0`)) return false; start = -1; }
+    }
+  }
+  return Array.isArray(g.open) && g.open.length === 26 && g.open.every(k => cells.has(k)) && new Set(g.open.map(k => cells.get(k))).size === 26;
+}
+
+/* ---------- drawing ---------- */
+// The fridge door with its handle, a square for every letter, and the magnets on it.
+function draw() {
+  const svg = $("svg"), vw = PADL + PAD + game.w * CS, vh = 2 * PAD + game.h * CS;
+  svg.setAttribute("viewBox", `0 0 ${vw} ${vh}`);
+  svg.innerHTML = "";
+  el("rect", {class: "door", x: 2, y: 2, width: vw - 4, height: vh - 4, rx: 18}, svg);
+  el("rect", {class: "handle", x: 14, y: vh * .2, width: 13, height: vh * .6, rx: 6.5}, svg);
+  const word = sel >= 0 ? wordAt(sel, dir) : null, bad = new Set(badWords().flat());
+  for (const k of F.sol.keys()) {
+    const r = Math.floor(k / game.w), c = k % game.w, x = PADL + c * CS, y = PAD + r * CS, ch = letterAt(k);
+    const g = el("g", {"data-k": k}, svg);
+    let cls = "slot";
+    if (F.open.has(k)) cls += ch ? " mine" : " open";
+    if (word && word.includes(k) && F.open.has(k)) cls += " word";
+    if (k === sel) cls += " sel";
+    if (bad.has(k) && empties().length === 0) cls += " bad";
+    el("rect", {class: cls, x: x + 3, y: y + 3, width: CS - 6, height: CS - 6, rx: 8}, g);
+    if (ch) el("text", {class: "mag", x: x + CS / 2, y: y + CS / 2 + 1, fill: colour(ch), transform: `rotate(${tilt(ch) / 3} ${x + CS / 2} ${y + CS / 2})`}, g).textContent = ch;
+  }
+  if (mark && mark.when === JSON.stringify(game.put)) for (const [k, b] of mark.sq) {
+    const r = Math.floor(k / game.w), c = k % game.w;
+    el("rect", {class: "hintsq" + (b ? " bad" : ""), x: PADL + c * CS, y: PAD + r * CS, width: CS, height: CS, rx: 10}, svg);
+  } else mark = null;
+  drawFloor();
+  update();
+}
+// The floor: the 26 letters in order, those still down bright and tilted, those up just an outline.
+function drawFloor() {
+  const fl = $("floor"), up = upLetters();
+  if (!fl.children.length) {
+    for (const ch of ABC) {
+      const b = document.createElement("button"); b.type = "button"; b.textContent = ch; b.dataset.l = ch;
+      b.style.setProperty("--c", colour(ch)); b.style.setProperty("--r", tilt(ch) + "deg");
+      fl.append(b);
+    }
+    const bat = new Image(); bat.src = catSrc("crunch-7"); bat.alt = "Crunch batting at the letters"; bat.id = "bat";
+    const nap = new Image(); nap.src = catSrc("crunch-4"); nap.alt = "Crunch curled up asleep"; nap.className = "nap";
+    fl.append(bat, nap);
+  }
+  for (const b of fl.querySelectorAll("button")) {
+    const ch = b.dataset.l, isUp = up.has(ch);
+    b.classList.toggle("up", isUp); b.classList.toggle("held", held === ch);
+    b.setAttribute("aria-label", isUp ? `${ch.toUpperCase()}, on the fridge` : ch.toUpperCase());
+    b.classList.toggle("hintcell", !!(mark && mark.when === JSON.stringify(game.put) && mark.letter === ch));
+  }
+  fl.classList.toggle("won", !!game.won);
+}
+function update() {
+  const left = empties().length;
+  $("count").textContent = game.won ? "Every letter's back up!" : `${left} letter${left === 1 ? "" : "s"} to put back`;
+  $("undoBtn").disabled = !game.history.length || game.won;
+  $("restartBtn").disabled = !Object.keys(game.put).length || game.won;
+  $("hintBtn").disabled = game.won;
+}
+// The squares of the word through square k going way d (or the other way, if there's no word that way).
+function wordAt(k, d) {
+  const ids = F.of.get(k) || [], pick = ids.find(i => game.words[i].d === d);
+  return F.slots[pick !== undefined ? pick : ids[0]];
+}
+// Full words that don't count, as lists of squares.
+function badWords() {
+  return F.slots.filter(s => s.every(k => letterAt(k)) && !IDX.all.has(s.map(letterAt).join("")));
+}
+
+/* ---------- playing ---------- */
+// Put letter ch on square k: any letter there goes back on the floor, and if ch was up somewhere else of yours,
+// it moves. Then the next empty square in the word gets picked.
+function place(ch, k) {
+  if (!playing() || !F.open.has(k)) return;
+  if (game.put[k] === ch) { sel = k; held = null; draw(); return; }
+  game.history.push({...game.put});
+  for (const q in game.put) if (game.put[q] === ch) delete game.put[q];
+  game.put[k] = ch; game.started = true; held = null;
+  sel = nextEmpty(k);
+  if (sel >= 0 && !wordAt(k, dir).includes(sel)) dir = (F.of.get(sel) || []).length === 1 ? game.words[F.of.get(sel)[0]].d : dir;
+  afterMove();
+}
+function takeDown(k) {
+  if (!playing() || !game.put[k]) return;
+  game.history.push({...game.put});
+  delete game.put[k]; game.started = true; sel = k;
+  afterMove();
+}
+function afterMove() {
+  save();
+  if (!empties().length) {
+    const bad = badWords();
+    if (!bad.length) { draw(); return win(); }
+    const names = bad.map(s => s.map(letterAt).join("").toUpperCase());
+    G.note(`Every letter's up, but ${names.slice(0, 2).join(" and ")} ${names.length > 1 ? "aren't words" : "isn't a word"}.`, 5000);
+  }
+  draw();
+}
+// After filling k: the next empty square in its word (after it, then before), then the next empty one anywhere.
+function nextEmpty(k) {
+  const s = wordAt(k, dir), i = s.indexOf(k);
+  for (const q of s.slice(i + 1).concat(s.slice(0, i))) if (F.open.has(q) && !game.put[q]) return q;
+  const e = empties();
+  return e.find(q => q > k) !== undefined ? e.find(q => q > k) : e.length ? e[0] : -1;
+}
+function shake(why) {
+  G.note(why, 3000);
+  const b = $("board"); b.classList.remove("shake"); b.getBoundingClientRect(); b.classList.add("shake");
+}
+// Tap a square to pick it (tap again to turn to the other word through it, or, if it has your letter, to take
+// the letter down); with a letter picked up from the floor, a tap puts it there.
+function tapSquare(k) {
+  if (!playing() || !F.open.has(k)) return;
+  game.started = true;
+  if (held) return place(held, k);
+  if (sel === k) {
+    if (game.put[k]) return takeDown(k);
+    if ((F.of.get(k) || []).length > 1) dir = 1 - dir;
+  } else {
+    sel = k;
+    const ids = F.of.get(k) || [];
+    if (!ids.some(i => game.words[i].d === dir)) dir = game.words[ids[0]].d;
+  }
+  draw();
+}
+// Tap a letter on the floor: it goes on the picked square, or, with none picked, it's picked up (tap it again to
+// put it back down).
+function tapLetter(ch) {
+  if (!playing()) return;
+  game.started = true;
+  if (upLetters().has(ch)) return G.note(`You've put the ${ch.toUpperCase()} up already. Drag it, or tap it twice, to take it down.`, 3500);
+  if (sel >= 0) return place(ch, sel);
+  held = held === ch ? null : ch;
+  if (held) G.note(`Now tap a square for the ${ch.toUpperCase()}.`, 2500);
+  draw();
+}
+
+// Dragging: a letter from the floor to a square, or one of yours from square to square, or off the fridge to
+// take it down. A press that doesn't move is a tap.
+let drag = null;
+function squareAt(x, y) {
+  const t = document.elementFromPoint(x, y), g = t && t.closest("[data-k]");
+  return g ? +g.dataset.k : -1;
+}
+$("board").addEventListener("pointerdown", e => {
+  if (!playing() || e.button > 0) return;
+  const b = e.target.closest(".floor button"), g = e.target.closest("[data-k]");
+  if (b) drag = {ch: b.dataset.l, from: -1, x: e.clientX, y: e.clientY, up: upLetters().has(b.dataset.l)};
+  else if (g) { const k = +g.dataset.k; drag = {ch: game.put[k] || null, from: k, x: e.clientX, y: e.clientY}; }
+  else return;
+  e.preventDefault();
+});
+window.addEventListener("pointermove", e => {
+  if (!drag || !drag.ch || drag.up) return;
+  if (!drag.ghost && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 8) return;
+  if (!drag.ghost) {
+    drag.ghost = document.createElement("div"); drag.ghost.className = "dragmag"; drag.ghost.textContent = drag.ch;
+    drag.ghost.style.setProperty("--c", colour(drag.ch)); document.body.append(drag.ghost);
+  }
+  drag.ghost.style.left = e.clientX + "px"; drag.ghost.style.top = e.clientY + "px";
+});
+window.addEventListener("pointerup", e => {
+  const d = drag; drag = null;
+  if (!d) return;
+  if (!d.ghost) { if (d.from >= 0) tapSquare(d.from); else tapLetter(d.ch); return; }
+  d.ghost.remove();
+  if (!playing()) return;
+  const k = squareAt(e.clientX, e.clientY);
+  if (k >= 0 && F.open.has(k)) { held = null; place(d.ch, k); }
+  else if (d.from >= 0 && k !== d.from) takeDown(d.from);
+});
+window.addEventListener("pointercancel", () => { if (drag && drag.ghost) drag.ghost.remove(); drag = null; });
+
+// Keys: a letter goes on the picked square (or the first empty one), Backspace takes one down, arrows move
+// between squares, Space turns to the other word.
+document.addEventListener("keydown", e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } return; }
+  if (!playing() || document.querySelector(".spot") || /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
+  const k = e.key;
+  if (/^[a-z]$/i.test(k)) {
+    e.preventDefault(); game.started = true;
+    if (sel < 0) sel = empties()[0] !== undefined ? empties()[0] : game.open[0];
+    place(k.toLowerCase(), sel);
+  } else if (k === "Backspace" || k === "Delete") {
+    e.preventDefault();
+    if (sel < 0) return;
+    if (game.put[sel]) return takeDown(sel);
+    const s = wordAt(sel, dir), mine = s.slice(0, s.indexOf(sel)).reverse().find(q => F.open.has(q));
+    if (mine !== undefined) { sel = mine; if (game.put[mine]) takeDown(mine); else draw(); }
+  } else if (k === " ") {
+    e.preventDefault(); if (sel >= 0 && (F.of.get(sel) || []).length > 1) { dir = 1 - dir; draw(); }
+  } else if (k.startsWith("Arrow")) {
+    e.preventDefault(); game.started = true;
+    const [dr, dc] = {ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1]}[k];
+    if (sel < 0) { sel = game.open[0]; draw(); return; }
+    let r = Math.floor(sel / game.w), c = sel % game.w;
+    while (true) {
+      r += dr; c += dc;
+      if (r < 0 || c < 0 || r >= game.h || c >= game.w) break;
+      const q = r * game.w + c;
+      if (F.open.has(q)) { sel = q; dir = dr ? 1 : 0; if (!(F.of.get(q) || []).some(i => game.words[i].d === dir)) dir = 1 - dir; break; }
+    }
+    draw();
+  } else if (k === "Escape") { sel = -1; held = null; draw(); }
+});
+
+// Undo takes back the last letter put up, taken down or moved (or a Restart).
+function undo() {
+  if (!playing() || !game.history.length) return;
+  game.undid = true; game.put = game.history.pop(); held = null;
+  draw(); save();
+}
+$("undoBtn").onclick = undo;
+$("restartBtn").onclick = () => {
+  if (!playing() || !Object.keys(game.put).length) return;
+  game.undid = true; game.history.push({...game.put}); game.put = {}; sel = -1; held = null;
+  draw(); save();
+  G.note("All your letters are back on the floor. Undo puts them back up.", 4000);
+};
+// Hint: a letter in the wrong square gets a red box, to take down; otherwise a gold box goes on the empty square
+// in the most-filled word, and its letter on the floor lights up too.
+let mark = null, markTimer = 0;
+$("hintBtn").onclick = () => {
+  if (!playing()) return;
+  game.hinted = true; game.started = true; save();
+  clearTimeout(markTimer);
+  const wrong = game.open.filter(k => game.put[k] && game.put[k] !== F.sol.get(k));
+  if (wrong.length) {
+    mark = {when: JSON.stringify(game.put), sq: [[wrong[0], true]]};
+    G.note(`The ${game.put[wrong[0]].toUpperCase()} doesn't go there. Take it down and try another letter.`, 5000);
+  } else {
+    const filled = s => s.filter(q => letterAt(q)).length / s.length;
+    const score = k => Math.max(...F.of.get(k).map(i => filled(F.slots[i])));
+    const k = empties().reduce((a, b) => score(b) > score(a) ? b : a), ch = F.sol.get(k);
+    mark = {when: JSON.stringify(game.put), sq: [[k, false]], letter: ch};
+    G.note(`The ${ch.toUpperCase()} goes in the gold square.`, 5000);
+  }
+  draw();
+  markTimer = setTimeout(() => { mark = null; if (game) draw(); }, 5000);
+};
+
+/* ---------- endings ---------- */
+// The magnets jiggle, Crunch curls up on the empty floor, and the card comes up.
+function win() {
+  game.won = true; G.finishClock(game); mark = null; sel = -1; held = null;
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save();
+  draw();
+  $("board").classList.add("won");
+  G.track(`Fridge Magnets solved level ${game.level}`);
+  wrapped.prefetch(next);
+  running = true;
+  const g = game;
+  setTimeout(() => { running = false; $("board").classList.remove("won"); if (game === g) finishCard(); }, matchMedia("(prefers-reduced-motion: reduce)").matches ? 500 : 1300);
+}
+function finishCard() {
+  const next = settings.level, gold = !game.undid && !game.hinted;
+  let text = `All 26 letters back on the fridge, in ${game.words.length} words.`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  // a gold paw: Crunch rolling about, in place of the random cat photo
+  const pic = new Image(); pic.className = "rollpic"; pic.src = catSrc("crunch-6"); pic.alt = "Crunch rolling about on a green mat";
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my fridge", game.result,
+    {title: "Back on the fridge!", goldTitle: "Gold paw, Crunch!", gold, goldWhy: "No hints or undos!", goldPic: [pic], next: `Next: level ${next}`,
+     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- new fridges ---------- */
+const fridges = G.builder([wordIndex, buildGrid, gridSquares, countFills, makeFridge], "makeFridge");
+// The builder is asked with the same object for a level each time, so a fridge made in advance is found again.
+const REQ = {}, req = n => REQ[n] = REQ[n] || {level: n, words: W};
+const wrapped = {take: n => fridges.take(req(n)), prefetch: n => fridges.prefetch(req(n))};
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
+function begin(p, level) {
+  game = {level, w: p.w, h: p.h, words: p.words, open: p.open, put: {}, history: [], won: false, hinted: false, undid: false, ...G.freshClock()};
+  sel = -1; held = null; mark = null; derive();
+}
+let asking = 0;
+function newPuzzle() {
+  G.closeCard();
+  const n = settings.level, ask = ++asking;
+  const slow = setTimeout(() => { if (ask === asking) G.note("Crunch is knocking the letters off…", 0); }, 400);
+  wrapped.take(n).then(p => {
+    clearTimeout(slow);
+    if (ask !== asking) return;
+    G.note("");
+    begin(p, n); draw(); save();
+    wrapped.prefetch(n);
+    G.track(`Fridge Magnets new puzzle level ${n}`);
+    helpOnFirstVisit();
+  });
+}
+
+/* ---------- sharing ---------- */
+// A fridge travels as its words ("r.c.d.word" each) and the squares to fill; progress as the letter on each of
+// those squares ("-" for empty).
+$("shareBtn").onclick = () => { if (game) G.shareCard({name: "Fridge Magnets", won: game.won,
+  puzzle: () => ({g: "magnets", N: game.level, w: game.w, h: game.h, x: game.words.map(x => `${x.r}.${x.c}.${x.d}.${x.w}`).join(" "), o: game.open.join(".")}),
+  progress: () => game.open.map(k => game.put[k] || "-").join("")}); };
+function openShared(d) {
+  const fail = () => G.note("That share link didn't work.", 5000);
+  if (!(d.N >= 1 && d.N <= MAX_LEVEL) || typeof d.x !== "string" || typeof d.o !== "string") return fail();
+  const words = d.x.split(" ").map(s => { const [r, c, dd, w] = s.split("."); return {r: +r, c: +c, d: +dd, w}; });
+  const p = {w: +d.w, h: +d.h, words, open: d.o.split(".").map(Number)};
+  if (!validGrid(p)) return fail();
+  p.open.sort((a, b) => a - b);
+  begin(p, d.N);
+  if (typeof d.p === "string" && d.p.length === p.open.length) {
+    const put = {}, seen = new Set();
+    let ok = true;
+    [...d.p].forEach((ch, i) => { if (ch === "-") return; if (!/[a-z]/.test(ch) || seen.has(ch)) ok = false; seen.add(ch); put[p.open[i]] = ch; });
+    if (ok && Object.keys(put).length) { game.put = put; game.timed = false; }
+  }
+  settings.level = d.N; $("levelSel").value = d.N;
+  draw(); save();
+}
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  if (game && game.won) return G.helpLater();
+  settings.seenHelp = false; helpOnFirstVisit();
+}
+// The fridge's squares, in page pixels.
+function map() {
+  const r = $("svg").getBoundingClientRect(), vb = $("svg").viewBox.baseVal, k = r.width / vb.width;
+  return {ox: r.left + PADL * k, oy: r.top + PAD * k, cw: CS * k, ch: CS * k};
+}
+function helpOnFirstVisit() {
+  if (!game || !playing() || document.querySelector(".spot") || settings.seenHelp) return;
+  const xy = k => [k % game.w, Math.floor(k / game.w)], all = [...F.sol.keys()].map(xy);
+  // the word with most squares to fill, and an empty square in it
+  const word = F.slots.reduce((a, b) => b.filter(k => F.open.has(k)).length > a.filter(k => F.open.has(k)).length ? b : a);
+  const gap = word.find(k => !game.put[k] && F.open.has(k)) !== undefined ? word.find(k => !game.put[k] && F.open.has(k)) : empties()[0];
+  const steps = [
+    {say: "Crunch knocked the letters off the fridge", lit: all, outline: []},
+    {say: "Put them back: every letter, A to Z, once", els: [$("floor")]},
+    {say: "Every line of squares spells a word", lit: word.map(xy), tone: "ok"},
+  ];
+  if (gap !== undefined) steps.push({say: "Tap a square, then a letter", lit: [xy(gap)]});
+  steps.push(
+    {say: "Or drag a letter up onto the fridge", els: [$("floor")]},
+    {say: "Drag yours off, or tap it twice, to take it down", lit: game.open.map(xy), outline: []},
+    {say: "Stuck? Hint shows where a letter goes", els: [$("hintBtn")]},
+  );
+  G.spotlight({grid: $("grid"), w: game.w, h: game.h, steps, map, done: () => { settings.seenHelp = true; save(); }});
+}
+
+/* ---------- start ---------- */
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", ""), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
+$("helpBtn").onclick = showHelp;
+$("crunch").src = catSrc("crunch-5");
+
+G.nav("magnets");
+G.checkClock(game);
+G.setupTimer({name: "magnets", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+
+G.note("Fetching the words…", 0);
+(window.WORDS_INLINE ? Promise.resolve(window.WORDS_INLINE) : fetch(`words.json?v=${window.SITE_BUILD || ""}`).then(r => { if (!r.ok) throw new Error("couldn't load the word list"); return r.json(); }))
+  .catch(e => { G.note(`The word list didn't load (${e.message}). Check your connection and reload.`, 0); throw e; }).then(w => {
+  W = w; IDX = wordIndex(w);
+  G.note("");
+  const shared = G.readShare("magnets");
+  if (game) G.reopen(() => {
+      if (!(game.level >= 1 && game.level <= MAX_LEVEL) || !validGrid(game) || typeof game.put !== "object" || !Array.isArray(game.history)) throw new Error("the saved fridge doesn't fit its level");
+      derive(); draw();
+      if (game.won) finishCard(); else helpOnFirstVisit();
+    }, why => { game = null; newPuzzle(); G.note(why, 0); });
+  else if (!shared) newPuzzle();
+  const shareOpts = () => ({name: "Fridge Magnets", inProgress: !!(game && !game.won && Object.keys(game.put).length), open: openShared, after: helpOnFirstVisit});
+  if (shared) G.offerShare(shared, shareOpts());
+  window.addEventListener("hashchange", () => { const d = G.readShare("magnets"); if (d) G.offerShare(d, shareOpts()); });
+});
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>

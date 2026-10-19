@@ -8,7 +8,6 @@ extra (accepted too): SCOWL up to size 80, everything in ENABLE, and a few newer
 Accents are dropped (épée counts as epee). Only a-z words of 4+ letters, with at most 7 different letters and no
 's' (as in Spelling Bee, so plurals don't double every list), and no slurs. Swear words count but are never answers."""
 import json, sys, os, glob, unicodedata
-scowl, enable, out = sys.argv[1:4]
 # Slurs, left out: words whose only meaning is a slur.
 SLURS = set("""nigger nigga kike gook spic wop spaz honky wetback dago darkie darky jigaboo pickaninny gippo lezzie
 bulldyke trannie""".split())
@@ -30,7 +29,8 @@ MAKE_COMMON = set("dino dada dadda droid".split())
 NOT_COMMON = set("dado poniard".split())
 def ok(w): return len(w) >= 4 and w.isascii() and w.isalpha() and w.islower() and "s" not in w and len(set(w)) <= 7 and w not in BLOCK
 def plain(w): return unicodedata.normalize("NFKD", w).encode("ascii", "ignore").decode()
-def scowl_words(top):
+# Every word in SCOWL up to size `top` that passes `ok` (Fridge Magnets' list, tools/make-magnet-words.py, passes its own).
+def scowl_words(scowl, top, ok=ok):
     words = set()
     for f in glob.glob(os.path.join(scowl, "*-words.*")):
         name = os.path.basename(f); kind, size = name.split("-")[0], int(name.rsplit(".", 1)[1])
@@ -38,8 +38,10 @@ def scowl_words(top):
             words |= {plain(w.strip()) for w in open(f, encoding="latin-1")}
     return {w for w in words if ok(w)}
 NOT_ANSWERS = CRUDE | ACCEPT_ONLY | NOT_COMMON
-common = (scowl_words(50) - NOT_ANSWERS) | {w for w in MAKE_COMMON if ok(w)}
-extra = (NOT_ANSWERS & scowl_words(80)) | (scowl_words(80) | {w.strip() for w in open(enable) if ok(w.strip())} | {w for w in ALSO if ok(w)} | NOT_COMMON) - common
+if __name__ != "__main__": raise ImportError  # imported for the rules above; tools/make-magnet-words.py catches this
+scowl, enable, out = sys.argv[1:4]
+common = (scowl_words(scowl, 50) - NOT_ANSWERS) | {w for w in MAKE_COMMON if ok(w)}
+extra = (NOT_ANSWERS & scowl_words(scowl, 80)) | (scowl_words(scowl, 80) | {w.strip() for w in open(enable) if ok(w.strip())} | {w for w in ALSO if ok(w)} | NOT_COMMON) - common
 json.dump({"common": sorted(common), "extra": sorted(extra)}, open(out, "w"), separators=(",", ":"))
 pangrams = [w for w in common if len(set(w)) == 7]
 print(len(common), "common,", len(extra), "extra,", len(pangrams), "pangram words,", os.path.getsize(out) // 1024, "KB")
