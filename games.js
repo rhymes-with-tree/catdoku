@@ -37,6 +37,7 @@ const G = (() => {
     ["Toydoku", "toydoku", "Help Laya give every row, column and box one of each toy", "#B3B94B", "logic", "sudoku solo number place latin square"],
     ["Scratch That", "scratchthat", "Save the sofa from Dottie!", "#8D78AD", "logic", "light up akari lamps lighting scratching posts"],
     ["Pick of the Pile", "pickpile", "Help Fred put the toy blocks away in pairs", "#7885BA", "teasers", "mahjong solitaire mahjongg shanghai tile match pairs"],
+    ["Fridge Magnets", "magnets", "Help Crunch put every letter back on the fridge", "#BD5538", "words", "unolingo crossword alphabet letters", "2026-10-19"],
   ];
   // The shelves the front page and the games menu sort the games onto, in order: key (also a plain name for it,
   // for search), heading, one line.
