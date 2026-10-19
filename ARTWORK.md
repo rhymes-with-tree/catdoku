@@ -58,7 +58,9 @@ anywhere, but keep track of who they are, because they'll be featured in games o
   the title, `crunch-1` creeps up from the corner of the mat to cheer a chain of matches, and
   `crunch-6` rolls about on the gold-paw card. Crunch is the star of Cat-astrophe too: `crunch-7`
   (standing, one paw out, flipped to face the pot) bats the pots of dye over at the corner of the rug,
-  `crunch-4` naps on the finished rug, and `crunch-2` lounges on the gold-paw card.
+  `crunch-4` naps on the finished rug, and `crunch-2` lounges on the gold-paw card. Crunch is the star of Fridge Magnets too: `crunch-5` (head on one side) sits beside its title, `crunch-7` (flipped) bats
+  at the alphabet magnets on the floor, `crunch-4` curls up on the empty floor once every letter is back on the fridge, and `crunch-6` rolls about on
+  the gold-paw card.
 - **Dottie** (Dottie Dietrich, `dottie-…`, all-black shorthair with yellow-green eyes, sometimes a purple
   collar or a teal bow) is the mascot of Night Light: `dottie-1` peeks from under the red blanket beside
   the title, every cat in the room is one of the `dottie-face-…` pictures (cut from `dottie-10`, `-16`,

@@ -615,10 +615,30 @@ def scratchthat():
     return frame(PAPER, out)
 
 
+# Fridge Magnets: a fridge door with a corner of crossword on it, alphabet magnets in its white squares
+# (CAT, TOP, MAP) and one square still empty, waiting for its letter.
+def magnets():
+    out = (f'<rect x="10" y="10" width="80" height="80" rx="8" fill="{PAPER}" stroke="{INK}" stroke-width="2.5"/>'
+           f'<rect x="15" y="26" width="5" height="48" rx="2.5" fill="#DCDDD5" stroke="{INK}" stroke-width="1.8"/>'
+           f'<rect x="26" y="20" width="58" height="58" rx="3" fill="{INK}"/>')
+    s, x0, y0 = 14, 28, 22
+    grid = ["CAT.", "..O.", "M_P.", "...."]
+    colours = {"C": RED, "A": TEAL, "T": GREEN, "O": YELLOW, "M": PLUM, "P": PERI}
+    for r, row in enumerate(grid):
+        for c, ch in enumerate(row):
+            if ch == ".": continue
+            x, y = x0 + c * s, y0 + r * s
+            out += f'<rect x="{x}" y="{y}" width="{s-1.5}" height="{s-1.5}" rx="1.5" fill="{"#FFF0C2" if ch == "_" else "#FBFAF5"}"/>'
+            if ch != "_":
+                out += (f'<text x="{x+s/2-.7}" y="{y+s/2}" font-size="13" fill="{colours[ch]}" stroke="{INK}" stroke-width="1.3" '
+                        f'paint-order="stroke" {FONT}>{ch}</text>')
+    return frame("#ECEEE7", out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")
