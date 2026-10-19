@@ -36,14 +36,14 @@
 .fridge svg{display:block;width:100%;height:auto;max-height:calc(var(--tall) - 250px);margin:0 auto;overflow:visible}
 .door{fill:#F7F8F3;stroke:#2A2530;stroke-width:3.5}
 .handle{fill:#DCDDD5;stroke:#2A2530;stroke-width:3}
-.slot{fill:transparent;stroke:none}
-.slot.open{fill:rgba(255,255,255,.7);stroke:#A9A4B0;stroke-width:2;stroke-dasharray:6 5}
-.slot.mine{fill:rgba(115,167,174,.1);stroke:#C9C6CE;stroke-width:2;stroke-dasharray:none}
-.slot.word{fill:rgba(115,167,174,.2)}
-.slot.sel{fill:#FFF6DA;stroke:#ECA818;stroke-width:4;stroke-dasharray:none}
-.slot.bad{fill:rgba(200,57,43,.12)}
+.backing{fill:#2A2530}
+.slot{fill:#FBFAF5}
+.slot.mine{fill:#E3EEEF}
+.slot.word{fill:#CFE2E4}
+.slot.sel{fill:#FFF0C2;stroke:#ECA818;stroke-width:4}
+.slot.bad{fill:#F3D3CF}
 [data-k]{cursor:pointer}
-.mag{font:800 46px var(--font);text-anchor:middle;dominant-baseline:central;text-transform:uppercase;stroke:#2A2530;stroke-width:3.5px;
+.mag{font:800 44px var(--font);text-anchor:middle;dominant-baseline:central;text-transform:uppercase;stroke:#2A2530;stroke-width:3.5px;
   paint-order:stroke fill;stroke-linejoin:round;pointer-events:none;filter:drop-shadow(1.5px 2.5px 0 rgba(42,37,48,.22))}
 .won .mag{animation:jig .45s ease-in-out 2 alternate}
 @keyframes jig{to{transform:translateY(-5px)}}
@@ -98,82 +98,92 @@
 <script src="../games.js?v=2026-10-18.3"></script>
 <script>
 /* ---------- fridges ---------- */
-// A fridge is a crossword with 26 empty squares, and the 26 letters a–z on the floor to fill them, each once.
-// Words cross like the branches of a tree (each new word crosses one already up, and nothing else touches),
-// inside 10 × 10, and the letters already up can be any letters, as many times as the words need. Words come from
-// magnets/words.json (tools/make-magnet-words.py): words a Spelling Bee might ask for, plus words with an S. The
-// empty squares are one square of each letter (a square in two words where there is one), checked to leave just
-// one way to fill them.
-// Levels: lower ones use only everyday words, and the fewer squares a fridge has, the fewer letters are up to help.
+// A fridge is a 10 × 10 crossword with 26 empty squares, and the 26 letters a–z on the floor to fill them, each
+// once. The letters already up can be any letters, as many times as the words need. Every line of two or more
+// squares, across and down, is a word from magnets/words.json (tools/make-magnet-words.py): everyday words only.
+// The empty squares are one square of each letter, checked to leave just one way to fill them.
+// Levels: the more squares a fridge has, the more letters are up to help; on the lower levels the empty squares
+// are mostly where two words cross (so both help), on the higher ones mostly in just one word.
 function wordIndex(w) {
-  if (self.MAG_IDX && self.MAG_IDX.src === w.answers.length) return self.MAG_IDX;
-  const day = w.everyday.split(" "), all = new Set(day.concat(w.answers.split(" "))), byLen = {}, byLetter = {}, everyday = new Set(day);
+  if (self.MAG_IDX && self.MAG_IDX.src === w.words.length) return self.MAG_IDX;
+  const all = new Set(w.words.split(" ")), byLen = {};
   for (const x of all) (byLen[x.length] = byLen[x.length] || []).push(x);
-  for (const x of all) { const o = {w: x, f: everyday.has(x)}; for (const ch of new Set(x)) (byLetter[ch] = byLetter[ch] || []).push(o); }
-  return self.MAG_IDX = {src: w.answers.length, byLen, all, byLetter};
+  return self.MAG_IDX = {src: w.words.length, all, byLen};
 }
-// Words crossing like a tree, together holding every letter a–z, inside S × S: start from a word with a Q, then keep
-// adding a word with the rarest letter not yet up (best if it brings other missing letters too), crossing a letter
-// already up. everyday: only everyday words. Returns {w, h, words: [{r, c, d, w}]} (d: 0 across, 1 down), or null.
-function buildGrid(idx, S, everyday) {
-  const cells = new Map(), words = [], key = (r, c) => r * 64 + c;
-  const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-  let r0 = 20, r1 = 20, c0 = 20, c1 = 20;
-  const fits = (w, r, c, dr, dc) => {
-    if (cells.has(key(r - dr, c - dc)) || cells.has(key(r + dr * w.length, c + dc * w.length))) return false;
-    let cross = 0;
-    for (let i = 0; i < w.length; i++) {
-      const rr = r + dr * i, cc = c + dc * i, p = key(rr, cc);
-      if (cells.has(p)) { if (cells.get(p) !== w[i]) return false; cross++; continue; }
-      if (cells.has(key(rr + dc, cc + dr)) || cells.has(key(rr - dc, cc - dr))) return false;
-    }
-    return cross > 0 && Math.max(r1, r + dr * (w.length - 1)) - Math.min(r0, r) < S && Math.max(c1, c + dc * (w.length - 1)) - Math.min(c0, c) < S;
+// Grow a crossword in N × N (N × N letters, "" for a black square): start with a 7-letter word with a q, j, x or
+// z, then keep adding words that cross letters already up, wherever every line they make across and down is a
+// word: words with the rarest letter not yet up first, then the ones crossing most letters, until nothing more
+// fits. Returns null if some letter a–z never gets up.
+function growGrid(idx, N) {
+  const g = Array(N * N).fill(""), used = new Set(), RARE = "zqxjkvbpygfwmucldrhsnioate";
+  const at = (r, c) => r < 0 || c < 0 || r >= N || c >= N ? "" : g[r * N + c];
+  // the line through (r, c) going way d (0 across, 1 down), with letter ch put there
+  const line = (r, c, d, ch) => {
+    const dr = d, dc = 1 - d;
+    let r0 = r, c0 = c, s = "";
+    while (at(r0 - dr, c0 - dc)) { r0 -= dr; c0 -= dc; }
+    for (let rr = r0, cc = c0; rr < N && cc < N && (rr === r && cc === c || at(rr, cc)); rr += dr, cc += dc) s += rr === r && cc === c ? ch : at(rr, cc);
+    return s;
   };
-  const put = (w, r, c, d) => {
-    for (let i = 0; i < w.length; i++) { const rr = r + d * i, cc = c + (1 - d) * i; cells.set(key(rr, cc), w[i]); r0 = Math.min(r0, rr); r1 = Math.max(r1, rr); c0 = Math.min(c0, cc); c1 = Math.max(c1, cc); }
-    words.push({r, c, d, w});
-  };
-  // A word with letter L: those bringing the most missing letters first, then about 6 letters long, everyday
-  // ones before the rest; crossing a square that's in one word so far, with nothing beside it the other way.
-  const add = L => {
-    const have = new Set(cells.values()), gain = w => new Set([...w].filter(ch => !have.has(ch))).size;
-    const rank = list => list.map(o => [Math.abs(o.w.length - 6) - 2 * gain(o.w) + Math.random() * 2.5, o.w]).sort((a, b) => a[0] - b[0]).map(x => x[1]);
-    const pool = idx.byLetter[L].filter(o => o.w.length <= S);
-    const order = rank(pool.filter(o => o.f)).concat(everyday ? [] : rank(pool.filter(o => !o.f)));
-    const spots = shuffle([...cells.keys()].filter(p => { const r = Math.floor(p / 64), c = p % 64; return !(cells.has(key(r - 1, c)) || cells.has(key(r + 1, c))) || !(cells.has(key(r, c - 1)) || cells.has(key(r, c + 1))); }));
-    let tried = 0;
-    for (const w of order) {
-      if (++tried > 1500) break;
-      if (words.some(x => x.w === w)) continue;
-      for (const p of spots) {
-        const ch = cells.get(p), pr = Math.floor(p / 64), pc = p % 64;
-        for (let i = 0; i < w.length; i++) if (w[i] === ch) for (const d of shuffle([0, 1])) {
-          const r = pr - d * i, c = pc - (1 - d) * i;
-          if (fits(w, r, c, d, 1 - d)) { put(w, r, c, d); return true; }
+  const place = L => {
+    const have = new Set(g.filter(Boolean)), cands = [];
+    for (let d = 0; d < 2; d++) for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+      const dr = d, dc = 1 - d;
+      if (at(r - dr, c - dc)) continue;
+      for (let len = 2; len <= N - (d ? r : c); len++) {
+        if (at(r + dr * len, c + dc * len)) continue;
+        let pat = "", cross = 0;
+        for (let i = 0; i < len; i++) { const ch = at(r + dr * i, c + dc * i); pat += ch || "."; if (ch) cross++; }
+        if (!cross || cross === len) continue;
+        for (const w of idx.byLen[len] || []) {
+          if (used.has(w) || (L && !w.includes(L))) continue;
+          let ok = true;
+          for (let i = 0; i < len && ok; i++) if (pat[i] !== "." && pat[i] !== w[i]) ok = false;
+          if (!ok) continue;
+          let gain = 0; for (const ch of new Set(w)) if (!have.has(ch)) gain++;
+          cands.push([(L ? gain * 4 : 0) + cross * 4 - (len - cross) * 1.2 + Math.random() * 3, w, r, c, d]);
         }
       }
     }
+    cands.sort((a, b) => b[0] - a[0]);
+    for (const [, w, r, c, d] of cands.slice(0, 300)) {
+      let ok = true;
+      for (let i = 0; i < w.length && ok; i++) {
+        const rr = r + d * i, cc = c + (1 - d) * i;
+        if (!at(rr, cc)) { const s = line(rr, cc, 1 - d, w[i]); ok = s.length < 2 || idx.all.has(s); }
+      }
+      if (!ok) continue;
+      for (let i = 0; i < w.length; i++) g[(r + d * i) * N + c + (1 - d) * i] = w[i];
+      used.add(w);
+      return true;
+    }
     return false;
   };
-  const q = idx.byLetter.q.filter(o => o.w.length <= S && (o.f || !everyday)), fq = q.filter(o => o.f);
-  put(shuffle(fq.length ? fq : q)[0].w, 20, 20, 0);
-  for (let n = 0; n < 30; n++) {
-    const have = new Set(cells.values()), left = [..."abcdefghijklmnopqrstuvwxyz"].filter(ch => !have.has(ch));
-    if (!left.length) return {w: c1 - c0 + 1, h: r1 - r0 + 1, words: words.map(x => ({r: x.r - r0, c: x.c - c0, d: x.d, w: x.w}))};
-    if (!add(left.sort((a, b) => idx.byLetter[a].length - idx.byLetter[b].length)[0])) return null;
+  const sevens = idx.byLen[7].filter(w => /[qjxz]/.test(w)), first = sevens[Math.floor(Math.random() * sevens.length)];
+  const r0 = Math.floor(Math.random() * N), c0 = Math.floor(Math.random() * (N - 6));
+  for (let i = 0; i < 7; i++) g[r0 * N + c0 + i] = first[i];
+  used.add(first);
+  for (let step = 0; step < 150; step++) {
+    const have = new Set(g.filter(Boolean)), left = [..."abcdefghijklmnopqrstuvwxyz"].filter(ch => !have.has(ch));
+    const L = left.length ? left.sort((a, b) => RARE.indexOf(a) - RARE.indexOf(b))[0] : null;
+    if (!place(L) && !(L && place(null))) return left.length ? null : g;
   }
   return null;
 }
-// A fridge's squares (square → letter, a square being r × w + c) and each word's squares.
-function gridSquares(g) {
-  const sq = new Map(), slots = [];
-  for (const x of g.words) {
-    const s = [];
-    for (let i = 0; i < x.w.length; i++) { const k = (x.r + x.d * i) * g.w + x.c + (1 - x.d) * i; sq.set(k, x.w[i]); s.push(k); }
-    slots.push(s);
+// A grid's words: every line of two or more squares, across then down, as lists of squares (r × N + c).
+function gridSlots(g, N) {
+  const slots = [];
+  for (let d = 0; d < 2; d++) for (let a = 0; a < N; a++) {
+    let run = [];
+    for (let b = 0; b <= N; b++) {
+      const k = d ? b * N + a : a * N + b;
+      if (b < N && g[k]) run.push(k);
+      else { if (run.length > 1) slots.push(run); run = []; }
+    }
   }
-  return {sq, slots};
+  return slots;
 }
+
 // How many ways (counting up to `cap`) to fill the `open` squares with different letters so every word counts,
 // the other squares having the letters in `given` ([square, letter] pairs). `found`, if given, collects them
 // (square → letter). Gives up after `budget` steps and says `cap`.
@@ -213,29 +223,35 @@ function countFills(idx, slots, given, open, cap, budget, found) {
   go();
   return n;
 }
-// A fridge for a level: req is {level, words (the word list)}. Builds grids until one has a number of squares in
+// A fridge for a level: req is {level, words (the word list)}. Grows grids until one has a number of squares in
 // the level's range, then picks which square of each letter is empty; while there's another way to fill them,
-// moves one of the letters that way puts somewhere else. Returns {level, w, h, words, open} or null.
+// moves one of the letters that way puts somewhere else. Returns {level, g (100 letters, "." for a black
+// square), open (the empty squares)} or null.
 function makeFridge(req) {
-  // [everyday words only, fewest squares, most squares]
-  const LEVELS = [null, [1, 45, 99], [1, 42, 44], [1, 39, 41], [1, 36, 38], [1, 26, 35], [0, 40, 43], [0, 37, 39], [0, 34, 36], [0, 26, 33]];
-  const [everyday, lo, hi] = LEVELS[req.level], idx = wordIndex(req.words);
-  let g = null, sq, slots;
-  for (let t = 0; t < 400 && !g; t++) {
-    g = buildGrid(idx, 10, everyday);
-    if (g) ({sq, slots} = gridSquares(g));
+  // [fewest squares, most squares, how often an empty square is where two words cross]
+  const LEVELS = [null, [62, 100, .9], [59, 61, .8], [56, 58, .6], [52, 55, .4], [0, 51, .25]];
+  const N = 10, [lo, hi, crossing] = LEVELS[req.level], idx = wordIndex(req.words);
+  let g = null, sq = null;
+  for (let t = 0; t < 30 && !g; t++) {
+    g = growGrid(idx, N);
+    if (g) sq = new Map(g.map((ch, k) => [k, ch]).filter(([, ch]) => ch));
     if (g && (sq.size < lo || sq.size > hi)) g = null;
   }
   if (!g) return null;
-  const cross = new Map(); slots.forEach(s => s.forEach(k => cross.set(k, (cross.get(k) || 0) + 1)));
+  const slots = gridSlots(g, N), cross = new Map();
+  slots.forEach(s => s.forEach(k => cross.set(k, (cross.get(k) || 0) + 1)));
   const by = {};
   for (const [k, ch] of sq) (by[ch] = by[ch] || []).push(k);
-  const pick = ch => { const ks = by[ch], c = ks.filter(k => cross.get(k) > 1), from = c.length && Math.random() < .8 ? c : ks; return from[Math.floor(Math.random() * from.length)]; };
+  const pick = ch => {
+    const ks = by[ch], two = ks.filter(k => cross.get(k) > 1), one = ks.filter(k => cross.get(k) === 1);
+    const from = Math.random() < crossing ? (two.length ? two : ks) : (one.length ? one : ks);
+    return from[Math.floor(Math.random() * from.length)];
+  };
   const at = {};
   for (const ch in by) at[ch] = pick(ch);
   for (let t = 0; t < 25; t++) {
     const open = Object.values(at), openSet = new Set(open), given = [...sq].filter(([k]) => !openSet.has(k)), found = [];
-    if (countFills(idx, slots, given, open, 2, 20000, found) === 1) return {level: req.level, w: g.w, h: g.h, words: g.words, open: open.sort((a, b) => a - b)};
+    if (countFills(idx, slots, given, open, 2, 20000, found) === 1) return {level: req.level, g: g.map(ch => ch || ".").join(""), open: open.sort((a, b) => a - b)};
     const alt = found.find(f => [...f].some(([k, ch]) => sq.get(k) !== ch));
     const movable = (alt ? [...alt].filter(([k, ch]) => sq.get(k) !== ch).map(([k]) => sq.get(k)) : Object.keys(at)).filter(ch => by[ch].length > 1);
     if (!movable.length) return null;
@@ -246,11 +262,11 @@ function makeFridge(req) {
 }
 
 /* ---------- game state ---------- */
-// game: {level, w, h, words, open (the 26 squares to fill), put ({square: letter} for the letters you've put up),
+// game: {level, g (the answer: 100 letters, "." for a black square), open (the 26 squares to fill), put ({square: letter} for the letters you've put up),
 //        history (put before each change, for Undo), won, hinted, undid…}
 // sel: the square picked (or -1), dir: 0 across or 1 down, for the word it's in; held: a letter picked up
 // from the floor with no square picked.
-const STORE = "catdoku.magnets.v1", MAX_LEVEL = 9, NS = "http://www.w3.org/2000/svg", CS = 54, PADL = 50, PAD = 24;
+const STORE = "catdoku.magnets.v1", MAX_LEVEL = 5, N = 10, NS = "http://www.w3.org/2000/svg", CS = 54, PADL = 50, PAD = 24;
 const ABC = "abcdefghijklmnopqrstuvwxyz";
 // each letter's colour, from the site's palette, and its tilt lying on the floor
 const PAL = ["#BD5538", "#73A7AE", "#ECA818", "#6AA673", "#B94588", "#7885BA", "#E16A4A", "#B3B94B", "#8D78AD", "#4E577D"];
@@ -263,69 +279,53 @@ let game = state.game || null, sel = -1, dir = 0, held = null, W = null, IDX = n
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !running && !$("overlay").classList.contains("show");
 let running = false;
-const levelName = n => `Level ${n} · ${n <= 5 ? "everyday words" : "harder words"}`;
+const levelName = n => `Level ${n} · ${"★".repeat(n)}`;
 const catSrc = f => (window.CAT_SRC || {})[f] || `../cats/${f}.webp`;
 const el = (t, a, parent) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (parent) parent.append(e); return e; };
 
-// What a fridge's words make: F = {sol (square → letter), slots (each word's squares), of (square → its words),
-// open (the empty squares, as a set)}.
+// What a fridge's answer makes: F = {sol (square → letter), slots (each word's squares), d (each word's way: 0
+// across, 1 down), of (square → its words), open (the empty squares, as a set)}.
 function derive() {
-  const {sq, slots} = gridSquares(game), of = new Map();
+  const g = [...game.g].map(ch => ch === "." ? "" : ch), slots = gridSlots(g, N), of = new Map();
   slots.forEach((s, i) => s.forEach(k => { if (!of.has(k)) of.set(k, []); of.get(k).push(i); }));
-  F = {sol: sq, slots, of, open: new Set(game.open)};
+  F = {sol: new Map(g.map((ch, k) => [k, ch]).filter(([, ch]) => ch)), slots, d: slots.map(s => s[1] - s[0] === 1 ? 0 : 1), of, open: new Set(game.open)};
 }
 const letterAt = k => F.open.has(k) ? game.put[k] || "" : F.sol.get(k) || "";
 const upLetters = () => new Set(Object.values(game.put));
 const empties = () => game.open.filter(k => !game.put[k]);
-// A fridge that came from a share link or a save: words that count, every line of two or more squares one of
-// the words, and 26 empty squares, one of each letter.
-function validGrid(g) {
-  if (!(g.w >= 1 && g.w <= 10 && g.h >= 1 && g.h <= 10) || !Array.isArray(g.words) || !g.words.length) return false;
-  const cells = new Map();
-  for (const x of g.words) {
-    if (!x || typeof x.w !== "string" || !IDX.all.has(x.w) || (x.d !== 0 && x.d !== 1) || !(x.r >= 0) || !(x.c >= 0)) return false;
-    for (let i = 0; i < x.w.length; i++) {
-      const r = x.r + x.d * i, c = x.c + (1 - x.d) * i;
-      if (r >= g.h || c >= g.w) return false;
-      const k = r * g.w + c;
-      if (cells.has(k) && cells.get(k) !== x.w[i]) return false;
-      cells.set(k, x.w[i]);
-    }
-  }
-  const runs = new Set(g.words.map(x => `${x.r},${x.c},${x.d}`));
-  for (const d of [0, 1]) for (let a = 0; a < (d ? g.w : g.h); a++) {
-    let start = -1;
-    for (let b = 0; b <= (d ? g.h : g.w); b++) {
-      const r = d ? b : a, c = d ? a : b, on = b < (d ? g.h : g.w) && cells.has(r * g.w + c);
-      if (on && start < 0) start = b;
-      if (!on && start >= 0) { if (b - start > 1 && !runs.has(d ? `${start},${a},1` : `${a},${start},0`)) return false; start = -1; }
-    }
-  }
-  return Array.isArray(g.open) && g.open.length === 26 && g.open.every(k => cells.has(k)) && new Set(g.open.map(k => cells.get(k))).size === 26;
+// A fridge that came from a share link or a save: every line of two or more squares a word that counts, and 26
+// empty squares, one of each letter.
+function validGrid(f) {
+  if (typeof f.g !== "string" || !/^[a-z.]{100}$/.test(f.g)) return false;
+  const g = [...f.g].map(ch => ch === "." ? "" : ch);
+  if (!gridSlots(g, N).every(s => IDX.all.has(s.map(k => g[k]).join("")))) return false;
+  return Array.isArray(f.open) && f.open.length === 26 && f.open.every(k => g[k]) && new Set(f.open.map(k => g[k])).size === 26;
 }
 
 /* ---------- drawing ---------- */
-// The fridge door with its handle, a square for every letter, and the magnets on it.
+// The fridge door with its handle, and on it a crossword board: black squares, and a white one for every letter,
+// with the magnets on them.
 function draw() {
-  const svg = $("svg"), vw = PADL + PAD + game.w * CS, vh = 2 * PAD + game.h * CS;
+  const svg = $("svg"), vw = PADL + PAD + N * CS, vh = 2 * PAD + N * CS;
   svg.setAttribute("viewBox", `0 0 ${vw} ${vh}`);
   svg.innerHTML = "";
   el("rect", {class: "door", x: 2, y: 2, width: vw - 4, height: vh - 4, rx: 18}, svg);
   el("rect", {class: "handle", x: 14, y: vh * .2, width: 13, height: vh * .6, rx: 6.5}, svg);
+  el("rect", {class: "backing", x: PADL - 3, y: PAD - 3, width: N * CS + 6, height: N * CS + 6, rx: 6}, svg);
   const word = sel >= 0 ? wordAt(sel, dir) : null, bad = new Set(badWords().flat());
   for (const k of F.sol.keys()) {
-    const r = Math.floor(k / game.w), c = k % game.w, x = PADL + c * CS, y = PAD + r * CS, ch = letterAt(k);
+    const r = Math.floor(k / N), c = k % N, x = PADL + c * CS, y = PAD + r * CS, ch = letterAt(k);
     const g = el("g", {"data-k": k}, svg);
     let cls = "slot";
-    if (F.open.has(k)) cls += ch ? " mine" : " open";
+    if (F.open.has(k) && ch) cls += " mine";
     if (word && word.includes(k) && F.open.has(k)) cls += " word";
     if (k === sel) cls += " sel";
     if (bad.has(k) && empties().length === 0) cls += " bad";
-    el("rect", {class: cls, x: x + 3, y: y + 3, width: CS - 6, height: CS - 6, rx: 8}, g);
+    el("rect", {class: cls, x: x + 1.5, y: y + 1.5, width: CS - 3, height: CS - 3, rx: 3}, g);
     if (ch) el("text", {class: "mag", x: x + CS / 2, y: y + CS / 2 + 1, fill: colour(ch), transform: `rotate(${tilt(ch) / 3} ${x + CS / 2} ${y + CS / 2})`}, g).textContent = ch;
   }
   if (mark && mark.when === JSON.stringify(game.put)) for (const [k, b] of mark.sq) {
-    const r = Math.floor(k / game.w), c = k % game.w;
+    const r = Math.floor(k / N), c = k % N;
     el("rect", {class: "hintsq" + (b ? " bad" : ""), x: PADL + c * CS, y: PAD + r * CS, width: CS, height: CS, rx: 10}, svg);
   } else mark = null;
   drawFloor();
@@ -361,7 +361,7 @@ function update() {
 }
 // The squares of the word through square k going way d (or the other way, if there's no word that way).
 function wordAt(k, d) {
-  const ids = F.of.get(k) || [], pick = ids.find(i => game.words[i].d === d);
+  const ids = F.of.get(k) || [], pick = ids.find(i => F.d[i] === d);
   return F.slots[pick !== undefined ? pick : ids[0]];
 }
 // Full words that don't count, as lists of squares.
@@ -379,7 +379,7 @@ function place(ch, k) {
   for (const q in game.put) if (game.put[q] === ch) delete game.put[q];
   game.put[k] = ch; game.started = true; held = null;
   sel = nextEmpty(k);
-  if (sel >= 0 && !wordAt(k, dir).includes(sel)) dir = (F.of.get(sel) || []).length === 1 ? game.words[F.of.get(sel)[0]].d : dir;
+  if (sel >= 0 && !wordAt(k, dir).includes(sel)) dir = (F.of.get(sel) || []).length === 1 ? F.d[F.of.get(sel)[0]] : dir;
   afterMove();
 }
 function takeDown(k) {
@@ -421,7 +421,7 @@ function tapSquare(k) {
   } else {
     sel = k;
     const ids = F.of.get(k) || [];
-    if (!ids.some(i => game.words[i].d === dir)) dir = game.words[ids[0]].d;
+    if (!ids.some(i => F.d[i] === dir)) dir = F.d[ids[0]];
   }
   draw();
 }
@@ -495,12 +495,12 @@ document.addEventListener("keydown", e => {
     e.preventDefault(); game.started = true;
     const [dr, dc] = {ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1]}[k];
     if (sel < 0) { sel = game.open[0]; draw(); return; }
-    let r = Math.floor(sel / game.w), c = sel % game.w;
+    let r = Math.floor(sel / N), c = sel % N;
     while (true) {
       r += dr; c += dc;
-      if (r < 0 || c < 0 || r >= game.h || c >= game.w) break;
-      const q = r * game.w + c;
-      if (F.open.has(q)) { sel = q; dir = dr ? 1 : 0; if (!(F.of.get(q) || []).some(i => game.words[i].d === dir)) dir = 1 - dir; break; }
+      if (r < 0 || c < 0 || r >= N || c >= N) break;
+      const q = r * N + c;
+      if (F.open.has(q)) { sel = q; dir = dr ? 1 : 0; if (!(F.of.get(q) || []).some(i => F.d[i] === dir)) dir = 1 - dir; break; }
     }
     draw();
   } else if (k === "Escape") { sel = -1; held = null; draw(); }
@@ -557,7 +557,7 @@ function win() {
 }
 function finishCard() {
   const next = settings.level, gold = !game.undid && !game.hinted;
-  let text = `All 26 letters back on the fridge, in ${game.words.length} words.`;
+  let text = `All 26 letters back on the fridge, in ${F.slots.length} words.`;
   text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
   // a gold paw: Crunch rolling about, in place of the random cat photo
   const pic = new Image(); pic.className = "rollpic"; pic.src = catSrc("crunch-6"); pic.alt = "Crunch rolling about on a green mat";
@@ -567,13 +567,13 @@ function finishCard() {
 }
 
 /* ---------- new fridges ---------- */
-const fridges = G.builder([wordIndex, buildGrid, gridSquares, countFills, makeFridge], "makeFridge");
+const fridges = G.builder([wordIndex, growGrid, gridSlots, countFills, makeFridge], "makeFridge");
 // The builder is asked with the same object for a level each time, so a fridge made in advance is found again.
 const REQ = {}, req = n => REQ[n] = REQ[n] || {level: n, words: W};
 const wrapped = {take: n => fridges.take(req(n)), prefetch: n => fridges.prefetch(req(n))};
 function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
 function begin(p, level) {
-  game = {level, w: p.w, h: p.h, words: p.words, open: p.open, put: {}, history: [], won: false, hinted: false, undid: false, ...G.freshClock()};
+  game = {level, g: p.g, open: p.open, put: {}, history: [], won: false, hinted: false, undid: false, ...G.freshClock()};
   sel = -1; held = null; mark = null; derive();
 }
 let asking = 0;
@@ -593,16 +593,15 @@ function newPuzzle() {
 }
 
 /* ---------- sharing ---------- */
-// A fridge travels as its words ("r.c.d.word" each) and the squares to fill; progress as the letter on each of
-// those squares ("-" for empty).
+// A fridge travels as its answer (100 letters, "." for a black square) and the squares to fill; progress as the
+// letter on each of those squares ("-" for empty).
 $("shareBtn").onclick = () => { if (game) G.shareCard({name: "Fridge Magnets", won: game.won,
-  puzzle: () => ({g: "magnets", N: game.level, w: game.w, h: game.h, x: game.words.map(x => `${x.r}.${x.c}.${x.d}.${x.w}`).join(" "), o: game.open.join(".")}),
+  puzzle: () => ({g: "magnets", N: game.level, b: game.g, o: game.open.join(".")}),
   progress: () => game.open.map(k => game.put[k] || "-").join("")}); };
 function openShared(d) {
   const fail = () => G.note("That share link didn't work.", 5000);
-  if (!(d.N >= 1 && d.N <= MAX_LEVEL) || typeof d.x !== "string" || typeof d.o !== "string") return fail();
-  const words = d.x.split(" ").map(s => { const [r, c, dd, w] = s.split("."); return {r: +r, c: +c, d: +dd, w}; });
-  const p = {w: +d.w, h: +d.h, words, open: d.o.split(".").map(Number)};
+  if (!(d.N >= 1 && d.N <= MAX_LEVEL) || typeof d.o !== "string") return fail();
+  const p = {g: d.b, open: d.o.split(".").map(Number)};
   if (!validGrid(p)) return fail();
   p.open.sort((a, b) => a - b);
   begin(p, d.N);
@@ -628,7 +627,7 @@ function map() {
 }
 function helpOnFirstVisit() {
   if (!game || !playing() || document.querySelector(".spot") || settings.seenHelp) return;
-  const xy = k => [k % game.w, Math.floor(k / game.w)], all = [...F.sol.keys()].map(xy);
+  const xy = k => [k % N, Math.floor(k / N)], all = [...F.sol.keys()].map(xy);
   // the word with most squares to fill, and an empty square in it
   const word = F.slots.reduce((a, b) => b.filter(k => F.open.has(k)).length > a.filter(k => F.open.has(k)).length ? b : a);
   const gap = word.find(k => !game.put[k] && F.open.has(k)) !== undefined ? word.find(k => !game.put[k] && F.open.has(k)) : empties()[0];
@@ -643,7 +642,7 @@ function helpOnFirstVisit() {
     {say: "Drag yours off, or tap it twice, to take it down", lit: game.open.map(xy), outline: []},
     {say: "Stuck? Hint shows where a letter goes", els: [$("hintBtn")]},
   );
-  G.spotlight({grid: $("grid"), w: game.w, h: game.h, steps, map, done: () => { settings.seenHelp = true; save(); }});
+  G.spotlight({grid: $("grid"), w: N, h: N, steps, map, done: () => { settings.seenHelp = true; save(); }});
 }
 
 /* ---------- start ---------- */
