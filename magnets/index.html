@@ -102,8 +102,10 @@
 // once. The letters already up can be any letters, as many times as the words need. Every line of two or more
 // squares, across and down, is a word from magnets/words.json (tools/make-magnet-words.py): everyday words only.
 // The empty squares are one square of each letter, checked to leave just one way to fill them.
-// Levels: the more squares a fridge has, the more letters are up to help; on the lower levels the empty squares
-// are mostly where two words cross (so both help), on the higher ones mostly in just one word.
+// Levels (★ to ★★★): how much thinking a fridge takes, found by solving it the way a person would (solveSteps):
+// the more letters that take the harder steps, the more stars. To make the right kind more often, ★ fridges are
+// grown bigger (more letters up to help) with the empty squares mostly where two words cross, ★★★ ones smaller
+// with them mostly in just one word.
 function wordIndex(w) {
   if (self.MAG_IDX && self.MAG_IDX.src === w.words.length) return self.MAG_IDX;
   const all = new Set(w.words.split(" ")), byLen = {};
@@ -251,7 +253,12 @@ function makeFridge(req) {
   for (const ch in by) at[ch] = pick(ch);
   for (let t = 0; t < 25; t++) {
     const open = Object.values(at), openSet = new Set(open), given = [...sq].filter(([k]) => !openSet.has(k)), found = [];
-    if (countFills(idx, slots, given, open, 2, 20000, found) === 1) return {level: req.level, g: g.map(ch => ch || ".").join(""), open: open.sort((a, b) => a - b)};
+    if (countFills(idx, slots, given, open, 2, 20000, found) === 1) {
+      // one answer: keep it if it takes the level's amount of thinking
+      const {n, stuck} = solveSteps(idx, slots, sq, open), work = n[2] + 4 * n[3] + (stuck ? 20 : 0);
+      if (work > [0, 10, 13, 99][req.level] || work < [0, 0, 11, 14][req.level]) return null;
+      return {level: req.level, g: g.map(ch => ch || ".").join(""), open: open.sort((a, b) => a - b)};
+    }
     const alt = found.find(f => [...f].some(([k, ch]) => sq.get(k) !== ch));
     const movable = (alt ? [...alt].filter(([k, ch]) => sq.get(k) !== ch).map(([k]) => sq.get(k)) : Object.keys(at)).filter(ch => by[ch].length > 1);
     if (!movable.length) return null;
@@ -259,6 +266,58 @@ function makeFridge(req) {
     at[ch] = others[Math.floor(Math.random() * others.length)];
   }
   return null;
+}
+
+// The next letter a person could place by reasoning, with the letters `known` so far (square → letter, including
+// those already up) and `open` the 26 empty squares, using steps up to `most`. Returns [square, letter, step] or
+// null. Steps: 1, a word with one gap that only one letter on the floor fills; 2, a word with more gaps that leaves
+// only one letter for one of them, or the words across and down through a square that together leave only one;
+// 3, a letter on the floor that can only go in one square.
+function deduce(idx, slots, known, open, most) {
+  const used = new Set(open.filter(k => known.has(k)).map(k => known.get(k))), may = new Map();
+  let two = null;
+  for (const s of slots) {
+    const gaps = s.filter(k => !known.has(k)).length;
+    if (!gaps || (most === 1 && gaps > 1)) continue;
+    const sets = s.map(() => new Set());
+    for (const w of idx.byLen[s.length]) {
+      let ok = true, seen = 0;
+      for (let i = 0; i < s.length && ok; i++) {
+        const h = known.get(s[i]);
+        if (h) ok = h === w[i];
+        else { const b = 1 << (w.charCodeAt(i) - 97); ok = !used.has(w[i]) && !(seen & b); seen |= b; }
+      }
+      if (ok) for (let i = 0; i < s.length; i++) sets[i].add(w[i]);
+    }
+    for (let i = 0; i < s.length; i++) {
+      const k = s[i];
+      if (known.has(k)) continue;
+      if (sets[i].size === 1) { if (gaps === 1) return [k, [...sets[i]][0], 1]; if (!two) two = [k, [...sets[i]][0], 2]; }
+      may.set(k, may.has(k) ? new Set([...may.get(k)].filter(ch => sets[i].has(ch))) : sets[i]);
+    }
+  }
+  if (most < 2) return null;
+  if (two) return two;
+  for (const [k, set] of may) if (set.size === 1) return [k, [...set][0], 2];
+  if (most < 3) return null;
+  for (const ch of "abcdefghijklmnopqrstuvwxyz") {
+    if (used.has(ch)) continue;
+    const where = [...may].filter(([, set]) => set.has(ch));
+    if (where.length === 1) return [where[0][0], ch, 3];
+  }
+  return null;
+}
+// How a person would get on solving a fridge, always taking the easiest step there is: how many letters took
+// each step (above), and whether the steps got stuck (so it takes trying letters).
+function solveSteps(idx, slots, sq, open) {
+  const openSet = new Set(open), known = new Map([...sq].filter(([k]) => !openSet.has(k))), n = [0, 0, 0, 0];
+  while (known.size < sq.size) {
+    const step = deduce(idx, slots, known, open, 1) || deduce(idx, slots, known, open, 3);
+    if (!step) return {n, stuck: true};
+    n[step[2]]++;
+    known.set(step[0], step[1]);
+  }
+  return {n, stuck: false};
 }
 
 /* ---------- game state ---------- */
@@ -531,11 +590,15 @@ $("hintBtn").onclick = () => {
     mark = {when: JSON.stringify(game.put), sq: [[wrong[0], true]]};
     G.note(`The ${game.put[wrong[0]].toUpperCase()} doesn't go there. Take it down and try another letter.`, 5000);
   } else {
+    // the easiest step a person could take next (or, if there isn't one, the square in the fullest word)
+    const known = new Map([...F.sol].filter(([k]) => !F.open.has(k) || game.put[k]));
+    const step = deduce(IDX, F.slots, known, game.open, 1) || deduce(IDX, F.slots, known, game.open, 3);
     const filled = s => s.filter(q => letterAt(q)).length / s.length;
     const score = k => Math.max(...F.of.get(k).map(i => filled(F.slots[i])));
-    const k = empties().reduce((a, b) => score(b) > score(a) ? b : a), ch = F.sol.get(k);
+    const k = step ? step[0] : empties().reduce((a, b) => score(b) > score(a) ? b : a), ch = F.sol.get(k);
     mark = {when: JSON.stringify(game.put), sq: [[k, false]], letter: ch};
-    G.note(`The ${ch.toUpperCase()} goes in the gold square.`, 5000);
+    const why = !step ? "" : step[2] === 1 ? ": it's the only letter left that makes a word there" : step[2] === 2 ? ": it's the only letter left that fits the words there" : `: it can't go anywhere else`;
+    G.note(`The ${ch.toUpperCase()} goes in the gold square${why}.`, 5000);
   }
   draw();
   markTimer = setTimeout(() => { mark = null; if (game) draw(); }, 5000);
@@ -567,7 +630,7 @@ function finishCard() {
 }
 
 /* ---------- new fridges ---------- */
-const fridges = G.builder([wordIndex, growGrid, gridSlots, countFills, makeFridge], "makeFridge");
+const fridges = G.builder([wordIndex, growGrid, gridSlots, countFills, deduce, solveSteps, makeFridge], "makeFridge");
 // The builder is asked with the same object for a level each time, so a fridge made in advance is found again.
 const REQ = {}, req = n => REQ[n] = REQ[n] || {level: n, words: W};
 const wrapped = {take: n => fridges.take(req(n)), prefetch: n => fridges.prefetch(req(n))};
