@@ -84,6 +84,7 @@
     <button id="hintBtn">Hint</button>
     <button id="undoBtn">Undo</button>
     <button id="restartBtn">Restart</button>
+    <button id="auditBtn">Audit</button>
     <button id="shareBtn">Share</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
@@ -417,6 +418,7 @@ function update() {
   $("undoBtn").disabled = !game.history.length || game.won;
   $("restartBtn").disabled = !Object.keys(game.put).length || game.won;
   $("hintBtn").disabled = game.won;
+  $("auditBtn").disabled = game.won;
 }
 // The squares of the word through square k going way d (or the other way, if there's no word that way).
 function wordAt(k, d) {
@@ -604,11 +606,24 @@ $("hintBtn").onclick = () => {
   markTimer = setTimeout(() => { mark = null; if (game) draw(); }, 5000);
 };
 
+// Audit: every letter you've put up in the wrong square gets a red box (or the message line says they're all right).
+$("auditBtn").onclick = () => {
+  if (!playing()) return;
+  if (!Object.keys(game.put).length) return G.note("Put some letters up first, then Audit checks them.", 3500);
+  game.audited = true; game.started = true; save();
+  clearTimeout(markTimer);
+  const wrong = game.open.filter(k => game.put[k] && game.put[k] !== F.sol.get(k));
+  mark = wrong.length ? {when: JSON.stringify(game.put), sq: wrong.map(k => [k, true])} : null;
+  G.note(!wrong.length ? "Every letter you've put up is in the right square." : `${wrong.length} letter${wrong.length > 1 ? "s are" : " is"} in the wrong square. Take ${wrong.length > 1 ? "them" : "it"} down and try again.`, 5000);
+  draw();
+  markTimer = setTimeout(() => { mark = null; if (game) draw(); }, 5000);
+};
+
 /* ---------- endings ---------- */
 // The magnets jiggle, Crunch curls up on the empty floor, and the card comes up.
 function win() {
   game.won = true; G.finishClock(game); mark = null; sel = -1; held = null;
-  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  const next = game.hinted || game.audited ? game.level : Math.min(MAX_LEVEL, game.level + 1);
   settings.level = next; $("levelSel").value = next; save();
   draw();
   $("board").classList.add("won");
@@ -619,13 +634,13 @@ function win() {
   setTimeout(() => { running = false; $("board").classList.remove("won"); if (game === g) finishCard(); }, matchMedia("(prefers-reduced-motion: reduce)").matches ? 500 : 1300);
 }
 function finishCard() {
-  const next = settings.level, gold = !game.undid && !game.hinted;
+  const next = settings.level, gold = !game.undid && !game.hinted && !game.audited;
   let text = `All 26 letters back on the fridge, in ${F.slots.length} words.`;
-  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  text += game.hinted || game.audited ? ` You had ${game.hinted ? "a hint" : "an audit"}, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
   // a gold paw: Crunch rolling about, in place of the random cat photo
   const pic = new Image(); pic.className = "rollpic"; pic.src = catSrc("crunch-6"); pic.alt = "Crunch rolling about on a green mat";
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my fridge", game.result,
-    {title: "Back on the fridge!", goldTitle: "Gold paw, Crunch!", gold, goldWhy: "No hints or undos!", goldPic: [pic], next: `Next: level ${next}`,
+    {title: "Back on the fridge!", goldTitle: "Gold paw, Crunch!", gold, goldWhy: "No hints, audits or undos!", goldPic: [pic], next: `Next: level ${next}`,
      after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
 }
 
@@ -703,6 +718,7 @@ function helpOnFirstVisit() {
   steps.push(
     {say: "Or drag a letter up onto the fridge", els: [$("floor")]},
     {say: "Drag yours off, or tap it twice, to take it down", lit: game.open.map(xy), outline: []},
+    {say: "Audit marks any letter in the wrong square", els: [$("auditBtn")]},
     {say: "Stuck? Hint shows where a letter goes", els: [$("hintBtn")]},
   );
   G.spotlight({grid: $("grid"), w: N, h: N, steps, map, done: () => { settings.seenHelp = true; save(); }});
