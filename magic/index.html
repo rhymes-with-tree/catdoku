@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Magic Square</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-19.1"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-19.1">
+<style>
+/* A square of tiles: every row, column and long diagonal adds up to the same total. Each line's total so far is
+   at its end (rows on the right, columns below, the diagonals in the corners), and the numbers 1 to N² are on a
+   pad below, each used once. A plain look for now, until the game has its theme. */
+.square{display:flex;flex-direction:column;gap:10px;width:var(--board);height:auto;touch-action:manipulation;user-select:none;-webkit-user-select:none;outline:none}
+.square svg{display:block;width:100%;height:auto;max-height:calc(var(--tall) - 230px);margin:0 auto}
+.cellbg{fill:#FBFAF5;stroke:#2A2530;stroke-width:2.5}
+.cellbg.mine{fill:#E3EEEF}
+.cellbg.line{fill:#D3E5E7}
+.cellbg.sel{fill:#FFF0C2;stroke:#ECA818;stroke-width:4}
+.num{font:800 30px var(--font);text-anchor:middle;dominant-baseline:central;fill:#2A2530;pointer-events:none}
+.num.mine{fill:#4E577D}
+.tot{font:700 19px var(--font);text-anchor:middle;dominant-baseline:central;fill:#8A8494;font-variant-numeric:tabular-nums}
+.tot.ok{fill:#4F8A58}
+.tot.bad{fill:#C8392B}
+.diag{stroke:#C9C6CE;stroke-width:2;stroke-dasharray:3 4}
+[data-k]{cursor:pointer}
+.won .num{animation:hop .4s ease-in-out 2 alternate}
+@keyframes hop{to{transform:translateY(-4px)}}
+/* the numbers, used ones faded */
+.pad{display:grid;gap:5px}
+.pad button{padding:0;aspect-ratio:1.25;font-weight:800;font-size:19px;border-radius:9px;font-variant-numeric:tabular-nums}
+.pad button.used{opacity:.25;cursor:default}
+.pad button.held{background:#FFF6DA;box-shadow:inset 0 0 0 3px #ECA818}
+.pad button.hinted{color:#B07A0A;background:#FFF6DA;box-shadow:inset 0 0 0 3px #ECA818}
+.shake{animation:shake .35s}
+@keyframes shake{25%{transform:translateX(-7px)}75%{transform:translateX(7px)}}
+</style>
+</head>
+<body>
+<main>
+  <header><div class="title"><h1>Magic Square</h1></div><div class="stripe"></div><p class="tagline">Make every row, column and diagonal add up the same</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap square" id="board" tabindex="0">
+    <div id="grid"><svg id="svg" role="img" aria-label="A magic square"></svg></div>
+    <div class="pad" id="pad" aria-label="Numbers"></div>
+  </div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="auditBtn">Audit</button>
+    <button id="shareBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New square</button>
+  </div>
+
+</main>
+
+<script src="../games.js?v=2026-10-19.1"></script>
+<script>
+/* ---------- squares ---------- */
+// A square is N × N (level 1 is 3 × 3, up to 6 × 6 at level 4) holding 1 to N² once each, every row, column and
+// long diagonal adding up to N(N² + 1) / 2. A random magic square is found by search, then numbers are taken away
+// one at a time, keeping each away only while a person could still fill the square by reasoning alone (magicStep),
+// so each square has one answer and never needs a guess.
+
+// The lines of an N × N square: rows, columns, then the two long diagonals (top left down, top right down).
+function magicLines(N) {
+  const lines = [];
+  for (let i = 0; i < N; i++) lines.push([...Array(N)].map((_, j) => i * N + j));
+  for (let i = 0; i < N; i++) lines.push([...Array(N)].map((_, j) => j * N + i));
+  lines.push([...Array(N)].map((_, j) => j * N + j), [...Array(N)].map((_, j) => j * N + N - 1 - j));
+  return lines;
+}
+// Fill the empty squares of g (0 = empty) with the numbers not yet used so every line adds up to the total, trying
+// numbers in a random order; g is left filled. Returns whether it found one (giving up after `budget` steps).
+function magicFill(N, g, budget) {
+  const M = N * (N * N + 1) / 2, NN = N * N, lines = magicLines(N), of = [...Array(NN)].map(() => []);
+  lines.forEach((l, i) => l.forEach(k => of[k].push(i)));
+  const used = new Array(NN + 1).fill(false), sum = lines.map(l => l.reduce((a, k) => a + g[k], 0)), gaps = lines.map(l => l.filter(k => !g[k]).length);
+  for (const v of g) if (v) used[v] = true;
+  let steps = 0, done = false;
+  // can k more different unused numbers add up to r? (between the k smallest and the k largest)
+  const feasible = (k, r) => {
+    if (k === 0) return r === 0;
+    let lo = 0, hi = 0, c = 0;
+    for (let v = 1; v <= NN && c < k; v++) if (!used[v]) { lo += v; c++; }
+    if (c < k) return false;
+    c = 0; for (let v = NN; v >= 1 && c < k; v--) if (!used[v]) { hi += v; c++; }
+    return r >= lo && r <= hi;
+  };
+  const set = (k, v, d) => { g[k] = d > 0 ? v : 0; used[v] = d > 0; for (const i of of[k]) { sum[i] += d * v; gaps[i] -= d; } };
+  const go = () => {
+    if (++steps > budget) return;
+    for (let i = 0; i < lines.length; i++) if (!feasible(gaps[i], M - sum[i])) return;
+    // an empty square in the line with fewest gaps
+    let best = -1, bl = 99;
+    for (let i = 0; i < lines.length; i++) if (gaps[i] && gaps[i] < bl) { bl = gaps[i]; best = i; }
+    if (best < 0) { done = true; return; }
+    const k = lines[best].find(q => !g[q]);
+    let vals = [];
+    if (bl === 1) { const v = M - sum[best]; if (v >= 1 && v <= NN && !used[v]) vals = [v]; }
+    else { for (let v = 1; v <= NN; v++) if (!used[v]) vals.push(v); for (let i = vals.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [vals[i], vals[j]] = [vals[j], vals[i]]; } }
+    for (const v of vals) { set(k, v, 1); go(); if (done) return; set(k, v, -1); }
+  };
+  go();
+  return done;
+}
+// The next number a person could put in by reasoning, on g (0 = empty). Returns [square, number, step, line] or
+// null. Step 1: a line with one gap takes what it's short of the total. Step 2: a square where only one number
+// left could still let every line through it reach the total (the line's other gaps filled with different
+// numbers left), or a number a line must have that only one of its squares can take. line: the line it's in.
+function magicStep(N, g) {
+  const M = N * (N * N + 1) / 2, NN = N * N, lines = magicLines(N), used = new Set(g.filter(Boolean)), left = [];
+  for (let v = 1; v <= NN; v++) if (!used.has(v)) left.push(v);
+  const sumOf = l => l.reduce((a, k) => a + g[k], 0);
+  for (let i = 0; i < lines.length; i++) {
+    const gaps = lines[i].filter(k => !g[k]);
+    if (gaps.length === 1) { const v = M - sumOf(lines[i]); if (v >= 1 && v <= NN && !used.has(v)) return [gaps[0], v, 1, i]; }
+  }
+  // can k different numbers from pool add up to r?
+  const canMake = (k, r, pool) => {
+    const go = (i, k, r) => k === 0 ? r === 0 : i < pool.length && r > 0 && (go(i + 1, k - 1, r - pool[i]) || go(i + 1, k, r));
+    return go(0, k, r);
+  };
+  const cand = new Map();
+  for (let k = 0; k < NN; k++) if (!g[k]) {
+    const mine = lines.filter(l => l.includes(k));
+    cand.set(k, left.filter(v => mine.every(l => canMake(l.filter(q => !g[q] && q !== k).length, M - sumOf(l) - v, left.filter(x => x !== v)))));
+  }
+  for (const [k, c] of cand) if (c.length === 1) return [k, c[0], 2, -1];
+  for (let i = 0; i < lines.length; i++) {
+    const gaps = lines[i].filter(k => !g[k]), r = M - sumOf(lines[i]);
+    for (const v of left) {
+      const where = gaps.filter(k => cand.get(k).includes(v));
+      if (where.length === 1 && !canMake(gaps.length, r, left.filter(x => x !== v))) return [where[0], v, 2, i];
+    }
+  }
+  return null;
+}
+// Whether a person could fill g by reasoning alone.
+function magicLogic(N, g) {
+  g = g.slice();
+  while (g.some(v => !v)) { const s = magicStep(N, g); if (!s) return false; g[s[0]] = s[1]; }
+  return true;
+}
+// A square for level n: {level, N, sol (the answer), given (the numbers up from the start, 0 for empty)}, or null.
+function makeSquare(n) {
+  const N = n + 2, sol = new Array(N * N).fill(0);
+  if (!magicFill(N, sol, 2e6)) return null;
+  const given = sol.slice();
+  for (const k of [...given.keys()].sort(() => Math.random() - .5)) { const v = given[k]; given[k] = 0; if (!magicLogic(N, given)) given[k] = v; }
+  return {level: n, N, sol, given};
+}
+
+/* ---------- game state ---------- */
+// game: {level, N, sol, given, put ({square: number} for the numbers you've put in), history (put before each
+//        change, for Undo), won, hinted, audited, undid…}
+// sel: the square picked (or -1); held: a number picked from the pad with no square picked.
+const STORE = "catdoku.magic.v1", MAX_LEVEL = 4, NS = "http://www.w3.org/2000/svg", CS = 64, PAD = 8, TOT = 46;
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1}, state.settings);
+let game = state.game || null, sel = -1, held = 0, running = false, mark = null, markTimer = 0;
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !running && !$("overlay").classList.contains("show");
+const levelName = n => `Level ${n} · ${n + 2} × ${n + 2}`;
+const el = (t, a, parent) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (parent) parent.append(e); return e; };
+const total = () => game.N * (game.N * game.N + 1) / 2;
+const valueAt = k => game.given[k] || game.put[k] || 0;
+const board = () => game.sol.map((_, k) => valueAt(k));
+const empties = () => game.sol.map((_, k) => k).filter(k => !valueAt(k));
+const usedNums = () => new Set(board().filter(Boolean));
+const markLive = () => mark && mark.when === JSON.stringify(game.put);
+
+/* ---------- drawing ---------- */
+// The tiles, with each line's total so far at its end: rows on the right, columns below, the diagonal from the
+// top left in the bottom right corner, and the one from the top right in the top right corner.
+function draw() {
+  const N = game.N, svg = $("svg"), x0 = PAD, y0 = PAD + TOT, w = x0 + N * CS + TOT + PAD, h = y0 + N * CS + TOT + PAD;
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  svg.innerHTML = "";
+  const lines = magicLines(N), M = total(), selLines = sel >= 0 ? lines.filter(l => l.includes(sel)) : [];
+  // the diagonals, faintly, out to their totals
+  el("line", {class: "diag", x1: x0 + 4, y1: y0 + 4, x2: x0 + N * CS + TOT * .55, y2: y0 + N * CS + TOT * .55}, svg);
+  el("line", {class: "diag", x1: x0 + N * CS + TOT * .55, y1: y0 - TOT * .55, x2: x0 + 4, y2: y0 + N * CS - 4}, svg);
+  for (let k = 0; k < N * N; k++) {
+    const r = Math.floor(k / N), c = k % N, x = x0 + c * CS, y = y0 + r * CS, v = valueAt(k), mine = !game.given[k];
+    const g = el("g", {"data-k": k}, svg);
+    let cls = "cellbg";
+    if (mine && v) cls += " mine";
+    if (mine && selLines.some(l => l.includes(k)) && k !== sel) cls += " line";
+    if (k === sel) cls += " sel";
+    el("rect", {class: cls, x: x + 2, y: y + 2, width: CS - 4, height: CS - 4, rx: 9}, g);
+    if (v) el("text", {class: "num" + (mine ? " mine" : ""), x: x + CS / 2, y: y + CS / 2 + 1, "font-size": N > 5 ? 26 : 30}, g).textContent = v;
+  }
+  // totals: grey while a line has gaps, green once it's full and right, red if it's full and wrong or already over
+  lines.forEach((l, i) => {
+    const s = l.reduce((a, k) => a + valueAt(k), 0), full = l.every(k => valueAt(k));
+    let x, y;
+    if (i < N) { x = x0 + N * CS + TOT / 2; y = y0 + i * CS + CS / 2; }
+    else if (i < 2 * N) { x = x0 + (i - N) * CS + CS / 2; y = y0 + N * CS + TOT / 2; }
+    else if (i === 2 * N) { x = x0 + N * CS + TOT / 2; y = y0 + N * CS + TOT / 2; }
+    else { x = x0 + N * CS + TOT / 2; y = y0 - TOT / 2; }
+    el("text", {class: "tot" + (full ? (s === M ? " ok" : " bad") : s > M ? " bad" : ""), x, y}, svg).textContent = s;
+  });
+  if (markLive()) for (const [k, bad] of mark.sq) {
+    const r = Math.floor(k / N), c = k % N;
+    el("rect", {class: "hintsq" + (bad ? " bad" : ""), x: x0 + c * CS, y: y0 + r * CS, width: CS, height: CS, rx: 11}, svg);
+  } else mark = null;
+  drawPad();
+  update();
+}
+// The pad: 1 to N², the ones already in the square faded.
+function drawPad() {
+  const pad = $("pad"), NN = game.N * game.N, used = usedNums(), cols = game.N <= 3 ? 9 : game.N === 4 ? 8 : 9;
+  if (pad.children.length !== NN) {
+    pad.innerHTML = "";
+    pad.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    for (let v = 1; v <= NN; v++) { const b = document.createElement("button"); b.type = "button"; b.textContent = v; b.dataset.v = v; pad.append(b); }
+  }
+  for (const b of pad.children) {
+    const v = +b.dataset.v;
+    b.classList.toggle("used", used.has(v)); b.classList.toggle("held", held === v);
+    b.classList.toggle("hinted", !!(markLive() && mark.num === v));
+  }
+}
+function update() {
+  const left = empties().length;
+  $("count").textContent = game.won ? `Every line adds up to ${total()}!` : `Every line adds up to ${total()} · ${left} to go`;
+  $("undoBtn").disabled = !game.history.length || game.won;
+  $("restartBtn").disabled = !Object.keys(game.put).length || game.won;
+  $("hintBtn").disabled = $("auditBtn").disabled = game.won;
+}
+
+/* ---------- playing ---------- */
+// Put number v in square k: a number of yours there goes back on the pad, and if v was in another square of yours,
+// it moves. Then the next empty square along the row (or anywhere after) is picked.
+function place(v, k) {
+  if (!playing() || game.given[k]) return;
+  if (game.put[k] === v) { sel = k; held = 0; draw(); return; }
+  if (game.given.includes(v)) return shake(`The ${v} is already in the square.`);
+  game.history.push({...game.put});
+  for (const q in game.put) if (game.put[q] === v) delete game.put[q];
+  game.put[k] = v; game.started = true; held = 0;
+  const e = empties();
+  sel = e.find(q => q > k) !== undefined ? e.find(q => q > k) : e.length ? e[0] : -1;
+  afterMove();
+}
+function takeOut(k) {
+  if (!playing() || !game.put[k]) return;
+  game.history.push({...game.put});
+  delete game.put[k]; game.started = true; sel = k;
+  afterMove();
+}
+function afterMove() {
+  save();
+  if (!empties().length) {
+    const M = total(), bad = magicLines(game.N).filter(l => l.reduce((a, k) => a + valueAt(k), 0) !== M).length;
+    if (!bad) { draw(); return win(); }
+    G.note(`The square's full, but ${bad} line${bad > 1 ? "s don't" : " doesn't"} add up to ${M}.`, 5000);
+  }
+  draw();
+}
+function shake(why) {
+  G.note(why, 3000);
+  const b = $("board"); b.classList.remove("shake"); b.getBoundingClientRect(); b.classList.add("shake");
+}
+// Tap an empty square (or one of yours) to pick it; tap yours again to take its number out. With a number picked
+// from the pad first, a tap puts it there.
+function tapSquare(k) {
+  if (!playing() || game.given[k]) return;
+  game.started = true;
+  if (held) return place(held, k);
+  if (sel === k && game.put[k]) return takeOut(k);
+  sel = k; draw();
+}
+// Tap a number: it goes in the picked square, or, with none picked, it's picked up (tap again to put it down).
+function tapNumber(v) {
+  if (!playing()) return;
+  game.started = true;
+  if (game.given.includes(v)) return G.note(`The ${v} is already in the square.`, 2500);
+  if (sel >= 0) return place(v, sel);
+  held = held === v ? 0 : v;
+  if (held) G.note(`Now tap a square for the ${v}.`, 2500);
+  draw();
+}
+$("svg").addEventListener("pointerdown", e => { const g = e.target.closest("[data-k]"); if (g) { e.preventDefault(); tapSquare(+g.dataset.k); } });
+$("pad").addEventListener("click", e => { const b = e.target.closest("button[data-v]"); if (b) tapNumber(+b.dataset.v); });
+
+// Keys: digits type a number into the picked square (two digits in quick succession make 10 to 36), Backspace
+// takes one out, arrows move.
+let typed = "", typedAt = 0, typedK = -1;
+document.addEventListener("keydown", e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } return; }
+  if (!playing() || document.querySelector(".spot") || /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
+  const N = game.N, k = e.key;
+  if (/^[0-9]$/.test(k)) {
+    e.preventDefault(); game.started = true;
+    if (sel < 0) { const em = empties(); if (!em.length) return; sel = em[0]; }
+    // a second digit soon after the first turns the number just put in into a two-digit one
+    const now = Date.now(), two = typed && now - typedAt < 900 && +(typed + k) <= N * N;
+    if (two) { place(+(typed + k), typedK); typed = ""; return; }
+    typed = +k * 10 <= N * N ? k : ""; typedAt = now; typedK = sel;
+    if (+k >= 1) place(+k, sel);
+  } else if (k === "Backspace" || k === "Delete") {
+    e.preventDefault(); if (sel >= 0 && game.put[sel]) takeOut(sel);
+  } else if (k.startsWith("Arrow")) {
+    e.preventDefault(); game.started = true;
+    if (sel < 0) { sel = empties()[0] ?? 0; draw(); return; }
+    const [dr, dc] = {ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1]}[k];
+    const r = Math.floor(sel / N) + dr, c = sel % N + dc;
+    if (r >= 0 && c >= 0 && r < N && c < N) { sel = r * N + c; draw(); }
+  } else if (k === "Escape") { sel = -1; held = 0; draw(); }
+});
+
+function undo() {
+  if (!playing() || !game.history.length) return;
+  game.undid = true; game.put = game.history.pop(); held = 0;
+  draw(); save();
+}
+$("undoBtn").onclick = undo;
+$("restartBtn").onclick = () => {
+  if (!playing() || !Object.keys(game.put).length) return;
+  game.undid = true; game.history.push({...game.put}); game.put = {}; sel = -1; held = 0;
+  draw(); save();
+  G.note("All your numbers are out. Undo puts them back.", 4000);
+};
+// Hint: a number in the wrong square gets a red box; otherwise the next number reasoning gives, in gold, its square
+// picked and its number gold on the pad, and why.
+function showMark(m, ms = 5000) {
+  clearTimeout(markTimer); mark = m; draw();
+  markTimer = setTimeout(() => { mark = null; if (game) draw(); }, ms);
+}
+$("hintBtn").onclick = () => {
+  if (!playing()) return;
+  game.hinted = true; game.started = true; save();
+  const wrong = Object.keys(game.put).map(Number).filter(k => game.put[k] !== game.sol[k]);
+  if (wrong.length) {
+    sel = wrong[0]; held = 0;
+    G.note(`The ${game.put[wrong[0]]} doesn't go there. Take it out and try another number.`, 5000);
+    return showMark({when: JSON.stringify(game.put), sq: [[wrong[0], true]]});
+  }
+  const s = magicStep(game.N, board()), k = s ? s[0] : empties()[0], v = game.sol[k];
+  const names = ["row", "column"], L = s && s[3] >= 0 ? (s[3] < 2 * game.N ? names[Math.floor(s[3] / game.N)] : "diagonal") : "";
+  const why = !s ? "" : s[2] === 1 ? `: it's what this ${L} is short of ${total()}` : L ? `: this ${L} needs it, and no other square in it can take it` : `: it's the only number left that lets every line through here reach ${total()}`;
+  sel = k; held = 0;
+  G.note(`The ${v} goes in the gold square${why}.`, 6000);
+  showMark({when: JSON.stringify(game.put), sq: [[k, false]], num: v});
+};
+// Audit: every number of yours in the wrong square gets a red box.
+$("auditBtn").onclick = () => {
+  if (!playing()) return;
+  if (!Object.keys(game.put).length) return G.note("Put some numbers in first, then Audit checks them.", 3500);
+  game.audited = true; game.started = true; save();
+  const wrong = Object.keys(game.put).map(Number).filter(k => game.put[k] !== game.sol[k]);
+  G.note(!wrong.length ? "Every number you've put in is in the right square." : `${wrong.length} number${wrong.length > 1 ? "s are" : " is"} in the wrong square.`, 5000);
+  if (wrong.length) showMark({when: JSON.stringify(game.put), sq: wrong.map(k => [k, true])}); else draw();
+};
+
+/* ---------- endings ---------- */
+function win() {
+  game.won = true; G.finishClock(game); mark = null; sel = -1; held = 0;
+  const helped = game.hinted || game.audited, next = helped ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save();
+  draw();
+  $("board").classList.add("won");
+  G.track(`Magic Square solved level ${game.level}`);
+  squares.prefetch(next);
+  running = true;
+  const g = game;
+  setTimeout(() => { running = false; $("board").classList.remove("won"); if (game === g) finishCard(); }, matchMedia("(prefers-reduced-motion: reduce)").matches ? 400 : 1000);
+}
+function finishCard() {
+  const next = settings.level, gold = !game.undid && !game.hinted && !game.audited;
+  let text = `Every row, column and diagonal adds up to ${total()}.`;
+  text += game.hinted || game.audited ? ` You had ${game.hinted ? "a hint" : "an audit"}, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the biggest square; here's another." : ` Next up: level ${next}.`;
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my square", game.result,
+    {title: "Magic!", gold, goldWhy: "No hints, audits or undos!", next: `Next: level ${next}`,
+     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- new squares ---------- */
+const squares = G.builder([magicLines, magicFill, magicStep, magicLogic, makeSquare], "makeSquare");
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
+function begin(p, level) {
+  game = {level, N: p.N, sol: p.sol, given: p.given, put: {}, history: [], won: false, hinted: false, audited: false, undid: false, ...G.freshClock()};
+  sel = -1; held = 0; mark = null;
+}
+let asking = 0;
+function newPuzzle() {
+  G.closeCard();
+  const n = settings.level, ask = ++asking;
+  squares.take(n).then(p => {
+    if (ask !== asking) return;
+    G.note("");
+    begin(p, n); draw(); save();
+    squares.prefetch(n);
+    G.track(`Magic Square new puzzle level ${n}`);
+    helpOnFirstVisit();
+  });
+}
+
+/* ---------- sharing ---------- */
+// A square travels as its answer and which numbers start in it; progress as your numbers ("-" for none).
+$("shareBtn").onclick = () => { if (game) G.shareCard({name: "Magic Square", won: game.won,
+  puzzle: () => ({g: "magic", N: game.level, s: game.sol.join("."), v: game.given.map(v => v ? 1 : 0).join("")}),
+  progress: () => game.sol.map((_, k) => game.put[k] || "-").join(".")}); };
+// An answer that's a magic square of the level's size, and givens that leave just one way to finish it.
+function validSquare(level, sol, given) {
+  const N = level + 2, M = N * (N * N + 1) / 2;
+  if (!Array.isArray(sol) || sol.length !== N * N || new Set(sol).size !== N * N || sol.some(v => !(v >= 1 && v <= N * N))) return false;
+  if (!magicLines(N).every(l => l.reduce((a, k) => a + sol[k], 0) === M)) return false;
+  return Array.isArray(given) && given.length === N * N && given.every((v, k) => v === 0 || v === sol[k]) && magicLogic(N, given);
+}
+function openShared(d) {
+  const fail = () => G.note("That share link didn't work.", 5000);
+  if (!(d.N >= 1 && d.N <= MAX_LEVEL) || typeof d.s !== "string" || typeof d.v !== "string") return fail();
+  const sol = d.s.split(".").map(Number), given = sol.map((v, k) => d.v[k] === "1" ? v : 0);
+  if (!validSquare(d.N, sol, given)) return fail();
+  begin({N: d.N + 2, sol, given}, d.N);
+  if (typeof d.p === "string") {
+    const p = d.p.split("."), put = {};
+    if (p.length === sol.length && p.every((x, k) => x === "-" || (!given[k] && +x >= 1 && +x <= sol.length))) {
+      p.forEach((x, k) => { if (x !== "-") put[k] = +x; });
+      if (new Set(Object.values(put)).size === Object.keys(put).length && Object.keys(put).length) { game.put = put; game.timed = false; }
+    }
+  }
+  settings.level = d.N; $("levelSel").value = d.N;
+  draw(); save();
+}
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  if (game && game.won) return G.helpLater();
+  settings.seenHelp = false; helpOnFirstVisit();
+}
+// The tiles, in page pixels.
+function map() {
+  const r = $("svg").getBoundingClientRect(), vb = $("svg").viewBox.baseVal, k = r.width / vb.width;
+  return {ox: r.left + PAD * k, oy: r.top + (PAD + TOT) * k, cw: CS * k, ch: CS * k};
+}
+function helpOnFirstVisit() {
+  if (!game || !playing() || document.querySelector(".spot") || settings.seenHelp) return;
+  const N = game.N, row = [...Array(N)].map((_, c) => [c, 0]), col = [...Array(N)].map((_, r) => [0, r]), diag = [...Array(N)].map((_, i) => [i, i]);
+  const gap = empties()[0];
+  const steps = [
+    {say: `Put in the numbers 1 to ${N * N}, once each`, els: [$("pad")]},
+    {say: `Every row must add up to ${total()}`, lit: row, tone: "ok"},
+    {say: "So must every column", lit: col, tone: "ok"},
+    {say: "And both long diagonals", lit: diag, tone: "ok"},
+    {say: "Each line's total so far is at its end", lit: row},
+  ];
+  if (gap !== undefined) steps.push({say: "Tap a square, then a number", lit: [[gap % N, Math.floor(gap / N)]]});
+  steps.push(
+    {say: "Tap your number twice to take it out", lit: [...Array(N * N).keys()].filter(k => !game.given[k]).map(k => [k % N, Math.floor(k / N)]), outline: []},
+    {say: "Audit marks any number in the wrong square", els: [$("auditBtn")]},
+    {say: "Stuck? Hint shows where a number goes", els: [$("hintBtn")]},
+  );
+  G.spotlight({grid: $("grid"), w: N, h: N, steps, map, done: () => { settings.seenHelp = true; save(); }});
+}
+
+/* ---------- start ---------- */
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", ""), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
+$("helpBtn").onclick = showHelp;
+
+G.nav("magic");
+G.checkClock(game);
+G.setupTimer({name: "magic", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+
+const shared = G.readShare("magic");
+if (game) G.reopen(() => {
+    if (!(game.level >= 1 && game.level <= MAX_LEVEL) || game.N !== game.level + 2 || !validSquare(game.level, game.sol, game.given) || typeof game.put !== "object" || !Array.isArray(game.history)) throw new Error("the saved square doesn't fit its level");
+    draw();
+    if (game.won) finishCard(); else helpOnFirstVisit();
+  }, why => { game = null; newPuzzle(); G.note(why, 0); });
+else if (!shared) newPuzzle();
+const shareOpts = () => ({name: "Magic Square", inProgress: !!(game && !game.won && Object.keys(game.put).length), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, shareOpts());
+window.addEventListener("hashchange", () => { const d = G.readShare("magic"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
