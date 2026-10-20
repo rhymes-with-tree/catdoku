@@ -635,10 +635,28 @@ def magnets():
     return frame("#ECEEE7", out)
 
 
+# Purrfect Square: a 3 x 3 magic square (2 7 6, 9 5 1, 4 3 8) with one square still a paw print, and gold paws at
+# the ends of the rows that add up.
+def purrfect():
+    out, s, x0, y0 = "", 20, 14, 22
+    nums = [2, 7, 6, 9, 5, 1, 4, 3, 0]
+    for k, v in enumerate(nums):
+        x, y = x0 + k % 3 * s, y0 + k // 3 * s
+        out += f'<rect x="{x+1}" y="{y+1}" width="{s-2}" height="{s-2}" rx="3.5" fill="{"#FBFAF5" if v else tint(TEAL, .25)}" stroke="{INK}" stroke-width="2"/>'
+        out += text(x + s / 2, y + s / 2 + .5, v, 13) if v else text(x + s / 2, y + s / 2 + .5, "\U0001F43E", 10)
+    for r in (0, 1):
+        cx, cy, f = x0 + 3 * s + 11, y0 + r * s + s / 2, .17
+        out += f'<g transform="translate({cx - 50 * f} {cy - 43 * f}) scale({f})" fill="{YELLOW}" stroke="{INK}" stroke-width="2">'
+        out += "".join(f'<ellipse cx="{a}" cy="{b}" rx="9.5" ry="10.75" transform="rotate({t} {a} {b})" vector-effect="non-scaling-stroke"/>' for a, b, t in [(16.5, 30.5, -24), (38.5, 15, -8), (61.5, 15, 8), (83.5, 30.5, 24)])
+        out += '<path d="M100 6 C126 6 141 28 153 46 C172 50 197 70 195 101 C193 133 166 147 140 141 C125 138 112 131 100 131 C88 131 75 138 60 141 C34 147 7 133 5 101 C3 70 28 50 47 46 C59 28 74 6 100 6Z" transform="translate(19 35.3) scale(.31 .298)" vector-effect="non-scaling-stroke"/></g>'
+    out += text(x0 + 3 * s + 11, y0 + 2 * s + s / 2, "7", 12, "#8A8494")
+    return frame(PAPER, out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")
