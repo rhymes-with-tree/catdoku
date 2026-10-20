@@ -32,24 +32,24 @@
 :root{--pc:#F2AEBB;--pt:#2A2530}
 .square{display:flex;flex-direction:column;gap:10px;width:var(--board);height:auto;touch-action:manipulation;user-select:none;-webkit-user-select:none;outline:none}
 .square svg{display:block;width:100%;height:auto;max-height:calc(var(--tall) - 230px);margin:0 auto}
-.bean{fill:#FBFAF5;stroke:#2A2530;stroke-width:3;transition:fill .25s}
-.bean.mine{fill:#E3EEEF}
-.bean.line{fill:#D9E8EA}
-.bean.sel{fill:#FFF0C2;stroke:#ECA818;stroke-width:4.5}
+.tile{fill:#FBFAF5;stroke:#2A2530;stroke-width:2.5;transition:fill .25s}
+.tile.mine{fill:#E3EEEF}
+.tile.line{fill:#D9E8EA}
+.tile.sel{fill:#FFF0C2;stroke:#ECA818;stroke-width:4}
+.prints{font-size:26px;text-anchor:middle;dominant-baseline:central;opacity:.3;pointer-events:none}
 .num{font:800 28px var(--font);text-anchor:middle;dominant-baseline:central;fill:#2A2530;pointer-events:none;font-variant-numeric:tabular-nums}
 .num.mine{fill:#4E577D}
-.mainpad{fill:none;stroke:#C9C6CE;stroke-width:2.2;transition:fill .25s}
-.mainpad.ok{fill:rgba(106,166,115,.18);stroke:#6AA673}
-.mainpad.bad{stroke:#C8392B}
-.tot{font:700 18px var(--font);text-anchor:middle;dominant-baseline:central;fill:#8A8494;font-variant-numeric:tabular-nums}
-.tot.ok{fill:#4F8A58}
+/* each line's total on a paw: outlined while it's short, gold once the line adds up, red if it's over or wrong */
+.paw ellipse,.paw path{fill:#FBFAF5;stroke:#2A2530;stroke-width:2;transition:fill .25s}
+.paw.ok ellipse,.paw.ok path{fill:#ECA818}
+.paw.bad ellipse,.paw.bad path{stroke:#C8392B}
+.tot{font:800 17px var(--font);text-anchor:middle;dominant-baseline:central;fill:#5E5866;font-variant-numeric:tabular-nums}
+.tot.ok{fill:#2A2530}
 .tot.bad{fill:#C8392B}
 .diag{stroke:#C9C6CE;stroke-width:2;stroke-dasharray:3 5}
 [data-k]{cursor:pointer}
-.solved .bean,.solved .mainpad{fill:var(--pc);stroke:#2A2530}
-.solved .num,.solved .tot{fill:var(--pt)}
-.solved.goldpaw .bean,.solved.goldpaw .mainpad{fill:#ECA818}
-.solved.goldpaw .num,.solved.goldpaw .tot{fill:#2A2530}
+.solved .tile{fill:var(--pc)}
+.solved .num{fill:var(--pt)}
 /* the numbers, used ones faded */
 .pad{display:grid;gap:5px}
 .pad button{padding:0;aspect-ratio:1.25;font-weight:800;font-size:19px;border-radius:999px;font-variant-numeric:tabular-nums}
@@ -190,8 +190,9 @@ function makeSquare(n) {
 // game: {level, N, sol, given, put ({square: number} for the numbers you've put in), history (put before each
 //        change, for Undo), won, hinted, audited, undid…}
 // sel: the square picked (or -1); held: a number picked from the pad with no square picked.
-const STORE = "catdoku.purrfect.v1", MAX_LEVEL = 4, NS = "http://www.w3.org/2000/svg", CS = 64, PAD = 8, TOT = 58;
-// Toe Beans' main pad shape (200 wide, 6 to 147 tall), and the paw pad colours a square can have (with text on them)
+const STORE = "catdoku.purrfect.v1", MAX_LEVEL = 4, NS = "http://www.w3.org/2000/svg", CS = 64, PAD = 8, TOT = 64;
+// Toe Beans' main pad shape (200 wide, 6 to 147 tall; on a paw 100 wide it sits at (19, 35.3) at .31 × .298, under
+// four toe beans, as on the win card's gold paw), and the paw pad colours a square can have (with text on them)
 const MAINPAD = "M100 6 C126 6 141 28 153 46 C172 50 197 70 195 101 C193 133 166 147 140 141 C125 138 112 131 100 131 C88 131 75 138 60 141 C34 147 7 133 5 101 C3 70 28 50 47 46 C59 28 74 6 100 6Z";
 const PADS = [["#F2AEBB", "#2A2530"], ["#C9677F", "#fff"], ["#B9805F", "#fff"], ["#6B4A3B", "#fff"], ["#8E8794", "#fff"], ["#2A2530", "#fff"]];
 const $ = G.$;
@@ -223,14 +224,15 @@ function draw() {
   for (let k = 0; k < N * N; k++) {
     const r = Math.floor(k / N), c = k % N, x = x0 + c * CS, y = y0 + r * CS, v = valueAt(k), mine = !game.given[k];
     const g = el("g", {"data-k": k}, svg);
-    let cls = "bean";
+    let cls = "tile";
     if (mine && v) cls += " mine";
     if (mine && selLines.some(l => l.includes(k)) && k !== sel) cls += " line";
     if (k === sel) cls += " sel";
-    el("ellipse", {class: cls, cx: x + CS / 2, cy: y + CS / 2, rx: CS * .42, ry: CS * .45}, g);
+    el("rect", {class: cls, x: x + 2, y: y + 2, width: CS - 4, height: CS - 4, rx: 9}, g);
+    if (!v) el("text", {class: "prints", x: x + CS / 2, y: y + CS / 2 + 1}, g).textContent = "🐾";
     if (v) el("text", {class: "num" + (mine ? " mine" : ""), x: x + CS / 2, y: y + CS / 2 + 1, "font-size": N > 5 ? 25 : 28}, g).textContent = v;
   }
-  // totals: grey while a line has gaps, green once it's full and right, red if it's full and wrong or already over
+  // totals, each on a paw: gold once the line is full and adds up, red if it's full and wrong or already over
   lines.forEach((l, i) => {
     const s = l.reduce((a, k) => a + valueAt(k), 0), full = l.every(k => valueAt(k));
     let x, y;
@@ -238,12 +240,14 @@ function draw() {
     else if (i < 2 * N) { x = x0 + (i - N) * CS + CS / 2; y = y0 + N * CS + TOT / 2; }
     else if (i === 2 * N) { x = x0 + N * CS + TOT / 2; y = y0 + N * CS + TOT / 2; }
     else { x = x0 + N * CS + TOT / 2; y = y0 - TOT / 2; }
-    const st = full ? (s === M ? " ok" : " bad") : s > M ? " bad" : "", pw = TOT * .9, ph = pw * .72;
-    el("path", {class: "mainpad" + st, d: MAINPAD, transform: `translate(${x - pw / 2} ${y - ph / 2 - pw * .02}) scale(${pw / 200})`, "vector-effect": "non-scaling-stroke"}, svg);
-    el("text", {class: "tot" + st, x, y: y + ph * .12}, svg).textContent = s;
+    const st = full ? (s === M ? " ok" : " bad") : s > M ? " bad" : "", f = TOT * .9 / 100;
+    const paw = el("g", {class: "paw" + st, transform: `translate(${x - 50 * f} ${y - 46 * f}) scale(${f})`}, svg);
+    for (const [cx, cy, a] of [[16.5, 30.5, -24], [38.5, 15, -8], [61.5, 15, 8], [83.5, 30.5, 24]])
+      el("ellipse", {cx, cy, rx: 9.5, ry: 10.75, transform: `rotate(${a} ${cx} ${cy})`, "vector-effect": "non-scaling-stroke"}, paw);
+    el("path", {d: MAINPAD, transform: "translate(19 35.3) scale(.31 .298)", "vector-effect": "non-scaling-stroke"}, paw);
+    el("text", {class: "tot" + st, x, y: y + 16 * f}, svg).textContent = s;
   });
   svg.classList.toggle("solved", !!game.won);
-  svg.classList.toggle("goldpaw", !!(game.won && !game.undid && !game.hinted && !game.audited));
   $("board").style.setProperty("--pc", game.pc[0]); $("board").style.setProperty("--pt", game.pc[1]);
   if (markLive()) for (const [k, bad] of mark.sq) {
     const r = Math.floor(k / N), c = k % N;
@@ -491,7 +495,8 @@ function helpOnFirstVisit() {
     {say: `Every row must add up to ${total()}`, lit: row, tone: "ok"},
     {say: "So must every column", lit: col, tone: "ok"},
     {say: "And both long diagonals", lit: diag, tone: "ok"},
-    {say: "Each line's total so far is on the pad at its end", lit: row},
+    {say: "Its total so far is on the paw at its end", lit: row},
+    {say: "The paw turns gold when the line adds up", lit: row},
   ];
   if (gap !== undefined) steps.push({say: "Tap a square, then a number", lit: [[gap % N, Math.floor(gap / N)]]});
   steps.push(
