@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Magic Square</title>
+<title>Purrfect Square</title>
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
@@ -25,27 +25,34 @@
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../games.css?v=2026-10-19.1">
 <style>
-/* A square of tiles: every row, column and long diagonal adds up to the same total. Each line's total so far is
-   at its end (rows on the right, columns below, the diagonals in the corners), and the numbers 1 to N² are on a
-   pad below, each used once. A plain look for now, until the game has its theme. */
+/* A magic square of toe beans: every row, column and long diagonal adds up to the same total. Each bean holds a
+   number, 1 to N² once each, and each line's total so far is on a main pad at its end (rows on the right, columns
+   below, the diagonals in the corners). The numbers are on a pad below. Solved, every bean fills with the square's
+   own pad colour (--pc, with --pt for text on it), or gold for a gold paw. */
+:root{--pc:#F2AEBB;--pt:#2A2530}
 .square{display:flex;flex-direction:column;gap:10px;width:var(--board);height:auto;touch-action:manipulation;user-select:none;-webkit-user-select:none;outline:none}
 .square svg{display:block;width:100%;height:auto;max-height:calc(var(--tall) - 230px);margin:0 auto}
-.cellbg{fill:#FBFAF5;stroke:#2A2530;stroke-width:2.5}
-.cellbg.mine{fill:#E3EEEF}
-.cellbg.line{fill:#D3E5E7}
-.cellbg.sel{fill:#FFF0C2;stroke:#ECA818;stroke-width:4}
-.num{font:800 30px var(--font);text-anchor:middle;dominant-baseline:central;fill:#2A2530;pointer-events:none}
+.bean{fill:#FBFAF5;stroke:#2A2530;stroke-width:3;transition:fill .25s}
+.bean.mine{fill:#E3EEEF}
+.bean.line{fill:#D9E8EA}
+.bean.sel{fill:#FFF0C2;stroke:#ECA818;stroke-width:4.5}
+.num{font:800 28px var(--font);text-anchor:middle;dominant-baseline:central;fill:#2A2530;pointer-events:none;font-variant-numeric:tabular-nums}
 .num.mine{fill:#4E577D}
-.tot{font:700 19px var(--font);text-anchor:middle;dominant-baseline:central;fill:#8A8494;font-variant-numeric:tabular-nums}
+.mainpad{fill:none;stroke:#C9C6CE;stroke-width:2.2;transition:fill .25s}
+.mainpad.ok{fill:rgba(106,166,115,.18);stroke:#6AA673}
+.mainpad.bad{stroke:#C8392B}
+.tot{font:700 18px var(--font);text-anchor:middle;dominant-baseline:central;fill:#8A8494;font-variant-numeric:tabular-nums}
 .tot.ok{fill:#4F8A58}
 .tot.bad{fill:#C8392B}
-.diag{stroke:#C9C6CE;stroke-width:2;stroke-dasharray:3 4}
+.diag{stroke:#C9C6CE;stroke-width:2;stroke-dasharray:3 5}
 [data-k]{cursor:pointer}
-.won .num{animation:hop .4s ease-in-out 2 alternate}
-@keyframes hop{to{transform:translateY(-4px)}}
+.solved .bean,.solved .mainpad{fill:var(--pc);stroke:#2A2530}
+.solved .num,.solved .tot{fill:var(--pt)}
+.solved.goldpaw .bean,.solved.goldpaw .mainpad{fill:#ECA818}
+.solved.goldpaw .num,.solved.goldpaw .tot{fill:#2A2530}
 /* the numbers, used ones faded */
 .pad{display:grid;gap:5px}
-.pad button{padding:0;aspect-ratio:1.25;font-weight:800;font-size:19px;border-radius:9px;font-variant-numeric:tabular-nums}
+.pad button{padding:0;aspect-ratio:1.25;font-weight:800;font-size:19px;border-radius:999px;font-variant-numeric:tabular-nums}
 .pad button.used{opacity:.25;cursor:default}
 .pad button.held{background:#FFF6DA;box-shadow:inset 0 0 0 3px #ECA818}
 .pad button.hinted{color:#B07A0A;background:#FFF6DA;box-shadow:inset 0 0 0 3px #ECA818}
@@ -55,13 +62,13 @@
 </head>
 <body>
 <main>
-  <header><div class="title"><h1>Magic Square</h1></div><div class="stripe"></div><p class="tagline">Make every row, column and diagonal add up the same</p></header>
+  <header><div class="title"><h1>Purrfect Square</h1></div><div class="stripe"></div><p class="tagline">Make every row, column and diagonal add up the same</p></header>
   <nav class="games" id="games" aria-label="Games"></nav>
 
   <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
 
   <div class="wrap square" id="board" tabindex="0">
-    <div id="grid"><svg id="svg" role="img" aria-label="A magic square"></svg></div>
+    <div id="grid"><svg id="svg" role="img" aria-label="A square of toe beans"></svg></div>
     <div class="pad" id="pad" aria-label="Numbers"></div>
   </div>
   <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
@@ -183,7 +190,10 @@ function makeSquare(n) {
 // game: {level, N, sol, given, put ({square: number} for the numbers you've put in), history (put before each
 //        change, for Undo), won, hinted, audited, undid…}
 // sel: the square picked (or -1); held: a number picked from the pad with no square picked.
-const STORE = "catdoku.magic.v1", MAX_LEVEL = 4, NS = "http://www.w3.org/2000/svg", CS = 64, PAD = 8, TOT = 46;
+const STORE = "catdoku.purrfect.v1", MAX_LEVEL = 4, NS = "http://www.w3.org/2000/svg", CS = 64, PAD = 8, TOT = 58;
+// Toe Beans' main pad shape (200 wide, 6 to 147 tall), and the paw pad colours a square can have (with text on them)
+const MAINPAD = "M100 6 C126 6 141 28 153 46 C172 50 197 70 195 101 C193 133 166 147 140 141 C125 138 112 131 100 131 C88 131 75 138 60 141 C34 147 7 133 5 101 C3 70 28 50 47 46 C59 28 74 6 100 6Z";
+const PADS = [["#F2AEBB", "#2A2530"], ["#C9677F", "#fff"], ["#B9805F", "#fff"], ["#6B4A3B", "#fff"], ["#8E8794", "#fff"], ["#2A2530", "#fff"]];
 const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1}, state.settings);
@@ -200,7 +210,7 @@ const usedNums = () => new Set(board().filter(Boolean));
 const markLive = () => mark && mark.when === JSON.stringify(game.put);
 
 /* ---------- drawing ---------- */
-// The tiles, with each line's total so far at its end: rows on the right, columns below, the diagonal from the
+// The beans, with each line's total so far on a main pad at its end: rows on the right, columns below, the diagonal from the
 // top left in the bottom right corner, and the one from the top right in the top right corner.
 function draw() {
   const N = game.N, svg = $("svg"), x0 = PAD, y0 = PAD + TOT, w = x0 + N * CS + TOT + PAD, h = y0 + N * CS + TOT + PAD;
@@ -213,12 +223,12 @@ function draw() {
   for (let k = 0; k < N * N; k++) {
     const r = Math.floor(k / N), c = k % N, x = x0 + c * CS, y = y0 + r * CS, v = valueAt(k), mine = !game.given[k];
     const g = el("g", {"data-k": k}, svg);
-    let cls = "cellbg";
+    let cls = "bean";
     if (mine && v) cls += " mine";
     if (mine && selLines.some(l => l.includes(k)) && k !== sel) cls += " line";
     if (k === sel) cls += " sel";
-    el("rect", {class: cls, x: x + 2, y: y + 2, width: CS - 4, height: CS - 4, rx: 9}, g);
-    if (v) el("text", {class: "num" + (mine ? " mine" : ""), x: x + CS / 2, y: y + CS / 2 + 1, "font-size": N > 5 ? 26 : 30}, g).textContent = v;
+    el("ellipse", {class: cls, cx: x + CS / 2, cy: y + CS / 2, rx: CS * .42, ry: CS * .45}, g);
+    if (v) el("text", {class: "num" + (mine ? " mine" : ""), x: x + CS / 2, y: y + CS / 2 + 1, "font-size": N > 5 ? 25 : 28}, g).textContent = v;
   }
   // totals: grey while a line has gaps, green once it's full and right, red if it's full and wrong or already over
   lines.forEach((l, i) => {
@@ -228,8 +238,13 @@ function draw() {
     else if (i < 2 * N) { x = x0 + (i - N) * CS + CS / 2; y = y0 + N * CS + TOT / 2; }
     else if (i === 2 * N) { x = x0 + N * CS + TOT / 2; y = y0 + N * CS + TOT / 2; }
     else { x = x0 + N * CS + TOT / 2; y = y0 - TOT / 2; }
-    el("text", {class: "tot" + (full ? (s === M ? " ok" : " bad") : s > M ? " bad" : ""), x, y}, svg).textContent = s;
+    const st = full ? (s === M ? " ok" : " bad") : s > M ? " bad" : "", pw = TOT * .9, ph = pw * .72;
+    el("path", {class: "mainpad" + st, d: MAINPAD, transform: `translate(${x - pw / 2} ${y - ph / 2 - pw * .02}) scale(${pw / 200})`, "vector-effect": "non-scaling-stroke"}, svg);
+    el("text", {class: "tot" + st, x, y: y + ph * .12}, svg).textContent = s;
   });
+  svg.classList.toggle("solved", !!game.won);
+  svg.classList.toggle("goldpaw", !!(game.won && !game.undid && !game.hinted && !game.audited));
+  $("board").style.setProperty("--pc", game.pc[0]); $("board").style.setProperty("--pt", game.pc[1]);
   if (markLive()) for (const [k, bad] of mark.sq) {
     const r = Math.floor(k / N), c = k % N;
     el("rect", {class: "hintsq" + (bad ? " bad" : ""), x: x0 + c * CS, y: y0 + r * CS, width: CS, height: CS, rx: 11}, svg);
@@ -391,7 +406,7 @@ function win() {
   settings.level = next; $("levelSel").value = next; save();
   draw();
   $("board").classList.add("won");
-  G.track(`Magic Square solved level ${game.level}`);
+  G.track(`Purrfect Square solved level ${game.level}`);
   squares.prefetch(next);
   running = true;
   const g = game;
@@ -402,7 +417,7 @@ function finishCard() {
   let text = `Every row, column and diagonal adds up to ${total()}.`;
   text += game.hinted || game.audited ? ` You had ${game.hinted ? "a hint" : "an audit"}, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the biggest square; here's another." : ` Next up: level ${next}.`;
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my square", game.result,
-    {title: "Magic!", gold, goldWhy: "No hints, audits or undos!", next: `Next: level ${next}`,
+    {title: "Purrfect!", gold, goldWhy: "No hints, audits or undos!", next: `Next: level ${next}`,
      after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
 }
 
@@ -410,7 +425,8 @@ function finishCard() {
 const squares = G.builder([magicLines, magicFill, magicStep, magicLogic, makeSquare], "makeSquare");
 function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
 function begin(p, level) {
-  game = {level, N: p.N, sol: p.sol, given: p.given, put: {}, history: [], won: false, hinted: false, audited: false, undid: false, ...G.freshClock()};
+  const last = game && game.pc, from = PADS.filter(c => !last || c[0] !== last[0]);
+  game = {level, N: p.N, sol: p.sol, given: p.given, pc: from[Math.floor(Math.random() * from.length)], put: {}, history: [], won: false, hinted: false, audited: false, undid: false, ...G.freshClock()};
   sel = -1; held = 0; mark = null;
 }
 let asking = 0;
@@ -422,15 +438,15 @@ function newPuzzle() {
     G.note("");
     begin(p, n); draw(); save();
     squares.prefetch(n);
-    G.track(`Magic Square new puzzle level ${n}`);
+    G.track(`Purrfect Square new puzzle level ${n}`);
     helpOnFirstVisit();
   });
 }
 
 /* ---------- sharing ---------- */
 // A square travels as its answer and which numbers start in it; progress as your numbers ("-" for none).
-$("shareBtn").onclick = () => { if (game) G.shareCard({name: "Magic Square", won: game.won,
-  puzzle: () => ({g: "magic", N: game.level, s: game.sol.join("."), v: game.given.map(v => v ? 1 : 0).join("")}),
+$("shareBtn").onclick = () => { if (game) G.shareCard({name: "Purrfect Square", won: game.won,
+  puzzle: () => ({g: "purrfect", N: game.level, s: game.sol.join("."), v: game.given.map(v => v ? 1 : 0).join("")}),
   progress: () => game.sol.map((_, k) => game.put[k] || "-").join(".")}); };
 // An answer that's a magic square of the level's size, and givens that leave just one way to finish it.
 function validSquare(level, sol, given) {
@@ -461,7 +477,7 @@ function showHelp() {
   if (game && game.won) return G.helpLater();
   settings.seenHelp = false; helpOnFirstVisit();
 }
-// The tiles, in page pixels.
+// The beans, in page pixels.
 function map() {
   const r = $("svg").getBoundingClientRect(), vb = $("svg").viewBox.baseVal, k = r.width / vb.width;
   return {ox: r.left + PAD * k, oy: r.top + (PAD + TOT) * k, cw: CS * k, ch: CS * k};
@@ -475,7 +491,7 @@ function helpOnFirstVisit() {
     {say: `Every row must add up to ${total()}`, lit: row, tone: "ok"},
     {say: "So must every column", lit: col, tone: "ok"},
     {say: "And both long diagonals", lit: diag, tone: "ok"},
-    {say: "Each line's total so far is at its end", lit: row},
+    {say: "Each line's total so far is on the pad at its end", lit: row},
   ];
   if (gap !== undefined) steps.push({say: "Tap a square, then a number", lit: [[gap % N, Math.floor(gap / N)]]});
   steps.push(
@@ -492,23 +508,24 @@ $("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
 $("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
 $("helpBtn").onclick = showHelp;
 
-G.nav("magic");
+G.nav("purrfect");
 G.checkClock(game);
-G.setupTimer({name: "magic", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
+G.setupTimer({name: "purrfect", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
 $("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
 if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
 $("levelSel").value = settings.level;
 
-const shared = G.readShare("magic");
+const shared = G.readShare("purrfect");
 if (game) G.reopen(() => {
+    if (!Array.isArray(game.pc)) game.pc = PADS[0];
     if (!(game.level >= 1 && game.level <= MAX_LEVEL) || game.N !== game.level + 2 || !validSquare(game.level, game.sol, game.given) || typeof game.put !== "object" || !Array.isArray(game.history)) throw new Error("the saved square doesn't fit its level");
     draw();
     if (game.won) finishCard(); else helpOnFirstVisit();
   }, why => { game = null; newPuzzle(); G.note(why, 0); });
 else if (!shared) newPuzzle();
-const shareOpts = () => ({name: "Magic Square", inProgress: !!(game && !game.won && Object.keys(game.put).length), open: openShared, after: helpOnFirstVisit});
+const shareOpts = () => ({name: "Purrfect Square", inProgress: !!(game && !game.won && Object.keys(game.put).length), open: openShared, after: helpOnFirstVisit});
 if (shared) G.offerShare(shared, shareOpts());
-window.addEventListener("hashchange", () => { const d = G.readShare("magic"); if (d) G.offerShare(d, shareOpts()); });
+window.addEventListener("hashchange", () => { const d = G.readShare("purrfect"); if (d) G.offerShare(d, shareOpts()); });
 </script>
 <!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
 <script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
