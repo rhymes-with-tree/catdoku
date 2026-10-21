@@ -226,7 +226,7 @@ Squares are made in a background Web Worker: a random magic square is found by s
 
 ## Ideas
 
-[IDEAS.md](IDEAS.md) lists every puzzle considered for the site, built or not, with how it plays, how easy it would be to add, and whether it's wanted.
+[IDEAS.md](IDEAS.md) lists every puzzle considered for the site, built or not, with how it plays, where it was mentioned, and Claude's guesses at how easy it would be to add. Nothing in it is a request.
 
 ## License
 

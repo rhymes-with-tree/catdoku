@@ -143,10 +143,10 @@ Tunnel Run puts a box round a piece that's the wrong way round and says so for 3
   <genre>: …": rules, controls, how puzzles are made, levels, hint/Undo/gold paw, timer, share link and
   cat photo. Add the game to the Gold paw and Share lists under "Across every game", and to Help if its
   rule differs.
-- **Ideas list:** keep `IDEAS.md` up to date with every decision, in the same PR. Set the game's row to
-  Built, name it "<Game> (<puzzle it's based on>)", and move it below the Idea rows of its group; add a row
+- **Ideas list:** keep `IDEAS.md` up to date with every decision, in the same PR. Set the game's row's
+  "On the site?" to Yes, name it "<Game> (<puzzle it's based on>)", and move it to the end of its group; add a row
   if the game wasn't listed. When two ideas become one game, merge their rows; when an idea becomes a mode
-  or levels of an existing game, mark it Built and say where (Notes); drop rows the user rules out; and note
+  or levels of an existing game, set "On the site?" to Yes and say where (Claude's notes); drop rows the user rules out; and note
   new ideas, themes or changes of plan that come up while talking it through.
 - **Build:** replace the current build string (`YYYY-MM-DD.N`) everywhere it appears (`version.txt`,
   every page's BUILD, every `?v=`) with a new one: today's date with `.1`, or the next number if the
