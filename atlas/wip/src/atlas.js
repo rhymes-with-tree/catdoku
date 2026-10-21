@@ -82,9 +82,13 @@ function project(lon, lat) {
   return [K * l * (0.8707 - 0.131979 * p2 + p4 * (-0.013791 + p4 * (0.003971 * p2 - 0.001529 * p4))),
     -K * p * (1.007226 + p2 * (0.015085 + p4 * (-0.044475 + 0.028874 * p2 - 0.005916 * p4)))];
 }
-let world = null;       // {land: Path2D of every country, by: {code: [pieces…]}, main: {code: {box, x, y}}}
-function buildWorld(raw) {
-  const land = new Path2D(), by = {}, main = {};
+let world = null;       // {land: Path2D of every country, by: {code: [pieces…]}, main: {code: {box, x, y}}, disputed: Path2D}
+function buildWorld(raw, disputedRaw) {
+  const land = new Path2D(), by = {}, main = {}, disputed = new Path2D();
+  for (const [, , mp] of disputedRaw) for (const poly of mp) for (const ring of poly) {
+    ring.forEach(([lon, lat], i) => { const [x, y] = project(lon, lat); if (i) disputed.lineTo(x, y); else disputed.moveTo(x, y); });
+    disputed.closePath();
+  }
   for (const [code, , , region, , mp] of raw) {
     const owner = ALIAS[code] || code, path = new Path2D();
     let best = null;
@@ -105,7 +109,7 @@ function buildWorld(raw) {
     (by[owner] = by[owner] || []).push(path);
     if (code === owner && best) main[code] = {box: best.box, x: (best.box[0] + best.box[2]) / 2, y: (best.box[1] + best.box[3]) / 2, region: REGION_FIX[code] || region};
   }
-  return {land, by, main};
+  return {land, by, main, disputed};
 }
 
 const canvas = G.$("canvas"), ctx = canvas.getContext("2d");
@@ -134,7 +138,14 @@ function draw() {
     ctx.fillStyle = css("--land"); ctx.fill(world.land);
     ctx.fillStyle = fill; for (const p of lit) ctx.fill(p);
     ctx.lineJoin = "round";
+    // disputed land: grey stripes over whatever colour is under them, and a dashed edge
+    ctx.save(); ctx.clip(world.disputed);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.beginPath(); for (let d = -h; d < w; d += 7) { ctx.moveTo(d, h); ctx.lineTo(d + h, 0); }
+    ctx.lineWidth = 1.6; ctx.strokeStyle = css("--stripe"); ctx.stroke();
+    ctx.restore();
     ctx.lineWidth = 0.9 / view.s; ctx.strokeStyle = css("--border"); ctx.stroke(world.land);
+    ctx.setLineDash([4 / view.s, 3 / view.s]); ctx.lineWidth = 1.2 / view.s; ctx.stroke(world.disputed); ctx.setLineDash([]);
     ctx.lineWidth = 1.8 / view.s; ctx.strokeStyle = edge; for (const p of lit) ctx.stroke(p);
     // a gold ring round a country too small to see
     const m = code && world.main[code];
@@ -420,6 +431,6 @@ function start() {
   }, msg => { newTrip(settings.level || 1); G.note(msg, 0); });
   if (!settings.seenHelp) setTimeout(walkthrough, 400);
 }
-fetch("world.json").then(r => r.json()).then(raw => {
-  world = buildWorld(raw); $("loading").remove(); resize(); start();
+Promise.all(["world.json", "disputed.json"].map(f => fetch(f).then(r => r.json()))).then(([raw, disputed]) => {
+  world = buildWorld(raw, disputed); $("loading").remove(); resize(); start();
 }).catch(e => { $("loading").textContent = "The map couldn't load. Check your connection and reload."; throw e; });

@@ -35,7 +35,7 @@ The owner's reasoning: large countries are easier than medium ones, which are ea
 | `sizes.json` | Area in km² and island flag (no land border) per country, from `scripts/sizes.py` |
 | `gbif_counts.json` | GBIF wild cat records per country and species (1990 onward, sightings and camera traps only), from `scripts/gbif.py` |
 | `iso2.json` | Country code to ISO 2-letter code, for GBIF |
-| `scripts/build_preview.py` | Builds the artifact page: `python3 atlas/wip/scripts/build_preview.py atlas/wip . ../mapstudy (the third argument is no longer used)` writes `atlas/wip/preview/` (ignored by git), with `world_un.json` copied in as `world.json` |
+| `scripts/build_preview.py` | Builds the artifact page: `python3 atlas/wip/scripts/build_preview.py atlas/wip . ../mapstudy (the third argument is no longer used)` writes `atlas/wip/preview/` (ignored by git), with `world_un.json` copied in as `world.json`, and `disputed.json` |
 | `scripts/play.js`, `scripts/trips.js` | Playwright checks. Wrap `preview/cat-atlas.html` in `<!doctype html><html><head><meta charset="utf-8"></head><body>…</body></html>` as `preview/test.html`, serve `preview/` on port 8766, then run them |
 
 ## The cat table (`CLUE` in `src/atlas.js`)
@@ -50,7 +50,9 @@ The IUCN key is a Bearer secret in the environment's network settings, added to 
 
 - Israel and Palestine are never each other's wrong answer on Easy (`NEVER_WITH` in `src/atlas.js`). The owner asked for this. Other pairs are waiting on the owner.
 - Borders follow the UN (the owner's call). World Map Recall's `world.json` draws Crimea as Russia, the Golan Heights as Israel and the Moroccan-held part of Western Sahara as Morocco; `scripts/un_borders.py` (needs shapely) moves them to Ukraine, Syria and Western Sahara using Natural Earth's `ne_50m_admin_0_breakaway_disputed_areas.geojson`, writing `world_un.json`, the game's map. `sizes.json` is measured from it.
-- Still open with the owner: whether to label Western Sahara differently, whether Somaliland becomes its own country in the quiz, and which other pairs to keep apart.
+- Western Sahara keeps its plain name and Somaliland stays part of Somalia, as the UN has them (the owner's call).
+- Disputed land is drawn with grey stripes and a dashed edge, with a "Disputed" key on the map. The shapes are in `disputed.json`, from `scripts/disputed.py` (Natural Earth's disputed areas, minus North Borneo, with the whole of Western Sahara). Natural Earth's Donetsk and Luhansk shapes are the 2014 lines.
+- Still open with the owner: which other pairs to keep apart, a "disputed territory" round (the owner's idea), and the difficulty ladder, which the owner feels isn't quite right yet.
 
 ## Still to do
 
