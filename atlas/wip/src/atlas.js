@@ -11,7 +11,7 @@ const OWNERS = [...new Set(Object.values(DEPS).map(d => d[1]))];
 // Map pieces that light up with the country they belong to.
 const ALIAS = {CYN: "CYP", SOL: "SOM", ALD: "FIN"};
 // Continents for Easy's wrong answers, as World Map Recall has them.
-const REGION_FIX = {CYP: "Europe", TUR: "Asia", RUS: "Europe"};
+const REGION_FIX = {CYP: "Europe", TUR: "Asia", RUS: "Europe", HMD: "Oceania", ATF: "Africa"};
 // What each cat is called in the clue. None of them names a country: "lynx", never "Iberian lynx".
 const CATS = {
   lion: "the lion", tiger: "the tiger", leopard: "the leopard", panther: "the black panther", snow: "the snow leopard",
@@ -48,8 +48,11 @@ GRL house GUF jaguar SJM house NCL house FLK house PRI house ATF empty SGS empty
 FRO house HKG leopardcat IMN house GUM house CUW house HMD empty MYT house MNP house TCA house VIR house CYM house BES house
 SPM house SHN house ABW house IOA house VGB house IOT house WLF house JEY house ASM house AIA house MSR house BMU house
 MAF house GGY house SXM house NFK house PCN house BLM house MAC house TKL house ATC empty`.trim().split(/\s+/).reduce((a, w, i, all) => (i % 2 ? a : [...a, [w, all[i + 1]]]), []));
-// Countries never offered as each other's wrong answer on Easy, however close they are.
-const NEVER_WITH = {ISR: ["PSX"], PSX: ["ISR"]};
+// Countries never offered as each other's wrong answer on Pick, however close: both claim land the map stripes as
+// disputed (and Israel and Palestine, the owner's call).
+const NEVER_WITH = {};
+for (const [a, b] of [["RUS", "UKR"], ["ISR", "SYR"], ["ISR", "PSX"], ["MAR", "SAH"], ["IND", "PAK"], ["IND", "CHN"], ["SDN", "SDS"]])
+  (NEVER_WITH[a] = NEVER_WITH[a] || []).push(b), (NEVER_WITH[b] = NEVER_WITH[b] || []).push(a);
 // "Greenland Denmark" or "Greenland (Denmark)" typed in one go: the territory and its country, or null.
 function bothNames(text) {
   const n = norm(text);
@@ -251,71 +254,101 @@ function flyTo(t, instant) {
 G.$("recentreBtn").onclick = () => { if (game && world) flyTo(frameFor(current())); };
 
 /* ---------- a trip ---------- */
-const KEY = "catdoku.atlas.v2", TRIP = 10;
-// 15 levels: Easy (pick from 4), Medium (type, with the list) and Hard (type, no list), each in 5 steps of geography.
-// Step 1 asks large countries with wrong answers spread far apart and of other sizes; step 5 asks mostly small
-// countries and islands, with wrong answers that are their nearest neighbours of a similar size.
-const MODES = [null, "Easy", "Medium", "Hard"], STEPS = [null, "large countries", "large and medium", "adds small", "adds tiny and islands", "mostly small and islands"];
-const modeOf = n => Math.ceil(n / 5), stepOf = n => (n - 1) % 5 + 1, mode = () => modeOf(game.level);
-const levelName = n => `${MODES[modeOf(n)]} ${stepOf(n)}`;
-for (let n = 1; n <= 15; n++) G.$("levelSel").append(new Option(`${levelName(n)}: ${STEPS[stepOf(n)]}`, n));
+const KEY = "catdoku.catlas.v1", TRIP = 10, TRIES = 2;
+// Levels are the owner's three lists of places: Easy, Medium and Hard (TIERS: 1, 2, 3).
+// A level's trip mixes in easier places: Easy is 10 Easy; Medium 7 Medium + 3 Easy; Hard 6 Hard + 3 Medium + 1 Easy.
+const LEVELS = [null, "Easy", "Medium", "Hard"];
+const TIERS = /*TIERS*/;
+const MIX = [null, [[1, 10]], [[2, 7], [1, 3]], [[3, 6], [2, 3], [1, 1]]];
+// Never asked on Hard, however a trip is mixed.
+const NOT_ON_HARD = ["USA", "MEX", "CAN", "RUS", "BRA", "AUS", "IND", "CHN"];
+// Regions, and the ones each level offers. Where a continent has too few places at a level, it's paired with
+// another (Europe & Africa, Asia & Oceania). Easy Americas also asks Panama and Jamaica, to make up 10.
+const REGIONS = {world: ["World", null], americas: ["Americas", ["Americas"]], africa: ["Africa", ["Africa"]], asia: ["Asia", ["Asia"]],
+  europe: ["Europe", ["Europe"]], oceania: ["Australia and Oceania", ["Oceania"]], eurafrica: ["Europe & Africa", ["Europe", "Africa"]],
+  asiaoceania: ["Asia & Oceania", ["Asia", "Oceania"]]};
+const REGIONS_AT = [null, ["world", "americas", "eurafrica", "asiaoceania"], ["world", "americas", "africa", "europe", "asiaoceania"],
+  ["world", "americas", "africa", "asia", "europe", "oceania"]];
+const EASY_EXTRA = {americas: ["PAN", "JAM"]};
+// Moving up a level, a region that the next level splits goes to its first part.
+const REGION_UP = {eurafrica: "europe", asiaoceania: "asia"};
+// How the answer is given: always the player's choice, List by default.
+const STYLES = {pick: ["Pick", "Choose from 4 names. Makes it easier."], list: ["List", "Type, with a list of every place to choose from."],
+  type: ["Type", "Type the name with no list. Makes it harder."]};
+const STYLE_ORDER = ["pick", "list", "type"];
 const $ = G.$;
-let saved = G.load(KEY), settings = saved.settings || {level: 1}, recent = saved.recent || [], game = null, busy = false;
+let saved = G.load(KEY), settings = Object.assign({level: 1, region: "world", style: "list"}, saved.settings), recent = saved.recent || [], game = null, busy = false;
 const save = () => G.save(KEY, {settings, recent, game});
 const current = () => game.trip[game.i] && game.trip[game.i].c;
+const style = () => settings.style;
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const regionOf = c => (world && world.main[c] ? world.main[c].region : "");
+// Best times are kept by level and answer style: the level times 10 plus 1, 2 or 3 for Pick, List or Type.
+const bestKey = g => g.level * 10 + STYLE_ORDER.indexOf(g.style) + 1;
+const keyName = n => `${LEVELS[Math.floor(n / 10)]} · ${STYLES[STYLE_ORDER[n % 10 - 1]][0]}`;
 
-// Countries by size: [km², 1 if it has no land border]. Tiny is under 10,000 km², small under 100,000,
-// medium under 500,000.
+// Countries by size: [km², 1 if it has no land border], for how alike two places are.
 const SIZE = /*SIZES*/;
-const km2 = c => SIZE[c][0], isIsland = c => SIZE[c][1] === 1;
-const tier = c => km2(c) >= 500000 ? 4 : km2(c) >= 100000 ? 3 : km2(c) >= 10000 ? 2 : 1;
-// Which countries a step asks, and (step 5) which it leans on.
-const askable = (c, step) => step === 1 ? tier(c) === 4 : step === 2 ? tier(c) >= 3 : step === 3 ? tier(c) >= 2 && !isIsland(c) : true;
-const hardOne = c => tier(c) <= 2 || isIsland(c);
-// How far apart two countries' main pieces are on the map, the short way round.
+const km2 = c => SIZE[c][0];
+// How far apart two places' main pieces are on the map, the short way round.
 function apart(a, b) {
   const p = world.main[a], q = world.main[b], dx = Math.abs(p.x - q.x);
   return Math.hypot(Math.min(dx, WORLD - dx), p.y - q.y);
 }
 const sizeGap = (a, b) => Math.abs(Math.log(km2(a) / km2(b)));
-// Easy's three wrong names, all from the same continent: far away and of other sizes on step 1, far away on 2,
-// one near neighbour on 3, near neighbours of a similar size on 4, and the most alike of all on 5.
-function wrongNames(c, step) {
-  let all = PLACES.filter(d => d !== c && regionOf(d) === regionOf(c) && !(NEVER_WITH[c] || []).includes(d));
-  // the two places alone in the Southern Ocean borrow their nearest neighbours
-  if (all.length < 6) all = PLACES.filter(d => d !== c && world.main[d]).sort((a, b) => apart(c, a) - apart(c, b)).slice(0, 8);
+// Pick's three wrong names, all from the same continent. Easy: other Easy places, spread out and of other sizes;
+// Medium: one near neighbour and two others; Hard: the nearest look-alikes (near, and of a similar size).
+function wrongNames(c, level) {
+  let all = PLACES.filter(d => d !== c && world.main[d] && regionOf(d) === regionOf(c) && !(NEVER_WITH[c] || []).includes(d));
+  if (all.length < 6) all = PLACES.filter(d => d !== c && world.main[d] && !(NEVER_WITH[c] || []).includes(d)).sort((a, b) => apart(c, a) - apart(c, b)).slice(0, 8);
   const byNear = [...all].sort((a, b) => apart(c, a) - apart(c, b));
+  if (level === 1) {
+    const easy = all.filter(d => TIERS[d] === 1), fair = all.filter(d => TIERS[d] <= 2), from = easy.length >= 3 ? easy : fair.length >= 3 ? fair : all;
+    const far = [...from].sort((a, b) => apart(c, b) - apart(c, a)).slice(0, Math.max(3, Math.ceil(from.length / 2)));
+    const other = far.filter(d => sizeGap(c, d) > Math.log(3));
+    return shuffle(other.length >= 3 ? other : far).slice(0, 3);
+  }
+  if (level === 2) { const near = shuffle(byNear.slice(0, 3))[0]; return [near, ...shuffle(all.filter(d => d !== near)).slice(0, 2)]; }
   const alike = [...all].sort((a, b) => (apart(c, a) / 30 + sizeGap(c, a)) - (apart(c, b) / 30 + sizeGap(c, b)));
-  const far = byNear.slice(Math.floor(byNear.length / 2));
-  if (step === 1) { const other = far.filter(d => sizeGap(c, d) > Math.log(3)); return shuffle(other.length >= 3 ? other : far).slice(0, 3); }
-  if (step === 2) return shuffle(far).slice(0, 3);
-  if (step === 3) { const near = shuffle(byNear.slice(0, 4))[0]; return [near, ...shuffle(all.filter(d => d !== near)).slice(0, 2)]; }
-  if (step === 4) return shuffle(alike.slice(0, 6)).slice(0, 3);
-  return alike.slice(0, 3);
+  return shuffle(alike.slice(0, 4)).slice(0, 3);
 }
-// Ten countries for a level, not asked lately where that leaves enough.
-function makeTrip(level) {
-  const step = stepOf(level), pool = PLACES.filter(c => askable(c, step) && world.main[c]);
+// Ten places for a level and region, not asked lately where that leaves enough.
+function makeTrip(level, region) {
+  const conts = REGIONS[region][1], extra = level === 1 ? EASY_EXTRA[region] || [] : [];
+  const tierOf = c => extra.includes(c) ? 1 : TIERS[c];
+  const pool = PLACES.filter(c => world.main[c] && (!conts || conts.includes(regionOf(c))) && tierOf(c) <= level && !(level === 3 && NOT_ON_HARD.includes(c)));
   const pick = (from, n) => { const fresh = from.filter(c => !recent.includes(c)); return shuffle(fresh.length >= n ? fresh : from).slice(0, n); };
-  let codes;
-  if (step === 5) { const hard = pick(pool.filter(hardOne), 7); codes = shuffle([...hard, ...pick(pool.filter(c => !hard.includes(c)), 3)]); }
-  else codes = pick(pool, TRIP);
-  return codes.map(c => DEPS[c] ? {c, opts: shuffle([c, ...wrongNames(c, step)]), owners: shuffle([DEPS[c][1], ...shuffle(OWNERS.filter(o => o !== DEPS[c][1])).slice(0, 3)])}
-    : {c, opts: shuffle([c, ...wrongNames(c, step)])});
+  let codes = [];
+  for (const [t, n] of MIX[level]) codes.push(...pick(pool.filter(c => tierOf(c) === t && !codes.includes(c)), n));
+  // a region short of one kind of place makes up the rest from the others it has
+  if (codes.length < TRIP) codes.push(...pick(pool.filter(c => !codes.includes(c)), TRIP - codes.length));
+  return shuffle(codes).map(c => DEPS[c] ? {c, opts: shuffle([c, ...wrongNames(c, level)]), owners: shuffle([DEPS[c][1], ...shuffle(OWNERS.filter(o => o !== DEPS[c][1])).slice(0, 3)])}
+    : {c, opts: shuffle([c, ...wrongNames(c, level)])});
 }
 const freshCard = () => ({wrong: [], hints: 0, out: []});
-function newTrip(level, trip) {
-  settings.level = level; $("levelSel").value = level;
-  game = {level, trip: trip || makeTrip(level), i: 0, res: [], card: freshCard(), hinted: false, restarted: false, won: false, ...G.freshClock()};
-  if (!trip) { recent = [...recent, ...game.trip.map(t => t.c)].slice(-120); }
+function fillRegions(level, region) {
+  const sel = $("regionSel"); sel.innerHTML = "";
+  for (const r of REGIONS_AT[level]) sel.append(new Option(REGIONS[r][0], r));
+  sel.value = REGIONS_AT[level].includes(region) ? region : REGIONS_AT[level].includes(REGION_UP[region]) ? REGION_UP[region] : "world";
+  return sel.value;
+}
+function newTrip(level, region, trip) {
+  region = fillRegions(level, region);
+  settings.level = level; settings.region = region; $("levelSel").value = level;
+  game = {level, region, style: style(), trip: trip || makeTrip(level, region), i: 0, res: [], card: freshCard(), hinted: false, restarted: false, won: false, ...G.freshClock()};
+  if (!trip) recent = [...recent, ...game.trip.map(t => t.c)].slice(-120);
   save(); show(true);
+}
+// Switching how answers are given works mid-trip; the trip's time and share count the easiest style used.
+function setStyle(s) {
+  settings.style = s; $("styleSel").value = s; $("styleHint").textContent = STYLES[s][1];
+  if (game && !game.won && STYLE_ORDER.indexOf(s) < STYLE_ORDER.indexOf(game.style)) game.style = s;
+  active = -1; save(); if (game) show();
 }
 
 function show(fly) {
   const code = current(), done = game.won;
-  // progress dots: green first time, coral after a miss
+  // progress dots: green on the first try, coral after a miss
   $("count").innerHTML = game.trip.map((t, i) => `<i class="${i < game.res.length ? (game.res[i].first ? "ok" : "miss") : i === game.i && !done ? "now" : ""}"></i>`).join("");
   $("count").setAttribute("aria-label", `Cat ${Math.min(game.i + 1, TRIP)} of ${TRIP}`);
   const cat = CATS[CLUE[code]] || "the cat", bonus = !done && game.card.bonus === "ask";
@@ -323,11 +356,11 @@ function show(fly) {
     : CLUE[code] === "house" ? "Where did the <b>housecat</b> migrate?" : CLUE[code] === "empty" ? "Where's the <b>cat</b> exploring where no one lives?"
     : `Where's ${cat.replace(/^(the )?(.*)$/, (m, the, rest) => `${the || ""}<b>${rest}</b>`)}?`;
   $("skipBtn").hidden = !bonus;
-  $("reveal").textContent = !done && !bonus && mode() > 1 && game.card.hints ? reveal(nameOf(code), game.card.hints) : "";
-  $("choices").hidden = done || mode() !== 1;
-  $("typebox").hidden = done || mode() === 1;
-  $("list").hidden = done || mode() !== 2;
-  if (mode() === 1 && !done) {
+  $("reveal").textContent = !done && !bonus && style() !== "pick" && game.card.hints ? reveal(nameOf(code), game.card.hints) : "";
+  $("choices").hidden = done || style() !== "pick";
+  $("typebox").hidden = done || style() === "pick";
+  $("list").hidden = done || style() !== "list";
+  if (style() === "pick" && !done) {
     $("choices").innerHTML = "";
     for (const o of bonus ? game.trip[game.i].owners : game.trip[game.i].opts) {
       const b = document.createElement("button"); b.textContent = nameOf(o);
@@ -339,8 +372,8 @@ function show(fly) {
       $("choices").append(b);
     }
   }
-  if (mode() === 2 && !done) fillList();
-  $("tried").innerHTML = mode() > 1 && !done && !bonus ? game.card.wrong.map(c => `<span>${nameOf(c)}</span>`).join("") : "";
+  if (style() === "list" && !done) fillList();
+  $("tried").innerHTML = style() !== "pick" && !done && !bonus ? game.card.wrong.map(c => `<span>${nameOf(c)}</span>`).join("") : "";
   $("hintBtn").disabled = done || bonus;
   if (world && code && fly) flyTo(frameFor(code), fly === "jump");
   else redraw();
@@ -348,10 +381,10 @@ function show(fly) {
 // "N o r _ _ _" with the first n letters showing (spaces and hyphens always show).
 function reveal(name, n) {
   let k = 0;
-  return [...name].map(ch => /[\p{L}]/u.test(ch) ? (k++ < n ? ch : "_") : ch).join(" ").replace(/ {3}/g, "   ");
+  return [...name].map(ch => /[\p{L}]/u.test(ch) ? (k++ < n ? ch : "_") : ch).join(" ");
 }
 
-// Medium's list of every country, narrowed to what's typed.
+// The List style's list of every place, narrowed to what's typed.
 let active = -1;
 function fillList() {
   const list = $("list"), cs = matching($("guess").value, game.card.bonus === "ask");
@@ -365,9 +398,9 @@ function fillList() {
     list.append(li);
   });
 }
-$("guess").addEventListener("input", () => { active = $("guess").value.trim() ? 0 : -1; if (mode() === 2) { fillList(); $("list").scrollTop = 0; } });
+$("guess").addEventListener("input", () => { active = $("guess").value.trim() ? 0 : -1; if (style() === "list") { fillList(); $("list").scrollTop = 0; } });
 $("guess").addEventListener("keydown", e => {
-  if (mode() !== 2 || !["ArrowDown", "ArrowUp"].includes(e.key)) return;
+  if (style() !== "list" || !["ArrowDown", "ArrowUp"].includes(e.key)) return;
   e.preventDefault();
   const n = $("list").querySelectorAll("li[data-c]").length; if (!n) return;
   active = (active + (e.key === "ArrowDown" ? 1 : -1) + n) % n; fillList();
@@ -380,31 +413,40 @@ $("typebox").addEventListener("submit", e => {
     if (exact && NAMES[exact]) { $("guess").value = ""; return answerBonus(exact); }
   } else if (exact) return submit(exact);
   else if (both) { game.card.bonus = both[1] === DEPS[both[0]][1] ? "given" : undefined; return submit(both[0]); }
-  if (mode() === 2) { const li = $("list").querySelectorAll("li[data-c]")[Math.max(active, 0)]; if (li && text.trim()) return submit(li.dataset.c); }
+  if (style() === "list") { const li = $("list").querySelectorAll("li[data-c]")[Math.max(active, 0)]; if (li && text.trim()) return submit(li.dataset.c); }
   if (!text.trim()) { G.note("Type the name of the lit country."); return; }
   G.note(`There's no ${game.card.bonus === "ask" ? "country" : "country or territory"} called “${text.trim()}”. Check the spelling?`);
 });
 function submit(c) { $("guess").value = ""; active = -1; if (game.card.bonus === "ask") answerBonus(c); else answer(c); }
+const focusTyping = () => { if (style() !== "pick" && matchMedia("(hover: hover)").matches) $("guess").focus(); };
 
+// Each place gets TRIES guesses; after that it's shown and counts as missed.
 function answer(c, btn) {
   if (busy || !game || game.won) return;
   game.started = true;
   const code = current(), card = game.card;
   if (c !== code) {
     if (!card.wrong.includes(c)) card.wrong.push(c);
-    G.note(`Not ${nameOf(c)}. Try again!`, 2500);
-    save(); show(); if (mode() > 1) $("guess").focus();
+    if (card.wrong.length >= TRIES) {
+      game.res.push({c: code, first: false, found: false, hinted: card.hints > 0});
+      G.note(`It's ${nameOf(code)}.`, 2600);
+      busy = true; save(); show();
+      setTimeout(() => { busy = false; advance(); }, 1800);
+      return;
+    }
+    G.note(`Not ${nameOf(c)}. One more try!`, 2500);
+    save(); show(); if (style() !== "pick") $("guess").focus();
     return;
   }
   const given = card.bonus === "given";
-  game.res.push({c, first: !card.wrong.length && !card.hints, hinted: card.hints > 0, ...(DEPS[c] ? {bonus: given} : {})});
+  game.res.push({c, first: !card.wrong.length && !card.hints, found: true, hinted: card.hints > 0, ...(DEPS[c] ? {bonus: given} : {})});
   if (btn) btn.className = "right";
   const name = given ? `${nameOf(c)} (${nameOf(DEPS[c][1])})` : nameOf(c);
   G.note(card.wrong.length || card.hints ? `${name}, yes.${given ? " Bonus!" : ""}` : `${name}! First try.${given ? " Bonus!" : ""}`, 1800);
   flash = {code}; busy = true; redraw();
   setTimeout(() => {
     flash = null; busy = false;
-    if (DEPS[c] && !given) { card.bonus = "ask"; save(); show(); if (mode() > 1 && matchMedia("(hover: hover)").matches) $("guess").focus(); }
+    if (DEPS[c] && !given) { card.bonus = "ask"; save(); show(); focusTyping(); }
     else advance();
   }, 1100);
   save();
@@ -423,31 +465,39 @@ $("skipBtn").onclick = () => { if (game.card.bonus !== "ask" || busy) return; ga
 function advance() {
   game.i++; game.card = freshCard();
   if (game.i >= TRIP) return win();
-  save(); show(true);
-  if (mode() > 1 && matchMedia("(hover: hover)").matches) $("guess").focus();
+  save(); show(true); focusTyping();
 }
 
+// Moving up (no hints, no Restart): 8 or more on the first try, or 7 and a bonus, or all 10 found within their tries.
+// Otherwise the next trip is the same level and region. Gold paw: all 10 on the first try, no hints.
 function win() {
   game.won = true; game.i = TRIP - 1;
-  const first = game.res.filter(r => r.first).length, gold = first === TRIP && !game.hinted && !game.restarted;
-  const level = game.level, next = gold ? Math.min(15, level + 1) : level;
-  G.finishClock(game); save(); show();
-  const deps = game.res.filter(r => "bonus" in r), bonusLine = deps.length ? ` Bonus: ${deps.filter(r => r.bonus).length} of ${deps.length} territories' countries named.` : "";
-  const why = game.hinted ? ` You had a hint, so here's another trip at ${levelName(level)}.`
-    : gold ? (next > level ? ` On to ${levelName(next)}!` : "") : ` Find all ${TRIP} on the first try to move up a level.`;
-  G.winCard(`${first} of ${TRIP} found on the first try.${bonusLine}${why}`, () => { G.closeCard(); newTrip(next); }, "Look at the map", game.result,
-    {title: "Trip done!", gold, goldWhy: "Every cat found on the first try!", next: next > level ? `Next: ${levelName(next)}` : "New trip",
-     after: G.otherSize($("levelSel"), next, l => newTrip(l), "Or play a different level:")});
+  const first = game.res.filter(r => r.first).length, found = game.res.filter(r => r.found).length, bonuses = game.res.filter(r => r.bonus).length;
+  const clean = !game.hinted && !game.restarted;
+  const up = clean && (first >= 8 || (first >= 7 && bonuses >= 1) || found === TRIP);
+  const gold = clean && first === TRIP;
+  const level = game.level, next = up ? Math.min(3, level + 1) : level, region = next > level ? REGION_UP[game.region] && !REGIONS_AT[next].includes(game.region) ? REGION_UP[game.region] : game.region : game.region;
+  game.level = level; G.finishClock(Object.assign(game, {level: bestKey(game)}));
+  game.level = level; save(); show();
+  const deps = game.res.filter(r => "bonus" in r), bonusLine = deps.length ? ` Bonus: ${bonuses} of ${deps.length} territories' countries named.` : "";
+  const where = r => `${LEVELS[next]}${r === "world" ? "" : ` (${REGIONS[r][0]})`}`;
+  const why = game.hinted ? ` You had a hint, so here's another trip at ${where(region)}.`
+    : game.restarted ? ` You restarted, so here's another trip at ${where(region)}.`
+    : next > level ? ` On to ${where(region)}!`
+    : up ? "" : " Get 8 on the first try (or 7 and a bonus), or find all 10, to move up.";
+  G.winCard(`${first} of ${TRIP} on the first try, ${found} found.${bonusLine}${why}`, () => { G.closeCard(); newTrip(next, region); }, "Look at the map", game.result,
+    {title: "Trip done!", gold, goldWhy: "Every cat found on the first try!", next: next > level ? `Next: ${LEVELS[next]}` : "New trip",
+     after: G.otherSize($("levelSel"), next, l => newTrip(l, region), "Or play a different level:")});
   if (typeof PREVIEW !== "undefined") for (const b of $("card").querySelectorAll("button")) if (/share/i.test(b.textContent)) b.remove();
 }
 
-// A hint shows, it never answers: Easy crosses out a wrong name (then rings the right one in gold);
-// Medium and Hard spell out one more letter of the name.
+// A hint shows, it never answers: Pick crosses out a wrong name (then rings the right one in gold);
+// List and Type spell out one more letter of the name.
 $("hintBtn").onclick = () => {
   if (!game || game.won || busy) return;
   const code = current(), card = game.card;
   card.hints++; game.hinted = true; game.started = true;
-  if (mode() === 1) {
+  if (style() === "pick") {
     const left = game.trip[game.i].opts.filter(o => o !== code && !card.wrong.includes(o) && !card.out.includes(o));
     if (left.length) { const o = left[Math.floor(Math.random() * left.length)]; card.out.push(o); G.note(`It isn't ${nameOf(o)}.`); }
     else { card.hints = 3; G.note("It's the one ringed in gold."); }
@@ -458,11 +508,14 @@ $("hintBtn").onclick = () => {
   }
   save(); show();
 };
-$("restartBtn").onclick = () => { if (!game) return; const t = game.trip, l = game.level; newTrip(l, t); game.restarted = true; save(); };
-$("newBtn").onclick = () => newTrip(+$("levelSel").value);
-$("levelSel").onchange = () => newTrip(+$("levelSel").value);
-$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
-G.setupTimer({name: "atlas", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
+$("restartBtn").onclick = () => { if (!game) return; newTrip(game.level, game.region, game.trip); game.restarted = true; save(); };
+$("newBtn").onclick = () => newTrip(+$("levelSel").value, $("regionSel").value);
+$("levelSel").onchange = () => newTrip(+$("levelSel").value, $("regionSel").value);
+$("regionSel").onchange = () => newTrip(+$("levelSel").value, $("regionSel").value);
+for (const s of STYLE_ORDER) $("styleSel").append(new Option(STYLES[s][0], s));
+$("styleSel").onchange = () => setStyle($("styleSel").value);
+$("bestBtn").onclick = () => G.showBests("Best times", game ? bestKey(game) : settings.level * 10 + STYLE_ORDER.indexOf(settings.style) + 1);
+G.setupTimer({name: "catlas", game: () => game, playing: g => !g.won, save, label: keyName, noun: "level"});
 
 // How to play, on the real board.
 function walkthrough() {
@@ -470,9 +523,10 @@ function walkthrough() {
   const steps = [
     {say: "This country is lit up.", lit: [[0, 0]], tone: "ok"},
     {say: "A cat is hiding in its native environment.", lit: [], els: [$("clue")]},
-    {say: mode() === 1 ? "Tap the country's name." : mode() === 2 ? "Type its name, or pick it from the list." : "Type its name, then Go.",
-     lit: [], els: [mode() === 1 ? $("choices") : $("typebox")]},
-    {say: "Drag or pinch the map to look around.", lit: [[0, 0]], els: [$("recentreBtn")]},
+    {say: style() === "pick" ? "Tap the country's name." : style() === "list" ? "Type its name, or pick it from the list." : "Type its name, then Go.",
+     lit: [], els: [style() === "pick" ? $("choices") : $("typebox")]},
+    {say: "Two tries each. Drag or pinch the map to look around.", lit: [[0, 0]], els: [$("recentreBtn")]},
+    {say: "Choose how you answer here.", lit: [], els: [$("styleSel")]},
     {say: "Stuck? Hint helps, but costs the gold paw.", lit: [], els: [$("hintBtn")]}];
   G.spotlight({grid: $("grid"), w: 1, h: 1, steps, done: () => { settings.seenHelp = true; save(); }});
 }
@@ -480,11 +534,12 @@ $("helpBtn").onclick = () => game && game.won ? G.helpLater() : walkthrough();
 
 /* ---------- start ---------- */
 function start() {
+  setStyle(STYLES[settings.style] ? settings.style : "list");
   G.reopen(() => {
-    if (saved.game && saved.game.trip && saved.game.trip.length === TRIP && saved.game.trip.every(t => PLACES.includes(t.c))) {
-      game = saved.game; G.checkClock(game); $("levelSel").value = game.level; show("jump");
-    } else newTrip(settings.level || 1);
-  }, msg => { newTrip(settings.level || 1); G.note(msg, 0); });
+    if (saved.game && saved.game.trip && saved.game.trip.length === TRIP && saved.game.trip.every(t => PLACES.includes(t.c)) && REGIONS[saved.game.region]) {
+      game = saved.game; G.checkClock(game); $("levelSel").value = game.level; fillRegions(game.level, game.region); show("jump");
+    } else newTrip(settings.level || 1, settings.region || "world");
+  }, msg => { newTrip(settings.level || 1, settings.region || "world"); G.note(msg, 0); });
   if (!settings.seenHelp) setTimeout(walkthrough, 400);
 }
 Promise.all(["world.json", "disputed.json"].map(f => fetch(f).then(r => r.json()))).then(([raw, disputed]) => {

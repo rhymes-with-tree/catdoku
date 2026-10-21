@@ -1,6 +1,6 @@
-# Cat Atlas: work in progress
+# Catlas: work in progress
 
-A new Catdoku game, not on the site yet. A country lights up on the world map, with a clue such as "Where's the lynx?" (a wild cat that lives there), and the player names the country. "Cat Atlas" is a working name.
+A new Catdoku game, not on the site yet, for a new Cat Travels shelf ("Countries, maps and places"). A country lights up on the world map, with a clue such as "Where's the lynx?" (a wild cat that lives there), and the player names the country. 
 
 Playable preview (the owner's artifact): https://claude.ai/artifact/JcXFSEy8b4zZwfZA2wJNn5. Republish to that same URL by passing it as `url` (read it first).
 
@@ -12,16 +12,14 @@ Playable preview (the owner's artifact): https://claude.ai/artifact/JcXFSEy8b4zZ
 | Countries with no native wild cat (45, mostly islands) | "Where did the **housecat** migrate?" |
 | Walkthrough, step 2 | "A cat is hiding in its native environment." |
 | Mascot | None |
-| Levels | A 15-step ladder: Easy 1–5 (pick from 4 names), Medium 1–5 (type, with a list of all 200 country names), Hard 1–5 (type, no list). The 5 steps are geography, as below |
-| Moving up | A gold paw (all 10 found on the first try, no hints, no Restart) moves up one level |
-
-| Step | Countries asked | Easy's 3 wrong names (same continent) |
-|---|---|---|
-| 1 | Large (over 500,000 km²) | Far away and a different size |
-| 2 | Large and medium (over 100,000 km²) | Far away |
-| 3 | Adds small (over 10,000 km²), no islands | One near neighbour, two random |
-| 4 | Everything, including tiny countries and islands | Picked from the 6 most alike (nearness plus size) |
-| 5 | 7 small, tiny or island countries, plus 3 others | The 3 most alike |
+| Levels | Easy / Medium / Hard: the owner's lists in `difficulty_by_owner.tsv` (`tiers.json`). Trips mix: Easy 10 Easy; Medium 7 Medium + 3 Easy; Hard 6 Hard + 3 Medium + 1 Easy. The US, Mexico, Canada, Russia, Brazil, Australia, India and China are never asked on Hard |
+| Regions | World, or a region; where a continent is short at a level it's paired: Easy offers Americas, Europe & Africa, Asia & Oceania (Easy Americas adds Panama and Jamaica); Medium offers Americas, Africa, Europe, Asia & Oceania; Hard offers all five (Americas, Africa, Asia, Europe, Australia and Oceania) |
+| Answer style | Always the player's choice: Pick (4 names, easier), List (default), Type (no list, harder). Doesn't affect moving up or the gold paw; best times and the shared result name it ("Medium · Pick") |
+| Pick's wrong answers | Same continent. Easy: other Easy places, spread out, of other sizes; Medium: one near neighbour and two others; Hard: the nearest look-alikes |
+| Tries | 2 per place, then it's shown and counts as missed |
+| Moving up | No hints and no Restart, and: 8+ on the first try, or 7 and any bonus, or all 10 found within their tries. Otherwise the same level and region again. Gold paw: 10 on the first try, no hints |
+| Pairs kept apart on Pick | Countries that both claim land the map stripes: Russia–Ukraine, Israel–Syria, Morocco–Western Sahara, India–Pakistan, India–China, Sudan–South Sudan, plus Israel–Palestine |
+| Disputed territory round | A separate mode (the owner doesn't want to review its sentences) |
 
 The owner's reasoning: large countries are easier than medium ones, which are easier than small ones; wrong answers that are close together or of a similar size are harder; everyone is bad at islands and small countries.
 

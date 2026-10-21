@@ -4,10 +4,11 @@ src = lambda f: open(os.path.join(S, 'src', f), encoding='utf-8').read()
 names = json.load(open(os.path.join(S, 'names.json'), encoding='utf-8'))
 js = src('atlas.js').replace('/*NAMES*/', json.dumps(names, ensure_ascii=False, separators=(',', ':')))
 js = js.replace('/*DEPS*/', json.dumps(json.load(open(os.path.join(S, 'deps.json'), encoding='utf-8')), ensure_ascii=False, separators=(',', ':')))
+js = js.replace('/*TIERS*/', json.dumps(json.load(open(os.path.join(S, 'tiers.json'))), separators=(',', ':')))
 sizes = json.load(open(os.path.join(S, 'sizes.json')))
 js = js.replace('/*SIZES*/', json.dumps({c: [v['km2'], int(v['island'])] for c, v in sizes.items()}, separators=(',', ':')))
 js = js.replace('.join(" ").replace(/ {3}/g, "   ");', '.join(" ");')
-out = f'''<title>Cat Atlas</title>
+out = f'''<title>Catlas</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
