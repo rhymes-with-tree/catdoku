@@ -1,7 +1,10 @@
 # The disputed areas Cat Atlas draws with stripes, from Natural Earth's 1:50m breakaway and disputed areas.
-# The rule (the owner's): stripe land where the map (drawn the UN's way) and who actually runs it disagree, or
-# where the line on the map is a ceasefire line rather than an agreed border. Natural Earth's other disputed areas
-# are drawn plainly, as the country that runs them; they still belong in the disputed-territory round.
+# The rule (the owner's): stripe land where the map, drawn the UN's way, and whoever actually runs it disagree; or a
+# region split by a ceasefire line where the UN takes no view on which side is whose. So the Koreas aren't striped
+# (the UN has both as member states, each with its own side). Palestine isn't striped either: Israel runs much of the
+# West Bank, but this map data can't show which parts, and striping all of it would mark land Palestinians do run.
+# Natural Earth's other disputed areas are drawn plainly, as the country that runs them. Every dispute, striped or not,
+# belongs in the disputed-territory round.
 # Western Sahara is striped whole (Natural Earth's shape is only the Moroccan-held part), so its outline comes from
 # the game's map.
 # Run: python3 disputed.py <ne_50m_admin_0_breakaway_disputed_areas.geojson> <world_un.json> <out.json>
