@@ -32,6 +32,7 @@ The owner's reasoning: large countries are easier than medium ones, which are ea
 | `src/atlas.js` | The game script. `/*NAMES*/` and `/*SIZES*/` are filled in by the build |
 | `src/atlas.css`, `src/atlas.body.html` | The page's own CSS and markup |
 | `names.json` | The 200 countries (same list and codes as World Map Recall in rhymes-with-tree/mapstudy) |
+| `deps.json` | The 45 territories: code to [name, country it belongs to] |
 | `sizes.json` | Area in km² and island flag (no land border) per country, from `scripts/sizes.py` |
 | `gbif_counts.json` | GBIF wild cat records per country and species (1990 onward, sightings and camera traps only), from `scripts/gbif.py` |
 | `iso2.json` | Country code to ISO 2-letter code, for GBIF |
@@ -55,9 +56,13 @@ The IUCN key is a Bearer secret in the environment's network settings, added to 
 - A "disputed territory" round (the owner's idea): a fill-in-the-blank sentence per place ("___ is controlled by ___ and claimed by ___"), one answer box, each right guess fills its blank; bonus points for naming every other name a place goes by (all names accepted). Everything disputed goes in, unstriped ones too (the Kurils, Kosovo, Taiwan, the Koreas, Israel and Palestine, Belize–Guatemala, the Falklands…). Sentences to be drafted by Claude and reviewed by the owner.
 - Still open with the owner: which other pairs to keep apart; the disputed round's place list and sentences; the difficulty ladder (the owner is writing their own lists of which countries each step adds, for a Western audience).
 
-## Dependencies
+## Territories
 
-The owner chose to quiz dependencies and overseas pieces in the main game, named like "Greenland (Denmark)" (option C). `scripts/deps.py` lists them with size and region; the owner is reviewing that list. Pieces drawn inside their country's shape (French Guiana, Réunion, Svalbard, the Canaries…) will need splitting out so they no longer light up with it.
+Quizzed alongside the 200 countries (the owner's choice): every place with an ISO country code of its own, 45 of them, in `deps.json` (code, name, the country it belongs to). Places without their own code stay with their country: Alaska, Hawaii, the Canaries, the Azores, Madeira. `scripts/un_borders.py` splits French Guiana, Guadeloupe, Martinique, Réunion, Mayotte, Svalbard, Bonaire/Sint Eustatius/Saba and Tokelau out of France, Norway, the Netherlands and New Zealand, so they don't light up with them. The Chagos Islands are quizzed as Mauritius's (UN view).
+
+- The territory's name alone is a right answer; naming its country too is a bonus. Hard and Medium take both typed at once ("Greenland (Denmark)"); otherwise a bonus question follows ("which country does Greenland belong to?": 4 choices on Easy, the country list on Medium, typing on Hard), one try, with "Skip the bonus". The win card counts bonuses.
+- Clues: housecat for most; jaguar for French Guiana and leopard cat for Hong Kong (both checked with IUCN); "Where's the cat exploring where no one lives?" for South Georgia, Heard and McDonald, the French Southern Lands, and Ashmore and Cartier.
+- Sizes use the same tiers as countries, so territories join the ladder by size like any country.
 
 ## Still to do
 

@@ -1,6 +1,8 @@
 import json, math, sys
 S, wj = sys.argv[1:3]
 names = json.load(open(S+'/names.json')); w = json.load(open(wj))
+# territories too (deps.json: code -> [name, country it belongs to])
+names.update({c: d[0] for c, d in json.load(open(S+'/deps.json')).items()})
 ALIAS = {'CYN':'CYP','SOL':'SOM','ALD':'FIN'}
 R = 6371.0
 def ring_area(r):

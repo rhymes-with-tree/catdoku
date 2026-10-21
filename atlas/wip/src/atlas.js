@@ -2,6 +2,12 @@
 // The 200 countries a trip can ask: the 193 UN members plus Vatican City, Palestine, Taiwan, Kosovo,
 // Western Sahara, the Cook Islands and Niue (the same list as World Map Recall).
 const NAMES = /*NAMES*/;
+// Territories quizzed alongside the countries: every place with an ISO country code of its own, named with the
+// country it belongs to ("Greenland (Denmark)"). Either answer is right on its own; naming the country too is a bonus.
+const DEPS = /*DEPS*/;
+const nameOf = c => NAMES[c] || (DEPS[c] && DEPS[c][0]) || c;
+const PLACES = [...Object.keys(NAMES), ...Object.keys(DEPS)];
+const OWNERS = [...new Set(Object.values(DEPS).map(d => d[1]))];
 // Map pieces that light up with the country they belong to.
 const ALIAS = {CYN: "CYP", SOL: "SOM", ALD: "FIN"};
 // Continents for Easy's wrong answers, as World Map Recall has them.
@@ -16,7 +22,7 @@ const CATS = {
   rusty: "the rusty-spotted cat", manul: "Pallas's cat", sand: "the sand cat", blackfoot: "the black-footed cat",
   jungle: "the jungle cat", wildcat: "the wildcat"};
 // One cat for each country: a wild cat that lives there (checked against GBIF sightings and the IUCN Red List), or,
-// where no wild cat does any more, a housecat that migrated there.
+// where no wild cat does any more, a housecat that migrated there; a cat exploring, where no one lives at all.
 const CLUE = Object.fromEntries(`
 DZA cheetah AGO serval BEN lion BWA leopard BFA leopard BDI serval CPV house CMR golden CAF golden TCD cheetah COM house
 COG leopard COD serval CIV leopard DJI caracal EGY jungle GNQ golden ERI caracal SWZ serval ETH lion GAB golden GMB serval
@@ -37,9 +43,22 @@ FIN lynx FRA lynx DEU wildcat GRC wildcat HUN wildcat ISL house IRL house ITA wi
 LUX wildcat MLT house MDA wildcat MCO house MNE wildcat NLD wildcat MKD lynx NOR lynx POL lynx PRT lynx ROU lynx RUS tiger
 SMR house SRB wildcat SVK lynx SVN lynx ESP lynx SWE lynx CHE lynx UKR lynx GBR house VAT house KOS wildcat
 AUS house FJI house KIR house MHL house FSM house NRU house NZL house PLW house PNG house WSM house SLB house TON house
-TUV house VUT house COK house NIU house`.trim().split(/\s+/).reduce((a, w, i, all) => (i % 2 ? a : [...a, [w, all[i + 1]]]), []));
+TUV house VUT house COK house NIU house
+GRL house GUF jaguar SJM house NCL house FLK house PRI house ATF empty SGS empty PYF house REU house GLP house MTQ house
+FRO house HKG leopardcat IMN house GUM house CUW house HMD empty MYT house MNP house TCA house VIR house CYM house BES house
+SPM house SHN house ABW house IOA house VGB house IOT house WLF house JEY house ASM house AIA house MSR house BMU house
+MAF house GGY house SXM house NFK house PCN house BLM house MAC house TKL house ATC empty`.trim().split(/\s+/).reduce((a, w, i, all) => (i % 2 ? a : [...a, [w, all[i + 1]]]), []));
 // Countries never offered as each other's wrong answer on Easy, however close they are.
 const NEVER_WITH = {ISR: ["PSX"], PSX: ["ISR"]};
+// "Greenland Denmark" or "Greenland (Denmark)" typed in one go: the territory and its country, or null.
+function bothNames(text) {
+  const n = norm(text);
+  for (const d in DEPS) for (const name of [DEPS[d][0], ...(AKA[d] || [])]) {
+    const k = norm(name);
+    if (n.startsWith(k + " ")) { const o = LOOKUP.get(n.slice(k.length + 1)); if (o && NAMES[o]) return [d, o]; }
+  }
+  return null;
+}
 // Other names typed answers are matched against (Medium's list finds them too).
 const AKA = {
   CIV: ["Côte d'Ivoire"], CZE: ["Czech Republic"], MMR: ["Burma"], TLS: ["East Timor"], SWZ: ["Swaziland"], CPV: ["Cabo Verde"],
@@ -50,7 +69,14 @@ const AKA = {
   ATG: ["Antigua"], KNA: ["Saint Kitts", "St Kitts and Nevis"], LCA: ["St Lucia"], VCT: ["Saint Vincent", "St Vincent and the Grenadines"],
   STP: ["São Tomé", "Sao Tome and Principe"], GMB: ["The Gambia"], BHS: ["The Bahamas"], PSX: ["State of Palestine"],
   LAO: ["Lao PDR"], RUS: ["Russian Federation"], BRN: ["Brunei Darussalam"], VNM: ["Viet Nam"], SAH: ["Sahrawi Republic"],
-  PNG: ["PNG"], NZL: ["Aotearoa"], DOM: ["DR"], SDS: ["S Sudan"], GNQ: ["Eq Guinea"]};
+  PNG: ["PNG"], NZL: ["Aotearoa"], DOM: ["DR"], SDS: ["S Sudan"], GNQ: ["Eq Guinea"],
+  GRL: ["Kalaallit Nunaat"], FLK: ["Falklands", "Malvinas", "Islas Malvinas"], FRO: ["Faeroe Islands", "Faroes"],
+  SGS: ["South Georgia"], ATF: ["French Southern Lands", "Kerguelen"], HMD: ["Heard Island"], SJM: ["Svalbard and Jan Mayen"],
+  SHN: ["Saint Helena", "St Helena"], IOA: ["Christmas Island", "Cocos Islands", "Cocos (Keeling) Islands"],
+  IOT: ["Chagos", "British Indian Ocean Territory", "BIOT"], BES: ["Caribbean Netherlands", "Bonaire", "Saba", "Sint Eustatius"],
+  BLM: ["St Barts", "St Barths", "Saint-Barthélemy"], MAF: ["St Martin", "Saint-Martin"], VIR: ["US Virgin Islands", "USVI"],
+  VGB: ["BVI"], TCA: ["Turks and Caicos"], CYM: ["Caymans"], PYF: ["Tahiti"], WLF: ["Wallis"], MNP: ["Northern Marianas"],
+  SPM: ["St Pierre and Miquelon"], ATC: ["Ashmore Reef"], MAC: ["Macau"], HKG: ["HK"]};
 
 /* ---------- names ---------- */
 // What a typed name is compared by: no accents, case, punctuation, "the", and "St" read as "Saint".
@@ -59,15 +85,17 @@ function norm(s) {
     .replace(/\bst\b\.?/g, "saint").replace(/[^a-z]+/g, " ").replace(/\bthe\b/g, " ").replace(/\s+/g, " ").trim();
 }
 const LOOKUP = new Map();
-for (const c in NAMES) for (const n of [NAMES[c], ...(AKA[c] || [])]) LOOKUP.set(norm(n), c);
-const SORTED = Object.keys(NAMES).sort((a, b) => NAMES[a].localeCompare(NAMES[b]));
+for (const c of PLACES) for (const n of [nameOf(c), ...(AKA[c] || [])]) LOOKUP.set(norm(n), c);
+const SORTED = [...PLACES].sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
 // Countries for Medium's list: every country, or those whose name (or other name) has a word starting with what's typed,
 // names that start with it first.
-function matching(q) {
-  q = norm(q); if (!q) return SORTED;
+// (Only countries, when it's the bonus question of whose a territory is.)
+function matching(q, countriesOnly) {
+  const from = countriesOnly ? SORTED.filter(c => NAMES[c]) : SORTED;
+  q = norm(q); if (!q) return from;
   const starts = [], words = [];
-  for (const c of SORTED) {
-    const ns = [NAMES[c], ...(AKA[c] || [])].map(norm);
+  for (const c of from) {
+    const ns = [nameOf(c), ...(AKA[c] || [])].map(norm);
     if (ns.some(n => n.startsWith(q))) starts.push(c);
     else if (ns.some(n => (" " + n).includes(" " + q))) words.push(c);
   }
@@ -255,7 +283,9 @@ const sizeGap = (a, b) => Math.abs(Math.log(km2(a) / km2(b)));
 // Easy's three wrong names, all from the same continent: far away and of other sizes on step 1, far away on 2,
 // one near neighbour on 3, near neighbours of a similar size on 4, and the most alike of all on 5.
 function wrongNames(c, step) {
-  const all = Object.keys(NAMES).filter(d => d !== c && regionOf(d) === regionOf(c) && !(NEVER_WITH[c] || []).includes(d));
+  let all = PLACES.filter(d => d !== c && regionOf(d) === regionOf(c) && !(NEVER_WITH[c] || []).includes(d));
+  // the two places alone in the Southern Ocean borrow their nearest neighbours
+  if (all.length < 6) all = PLACES.filter(d => d !== c && world.main[d]).sort((a, b) => apart(c, a) - apart(c, b)).slice(0, 8);
   const byNear = [...all].sort((a, b) => apart(c, a) - apart(c, b));
   const alike = [...all].sort((a, b) => (apart(c, a) / 30 + sizeGap(c, a)) - (apart(c, b) / 30 + sizeGap(c, b)));
   const far = byNear.slice(Math.floor(byNear.length / 2));
@@ -267,12 +297,13 @@ function wrongNames(c, step) {
 }
 // Ten countries for a level, not asked lately where that leaves enough.
 function makeTrip(level) {
-  const step = stepOf(level), pool = Object.keys(NAMES).filter(c => askable(c, step) && world.main[c]);
+  const step = stepOf(level), pool = PLACES.filter(c => askable(c, step) && world.main[c]);
   const pick = (from, n) => { const fresh = from.filter(c => !recent.includes(c)); return shuffle(fresh.length >= n ? fresh : from).slice(0, n); };
   let codes;
   if (step === 5) { const hard = pick(pool.filter(hardOne), 7); codes = shuffle([...hard, ...pick(pool.filter(c => !hard.includes(c)), 3)]); }
   else codes = pick(pool, TRIP);
-  return codes.map(c => ({c, opts: shuffle([c, ...wrongNames(c, step)])}));
+  return codes.map(c => DEPS[c] ? {c, opts: shuffle([c, ...wrongNames(c, step)]), owners: shuffle([DEPS[c][1], ...shuffle(OWNERS.filter(o => o !== DEPS[c][1])).slice(0, 3)])}
+    : {c, opts: shuffle([c, ...wrongNames(c, step)])});
 }
 const freshCard = () => ({wrong: [], hints: 0, out: []});
 function newTrip(level, trip) {
@@ -287,16 +318,20 @@ function show(fly) {
   // progress dots: green first time, coral after a miss
   $("count").innerHTML = game.trip.map((t, i) => `<i class="${i < game.res.length ? (game.res[i].first ? "ok" : "miss") : i === game.i && !done ? "now" : ""}"></i>`).join("");
   $("count").setAttribute("aria-label", `Cat ${Math.min(game.i + 1, TRIP)} of ${TRIP}`);
-  const cat = CATS[CLUE[code]] || "the cat";
-  $("clue").innerHTML = done ? "Trip done!" : CLUE[code] === "house" ? "Where did the <b>housecat</b> migrate?" : `Where's ${cat.replace(/^(the )?(.*)$/, (m, the, rest) => `${the || ""}<b>${rest}</b>`)}?`;
-  $("reveal").textContent = !done && mode() > 1 && game.card.hints ? reveal(NAMES[code], game.card.hints) : "";
+  const cat = CATS[CLUE[code]] || "the cat", bonus = !done && game.card.bonus === "ask";
+  $("clue").innerHTML = done ? "Trip done!" : bonus ? `Bonus: which country does <b>${nameOf(code)}</b> belong to?`
+    : CLUE[code] === "house" ? "Where did the <b>housecat</b> migrate?" : CLUE[code] === "empty" ? "Where's the <b>cat</b> exploring where no one lives?"
+    : `Where's ${cat.replace(/^(the )?(.*)$/, (m, the, rest) => `${the || ""}<b>${rest}</b>`)}?`;
+  $("skipBtn").hidden = !bonus;
+  $("reveal").textContent = !done && !bonus && mode() > 1 && game.card.hints ? reveal(nameOf(code), game.card.hints) : "";
   $("choices").hidden = done || mode() !== 1;
   $("typebox").hidden = done || mode() === 1;
   $("list").hidden = done || mode() !== 2;
   if (mode() === 1 && !done) {
     $("choices").innerHTML = "";
-    for (const o of game.trip[game.i].opts) {
-      const b = document.createElement("button"); b.textContent = NAMES[o];
+    for (const o of bonus ? game.trip[game.i].owners : game.trip[game.i].opts) {
+      const b = document.createElement("button"); b.textContent = nameOf(o);
+      if (bonus) { b.onclick = () => answerBonus(o, b); $("choices").append(b); continue; }
       if (game.card.wrong.includes(o)) b.className = "wrong"; else if (game.card.out.includes(o)) b.className = "out";
       else if (o === code && game.card.hints > 2) b.className = "gold";
       b.disabled = game.card.wrong.includes(o) || game.card.out.includes(o);
@@ -305,8 +340,8 @@ function show(fly) {
     }
   }
   if (mode() === 2 && !done) fillList();
-  $("tried").innerHTML = mode() > 1 && !done ? game.card.wrong.map(c => `<span>${NAMES[c]}</span>`).join("") : "";
-  $("hintBtn").disabled = done;
+  $("tried").innerHTML = mode() > 1 && !done && !bonus ? game.card.wrong.map(c => `<span>${nameOf(c)}</span>`).join("") : "";
+  $("hintBtn").disabled = done || bonus;
   if (world && code && fly) flyTo(frameFor(code), fly === "jump");
   else redraw();
 }
@@ -319,11 +354,11 @@ function reveal(name, n) {
 // Medium's list of every country, narrowed to what's typed.
 let active = -1;
 function fillList() {
-  const list = $("list"), cs = matching($("guess").value);
+  const list = $("list"), cs = matching($("guess").value, game.card.bonus === "ask");
   list.innerHTML = "";
   if (!cs.length) { const li = document.createElement("li"); li.className = "none"; li.textContent = "No country starts like that"; list.append(li); }
   cs.forEach((c, i) => {
-    const li = document.createElement("li"); li.role = "option"; li.textContent = NAMES[c]; li.dataset.c = c;
+    const li = document.createElement("li"); li.setAttribute("role", "option"); li.textContent = nameOf(c); li.dataset.c = c;
     li.setAttribute("aria-selected", i === active);
     li.onpointerdown = e => e.preventDefault();      // keep the keyboard up on phones
     li.onclick = () => submit(c);
@@ -340,13 +375,16 @@ $("guess").addEventListener("keydown", e => {
 });
 $("typebox").addEventListener("submit", e => {
   e.preventDefault();
-  const text = $("guess").value, exact = LOOKUP.get(norm(text));
-  if (exact) return submit(exact);
+  const text = $("guess").value, exact = LOOKUP.get(norm(text)), both = !exact && bothNames(text);
+  if (game.card.bonus === "ask") {
+    if (exact && NAMES[exact]) { $("guess").value = ""; return answerBonus(exact); }
+  } else if (exact) return submit(exact);
+  else if (both) { game.card.bonus = both[1] === DEPS[both[0]][1] ? "given" : undefined; return submit(both[0]); }
   if (mode() === 2) { const li = $("list").querySelectorAll("li[data-c]")[Math.max(active, 0)]; if (li && text.trim()) return submit(li.dataset.c); }
   if (!text.trim()) { G.note("Type the name of the lit country."); return; }
-  G.note(`There's no country called “${text.trim()}”. Check the spelling?`);
+  G.note(`There's no ${game.card.bonus === "ask" ? "country" : "country or territory"} called “${text.trim()}”. Check the spelling?`);
 });
-function submit(c) { $("guess").value = ""; active = -1; answer(c); }
+function submit(c) { $("guess").value = ""; active = -1; if (game.card.bonus === "ask") answerBonus(c); else answer(c); }
 
 function answer(c, btn) {
   if (busy || !game || game.won) return;
@@ -354,22 +392,39 @@ function answer(c, btn) {
   const code = current(), card = game.card;
   if (c !== code) {
     if (!card.wrong.includes(c)) card.wrong.push(c);
-    G.note(`Not ${NAMES[c]}. Try again!`, 2500);
+    G.note(`Not ${nameOf(c)}. Try again!`, 2500);
     save(); show(); if (mode() > 1) $("guess").focus();
     return;
   }
-  game.res.push({c, first: !card.wrong.length && !card.hints, hinted: card.hints > 0});
+  const given = card.bonus === "given";
+  game.res.push({c, first: !card.wrong.length && !card.hints, hinted: card.hints > 0, ...(DEPS[c] ? {bonus: given} : {})});
   if (btn) btn.className = "right";
-  G.note(card.wrong.length || card.hints ? `${NAMES[c]}, yes.` : `${NAMES[c]}! First try.`, 1800);
+  const name = given ? `${nameOf(c)} (${nameOf(DEPS[c][1])})` : nameOf(c);
+  G.note(card.wrong.length || card.hints ? `${name}, yes.${given ? " Bonus!" : ""}` : `${name}! First try.${given ? " Bonus!" : ""}`, 1800);
   flash = {code}; busy = true; redraw();
   setTimeout(() => {
     flash = null; busy = false;
-    game.i++; game.card = freshCard();
-    if (game.i >= TRIP) return win();
-    save(); show(true);
-    if (mode() > 1 && matchMedia("(hover: hover)").matches) $("guess").focus();
+    if (DEPS[c] && !given) { card.bonus = "ask"; save(); show(); if (mode() > 1 && matchMedia("(hover: hover)").matches) $("guess").focus(); }
+    else advance();
   }, 1100);
   save();
+}
+// The bonus for a territory: one try at the country it belongs to.
+function answerBonus(o, btn) {
+  if (busy || game.card.bonus !== "ask") return;
+  const code = current(), owner = DEPS[code][1], got = o === owner;
+  game.res[game.res.length - 1].bonus = got; game.card.bonus = "done";
+  if (btn) btn.className = got ? "right" : "wrong";
+  G.note(got ? `${nameOf(owner)}! Bonus!` : `It belongs to ${nameOf(owner)}.`, 2200);
+  busy = true; save();
+  setTimeout(() => { busy = false; advance(); }, got ? 900 : 1600);
+}
+$("skipBtn").onclick = () => { if (game.card.bonus !== "ask" || busy) return; game.card.bonus = "done"; G.note(`It belongs to ${nameOf(DEPS[current()][1])}.`, 2200); save(); advance(); };
+function advance() {
+  game.i++; game.card = freshCard();
+  if (game.i >= TRIP) return win();
+  save(); show(true);
+  if (mode() > 1 && matchMedia("(hover: hover)").matches) $("guess").focus();
 }
 
 function win() {
@@ -377,9 +432,10 @@ function win() {
   const first = game.res.filter(r => r.first).length, gold = first === TRIP && !game.hinted && !game.restarted;
   const level = game.level, next = gold ? Math.min(15, level + 1) : level;
   G.finishClock(game); save(); show();
+  const deps = game.res.filter(r => "bonus" in r), bonusLine = deps.length ? ` Bonus: ${deps.filter(r => r.bonus).length} of ${deps.length} territories' countries named.` : "";
   const why = game.hinted ? ` You had a hint, so here's another trip at ${levelName(level)}.`
     : gold ? (next > level ? ` On to ${levelName(next)}!` : "") : ` Find all ${TRIP} on the first try to move up a level.`;
-  G.winCard(`${first} of ${TRIP} found on the first try.${why}`, () => { G.closeCard(); newTrip(next); }, "Look at the map", game.result,
+  G.winCard(`${first} of ${TRIP} found on the first try.${bonusLine}${why}`, () => { G.closeCard(); newTrip(next); }, "Look at the map", game.result,
     {title: "Trip done!", gold, goldWhy: "Every cat found on the first try!", next: next > level ? `Next: ${levelName(next)}` : "New trip",
      after: G.otherSize($("levelSel"), next, l => newTrip(l), "Or play a different level:")});
   if (typeof PREVIEW !== "undefined") for (const b of $("card").querySelectorAll("button")) if (/share/i.test(b.textContent)) b.remove();
@@ -393,10 +449,10 @@ $("hintBtn").onclick = () => {
   card.hints++; game.hinted = true; game.started = true;
   if (mode() === 1) {
     const left = game.trip[game.i].opts.filter(o => o !== code && !card.wrong.includes(o) && !card.out.includes(o));
-    if (left.length) { const o = left[Math.floor(Math.random() * left.length)]; card.out.push(o); G.note(`It isn't ${NAMES[o]}.`); }
+    if (left.length) { const o = left[Math.floor(Math.random() * left.length)]; card.out.push(o); G.note(`It isn't ${nameOf(o)}.`); }
     else { card.hints = 3; G.note("It's the one ringed in gold."); }
   } else {
-    const letters = [...NAMES[code]].filter(ch => /\p{L}/u.test(ch)).length;
+    const letters = [...nameOf(code)].filter(ch => /\p{L}/u.test(ch)).length;
     card.hints = Math.min(card.hints, letters);
     G.note(card.hints >= letters ? "That's the whole name." : "One more letter, under the cat.");
   }
@@ -425,7 +481,7 @@ $("helpBtn").onclick = () => game && game.won ? G.helpLater() : walkthrough();
 /* ---------- start ---------- */
 function start() {
   G.reopen(() => {
-    if (saved.game && saved.game.trip && saved.game.trip.length === TRIP && saved.game.trip.every(t => NAMES[t.c])) {
+    if (saved.game && saved.game.trip && saved.game.trip.length === TRIP && saved.game.trip.every(t => PLACES.includes(t.c))) {
       game = saved.game; G.checkClock(game); $("levelSel").value = game.level; show("jump");
     } else newTrip(settings.level || 1);
   }, msg => { newTrip(settings.level || 1); G.note(msg, 0); });
