@@ -33,7 +33,7 @@ The owner's reasoning: large countries are easier than medium ones, which are ea
 | `src/atlas.css`, `src/atlas.body.html` | The page's own CSS and markup |
 | `names.json` | The 200 countries (same list and codes as World Map Recall in rhymes-with-tree/mapstudy) |
 | `deps.json` | The 45 territories: code to [name, country it belongs to] |
-| `difficulty_by_owner.tsv` | The owner's own difficulty for each place (Easy, Medium, Very Difficult), for the reworked ladder. Not wired into the game yet |
+| `difficulty_by_owner.tsv` | The owner's own difficulty for each place (Easy, Medium, Difficult), one row per place in the game, for the reworked ladder. Not wired into the game yet |
 | `sizes.json` | Area in km² and island flag (no land border) per country, from `scripts/sizes.py` |
 | `gbif_counts.json` | GBIF wild cat records per country and species (1990 onward, sightings and camera traps only), from `scripts/gbif.py` |
 | `iso2.json` | Country code to ISO 2-letter code, for GBIF |
