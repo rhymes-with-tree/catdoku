@@ -2,8 +2,6 @@
 
 A new Catdoku game, not on the site yet, for a new Cat Travels shelf ("Countries, maps and places"). A country lights up on the world map, with a clue such as "Where's the lynx?" (a wild cat that lives there), and the player names the country. 
 
-Playable preview (the owner's artifact): https://claude.ai/artifact/JcXFSEy8b4zZwfZA2wJNn5. Republish to that same URL by passing it as `url` (read it first).
-
 ## Decisions the owner made
 
 | Topic | Decision |
@@ -35,7 +33,7 @@ The owner's reasoning: large countries are easier than medium ones, which are ea
 | `sizes.json` | Area in km² and island flag (no land border) per country, from `scripts/sizes.py` |
 | `gbif_counts.json` | GBIF wild cat records per country and species (1990 onward, sightings and camera traps only), from `scripts/gbif.py` |
 | `iso2.json` | Country code to ISO 2-letter code, for GBIF |
-| `scripts/build_preview.py` | Builds the artifact page: `python3 atlas/wip/scripts/build_preview.py atlas/wip . ../mapstudy (the third argument is no longer used)` writes `atlas/wip/preview/` (ignored by git), with `world_un.json` copied in as `world.json`, and `disputed.json` |
+| `scripts/build_preview.py` | Builds a standalone preview page: `python3 atlas/wip/scripts/build_preview.py atlas/wip . ../mapstudy (the third argument is no longer used)` writes `atlas/wip/preview/` (ignored by git), with `world_un.json` copied in as `world.json`, and `disputed.json` |
 | `scripts/play.js`, `scripts/trips.js` | Playwright checks. Wrap `preview/cat-atlas.html` in `<!doctype html><html><head><meta charset="utf-8"></head><body>…</body></html>` as `preview/test.html`, serve `preview/` on port 8766, then run them |
 
 ## The cat table (`CLUE` in `src/atlas.js`)
