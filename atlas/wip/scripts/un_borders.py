@@ -3,6 +3,7 @@
 # Earth's 1:50m breakaway and disputed areas, this moves:
 #   Crimea from Russia to Ukraine, the Golan Heights from Israel to Syria, and the Moroccan-held part of
 #   Western Sahara from Morocco to Western Sahara.
+# It also hands the Chagos Islands (British Indian Ocean Territory) to Mauritius, as the UN General Assembly voted in 2019.
 # Run: python3 un_borders.py <world.json> <ne_50m_admin_0_breakaway_disputed_areas.geojson> <out.json>
 import json, sys
 from shapely.geometry import shape, mapping, MultiPolygon, Polygon
@@ -26,7 +27,8 @@ def coords(g):
         p = orient(p, sign=-1.0)            # outer rings clockwise, holes counterclockwise, as in world.json
         res.append([[[round(x, 3), round(y, 3)] for x, y in r.coords] for r in [p.exterior, *p.interiors]])
     return res
-changed = {c for pair in MOVES.values() for c in pair}
-rows = [row[:5] + [coords(geom[row[0]])] if row[0] in changed else row for row in world]
+geom["MUS"] = snap(geom["MUS"].union(geom["IOT"]))
+changed = {c for pair in MOVES.values() for c in pair} | {"MUS"}
+rows = [row[:5] + [coords(geom[row[0]])] if row[0] in changed else row for row in world if row[0] != "IOT"]
 json.dump(rows, open(out, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
 for c in sorted(changed): print(c, len(geom[c].geoms) if hasattr(geom[c], "geoms") else 1, "pieces")
