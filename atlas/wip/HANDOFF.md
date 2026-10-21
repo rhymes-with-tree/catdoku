@@ -10,7 +10,6 @@ Playable preview (the owner's artifact): https://claude.ai/artifact/JcXFSEy8b4zZ
 |---|---|
 | Clues | Wild cats by plain species name, never a name that gives the country away ("lynx", not "Iberian lynx") |
 | Countries with no native wild cat (45, mostly islands) | "Where did the **housecat** migrate?" |
-| Walkthrough, step 2 | "A cat is hiding in its native environment." |
 | Mascot | None |
 | Levels | Easy / Medium / Hard: the owner's lists in `difficulty_by_owner.tsv` (`tiers.json`). Trips mix: Easy 10 Easy; Medium 7 Medium + 3 Easy; Hard 6 Hard + 3 Medium + 1 Easy. The US, Mexico, Canada, Russia, Brazil, Australia, India and China are never asked on Hard |
 | Regions | World, or a region; where a continent is short at a level it's paired: Easy offers Americas, Europe & Africa, Asia & Oceania (Easy Americas adds Panama and Jamaica); Medium offers Americas, Africa, Europe, Asia & Oceania; Hard offers all five (Americas, Africa, Asia, Europe, Australia and Oceania) |
@@ -32,7 +31,7 @@ The owner's reasoning: large countries are easier than medium ones, which are ea
 | `src/atlas.css`, `src/atlas.body.html` | The page's own CSS and markup |
 | `names.json` | The 200 countries (same list and codes as World Map Recall in rhymes-with-tree/mapstudy) |
 | `deps.json` | The 45 territories: code to [name, country it belongs to] |
-| `difficulty_by_owner.tsv` | The owner's own difficulty for each place (Easy, Medium, Difficult), one row per place in the game, for the reworked ladder. Not wired into the game yet |
+| `difficulty_by_owner.tsv` | The owner's own difficulty for each place (Easy, Medium, Difficult), one row per place in the game; `tiers.json` is the same as codes, used by the game |
 | `sizes.json` | Area in km² and island flag (no land border) per country, from `scripts/sizes.py` |
 | `gbif_counts.json` | GBIF wild cat records per country and species (1990 onward, sightings and camera traps only), from `scripts/gbif.py` |
 | `iso2.json` | Country code to ISO 2-letter code, for GBIF |
@@ -49,12 +48,11 @@ The IUCN key is a Bearer secret in the environment's network settings, added to 
 
 ## Sensitive pairs
 
-- Israel and Palestine are never each other's wrong answer on Easy (`NEVER_WITH` in `src/atlas.js`). The owner asked for this. Other pairs are waiting on the owner.
+- Pairs kept apart on Pick: see the table above (`NEVER_WITH` in `src/atlas.js`).
 - Borders follow the UN (the owner's call). World Map Recall's `world.json` draws Crimea as Russia, the Golan Heights as Israel and the Moroccan-held part of Western Sahara as Morocco; `scripts/un_borders.py` (needs shapely) moves them to Ukraine, Syria and Western Sahara (and the Chagos Islands to Mauritius, per the 2019 UN General Assembly vote) using Natural Earth's `ne_50m_admin_0_breakaway_disputed_areas.geojson`, writing `world_un.json`, the game's map. `sizes.json` is measured from it.
 - Western Sahara keeps its plain name and Somaliland stays part of Somalia, as the UN has them (the owner's call).
 - Disputed land is drawn with grey stripes and a dashed edge, with a "Disputed" key on the map. The owner's rule: stripe land where the map, drawn the UN's way, and whoever actually runs it disagree; or a region split by a ceasefire line where the UN takes no view on which side is whose. The Koreas and Palestine are not striped (reasons in `scripts/disputed.py`) but go in the disputed round. Applied in `scripts/disputed.py`, written to `disputed.json`: Crimea, Donetsk, Luhansk (Natural Earth's 2014 lines), Golan Heights, Northern Cyprus, Somaliland, Abkhazia, South Ossetia, Transnistria, Abyei, the Kashmir areas, Aksai Chin, Arunachal Pradesh and the small India–China valleys, and all of Western Sahara. Not striped: Kosovo, Taiwan, Palestine, the Kuril Islands, the Ilemi Triangle, the Guyana/French Guiana–Suriname headwaters, Junagadh, Nagorno-Karabakh (Azerbaijan has run it since 2023), the Falklands.
-- A "disputed territory" round (the owner's idea): a fill-in-the-blank sentence per place ("___ is controlled by ___ and claimed by ___"), one answer box, each right guess fills its blank; bonus points for naming every other name a place goes by (all names accepted). Everything disputed goes in, unstriped ones too (the Kurils, Kosovo, Taiwan, the Koreas, Israel and Palestine, Belize–Guatemala, the Falklands…). Sentences to be drafted by Claude and reviewed by the owner.
-- Still open with the owner: which other pairs to keep apart; the disputed round's place list and sentences; the difficulty ladder, which the owner is reworking from scratch, starting from `difficulty_by_owner.tsv`.
+- A "disputed territory" round (the owner's idea): a fill-in-the-blank sentence per place ("___ is controlled by ___ and claimed by ___"), one answer box, each right guess fills its blank; bonus points for naming every other name a place goes by (all names accepted). Everything disputed goes in, unstriped ones too (the Kurils, Kosovo, Taiwan, the Koreas, Israel and Palestine, Belize–Guatemala, the Falklands…). Built (see the table above).
 
 ## Territories
 
@@ -64,8 +62,12 @@ Quizzed alongside the 200 countries (the owner's choice): every place with an IS
 - Clues: housecat for most; jaguar for French Guiana and leopard cat for Hong Kong (both checked with IUCN); "Where's the cat exploring where no one lives?" for South Georgia, Heard and McDonald, the French Southern Lands, and Ashmore and Cartier.
 - Sizes use the same tiers as countries, so territories join the ladder by size like any country.
 
+## Cat photos
+
+The owner is restyling the iNaturalist photos (`cat-photos/CREDITS.md`, `cat-photos/contact-sheet.jpg`) to match the site's art, like Fred and Jan Brady. When they come back, show them with the clues: one per wild species (the black panther is a black leopard), and the site's own cats from `cats/` for the housecat and the cat exploring where no one lives. Keep the credits, on a credits card or in `ARTWORK.md`.
+
 ## Still to do
 
-1. Settle the sensitive pairs and the disputed borders with the owner.
+1. Add the owner's restyled cat pictures.
 2. Port to the site following `.claude/skills/new-game/SKILL.md` (step 3 onward): `atlas/index.html`, the map data in `atlas/`, `G.GAMES` entry, icon, README section, the `IDEAS.md` row (group Geography), build bump, PR. Ask the owner which shelf it goes on.
 3. Maybe later: wild cat photos from iNaturalist (Creative Commons, needs credits).
