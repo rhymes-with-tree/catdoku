@@ -5,7 +5,7 @@ const NAMES = /*NAMES*/;
 // Territories quizzed alongside the countries: every place with an ISO country code of its own, named with the
 // country it belongs to ("Greenland (Denmark)"). Either answer is right on its own; naming the country too is a bonus.
 const DEPS = /*DEPS*/;
-const nameOf = c => NAMES[c] || (DEPS[c] && DEPS[c][0]) || c;
+const nameOf = c => NAMES[c] || (DEPS[c] && DEPS[c][0]) || (c.startsWith("dz:") && DISPUTES[c.slice(3)] ? DISPUTES[c.slice(3)].name : c);
 const PLACES = [...Object.keys(NAMES), ...Object.keys(DEPS)];
 const OWNERS = [...new Set(Object.values(DEPS).map(d => d[1]))];
 // Map pieces that light up with the country they belong to.
@@ -62,6 +62,34 @@ function bothNames(text) {
   }
   return null;
 }
+// The disputed-territory round: each place has a sentence with blanks, {0} for the place itself and {1}, {2}... for
+// the countries in its dispute (codes in `who`). Every name in `aka` also counts for the place; naming them earns bonuses.
+// The sentences say who controls and who claims, never who's right.
+const DISPUTES = {
+  crimea: {name: "Crimea", aka: ["Crimean Peninsula", "Krym"], s: "{0} is controlled by {1} and claimed by {2}.", who: ["RUS", "UKR"]},
+  donbas: {name: "Donbas", aka: ["Donbass", "Donetsk and Luhansk", "Donetsk", "Luhansk"], s: "Most of the {0} is controlled by {1} and claimed by {2}.", who: ["RUS", "UKR"]},
+  golan: {name: "Golan Heights", aka: ["Golan", "Jawlan"], s: "The {0} are controlled by {1} and claimed by {2}.", who: ["ISR", "SYR"]},
+  wsahara: {name: "Western Sahara", aka: ["Sahrawi Arab Democratic Republic", "Sahrawi Republic", "SADR", "Southern Provinces"], s: "Most of {0} is controlled by {1}, and the Sahrawi Republic claims all of it.", who: ["MAR"]},
+  kashmir: {name: "Kashmir", aka: ["Jammu and Kashmir", "Azad Kashmir", "Gilgit-Baltistan", "Ladakh"], s: "{0} is divided between {1}, {2} and {3}, and none of the lines between them is an agreed border.", who: ["IND", "PAK", "CHN"]},
+  aksaichin: {name: "Aksai Chin", aka: [], s: "{0} is controlled by {1} and claimed by {2}.", who: ["CHN", "IND"]},
+  arunachal: {name: "Arunachal Pradesh", aka: ["Zangnan", "South Tibet"], s: "{0} is controlled by {1} and claimed by {2}.", who: ["IND", "CHN"]},
+  abkhazia: {name: "Abkhazia", aka: ["Apsny"], s: "{0} governs itself with {1}'s backing and is claimed by {2}.", who: ["RUS", "GEO"]},
+  sossetia: {name: "South Ossetia", aka: ["Tskhinvali Region", "Alania"], s: "{0} governs itself with {1}'s backing and is claimed by {2}.", who: ["RUS", "GEO"]},
+  transnistria: {name: "Transnistria", aka: ["Pridnestrovie", "Transdniestria"], s: "{0} governs itself and is claimed by {1}.", who: ["MDA"]},
+  ncyprus: {name: "Northern Cyprus", aka: ["North Cyprus", "TRNC", "Turkish Republic of Northern Cyprus"], s: "{0} governs itself, is recognised only by {1}, and is claimed by {2}.", who: ["TUR", "CYP"]},
+  somaliland: {name: "Somaliland", aka: ["Republic of Somaliland"], s: "{0} governs itself and is claimed by {1}.", who: ["SOM"]},
+  abyei: {name: "Abyei", aka: [], s: "{0} is claimed by both {1} and {2}.", who: ["SDN", "SDS"]},
+  ilemi: {name: "Ilemi Triangle", aka: ["Ilemi"], s: "The {0} is controlled by {1} and claimed by {2}.", who: ["KEN", "SDS"]},
+  kurils: {name: "Kuril Islands", aka: ["Kurils", "Southern Kurils", "Northern Territories", "Chishima"], s: "The southern {0} are controlled by {1} and claimed by {2}.", who: ["RUS", "JPN"]},
+  karabakh: {name: "Nagorno-Karabakh", aka: ["Artsakh", "Karabakh", "Mountainous Karabakh"], s: "{0} was fought over by {1} and {2}; Azerbaijan has controlled it since 2023.", who: ["ARM", "AZE"]},
+  kosovo: {name: "Kosovo", aka: ["Kosova", "Republic of Kosovo"], s: "{0} declared independence from {1}, which still claims it.", who: ["SRB"]},
+  taiwan: {name: "Taiwan", aka: ["Republic of China", "Formosa", "Chinese Taipei"], s: "{0} governs itself and is claimed by {1}.", who: ["CHN"]},
+  palestine: {name: "Palestine", aka: ["State of Palestine", "Palestinian territories", "West Bank and Gaza"], s: "{0} is recognised as a state by most UN members; its borders with {1} are not agreed.", who: ["ISR"]},
+  korea: {name: "Korean Peninsula", aka: ["Korea"], s: "The {0} is divided between {1} and {2}, and each claims all of it.", who: ["PRK", "KOR"]},
+  falklands: {name: "Falkland Islands", aka: ["Falklands", "Malvinas", "Islas Malvinas"], s: "The {0} are governed by the {1} and claimed by {2}.", who: ["GBR", "ARG"]},
+  chagos: {name: "Chagos Islands", aka: ["Chagos Archipelago", "British Indian Ocean Territory"], s: "The UN backs {1}'s claim to the {0}, which the {2} took in 1965.", who: ["MUS", "GBR"]},
+  belize: {name: "Belize", aka: [], s: "{1} claims about half of {0}.", who: ["GTM"]},
+  essequibo: {name: "Essequibo", aka: ["Guayana Esequiba"], s: "{1} claims the {0} region, about two-thirds of {2}.", who: ["VEN", "GUY"]}};
 // Other names typed answers are matched against (Medium's list finds them too).
 const AKA = {
   CIV: ["Côte d'Ivoire"], CZE: ["Czech Republic"], MMR: ["Burma"], TLS: ["East Timor"], SWZ: ["Swaziland"], CPV: ["Cabo Verde"],
@@ -114,12 +142,14 @@ function project(lon, lat) {
     -K * p * (1.007226 + p2 * (0.015085 + p4 * (-0.044475 + 0.028874 * p2 - 0.005916 * p4)))];
 }
 let world = null;       // {land: Path2D of every country, by: {code: [pieces…]}, main: {code: {box, x, y}}, disputed: Path2D}
-function buildWorld(raw, disputedRaw) {
+function buildWorld(raw, disputedRaw, dzRaw) {
   const land = new Path2D(), by = {}, main = {}, disputed = new Path2D();
   for (const [, , mp] of disputedRaw) for (const poly of mp) for (const ring of poly) {
     ring.forEach(([lon, lat], i) => { const [x, y] = project(lon, lat); if (i) disputed.lineTo(x, y); else disputed.moveTo(x, y); });
     disputed.closePath();
   }
+  // the disputed round's shapes light up like places, but aren't drawn as land of their own
+  for (const [code, mp] of dzRaw) raw.push([code, "", "", "", "", mp]);
   for (const [code, , , region, , mp] of raw) {
     const owner = ALIAS[code] || code, path = new Path2D();
     let best = null;
@@ -136,7 +166,7 @@ function buildWorld(raw, disputedRaw) {
       });
       if (!best || Math.abs(area) > best.area) best = {area: Math.abs(area), box};
     }
-    land.addPath(path);
+    if (!code.startsWith("dz:")) land.addPath(path);
     (by[owner] = by[owner] || []).push(path);
     if (code === owner && best) main[code] = {box: best.box, x: (best.box[0] + best.box[2]) / 2, y: (best.box[1] + best.box[3]) / 2, region: REGION_FIX[code] || region};
   }
@@ -284,8 +314,8 @@ const style = () => settings.style;
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const regionOf = c => (world && world.main[c] ? world.main[c].region : "");
 // Best times are kept by level and answer style: the level times 10 plus 1, 2 or 3 for Pick, List or Type.
-const bestKey = g => g.level * 10 + STYLE_ORDER.indexOf(g.style) + 1;
-const keyName = n => `${LEVELS[Math.floor(n / 10)]} · ${STYLES[STYLE_ORDER[n % 10 - 1]][0]}`;
+const bestKey = g => (g.mode === "disputed" ? 90 : g.level * 10) + STYLE_ORDER.indexOf(g.style) + 1;
+const keyName = n => `${n >= 90 ? "Disputed land" : LEVELS[Math.floor(n / 10)]} · ${STYLES[STYLE_ORDER[n % 10 - 1]][0]}`;
 
 // Countries by size: [km², 1 if it has no land border], for how alike two places are.
 const SIZE = /*SIZES*/;
@@ -333,6 +363,7 @@ function fillRegions(level, region) {
   return sel.value;
 }
 function newTrip(level, region, trip) {
+  settings.round = "countries"; showMode();
   region = fillRegions(level, region);
   settings.level = level; settings.region = region; $("levelSel").value = level;
   game = {level, region, style: style(), trip: trip || makeTrip(level, region), i: 0, res: [], card: freshCard(), hinted: false, restarted: false, won: false, ...G.freshClock()};
@@ -347,6 +378,7 @@ function setStyle(s) {
 }
 
 function show(fly) {
+  if (game.mode === "disputed") return showDz(fly);
   const code = current(), done = game.won;
   // progress dots: green on the first try, coral after a miss
   $("count").innerHTML = game.trip.map((t, i) => `<i class="${i < game.res.length ? (game.res[i].first ? "ok" : "miss") : i === game.i && !done ? "now" : ""}"></i>`).join("");
@@ -387,14 +419,15 @@ function reveal(name, n) {
 // The List style's list of every place, narrowed to what's typed.
 let active = -1;
 function fillList() {
-  const list = $("list"), cs = matching($("guess").value, game.card.bonus === "ask");
+  const list = $("list"), dz = game.mode === "disputed";
+  const cs = dz ? (q => DZ_LIST().filter(c => !norm(q) || (" " + norm(nameOf(c))).includes(" " + norm(q))))($("guess").value) : matching($("guess").value, game.card.bonus === "ask");
   list.innerHTML = "";
   if (!cs.length) { const li = document.createElement("li"); li.className = "none"; li.textContent = "No country starts like that"; list.append(li); }
   cs.forEach((c, i) => {
     const li = document.createElement("li"); li.setAttribute("role", "option"); li.textContent = nameOf(c); li.dataset.c = c;
     li.setAttribute("aria-selected", i === active);
     li.onpointerdown = e => e.preventDefault();      // keep the keyboard up on phones
-    li.onclick = () => submit(c);
+    li.onclick = () => dz ? dzGuess(nameOf(c)) : submit(c);
     list.append(li);
   });
 }
@@ -408,7 +441,12 @@ $("guess").addEventListener("keydown", e => {
 });
 $("typebox").addEventListener("submit", e => {
   e.preventDefault();
-  const text = $("guess").value, exact = LOOKUP.get(norm(text)), both = !exact && bothNames(text);
+  const text = $("guess").value;
+  if (game.mode === "disputed") {
+    const li = style() === "list" && active >= 0 && $("list").querySelectorAll("li[data-c]")[active];
+    return dzGuess(li ? li.textContent : text);
+  }
+  const exact = LOOKUP.get(norm(text)), both = !exact && bothNames(text);
   if (game.card.bonus === "ask") {
     if (exact && NAMES[exact]) { $("guess").value = ""; return answerBonus(exact); }
   } else if (exact) return submit(exact);
@@ -461,7 +499,7 @@ function answerBonus(o, btn) {
   busy = true; save();
   setTimeout(() => { busy = false; advance(); }, got ? 900 : 1600);
 }
-$("skipBtn").onclick = () => { if (game.card.bonus !== "ask" || busy) return; game.card.bonus = "done"; G.note(`It belongs to ${nameOf(DEPS[current()][1])}.`, 2200); save(); advance(); };
+$("skipBtn").onclick = () => { if (game.card.bonus !== "ask" || busy) return; if (game.mode === "disputed") { game.card.bonus = "done"; save(); return dzNext(); } game.card.bonus = "done"; G.note(`It belongs to ${nameOf(DEPS[current()][1])}.`, 2200); save(); advance(); };
 function advance() {
   game.i++; game.card = freshCard();
   if (game.i >= TRIP) return win();
@@ -497,6 +535,7 @@ $("hintBtn").onclick = () => {
   if (!game || game.won || busy) return;
   const code = current(), card = game.card;
   card.hints++; game.hinted = true; game.started = true;
+  if (game.mode === "disputed") { G.note("The first empty blank gets one more letter."); save(); return show(); }
   if (style() === "pick") {
     const left = game.trip[game.i].opts.filter(o => o !== code && !card.wrong.includes(o) && !card.out.includes(o));
     if (left.length) { const o = left[Math.floor(Math.random() * left.length)]; card.out.push(o); G.note(`It isn't ${nameOf(o)}.`); }
@@ -508,8 +547,8 @@ $("hintBtn").onclick = () => {
   }
   save(); show();
 };
-$("restartBtn").onclick = () => { if (!game) return; newTrip(game.level, game.region, game.trip); game.restarted = true; save(); };
-$("newBtn").onclick = () => newTrip(+$("levelSel").value, $("regionSel").value);
+$("restartBtn").onclick = () => { if (!game) return; if (game.mode === "disputed") newDzTrip(game.trip); else newTrip(game.level, game.region, game.trip); game.restarted = true; save(); };
+$("newBtn").onclick = () => settings.round === "disputed" ? newDzTrip() : newTrip(+$("levelSel").value, $("regionSel").value);
 $("levelSel").onchange = () => newTrip(+$("levelSel").value, $("regionSel").value);
 $("regionSel").onchange = () => newTrip(+$("levelSel").value, $("regionSel").value);
 for (const s of STYLE_ORDER) $("styleSel").append(new Option(STYLES[s][0], s));
@@ -521,27 +560,162 @@ G.setupTimer({name: "catlas", game: () => game, playing: g => !g.won, save, labe
 function walkthrough() {
   if (!game) return;
   const steps = [
-    {say: "This country is lit up.", lit: [[0, 0]], tone: "ok"},
-    {say: "A cat is hiding in its native environment.", lit: [], els: [$("clue")]},
+    {say: "A cat is hiding here.", lit: [[0, 0]], tone: "ok", els: [$("clue")]},
     {say: style() === "pick" ? "Tap the country's name." : style() === "list" ? "Type its name, or pick it from the list." : "Type its name, then Go.",
      lit: [], els: [style() === "pick" ? $("choices") : $("typebox")]},
-    {say: "Two tries each. Drag or pinch the map to look around.", lit: [[0, 0]], els: [$("recentreBtn")]},
+    {say: "You get two tries for each.", lit: [], els: [style() === "pick" ? $("choices") : $("typebox")]},
+    {say: "Drag or pinch the map to look around.", lit: [[0, 0]], els: [$("recentreBtn")]},
     {say: "Choose how you answer here.", lit: [], els: [$("styleSel")]},
     {say: "Stuck? Hint helps, but costs the gold paw.", lit: [], els: [$("hintBtn")]}];
   G.spotlight({grid: $("grid"), w: 1, h: 1, steps, done: () => { settings.seenHelp = true; save(); }});
 }
 $("helpBtn").onclick = () => game && game.won ? G.helpLater() : walkthrough();
 
+/* ---------- the disputed-territory round ---------- */
+// A separate mode: 10 disputed places, each a sentence to fill in. One answer box (or chips on Pick, or the list):
+// a right guess fills whichever blank it belongs to. 3 wrong guesses and the rest are shown. Once a place is
+// filled in, each of its other names is a bonus (Skip moves on). Gold paw: all 10 with no wrong guess and no hint.
+const DZ_TRIES = 3;
+const dzOf = c => DISPUTES[c.slice(3)];
+// The blanks still to fill: index 0 is the place, then its countries.
+const dzBlanks = d => [d.name, ...d.who.map(nameOf)];
+const dzKnown = (d, i) => i === 0 ? [d.name, ...d.aka] : [nameOf(d.who[i - 1]), ...(AKA[d.who[i - 1]] || [])];
+function makeDzTrip() {
+  const ids = Object.keys(DISPUTES).filter(k => world.by["dz:" + k]);
+  const fresh = ids.filter(k => !recent.includes("dz:" + k));
+  return shuffle(fresh.length >= TRIP ? fresh : ids).slice(0, TRIP).map(k => {
+    const d = DISPUTES[k], apartFrom = d.who.flatMap(w => NEVER_WITH[w] || []).filter(c => !d.who.includes(c));   // never Israel beside Palestine...
+    const others = shuffle(Object.keys(DISPUTES).filter(o => o !== k && !apartFrom.some(c => nameOf(c) === DISPUTES[o].name))).slice(0, 2).map(o => DISPUTES[o].name);
+    const near = PLACES.filter(c => NAMES[c] && !d.who.includes(c) && !apartFrom.includes(c) && world.main[c] && world.main[d.who[0]]).sort((a, b) => apart(d.who[0], a) - apart(d.who[0], b)).slice(0, 2).map(nameOf);
+    const altDecoys = shuffle(Object.keys(DISPUTES).filter(o => o !== k).flatMap(o => DISPUTES[o].aka)).slice(0, 3);
+    return {c: "dz:" + k, chips: shuffle([...dzBlanks(d), ...others, ...near]), altChips: shuffle([...d.aka, ...altDecoys])};
+  });
+}
+function newDzTrip(trip) {
+  settings.round = "disputed";
+  game = {mode: "disputed", level: 9, region: "world", style: style(), trip: trip || makeDzTrip(), i: 0, res: [], card: dzCard(), hinted: false, restarted: false, won: false, ...G.freshClock()};
+  if (!trip) recent = [...recent, ...game.trip.map(t => t.c)].slice(-120);
+  save(); showMode(); show(true);
+}
+const dzCard = () => ({filled: [], wrong: [], hints: 0, alts: [], bonus: undefined});
+function dzSentence(d, card) {
+  const blank = i => {
+    if (card.filled.includes(i)) return `<b>${esc(dzBlanks(d)[i])}</b>`;
+    const first = card.filled.length === 0 || ![...dzBlanks(d).keys()].some(j => j < i && !card.filled.includes(j));
+    const hint = first && card.hints ? dzBlanks(d)[i].slice(0, card.hints) : "";
+    return `<span class="blank">${esc(hint)}${"_".repeat(Math.max(3, 8 - hint.length))}</span>`;
+  };
+  return d.s.replace(/\{(\d)\}/g, (m, i) => blank(+i)).replace(/^(\w)/, x => x.toUpperCase());
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+function showDz(fly) {
+  const t = game.trip[game.i], d = dzOf(t.c), card = game.card, done = game.won, bonus = !done && card.bonus === "ask";
+  $("count").innerHTML = game.trip.map((x, i) => `<i class="${i < game.res.length ? (game.res[i].first ? "ok" : "miss") : i === game.i && !done ? "now" : ""}"></i>`).join("");
+  $("clue").classList.add("dz");
+  $("clue").innerHTML = done ? "Round done!" : dzSentence(d, card);
+  const left = d.aka.filter(a => !card.alts.includes(a));
+  $("reveal").classList.toggle("note", bonus);
+  $("reveal").textContent = bonus ? `Bonus: name another name for ${d.name} (${left.length} more)` + (card.alts.length ? ` · ${card.alts.join(", ")}` : "") : "";
+  $("skipBtn").hidden = !bonus; $("skipBtn").textContent = "Skip the bonus";
+  $("choices").hidden = done || style() !== "pick"; $("typebox").hidden = done || style() === "pick"; $("list").hidden = done || style() !== "list";
+  if (style() === "pick" && !done) {
+    $("choices").innerHTML = "";
+    for (const name of bonus ? t.altChips : t.chips) {
+      const b = document.createElement("button"); b.textContent = name;
+      const used = bonus ? card.alts.includes(name) : dzBlanks(d).some((x, i) => x === name && card.filled.includes(i));
+      if (used) b.className = "right"; if (card.wrong.includes(name)) b.className = "wrong";
+      b.disabled = used || card.wrong.includes(name);
+      b.onclick = () => dzGuess(name);
+      $("choices").append(b);
+    }
+  }
+  if (style() === "list" && !done) fillList();
+  $("tried").innerHTML = style() !== "pick" && !done ? card.wrong.map(w => `<span>${esc(w)}</span>`).join("") : "";
+  $("hintBtn").disabled = done || bonus;
+  if (world && fly) flyTo(frameFor(t.c), fly === "jump"); else redraw();
+}
+// The list for the round: every disputed place and every country.
+const DZ_LIST = () => [...Object.keys(DISPUTES).map(k => "dz:" + k), ...Object.keys(NAMES)].sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+function dzGuess(text) {
+  if (busy || !game || game.won || !text.trim()) return;
+  game.started = true;
+  const t = game.trip[game.i], d = dzOf(t.c), card = game.card, n = norm(text);
+  if (card.bonus === "ask") {
+    const alt = d.aka.find(a => norm(a) === n);
+    if (alt && !card.alts.includes(alt)) { card.alts.push(alt); G.note(`${alt}! Bonus!`, 1600); game.res[game.res.length - 1].bonus = card.alts.length; }
+    else if (alt) G.note("You've named that one.");
+    else { G.note(`${d.name} isn't also called “${text.trim()}”.`, 2000); if (style() === "pick" && !card.wrong.includes(text)) card.wrong.push(text); }
+    $("guess").value = "";
+    if (card.alts.length === d.aka.length) { save(); return setTimeout(dzNext, 900); }
+    save(); show(); return;
+  }
+  const i = dzBlanks(d).findIndex((x, j) => !card.filled.includes(j) && dzKnown(d, j).some(k => norm(k) === n));
+  $("guess").value = ""; active = -1;
+  if (i < 0) {
+    const already = dzBlanks(d).findIndex((x, j) => card.filled.includes(j) && dzKnown(d, j).some(k => norm(k) === n));
+    if (already >= 0) { G.note("That one's filled in already."); return; }
+    card.wrong.push(text.trim());
+    if (card.wrong.length >= DZ_TRIES) {
+      card.filled = [...dzBlanks(d).keys()];
+      game.res.push({c: t.c, first: false, found: false, hinted: card.hints > 0});
+      G.note("Here's the whole sentence.", 2600); busy = true; save(); show();
+      return setTimeout(() => { busy = false; dzNext(); }, 2600);
+    }
+    G.note(`“${text.trim()}” doesn't fit this one. ${DZ_TRIES - card.wrong.length} more ${DZ_TRIES - card.wrong.length === 1 ? "try" : "tries"}.`, 2500);
+    save(); show(); focusTyping(); return;
+  }
+  card.filled.push(i);
+  if (i === 0 && norm(d.name) !== n) { const alt = d.aka.find(a => norm(a) === n); if (alt) card.alts.push(alt); }
+  if (card.filled.length < dzBlanks(d).length) { G.note("Yes!", 1200); save(); show(); focusTyping(); return; }
+  game.res.push({c: t.c, first: !card.wrong.length && !card.hints, found: true, hinted: card.hints > 0, bonus: card.alts.length});
+  G.note(card.wrong.length || card.hints ? "Filled in." : "All of it, first try!", 1600);
+  flash = {code: t.c}; busy = true; save(); show();
+  setTimeout(() => {
+    flash = null; busy = false;
+    if (d.aka.some(a => !card.alts.includes(a))) { card.bonus = "ask"; save(); show(); focusTyping(); } else dzNext();
+  }, 1100);
+}
+function dzNext() {
+  game.i++; game.card = dzCard();
+  if (game.i >= TRIP) return dzWin();
+  save(); show(true); focusTyping();
+}
+function dzWin() {
+  game.won = true; game.i = TRIP - 1;
+  const first = game.res.filter(r => r.first).length, found = game.res.filter(r => r.found).length, bonuses = game.res.reduce((s, r) => s + (r.bonus || 0), 0);
+  const gold = !game.hinted && !game.restarted && first === TRIP;
+  G.finishClock(Object.assign(game, {level: 90 + STYLE_ORDER.indexOf(game.style) + 1}));
+  game.level = 9; save(); show();
+  G.winCard(`${first} of ${TRIP} filled in with no wrong guesses, ${found} in all. ${bonuses} other ${bonuses === 1 ? "name" : "names"} named.`, () => { G.closeCard(); newDzTrip(); }, "Look at the map", game.result,
+    {title: "Round done!", gold, goldWhy: "Every sentence right, first try!", next: "New round"});
+  if (typeof PREVIEW !== "undefined") for (const b of $("card").querySelectorAll("button")) if (/share/i.test(b.textContent)) b.remove();
+}
+// Countries trips or the disputed round: the round has no levels or regions.
+function showMode() {
+  const dz = settings.round === "disputed";
+  $("roundSel").value = dz ? "disputed" : "countries";
+  for (const id of ["levelSel", "regionSel"]) $(id).closest("label").hidden = dz;
+  $("clue").classList.toggle("dz", dz);
+  $("newBtn").textContent = dz ? "New round" : "New trip";
+  $("guess").placeholder = dz ? "Type a place or country" : "Type a country";
+  if (!dz) $("reveal").classList.remove("note");
+}
+$("roundSel").onchange = () => { if ($("roundSel").value === "disputed") newDzTrip(); else { settings.round = "countries"; showMode(); newTrip(settings.level || 1, settings.region || "world"); } };
+
 /* ---------- start ---------- */
 function start() {
   setStyle(STYLES[settings.style] ? settings.style : "list");
   G.reopen(() => {
-    if (saved.game && saved.game.trip && saved.game.trip.length === TRIP && saved.game.trip.every(t => PLACES.includes(t.c)) && REGIONS[saved.game.region]) {
-      game = saved.game; G.checkClock(game); $("levelSel").value = game.level; fillRegions(game.level, game.region); show("jump");
-    } else newTrip(settings.level || 1, settings.region || "world");
+    const g = saved.game;
+    if (g && g.trip && g.trip.length === TRIP && g.trip.every(t => PLACES.includes(t.c) || (t.c.startsWith("dz:") && DISPUTES[t.c.slice(3)])) && REGIONS[g.region]) {
+      game = g; G.checkClock(game); settings.round = g.mode === "disputed" ? "disputed" : "countries"; showMode();
+      if (g.mode !== "disputed") { $("levelSel").value = game.level; fillRegions(game.level, game.region); }
+      show("jump");
+    } else if (settings.round === "disputed") newDzTrip();
+    else newTrip(settings.level || 1, settings.region || "world");
   }, msg => { newTrip(settings.level || 1, settings.region || "world"); G.note(msg, 0); });
   if (!settings.seenHelp) setTimeout(walkthrough, 400);
 }
-Promise.all(["world.json", "disputed.json"].map(f => fetch(f).then(r => r.json()))).then(([raw, disputed]) => {
-  world = buildWorld(raw, disputed); $("loading").remove(); resize(); start();
+Promise.all(["world.json", "disputed.json", "dz.json"].map(f => fetch(f).then(r => r.json()))).then(([raw, disputed, dz]) => {
+  world = buildWorld(raw, disputed, dz); $("loading").remove(); resize(); start();
 }).catch(e => { $("loading").textContent = "The map couldn't load. Check your connection and reload."; throw e; });

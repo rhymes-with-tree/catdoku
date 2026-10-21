@@ -19,7 +19,8 @@ Playable preview (the owner's artifact): https://claude.ai/artifact/JcXFSEy8b4zZ
 | Tries | 2 per place, then it's shown and counts as missed |
 | Moving up | No hints and no Restart, and: 8+ on the first try, or 7 and any bonus, or all 10 found within their tries. Otherwise the same level and region again. Gold paw: 10 on the first try, no hints |
 | Pairs kept apart on Pick | Countries that both claim land the map stripes: Russia–Ukraine, Israel–Syria, Morocco–Western Sahara, India–Pakistan, India–China, Sudan–South Sudan, plus Israel–Palestine |
-| Disputed territory round | A separate mode (the owner doesn't want to review its sentences) |
+| Disputed territory round | A separate mode (Round: Disputed land), written without the owner's review at their request. 24 places in `DISPUTES` (`src/atlas.js`), shapes in `dz.json` from `scripts/dz_shapes.py`. Each is a sentence with blanks (the place, then the countries), filled in any order from one box (or chips on Pick, or the list); 3 wrong guesses and the sentence is shown; each other name for the place is a bonus. Sentences say who controls and who claims, never who's right |
+| Walkthrough | "A cat is hiding here." / how to answer / "You get two tries for each." / "Drag or pinch the map to look around." / answer style / Hint |
 
 The owner's reasoning: large countries are easier than medium ones, which are easier than small ones; wrong answers that are close together or of a similar size are harder; everyone is bad at islands and small countries.
 
