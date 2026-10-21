@@ -28,5 +28,5 @@ const PREVIEW = true;
 os.makedirs(os.path.join(S, 'preview'), exist_ok=True)
 open(os.path.join(S, 'preview', 'cat-atlas.html'), 'w', encoding='utf-8').write(out)
 open(os.path.join(S, 'preview', 'atlas.js.check.js'), 'w', encoding='utf-8').write(js)
-import shutil; shutil.copy(os.path.join(mapstudy, 'world.json'), os.path.join(S, 'preview', 'world.json'))
+import shutil; shutil.copy(os.path.join(S, 'world_un.json'), os.path.join(S, 'preview', 'world.json'))
 print(len(out))

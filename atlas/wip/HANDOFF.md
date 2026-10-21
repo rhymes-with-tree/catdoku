@@ -35,7 +35,7 @@ The owner's reasoning: large countries are easier than medium ones, which are ea
 | `sizes.json` | Area in km² and island flag (no land border) per country, from `scripts/sizes.py` |
 | `gbif_counts.json` | GBIF wild cat records per country and species (1990 onward, sightings and camera traps only), from `scripts/gbif.py` |
 | `iso2.json` | Country code to ISO 2-letter code, for GBIF |
-| `scripts/build_preview.py` | Builds the artifact page: `python3 atlas/wip/scripts/build_preview.py atlas/wip . ../mapstudy` writes `atlas/wip/preview/` (ignored by git), with `world.json` copied from mapstudy |
+| `scripts/build_preview.py` | Builds the artifact page: `python3 atlas/wip/scripts/build_preview.py atlas/wip . ../mapstudy (the third argument is no longer used)` writes `atlas/wip/preview/` (ignored by git), with `world_un.json` copied in as `world.json` |
 | `scripts/play.js`, `scripts/trips.js` | Playwright checks. Wrap `preview/cat-atlas.html` in `<!doctype html><html><head><meta charset="utf-8"></head><body>…</body></html>` as `preview/test.html`, serve `preview/` on port 8766, then run them |
 
 ## The cat table (`CLUE` in `src/atlas.js`)
@@ -49,7 +49,8 @@ The IUCN key is a Bearer secret in the environment's network settings, added to 
 ## Sensitive pairs
 
 - Israel and Palestine are never each other's wrong answer on Easy (`NEVER_WITH` in `src/atlas.js`). The owner asked for this. Other pairs are waiting on the owner.
-- The map data (Natural Earth, through World Map Recall's `world.json`) draws Crimea as Russia, the Golan Heights as Israel, and the Moroccan-held part of Western Sahara as Morocco, with only the eastern strip as "Western Sahara". The owner hasn't decided how to handle these.
+- Borders follow the UN (the owner's call). World Map Recall's `world.json` draws Crimea as Russia, the Golan Heights as Israel and the Moroccan-held part of Western Sahara as Morocco; `scripts/un_borders.py` (needs shapely) moves them to Ukraine, Syria and Western Sahara using Natural Earth's `ne_50m_admin_0_breakaway_disputed_areas.geojson`, writing `world_un.json`, the game's map. `sizes.json` is measured from it.
+- Still open with the owner: whether to label Western Sahara differently, whether Somaliland becomes its own country in the quiz, and which other pairs to keep apart.
 
 ## Still to do
 
