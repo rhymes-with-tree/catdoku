@@ -15,13 +15,13 @@ const CATS = {
   andean: "the Andean cat", golden: "the golden cat", leopardcat: "the leopard cat", fishing: "the fishing cat",
   rusty: "the rusty-spotted cat", manul: "Pallas's cat", sand: "the sand cat", blackfoot: "the black-footed cat",
   jungle: "the jungle cat", wildcat: "the wildcat"};
-// One cat for each country: a wild cat that lives there (checked against GBIF sightings), or, where no wild cat
-// does, a housecat that migrated there.
+// One cat for each country: a wild cat that lives there (checked against GBIF sightings and the IUCN Red List), or,
+// where no wild cat does any more, a housecat that migrated there.
 const CLUE = Object.fromEntries(`
-DZA cheetah AGO serval BEN lion BWA leopard BFA lion BDI serval CPV house CMR golden CAF golden TCD cheetah COM house
-COG leopard COD serval CIV leopard DJI caracal EGY jungle GNQ golden ERI caracal SWZ lion ETH lion GAB golden GMB serval
-GHA golden GIN leopard GNB serval KEN cheetah LSO wildcat LBR leopard LBY sand MDG house MWI serval MLI caracal MRT sand
-MUS house MAR sand MOZ lion NAM cheetah NER cheetah NGA lion RWA lion STP house SEN lion SYC house SLE golden SOM cheetah
+DZA cheetah AGO serval BEN lion BWA leopard BFA leopard BDI serval CPV house CMR golden CAF golden TCD cheetah COM house
+COG leopard COD serval CIV leopard DJI caracal EGY jungle GNQ golden ERI caracal SWZ serval ETH lion GAB golden GMB serval
+GHA golden GIN leopard GNB serval KEN cheetah LSO wildcat LBR leopard LBY caracal MDG house MWI serval MLI caracal MRT sand
+MUS house MAR caracal MOZ lion NAM cheetah NER cheetah NGA leopard RWA lion STP house SEN lion SYC house SLE golden SOM leopard
 ZAF blackfoot SDS lion SDN lion TZA lion TGO serval TUN wildcat UGA lion ZMB leopard ZWE lion SAH sand
 ATG house ARG geoffroy BHS house BRB house BLZ jaguar BOL andean BRA jaguar CAN lynx CHL kodkod COL ocelot CRI margay
 CUB house DMA house DOM house ECU oncilla SLV jaguarundi GRD house GTM margay GUY jaguar HTI house HND jaguarundi JAM house
@@ -29,15 +29,17 @@ MEX jaguar NIC ocelot PAN ocelot PRY jaguar PER puma KNA house LCA house VCT hou
 URY margay VEN puma
 AFG snow ARM leopard AZE jungle BHR house BGD tiger BTN tiger BRN clouded KHM leopardcat CHN snow GEO lynx IND lion
 IDN tiger IRN cheetah IRQ leopard ISR jungle JPN leopardcat JOR sand KAZ caracal KWT sand KGZ snow LAO clouded LBN wildcat
-MYS panther MDV house MNG manul MMR clouded NPL snow PRK leopardcat OMN leopard PAK leopard PHL leopardcat QAT sand
+MYS panther MDV house MNG manul MMR clouded NPL snow PRK leopardcat OMN leopard PAK leopard PHL leopardcat QAT house
 SAU sand SGP leopardcat KOR leopardcat LKA rusty SYR jungle TJK snow THA fishing TLS house TUR caracal TKM manul
 ARE caracal UZB sand VNM leopardcat YEM caracal PSX caracal TWN leopardcat
 ALB lynx AND wildcat AUT lynx BLR lynx BEL wildcat BIH lynx BGR wildcat HRV lynx CYP house CZE lynx DNK house EST lynx
 FIN lynx FRA lynx DEU wildcat GRC wildcat HUN wildcat ISL house IRL house ITA wildcat LVA lynx LIE lynx LTU lynx
 LUX wildcat MLT house MDA wildcat MCO house MNE wildcat NLD wildcat MKD lynx NOR lynx POL lynx PRT lynx ROU lynx RUS tiger
-SMR house SRB wildcat SVK lynx SVN lynx ESP lynx SWE lynx CHE lynx UKR lynx GBR wildcat VAT house KOS wildcat
+SMR house SRB wildcat SVK lynx SVN lynx ESP lynx SWE lynx CHE lynx UKR lynx GBR house VAT house KOS wildcat
 AUS house FJI house KIR house MHL house FSM house NRU house NZL house PLW house PNG house WSM house SLB house TON house
 TUV house VUT house COK house NIU house`.trim().split(/\s+/).reduce((a, w, i, all) => (i % 2 ? a : [...a, [w, all[i + 1]]]), []));
+// Countries never offered as each other's wrong answer on Easy, however close they are.
+const NEVER_WITH = {ISR: ["PSX"], PSX: ["ISR"]};
 // Other names typed answers are matched against (Medium's list finds them too).
 const AKA = {
   CIV: ["Côte d'Ivoire"], CZE: ["Czech Republic"], MMR: ["Burma"], TLS: ["East Timor"], SWZ: ["Swaziland"], CPV: ["Cabo Verde"],
@@ -242,7 +244,7 @@ const sizeGap = (a, b) => Math.abs(Math.log(km2(a) / km2(b)));
 // Easy's three wrong names, all from the same continent: far away and of other sizes on step 1, far away on 2,
 // one near neighbour on 3, near neighbours of a similar size on 4, and the most alike of all on 5.
 function wrongNames(c, step) {
-  const all = Object.keys(NAMES).filter(d => d !== c && regionOf(d) === regionOf(c));
+  const all = Object.keys(NAMES).filter(d => d !== c && regionOf(d) === regionOf(c) && !(NEVER_WITH[c] || []).includes(d));
   const byNear = [...all].sort((a, b) => apart(c, a) - apart(c, b));
   const alike = [...all].sort((a, b) => (apart(c, a) / 30 + sizeGap(c, a)) - (apart(c, b) / 30 + sizeGap(c, b)));
   const far = byNear.slice(Math.floor(byNear.length / 2));

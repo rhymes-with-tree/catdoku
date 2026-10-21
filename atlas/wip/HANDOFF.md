@@ -42,12 +42,17 @@ The owner's reasoning: large countries are easier than medium ones, which are ea
 
 Each pick is a wild cat native to the country and, where GBIF has records, one recorded there. GBIF also has zoo animals and misidentifications (a serval in the Netherlands, a lion in Germany, an ocelot in Oman), so its top species wasn't taken blindly.
 
-These 12 have no GBIF records behind them and should be checked against the IUCN Red List ranges: Burundi (serval), Equatorial Guinea (golden cat), Eritrea (caracal), Guinea-Bissau (serval), Libya (sand cat), Somalia (cheetah), Togo (serval), Bolivia (Andean cat), Malaysia (black panther), North Korea (leopard cat), Oman (leopard), Yemen (caracal).
+All 155 wild cat picks were then checked against the IUCN Red List (`scripts/iucn.py`, results in `iucn_check.json`). Changed on the owner's say-so: Burkina Faso, Nigeria and Somalia to leopard, Eswatini to serval, Libya and Morocco to caracal, Qatar and the United Kingdom to the housecat. Kept: Rwanda (lions reintroduced 2015) and Portugal (Iberian lynx reintroduced); Philippines (IUCN has no page yet for the leopard cat split that lives there); Palestine and Kosovo (rarely listed separately by IUCN).
 
-The IUCN API (v4, `https://api.iucnredlist.org/api/v4/`) needs the key as an `Authorization: Bearer <key>` header.
+The IUCN key is a Bearer secret in the environment's network settings, added to requests by the network itself; plain `curl https://api.iucnredlist.org/api/v4/...` works.
+
+## Sensitive pairs
+
+- Israel and Palestine are never each other's wrong answer on Easy (`NEVER_WITH` in `src/atlas.js`). The owner asked for this. Other pairs are waiting on the owner.
+- The map data (Natural Earth, through World Map Recall's `world.json`) draws Crimea as Russia, the Golan Heights as Israel, and the Moroccan-held part of Western Sahara as Morocco, with only the eastern strip as "Western Sahara". The owner hasn't decided how to handle these.
 
 ## Still to do
 
-1. Check the 12 picks above with IUCN, and swap any that don't hold up.
+1. Settle the sensitive pairs and the disputed borders with the owner.
 2. Port to the site following `.claude/skills/new-game/SKILL.md` (step 3 onward): `atlas/index.html`, the map data in `atlas/`, `G.GAMES` entry, icon, README section, the `IDEAS.md` row (group Geography), build bump, PR. Ask the owner which shelf it goes on.
 3. Maybe later: wild cat photos from iNaturalist (Creative Commons, needs credits).
