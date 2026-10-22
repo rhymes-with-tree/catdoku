@@ -62,10 +62,14 @@ Quizzed alongside the 200 countries (the owner's choice): every place with an IS
 
 ## Cat photos
 
-The owner is restyling the iNaturalist photos (`cat-photos/CREDITS.md`, `cat-photos/contact-sheet.jpg`) to match the site's art, like Fred and Jan Brady. When they come back, show them with the clues: one per wild species (the black panther is a black leopard), and the site's own cats from `cats/` for the housecat and the cat exploring where no one lives. Keep the credits, on a credits card or in `ARTWORK.md`.
+Each clue shows the cat's photo from Wikipedia beside it, with a link to its Wikipedia page ("Iberian lynx on Wikipedia") and the photo credit (photographer and licence, from Wikimedia Commons). The owner chose this over redrawing the photos: it saves the drawing, and the link lets players read more. Spoilers don't matter (the owner: "we aren't competing"), so the link names the exact species for that country.
+
+- `WIKI` in `src/atlas.js` is each clue's page; `WIKI_HERE` overrides it for one country where the clue's plain name covers several species (Canada lynx, Iberian lynx, African wildcat, Sunda clouded leopard, Sunda leopard cat). Housecats and explorers get the page on cats.
+- The player's browser fetches the photo from Wikipedia's page summary (`en.wikipedia.org/api/rest_v1/page/summary/<title>`) and the credit from Commons (`commons.wikimedia.org/w/api.php`, `origin=*`). If either fails, the link still shows, without the photo or credit.
+- This environment can't reach Wikipedia, so the photos were tested with stand-ins; check them on the real site.
+- The owner's restyled drawings of the first cats (`cat-photos/`) aren't used.
 
 ## Still to do
 
-1. Add the owner's restyled cat pictures.
+1. Look over the Wikipedia photos on the real site, and swap any page whose lead picture doesn't suit.
 2. Port to the site following `.claude/skills/new-game/SKILL.md` (step 3 onward): `atlas/index.html`, the map data in `atlas/`, `G.GAMES` entry, icon, README section, the `IDEAS.md` row (group Geography), build bump, PR. Ask the owner which shelf it goes on.
-3. Maybe later: wild cat photos from iNaturalist (Creative Commons, needs credits).

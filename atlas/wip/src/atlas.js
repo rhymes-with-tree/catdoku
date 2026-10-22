@@ -48,6 +48,58 @@ GRL house GUF jaguar SJM house NCL house FLK house PRI house ATF empty SGS empty
 FRO house HKG leopardcat IMN house GUM house CUW house HMD empty MYT house MNP house TCA house VIR house CYM house BES house
 SPM house SHN house ABW house IOA house VGB house IOT house WLF house JEY house ASM house AIA house MSR house BMU house
 MAF house GGY house SXM house NFK house PCN house BLM house MAC house TKL house ATC empty`.trim().split(/\s+/).reduce((a, w, i, all) => (i % 2 ? a : [...a, [w, all[i + 1]]]), []));
+// Each cat's Wikipedia page, for its photo and a link to read more: the exact species where the clue's plain name
+// covers several (the lynx in Spain is the Iberian lynx). Housecats and explorers get the page on cats.
+const WIKI = {
+  lion: "Lion", tiger: "Tiger", leopard: "Leopard", panther: "Black panther", snow: "Snow leopard", clouded: "Clouded leopard",
+  jaguar: "Jaguar", cheetah: "Cheetah", puma: "Cougar", lynx: "Eurasian lynx", bobcat: "Bobcat", caracal: "Caracal",
+  serval: "Serval", ocelot: "Ocelot", margay: "Margay", jaguarundi: "Jaguarundi", oncilla: "Oncilla", geoffroy: "Geoffroy's cat",
+  kodkod: "Kodkod", andean: "Andean mountain cat", golden: "African golden cat", leopardcat: "Leopard cat", fishing: "Fishing cat",
+  rusty: "Rusty-spotted cat", manul: "Pallas's cat", sand: "Sand cat", blackfoot: "Black-footed cat", jungle: "Jungle cat",
+  wildcat: "European wildcat", house: "Cat", empty: "Cat"};
+const WIKI_HERE = {CAN: "Canada lynx", ESP: "Iberian lynx", PRT: "Iberian lynx", LSO: "African wildcat", TUN: "African wildcat",
+  LBN: "African wildcat", BRN: "Sunda clouded leopard", PHL: "Sunda leopard cat"};
+const wikiTitle = code => WIKI_HERE[code] || WIKI[CLUE[code]] || "Cat";
+// The page's lead photo and who took it, fetched by the player's browser from Wikipedia and Wikimedia Commons
+// (the photos' licences ask for the photographer and licence to be named). Once per page, then kept.
+const wikiPics = {};
+function wikiPic(title) {
+  const plain = html => new DOMParser().parseFromString(html || "", "text/html").body.textContent.trim();
+  return wikiPics[title] = wikiPics[title] || fetch("https://en.wikipedia.org/api/rest_v1/page/summary/" + encodeURIComponent(title.replace(/ /g, "_")))
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(async s => {
+      const pic = {page: s.content_urls?.desktop?.page || "https://en.wikipedia.org/wiki/" + encodeURIComponent(title.replace(/ /g, "_")),
+        src: s.thumbnail?.source, credit: ""};
+      const file = s.originalimage?.source && decodeURIComponent(s.originalimage.source.split("/").pop());
+      if (!pic.src || !file) return pic;
+      pic.file = "https://commons.wikimedia.org/wiki/File:" + encodeURIComponent(file);
+      try {
+        const q = await fetch("https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&prop=imageinfo&iiprop=extmetadata&titles=File:" + encodeURIComponent(file)).then(r => r.json());
+        const m = Object.values(q.query.pages)[0].imageinfo[0].extmetadata;
+        pic.credit = [plain(m.Artist?.value), m.LicenseShortName?.value].filter(Boolean).join(", ");
+      } catch (e) {}
+      return pic;
+    })
+    .catch(() => { delete wikiPics[title]; return {page: "https://en.wikipedia.org/wiki/" + encodeURIComponent(title.replace(/ /g, "_"))}; });
+}
+// The cat's photo beside the clue, with "Iberian lynx on Wikipedia" and the photo credit under it.
+function showCatPic(code) {
+  const box = $("wildpic");
+  box.hidden = $("catWiki").hidden = !code;
+  if (!code) return;
+  const title = wikiTitle(code);
+  if (box.dataset.title === title) return;
+  box.dataset.title = title;
+  $("catImg").hidden = true; $("catImg").removeAttribute("src");
+  $("catMore").textContent = title + " on Wikipedia"; $("catMore").href = "https://en.wikipedia.org/wiki/" + encodeURIComponent(title.replace(/ /g, "_"));
+  $("catCredit").textContent = "";
+  wikiPic(title).then(pic => {
+    if (box.dataset.title !== title) return;
+    $("catMore").href = $("catImgLink").href = pic.page;
+    if (pic.src) { $("catImg").src = pic.src; $("catImg").alt = "Photo: " + title; $("catImg").onload = () => { $("catImg").hidden = false; }; }
+    if (pic.credit) { $("catCredit").textContent = "Photo: " + pic.credit; $("catCredit").href = pic.file; }
+  });
+}
 // Countries never offered as each other's wrong answer on Pick, however close: both claim land the map stripes as
 // disputed (and Israel and Palestine, the owner's call).
 const NEVER_WITH = {};
@@ -387,6 +439,7 @@ function show(fly) {
   $("clue").innerHTML = done ? "Trip done!" : bonus ? `Bonus: which country does <b>${nameOf(code)}</b> belong to?`
     : CLUE[code] === "house" ? "Where did the <b>housecat</b> migrate?" : CLUE[code] === "empty" ? "Where's the <b>cat</b> exploring where no one lives?"
     : `Where's ${cat.replace(/^(the )?(.*)$/, (m, the, rest) => `${the || ""}<b>${rest}</b>`)}?`;
+  showCatPic(done || bonus ? null : code);
   $("skipBtn").hidden = !bonus;
   $("reveal").textContent = !done && !bonus && style() !== "pick" && game.card.hints ? reveal(nameOf(code), game.card.hints) : "";
   $("choices").hidden = done || style() !== "pick";
@@ -613,6 +666,7 @@ function showDz(fly) {
   $("count").innerHTML = game.trip.map((x, i) => `<i class="${i < game.res.length ? (game.res[i].first ? "ok" : "miss") : i === game.i && !done ? "now" : ""}"></i>`).join("");
   $("clue").classList.add("dz");
   $("clue").innerHTML = done ? "Round done!" : dzSentence(d, card);
+  showCatPic(null);
   const left = d.aka.filter(a => !card.alts.includes(a));
   $("reveal").classList.toggle("note", bonus);
   $("reveal").textContent = bonus ? `Bonus: name another name for ${d.name} (${left.length} more)` + (card.alts.length ? ` · ${card.alts.join(", ")}` : "") : "";
