@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cat Burglar</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-22.5";
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-22.5">
+<style>
+/* Night at the museum: a painting in a gilt frame on a dark gallery wall, lit by a brass picture light.
+   A cat has sneaked into the painting; pinch or use + and − to look closer, and tap it to catch it. */
+.wall{--gilt:#ECA818;--gilt-dark:#9A6A0C;--gilt-light:#F6D27A;
+  position:relative;width:var(--board);display:flex;flex-direction:column;align-items:center;
+  background:radial-gradient(ellipse 70% 55% at 50% 0%,color-mix(in srgb,#ECA818 26%,#4E577D) 0%,#4E577D 45%,color-mix(in srgb,#4E577D 70%,#2A2530) 100%);
+  border-radius:12px;padding:30px 12px 14px}
+/* the picture light over the frame */
+.lamp{position:absolute;top:8px;left:50%;width:96px;height:14px;margin-left:-48px;border-radius:7px 7px 10px 10px;
+  background:linear-gradient(#F6D27A,#9A6A0C);border:2px solid #2A2530;z-index:2}
+.lamp::before{content:"";position:absolute;left:44px;top:-8px;width:4px;height:8px;background:#2A2530}
+.frame{position:relative;padding:9px;border-radius:4px;
+  background:linear-gradient(135deg,var(--gilt-light),var(--gilt) 30%,var(--gilt-dark) 55%,var(--gilt) 80%,var(--gilt-light));
+  box-shadow:0 6px 18px rgba(0,0,0,.45),inset 0 0 0 2px #2A2530}
+.view{position:relative;overflow:hidden;background:#2A2530;box-shadow:inset 0 0 0 2px var(--gilt-dark);
+  touch-action:none;user-select:none;-webkit-user-select:none;cursor:crosshair}
+.layer{position:absolute;left:0;top:0;transform-origin:0 0}
+.layer canvas,.layer svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.layer svg{pointer-events:none}
+.miss path{fill:none;stroke:#C8392B;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.miss circle{fill:rgba(255,255,255,.55);stroke:#C8392B;vector-effect:non-scaling-stroke}
+.found{fill:none;stroke:#6AA673;stroke-width:5px;vector-effect:non-scaling-stroke}
+.found.away{stroke:#C8392B}
+.view.zoomed{cursor:grab}
+/* zoom buttons in the frame's corner */
+.zoom{position:absolute;right:6px;bottom:6px;display:flex;flex-direction:column;gap:6px;z-index:2}
+.zoom button{width:38px;height:38px;padding:0;border-radius:50%;font-size:24px;line-height:1;font-weight:800;
+  background:rgba(247,248,243,.9);display:flex;align-items:center;justify-content:center}
+/* the museum's label beside the painting */
+.placard{margin-top:12px;max-width:100%;background:#F7F8F3;border:2px solid #2A2530;border-radius:4px;padding:3px 12px;
+  font-size:14px;line-height:1.3;text-align:center;color:var(--ink)}
+.placard i{font-weight:600}
+.placard small{display:block;color:var(--ink-soft);font-size:13px}
+.loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#F7F8F3;font-weight:600}
+.loading[hidden]{display:none}
+.hearts{letter-spacing:2px}
+.left{display:flex;gap:10px;align-items:center}
+/* a cat peeking round the edge of the title, as if sneaking in */
+.title{display:flex;align-items:flex-end;gap:6px}
+.peek{display:block;height:58px;width:auto;margin-bottom:-4px}
+@media (max-height:760px){.peek{height:42px;margin-bottom:-3px}}
+.card img.caught{display:block;max-width:100%;max-height:220px;margin:0 auto 14px;border-radius:10px;border:2px solid var(--ink)}
+.card .museum{margin:12px 0 0;font-size:15px}
+.card .museum a{color:var(--ink);font-weight:600}
+</style>
+</head>
+<body>
+<main>
+  <header><div class="title"><h1>Cat Burglar</h1><img class="peek" id="peek" alt="A cat peeking round the corner"></div><div class="stripe"></div><p class="tagline">Catch the cat that's sneaked into the painting</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span class="left"><span class="hearts" id="hearts"></span><span id="count"></span></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wall" id="wall">
+    <div class="lamp" aria-hidden="true"></div>
+    <div class="frame">
+      <div class="view" id="board" role="img" aria-label="A painting with a cat hidden in it">
+        <div class="layer" id="layer"><canvas id="art"></canvas><svg id="marks" aria-hidden="true"></svg></div>
+        <div class="loading" id="loading">Hanging the painting…</div>
+        <div class="zoom" id="zoom"><button id="zoomIn" aria-label="Zoom in">+</button><button id="zoomOut" aria-label="Zoom out">−</button></div>
+      </div>
+    </div>
+    <div class="placard" id="placard"></div>
+  </div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="shareBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New painting</button>
+  </div>
+
+</main>
+
+<script src="../games.js?v=2026-10-22.5"></script>
+<script src="paintings.js?v=2026-10-22.5"></script>
+<script>
+/* ---------- levels ---------- */
+// How big the cat is (the side of a square of the same area, as a share of the painting's), and how far it takes on
+// the colours, light and brushwork of the spot it's hiding in (0 keeps its own colours).
+const LEVELS = [null,
+  {size: .15, blend: .2},
+  {size: .115, blend: .35},
+  {size: .09, blend: .5},
+  {size: .07, blend: .6},
+  {size: .055, blend: .68},
+  {size: .043, blend: .75},
+];
+const TOP = LEVELS.length - 1;
+const levelLabel = n => `Level ${n}`;
+
+/* ---------- the cats ---------- */
+// General cats from ../cats/, sitting, lying, stretching and curled up, in every colour (ARTWORK.md, "Who's who").
+const CATS = ("c17-1 c17-2 c17-3 c17-4 c17-5 c17-7 c17-8 c17-9 c17-10 c17-12 c17-13 c17-14 c17-15 c17-16 c17-19 c17-21 c17-22 c17-23 c17-24 c17-25 " +
+  "c18-1 c18-2 c18-3 c18-4 c18-5 c18-6 c18-7 c18-8 c18-9 c18-10 c18-11 c18-12 c18-13 c18-14 c18-15 c18-16 c18-17 c18-18 c18-19 c18-20 c18-21 c18-22 c18-23 c18-24 " +
+  "c18-25 c18-26 c18-27 c18-28 c18-29 c18-30 c18-31 c18-32 c18-33 c18-34 c18-35 c18-36 c18-37 c18-38 c18-39 c18-40 c18-41 c18-42 c18-43 c18-44 c18-45 c18-46 c18-47 " +
+  "c19-1 c19-2 c19-3 c19-4 c19-5 c19-6 c19-7 c19-8 c19-9 c19-10 c19-11 c19-12 c19-13 c19-14 c19-15 c19-16 c19-17 c19-18 c19-19 c19-20 c19-22 c19-23 c19-24 c19-25 " +
+  "c19-26 c19-27 c19-28 c19-29 c19-30 c19-31 c19-32 c19-33 c19-34 c19-35 c19-36 c19-37 c19-38 c19-39 c19-40 c19-41 c19-42 c19-43 c19-44 c19-45 c19-46 " +
+  "c20-1 c20-2 c20-3 c20-4 c20-5 c20-6 c20-7 c20-9 c20-10 c20-11 c20-12 c20-13 c20-14 c20-15 c20-16 c20-17 c20-18 c20-19 c20-20 c20-21 c20-22 c20-23 c20-24 " +
+  "c20-25 c20-26 c20-27 c20-28 c20-29 c20-30").split(" ");
+const CAT_SRC = {}, ART_SRC = {};   // filled with embedded pictures when the page is bundled into one file
+const catSrc = c => CAT_SRC[c] || `../cats/${c}.webp`, artSrc = id => ART_SRC[id] || `art/${id}.webp`;
+const paintingOf = id => PAINTINGS.find(p => p.id === id);
+const loaded = {};
+function picture(src) {
+  if (!loaded[src]) loaded[src] = new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => { delete loaded[src]; rej(new Error("couldn't load " + src.slice(0, 60))); }; im.src = src; });
+  return loaded[src];
+}
+const canvasOf = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; };
+
+/* ---------- sneaking the cat in ---------- */
+// The cat's box once it's turned: width and height.
+function turnedBox(w, h, r) {
+  const a = r * Math.PI / 180, c = Math.abs(Math.cos(a)), s = Math.abs(Math.sin(a));
+  return [Math.ceil(w * c + h * s) + 4, Math.ceil(w * s + h * c) + 4];
+}
+// Many of the cat drawings have a white rim round them, like a sticker. Peel it off (up to 3 pixels of pale grey or
+// white next to the transparent background), so the cat sits in the paint rather than on it.
+const peeled = new Map();
+function peel(im) {
+  if (peeled.has(im)) return peeled.get(im);
+  const w = im.naturalWidth, h = im.naturalHeight, c = canvasOf(w, h), x = c.getContext("2d");
+  x.drawImage(im, 0, 0); const img = x.getImageData(0, 0, w, h), d = img.data;
+  for (let pass = 0; pass < 3; pass++) {
+    const clear = [];
+    for (let y = 0; y < h; y++) for (let x0 = 0; x0 < w; x0++) {
+      const i = (y * w + x0) * 4; if (!d[i + 3]) continue;
+      const r = d[i], g = d[i + 1], b = d[i + 2];
+      if (0.3 * r + 0.59 * g + 0.11 * b < 200 || Math.max(r, g, b) - Math.min(r, g, b) > 40) continue;
+      const open = (xx, yy) => xx < 0 || yy < 0 || xx >= w || yy >= h || d[(yy * w + xx) * 4 + 3] < 40;
+      if (open(x0 - 1, y) || open(x0 + 1, y) || open(x0, y - 1) || open(x0, y + 1)) clear.push(i);
+    }
+    if (!clear.length) break;
+    for (const i of clear) d[i + 3] = 0;
+  }
+  x.putImageData(img, 0, 0); peeled.set(im, c);
+  return c;
+}
+// The cat drawn on a canvas of its own, turned and flipped.
+function catCanvas(im, pz) {
+  const [bw, bh] = turnedBox(pz.w, pz.h, pz.r), c = canvasOf(bw, bh), x = c.getContext("2d");
+  x.translate(bw / 2, bh / 2); x.rotate(pz.r * Math.PI / 180); x.scale(pz.f ? -1 : 1, 1);
+  x.drawImage(peel(im), -pz.w / 2, -pz.h / 2, pz.w, pz.h);
+  return c;
+}
+// Average colour (and spread of brightness) of a picture's opaque pixels.
+function catColour(im) {
+  const k = 40 / Math.max(im.naturalWidth, im.naturalHeight), w = Math.max(1, Math.round(im.naturalWidth * k)), h = Math.max(1, Math.round(im.naturalHeight * k));
+  const c = canvasOf(w, h), x = c.getContext("2d"); x.drawImage(im, 0, 0, w, h);
+  const d = x.getImageData(0, 0, w, h).data; let n = 0, r = 0, g = 0, b = 0;
+  for (let i = 0; i < d.length; i += 4) { const a = d[i + 3] / 255; n += a; r += d[i] * a; g += d[i + 1] * a; b += d[i + 2] * a; }
+  return [r / n, g / n, b / n];
+}
+// A new puzzle: a painting, a cat, and a spot where the cat's own colours already fit (with some texture to hide in),
+// picked from a few hundred tries with a little luck mixed in.
+async function makePuzzle(level, avoid) {
+  const fresh = PAINTINGS.filter(p => !avoid.includes(p.id)), pool = fresh.length ? fresh : PAINTINGS;
+  const p = pool[Math.floor(Math.random() * pool.length)], cat = CATS[Math.floor(Math.random() * CATS.length)];
+  const [art, im] = await Promise.all([picture(artSrc(p.id)), picture(catSrc(cat))]);
+  const PW = art.naturalWidth, PH = art.naturalHeight, side = LEVELS[level].size * Math.sqrt(PW * PH) * (0.9 + Math.random() * 0.2);
+  const asp = im.naturalWidth / im.naturalHeight, w = Math.round(side * Math.sqrt(asp)), h = Math.round(side / Math.sqrt(asp));
+  const r = Math.round((Math.random() * 2 - 1) * 14), f = Math.random() < 0.5 ? 1 : 0, [bw, bh] = turnedBox(w, h, r);
+  // the painting, small, with running sums for quick averages over any box
+  const GW = 160, g = GW / PW, GH = Math.max(1, Math.round(PH * g)), sc = canvasOf(GW, GH), sx = sc.getContext("2d");
+  sx.drawImage(art, 0, 0, GW, GH);
+  const d = sx.getImageData(0, 0, GW, GH).data, S = [0, 1, 2, 3].map(() => new Float64Array((GW + 1) * (GH + 1)));
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+    const i = (y * GW + x) * 4, L = 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2], v = [d[i], d[i + 1], d[i + 2], L * L], at = (y + 1) * (GW + 1) + x + 1;
+    for (let k = 0; k < 4; k++) S[k][at] = v[k] + S[k][at - 1] + S[k][at - GW - 1] - S[k][at - GW - 2];
+  }
+  const sum = (k, x0, y0, x1, y1) => S[k][y1 * (GW + 1) + x1] - S[k][y0 * (GW + 1) + x1] - S[k][y1 * (GW + 1) + x0] + S[k][y0 * (GW + 1) + x0];
+  const mc = catColour(im), margin = 0.04 * Math.min(PW, PH);
+  let best = null, bestScore = Infinity;
+  for (let t = 0; t < 400; t++) {
+    const cx = margin + bw / 2 + Math.random() * (PW - 2 * margin - bw), cy = margin + bh / 2 + Math.random() * (PH - 2 * margin - bh);
+    const x0 = Math.max(0, Math.floor((cx - bw / 2) * g)), y0 = Math.max(0, Math.floor((cy - bh / 2) * g));
+    const x1 = Math.min(GW, Math.max(x0 + 1, Math.ceil((cx + bw / 2) * g))), y1 = Math.min(GH, Math.max(y0 + 1, Math.ceil((cy + bh / 2) * g))), n = (x1 - x0) * (y1 - y0);
+    const m = [0, 1, 2].map(k => sum(k, x0, y0, x1, y1) / n), L = 0.3 * m[0] + 0.59 * m[1] + 0.11 * m[2];
+    const spread = Math.sqrt(Math.max(0, sum(3, x0, y0, x1, y1) / n - L * L));
+    // plain sky or a bare wall gives the cat away, so busy spots score better
+    const score = Math.hypot(m[0] - mc[0], m[1] - mc[1], m[2] - mc[2]) + 1.5 * Math.max(0, 35 - spread) - 0.3 * Math.min(spread, 80) + Math.random() * 30;
+    if (score < bestScore) { bestScore = score; best = [cx, cy]; }
+  }
+  return {i: p.id, c: cat, x: Math.round(best[0]), y: Math.round(best[1]), w, h, r, f};
+}
+// Blur one channel image (w × h floats) with a box of radius R, twice over (close to a soft Gaussian).
+function blur(src, w, h, R) {
+  let a = src, b = new Float32Array(w * h);
+  for (let pass = 0; pass < 2; pass++) {
+    for (let y = 0; y < h; y++) {   // across
+      let s = 0; const row = y * w;
+      for (let x = -R; x <= R; x++) s += a[row + Math.min(w - 1, Math.max(0, x))];
+      for (let x = 0; x < w; x++) { b[row + x] = s / (2 * R + 1); s += a[row + Math.min(w - 1, x + R + 1)] - a[row + Math.max(0, x - R)]; }
+    }
+    const c = new Float32Array(w * h);
+    for (let x = 0; x < w; x++) {   // down
+      let s = 0;
+      for (let y = -R; y <= R; y++) s += b[Math.min(h - 1, Math.max(0, y)) * w + x];
+      for (let y = 0; y < h; y++) { c[y * w + x] = s / (2 * R + 1); s += b[Math.min(h - 1, y + R + 1) * w + x] - b[Math.max(0, y - R) * w + x]; }
+    }
+    a = c; b = new Float32Array(w * h);
+  }
+  return a;
+}
+// Paint the cat into the painting. Its colours are shifted toward the spot's (keeping its own light and dark),
+// it takes on the spot's light and shade, and the painting's brushwork shows through it; `blend` says how far.
+function sneakIn(ctx, catIm, pz, blend) {
+  const cc = catCanvas(catIm, pz), bw = cc.width, bh = cc.height, cd = cc.getContext("2d").getImageData(0, 0, bw, bh).data;
+  // on the harder levels, soften the drawing's crisp outline a little, like paint
+  if (blend >= 0.6) {
+    const ch = [0, 1, 2, 3].map(k => { const c = new Float32Array(bw * bh); for (let i = 0; i < bw * bh; i++) c[i] = k < 3 ? cd[i * 4 + k] * cd[i * 4 + 3] / 255 : cd[i * 4 + 3]; return blur(c, bw, bh, 1); });
+    for (let i = 0; i < bw * bh; i++) { const a = ch[3][i]; cd[i * 4 + 3] = a; for (let k = 0; k < 3; k++) cd[i * 4 + k] = a ? ch[k][i] * 255 / a : 0; }
+  }
+  const R = Math.max(2, Math.round(Math.sqrt(pz.w * pz.h) / 9)), x0 = Math.round(pz.x - bw / 2), y0 = Math.round(pz.y - bh / 2);
+  const rw = bw + 2 * R, rh = bh + 2 * R, reg = ctx.getImageData(x0 - R, y0 - R, rw, rh), pd = reg.data;
+  // the spot's soft light (blurred) for each channel
+  const lo = [0, 1, 2].map(k => { const ch = new Float32Array(rw * rh); for (let i = 0; i < rw * rh; i++) ch[i] = pd[i * 4 + k]; return blur(ch, rw, rh, R); });
+  // averages and spreads, of the cat and of the painting under it
+  const mc = [0, 0, 0], mp = [0, 0, 0], vc = [0, 0, 0], vp = [0, 0, 0]; let n = 0;
+  for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
+    const a = cd[(y * bw + x) * 4 + 3] / 255; if (!a) continue;
+    const ci = (y * bw + x) * 4, pi = ((y + R) * rw + x + R) * 4; n += a;
+    for (let k = 0; k < 3; k++) { mc[k] += cd[ci + k] * a; mp[k] += pd[pi + k] * a; }
+  }
+  for (let k = 0; k < 3; k++) { mc[k] /= n; mp[k] /= n; }
+  for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
+    const a = cd[(y * bw + x) * 4 + 3] / 255; if (!a) continue;
+    const ci = (y * bw + x) * 4, pi = ((y + R) * rw + x + R) * 4;
+    for (let k = 0; k < 3; k++) { vc[k] += (cd[ci + k] - mc[k]) ** 2 * a; vp[k] += (pd[pi + k] - mp[k]) ** 2 * a; }
+  }
+  const sc = vc.map(v => Math.max(4, Math.sqrt(v / n))), sp = vp.map(v => Math.sqrt(v / n));
+  // its light and dark move toward the painting's too, but it keeps at least half its own contrast, so it's never
+  // just a blur of the painting
+  const st = sc.map((s, k) => Math.max(s * 0.5, s * (1 - blend) + sp[k] * blend));
+  const lum = (r, g, b) => 0.3 * r + 0.59 * g + 0.11 * b, meanLo = lum(...mp) || 1;
+  for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
+    const a = cd[(y * bw + x) * 4 + 3] / 255; if (!a) continue;
+    const ci = (y * bw + x) * 4, j = (y + R) * rw + x + R, pi = j * 4;
+    const shade = Math.min(1.6, Math.max(0.5, lum(lo[0][j], lo[1][j], lo[2][j]) / meanLo)), light = 1 + (shade - 1) * blend * 0.8;
+    for (let k = 0; k < 3; k++) {
+      const own = cd[ci + k], moved = (own - mc[k]) / sc[k] * st[k] + mp[k], brush = pd[pi + k] - lo[k][j];
+      const v = (own * (1 - blend) + moved * blend) * light + brush * blend * 0.5;
+      pd[pi + k] = Math.round(pd[pi + k] * (1 - a) + Math.min(255, Math.max(0, v)) * a);
+    }
+  }
+  ctx.putImageData(reg, x0 - R, y0 - R);
+  // where the cat is, for checking taps: its pixels at least a third opaque
+  const mask = new Uint8Array(bw * bh); for (let i = 0; i < bw * bh; i++) mask[i] = cd[i * 4 + 3] > 85 ? 1 : 0;
+  return {x0, y0, bw, bh, mask};
+}
+
+/* ---------- game ---------- */
+const STORE = "catdoku.catburglar.v1";
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1, recent: []}, state.settings);
+let game = state.game || null, scene = null;   // scene: the painting drawn with the cat in it, for this game
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !game.lost;
+const ready = () => scene && scene.game === game;
+
+async function newPainting() {
+  const level = settings.level, ask = Symbol();
+  newPainting.ask = ask; game = null; scene = null; showLoading(true); G.note("");
+  let pz;
+  try { pz = await makePuzzle(level, settings.recent); }
+  catch (e) { if (newPainting.ask === ask) { showLoading(false, "The painting didn't load. Try New painting."); } return; }
+  if (newPainting.ask !== ask) return;
+  settings.recent = [pz.i, ...settings.recent.filter(i => i !== pz.i)].slice(0, 30);
+  game = {level, ...pz, lives: 3, misses: [], hints: 0, hinted: false, won: false, lost: false, ...G.freshClock()};
+  save(); await hang();
+  G.track(`Cat Burglar new painting level ${level}`);
+}
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); G.closeCard(); newPainting(); }
+
+// Draw this game's painting with its cat sneaked in.
+async function hang() {
+  const g = game; showLoading(true);
+  const p = paintingOf(g.i); if (!p) throw new Error("unknown painting " + g.i);
+  const [art, im] = await Promise.all([picture(artSrc(g.i)), picture(catSrc(g.c))]);
+  if (game !== g) return;
+  const c = $("art"); c.width = art.naturalWidth; c.height = art.naturalHeight;
+  const ctx = c.getContext("2d", {willReadFrequently: true}); ctx.drawImage(art, 0, 0);
+  const where = sneakIn(ctx, im, g, LEVELS[g.level].blend);
+  scene = {game: g, PW: c.width, PH: c.height, ...where};
+  $("placard").innerHTML = ""; const t = document.createElement("i"); t.textContent = p.title;
+  const by = document.createElement("small"); by.textContent = [p.artist, p.date].filter(Boolean).join(", ");
+  $("placard").append(t, by);
+  $("levelSel").value = g.level;
+  showLoading(false); layout(); view.z = 1; view.tx = view.ty = 0; applyView(); draw();
+}
+function showLoading(on, text) {
+  $("loading").hidden = !on && !text; $("loading").textContent = text || "Hanging the painting…";
+  $("art").style.visibility = on || text ? "hidden" : "";
+}
+
+// A tap on the painting, in painting pixels: the cat, or a miss.
+function tapAt(px, py) {
+  if (!playing() || !ready()) { if (game && game.lost) awayCard(); return; }
+  game.started = true;
+  if (onCat(px, py)) { win(); return; }
+  game.misses.push([Math.round(px), Math.round(py)]); game.lives--; save(); draw();
+  if (!game.lives) { lose(); return; }
+  G.note(game.lives === 1 ? "Not there! One life left." : "Not there!", 2500);
+}
+// Whether a point is on the cat, or close enough to it: within a few of the player's screen pixels
+// (fewer when zoomed in) or a sliver of the cat's own size.
+function onCat(px, py) {
+  const s = scene, tol = Math.max(Math.sqrt(game.w * game.h) * 0.08, 10 / pxScale()), t2 = tol * tol;
+  const x0 = Math.max(0, Math.floor(px - tol - s.x0)), x1 = Math.min(s.bw - 1, Math.ceil(px + tol - s.x0));
+  const y0 = Math.max(0, Math.floor(py - tol - s.y0)), y1 = Math.min(s.bh - 1, Math.ceil(py + tol - s.y0));
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++)
+    if (s.mask[y * s.bw + x] && (x + s.x0 - px) ** 2 + (y + s.y0 - py) ** 2 <= t2) return true;
+  return false;
+}
+
+/* ---------- endings ---------- */
+// A win without a hint moves up a level; one with no life lost as well earns a gold paw.
+const clean = () => !game.hinted, gold = () => game.lives === 3 && !game.hinted;
+function win() {
+  game.won = true; G.finishClock(game);
+  settings.level = clean() ? G.sizeUp(game.level, $("levelSel")) : game.level; $("levelSel").value = settings.level;
+  save(); draw(); G.note("Caught!", 0);
+  G.track(`Cat Burglar caught level ${game.level}`);
+  const done = game;   // a moment to see the cat circled first
+  setTimeout(() => { if (game === done) winCard(); }, 1500);
+}
+function lose() {
+  game.lost = true; save(); draw(); G.note("The cat got away! There it is.", 0);
+  G.track(`Cat Burglar got away level ${game.level}`);
+  const done = game;
+  setTimeout(() => { if (game === done) awayCard(); }, 1800);
+}
+// The cat as it was found: the painting around it, cropped.
+function caughtPic() {
+  const s = scene, k = 1.4, side = Math.max(game.w, game.h) * k * 2, c = $("art");
+  const x = Math.max(0, Math.min(s.PW - side, game.x - side / 2)), y = Math.max(0, Math.min(s.PH - side, game.y - side / 2));
+  const w = Math.min(side, s.PW), h = Math.min(side, s.PH), out = canvasOf(Math.round(w), Math.round(h));
+  out.getContext("2d").drawImage(c, x, y, w, h, 0, 0, out.width, out.height);
+  const im = new Image(); im.className = "caught"; im.alt = "The cat, hiding in the painting"; im.src = out.toDataURL("image/jpeg", 0.88);
+  return im;
+}
+// Where to see the painting itself (without a cat in it), then a pick of other levels.
+function museumBits(next) {
+  const p = paintingOf(game.i), box = document.createElement("div"), m = document.createElement("p");
+  m.className = "museum";
+  const a = document.createElement("a"); a.href = p.url; a.target = "_blank"; a.rel = "noopener"; a.textContent = `See “${p.title}” at The Met`;
+  m.append(a, document.createElement("br"), "(no cats in the real one)");
+  box.append(m, G.otherSize($("levelSel"), next, startLevel, "Or play a different level:"));
+  return box;
+}
+function winCard() {
+  if (!ready()) return;
+  const p = paintingOf(game.i), next = settings.level, lost = 3 - game.lives;
+  let text = `You caught the cat in ${p.title}${p.artist ? `, by ${p.artist}` : ""}${lost ? `, with ${lost} wrong ${lost > 1 ? "taps" : "tap"}` : ""}.`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : next > game.level ? ` Next up: level ${next}.` : " That's the top level; here's another painting.";
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the painting", game.result,
+    {title: "Caught!", gold: gold(), goldWhy: "First tap, no hints!", goldTitle: "Caught red-pawed!", goldPic: [caughtPic()],
+     next: next > game.level ? `Next: level ${next}` : "Next painting", after: museumBits(next)});
+}
+function awayCard() {
+  if (!ready()) return;
+  G.openCard("The cat got away!", "Three wrong taps, and it slipped off. It was hiding here.", [
+    ["Next painting", () => { G.closeCard(); newPainting(); }, true],
+    ["Look at the painting", () => { G.closeCard(); G.note("Tap New painting when you're ready for another.", 0); }], G.homeBtn()],
+    caughtPic(), museumBits(game.level));
+}
+
+/* ---------- hints ---------- */
+// A gold ring round the part of the painting the cat is in; each hint after the first rings a smaller part.
+let shown = null;
+function hint() {
+  if (!playing() || !ready()) return;
+  const s = scene, catR = Math.max(game.w, game.h) * 0.6, r = Math.max(catR * 1.6, Math.min(s.PW, s.PH) * (game.hints ? 0.13 : 0.26));
+  const off = Math.random() * Math.max(0, r - catR), a = Math.random() * Math.PI * 2;
+  shown = {x: game.x + Math.cos(a) * off, y: game.y + Math.sin(a) * off, r, misses: game.misses.length, until: Date.now() + 6000};
+  game.hints++; if (!game.hinted) game.hinted = true;
+  save(); draw(); G.note("The cat is somewhere in the gold ring.", 5000);
+  setTimeout(draw, 6100);
+}
+
+/* ---------- looking closer: pinch, drag, the mouse wheel, + and − ---------- */
+const view = {z: 1, tx: 0, ty: 0}, MAXZ = 8;
+let VW = 0, VH = 0;
+// Size the painting to fit the page: the full width, or less when a tall painting would run off the screen.
+function layout() {
+  if (!scene) return;
+  const wall = $("wall"), room = wall.clientWidth - 24 - 18, tall = Math.max(240, innerHeight * 0.6);
+  const k = Math.min(room / scene.PW, tall / scene.PH), was = VW;
+  VW = Math.round(scene.PW * k); VH = Math.round(scene.PH * k);
+  const v = $("board"), l = $("layer"); v.style.width = VW + "px"; v.style.height = VH + "px"; l.style.width = VW + "px"; l.style.height = VH + "px";
+  $("marks").setAttribute("viewBox", `0 0 ${scene.PW} ${scene.PH}`);
+  if (was && was !== VW) { view.tx *= VW / was; view.ty *= VW / was; }
+  applyView();
+}
+const pxScale = () => VW / scene.PW * view.z;   // screen pixels per painting pixel
+function applyView() {
+  view.z = Math.min(MAXZ, Math.max(1, view.z));
+  view.tx = Math.min(0, Math.max(VW - VW * view.z, view.tx)); view.ty = Math.min(0, Math.max(VH - VH * view.z, view.ty));
+  $("layer").style.transform = `translate(${view.tx}px, ${view.ty}px) scale(${view.z})`;
+  $("board").classList.toggle("zoomed", view.z > 1);
+  $("zoomOut").disabled = view.z <= 1; $("zoomIn").disabled = view.z >= MAXZ;
+  if (scene) drawMarks();
+}
+// Zoom by a factor, keeping the point (ax, ay) in the view where it is.
+function zoomBy(f, ax = VW / 2, ay = VH / 2) {
+  const z = Math.min(MAXZ, Math.max(1, view.z * f)), k = z / view.z;
+  view.tx = ax - (ax - view.tx) * k; view.ty = ay - (ay - view.ty) * k; view.z = z; applyView();
+}
+const pts = new Map(); let gesture = null;
+const local = e => { const b = $("board").getBoundingClientRect(); return [e.clientX - b.left, e.clientY - b.top]; };
+const spread = () => { const [a, b] = [...pts.values()]; return [Math.hypot(a[0] - b[0], a[1] - b[1]), (a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; };
+$("board").addEventListener("pointerdown", e => {
+  if (e.target.closest(".zoom")) return;
+  $("board").setPointerCapture(e.pointerId); pts.set(e.pointerId, local(e));
+  if (pts.size === 1) { const [x, y] = local(e); gesture = {kind: "tap", x, y, tx: view.tx, ty: view.ty}; }
+  else if (pts.size === 2) { const [d, mx, my] = spread(); gesture = {kind: "pinch", d, mx, my, z: view.z, tx: view.tx, ty: view.ty}; }
+});
+$("board").addEventListener("pointermove", e => {
+  if (!pts.has(e.pointerId) || !gesture) return;
+  pts.set(e.pointerId, local(e));
+  if (gesture.kind === "pinch" && pts.size === 2) {
+    const [d, mx, my] = spread(), z = Math.min(MAXZ, Math.max(1, gesture.z * d / gesture.d)), k = z / gesture.z;
+    view.z = z; view.tx = mx - (gesture.mx - gesture.tx) * k; view.ty = my - (gesture.my - gesture.ty) * k; applyView();
+  } else if (gesture.kind !== "pinch") {
+    const [x, y] = local(e);
+    if (gesture.kind === "tap" && Math.hypot(x - gesture.x, y - gesture.y) > 8) gesture.kind = "drag";
+    if (gesture.kind === "drag") { view.tx = gesture.tx + x - gesture.x; view.ty = gesture.ty + y - gesture.y; applyView(); }
+  }
+});
+const lift = e => {
+  if (!pts.has(e.pointerId)) return;
+  const was = gesture; pts.delete(e.pointerId);
+  if (was && was.kind === "tap" && e.type === "pointerup" && !pts.size) {
+    const [x, y] = local(e), s = VW / scene.PW;
+    tapAt((x - view.tx) / view.z / s, (y - view.ty) / view.z / s);
+  }
+  if (!pts.size) gesture = null;
+  else if (pts.size === 1) { const [x, y] = [...pts.values()][0]; gesture = {kind: "drag", x, y, tx: view.tx, ty: view.ty}; }
+};
+$("board").addEventListener("pointerup", lift);
+$("board").addEventListener("pointercancel", lift);
+$("board").addEventListener("wheel", e => { e.preventDefault(); const [x, y] = local(e); zoomBy(Math.exp(-e.deltaY * 0.0025), x, y); }, {passive: false});
+$("zoomIn").onclick = () => zoomBy(1.6);
+$("zoomOut").onclick = () => zoomBy(1 / 1.6);
+addEventListener("keydown", e => {
+  if (document.querySelector(".spot") || $("overlay").classList.contains("show") || e.target.closest("input,select")) return;
+  if (e.key === "+" || e.key === "=") zoomBy(1.6); else if (e.key === "-" || e.key === "_") zoomBy(1 / 1.6);
+});
+addEventListener("resize", layout);
+
+/* ---------- drawing ---------- */
+const ns = "http://www.w3.org/2000/svg";
+const svgEl = (t, a) => { const e = document.createElementNS(ns, t); for (const k in a) e.setAttribute(k, a[k]); return e; };
+// Misses (a red cross on a pale dot), the hint ring, and the ring round the cat once it's caught or got away;
+// the marks keep the same size on the screen however far in you zoom.
+function drawMarks() {
+  const svg = $("marks"); svg.innerHTML = "";
+  if (!game || !ready()) return;
+  const u = 1 / pxScale();
+  for (const [x, y] of game.misses) {
+    const g = svgEl("g", {class: "miss"}), r = 9 * u, q = 4.5 * u;
+    g.append(svgEl("circle", {cx: x, cy: y, r, "stroke-width": 2}), svgEl("path", {d: `M${x - q} ${y - q}L${x + q} ${y + q}M${x + q} ${y - q}L${x - q} ${y + q}`, "stroke-width": 3}));
+    svg.append(g);
+  }
+  if (shown && playing() && Date.now() < shown.until && shown.misses === game.misses.length)
+    svg.append(svgEl("circle", {class: "hintsq", cx: shown.x, cy: shown.y, r: shown.r}));
+  if (game.won || game.lost) svg.append(svgEl("ellipse", {class: "found" + (game.lost ? " away" : ""), cx: game.x, cy: game.y,
+    rx: Math.max(game.w, game.h) * 0.62 + 6 * u, ry: Math.max(game.w, game.h) * 0.62 + 6 * u}));
+}
+function draw() {
+  if (!game) return;
+  $("hearts").textContent = "❤️".repeat(game.lives) + "🤍".repeat(3 - game.lives);
+  $("hearts").setAttribute("aria-label", `${game.lives} lives left`);
+  $("count").textContent = levelLabel(game.level);
+  $("hintBtn").disabled = !playing();
+  drawMarks();
+}
+
+$("hintBtn").onclick = hint;
+$("newBtn").onclick = () => { G.closeCard(); newPainting(); };
+for (let n = 1; n <= TOP; n++) $("levelSel").append(new Option(levelLabel(n), n));
+$("levelSel").value = settings.level;
+$("levelSel").onchange = e => startLevel(+e.target.value);
+$("helpBtn").onclick = showHelp;
+// a cat peeking round the corner of the title, sneaking in
+$("peek").src = catSrc("c19-21");
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  settings.seenHelp = false; helpOnFirstVisit();
+  if (!document.querySelector(".spot") && !(game && playing())) { settings.seenHelp = true; G.helpLater(); }
+}
+// The walkthrough points at the painting and the buttons, never at the cat. If the painting is still being
+// hung, it waits for it.
+function helpOnFirstVisit(tries = 0) {
+  if (settings.seenHelp || document.querySelector(".spot")) return;
+  if (!game || !ready()) { if (tries < 40) setTimeout(() => helpOnFirstVisit(tries + 1), 250); return; }
+  if (!playing()) return;
+  const steps = [
+    {say: "A cat has sneaked into this painting!", lit: [[0, 0]]},
+    {say: "Tap the cat to catch it", lit: [[0, 0]], tone: "ok"},
+    {say: "Pinch or tap + to look closer", els: [$("zoom")]},
+    {say: "A wrong tap costs a life", els: [$("hearts")]},
+    {say: "Stuck? Hint rings where to look", els: [$("hintBtn")]},
+  ];
+  G.spotlight({grid: $("board"), w: 1, h: 1, steps, done: () => { settings.seenHelp = true; save(); }});
+}
+
+G.nav("catburglar");
+G.checkClock(game);
+G.setupTimer({name: "catburglar", game: () => game, playing: g => !g.won && !g.lost, save, label: levelLabel, noun: "level",
+  emptyText: "Catch a cat and your times will show up here. They're kept on this device only."});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+
+/* ---------- sharing ---------- */
+$("shareBtn").onclick = () => {
+  if (!game || !ready()) return;
+  G.shareCard({name: "Cat Burglar", won: game.won || game.lost,
+    puzzle: () => ({g: "catburglar", N: game.level, i: game.i, c: game.c, x: game.x, y: game.y, w: game.w, h: game.h, r: game.r, f: game.f}),
+    progress: () => ({m: game.misses, l: game.lives})});
+};
+// A painting from a share link: the same cat in the same spot (and the misses so far, if sent).
+function openShared(d) {
+  const p = paintingOf(d.i), int = v => Number.isInteger(v);
+  if (!LEVELS[d.N] || !p || !CATS.includes(d.c) || ![d.x, d.y, d.w, d.h, d.r].every(int) || d.w < 8 || d.h < 8 || Math.abs(d.r) > 45 ||
+      d.x - d.w < 0 || d.y - d.h < 0 || d.x + d.w > p.w || d.y + d.h > p.h) {
+    G.note("That share link didn't work. It may have been cut off.", 6000); return;
+  }
+  newPainting.ask = Symbol();
+  game = {level: d.N, i: d.i, c: d.c, x: d.x, y: d.y, w: d.w, h: d.h, r: d.r, f: d.f ? 1 : 0, lives: 3, misses: [], hints: 0, hinted: false, won: false, lost: false, ...G.freshClock()};
+  const q = d.p;
+  if (q && Array.isArray(q.m) && q.m.length < 3 && q.m.every(m => Array.isArray(m) && m.length === 2 && m.every(int)))
+    Object.assign(game, {misses: q.m, lives: 3 - q.m.length, timed: false});
+  settings.level = d.N; save();
+  hang().catch(e => { showLoading(false, "The painting didn't load. Try New painting."); });
+}
+const shared = G.readShare("catburglar");
+if (game && game.i) G.reopen(() => {
+  if (!paintingOf(game.i) || !CATS.includes(game.c)) throw new Error("that painting isn't in the gallery any more");
+  hang().then(() => { if (game.won) winCard(); else if (game.lost) awayCard(); helpOnFirstVisit(); })
+    .catch(() => { newPainting(); });
+}, why => { newPainting(); G.note(why, 0); });
+else if (!shared) { newPainting(); helpOnFirstVisit(); }
+const shareOpts = () => ({name: "Cat Burglar", inProgress: !!(game && playing() && game.misses.length), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, shareOpts());
+// A share link opened while this page is already showing only changes the address, so watch for it.
+addEventListener("hashchange", () => { const d = G.readShare("catburglar"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
