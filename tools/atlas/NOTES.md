@@ -10,11 +10,11 @@ How Catlas (`atlas/`, on the Cat Travels shelf) was made, and the owner's decisi
 | Countries with no native wild cat (45, mostly islands) | "Where did the **housecat** migrate?" |
 | Mascot | None |
 | Levels | Easy / Medium / Hard: the owner's lists in `difficulty_by_owner.tsv` (`tiers.json`). Trips mix: Easy 10 Easy; Medium 7 Medium + 3 Easy; Hard 6 Hard + 3 Medium + 1 Easy. The US, Mexico, Canada, Russia, Brazil, Australia, India and China are never asked on Hard |
-| Regions | World, or a region; where a continent is short at a level it's paired: Easy offers Americas, Europe & Africa, Asia & Oceania (Easy Americas adds Panama and Jamaica); Medium offers Americas, Africa, Europe, Asia & Oceania; Hard offers all five (Americas, Africa, Asia, Europe, Australia and Oceania) |
+| Rounds | The levels' regions are rounds, played in order (the owner's change after launch; order within a level alphabetical, the owner's "fine"): each level's regions, then the whole Earth, then the next level; Disputed land is the last round. Where a continent is short at a level it's paired: Easy has Americas, Asia & Oceania, Europe & Africa (Easy Americas adds Panama and Jamaica); Medium Africa, Americas, Asia & Oceania, Europe; Hard all five (Africa, Americas, Asia, Australia and Oceania, Europe). 16 rounds in all, any of them pickable from the Round list |
 | Answer style | Always the player's choice: Pick (4 names, easier), List (default), Type (no list, harder). Doesn't affect moving up or the gold paw; best times and the shared result name it ("Medium · Pick") |
 | Pick's wrong answers | Same continent. Easy: other Easy places, spread out, of other sizes; Medium: one near neighbour and two others; Hard: the nearest look-alikes |
 | Tries | 2 per place, then it's shown and counts as missed |
-| Moving up | No hints and no Restart, and: 8+ on the first try, or 7 and any bonus, or all 10 found within their tries. Otherwise the same level and region again. Gold paw: 10 on the first try, no hints |
+| Moving on | No hints and no Restart, and: 8+ on the first try, or 7 and any bonus, or all 10 found within their tries, moves on to the next round. Otherwise the same round again. Gold paw: 10 on the first try, no hints |
 | Pairs kept apart on Pick | Countries that both claim land the map stripes: Russia–Ukraine, Israel–Syria, Morocco–Western Sahara, India–Pakistan, India–China, Sudan–South Sudan, plus Israel–Palestine |
 | Disputed territory round | A separate mode (Round: Disputed land), written without the owner's review at their request. 24 places in `DISPUTES` (`atlas/index.html`), shapes in `atlas/dz.json` from `scripts/dz_shapes.py`. Each is a sentence with blanks (the place, then the countries), filled in any order from one box (or chips on Pick, or the list); 3 wrong guesses and the sentence is shown; each other name for the place is a bonus. Sentences say who controls and who claims, never who's right |
 | Walkthrough | "A cat is hiding here." / how to answer / "You get two tries for each." / "Drag or pinch the map to look around." / answer style / Hint |
@@ -63,8 +63,9 @@ Quizzed alongside the 200 countries (the owner's choice): every place with an IS
 
 ## Cat photos
 
-Each clue shows the cat's photo from Wikipedia beside it, with a link to its Wikipedia page ("Iberian lynx on Wikipedia") and the photo credit (photographer and licence, from Wikimedia Commons). The owner chose this over redrawing the photos: it saves the drawing, and the link lets players read more. Spoilers don't matter (the owner: "we aren't competing"), so the link names the exact species for that country.
+Once a place is answered (found, or shown after two misses), the cat's photo from Wikipedia comes up beside the clue, with a link to its Wikipedia page ("Iberian lynx on Wikipedia") and the photo credit (photographer and licence, from Wikimedia Commons). The owner chose this over redrawing the photos: it saves the drawing, and the link lets players read more. Spoilers don't matter (the owner: "we aren't competing"), so the link names the exact species for that country.
 
+- Not before: the owner's call, "because you haven't found it yet". The answer stays up with a Next button, and the clock waits until Next.
 - `WIKI` in `atlas/index.html` is each clue's page; `WIKI_HERE` overrides it for one country where the clue's plain name covers several species (Canada lynx, Iberian lynx, African wildcat, Sunda clouded leopard, Sunda leopard cat). Housecats and explorers get the page on cats.
 - The player's browser fetches the photo from Wikipedia's page summary (`en.wikipedia.org/api/rest_v1/page/summary/<title>`) and the credit from Commons (`commons.wikimedia.org/w/api.php`, `origin=*`). If either fails, the link still shows, without the photo or credit.
 - They were first tested with stand-ins (the build environment can't reach Wikipedia); check them on the real site.
