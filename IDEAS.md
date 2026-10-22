@@ -102,7 +102,7 @@ Rows are sorted by group, with the games already on the site at the end of each 
 | Twirl | Moving and planning | Slide ribbons off the mat when nothing is in the way | — | — | — | Merge-3 chat | Yes | |
 | Tangle (Untangle) | Moving and planning | Drag balls of yarn until no strands cross; this was the "Untie the rope" idea | — | — | — | Game Suite chat, Tatham | Yes | |
 | Night Light (Lights Out, Flip) | Moving and planning | Tap cats to put them all to sleep; each tap also flips its neighbours | — | — | — | Fair Play chat, Tatham | Yes | |
-| Block Blast, Blockudoku, Cat Pile, falling blocks | Fitting shapes | Place or drop shapes to fill and clear lines | None | Medium | — | Idea list, Game Suite chat, wordleunlimited | | |
+| Block Blast, Blockudoku, Cat Pile | Fitting shapes | Place shapes to fill and clear lines | None | Medium | — | Idea list, Game Suite chat, wordleunlimited | | |
 | If It Fits (Tangram) | Fitting shapes | Build an odd-shaped box from the seven tangram pieces; a cat comes to sit in it | — | — | — | Fair Play chat | Yes | Began as packing loaf, curled and stretched-out cats into a box. Starring Bugsy, who hops into each finished box, with Bowtie as guest star |
 | Same Game | Match and clear | Tap groups of one colour to clear them; bigger groups score more | None | Easy | Pounce | Tatham | | |
 | Tile match (Tile Busters, Triple Tile) | Match and clear | Tap free tiles from a stacked layout into a tray of about 7; three of a kind clear, and a full tray loses | None | Medium | Pick of the Pile | Idea list, Bubbles and Game Suite chats | | Could reuse Pick of the Pile's toy blocks and piles |
