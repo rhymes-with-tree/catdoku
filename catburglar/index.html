@@ -99,7 +99,7 @@
   </div>
   <div class="bar">
     <label>Level <select id="levelSel" aria-label="Level"></select></label>
-    <button id="newBtn" class="primary">New painting</button>
+    <button id="newBtn" class="primary">New round</button>
   </div>
 
 </main>
@@ -347,28 +347,36 @@ function sneakIn(ctx, catIm, pz, strength) {
 }
 
 /* ---------- game ---------- */
-const STORE = "catdoku.catburglar.v1";
+// A round is five paintings at one level, one after another. Each painting has its own hunt (`game`: three lives,
+// misses, hints); the round keeps the score and the clock.
+const STORE = "catdoku.catburglar.v1", ROUND = 5;
 const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1, recent: []}, state.settings);
-let game = state.game || null, scene = null;   // scene: the painting drawn with the cat in it, for this game
-const save = () => G.save(STORE, {settings, game});
+let game = state.game || null, round = state.round || null, scene = null;   // scene: the painting drawn with the cat in it, for this game
+const save = () => G.save(STORE, {settings, game, round});
 const playing = () => game && !game.won && !game.lost;
 const ready = () => scene && scene.game === game;
+const caught = () => round.results.filter(r => r.caught).length;
 
+function newRound(level = settings.level) {
+  round = {level, results: [], hinted: false, over: false, ...G.freshClock()};
+  game = null; save(); newPainting();
+  G.track(`Cat Burglar new round level ${level}`);
+}
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); G.closeCard(); newRound(n); }
 async function newPainting() {
-  const level = settings.level, ask = Symbol();
-  newPainting.ask = ask; game = null; scene = null; showLoading(true); G.note("");
+  const level = round.level, ask = Symbol();
+  newPainting.ask = ask; game = null; scene = null; showLoading(true); G.note(""); draw();
   let pz;
   try { pz = await makePuzzle(level, settings.recent); }
-  catch (e) { if (newPainting.ask === ask) { showLoading(false, "The painting didn't load. Try New painting."); } return; }
+  catch (e) { if (newPainting.ask === ask) showLoading(false, "The painting didn't load. Tap here to try again."); return; }
   if (newPainting.ask !== ask) return;
   settings.recent = [pz.i, ...settings.recent.filter(i => i !== pz.i)].slice(0, 30);
-  game = {level, ...pz, lives: 3, misses: [], hints: 0, hinted: false, won: false, lost: false, ...G.freshClock()};
+  game = {level, ...pz, lives: 3, misses: [], hints: 0, hinted: false, won: false, lost: false};
   save(); await hang();
-  G.track(`Cat Burglar new painting level ${level}`);
 }
-function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); G.closeCard(); newPainting(); }
+$("loading").onclick = () => { if (round && !round.over && !game) newPainting(); };
 
 // Draw this game's painting with its cat sneaked in.
 async function hang() {
@@ -385,19 +393,18 @@ async function hang() {
   $("placard").append(t, by);
   $("levelSel").value = g.level;
   showLoading(false); layout(); view.z = 1; view.tx = view.ty = 0; applyView(); draw();
-  // the looking is the puzzle, so the clock starts as soon as the painting is up (it waits while the walkthrough or
-  // a card is showing, or the page is hidden)
-  if (playing()) game.started = true;
+  // the looking is the puzzle, so the clock starts as soon as the painting is up (it waits between paintings, while
+  // the walkthrough or a card is showing, or the page is hidden)
+  if (playing()) round.started = true;
 }
 function showLoading(on, text) {
   $("loading").hidden = !on && !text; $("loading").textContent = text || "Hanging the painting…";
   $("art").style.visibility = on || text ? "hidden" : "";
 }
 
-// A tap on the painting, in painting pixels: the cat, or a miss.
+// A tap on the painting, in painting pixels: the cat, or a miss. Once a painting is done, a tap brings back its card.
 function tapAt(px, py) {
-  if (!playing() || !ready()) { if (game && game.lost) awayCard(); return; }
-  game.started = true;
+  if (!playing() || !ready()) { if (game && (game.won || game.lost)) paintingCard(); return; }
   if (onCat(px, py)) { win(); return; }
   game.misses.push([Math.round(px), Math.round(py)]); game.lives--; save(); draw();
   if (!game.lives) { lose(); return; }
@@ -415,22 +422,37 @@ function onCat(px, py) {
 }
 
 /* ---------- endings ---------- */
-// A win without a hint moves up a level; one with no life lost as well earns a gold paw.
-const clean = () => !game.hinted, gold = () => game.lives === 3 && !game.hinted;
+// One painting done: caught, or missed (out of lives, or given up).
+function done(caughtIt) {
+  round.results.push({i: game.i, caught: caughtIt, lives: game.lives, hinted: game.hinted});
+  if (game.hinted) round.hinted = true;
+  if (round.results.length >= ROUND) endRound();
+  save(); draw();
+  const g = game;   // a moment to see the cat ringed first
+  setTimeout(() => { if (game === g) paintingCard(); }, caughtIt ? 1500 : 1800);
+}
 function win() {
-  game.won = true; G.finishClock(game);
-  settings.level = clean() ? G.sizeUp(game.level, $("levelSel")) : game.level; $("levelSel").value = settings.level;
-  save(); draw(); G.note("Caught!", 0);
+  game.won = true; G.note("Caught!", 0);
   G.track(`Cat Burglar caught level ${game.level}`);
-  const done = game;   // a moment to see the cat circled first
-  setTimeout(() => { if (game === done) winCard(); }, 1500);
+  done(true);
 }
 // Out of lives, or given up: the cat is ringed in red where it was hiding.
 function lose(gaveUp) {
-  game.lost = true; game.gaveUp = !!gaveUp; save(); draw(); G.note(gaveUp ? "Here it was!" : "The cat got away! There it is.", 0);
+  game.lost = true; game.gaveUp = !!gaveUp; G.note(gaveUp ? "Here it was!" : "The cat got away! There it is.", 0);
   G.track(`Cat Burglar ${gaveUp ? "gave up" : "got away"} level ${game.level}`);
-  const done = game;
-  setTimeout(() => { if (game === done) awayCard(); }, 1800);
+  done(false);
+}
+// The round's score. Four or five caught with no hints moves up a level; all five on the first tap with no hints
+// earns a gold paw. Best times keeps the time of rounds with all five caught.
+function endRound() {
+  const k = caught(), clean = !round.hinted;
+  round.over = true; round.level = round.level || game.level;
+  round.next = clean && k >= 4 ? G.sizeUp(round.level, $("levelSel")) : round.level;
+  round.gold = k === ROUND && clean && round.results.every(r => r.lives === 3);
+  if (k === ROUND) G.finishClock(round);
+  else { if (k >= 3) G.dailyWon(); round.result = {ms: null, n: round.level}; }
+  settings.level = round.next; $("levelSel").value = settings.level;
+  G.track(`Cat Burglar round over level ${round.level}: ${k} caught`);
 }
 // The cat as it was found: the painting around it, cropped.
 function caughtPic() {
@@ -441,32 +463,42 @@ function caughtPic() {
   const im = new Image(); im.className = "caught"; im.alt = "The cat, hiding in the painting"; im.src = out.toDataURL("image/jpeg", 0.88);
   return im;
 }
-// Where to see the painting itself (without a cat in it), then a pick of other levels.
+// Where to see the painting itself (without a cat in it), and at the end of a round a pick of other levels.
 function museumBits(next) {
   const p = paintingOf(game.i), box = document.createElement("div"), m = document.createElement("p");
   m.className = "museum";
   const a = document.createElement("a"); a.href = p.url; a.target = "_blank"; a.rel = "noopener";
   a.textContent = `See “${p.title}” ${live(p) ? "on Wikimedia Commons" : "at The Met"}`;
   m.append(a, document.createElement("br"), "(no cats in the real one)");
-  box.append(m, G.otherSize($("levelSel"), next, startLevel, "Or play a different level:"));
+  box.append(m);
+  if (next) box.append(G.otherSize($("levelSel"), next, startLevel, "Or play a different level:"));
   return box;
 }
-function winCard() {
+// After each painting: where the cat was, and on to the next (or the round's score after the fifth).
+function paintingCard() {
   if (!ready()) return;
-  if (!game.admired) { game.admired = true; save(); drawMarks(); }
-  const p = paintingOf(game.i), next = settings.level, lost = 3 - game.lives;
-  let text = `You caught the cat in ${p.title}${p.artist ? `, by ${p.artist}` : ""}${lost ? `, with ${lost} wrong ${lost > 1 ? "taps" : "tap"}` : ""}.`;
-  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : next > game.level ? ` Next up: level ${next}.` : " That's the top level; here's another painting.";
-  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the painting", game.result,
-    {title: "Caught!", gold: gold(), goldWhy: "First tap, no hints!", goldTitle: "Caught red-pawed!", goldPic: [caughtPic()],
-     next: next > game.level ? `Next: level ${next}` : "Next painting", after: museumBits(next)});
+  if (game.won && !game.admired) { game.admired = true; save(); drawMarks(); }
+  const p = paintingOf(game.i), n = round.results.length, last = round.over;
+  const title = game.won ? `Caught! ${n} of ${ROUND}` : game.gaveUp ? `Here it was! ${n} of ${ROUND}` : `The cat got away! ${n} of ${ROUND}`;
+  const lost = 3 - game.lives;
+  const text = game.won ? `It was hiding in ${p.title}${lost ? `, and took ${lost + 1} taps` : ""}.`
+    : game.gaveUp ? "The cat was hiding here." : "Three wrong taps, and it slipped off. It was hiding here.";
+  const next = last ? ["See how you did", () => { G.closeCard(); roundCard(); }, true] : ["Next painting", () => { G.closeCard(); newPainting(); }, true];
+  G.openCard(title, text, [next,
+    [game.won ? "Admire the painting" : "Look at the painting", () => { G.closeCard(); G.note("Tap the painting when you're ready to go on.", 0); }]],
+    caughtPic(), museumBits());
 }
-function awayCard() {
-  if (!ready()) return;
-  G.openCard(game.gaveUp ? "Here it was!" : "The cat got away!", game.gaveUp ? "The cat was hiding here." : "Three wrong taps, and it slipped off. It was hiding here.", [
-    ["Next painting", () => { G.closeCard(); newPainting(); }, true],
-    ["Look at the painting", () => { G.closeCard(); G.note("Tap New painting when you're ready for another.", 0); }], G.homeBtn()],
-    caughtPic(), museumBits(game.level));
+function roundCard() {
+  if (!ready() || !round.over) return;
+  const k = caught(), next = round.next;
+  let text = `You caught ${k} of ${ROUND} cats.`;
+  text += round.hinted ? ` You had a hint, so here's another round at level ${next}.`
+    : next > round.level ? ` Next up: level ${next}.`
+    : k >= 4 ? " That's the top level; here's another round."
+    : ` Catch 4 with no hints to move up. Here's another round at level ${next}.`;
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the painting", round.result,
+    {title: k === ROUND ? "All five caught!" : "Round over!", gold: round.gold, goldWhy: "Five cats, each on the first tap, no hints!",
+     goldTitle: "Caught red-pawed!", goldPic: [caughtPic()], next: next > round.level ? `Next round: level ${next}` : "Next round", after: museumBits(next)});
 }
 
 /* ---------- hints ---------- */
@@ -573,17 +605,26 @@ function drawMarks() {
     rx: Math.max(game.w, game.h) * 0.62 + 6 * u, ry: Math.max(game.w, game.h) * 0.62 + 6 * u}));
 }
 function draw() {
+  $("hintBtn").disabled = $("giveUpBtn").disabled = !playing() || !ready();
+  if (!round) return;
+  // which painting of the round this is: the one being hunted, or the last one done
+  const n = Math.min(ROUND, round.results.length + (playing() || !game ? 1 : 0));
+  $("count").textContent = `${levelLabel(round.level)} · ${n} of ${ROUND}`;
   if (!game) return;
   $("hearts").textContent = "❤️".repeat(game.lives) + "🤍".repeat(3 - game.lives);
   $("hearts").setAttribute("aria-label", `${game.lives} lives left`);
-  $("count").textContent = levelLabel(game.level);
-  $("hintBtn").disabled = $("giveUpBtn").disabled = !playing();
   drawMarks();
 }
 
 $("hintBtn").onclick = hint;
 $("giveUpBtn").onclick = () => { if (playing() && ready()) lose(true); };
-$("newBtn").onclick = () => { G.closeCard(); newPainting(); };
+// New round: straight away, or after asking if this round is partway through.
+const midRound = () => !!(round && !round.over && (round.results.length || (game && game.misses.length)));
+$("newBtn").onclick = () => {
+  if (!midRound()) { G.closeCard(); newRound(); return; }
+  G.openCard("Start a new round?", `You're on painting ${Math.min(ROUND, round.results.length + 1)} of ${ROUND}. This round won't count.`,
+    [["New round", () => { G.closeCard(); newRound(); }, true], ["Keep playing", G.closeCard]]);
+};
 for (let n = 1; n <= TOP; n++) $("levelSel").append(new Option(levelLabel(n), n));
 $("levelSel").value = settings.level;
 $("levelSel").onchange = e => startLevel(+e.target.value);
@@ -605,18 +646,21 @@ function helpOnFirstVisit(tries = 0) {
   const steps = [
     {say: "A cat has sneaked into this painting!", lit: [[0, 0]]},
     {say: "Tap the cat to catch it", lit: [[0, 0]], tone: "ok"},
+    {say: "Catch as many as you can in 5 paintings", els: [$("count")]},
     {say: "Pinch or tap + to look closer", els: [$("zoom")]},
     {say: "A wrong tap costs a life", els: [$("hearts")]},
+    {say: "Give up shows where it was and moves on", els: [$("giveUpBtn")]},
     {say: "Stuck? Hint rings where to look", els: [$("hintBtn")]},
   ];
   G.spotlight({grid: $("board"), w: 1, h: 1, steps, done: () => { settings.seenHelp = true; save(); }});
 }
 
 G.nav("catburglar");
-G.checkClock(game);
-G.setupTimer({name: "catburglar", game: () => game, playing: g => !g.won && !g.lost, save, label: levelLabel, noun: "level",
-  emptyText: "Catch a cat and your times will show up here. They're kept on this device only."});
-$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+// The clock is the round's: it runs while a painting is being hunted.
+G.checkClock(round);
+G.setupTimer({name: "catburglar", game: () => round, playing: r => !r.over && playing(), save, label: levelLabel, noun: "level",
+  emptyText: "Catch all five cats in a round and your time will show up here. Times are kept on this device only."});
+$("bestBtn").onclick = () => G.showBests("Best times", round ? round.level : settings.level);
 
 /* ---------- sharing ---------- */
 $("shareBtn").onclick = () => {
@@ -625,7 +669,8 @@ $("shareBtn").onclick = () => {
     puzzle: () => ({g: "catburglar", N: game.level, i: game.i, c: game.c, x: game.x, y: game.y, w: game.w, h: game.h, r: game.r, f: game.f}),
     progress: () => ({m: game.misses, l: game.lives})});
 };
-// A painting from a share link: the same cat in the same spot (and the misses so far, if sent).
+// A painting from a share link: the same cat in the same spot (and the misses so far, if sent), as the first
+// painting of a new round.
 function openShared(d) {
   const p = paintingOf(d.i), int = v => Number.isInteger(v);
   if (!LEVELS[d.N] || !p || !CATS.includes(d.c) || ![d.x, d.y, d.w, d.h, d.r].every(int) || d.w < 8 || d.h < 8 || Math.abs(d.r) > 45 ||
@@ -633,21 +678,27 @@ function openShared(d) {
     G.note("That share link didn't work. It may have been cut off.", 6000); return;
   }
   newPainting.ask = Symbol();
-  game = {level: d.N, i: d.i, c: d.c, x: d.x, y: d.y, w: d.w, h: d.h, r: d.r, f: d.f ? 1 : 0, lives: 3, misses: [], hints: 0, hinted: false, won: false, lost: false, ...G.freshClock()};
+  round = {level: d.N, results: [], hinted: false, over: false, ...G.freshClock()};
+  game = {level: d.N, i: d.i, c: d.c, x: d.x, y: d.y, w: d.w, h: d.h, r: d.r, f: d.f ? 1 : 0, lives: 3, misses: [], hints: 0, hinted: false, won: false, lost: false};
   const q = d.p;
-  if (q && Array.isArray(q.m) && q.m.length < 3 && q.m.every(m => Array.isArray(m) && m.length === 2 && m.every(int)))
-    Object.assign(game, {misses: q.m, lives: 3 - q.m.length, timed: false});
-  settings.level = d.N; save();
-  hang().catch(e => { showLoading(false, "The painting didn't load. Try New painting."); });
+  if (q && Array.isArray(q.m) && q.m.length < 3 && q.m.every(m => Array.isArray(m) && m.length === 2 && m.every(int))) {
+    Object.assign(game, {misses: q.m, lives: 3 - q.m.length}); round.timed = false;
+  }
+  settings.level = d.N; $("levelSel").value = d.N; save();
+  hang().catch(() => { showLoading(false, "The shared painting didn't load. Tap New round for another."); });
 }
 const shared = G.readShare("catburglar");
-if (game && game.i) G.reopen(() => {
-  if (!paintingOf(game.i) || !CATS.includes(game.c)) throw new Error("that painting isn't in the gallery any more");
-  hang().then(() => { if (game.won) winCard(); else if (game.lost) awayCard(); helpOnFirstVisit(); })
-    .catch(() => { newPainting(); });
-}, why => { newPainting(); G.note(why, 0); });
-else if (!shared) { newPainting(); helpOnFirstVisit(); }
-const shareOpts = () => ({name: "Cat Burglar", inProgress: !!(game && playing() && game.misses.length), open: openShared, after: helpOnFirstVisit});
+// Reopen the round where it was left: the painting being hunted (or just done, with its card), or the next one.
+if (round && round.results) G.reopen(() => {
+  if (game && game.i) {
+    if (!paintingOf(game.i) || !CATS.includes(game.c)) throw new Error("that painting isn't in the gallery any more");
+    hang().then(() => { if (round.over) roundCard(); else if (!playing()) paintingCard(); helpOnFirstVisit(); })
+      .catch(() => { if (round.over) newRound(); else newPainting(); });
+  } else if (round.over) newRound();
+  else { newPainting(); helpOnFirstVisit(); }
+}, why => { newRound(); G.note(why, 0); });
+else if (!shared) { newRound(); helpOnFirstVisit(); }
+const shareOpts = () => ({name: "Cat Burglar", inProgress: midRound(), open: openShared, after: helpOnFirstVisit});
 if (shared) G.offerShare(shared, shareOpts());
 // A share link opened while this page is already showing only changes the address, so watch for it.
 addEventListener("hashchange", () => { const d = G.readShare("catburglar"); if (d) G.offerShare(d, shareOpts()); });
