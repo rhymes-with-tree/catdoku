@@ -781,6 +781,30 @@ const G = (() => {
     if (text && ms !== 0) msgTimer = setTimeout(() => note(""), ms || 3500);
   }
 
+  /* ---------- hints ---------- */
+  // Every game's Hint works the same way. The game works out what to show and hands it to its hinter, which keeps
+  // the mark on the board for HINT_MS (or until the board changes) with a line saying what to do. Marks are gold
+  // (HINT.gold) for where to go and red (HINT.red) for a mistake. Pressing Hint again on the same board can say more
+  // each time: level() is how many hints have already been shown on this board (0 the first time).
+  // o: {key() (the board as it stands, as a string), draw() (redraws; it reads the mark with current())}
+  const HINT_MS = 5000, HINT = {gold: "#ECA818", red: "#C8392B"};
+  function hinter(o) {
+    let mark = null, at = null, shown = 0, timer = 0;
+    return {
+      level() { if (o.key() !== at) shown = 0; return shown; },
+      show(m, say, ms = HINT_MS) {
+        clearTimeout(timer);
+        const k = o.key(); if (k !== at) shown = 0;
+        mark = m; at = k; shown++;
+        o.draw(); if (say) note(say, ms);
+        timer = setTimeout(() => { if (mark === m) { mark = null; o.draw(); } }, ms);
+      },
+      // the mark to draw, while the board is as it was when it was shown
+      current() { if (mark && o.key() !== at) mark = null; return mark; },
+      clear() { clearTimeout(timer); if (mark) { mark = null; o.draw(); } },
+    };
+  }
+
   // The square under a pointer, or -1.
   function cellAt(x, y) {
     const el = document.elementFromPoint(x, y), c = el && el.closest && el.closest(".board .cell");
@@ -805,6 +829,6 @@ const G = (() => {
     }
   }
 
-  return {GAMES, GROUPS, recent, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, track, reopen,
+  return {GAMES, GROUPS, recent, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, track, reopen,
           setupTimer, freshClock, spotlight, toysOff, saveToys, needToys, goldPaw, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, toyPicker, pickLook};
 })();

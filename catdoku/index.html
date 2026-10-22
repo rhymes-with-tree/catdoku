@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.9";
+  var BUILD = "2026-10-22.10";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -24,7 +24,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-22.9">
+<link rel="stylesheet" href="../games.css?v=2026-10-22.10">
 <style>
 /* Catdoku's own looks; the rest is games.css. */
 html,body{height:100%}
@@ -57,6 +57,8 @@ main{padding-top:18px}
 .cell .higginsface{display:block;width:1.3em;height:1.3em}   /* each cat on the board is Higgins */
 .cell.bad{animation:shake .35s}
 .cell.bad::after{content:"";position:absolute;inset:0;background:rgba(42,37,48,.45)}
+.cell.hint::before{content:"";position:absolute;inset:0;z-index:1;box-shadow:inset 0 0 0 4px #ECA818;background:rgba(255,224,122,.35);pointer-events:none}
+.cell.hint.bad::before{box-shadow:inset 0 0 0 4px #C8392B;background:rgba(200,57,43,.18)}
 .cell.wrong::after{content:"";position:absolute;inset:3px;border:3px dashed var(--ink);border-radius:4px;background:rgba(255,255,255,.35)}
 @keyframes shake{0%,100%{transform:none}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
 .card .fact{font-size:15px;color:var(--ink);background:var(--paper);border-radius:10px;padding:10px 12px;margin:0 0 4px;text-align:left}
@@ -81,9 +83,10 @@ main{padding-top:18px}
   <p class="breed" id="breed" hidden></p>
 
   <div class="actions">
-    <button id="auditBtn">Audit</button>
+    <button id="hintBtn">Hint</button>
     <button id="undoBtn">Undo</button>
     <button id="restartBtn">Restart</button>
+    <button id="auditBtn">Audit</button>
     <button id="eraseBtn" aria-pressed="false">Erase 🐾</button>
     <button id="completeBtn" class="primary">Complete</button>
     <button id="shareBtn">Share</button>
@@ -107,7 +110,7 @@ main{padding-top:18px}
 
 </main>
 
-<script src="../games.js?v=2026-10-22.9"></script>
+<script src="../games.js?v=2026-10-22.10"></script>
 <script>G.nav("catdoku");</script>
 <script>
 const PALETTE = ["#BD5538","#73A7AE","#ECA818","#6AA673","#B94588","#B3B94B",
@@ -414,6 +417,41 @@ function audit() {
   render(); save();
 }
 
+// Hint: first a mistake, in red (a cat where none goes, or a paw where the cat goes). Otherwise a row, column or
+// region with one spot left for its cat: the first time, the whole row, column or region glows and the line says
+// so; asked again, the square itself. Failing that, the row, column or region with the fewest spots left, then a
+// square in it from the answer. You place the cat. Like Audit, a hint keeps you on this size and costs the gold paw.
+const hints = G.hinter({key: () => game ? game.cells.map(show).join("") : "", draw: () => render()});
+function hint() {
+  if (!game || game.status !== "playing" || busy) return;
+  const N = game.N, isSol = k => game.sol[Math.floor(k / N)] === k % N;
+  // (a paw Auto exclude put down for a wrong cat goes with that cat, so only your own paws count)
+  const wrong = game.cells.map((c, k) => (show(c) === "cat" && !isSol(k)) || (show(c) === "paw" && c.manual && isSol(k)) ? k : -1).filter(k => k >= 0);
+  const give = (m, say) => { game.helped = true; save(); hints.show(m, say); };
+  if (wrong.length) {
+    const k = wrong[0], more = wrong.length > 1 ? ` (and ${wrong.length - 1} more)` : "";
+    return give({cells: [k], bad: true}, show(game.cells[k]) === "cat" ? `That cat doesn't go there${more}.` : `A cat goes under that paw${more}: take it off.`);
+  }
+  // squares a cat can still go: no cat or paw, and nothing it would share a row, column, region or corner with
+  const cats = game.cells.map((c, k) => c.cat ? k : -1).filter(k => k >= 0), taken = new Set(cats.flatMap(peers));
+  const open = k => show(game.cells[k]) === "empty" && !taken.has(k);
+  const units = [];
+  for (let r = 0; r < N; r++) units.push(["row", [...Array(N).keys()].map(c => r * N + c)]);
+  for (let c = 0; c < N; c++) units.push(["column", [...Array(N).keys()].map(r => r * N + c)]);
+  for (let g = 0; g < N; g++) units.push(["color", game.reg.map((v, k) => v === g ? k : -1).filter(k => k >= 0)]);
+  const todo = units.filter(([, u]) => !u.some(k => game.cells[k].cat)).map(([name, u]) => [name, u, u.filter(open)]);
+  if (!todo.length) { note("Every cat's in place: press Complete.", 4000); return; }
+  todo.sort((a, b) => a[2].length - b[2].length);
+  const [name, u, spots] = todo[0], at = spots.find(isSol) ?? u.find(isSol), level = hints.level();
+  const where = name === "color" ? "this color" : `this ${name}`;
+  if (spots.length === 1) {
+    if (level === 0) return give({cells: u}, `There's only one spot left for the cat in ${where}.`);
+    return give({cells: [at]}, `A cat goes in the gold square: it's the only spot left in its ${name}.`);
+  }
+  if (level === 0) return give({cells: u}, `${where[0].toUpperCase() + where.slice(1)} has the fewest spots left for its cat (${spots.length}).`);
+  return give({cells: [at]}, "A cat goes in the gold square.");
+}
+
 function setNextSize(n) {
   settings.size = Math.min(MAX_N, Math.max(MIN_N, n));
   $("size").value = settings.size;
@@ -644,12 +682,13 @@ const FACE = "../cats/higgins-face.webp", HIGGINS = `<img class="higginsface" sr
 new Image().src = FACE;
 function higginsPic(alt = "") { const im = new Image(); im.className = "inlineface"; im.src = FACE; im.alt = alt; return im; }
 function render() {
-  const kids = $("board").children;
+  const kids = $("board").children, mark = hints.current();
   game.cells.forEach((c, i) => {
     const el = kids[i], s = show(c), N = game.N;
     const html = s === "cat" ? HIGGINS : s === "paw" ? '<span class="paw">🐾</span>' : "";
     if (el.innerHTML !== html) el.innerHTML = html;
     el.classList.toggle("wrong", game.wrong.includes(i));
+    el.classList.toggle("hint", !!(mark && mark.cells.includes(i))); el.classList.toggle("bad", !!(mark && mark.bad && mark.cells.includes(i)));
     el.setAttribute("aria-label", `Row ${Math.floor(i / N) + 1}, column ${i % N + 1}: ${s === "empty" ? "blank" : s}`);
   });
   $("hearts").innerHTML = Array.from({length: Math.max(HEARTS, game.livesUsed)},
@@ -658,7 +697,7 @@ function render() {
   $("found").replaceChildren(higginsPic("Cats placed:"), ` ${game.cells.filter(c => c.cat).length} / ${game.N}`);
   $("completeBtn").style.display = settings.autoGrade ? "none" : "";
   $("auditBtn").style.display = settings.autoGrade ? "none" : "";
-  $("auditBtn").disabled = game.status !== "playing";
+  $("auditBtn").disabled = $("hintBtn").disabled = game.status !== "playing";
   $("eraseBtn").setAttribute("aria-pressed", erasing);
   $("undoBtn").disabled = !game.history.length || game.status !== "playing";
   $("gradeTgl").checked = settings.autoGrade;
@@ -706,6 +745,7 @@ $("undoBtn").onclick = undo;
 $("restartBtn").onclick = () => { if (!busy) restart(); };
 $("completeBtn").onclick = complete;
 $("auditBtn").onclick = audit;
+$("hintBtn").onclick = hint;
 $("eraseBtn").onclick = () => { erasing = !erasing; if (game) render(); };
 $("gradeTgl").onchange = e => {
   settings.autoGrade = e.target.checked;
@@ -735,6 +775,7 @@ function spotlightSteps() {
     {say: "Tap once for 🐾, twice for 🐱", lit: [[c, r]], marks: [[c, r, ["🐾", FACE]]]},
     {say: "Drag to 🐾 several squares at once", lit: drag, marks: drag.map(([x, y]) => [x, y, "🐾"])},
     {say: "Turn on Erase 🐾 to tap or drag paws away", els: [$("eraseBtn")]},
+    {say: "Stuck? Hint shows where to look; ask again for the square", els: [$("hintBtn")]},
     {say: "Auto exclude puts paws down for you after each cat", els: [$("exclTgl").closest(".opt")]},
     {say: "Auto grade checks each cat as you place it, and makes it harder", els: [$("gradeTgl").closest(".opt")]},
   ];
