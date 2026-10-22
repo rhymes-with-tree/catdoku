@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.7"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-22.8"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-22.7">
+<link rel="stylesheet" href="../games.css?v=2026-10-22.8">
 <style>
 /* A cat has walked across the keyboard and broken it. Only seven keys still work. Make words with them, always
    using the gold one. */
@@ -184,8 +184,8 @@
   <p class="help">Words from <a href="https://wordlist.aspell.net/">SCOWL</a>, © Kevin Atkinson, and ENABLE.</p>
 </main>
 
-<script src="../games.js?v=2026-10-22.7"></script>
-<script src="../walkcat.js?v=2026-10-22.7"></script>
+<script src="../games.js?v=2026-10-22.8"></script>
+<script src="../walkcat.js?v=2026-10-22.8"></script>
 <script>
 const WORDS_INLINE = null;  // the word list, filled in when the page is bundled into one file
 
@@ -200,9 +200,9 @@ function answersFor(keys, centre) {
   return {answers: W.common.filter(ok), extra: W.extra.filter(ok)};
 }
 // Ranks, as a share of the points every common answer is worth; the Cat's Meow means every common answer (and
-// the Cat's Pyjamas, every common answer without a hint).
+// the Cat's Pyjamas, every common answer without a hint). Reaching Genius Cat wins the keyboard, with a gold paw.
 const RANKS = [["Kitten", 0], ["Curious", .02], ["Playful", .05], ["Pouncer", .1], ["Mouser", .2], ["Prowler", .3], ["Clever Cat", .45], ["Genius Cat", .7], ["The Cat's Meow", 1]];
-const PYJAMAS = "The Cat's Pyjamas";
+const PYJAMAS = "The Cat's Pyjamas", GENIUS = RANKS.findIndex(([r]) => r === "Genius Cat");
 
 /* ---------- game ---------- */
 // game: {id (index into puzzles), daily (the day number, or null), keys, centre, found (words), revealed, won,
@@ -344,8 +344,9 @@ function submit() {
   toast(smash ? `${w.length === 7 ? "Perfect Pounce" : "Full Pounce"}! +${p}` : EXTRA.has(w) ? `A rare one! +${p}` : `${["", "Nice!", "", "", "", "Good!", "Great!", "Purrfect!"][Math.min(7, w.length - 3)] || "Purrfect!"} +${p}`);
   const after = rankAt(score());
   draw(); save();
-  if (after > before && after < RANKS.length - 1) setTimeout(() => toast(`You're now ${/^[AEIOU]/.test(RANKS[after][0]) ? "an" : "a"} ${RANKS[after][0]}!`), 1500);
-  if (commonFound() === answers.length && !game.won) win();
+  if (after > before && after < GENIUS) setTimeout(() => toast(`You're now ${/^[AEIOU]/.test(RANKS[after][0]) ? "an" : "a"} ${RANKS[after][0]}!`), 1500);
+  if (after >= GENIUS && !game.won) win();
+  else if (after > before && after === RANKS.length - 1) meow();
 }
 
 /* ---------- the word list and hints ---------- */
@@ -373,7 +374,7 @@ function drawWords() {
     + ` · you've found ${got}`;
   $("foundSum").textContent = n ? `You've found ${n} word${n === 1 ? "" : "s"} (${commonFound()} of ${answers.length} everyday ones)` : "No words yet";
   $("hintbar").innerHTML = HINTS.map(([k, name]) => `<button data-h="${k}" aria-pressed="${!!h[k]}"><b>Hint</b>: ${name}</button>`).join("")
-    + (game.won || game.revealed || !left.length ? "" : `<button class="reveal" id="revealBtn">Give up and show the words I missed</button>`);
+    + (game.revealed || !left.length ? "" : `<button class="reveal" id="revealBtn">Give up and show the words I missed</button>`);
   // what the highlights point at
   const endsLeft = new Set(left.map(suffixOf).filter(Boolean));
   const startsLonger = f => left.some(w => w.length > f.length && w.startsWith(f));
@@ -547,14 +548,23 @@ function reveal() {
 }
 
 /* ---------- winning ---------- */
+// Reaching Genius Cat wins the keyboard (hints or not) with a gold paw; the words left can still be found, on to
+// the Cat's Meow, which gets a card of its own.
 function win() {
   game.won = true; save(); draw(); G.dailyWon();   // Keyboard Cat has no timer, so it marks today's challenge here
-  G.track(`Keyboard Cat cat's meow ${game.daily != null ? "daily" : "practice"}`);
+  G.track(`Keyboard Cat genius ${game.daily != null ? "daily" : "practice"}`);
+  const meowToo = rankAt(score()) === RANKS.length - 1;
   setTimeout(() => {
-    const text = `You found all ${answers.length} everyday words${game.found.length > answers.length ? `, and ${game.found.length - answers.length} rare one${game.found.length - answers.length === 1 ? "" : "s"} too` : ""}.`;
-    G.winCard(text, () => { G.closeCard(); newKeyboard(); }, "Admire my words", null,
-      {gold: true, goldWhy: game.hinted ? "You're the Cat's Meow!" : "You're the Cat's Pyjamas! (No hints!)", next: "Another keyboard"});
+    const left = answers.length - commonFound();
+    const text = meowToo ? `You found all ${answers.length} everyday words.` : `You found ${commonFound()} of the ${answers.length} everyday words. Keep going for the Cat's Meow: ${left} to find.`;
+    G.winCard(text, () => { G.closeCard(); newKeyboard(); }, meowToo ? "Admire my words" : "Keep finding words", null,
+      {gold: true, goldWhy: meowToo ? (game.hinted ? "You're the Cat's Meow!" : "You're the Cat's Pyjamas! (No hints!)") : game.hinted ? "You're a Genius Cat!" : "Genius Cat, with no hints!", next: "Another keyboard"});
   }, 900);
+}
+function meow() {
+  G.track(`Keyboard Cat cat's meow ${game.daily != null ? "daily" : "practice"}`);
+  setTimeout(() => G.openCard(game.hinted ? "The Cat's Meow!" : "The Cat's Pyjamas!", `You found all ${answers.length} everyday words${game.hinted ? "" : ", with no hints"}.`,
+    [["Another keyboard", () => { G.closeCard(); newKeyboard(); }, true], ["Admire my words", G.closeCard]]), 900);
 }
 
 /* ---------- choosing keyboards ---------- */
@@ -621,7 +631,7 @@ function helpOnFirstVisit() {
     {say: "Every word must use the gold key", els: [centreEl]},
     {say: "Make words of 4 letters or more. Keys can be used again", els: [$("entry")]},
     {say: "Use all 7 keys in one word for a Full Pounce!", els: [keyEls]},
-    {say: "Find every everyday word to be the Cat's Meow (with no hints, the Cat's Pyjamas!)", els: [$("dots")]},
+    {say: "Reach Genius Cat for a gold paw; find every everyday word to be the Cat's Meow", els: [$("dots")]},
   ];
   G.spotlight({grid: $("board"), w: 10, h: 4, steps, done: () => { saved.seenHelp = true; save(); }});
 }
