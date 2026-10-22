@@ -190,15 +190,15 @@ function catColour(im) {
   for (let i = 0; i < d.length; i += 4) { const a = d[i + 3] / 255; n += a; r += d[i] * a; g += d[i + 1] * a; b += d[i + 2] * a; }
   return [r / n, g / n, b / n];
 }
-// A new puzzle: a painting, a cat, and a spot where the cat's own colours already fit (with some texture to hide in),
-// picked from a few hundred tries with a little luck mixed in.
+// A new puzzle: a painting, then a dozen cats tried in it, each at its best spot from a few hundred tries (with a
+// little luck mixed in), and the best of those. A busy spot hides any cat; a calm one (sky, a wall, a dress) only
+// suits a cat of much the same colour.
 async function makePuzzle(level, avoid) {
   const fresh = PAINTINGS.filter(p => !avoid.includes(p.id)), pool = fresh.length ? fresh : PAINTINGS;
-  const p = pool[Math.floor(Math.random() * pool.length)], cat = CATS[Math.floor(Math.random() * CATS.length)];
-  const [art, im] = await Promise.all([picture(artSrc(p.id)), picture(catSrc(cat))]);
-  const PW = art.naturalWidth, PH = art.naturalHeight, side = LEVELS[level].size * Math.sqrt(PW * PH) * (0.9 + Math.random() * 0.2);
-  const asp = im.naturalWidth / im.naturalHeight, w = Math.round(side * Math.sqrt(asp)), h = Math.round(side / Math.sqrt(asp));
-  const r = Math.round((Math.random() * 2 - 1) * 14), f = Math.random() < 0.5 ? 1 : 0, [bw, bh] = turnedBox(w, h, r);
+  const p = pool[Math.floor(Math.random() * pool.length)], tried = new Set();
+  while (tried.size < 12) tried.add(CATS[Math.floor(Math.random() * CATS.length)]);
+  const art = await picture(artSrc(p.id)), ims = await Promise.all([...tried].map(c => picture(catSrc(c)).catch(() => null)));
+  const PW = art.naturalWidth, PH = art.naturalHeight;
   // the painting, small, with running sums for quick averages over any box
   const GW = 160, g = GW / PW, GH = Math.max(1, Math.round(PH * g)), sc = canvasOf(GW, GH), sx = sc.getContext("2d");
   sx.drawImage(art, 0, 0, GW, GH);
@@ -210,21 +210,29 @@ async function makePuzzle(level, avoid) {
   const sum = (k, x0, y0, x1, y1) => S[k][y1 * (GW + 1) + x1] - S[k][y0 * (GW + 1) + x1] - S[k][y1 * (GW + 1) + x0] + S[k][y0 * (GW + 1) + x0];
   // spread of brightness over a box of the small painting
   const spreadIn = (x0, y0, x1, y1) => { const n = (x1 - x0) * (y1 - y0), L = (0.3 * sum(0, x0, y0, x1, y1) + 0.59 * sum(1, x0, y0, x1, y1) + 0.11 * sum(2, x0, y0, x1, y1)) / n; return Math.sqrt(Math.max(0, sum(3, x0, y0, x1, y1) / n - L * L)); };
-  const mc = catColour(im), margin = 0.04 * Math.min(PW, PH);
-  let best = null, bestScore = Infinity;
-  for (let t = 0; t < 400; t++) {
-    const cx = margin + bw / 2 + Math.random() * (PW - 2 * margin - bw), cy = margin + bh / 2 + Math.random() * (PH - 2 * margin - bh);
-    const x0 = Math.max(0, Math.floor((cx - bw / 2) * g)), y0 = Math.max(0, Math.floor((cy - bh / 2) * g));
-    const x1 = Math.min(GW, Math.max(x0 + 1, Math.ceil((cx + bw / 2) * g))), y1 = Math.min(GH, Math.max(y0 + 1, Math.ceil((cy + bh / 2) * g))), n = (x1 - x0) * (y1 - y0);
-    const m = [0, 1, 2].map(k => sum(k, x0, y0, x1, y1) / n), spread = spreadIn(x0, y0, x1, y1);
-    // plain sky or a bare wall gives the cat away, so busy spots score better; and every quarter of the spot has
-    // to be busy, so the cat never hangs half off a roof into the sky
-    const xm = (x0 + x1) >> 1, ym = (y0 + y1) >> 1;
-    const quiet = x1 - x0 > 1 && y1 - y0 > 1 ? Math.min(spreadIn(x0, y0, xm, ym), spreadIn(xm, y0, x1, ym), spreadIn(x0, ym, xm, y1), spreadIn(xm, ym, x1, y1)) : spread;
-    const score = 0.6 * Math.hypot(m[0] - mc[0], m[1] - mc[1], m[2] - mc[2]) + 2.5 * Math.max(0, 30 - quiet) - 0.3 * Math.min(spread, 80) + Math.random() * 25;
-    if (score < bestScore) { bestScore = score; best = [cx, cy]; }
-  }
-  return {i: p.id, c: cat, x: Math.round(best[0]), y: Math.round(best[1]), w, h, r, f};
+  const margin = 0.04 * Math.min(PW, PH);
+  let best = null;
+  [...tried].forEach((cat, j) => {
+    const im = ims[j]; if (!im) return;
+    const side = LEVELS[level].size * Math.sqrt(PW * PH) * (0.9 + Math.random() * 0.2), asp = im.naturalWidth / im.naturalHeight;
+    const w = Math.round(side * Math.sqrt(asp)), h = Math.round(side / Math.sqrt(asp));
+    const r = Math.round((Math.random() * 2 - 1) * 14), f = Math.random() < 0.5 ? 1 : 0, [bw, bh] = turnedBox(w, h, r), mc = catColour(im);
+    for (let t = 0; t < 250; t++) {
+      const cx = margin + bw / 2 + Math.random() * (PW - 2 * margin - bw), cy = margin + bh / 2 + Math.random() * (PH - 2 * margin - bh);
+      const x0 = Math.max(0, Math.floor((cx - bw / 2) * g)), y0 = Math.max(0, Math.floor((cy - bh / 2) * g));
+      const x1 = Math.min(GW, Math.max(x0 + 1, Math.ceil((cx + bw / 2) * g))), y1 = Math.min(GH, Math.max(y0 + 1, Math.ceil((cy + bh / 2) * g))), n = (x1 - x0) * (y1 - y0);
+      const m = [0, 1, 2].map(k => sum(k, x0, y0, x1, y1) / n), spread = spreadIn(x0, y0, x1, y1);
+      // how calm the calmest quarter of the spot is: a cat half on a roof and half in the sky counts as in the sky
+      const xm = (x0 + x1) >> 1, ym = (y0 + y1) >> 1;
+      const quiet = x1 - x0 > 1 && y1 - y0 > 1 ? Math.min(spreadIn(x0, y0, xm, ym), spreadIn(xm, y0, x1, ym), spreadIn(x0, ym, xm, y1), spreadIn(xm, ym, x1, y1)) : spread;
+      // colour that doesn't match costs more the calmer the spot, so calm spots go only to cats of their colour
+      const off = Math.hypot(m[0] - mc[0], m[1] - mc[1], m[2] - mc[2]);
+      const score = off * (0.5 + 0.06 * Math.max(0, 30 - quiet)) - 0.3 * Math.min(spread, 80) + Math.random() * 20;
+      if (!best || score < best.score) best = {score, c: cat, x: Math.round(cx), y: Math.round(cy), w, h, r, f};
+    }
+  });
+  if (!best) throw new Error("couldn't load the cats");
+  return {i: p.id, c: best.c, x: best.x, y: best.y, w: best.w, h: best.h, r: best.r, f: best.f};
 }
 // Blur one channel image (w × h floats) with a box of radius R, twice over (close to a soft Gaussian).
 function blur(src, w, h, R) {
