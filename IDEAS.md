@@ -8,7 +8,7 @@ Every puzzle considered for the site, one row each with variants grouped: ideas 
 
 Rows are sorted by group, with the games already on the site at the end of each group. When a game ships, set its row's "On the site?" to Yes (or add a row) in the same PR.
 
-- **Clues?** None; Definitions (dictionary definitions would do); Written (needs clues or categories someone writes, which rules it out).
+- **Clues?** None; Definitions (dictionary definitions would do); Written (needs clues, categories or stories we'd have to write; the owner's rule is that this rules it out unless the owner says otherwise).
 - **Claude's ease guess** of adding it: Easy = a simple generator, or mostly reuses a game already on the site; Medium = a new generator plus a solver to guarantee one answer; Hard = needs new art, physics, split-second timing or a big data file.
 - **Mentioned in:** where the idea came up (a past chat, the owner's idea list, a games site), so that conversation can be looked back at for anything said about it. It's a pointer to information, not a record of a request.
 
@@ -16,9 +16,9 @@ Rows are sorted by group, with the games already on the site at the end of each 
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Kakuro | Logic grids | Fill runs of squares with digits that add up to each run's sum, with no repeats | None | Easy | Open the Door! | Kakuro chat | | Already built as the Kakuro Cross Sums artifact |
 | Mastermind (Guess) | Logic grids | Guess a hidden row of colours from feedback on each guess | None | Easy | — | Tatham | | |
-| Tents | Logic grids | Place a tent beside each tree to match row and column counts; tents never touch | None | Medium | Catdoku | Tatham | | Once ruled out; reconsider. Theme: each cat needs its own bed beside it |
+| Tents | Logic grids | Place a tent beside each tree to match row and column counts; tents never touch | None | Medium | Catdoku | Tatham | | Theme: each cat needs its own bed beside it |
 | Cat Trap | Logic grids | Place tape squares on the floor so every cat walks to its nearest one and sits | None | Medium | — | Fair Play chat | | |
-| Nonogram (Pattern) | Logic grids | Shade squares to match the run lengths given for each row and column; solving draws a picture | None | Medium | — | Idea list, Tatham | | On hold; solving could draw a cat |
+| Nonogram (Pattern) | Logic grids | Shade squares to match the run lengths given for each row and column; solving draws a picture | None | Medium | — | Idea list, Tatham | | Solving could draw a cat |
 | Dominosa | Logic grids | Split a grid of numbers into a full set of dominoes, each pair used once | None | Medium | — | Tatham | | |
 | Fillomino (Filling) | Logic grids | Write numbers so every region of joined same numbers has exactly that many squares | None | Medium | Sunbeams | Tatham | | |
 | Galaxies | Logic grids | Divide the grid into regions, each symmetric around the dot inside it | None | Medium | Sunbeams | Tatham | | |
@@ -61,7 +61,7 @@ Rows are sorted by group, with the games already on the site at the end of each 
 | Rootonym | Make and find words | Given a word root and its meaning, fill in words that contain it from their definitions | Definitions | Medium | Keyboard Cat's Origin clues | GoComics | | |
 | Upwordly | Make and find words | Unscramble six words, each a letter longer than the last, with a clue for each | Definitions | Easy | Anagram | GoComics | | |
 | 7 Little Words | Make and find words | Seven clues and a pool of two- and three-letter chunks; join chunks to spell each answer | Definitions | Medium | — | GoComics | | |
-| Lexigo | Make and find words | Answer clues by winding through hexagon letter tiles; each answer starts with the last letter of the one before | Definitions | Medium | Boggle | GoComics | | Only if dictionary definitions work as its clues |
+| Lexigo | Make and find words | Answer clues by winding through hexagon letter tiles; each answer starts with the last letter of the one before | Definitions | Medium | Boggle | GoComics | | |
 | Anagram | Make and find words | Unscramble a word | None | Easy | Keyboard Cat | Idea list | | |
 | Boggle (Squaredle) | Make and find words | Find words by joining neighbouring letters in a grid | None | Easy | Keyboard Cat | Idea list, wordleunlimited | | |
 | Word search (WonderWord) | Make and find words | Find listed words hidden in a grid; WonderWord's leftover letters spell a hidden answer | None | Easy | — | Idea list, GoComics | | |
@@ -83,14 +83,13 @@ Rows are sorted by group, with the games already on the site at the end of each 
 | Redactle | Words by meaning | Guess the words of a hidden Wikipedia article to reveal its title | Written | — | — | wordleunlimited | | Needs Wikipedia articles |
 | Toe Beans (Countdown numbers) | Numbers | Combine numbers with + − × ÷ to hit the goal; this was the "Digits" idea | — | — | — | Game Suite chat | Yes | |
 | Purrfect Square (Magic squares) | Numbers | Put 1 to N² in a square, once each, so every row, column and long diagonal adds up the same; some numbers start in place | — | — | — | Idea list | Yes | 3 × 3 to 6 × 6, every square solvable by reasoning alone. Empty squares show 🐾, each line's total turns into a gold paw once it adds up, and a random sitting cat is beside the title. Themes talked about: kibble bowls with cats at the line ends (Fair shares), Nine Lives, cat tree cubbies, yarn balls, kibble dots, a cat bingo card (CAT / MEOW / MEOWS / KITTEN across the top, paw-print daubers), whole paw prints, scratching-post tallies, cat faces; a square of toe beans was tried and looked like random shapes |
-| Border ladder | Geography | Get from one country to another through shared borders | None | Medium | — | Word Dictionaries chat | | Recommended first in that chat; needs a saved list of borders |
-| Hidden cat in a painting (Cat Burglar) | Seeking | Find a cat hidden in a famous painting | None | Hard | — | Word Dictionaries chat | | Waiting on where the images come from |
-| Spot the Difference | Seeking | Find the changes between two pictures | None | — | — | GoComics | | Never |
-| Kaleidocat (Colorscope-style) | Colour | Rebuild a target pattern from a few mirrored pieces whose overlapping colours blend | None | Medium | Pawlette | Possible suites | | The saved name Kaleidocat could fit |
+| Hidden cat in a painting (Cat Burglar) | Seeking | Find a cat hidden in a famous painting | None | Hard | — | Word Dictionaries chat | | |
+| Spot the Difference | Seeking | Find the changes between two pictures | None | — | — | GoComics | | Never: the owner ruled it out |
+| Kaleidocat (Colorscope-style) | Colour | Rebuild a target pattern from a few mirrored pieces whose overlapping colours blend | None | Medium | Pawlette | Possible suites | | The owner saved the name Kaleidocat |
 | Cat-astrophe (Flood) | Colour | Crunch knocks pots of dye over at the corner of a rug; the dye floods the joined squares of the colour it touches, until the rug's one colour | — | — | — | Tatham | Yes | Began as a knitted blanket called Dye Job. Going over the pots is allowed, without a gold paw, and keeps you on the same level |
 | Night Light arrows (Switch Spots) | Colour | Put every cat to sleep in the fewest taps; each cat's arrows say which others blink with it | — | — | — | GoComics | Yes | Night Light levels 10 to 19 (after the plain levels 1 to 9 grow to 9 × 9, it starts small again with some cats pointing their own way) |
 | Pawlette | Colour | Mix colours like paint; Swipe mode clears lines | — | — | — | Game Suite chat | Yes | |
-| Bed Hog (Klotski, Rush Hour) | Moving and planning | Slide sprawled cats around the bed until there's room for the human | None | Medium | Knock It Off | Fair Play chat, idea list | | Once ruled out; reconsider. You play Klotski |
+| Bed Hog (Klotski, Rush Hour) | Moving and planning | Slide sprawled cats around the bed until there's room for the human | None | Medium | Knock It Off | Fair Play chat, idea list | | You play Klotski |
 | Warm Seat | Moving and planning | When someone gets up, plan which cat slides where to take the warm seat | None | Medium | Bed Hog | Fair Play chat | | |
 | Special Delivery | Moving and planning | Carry each gift to the right person's shoes by the shortest route, avoiding the dog | None | Medium | Knock It Off | Fair Play chat | | |
 | Ribbon pick-up sticks | Moving and planning | Pull only a ribbon with nothing on top of it | None | Medium | Twirl | Merge-3 chat | | |
@@ -106,7 +105,7 @@ Rows are sorted by group, with the games already on the site at the end of each 
 | Block Blast, Blockudoku, Cat Pile, falling blocks | Fitting shapes | Place or drop shapes to fill and clear lines | None | Medium | — | Idea list, Game Suite chat, wordleunlimited | | |
 | If It Fits (Tangram) | Fitting shapes | Build an odd-shaped box from the seven tangram pieces; a cat comes to sit in it | — | — | — | Fair Play chat | Yes | Began as packing loaf, curled and stretched-out cats into a box. Starring Bugsy, who hops into each finished box, with Bowtie as guest star |
 | Same Game | Match and clear | Tap groups of one colour to clear them; bigger groups score more | None | Easy | Pounce | Tatham | | |
-| Tile match (Tile Busters, Triple Tile) | Match and clear | Tap free tiles from a stacked layout into a tray of about 7; three of a kind clear, and a full tray loses | None | Medium | Pick of the Pile | Idea list, Bubbles and Game Suite chats | | Named in three places; could reuse Pick of the Pile's toy blocks and piles |
+| Tile match (Tile Busters, Triple Tile) | Match and clear | Tap free tiles from a stacked layout into a tray of about 7; three of a kind clear, and a full tray loses | None | Medium | Pick of the Pile | Idea list, Bubbles and Game Suite chats | | Could reuse Pick of the Pile's toy blocks and piles |
 | Kolori-style pairing | Match and clear | Tap two same-coloured tiles with a clear straight line between them to clear both | None | Medium | — | Possible suites | | |
 | Suika | Match and clear | Drop toys that merge into a bigger toy when two of a kind touch | None | Hard | — | wordleunlimited | | Needs physics; you play 2048 |
 | Pounce (match-3) | Match and clear | Swap toys to line up three of a kind | — | — | — | Merge-3 chat | Yes | |
