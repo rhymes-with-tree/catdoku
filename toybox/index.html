@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.11"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-22.12"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -22,7 +22,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-22.11">
+<link rel="stylesheet" href="../games.css?v=2026-10-22.12">
 <style>
 /* A living room floor: a winding ball track on the rug, with wicker baskets of toys around it. */
 .wrap.room{height:auto;aspect-ratio:2/3;max-width:calc(var(--tall) * 2 / 3)}
@@ -70,17 +70,19 @@
   </div>
   <div class="actions">
     <button id="restartBtn">Restart</button>
+    <button id="shareBtn">Share</button>
     <button id="toysBtn">Toys</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
   </div>
   <div class="bar">
     <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New baskets</button>
   </div>
 
 </main>
 
-<script src="../games.js?v=2026-10-22.11"></script>
+<script src="../games.js?v=2026-10-22.12"></script>
 <script>
 const $ = G.$;
 G.nav("toybox");
@@ -870,6 +872,17 @@ $("shakeBtn").onclick = () => {
 $("rainbowBtn").onclick = () => ready() && rainbowCard();
 $("basketBtn").onclick = () => ready() && addBasket();
 $("restartBtn").onclick = () => S && !loading && (pickShake(false), start(S.level, S.d));
+// New baskets: another level of the same number. Share: a link to these exact baskets (the toys and which are hidden).
+$("newBtn").onclick = () => { if (!loading) { pickShake(false); G.closeCard(); startLevel(S ? S.level : 1); } };
+$("shareBtn").onclick = () => { if (S && !loading) G.shareCard({name: "Toy Box", what: "level", won: S.over,
+  puzzle: () => ({g: "toybox", N: S.level, C: S.d.C, k: S.d.k, t: S.d.toys.map(b => b.join("")).join(","), h: S.d.hid.map(b => b.map(Number).join("")).join(",")})}); };
+// A shared level, checked before it's dealt: baskets of 2 to 8 toys of known kinds, each with its hidden marks.
+function openShared(d) {
+  const toys = String(d.t || "").split(",").map(b => [...b].map(Number)), hid = String(d.h || "").split(",").map(b => [...b].map(x => x === "1"));
+  if (!(d.N >= 1 && d.N <= MAX_LEVEL) || !toys.length || toys.length > 10 || hid.length !== toys.length || toys.some((b, i) => b.length < 2 || b.length > 8 || b.length !== hid[i].length || b.some(k => !KINDS[k])) || !(d.C >= 3 && d.C <= 16))
+    throw new Error("the shared level doesn't fit the game");
+  pickShake(false); start(d.N, fitToys({C: d.C, k: d.k, toys, hid}));
+}
 function helpCard(tries = 0) {
   // a level still being set out is waited for, then the walkthrough plays
   if (loading && !document.querySelector(".spot")) { if (tries < 20) setTimeout(() => helpCard(tries + 1), 250); return; }
@@ -944,8 +957,13 @@ G.setupTimer({name: "toybox", game: () => S, playing: g => !g.over && !loading, 
   emptyText: "Finish a level and your times will show up here. They're kept on this device only."});
 $("bestBtn").onclick = () => G.showBests("Best times", S ? S.level : 1);
 
-const saved = G.load("toybox.v2");
-G.reopen(() => { if (saved.d && saved.level <= MAX_LEVEL) start(saved.level, saved.d); else startLevel(saved.level || 1); }, why => { startLevel(saved.level || 1).then(() => G.note(why, 0)); });
+const saved = G.load("toybox.v2"), shared = G.readShare("toybox");
+const shareOpts = () => ({name: "Toy Box", inProgress: !!(S && !S.over && S.started), open: d => { try { openShared(d); } catch (e) { G.note("That share link didn't work.", 5000); } }});
+window.addEventListener("hashchange", () => { const d = G.readShare("toybox"); if (d) G.offerShare(d, shareOpts()); });
+// a shared level opens in place of the saved one
+let openedShare = false;
+if (shared) try { openShared(shared); openedShare = true; G.note("Here's the shared level. Good luck!", 6000); G.track("Toy Box shared puzzle opened"); } catch (e) { G.note("That share link didn't work.", 5000); }
+if (!openedShare) G.reopen(() => { if (saved.d && saved.level <= MAX_LEVEL) start(saved.level, saved.d); else startLevel(saved.level || 1); }, why => { startLevel(saved.level || 1).then(() => G.note(why, 0)); });
 // Players from before the spotlight had the How to play card instead, so it's only for new players.
 if (saved.level) { const s = G.load("toybox.tips"); if (!s.intro) { s.intro = true; G.save("toybox.tips", s); } }
 intro();

@@ -503,17 +503,19 @@ const G = (() => {
     track(`${name} result shared`);
     sendLink(name, bits.join(" · "), location.origin + location.pathname, {btn});
   }
-  // The Share card: a fresh copy of the puzzle, or the puzzle with the moves so far.
+  // The Share card: a fresh copy of the puzzle, or the puzzle with the moves so far (when o.progress is given;
+  // a game played against the clock, like Pounce, shares only the fresh level).
   function shareCard(o) {
     const send = (data, what) => {
       track(`${o.name} shared${what ? " " + what : ""}`);
-      const text = !data.p ? `Try this ${o.name} puzzle!` : o.won ? `Here's my finished ${o.name} puzzle!` : `Can you help me with this ${o.name} puzzle?`;
+      const text = !data.p ? `Try this ${o.name} ${o.what || "puzzle"}!` : o.won ? `Here's my finished ${o.name} puzzle!` : `Can you help me with this ${o.name} puzzle?`;
       sendLink(o.name, text, shareUrl(data));
     };
     const won = o.won;
-    openCard("Share this puzzle", "Send a link so someone else can play this exact puzzle.", [
-      ["Share this puzzle", () => send(o.puzzle(), ""), true],
-      [won ? "Share my solved board" : "Share with my progress", () => send(Object.assign(o.puzzle(), {p: o.progress()}), "with progress")],
+    const what = o.what || "puzzle";
+    openCard(`Share this ${what}`, `Send a link so someone else can play this exact ${what}.`, [
+      [`Share this ${what}`, () => send(o.puzzle(), ""), true],
+      ...(o.progress ? [[won ? "Share my solved board" : "Share with my progress", () => send(Object.assign(o.puzzle(), {p: o.progress()}), "with progress")]] : []),
       ["Cancel", closeCard],
     ]);
   }
@@ -833,5 +835,5 @@ const G = (() => {
   }
 
   return {GAMES, GROUPS, recent, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, track, reopen,
-          setupTimer, freshClock, spotlight, toysOff, saveToys, needToys, goldPaw, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, toyPicker, pickLook};
+          setupTimer, freshClock, spotlight, toysOff, saveToys, needToys, goldPaw, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();

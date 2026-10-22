@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.11"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-22.12"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -22,7 +22,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-22.11">
+<link rel="stylesheet" href="../games.css?v=2026-10-22.12">
 <style>
 /* Toys in soap bubbles, clinging under a shelf, and a cat at the bottom batting more up. */
 .wrap{height:auto}
@@ -69,17 +69,19 @@
 
   <div class="actions">
     <button id="restartBtn">Restart</button>
+    <button id="shareBtn">Share</button>
     <button id="toysBtn">Toys</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
   </div>
   <div class="bar">
     <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New board</button>
   </div>
 
 </main>
 
-<script src="../games.js?v=2026-10-22.11"></script>
+<script src="../games.js?v=2026-10-22.12"></script>
 <script>
 const $ = G.$;
 G.nav("bubbles");
@@ -378,7 +380,7 @@ function start(level, d) {
   intro = nextIntro();
   $("levelSel").value = level;
   G.save(STORE, {level, d, climb}); hud(true);
-  $("restartBtn").textContent = level ? "Restart" : "New board";
+  $("restartBtn").hidden = $("shareBtn").hidden = !level;   // zen just deals new boards
   const what = {clear: "Pop every bubble.", catch: "Catch the toys shown above.", kittens: "Free the kittens: they come down when nothing holds them up."};
   G.note(level ? what[d.goal] : `Zen: no goals, and new rows keep coming. Pick level ${climb} to carry on with the levels.`, level ? 5000 : 8000);
   if (level && overLine(d.B)) lost();   // saved just as the bubbles reached the cat
@@ -386,8 +388,10 @@ function start(level, d) {
 function startLevel(level) {
   level = level === 0 ? 0 : Math.min(MAX_LEVEL, Math.max(1, level));
   G.track(level ? `Bubbles level ${level} started` : "Bubbles zen started");
-  start(level, deal(level));
+  start(level, dealt(deal(level)));
 }
+// Each board keeps a copy of itself as dealt (fresh), for Restart and Share.
+function dealt(d) { const {fresh, ms, ...rest} = d; d.fresh = JSON.stringify(rest); return d; }
 const GOAL_NAME = {clear: "clear", catch: "catch", kittens: "kittens"};
 for (let n = 1; n <= MAX_LEVEL; n++) {
   const g = GOAL_NAME[params(n).goal];
@@ -395,8 +399,24 @@ for (let n = 1; n <= MAX_LEVEL; n++) {
 }
 $("levelSel").append(new Option("Zen (no goals)", 0));
 $("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
-const newBoard = () => start(S.level, Object.assign(deal(S.level), {helped: S.d.helped, caught: S.level ? 0 : S.d.caught}));
-$("restartBtn").onclick = () => { if (S) { G.closeCard(); newBoard(); } };
+// A new board at this level (zen keeps its count of toys caught), or this board again as it was dealt (a board
+// saved before boards kept a copy deals a new one). Either way, help used on the level still counts.
+const newBoard = () => start(S.level, dealt(Object.assign(deal(S.level), {helped: S.level ? S.d.helped : false, caught: S.level ? 0 : S.d.caught})));
+$("newBtn").onclick = () => { if (S) { G.closeCard(); newBoard(); } };
+$("restartBtn").onclick = () => {
+  if (!S) return;
+  G.closeCard();
+  if (!S.d.fresh) return newBoard();
+  start(S.level, Object.assign(JSON.parse(S.d.fresh), {fresh: S.d.fresh, helped: S.d.helped}));
+};
+// Share: a link to this board as it was dealt; whoever opens it sees it with their own toy pictures.
+$("shareBtn").onclick = () => { if (S && S.level) G.shareCard({name: "Bubbles", what: "board", won: S.over,
+  puzzle: () => { const {look, helped, used, extra, ...f} = JSON.parse(S.d.fresh || JSON.stringify(S.d)); return {g: "bubbles", N: S.level, f}; }}); };
+function openShared(d) {
+  if (!(d.N >= 1 && d.N <= MAX_LEVEL) || !d.f || !Array.isArray(d.f.kinds)) throw new Error("the shared board doesn't fit the game");
+  const look = KINDS.map(k => { const ok = k.looks.map((_, j) => j).filter(j => !offToys.has(k.looks[j][0])), from = ok.length ? ok : k.looks.map((_, j) => j); return from[Math.floor(Math.random() * from.length)]; });
+  start(d.N, dealt({...d.f, look, used: {}, helped: false, extra: 0}));   // start checks the board fits
+}
 
 const toyName = (n, k) => { const many = lookOf(k)[1]; return `${n} ${n !== 1 ? many : {mice: "mouse", fish: "fish"}[many] || many.replace(/s$/, "")}`; };
 const bubblesLeft = d => cellsOf(d.B).filter(([, , k]) => k !== PEG).length;
@@ -498,7 +518,7 @@ function lost() {
     for (const [r, c, k] of cellsOf(B)) if (r + B.drops >= ROWS - 1) { effects.push({type: "pop", k, x: cellX(B, r, c), y: cellY(B, r), t0: now, dur: 0.3}); B.rows[r][c] = EMPTY; }
     S.d.since = 0; S.over = false; hud(); save();
   }, true]);
-  btns.push(["Try again", () => { G.closeCard(); start(S.level, Object.assign(deal(S.level), {helped: S.d.helped})); }, !btns.length]);
+  btns.push(["Try again", () => { G.closeCard(); start(S.level, dealt(Object.assign(deal(S.level), {helped: S.d.helped}))); }, !btns.length]);
   const d = S.d, still = d.goal === "kittens" ? `${d.kits.need - d.kits.got} kittens still to free.` : d.goal === "clear" ? `${bubblesLeft(d)} bubbles still to pop.`
     : `Still to catch: ${d.goals.filter(gl => gl.got < gl.need).map(gl => toyName(gl.need - gl.got, gl.k)).join(" and ")}.`;
   setTimeout(() => G.openCard("The bubbles reached the cat!", still, btns, null, G.otherSize($("levelSel"), S.level, startLevel, "Or play a different level:")), 500);
@@ -927,9 +947,14 @@ G.setupTimer({name: "bubbles", game: () => S, playing: g => !g.over && !intro, s
   emptyText: "Finish a level and your times will show up here. They're kept on this device only."});
 $("bestBtn").onclick = () => G.showBests("Best times", S && S.level ? S.level : climb);
 
-const saved = G.load(STORE), first = saved.level ?? 1;
+const saved = G.load(STORE), first = saved.level ?? 1, shared = G.readShare("bubbles");
 climb = saved.climb || saved.level || 1;
-G.reopen(() => { if (saved.d && first <= MAX_LEVEL) start(first, saved.d); else startLevel(first); },
+const shareOpts = () => ({name: "Bubbles", inProgress: !!(S && !S.over && S.started), open: d => { try { openShared(d); } catch (e) { G.note("That share link didn't work.", 5000); } }});
+window.addEventListener("hashchange", () => { const d = G.readShare("bubbles"); if (d) G.offerShare(d, shareOpts()); });
+// a shared board opens in place of the saved one
+let openedShare = false;
+if (shared) try { openShared(shared); openedShare = true; G.note("Here's the shared board. Good luck!", 6000); G.track("Bubbles shared puzzle opened"); } catch (e) { G.note("That share link didn't work.", 5000); }
+if (!openedShare) G.reopen(() => { if (saved.d && first <= MAX_LEVEL) start(first, saved.d); else startLevel(first); },
   why => { startLevel(first); G.note(why, 0); });
 // Players from before the walkthrough have already found their way round.
 if (!G.load(WALK).seen && (climb > 1 || G.load("catdoku.bests.v1").bubbles)) G.save(WALK, {seen: true});
