@@ -666,10 +666,22 @@ def atlas():
     return frame("#C9DEE1", out)
 
 
+def catburglar():
+    """A painting in a gilt frame, a picture light over it, and a cat's face hiding in its hills."""
+    out = (f'<rect x="38" y="13" width="24" height="6" rx="3" fill="{YELLOW}" stroke="{INK}" stroke-width="2"/>'
+           f'<rect x="14" y="23" width="72" height="62" rx="3" fill="{YELLOW}" stroke="{INK}" stroke-width="2.5"/>'
+           f'<rect x="22" y="31" width="56" height="46" fill="#CFE3E6" stroke="{INK}" stroke-width="2"/>'
+           f'<circle cx="64" cy="42" r="5" fill="{PAPER}" stroke="{INK}" stroke-width="1.6"/>'
+           f'<path d="M22 64Q34 50 46 58Q58 46 78 56L78 77L22 77Z" fill="{GREEN}" stroke="{INK}" stroke-width="2" stroke-linejoin="round"/>'
+           f'<path d="M22 72Q40 64 56 70Q68 66 78 70L78 77L22 77Z" fill="{LIME}" stroke="{INK}" stroke-width="1.6" stroke-linejoin="round"/>')
+    out += catface(40, 64, 6, "#8E9E5A")
+    return frame("#D5D9E8", out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")
