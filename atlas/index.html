@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.4"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-22.5"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-22.4">
+<link rel="stylesheet" href="../games.css?v=2026-10-22.5">
 <style>
 /* The map is the board: the country to name is lit in coral, and a gold ring goes round it when it's too small
    to see. Under it, the cat to find and the answer, given the way the player picks: four names (Pick), typing with
@@ -75,6 +75,8 @@
 .reveal.note{font-size:16px;font-weight:600;letter-spacing:0;color:var(--ink-soft);margin:0}
 
 /* the cat's photo from Wikipedia beside the clue, with a link to its page and the photo credit under it */
+.catline{margin:0;font-size:18px;font-weight:700;text-align:center;text-wrap:balance}
+.catline b{color:#B23A28}
 .cluerow{display:flex;align-items:center;justify-content:center;gap:12px;max-width:100%}
 .wildpic a{display:block}
 .wildpic img{display:block;width:76px;height:76px;object-fit:cover;border-radius:12px;border:2px solid var(--ink);background:var(--panel)}
@@ -101,6 +103,7 @@
   <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
 
   <div class="pad" id="pad">
+    <p class="catline" id="catLine" hidden></p>
     <div class="cluerow">
       <div class="wildpic" id="wildpic" hidden><a id="catImgLink" target="_blank" rel="noopener"><img id="catImg" alt="" hidden></a></div>
       <p class="clue" id="clue"></p>
@@ -134,7 +137,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-22.4"></script>
+<script src="../games.js?v=2026-10-22.5"></script>
 <script>
 /* ---------- countries and their cats ---------- */
 // The 200 countries a trip can ask: the 193 UN members plus Vatican City, Palestine, Taiwan, Kosovo,
@@ -197,7 +200,22 @@ const WIKI = {
   wildcat: "European wildcat", house: "Cat", empty: "Cat"};
 const WIKI_HERE = {CAN: "Canada lynx", ESP: "Iberian lynx", PRT: "Iberian lynx", LSO: "African wildcat", TUN: "African wildcat",
   LBN: "African wildcat", BRN: "Sunda clouded leopard", PHL: "Sunda leopard cat"};
-const wikiTitle = code => WIKI_HERE[code] || WIKI[CLUE[code]] || "Cat";
+// The disputed round's cats: a wild cat recorded there (GBIF sightings inside each place's outline), or a housecat.
+const DZ_CAT = {crimea: "house", donbas: "house", golan: "jungle", wsahara: "sand", kashmir: "snow", aksaichin: "manul", arunachal: "clouded",
+  abkhazia: "wildcat", sossetia: "lynx", transnistria: "wildcat", ncyprus: "house", somaliland: "caracal", abyei: "leopard", ilemi: "cheetah",
+  kurils: "house", karabakh: "lynx", kosovo: "lynx", taiwan: "leopardcat", palestine: "caracal", korea: "leopardcat", falklands: "house",
+  chagos: "house", belize: "jaguar", essequibo: "ocelot"};
+const catOf = code => code.startsWith("dz:") ? DZ_CAT[code.slice(3)] : CLUE[code];
+const wikiTitle = code => WIKI_HERE[code] || WIKI[catOf(code)] || "Cat";
+// "the <b>lynx</b>", "<b>Pallas's cat</b>", "the <b>housecat</b>"
+const catHtml = code => catOf(code) === "house" ? "the <b>housecat</b>" : catOf(code) === "empty" ? "the <b>cat</b>"
+  : (CATS[catOf(code)] || "the cat").replace(/^(the )?(.*)$/, (m, the, rest) => `${the || ""}<b>${rest}</b>`);
+const upFirst = h => h.replace(/^the /, "The ");
+// "in the Philippines", "in the Falkland Islands", but "in Spain" and "in Heard Island and McDonald Islands"
+const THE = ["Central African Republic", "Comoros", "Republic of the Congo", "Gambia", "Seychelles", "Bahamas", "Dominican Republic", "United States",
+  "Maldives", "Philippines", "United Arab Emirates", "Netherlands", "United Kingdom", "French Southern and Antarctic Lands", "Golan Heights",
+  "Korean Peninsula", "Ilemi Triangle"];
+const theBold = name => ((THE.includes(name) || (/Islands$/.test(name) && !/ and /.test(name))) ? "the " : "") + `<b>${esc(name)}</b>`;
 // The page's lead photo and who took it, fetched by the player's browser from Wikipedia and Wikimedia Commons
 // (the photos' licences ask for the photographer and licence to be named). Once per page, then kept.
 const wikiPics = {};
@@ -580,9 +598,9 @@ function show(fly) {
   $("count").innerHTML = game.trip.map((t, i) => `<i class="${i < game.res.length ? (game.res[i].first ? "ok" : "miss") : i === game.i && !done ? "now" : ""}"></i>`).join("");
   $("count").setAttribute("aria-label", `Cat ${Math.min(game.i + 1, TRIP)} of ${TRIP}`);
   const bonus = !done && game.card.bonus === "ask", seen = !done && game.card.seen, got = seen && game.res[game.i] && game.res[game.i].found;
-  const cat = CLUE[code] === "house" ? "the <b>housecat</b>" : CLUE[code] === "empty" ? "the <b>cat</b>"
-    : (CATS[CLUE[code]] || "the cat").replace(/^(the )?(.*)$/, (m, the, rest) => `${the || ""}<b>${rest}</b>`);
-  $("clue").innerHTML = done ? "Trip done!" : seen ? got ? `Found ${cat} in <b>${nameOf(code)}</b>!` : `Sorry! It's <b>${nameOf(code)}</b>. That's where ${cat} is.`
+  const cat = catHtml(code);
+  $("catLine").hidden = true;
+  $("clue").innerHTML = done ? "Trip done!" : seen ? got ? `Found ${cat} in ${theBold(nameOf(code))}!` : `Sorry! It's <b>${nameOf(code)}</b>. That's where ${cat} is.`
     : bonus ? `Bonus: which country does <b>${nameOf(code)}</b> belong to?`
     : CLUE[code] === "house" ? "Where did the <b>housecat</b> migrate?" : CLUE[code] === "empty" ? "Where's the <b>cat</b> exploring where no one lives?"
     : `Where's ${cat}?`;
@@ -646,7 +664,10 @@ $("typebox").addEventListener("submit", e => {
   e.preventDefault();
   const text = $("guess").value;
   if (game.mode === "disputed") {
-    const li = style() === "list" && active >= 0 && $("list").querySelectorAll("li[data-c]")[active];
+    // a name typed in full counts as typed, even when the list's top line is another ("Sudan", not "South Sudan")
+    const d = dzOf(current()), n = norm(text);
+    const typed = n && (DZ_LIST().some(c => norm(nameOf(c)) === n) || d.aka.some(a => norm(a) === n) || dzBlanks(d).some((x, j) => dzKnown(d, j).some(k => norm(k) === n)));
+    const li = !typed && style() === "list" && active >= 0 && $("list").querySelectorAll("li[data-c]")[active];
     return dzGuess(li ? li.textContent : text);
   }
   const exact = LOOKUP.get(norm(text)), both = !exact && bothNames(text);
@@ -702,13 +723,13 @@ function answerBonus(o, btn) {
   busy = true; save();
   setTimeout(() => { busy = false; seeCat(); }, got ? 900 : 1600);
 }
-$("skipBtn").onclick = () => { if (game.card.bonus !== "ask" || busy) return; if (game.mode === "disputed") { game.card.bonus = "done"; save(); return dzNext(); } game.card.bonus = "done"; G.note(`It belongs to ${nameOf(DEPS[current()][1])}.`, 2200); save(); seeCat(); };
+$("skipBtn").onclick = () => { if (game.card.bonus !== "ask" || busy) return; if (game.mode === "disputed") { game.card.bonus = "done"; save(); return seeCat(); } game.card.bonus = "done"; G.note(`It belongs to ${nameOf(DEPS[current()][1])}.`, 2200); save(); seeCat(); };
 // Once a place is answered, its cat's photo and Wikipedia link come up, until Next (the clock waits meanwhile).
 function seeCat() {
   game.card.seen = true; game.card.bonus = undefined; save(); show();
   if (matchMedia("(hover: hover)").matches) $("nextBtn").focus();
 }
-$("nextBtn").onclick = () => { if (game && !game.won && game.card.seen && !busy) advance(); };
+$("nextBtn").onclick = () => { if (game && !game.won && game.card.seen && !busy) game.mode === "disputed" ? dzNext() : advance(); };
 function advance() {
   game.i++; game.card = freshCard();
   if (game.i >= TRIP) return win();
@@ -823,13 +844,20 @@ function showDz(fly) {
   $("count").innerHTML = game.trip.map((x, i) => `<i class="${i < game.res.length ? (game.res[i].first ? "ok" : "miss") : i === game.i && !done ? "now" : ""}"></i>`).join("");
   $("clue").classList.add("dz");
   $("clue").innerHTML = done ? "Round done!" : dzSentence(d, card);
-  showCatPic(null); $("nextBtn").hidden = true;
+  // each place has a cat too: named above the sentence, and its photo once the sentence is done
+  const seen = !done && card.seen, got = seen && game.res[game.i] && game.res[game.i].found, cat = catHtml(t.c);
+  $("catLine").hidden = done;
+  $("catLine").innerHTML = seen ? got ? `Found ${cat} in ${theBold(d.name)}!` : `That's where ${cat} is.`
+    : catOf(t.c) === "house" ? "A <b>housecat</b> migrated to this disputed land." : `${upFirst(cat)} is hiding in this disputed land.`;
+  showCatPic(seen ? t.c : null);
+  if (!done && !seen) wikiPic(wikiTitle(t.c)).then(p => { if (p.src) new Image().src = p.src; });
+  $("nextBtn").hidden = !seen; $("nextBtn").textContent = game.i >= TRIP - 1 ? "Finish the round" : "Next cat";
   const left = d.aka.filter(a => !card.alts.includes(a));
   $("reveal").classList.toggle("note", bonus);
   $("reveal").textContent = bonus ? `Bonus: name another name for ${d.name} (${left.length} more)` + (card.alts.length ? ` · ${card.alts.join(", ")}` : "") : "";
   $("skipBtn").hidden = !bonus; $("skipBtn").textContent = "Skip the bonus";
-  $("choices").hidden = done || style() !== "pick"; $("typebox").hidden = done || style() === "pick"; $("list").hidden = done || style() !== "list";
-  if (style() === "pick" && !done) {
+  $("choices").hidden = done || seen || style() !== "pick"; $("typebox").hidden = done || seen || style() === "pick"; $("list").hidden = done || seen || style() !== "list";
+  if (style() === "pick" && !done && !seen) {
     $("choices").innerHTML = "";
     for (const name of bonus ? t.altChips : t.chips) {
       const b = document.createElement("button"); b.textContent = name;
@@ -840,15 +868,15 @@ function showDz(fly) {
       $("choices").append(b);
     }
   }
-  if (style() === "list" && !done) fillList();
-  $("tried").innerHTML = style() !== "pick" && !done ? card.wrong.map(w => `<span>${esc(w)}</span>`).join("") : "";
-  $("hintBtn").disabled = done || bonus;
+  if (style() === "list" && !done && !seen) fillList();
+  $("tried").innerHTML = style() !== "pick" && !done && !seen ? card.wrong.map(w => `<span>${esc(w)}</span>`).join("") : "";
+  $("hintBtn").disabled = done || bonus || seen;
   if (world && fly) flyTo(frameFor(t.c), fly === "jump"); else redraw();
 }
 // The list for the round: every disputed place and every country.
 const DZ_LIST = () => [...Object.keys(DISPUTES).map(k => "dz:" + k), ...Object.keys(NAMES)].sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
 function dzGuess(text) {
-  if (busy || !game || game.won || !text.trim()) return;
+  if (busy || !game || game.won || game.card.seen || !text.trim()) return;
   game.started = true;
   const t = game.trip[game.i], d = dzOf(t.c), card = game.card, n = norm(text);
   if (card.bonus === "ask") {
@@ -857,7 +885,7 @@ function dzGuess(text) {
     else if (alt) G.note("You've named that one.");
     else { G.note(`${d.name} isn't also called “${text.trim()}”.`, 2000); if (style() === "pick" && !card.wrong.includes(text)) card.wrong.push(text); }
     $("guess").value = "";
-    if (card.alts.length === d.aka.length) { save(); return setTimeout(dzNext, 900); }
+    if (card.alts.length === d.aka.length) { save(); busy = true; return setTimeout(() => { busy = false; seeCat(); }, 900); }
     save(); show(); return;
   }
   const i = dzBlanks(d).findIndex((x, j) => !card.filled.includes(j) && dzKnown(d, j).some(k => norm(k) === n));
@@ -870,7 +898,7 @@ function dzGuess(text) {
       card.filled = [...dzBlanks(d).keys()];
       game.res.push({c: t.c, first: false, found: false, hinted: card.hints > 0});
       G.note("Sorry! Here's the whole sentence.", 2600); busy = true; save(); show();
-      return setTimeout(() => { busy = false; dzNext(); }, 2600);
+      return setTimeout(() => { busy = false; seeCat(); }, 2600);
     }
     G.note(`“${text.trim()}” doesn't fit this one. ${DZ_TRIES - card.wrong.length} more ${DZ_TRIES - card.wrong.length === 1 ? "try" : "tries"}.`, 2500);
     save(); show(); focusTyping(); return;
@@ -883,7 +911,7 @@ function dzGuess(text) {
   flash = {code: t.c}; busy = true; save(); show();
   setTimeout(() => {
     flash = null; busy = false;
-    if (d.aka.some(a => !card.alts.includes(a))) { card.bonus = "ask"; save(); show(); focusTyping(); } else dzNext();
+    if (d.aka.some(a => !card.alts.includes(a))) { card.bonus = "ask"; save(); show(); focusTyping(); } else seeCat();
   }, 1100);
 }
 function dzNext() {
