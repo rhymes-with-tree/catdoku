@@ -93,6 +93,7 @@ const G = (() => {
   }
   const dailyDoneToday = () => dailyDates().includes(today());
   let CURRENT = null;   // the game on this page, from nav
+  let HOME = "../";     // the front page, from nav's base
   // A win just now on this page (in Pawlette, 3 lines cleared in one Swipe game): if it's today's challenge, mark
   // it done. Called at the moment of winning (finishClock), never when a solved puzzle is reopened, so an old
   // win doesn't count for today. Returns the line for the win card, or "".
@@ -125,7 +126,7 @@ const G = (() => {
   // The games menu: an "All games" button that opens a grid of every game, with this one marked.
   // Game pages sit one folder below the front page, so links start with ../ unless `base` says otherwise.
   function nav(current, base = "../") {
-    CURRENT = current || null;
+    CURRENT = current || null; HOME = base || "./";
     const el = $("games"); el.innerHTML = "";
     const btn = document.createElement("button");
     btn.className = "gamesBtn"; btn.type = "button";
@@ -268,7 +269,7 @@ const G = (() => {
   // "Solved!" card: message, cat photo, cat name, then the next-puzzle button and a button
   // that closes the card to leave the finished board on screen. `o` can change the title and
   // next button and add something below the buttons (`after`); passing admire as null leaves out
-  // the admire button.
+  // the admire button. Last comes a way back to the front page.
   // After admiring, point to the page's own new-puzzle button (New floor, New table…), or the level list.
   const admireNote = () => $("newBtn") ? `Done! Tap ${$("newBtn").textContent.trim()} when you're ready for another.` : "Done! Pick a level when you're ready for another.";
   // A perfect clear (no help, nothing lost, no undo) earns a gold paw: o.gold puts one on the win card,
@@ -282,6 +283,8 @@ const G = (() => {
       <path d="${PAW}" transform="translate(19 35.3) scale(.31 .298)" vector-effect="non-scaling-stroke"/></g></svg>`;
     return box.firstChild;
   }
+  // The win cards' way out to every game.
+  const homeBtn = () => ["Back to the front page", () => { location.href = HOME; }];
   function winCard(text, onNext, admire = "Admire my board", result, o = {}) {
     const media = document.createElement("div");
     // what earned the gold paw ("No undos!"), under the paw
@@ -296,7 +299,7 @@ const G = (() => {
     if (o.gold && o.goldPic) media.append(...o.goldPic); else media.append(catPhoto(), name);
     const btns = [[o.next || "New puzzle", onNext, true]];
     if (admire !== null) btns.push([admire, () => { closeCard(); note(admireNote(), 0); }]);
-    btns.push(["Share my result", e => shareResult(result, o.gold, e.currentTarget)]);
+    btns.push(["Share my result", e => shareResult(result, o.gold, e.currentTarget)], homeBtn());
     openCard(o.gold ? o.goldTitle || "Gold paw!" : o.title || "Solved!", "", btns, media, o.after);
   }
 
@@ -801,6 +804,6 @@ const G = (() => {
     }
   }
 
-  return {GAMES, GROUPS, recent, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, sizeUp, otherSize, note, helpLater, cellAt, track, reopen,
+  return {GAMES, GROUPS, recent, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, track, reopen,
           setupTimer, freshClock, spotlight, toysOff, saveToys, needToys, goldPaw, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, toyPicker, pickLook};
 })();
