@@ -386,10 +386,11 @@ function draw() {
     el("rect", {class: cls, x: x + 1.5, y: y + 1.5, width: CS - 3, height: CS - 3, rx: 3}, g);
     if (ch) el("text", {class: "mag", x: x + CS / 2, y: y + CS / 2 + 1, fill: colour(ch), transform: `rotate(${tilt(ch) / 3} ${x + CS / 2} ${y + CS / 2})`}, g).textContent = ch;
   }
-  if (mark && mark.when === JSON.stringify(game.put)) for (const [k, b] of mark.sq) {
+  const mark = hints.current();
+  if (mark) for (const [k, b] of mark.sq) {
     const r = Math.floor(k / N), c = k % N;
     el("rect", {class: "hintsq" + (b ? " bad" : ""), x: PADL + c * CS, y: PAD + r * CS, width: CS, height: CS, rx: 10}, svg);
-  } else mark = null;
+  }
   drawFloor();
   update();
 }
@@ -410,7 +411,7 @@ function drawFloor() {
     const ch = b.dataset.l, isUp = up.has(ch);
     b.classList.toggle("up", isUp); b.classList.toggle("held", held === ch);
     b.setAttribute("aria-label", isUp ? `${ch.toUpperCase()}, on the fridge` : ch.toUpperCase());
-    b.classList.toggle("hinted", !!(mark && mark.when === JSON.stringify(game.put) && mark.letter === ch));
+    b.classList.toggle("hinted", !!(hints.current() && hints.current().letter === ch));
   }
   fl.classList.toggle("won", !!game.won);
 }
@@ -589,16 +590,16 @@ $("restartBtn").onclick = () => {
   G.note("All your letters are back on the floor. Undo puts them back up.", 4000);
 };
 // Hint: a letter in the wrong square gets a red box, to take down; otherwise a gold box goes on the empty square
-// in the most-filled word, and its letter on the floor lights up too.
-let mark = null, markTimer = 0;
+// the easiest step next (or the square in the most-filled word), saying why the first time, and asked again which
+// letter goes there, with that letter on the floor lit up too.
+const hints = G.hinter({key: () => game ? JSON.stringify(game.put) : "", draw: () => draw()});   // marks {sq: [[square, bad]…], letter}
 $("hintBtn").onclick = () => {
   if (!playing()) return;
   game.hinted = true; game.started = true; save();
-  clearTimeout(markTimer);
   const wrong = game.open.filter(k => game.put[k] && game.put[k] !== F.sol.get(k));
   if (wrong.length) {
-    mark = {when: JSON.stringify(game.put), sq: [[wrong[0], true]]}; pickSquare(wrong[0]);
-    G.note(`The ${game.put[wrong[0]].toUpperCase()} doesn't go there${wrong.length > 1 ? ` (and ${wrong.length - 1} more)` : ""}. Take it down and try another letter.`, 5000);
+    pickSquare(wrong[0]);
+    hints.show({sq: [[wrong[0], true]]}, `The ${game.put[wrong[0]].toUpperCase()} doesn't go there${wrong.length > 1 ? ` (and ${wrong.length - 1} more)` : ""}. Take it down and try another letter.`);
   } else {
     // the easiest step a person could take next (or, if there isn't one, the square in the fullest word)
     const known = new Map([...F.sol].filter(([k]) => !F.open.has(k) || game.put[k]));
@@ -606,12 +607,12 @@ $("hintBtn").onclick = () => {
     const filled = s => s.filter(q => letterAt(q)).length / s.length;
     const score = k => Math.max(...F.of.get(k).map(i => filled(F.slots[i])));
     const k = step ? step[0] : empties().reduce((a, b) => score(b) > score(a) ? b : a), ch = F.sol.get(k);
-    mark = {when: JSON.stringify(game.put), sq: [[k, false]], letter: ch}; pickSquare(k);
+    pickSquare(k);
     const why = !step ? "" : step[2] === 1 ? ": it's the only letter left that makes a word there" : step[2] === 2 ? ": it's the only letter left that fits the words there" : `: it can't go anywhere else`;
-    G.note(`The ${ch.toUpperCase()} goes in the gold square${why}.`, 5000);
+    if (!hints.level()) hints.show({sq: [[k, false]]}, !step ? "The gold square is in the fullest word." : step[2] === 3 ? "One letter on the floor can only go in the gold square. Which one?"
+      : `Only one letter left on the floor ${step[2] === 1 ? "makes a word" : "fits the words"} in the gold square.`);
+    else hints.show({sq: [[k, false]], letter: ch}, `The ${ch.toUpperCase()} goes in the gold square${why}.`);
   }
-  draw();
-  markTimer = setTimeout(() => { mark = null; if (game) draw(); }, 5000);
 };
 
 // Audit: every letter you've put up in the wrong square gets a red box (or the message line says they're all right).
@@ -619,18 +620,15 @@ $("auditBtn").onclick = () => {
   if (!playing()) return;
   if (!Object.keys(game.put).length) return G.note("Put some letters up first, then Audit checks them.", 3500);
   game.audited = true; game.started = true; save();
-  clearTimeout(markTimer);
   const wrong = game.open.filter(k => game.put[k] && game.put[k] !== F.sol.get(k));
-  mark = wrong.length ? {when: JSON.stringify(game.put), sq: wrong.map(k => [k, true])} : null;
-  G.note(!wrong.length ? "Every letter you've put up is in the right square." : `${wrong.length} letter${wrong.length > 1 ? "s are" : " is"} in the wrong square. Take ${wrong.length > 1 ? "them" : "it"} down and try again.`, 5000);
-  draw();
-  markTimer = setTimeout(() => { mark = null; if (game) draw(); }, 5000);
+  if (!wrong.length) { hints.clear(); return G.note("Every letter you've put up is in the right square.", 5000); }
+  hints.show({sq: wrong.map(k => [k, true])}, `${wrong.length} letter${wrong.length > 1 ? "s are" : " is"} in the wrong square. Take ${wrong.length > 1 ? "them" : "it"} down and try again.`, {uncounted: true});
 };
 
 /* ---------- endings ---------- */
 // The magnets jiggle, Crunch curls up on the empty floor, and the card comes up.
 function win() {
-  game.won = true; G.finishClock(game); mark = null; sel = -1; held = null;
+  game.won = true; G.finishClock(game); hints.clear(false); sel = -1; held = null;
   const next = game.hinted || game.audited ? game.level : Math.min(MAX_LEVEL, game.level + 1);
   settings.level = next; $("levelSel").value = next; save();
   draw();
@@ -660,7 +658,7 @@ const wrapped = {take: n => fridges.take(req(n)), prefetch: n => fridges.prefetc
 function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
 function begin(p, level) {
   game = {level, g: p.g, open: p.open, put: {}, history: [], won: false, hinted: false, undid: false, ...G.freshClock()};
-  sel = -1; held = null; mark = null; derive();
+  sel = -1; held = null; hints.clear(false); derive();
 }
 let asking = 0;
 function newPuzzle() {

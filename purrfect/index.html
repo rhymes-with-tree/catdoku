@@ -202,7 +202,7 @@ const catSrc = f => (window.CAT_SRC || {})[f] || `../cats/${f}.webp`;
 const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1}, state.settings);
-let game = state.game || null, sel = -1, held = 0, running = false, mark = null, markTimer = 0;
+let game = state.game || null, sel = -1, held = 0, running = false;
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !running && !$("overlay").classList.contains("show");
 const levelName = n => `Level ${n} · ${n + 2} × ${n + 2}`;
@@ -212,7 +212,7 @@ const valueAt = k => game.given[k] || game.put[k] || 0;
 const board = () => game.sol.map((_, k) => valueAt(k));
 const empties = () => game.sol.map((_, k) => k).filter(k => !valueAt(k));
 const usedNums = () => new Set(board().filter(Boolean));
-const markLive = () => mark && mark.when === JSON.stringify(game.put);
+const hints = G.hinter({key: () => game ? JSON.stringify(game.put) : "", draw: () => draw()});   // marks {sq: [[square, bad]…], num}
 
 /* ---------- drawing ---------- */
 // The beans, with each line's total so far on a main pad at its end: rows on the right, columns below, the diagonal from the
@@ -253,10 +253,11 @@ function draw() {
   });
   svg.classList.toggle("solved", !!game.won);
   $("board").style.setProperty("--pc", game.pc[0]); $("board").style.setProperty("--pt", game.pc[1]);
-  if (markLive()) for (const [k, bad] of mark.sq) {
+  const mark = hints.current();
+  if (mark) for (const [k, bad] of mark.sq) {
     const r = Math.floor(k / N), c = k % N;
     el("rect", {class: "hintsq" + (bad ? " bad" : ""), x: x0 + c * CS, y: y0 + r * CS, width: CS, height: CS, rx: 11}, svg);
-  } else mark = null;
+  }
   drawPad();
   update();
 }
@@ -270,7 +271,7 @@ function drawPad() {
   for (const b of pad.children) {
     const v = +b.dataset.v;
     b.classList.toggle("used", used.has(v)); b.classList.toggle("held", held === v);
-    b.classList.toggle("hinted", !!(markLive() && mark.num === v));
+    b.classList.toggle("hinted", !!(hints.current() && hints.current().num === v));
   }
 }
 function update() {
@@ -374,27 +375,24 @@ $("restartBtn").onclick = () => {
   draw(); save();
   G.note("All your numbers are out. Undo puts them back.", 4000);
 };
-// Hint: a number in the wrong square gets a red box; otherwise the next number reasoning gives, in gold, its square
-// picked and its number gold on the pad, and why.
-function showMark(m, ms = 5000) {
-  clearTimeout(markTimer); mark = m; draw();
-  markTimer = setTimeout(() => { mark = null; if (game) draw(); }, ms);
-}
+// Hint: a number in the wrong square gets a red box; otherwise the next square reasoning settles, in gold and picked,
+// and why; asked again, its number too, gold on the pad.
 $("hintBtn").onclick = () => {
   if (!playing()) return;
   game.hinted = true; game.started = true; save();
   const wrong = Object.keys(game.put).map(Number).filter(k => game.put[k] !== game.sol[k]);
   if (wrong.length) {
     sel = wrong[0]; held = 0;
-    G.note(`The ${game.put[wrong[0]]} doesn't go there${wrong.length > 1 ? ` (and ${wrong.length - 1} more)` : ""}. Take it out and try another number.`, 5000);
-    return showMark({when: JSON.stringify(game.put), sq: [[wrong[0], true]]});
+    return hints.show({sq: [[wrong[0], true]]}, `The ${game.put[wrong[0]]} doesn't go there${wrong.length > 1 ? ` (and ${wrong.length - 1} more)` : ""}. Take it out and try another number.`);
   }
   const s = magicStep(game.N, board()), k = s ? s[0] : empties()[0], v = game.sol[k];
   const names = ["row", "column"], L = s && s[3] >= 0 ? (s[3] < 2 * game.N ? names[Math.floor(s[3] / game.N)] : "diagonal") : "";
   const why = !s ? "" : s[2] === 1 ? `: it's what this ${L} is short of ${total()}` : L ? `: this ${L} needs it, and no other square in it can take it` : `: it's the only number left that lets every line through here reach ${total()}`;
   sel = k; held = 0;
-  G.note(`The ${v} goes in the gold square${why}.`, 6000);
-  showMark({when: JSON.stringify(game.put), sq: [[k, false]], num: v});
+  if (hints.level()) return hints.show({sq: [[k, false]], num: v}, `The ${v} goes in the gold square${why}.`);
+  hints.show({sq: [[k, false]]}, !s ? "Look at the gold square: ask again for its number."
+    : s[2] === 1 ? `The gold square is the last gap in its ${L}: it takes what the ${L} is short of ${total()}.`
+    : L ? `This ${L} needs a number that only the gold square can take.` : `Only one number left lets every line through the gold square reach ${total()}.`);
 };
 // Audit: every number of yours in the wrong square gets a red box.
 $("auditBtn").onclick = () => {
@@ -402,13 +400,13 @@ $("auditBtn").onclick = () => {
   if (!Object.keys(game.put).length) return G.note("Put some numbers in first, then Audit checks them.", 3500);
   game.audited = true; game.started = true; save();
   const wrong = Object.keys(game.put).map(Number).filter(k => game.put[k] !== game.sol[k]);
-  G.note(!wrong.length ? "Every number you've put in is in the right square." : `${wrong.length} number${wrong.length > 1 ? "s are" : " is"} in the wrong square.`, 5000);
-  if (wrong.length) showMark({when: JSON.stringify(game.put), sq: wrong.map(k => [k, true])}); else draw();
+  if (!wrong.length) { hints.clear(); return G.note("Every number you've put in is in the right square.", 5000); }
+  hints.show({sq: wrong.map(k => [k, true])}, `${wrong.length} number${wrong.length > 1 ? "s are" : " is"} in the wrong square.`, {uncounted: true});
 };
 
 /* ---------- endings ---------- */
 function win() {
-  game.won = true; G.finishClock(game); mark = null; sel = -1; held = 0;
+  game.won = true; G.finishClock(game); hints.clear(false); sel = -1; held = 0;
   const helped = game.hinted || game.audited, next = helped ? game.level : Math.min(MAX_LEVEL, game.level + 1);
   settings.level = next; $("levelSel").value = next; save();
   draw();
@@ -434,7 +432,7 @@ function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); ne
 function begin(p, level) {
   const last = game && game.pc, from = PADS.filter(c => !last || c[0] !== last[0]);
   game = {level, N: p.N, sol: p.sol, given: p.given, pc: from[Math.floor(Math.random() * from.length)], put: {}, history: [], won: false, hinted: false, audited: false, undid: false, ...G.freshClock()};
-  sel = -1; held = 0; mark = null;
+  sel = -1; held = 0; hints.clear(false);
 }
 let asking = 0;
 function newPuzzle() {

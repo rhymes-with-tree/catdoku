@@ -344,7 +344,7 @@ function draw() {
   $("board").style.setProperty("--cell", ($("board").clientWidth / N) + "px");
   el.style.gridTemplateColumns = el.style.gridTemplateRows = `repeat(${N}, 1fr)`;
   const cols = Math.ceil(Math.sqrt(N)), sr = sel >= 0 ? Math.floor(sel / N) : -1, sc = sel % N;
-  if (flash && flash.key !== game.grid.join()) flash = null;   // a hint is for the board as it was
+  const flash = hints.current();
   let html = "";
   for (let i = 0; i < N * N; i++) {
     const k = plan.at[i], room = plan.rooms[k], [floor, lit] = FLOORS[plan.floor[k]];
@@ -368,7 +368,8 @@ function draw() {
   return {clash, right, wrong};
 }
 // The walls between rooms (thin seams inside a room), with each room's door hung in one of them.
-let forceOpen = -1, rattle = new Set(), wasOpen = [], flash = null;
+let forceOpen = -1, rattle = new Set(), wasOpen = [];
+const hints = G.hinter({key: () => game ? game.grid.join() : "", draw: () => draw()});   // marks {i, kind}: a square to look at
 function drawWalls(right) {
   const N = game.N, svg = $("walls"), at = plan.at;
   svg.setAttribute("viewBox", `0 0 ${N} ${N}`);
@@ -471,39 +472,38 @@ document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.ke
 function undo() { if (playing() && game.history.length) { game.undid = true; const h = game.history.pop(); game.grid = h.grid; game.notes = h.notes; draw(); save(); } }
 $("undoBtn").onclick = undo;
 // Hint: first points out a number that's wrong, if there is one; otherwise picks a square in a room that's nearly
-// full (so a door is close to opening), glows it and says its number. It never fills it in for you. Any hint keeps you on the same level and costs the gold paw.
+// full (so a door is close to opening) and glows it: the first time, the message says why it can be worked out;
+// asked again, its number. It never fills it in for you. Any hint keeps you on the same level and costs the gold paw.
 let answer = null;
 const solution = () => answer && answer.g === game ? answer.sol : (answer = {g: game, sol: solveRooms(game.N, plan.rooms, 1).first}).sol;
 function hint() {
   if (!playing()) return;
   const sol = solution(), g = game.grid;
   if (!sol) { G.note("Couldn't work out a hint for this puzzle. Try Undo, or check for a wrong number.", 4000); return; }
-  game.hinted = true; game.started = true;
+  game.hinted = true; game.started = true; save();
   const wrong = g.map((v, i) => v && v !== sol[i] ? i : -1).filter(i => i >= 0);
   if (wrong.length) {
     const i = wrong.includes(sel) ? sel : wrong[0];
-    sel = i; flash = {i, kind: "hintBad", key: game.grid.join()}; draw(); save();
-    G.note(wrong.length > 1 ? `That one's wrong (and ${wrong.length - 1} more)` : "That one's wrong", 5000);
+    sel = i; hints.show({i, kind: "hintBad"}, wrong.length > 1 ? `That one's wrong (and ${wrong.length - 1} more)` : "That one's wrong");
   } else {
     const empty = (i => !g[i]), left = k => plan.rooms[k].cells.filter(empty).length;
     const cands = g.map((_, i) => i).filter(empty).sort((a, b) => left(plan.at[a]) - left(plan.at[b]) || a - b);
     const i = cands.includes(sel) ? sel : cands[0];
-    sel = i; flash = {i, kind: "hinted", key: game.grid.join()}; draw(); save();   // pick the square and say its number; the player puts it in
-    G.note(`The glowing square is a ${sol[i]}${whyNumber(i)}.`, 5000);
+    const why = whyNumber(i);   // pick the square and say why, then its number; the player puts it in
+    sel = i; hints.show({i, kind: "hinted"}, hints.level() ? `The glowing square is a ${sol[i]}${why[1]}.` : why[0]);
   }
-  const f = flash; setTimeout(() => { if (flash === f) { flash = null; draw(); } }, 5000);
 }
-// Why a hinted square takes its number, when the board shows it: the only number its row and column leave, or
-// the only one that makes its room's sign once it's the room's last square. Otherwise nothing is said.
+// Why a hinted square takes its number: the only number its row and column leave, or the only one that makes its
+// room's sign once it's the room's last square. [what to say first, without the number; what to add to the number]
 function whyNumber(i) {
   const N = game.N, g = game.grid, r = Math.floor(i / N), c = i % N, room = plan.rooms[plan.at[i]];
   const free = [...Array(N)].map((_, v) => v + 1).filter(v => ![...Array(N)].some((_, j) => g[r * N + j] === v || g[j * N + c] === v));
-  if (free.length === 1) return ": its row and column have the rest";
+  if (free.length === 1) return ["Only one number fits in the glowing square: its row and column have the rest.", ": its row and column have the rest"];
   if (room.cells.length > 1 && room.cells.every(k => k === i || g[k])) {
     const fits = free.filter(v => cageValue(room.op, room.cells.map(k => k === i ? v : g[k])) === room.t);
-    if (fits.length === 1) return `: it's the last square in its room, and only a ${fits[0]} makes ${room.t}${OPS[room.op]}`;
+    if (fits.length === 1) return [`The glowing square is the last in its room, and only one number makes ${room.t}${OPS[room.op]}.`, `: it's the last square in its room, and only a ${fits[0]} makes ${room.t}${OPS[room.op]}`];
   }
-  return "";
+  return [`The glowing square's room is the nearest to full. Its row and column leave ${free.length} numbers.`, ""];
 }
 $("hintBtn").onclick = hint;
 $("restartBtn").onclick = () => { if (playing() && game.history.length) { game.undid = true; snapshot(); game.grid = game.grid.map(() => 0); game.notes = game.notes.map(() => 0); draw(); save(); G.note("Every door's shut again. Undo brings your numbers back.", 3500); } };

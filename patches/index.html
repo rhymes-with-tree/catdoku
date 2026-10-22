@@ -234,7 +234,8 @@ function undo() {
 // Hint: the quilt has one answer. A patch in the wrong fabric is tinted red; otherwise the open patch with the
 // fewest fabrics left to choose from glows gold and the note names its fabric. The player sews it.
 // A hint keeps the next puzzle at this size and costs the gold paw.
-let hintMark = null, answer = null;
+let answer = null;
+const hints = G.hinter({key: () => game ? game.col.join() : "", draw: () => render()});   // marks {g, bad}: a patch to look at
 function hint() {
   if (!game || game.won || busy) return;
   if (!answer || answer.g !== game) answer = {g: game, sol: solveColors(game.adj, game.given, 1, false)[0]};
@@ -243,16 +244,15 @@ function hint() {
   game.hinted = true; save();
   const wrong = game.col.map((c, g) => c >= 0 && c !== sol[g] ? g : -1).filter(g => g >= 0);
   if (wrong.length) {
-    hintMark = {at: game.col.join(), g: wrong[0], bad: true}; render();
-    G.note(wrong.length > 1 ? `The red patch has the wrong fabric (and ${wrong.length - 1} more).` : "The red patch has the wrong fabric.", 5000);
+    hints.show({g: wrong[0], bad: true}, wrong.length > 1 ? `The red patch has the wrong fabric (and ${wrong.length - 1} more).` : "The red patch has the wrong fabric.");
   } else {
     const left = g => [0, 1, 2, 3].filter(c => game.adj[g].every(h => game.col[h] !== c)).length;
     const g = game.col.map((c, g) => c < 0 ? g : -1).filter(g => g >= 0).sort((a, b) => left(a) - left(b))[0];
     if (g === undefined) return;
-    hintMark = {at: game.col.join(), g}; render();
-    G.note(`The glowing patch is ${look()[sol[g]].name.toLowerCase()}.`, 5000);
+    const n = left(g);   // the first time, how many fabrics are left for it; asked again, which one
+    hints.show({g}, hints.level() ? `The glowing patch is ${look()[sol[g]].name.toLowerCase()}.`
+      : n === 1 ? "Only one fabric is left for the glowing patch: its neighbours have the rest." : `The glowing patch has the fewest fabrics left (${n}).`);
   }
-  const m = hintMark; setTimeout(() => { if (hintMark === m) { hintMark = null; render(); } }, 5000);
 }
 function clearAll() { if (game.won) return; game.undid = true; snapshot(); game.col = game.given.slice(); game.mine = []; render(); save(); }
 // The player's own buttons: just notes, in plum, on patches they want to remember. They don't sew a
@@ -351,14 +351,14 @@ function buildBoard() {
 
 function render() {
   const bad = clashes(), kids = $("board").children, N = game.N, W = $("board").clientWidth, step = W / N || 40;
-  const mineAt = new Set((game.mine || []).map(middleOf));
+  const mineAt = new Set((game.mine || []).map(middleOf)), hintMark = hints.current();
   if (W && W !== render.w) { drawSeams($("board"), game.reg, N, W); render.w = W; }
   for (let i = 0; i < N * N; i++) {
     const g = game.reg[i], c = game.col[g];
     fabricOn(kids[i], c >= 0 ? look()[c] : MUSLIN, (i % N) * step, Math.floor(i / N) * step);
     kids[i].classList.toggle("clash", bad.has(g));
     kids[i].classList.toggle("mine", mineAt.has(i));
-    const hinted = hintMark && hintMark.at === game.col.join() && hintMark.g === g;
+    const hinted = hintMark && hintMark.g === g;
     kids[i].classList.toggle("hintcell", !!hinted); kids[i].classList.toggle("bad", !!(hinted && hintMark.bad));
     kids[i].setAttribute("aria-label", `Row ${Math.floor(i / N) + 1}, column ${i % N + 1}: ${c >= 0 ? look()[c].name : "plain muslin"}${game.given[g] >= 0 ? ", already sewn" : ""}`);
   }

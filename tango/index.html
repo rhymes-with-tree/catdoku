@@ -261,7 +261,7 @@ function draw() {
   const N = game.N, el = $("squares"), {bad, badSign} = problems();
   el.style.gridTemplateColumns = `repeat(${N}, 1fr)`;
   const guesses = game.guesses || [];
-  if (flash && flash.key !== game.grid.join()) flash = null;   // a hint is for the board as it was
+  const flash = hints.current();
   el.innerHTML = game.grid.map((v, i) => `<div class="sq${game.givens[i] !== -1 ? " given" : ""}${bad.has(i) ? " bad" : ""}${guesses.includes(i) ? " guess" : ""}${flash && flash.i === i ? " " + flash.kind : ""}" data-i="${i}" role="button" aria-label="${v === -1 ? "Empty" : nameOf(game.toys[v])}">${v === -1 ? "" : img(game.toys[v])}</div>`).join("");
   // each sign sits on the edge between its two squares
   const cells = [...el.children], box = $("board").getBoundingClientRect(), bl = $("board").clientLeft, bt = $("board").clientTop;
@@ -295,7 +295,8 @@ const snapshot = () => game.history.push({grid: game.grid.slice(), notes: (game.
 function restore(h) { if (Array.isArray(h)) game.grid = h; else { game.grid = h.grid; game.notes = h.notes; game.guesses = h.guesses || []; } }
 // Mark = ×: the player's own signs between squares, as notes. While it's on, a tap goes to the edge
 // nearest the finger and turns it = , then ×, then off. They're never checked; they're just reminders.
-let marking = false, guessing = false, litSign = null, flash = null;  // litSign: a sign the walkthrough is pointing at, coloured to match
+let marking = false, guessing = false, litSign = null;  // litSign: a sign the walkthrough is pointing at, coloured to match
+const hints = G.hinter({key: () => game ? game.grid.join() : "", draw: () => draw()});   // marks {i, kind}: a square to look at
 $("markBtn").onclick = () => {
   if (!game || game.won) return;
   marking = !marking; guessing = false; draw();
@@ -381,20 +382,19 @@ function hint() {
   if (!playing()) return;
   const sol = solution(), g = game.grid;
   if (!sol) { G.note("Couldn't work out a hint for this puzzle. Try Undo, or check for a wrong toy.", 4000); return; }
-  game.hinted = true; guessing = false; marking = false;
+  game.hinted = true; guessing = false; marking = false; save();
   const wrong = g.map((v, i) => v !== -1 && v !== sol[i] ? i : -1).filter(i => i >= 0);
   if (wrong.length) {
     const i = wrong.find(i => !(game.guesses || []).includes(i)) ?? wrong[0];
-    flash = {i, kind: "hintBad", key: game.grid.join()}; draw(); save();
-    G.note(wrong.length > 1 ? `That toy's wrong (and ${wrong.length - 1} more)` : "That toy's wrong", 5000);
+    hints.show({i, kind: "hintBad"}, wrong.length > 1 ? `That toy's wrong (and ${wrong.length - 1} more)` : "That toy's wrong");
   } else {
     let f = forcedSquare();
     if (!f || f.v !== sol[f.i]) { const i = g.findIndex(v => v === -1); f = {i, v: sol[i], why: ""}; }
-    flash = {i: f.i, kind: "hinted", key: game.grid.join()}; draw(); save();   // show the square and say what goes there; the player puts it down
+    // show the square and why it's settled; asked again, what goes there. The player puts it down.
     const t = nameOf(game.toys[f.v]), T = t[0].toUpperCase() + t.slice(1);
-    G.note(f.why ? `${T} go in the glowing square: ${f.why}.` : `${T} go in the glowing square.`, 6000);
+    hints.show({i: f.i, kind: "hinted"}, !hints.level() ? (f.why ? `The glowing square can be worked out: ${f.why}.` : "Look at the glowing square: ask again for what goes there.")
+      : f.why ? `${T} go in the glowing square: ${f.why}.` : `${T} go in the glowing square.`);
   }
-  const fl = flash; setTimeout(() => { if (flash === fl) { flash = null; draw(); } }, 5000);
 }
 $("hintBtn").onclick = hint;
 addEventListener("resize", () => { if (game) draw(); });
