@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.10";
+  var BUILD = "2026-10-22.11";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-22.10">
+<link rel="stylesheet" href="../games.css?v=2026-10-22.11">
 <style>
 /* A gigantic cat tower: sisal posts up from a carpeted base, numbered carpeted perches on them, linked by rope catwalks. */
 .wall{width:var(--board);aspect-ratio:1;background:#EBDDCB;border:3px solid #A98663;border-radius:16px;overflow:hidden;touch-action:manipulation;user-select:none;-webkit-user-select:none}
@@ -67,8 +67,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-22.10"></script>
-<script src="../cattower.js?v=2026-10-22.10"></script>
+<script src="../games.js?v=2026-10-22.11"></script>
+<script src="../cattower.js?v=2026-10-22.11"></script>
 <script>
 /* ---------- the puzzle ---------- */
 // A perch: {x, y, n}. Catwalks run from a perch to the nearest perch straight across or up and down (and on the
@@ -248,7 +248,10 @@ function draw(flash) {
     s += `<g class="lane${flash === k ? " no" : ""}">${g}</g>`;
   });
   // under the perches, the hint: a gold catwalk to build (red: one to take away) and its two perches, while the catwalks are as they were
-  if (hintMark && hintMark.at === val.join()) {
+  // (or, the first time, just one perch that needs a catwalk)
+  const hintMark = hints.current();
+  if (hintMark && hintMark.perch !== undefined) { const P = isles[hintMark.perch]; s += `<circle class="hintsq" cx="${P.x * U + U / 2}" cy="${P.y * U + U / 2}" r="${U * .5}"/>`; }
+  else if (hintMark) {
     const l = lanes[hintMark.k], A = isles[l.a], B = isles[l.b], c = hintMark.bad ? " bad" : "";
     s += `<line class="hintline${c}" x1="${A.x * U + U / 2}" y1="${A.y * U + U / 2}" x2="${B.x * U + U / 2}" y2="${B.y * U + U / 2}"/>`;
     for (const P of [A, B]) s += `<circle class="hintsq${c}" cx="${P.x * U + U / 2}" cy="${P.y * U + U / 2}" r="${U * .5}"/>`;
@@ -312,23 +315,26 @@ document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.ke
 $("restartBtn").onclick = () => { if (playing() && game.history.length) { game.undid = true; game.history.push(game.val.slice()); game.val = game.val.map(() => 0); sel = -1; draw(); save(); G.note("Back to bare perches. Undo brings your catwalks back.", 3500); } };
 
 // Hint: the tower has one answer. A catwalk that shouldn't be there (or one too many) shows in red; otherwise a
-// catwalk still to build glows gold between its two perches. The player builds it. A hint keeps the next
-// tower the same size and costs the gold paw.
-let hintMark = null, answer = null;
+// perch that needs a catwalk glows gold, and asked again, the catwalk to build between its two perches. The
+// player builds it. A hint keeps the next tower the same size and costs the gold paw.
+let answer = null;
+const hints = G.hinter({game: () => game, key: () => game ? game.val.join() : "", draw: () => draw()});   // marks {k, bad} or {perch}
 function hint() {
   if (!playing()) return;
   if (!answer || answer.g !== game) { countSolutions(game.isles, lanes, 1); answer = {g: game, sol: (countSolutions.sols || [])[0]}; }
   const sol = answer.sol;
   if (!sol) { G.note("Couldn't work out a hint for this tower. Try Undo.", 4000); return; }
-  game.hinted = true; save();
   const over = lanes.map((_, k) => k).filter(k => game.val[k] > sol[k]);
   const have = totals(), short = k => game.isles[lanes[k].a].n - have[lanes[k].a] + game.isles[lanes[k].b].n - have[lanes[k].b];
   const k = over.length ? over[0] : lanes.map((_, k) => k).filter(k => game.val[k] < sol[k]).sort((a, b) => short(a) - short(b))[0];
   if (k === undefined) return;
-  hintMark = {at: game.val.join(), k, bad: over.length > 0}; sel = -1; draw();
-  G.note(over.length ? (sol[k] ? "One catwalk too many between the red perches" : "The red catwalk shouldn't be there") + (over.length > 1 ? ` (and ${over.length - 1} more).` : ".")
-    : game.val[k] ? "Add a second catwalk between the glowing perches." : sol[k] === 2 ? "The glowing perches need two catwalks between them." : "Add a catwalk between the glowing perches.", 5000);
-  const m = hintMark; setTimeout(() => { if (hintMark === m) { hintMark = null; draw(); } }, 5000);
+  game.hinted = true; save(); sel = -1;
+  if (!over.length && !hints.level()) {
+    const l = lanes[k], p = [l.a, l.b].sort((a, b) => (game.isles[b].n - have[b]) - (game.isles[a].n - have[a]))[0], n = game.isles[p].n - have[p];
+    return hints.show({perch: p}, `The glowing perch still needs ${n} catwalk${n === 1 ? "" : "s"}. Ask again to see where one goes.`);
+  }
+  hints.show({k, bad: over.length > 0}, over.length ? (sol[k] ? "One catwalk too many between the red perches" : "The red catwalk shouldn't be there") + (over.length > 1 ? ` (and ${over.length - 1} more).` : ".")
+    : game.val[k] ? "Add a second catwalk between the glowing perches." : sol[k] === 2 ? "The glowing perches need two catwalks between them." : "Add a catwalk between the glowing perches.");
 }
 $("hintBtn").onclick = hint;
 

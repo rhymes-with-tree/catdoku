@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.10"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-22.11"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-22.10">
+<link rel="stylesheet" href="../games.css?v=2026-10-22.11">
 <style>
 /* Pegs on a board with a shape chalked between them. The cat unrolls one strand of yarn along the shape,
    peg to peg, and the ball shrinks as it goes. Every line once, in one go. */
@@ -72,8 +72,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-22.10"></script>
-<script src="../colorways.js?v=2026-10-22.10"></script>
+<script src="../games.js?v=2026-10-22.11"></script>
+<script src="../colorways.js?v=2026-10-22.11"></script>
 <script>
 /* ---------- shapes (plain functions, also run in a background worker) ---------- */
 // Levels: [columns, rows of pegs, lines to cover, diagonals allowed, pegs the strand must cross itself at (go
@@ -274,7 +274,8 @@ const COLORS = ["#E16A4A", "#B94588", "#73A7AE", "#6AA673", "#7885BA", "#ECA818"
 const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1}, state.settings);
-let game = state.game || null, busy = false, hintMark = null;
+let game = state.game || null, busy = false;
+const hints = G.hinter({game: () => game, key: () => game ? game.path.join() : "", draw: () => draw()});   // marks {peg, bad} or {from, to}
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !busy && !$("overlay").classList.contains("show");
 const levelName = n => { const [W, H, L, , , , , oneWay, doubles] = levelOf(n); return `Level ${n} · ${W} × ${H}, ${L} lines${oneWay ? ", arrows" : ""}${doubles ? ", doubles" : ""}`; };
@@ -324,6 +325,7 @@ function draw() {
     const [cx, cy] = pt(p), open = t.at[p].some(key => (used[key] || 0) < t.lines[key].need);
     svg.append(svgEl("circle", {cx, cy, r: .1, class: "peg" + (nexts.has(p) ? " next" : open ? " open" : "")}));
   }
+  const hintMark = hints.current();
   if (hintMark) {
     if (hintMark.to !== undefined) { const [x1, y1] = pt(hintMark.from), [x2, y2] = pt(hintMark.to); svg.append(svgEl("line", {x1, y1, x2, y2, class: "hintline"})); }
     else { const [cx, cy] = pt(hintMark.peg); svg.append(svgEl("circle", {cx, cy, r: .3, class: "hintpeg" + (hintMark.bad ? " bad" : "")})); }
@@ -355,7 +357,6 @@ function step(to) {
   return true;
 }
 function afterMove() {
-  hintMark = null;
   if (covered() === T().total) { draw(); save(); win(); return; }
   draw(); save();
   const end = game.path[game.path.length - 1];
@@ -390,9 +391,9 @@ $("board").addEventListener("pointermove", e => {
 const stopDrag = () => { dragging = false; };
 $("board").addEventListener("pointerup", stopDrag); $("board").addEventListener("pointercancel", stopDrag);
 
-$("undoBtn").onclick = () => { if (playing() && game.path.length) { game.undid = true; game.path.pop(); hintMark = null; draw(); save(); } };
+$("undoBtn").onclick = () => { if (playing() && game.path.length) { game.undid = true; game.path.pop(); draw(); save(); } };
 document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !$("undoBtn").disabled) { e.preventDefault(); $("undoBtn").click(); } });
-$("restartBtn").onclick = () => { if (playing() && game.path.length) { game.undid = true; game.path = []; hintMark = null; draw(); save(); G.note("Wound back up. Start from any peg.", 3000); } };
+$("restartBtn").onclick = () => { if (playing() && game.path.length) { game.undid = true; game.path = []; draw(); save(); G.note("Wound back up. Start from any peg.", 3000); } };
 
 // Hint: shows, never moves. If the strand can't cover every line from where it is, the peg to wind it back to
 // glows red; otherwise the next line on a way that finishes glows (or the peg to start from). Keeps you on the level.
@@ -404,24 +405,19 @@ function hint() {
     let k = path.length - 1;
     while (k > 0 && finishFrom(t, path.slice(0, k + 1)) === false) k--;
     if (k === 0 && finishFrom(t, path.slice(0, 1)) === false) {
-      hintMark = {peg: startPeg()}; draw();
-      G.note("That strand can't cover every line. Restart, and start on the glowing peg.", 6000);
+      hints.show({peg: startPeg()}, "That strand can't cover every line. Restart, and start on the glowing peg.");
     } else {
-      hintMark = {peg: path[k], bad: true}; draw();
-      G.note("That strand can't cover every line from here. Wind it back to the red peg.", 6000);
+      hints.show({peg: path[k], bad: true}, "That strand can't cover every line from here. Wind it back to the red peg.");
     }
-    clearMark(); return;
+    return;
   }
   if (!path.length || (path.length === 1 && finishFrom(t, path) === false)) {
-    hintMark = {peg: startPeg()}; draw();
-    G.note(path.length ? "Start on the glowing peg instead." : "Start on the glowing peg.", 5000); clearMark(); return;
+    return hints.show({peg: startPeg()}, path.length ? "Start on the glowing peg instead." : "Start on the glowing peg.");
   }
   const end = path[path.length - 1], way = finishFrom(t, path), used = usedOf();
   const to = way ? way[path.length] : movesFrom(t, end, used).find(q => { const key = edgeKey(end, q); used[key] = (used[key] || 0) + 1; return mightFinish(t, q, used); });
-  hintMark = {from: end, to}; draw();
-  G.note("Follow the glowing line.", 5000); clearMark();
+  hints.show({from: end, to}, "Follow the glowing line.");
 }
-function clearMark() { const g = game, m = hintMark; setTimeout(() => { if (game === g && hintMark === m) { hintMark = null; draw(); } }, 5000); }
 $("hintBtn").onclick = hint;
 
 /* ---------- endings ---------- */
@@ -450,7 +446,7 @@ async function newPuzzle() {
   if (busy) return;
   busy = true;
   const n = settings.level, p = await build.take(n);
-  game = fresh(n, p); hintMark = null;
+  game = fresh(n, p);
   busy = false; G.closeCard(); G.note(""); draw(); save();
   build.prefetch(n);
   G.track(`Unravel new puzzle level ${n}`);
@@ -470,7 +466,7 @@ function openShared(d) {
     for (let k = 1; k < p.length && step(p[k]); k++);
     game.timed = false;
   }
-  settings.level = d.N; $("levelSel").value = d.N; hintMark = null;
+  settings.level = d.N; $("levelSel").value = d.N;
   draw(); save(); build.prefetch(d.N);
   if (covered() === T().total) { game.won = true; draw(); save(); }
 }

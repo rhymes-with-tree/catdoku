@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.10"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-22.11"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-22.10">
+<link rel="stylesheet" href="../games.css?v=2026-10-22.11">
 <style>
 /* Columns of letters slide up and down; line them up so the bar across the middle spells a word. One word a
    level. Each column is a hanging pompom toy with a letter on every pompom; the toys hang a little crooked, as if
@@ -82,8 +82,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-22.10"></script>
-<script src="../walkcat.js?v=2026-10-22.10"></script>
+<script src="../games.js?v=2026-10-22.11"></script>
+<script src="../walkcat.js?v=2026-10-22.11"></script>
 <script>
 /* ---------- words ---------- */
 // The words come from the list shared with Up a Tree (words/words.json): answers from its familiar words, and any
@@ -147,7 +147,7 @@ const barWord = () => line().cols.map((c, i) => c[line().pos[i]]).join("");
 const U = 100, TOP = 110, BOT = 125;
 const still = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 let swing = new Set(), wiggle = new Set();   // this draw: whole toys to swing (a new word), tails to wiggle (a toy just moved)
-let hintMark = null;   // {c, j, key}: the letter to bring to the bar, while the columns are as they were
+const hints = G.hinter({game: () => game, key: () => game ? line().pos.join() : "", draw: () => draw()});   // marks {c, j}: the letter to bring to the bar
 // Each pompom is the same picture (pompom.webp: a pompom with its colour taken out, keeping its shading and
 // fibres), tinted to one of the site's colours (games.css) and turned its own way, so no two look alike.
 const POM_SRC = window.POM_SRC || "pompom.webp";
@@ -185,6 +185,7 @@ function toyEnds(x, c, K, wiggle) {
 }
 function draw(found) {
   const {L} = levelOf(game.level), K = reach(), Ln = line(), svg = $("svg"), W = L * U, H = (2 * K - 1) * U, bar = (K - 1) * U;
+  const hintMark = hints.current();
   // room above and below the letters, so a toy's head and tail stay in sight wherever it's pulled to
   $("board").style.aspectRatio = `${W} / ${H + TOP + BOT}`;
   svg.setAttribute("viewBox", `0 ${-TOP} ${W} ${H + TOP + BOT}`);
@@ -201,7 +202,7 @@ function draw(found) {
     s += toyEnds(x, i, Ln.cols[i].length, wiggle.has(i) && !still());
     [...Ln.cols[i]].forEach((ch, j) => {
       s += tileSvg(x, j * U, ch, i);
-      if (hintMark && hintMark.key === Ln.pos.join() && hintMark.c === i && hintMark.j === j) s += `<rect class="hintsq" x="${x + 6}" y="${j * U + 4}" width="88" height="92" rx="14"/>`;
+      if (hintMark && hintMark.c === i && hintMark.j === j) s += `<rect class="hintsq" x="${x + 6}" y="${j * U + 4}" width="88" height="92" rx="14"/>`;
     });
     s += `</g></g>`;
   }
@@ -292,7 +293,7 @@ $("svg").addEventListener("blur", () => { if (game) draw(); });
 // A word on the bar: it lights up and Keyboard Cat's cat trots across below the toys, then the level's done.
 function lined() {
   const w = barWord();
-  game.found.push(w); hintMark = null;
+  game.found.push(w);
   G.note(w === line().w ? `${w.toUpperCase()}!` : `${w.toUpperCase()}! That counts too.`, 1500);
   pause = true; draw(true); save();
   const g = game;
@@ -303,16 +304,12 @@ function lined() {
 }
 // Hint: a gold box round a letter to bring to the bar (in the first column that's wrong), for the player to move.
 // A hint keeps you on the same level and costs the gold paw.
-let hintTimer = null;
 $("hintBtn").onclick = () => {
   if (!playing()) return;
   const Ln = line(), c = Ln.cols.findIndex((col, i) => col[Ln.pos[i]] !== Ln.w[i]);
   if (c < 0) return;
-  hintMark = {c, j: Ln.cols[c].indexOf(Ln.w[c]), key: Ln.pos.join()};
-  game.hinted = true; game.started = true; draw(); save();
-  G.note(`Bring the letter in the gold box to the bar.`, 5000);
-  clearTimeout(hintTimer); const m = hintMark;
-  hintTimer = setTimeout(() => { if (hintMark === m) { hintMark = null; if (game) draw(); } }, 5000);
+  game.hinted = true; game.started = true; save();
+  hints.show({c, j: Ln.cols[c].indexOf(Ln.w[c])}, "Bring the letter in the gold box to the bar.");
 };
 
 // Give up: the toys pull themselves round to spell the answer, and the next round is the same level.
@@ -325,7 +322,7 @@ function giveUp() {
   const Ln = line();
   Ln.pos = Ln.cols.map((c, i) => c.indexOf(Ln.w[i]));
   game.won = true; game.gaveUp = true; game.result = {ms: null, n: game.level};
-  settings.level = game.level; hintMark = null; pause = true;
+  settings.level = game.level; hints.clear(false); pause = true;
   swing = new Set(Ln.cols.keys()); draw(); save();
   G.track(`Fuzzy Spelling gave up level ${game.level}`);
   const g = game;
@@ -364,7 +361,7 @@ async function newPuzzle() {
   const n = settings.level;
   game = {level: n, lines: makeRound(n), at: 0, found: [], won: false, ...G.freshClock()};
   game.lines[0].start = game.lines[0].pos.slice();
-  busy = false; cursor = 0; hintMark = null; G.note(""); swing = new Set(game.lines[0].cols.keys()); draw(); save();
+  busy = false; cursor = 0; G.note(""); swing = new Set(game.lines[0].cols.keys()); draw(); save();
   G.track(`Fuzzy Spelling new puzzle level ${n}`);
 }
 
@@ -384,7 +381,7 @@ function openShared(d) {
   game = {level: d.N, lines: [{w, cols, pos: start.slice(), start}], at: 0, found: [], won: false, ...G.freshClock()};
   if (posOk(d.p)) { line().pos = [...d.p].map(Number); game.timed = false; }
   settings.level = d.N; $("levelSel").value = d.N;
-  cursor = 0; hintMark = null; swing = new Set(cols.keys()); draw(); save();
+  cursor = 0; swing = new Set(cols.keys()); draw(); save();
   if (accepts(w.length).has(barWord())) { game.found.push(barWord()); win(); }
 }
 

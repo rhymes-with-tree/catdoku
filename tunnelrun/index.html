@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.10"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-22.11"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-22.10">
+<link rel="stylesheet" href="../games.css?v=2026-10-22.11">
 <style>
 /* A rug covered in pieces of cat tunnel, with the cat's bed in the middle. Turn the pieces until they all join
    into one network; pieces joined to the bed turn purple and crinkly, and when every one is joined the cat runs
@@ -97,7 +97,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-22.10"></script>
+<script src="../games.js?v=2026-10-22.11"></script>
 <script>
 /* ---------- tunnel networks (plain functions, also run in a background worker) ---------- */
 // A piece's tunnels are a 4-bit mask of the sides they open onto: 1 up, 2 right, 4 down, 8 left.
@@ -453,7 +453,7 @@ function update() {
   $("hintBtn").disabled = game.won || hinting;
   $("undoBtn").disabled = !game.history.length || game.won;
   $("restartBtn").disabled = !game.history.length || game.won;
-  if (hintShown && hintShown.key !== boardKey()) clearHint();
+  paintHint();
   return count === all;
 }
 // Turn and move the pictures to match the game (after Undo or Restart), each the short way round.
@@ -608,9 +608,19 @@ $("restartBtn").onclick = () => {
 // Hint: while a track is out of place, a gold box goes round a track to slide and the message says which way.
 // Then a gold box shows a piece that's the wrong way round (next to the joined part where it can). The player
 // makes the move. A hint keeps you on the same level and costs the gold paw.
-let hintTimer = null, hintShown = null;
 const boardKey = () => game.pos.join() + "/" + game.turns.join();
-function clearHint() { hintShown = null; const b = $("hintline"), p = $("hintbox"); if (b) b.setAttribute("x", -2000); if (p) p.setAttribute("x", -200); }
+const hints = G.hinter({game: () => game, key: () => game ? boardKey() : "", draw: () => paintHint()});   // marks {slide: [across, line]} or {i}: a piece
+function paintHint() {
+  const b = $("hintline"), p = $("hintbox"), m = hints.current(), N = game && game.N;
+  if (!b || !p) return;
+  b.setAttribute("x", -2000); p.setAttribute("x", -200);
+  if (m && m.slide) {
+    const [a, l] = m.slide;
+    b.setAttribute("x", a ? l * 100 + 4 : 4); b.setAttribute("y", a ? 4 : l * 100 + 4);
+    b.setAttribute("width", a ? 92 : N * 100 - 8); b.setAttribute("height", a ? N * 100 - 8 : 92);
+  } else if (m) { p.setAttribute("x", m.i % N * 100 + 6); p.setAttribute("y", Math.floor(m.i / N) * 100 + 6); }
+}
+const clearHint = () => hints.clear();
 // The next slide back towards the answer: one that gets there in two or fewer if there is one, otherwise the
 // last slide still to undo (skipping any that don't change how the rug looks).
 function nextSlide() {
@@ -624,29 +634,19 @@ function nextSlide() {
 }
 $("hintBtn").onclick = () => {
   if (!playing()) return;
-  const N = game.N, m = nextSlide(), g = game;
-  clearTimeout(hintTimer);
+  const N = game.N, m = nextSlide();
   if (m) {
     game.hinted = true; game.started = true; update(); save();
-    const [a, l, k] = m, b = $("hintline"), back = k > N / 2, n = back ? N - k : k;
-    b.setAttribute("x", a ? l * 100 + 4 : 4); b.setAttribute("y", a ? 4 : l * 100 + 4);
-    b.setAttribute("width", a ? 92 : N * 100 - 8); b.setAttribute("height", a ? N * 100 - 8 : 92);
-    hintShown = {key: boardKey()};
+    const [a, l, k] = m, back = k > N / 2, n = back ? N - k : k;
     const way = a ? (back ? "up" : "down") : (back ? "left" : "right");
-    G.note(`Slide the ${a ? "column" : "row"} in the gold box ${n === 1 ? "one square" : `${n} squares`} ${way}.`, 5000);
-    hintTimer = setTimeout(() => { if (game === g) clearHint(); }, 5000);
-    return;
+    return hints.show({slide: [a, l]}, `Slide the ${a ? "column" : "row"} in the gold box ${n === 1 ? "one square" : `${n} squares`} ${way}.`);
   }
   const {lit} = joined(), wrong = [...Array(N * N).keys()].filter(i => turnable(i) && cur(i) !== game.sol[i]);
   if (!wrong.length) return;
   const near = wrong.filter(i => lit[i] || [1, 2, 4, 8].some(d => { const j = nbr(N, i, d); return j >= 0 && lit[j]; }));
   const pool = near.length ? near : wrong, i = pool[Math.floor(Math.random() * pool.length)];
   game.hinted = true; game.started = true; update(); save();
-  const box = $("hintbox");
-  box.setAttribute("x", i % N * 100 + 6); box.setAttribute("y", Math.floor(i / N) * 100 + 6);
-  hintShown = {key: boardKey()};
-  G.note("The piece in the gold box is the wrong way round.", 5000);
-  hintTimer = setTimeout(() => { if (game === g) clearHint(); }, 5000);
+  hints.show({i}, "The piece in the gold box is the wrong way round.");
 };
 
 /* ---------- endings ---------- */

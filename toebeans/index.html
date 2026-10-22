@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.10";
+  var BUILD = "2026-10-22.11";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-22.10">
+<link rel="stylesheet" href="../games.css?v=2026-10-22.11">
 <style>
 /* Six number tiles up top, then one outlined paw: its four toe beans are + − × ÷ and its main pad holds the goal.
    An exact hit fills every pad at once in gold; the paw's own pad colour (--pc, with --pt for text on it) is
@@ -115,7 +115,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-22.10"></script>
+<script src="../games.js?v=2026-10-22.11"></script>
 <script>
 /* ---------- puzzles ---------- */
 // Each level: [fewest steps the goal needs, lowest goal, highest goal, the big numbers that can be dealt].
@@ -322,9 +322,9 @@ function undo() {
 }
 
 // Hint: the first step of a shortest way to the goal from the numbers left: its two numbers and its toe bean glow,
-// and the note says the sum. The player taps it in. If the goal can't be made from here, it says to undo.
-// A hint keeps you on this level and costs the gold paw.
-let hintMark = null;
+// and the note says the sum (the first time, just the two numbers glow). The player taps it in. If the goal can't
+// be made from here, it says to undo. A hint keeps you on this level and costs the gold paw.
+const hints = G.hinter({game: () => game, key: () => game ? game.beans.join() + (game.rev ? "|" + game.pad : "") : "", draw: () => render()});   // marks {i, j, op, pad}
 function hint() {
   if (!playing()) return;
   if (game.rev) return revHint();
@@ -334,9 +334,8 @@ function hint() {
   game.hinted = true; save();
   const [a, o, b] = way[0], i = game.beans.indexOf(a), j = game.beans.findIndex((v, k) => v === b && k !== i);
   pick = null; op = null;
-  hintMark = {at: game.beans.join(), i, j, op: o}; render();
-  G.note(`Try ${a} ${SIGN[o]} ${b}: tap ${a}, then ${SIGN[o]}, then ${b}.`, 6000);
-  const m = hintMark; setTimeout(() => { if (hintMark === m) { hintMark = null; render(); } }, 6000);
+  if (!hints.level()) return hints.show({i, j}, `Try ${a} and ${b} together. Ask again for the sign.`);
+  hints.show({i, j, op: o}, `Try ${a} ${SIGN[o]} ${b}: tap ${a}, then ${SIGN[o]}, then ${b}.`);
 }
 // Reverse mode's hint: the first step of a shortest way to 0, with the pad glowing if it's in it.
 function revHint() {
@@ -350,12 +349,9 @@ function revHint() {
   else if (a === game.pad) { padFirst = true; j = game.beans.indexOf(b); }
   else i = game.beans.indexOf(a);
   pick = null; op = null;
-  hintMark = {at: game.beans.join() + "|" + game.pad, i, j, op: o, pad: onPad};
-  render();
-  const name = v => v === game.pad && onPad ? "the pad" : v;
-  G.note(onPad ? (padFirst ? `Try ${a} ${SIGN[o]} ${b}: tap the pad, then ${SIGN[o]}, then ${b}.` : `Try ${a} ${SIGN[o]} ${b}: tap ${a}, then ${SIGN[o]}, then the pad.`)
-    : `Try ${a} ${SIGN[o]} ${b}: tap ${a}, then ${SIGN[o]}, then ${b}.`, 6000);
-  const m = hintMark; setTimeout(() => { if (hintMark === m) { hintMark = null; render(); } }, 6000);
+  if (!hints.level()) return hints.show({i, j, pad: onPad}, onPad ? `Try the glowing number with the pad. Ask again for the sign.` : `Try ${a} and ${b} together. Ask again for the sign.`);
+  hints.show({i, j, op: o, pad: onPad}, onPad ? (padFirst ? `Try ${a} ${SIGN[o]} ${b}: tap the pad, then ${SIGN[o]}, then ${b}.` : `Try ${a} ${SIGN[o]} ${b}: tap ${a}, then ${SIGN[o]}, then the pad.`)
+    : `Try ${a} ${SIGN[o]} ${b}: tap ${a}, then ${SIGN[o]}, then ${b}.`);
 }
 function remember(score) {
   settings[recentKey()] = settings[recentKey()].concat({c: game.pads[0], s: score}).slice(-5);
@@ -466,7 +462,7 @@ function render() {
   document.querySelector(".tagline").textContent = game.rev ? "Bring the big pad down to 0" : "Make the number on the big pad";
   $("goal").textContent = game.rev ? game.pad : game.goal;
   $("goalLabel").textContent = game.won ? "Got it!" : game.rev ? "Down to 0" : `Level ${game.N}`;
-  const hm = hintMark && hintMark.at === game.beans.join() + (game.rev ? "|" + game.pad : "") && playing() ? hintMark : null;
+  const hm = playing() ? hints.current() : null;
   const pad = $("pad");
   if (game.rev) {
     pad.classList.toggle("picked", pick === "pad");

@@ -786,22 +786,24 @@ const G = (() => {
   // the mark on the board for HINT_MS (or until the board changes) with a line saying what to do. Marks are gold
   // (HINT.gold) for where to go and red (HINT.red) for a mistake. Pressing Hint again on the same board can say more
   // each time: level() is how many hints have already been shown on this board (0 the first time).
-  // o: {key() (the board as it stands, as a string), draw() (redraws; it reads the mark with current())}
+  // o: {key() (the board as it stands, as a string), draw() (redraws; it reads the mark with current()),
+  //     game() (the puzzle being played, so a new one that happens to look the same starts afresh)}
   // show(mark, say, {ms, uncounted}): uncounted shows a mark that isn't a hint (Audit's), so it doesn't add a level.
   const HINT_MS = 5000, HINT = {gold: "#ECA818", red: "#C8392B"};
   function hinter(o) {
-    let mark = null, at = null, shown = 0, timer = 0;
+    let mark = null, at = null, of = null, shown = 0, timer = 0;
+    const same = () => o.game() === of && o.key() === at;
     return {
-      level() { if (o.key() !== at) shown = 0; return shown; },
+      level() { if (!same()) shown = 0; return shown; },
       show(m, say, {ms = HINT_MS, uncounted = false} = {}) {
         clearTimeout(timer);
-        const k = o.key(); if (k !== at) shown = 0;
-        mark = m; at = k; if (!uncounted) shown++;
+        if (!same()) shown = 0;
+        mark = m; at = o.key(); of = o.game(); if (!uncounted) shown++;
         o.draw(); if (say) note(say, ms);
         timer = setTimeout(() => { if (mark === m) { mark = null; o.draw(); } }, ms);
       },
       // the mark to draw, while the board is as it was when it was shown
-      current() { if (mark && o.key() !== at) mark = null; return mark; },
+      current() { if (mark && !same()) mark = null; return mark; },
       clear(redraw = true) { clearTimeout(timer); if (mark) { mark = null; if (redraw) o.draw(); } },
     };
   }

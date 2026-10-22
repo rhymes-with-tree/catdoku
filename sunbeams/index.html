@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.10";
+  var BUILD = "2026-10-22.11";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-22.10">
+<link rel="stylesheet" href="../games.css?v=2026-10-22.11">
 <style>
 /* A wooden floor in the shade; sunbeams are patches of window light, each with a cat stretched out in it. */
 .board{border-color:#5C3A22;border-radius:12px;position:relative;z-index:2}
@@ -65,7 +65,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-22.10"></script>
+<script src="../games.js?v=2026-10-22.11"></script>
 <script>
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 // Split the grid into random rectangles, scanning for the first uncovered cell each time.
@@ -264,27 +264,29 @@ function clearAll() { if (game.won || !game.rects.length) return; game.undid = t
 // Hint: the floor has one answer. A sunbeam that isn't part of it is tinted red; otherwise the squares of a
 // sunbeam still to place glow gold (the one with the fewest ways to fit). The player drags it out.
 // A hint keeps the next puzzle at this size and costs the gold paw.
-let hintMark = null, answer = null;
+let answer = null;
+const hints = G.hinter({game: () => game, key: () => game ? JSON.stringify(game.rects) : "", draw: () => render()});   // marks {cells, bad}
 const same = (A, B) => A.r === B.r && A.c === B.c && A.w === B.w && A.h === B.h;
 function hint() {
   if (!game || game.won || busy) return;
   if (!answer || answer.g !== game) answer = {g: game, sol: solveShikaku(game.N, game.clue, 1)[0]};
   const sol = answer.sol;
   if (!sol) { G.note("Couldn't work out a hint for this floor. Try Undo.", 4000); return; }
-  game.hinted = true; save();
   const wrong = game.rects.filter(R => !sol.some(S => same(R, S)));
   if (wrong.length) {
-    hintMark = {at: JSON.stringify(game.rects), R: wrong[0], bad: true}; render();
-    G.note(wrong.length > 1 ? `The red sunbeam isn't right (and ${wrong.length - 1} more).` : "The red sunbeam isn't right.", 5000);
+    game.hinted = true; save();
+    hints.show({cells: cellsIn(game.N, wrong[0]), bad: true}, wrong.length > 1 ? `The red sunbeam isn't right (and ${wrong.length - 1} more).` : "The red sunbeam isn't right.");
   } else {
     const ways = S => { const cat = cellsIn(game.N, S).find(k => game.clue[k]);
       return candidates(game.N, game.clue, cat).filter(R => !game.rects.some(X => overlaps(X, R))).length; };
     const R = sol.filter(S => !game.rects.some(X => same(X, S))).sort((a, b) => ways(a) - ways(b))[0];
     if (!R) return;
-    hintMark = {at: JSON.stringify(game.rects), R}; render();
-    G.note("A sunbeam goes on the glowing squares.", 5000);
+    game.hinted = true; save();
+    // the first time, just the cat whose sunbeam to place; asked again, the whole sunbeam
+    const cat = cellsIn(game.N, R).find(k => game.clue[k]), n = ways(R);
+    if (!hints.level()) hints.show({cells: [cat]}, n === 1 ? "The glowing cat's sunbeam can only go one way." : `The glowing cat's sunbeam has the fewest ways to go (${n}).`);
+    else hints.show({cells: cellsIn(game.N, R)}, "A sunbeam goes on the glowing squares.");
   }
-  const m = hintMark; setTimeout(() => { if (hintMark === m) { hintMark = null; render(); } }, 5000);
 }
 function place(R) {
   snapshot();
@@ -346,7 +348,7 @@ function render() {
   const N = game.N;
   drawScene($("beams"), N, game.clue, game.rects, valid, press && press.draft, game.seed || 0);
   const kids = $("board").children, lit = new Set(game.rects.filter(valid).flatMap(R => cellsIn(N, R)));
-  const hinted = new Set(hintMark && hintMark.at === JSON.stringify(game.rects) ? cellsIn(N, hintMark.R) : []);
+  const hintMark = hints.current(), hinted = new Set(hintMark ? hintMark.cells : []);
   for (let i = 0; i < N * N; i++) { kids[i].classList.toggle("hintcell", hinted.has(i)); kids[i].classList.toggle("bad", hinted.has(i) && !!hintMark.bad); }
   for (let i = 0; i < N * N; i++) kids[i].setAttribute("aria-label",
     `Row ${Math.floor(i / N) + 1}, column ${i % N + 1}${game.clue[i] ? ", cat " + game.clue[i] : ""}${lit.has(i) ? ", sunny" : ""}`);
