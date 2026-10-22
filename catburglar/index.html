@@ -110,11 +110,11 @@
 // How big the cat is (the side of a square of the same area, as a share of the painting's), and how far it takes on
 // the colours, light and brushwork of the spot it's hiding in (0 keeps its own colours).
 const LEVELS = [null,
-  {size: .15, blend: .2},
-  {size: .115, blend: .35},
-  {size: .09, blend: .5},
-  {size: .07, blend: .6},
-  {size: .055, blend: .68},
+  {size: .15, blend: .55},
+  {size: .115, blend: .6},
+  {size: .09, blend: .64},
+  {size: .07, blend: .68},
+  {size: .055, blend: .72},
   {size: .043, blend: .75},
 ];
 const TOP = LEVELS.length - 1;
@@ -146,7 +146,8 @@ function turnedBox(w, h, r) {
   return [Math.ceil(w * c + h * s) + 4, Math.ceil(w * s + h * c) + 4];
 }
 // Many of the cat drawings have a white rim round them, like a sticker. Peel it off (up to 3 pixels of pale grey or
-// white next to the transparent background), so the cat sits in the paint rather than on it.
+// white next to the transparent background), then fade the outermost pixels left, which fade from the rim into the
+// outline, so the cat sits in the paint rather than on it.
 const peeled = new Map();
 function peel(im) {
   if (peeled.has(im)) return peeled.get(im);
@@ -157,13 +158,20 @@ function peel(im) {
     for (let y = 0; y < h; y++) for (let x0 = 0; x0 < w; x0++) {
       const i = (y * w + x0) * 4; if (!d[i + 3]) continue;
       const r = d[i], g = d[i + 1], b = d[i + 2];
-      if (0.3 * r + 0.59 * g + 0.11 * b < 200 || Math.max(r, g, b) - Math.min(r, g, b) > 40) continue;
+      if (0.3 * r + 0.59 * g + 0.11 * b < 165 || Math.max(r, g, b) - Math.min(r, g, b) > 50) continue;
       const open = (xx, yy) => xx < 0 || yy < 0 || xx >= w || yy >= h || d[(yy * w + xx) * 4 + 3] < 40;
       if (open(x0 - 1, y) || open(x0 + 1, y) || open(x0, y - 1) || open(x0, y + 1)) clear.push(i);
     }
     if (!clear.length) break;
     for (const i of clear) d[i + 3] = 0;
   }
+  const edge = [];
+  for (let y = 0; y < h; y++) for (let x0 = 0; x0 < w; x0++) {
+    const i = (y * w + x0) * 4; if (!d[i + 3]) continue;
+    const open = (xx, yy) => xx < 0 || yy < 0 || xx >= w || yy >= h || d[(yy * w + xx) * 4 + 3] < 40;
+    if (open(x0 - 1, y) || open(x0 + 1, y) || open(x0, y - 1) || open(x0, y + 1)) edge.push(i);
+  }
+  for (const i of edge) d[i + 3] = Math.round(d[i + 3] * 0.35);
   x.putImageData(img, 0, 0); peeled.set(im, c);
   return c;
 }
@@ -200,16 +208,20 @@ async function makePuzzle(level, avoid) {
     for (let k = 0; k < 4; k++) S[k][at] = v[k] + S[k][at - 1] + S[k][at - GW - 1] - S[k][at - GW - 2];
   }
   const sum = (k, x0, y0, x1, y1) => S[k][y1 * (GW + 1) + x1] - S[k][y0 * (GW + 1) + x1] - S[k][y1 * (GW + 1) + x0] + S[k][y0 * (GW + 1) + x0];
+  // spread of brightness over a box of the small painting
+  const spreadIn = (x0, y0, x1, y1) => { const n = (x1 - x0) * (y1 - y0), L = (0.3 * sum(0, x0, y0, x1, y1) + 0.59 * sum(1, x0, y0, x1, y1) + 0.11 * sum(2, x0, y0, x1, y1)) / n; return Math.sqrt(Math.max(0, sum(3, x0, y0, x1, y1) / n - L * L)); };
   const mc = catColour(im), margin = 0.04 * Math.min(PW, PH);
   let best = null, bestScore = Infinity;
   for (let t = 0; t < 400; t++) {
     const cx = margin + bw / 2 + Math.random() * (PW - 2 * margin - bw), cy = margin + bh / 2 + Math.random() * (PH - 2 * margin - bh);
     const x0 = Math.max(0, Math.floor((cx - bw / 2) * g)), y0 = Math.max(0, Math.floor((cy - bh / 2) * g));
     const x1 = Math.min(GW, Math.max(x0 + 1, Math.ceil((cx + bw / 2) * g))), y1 = Math.min(GH, Math.max(y0 + 1, Math.ceil((cy + bh / 2) * g))), n = (x1 - x0) * (y1 - y0);
-    const m = [0, 1, 2].map(k => sum(k, x0, y0, x1, y1) / n), L = 0.3 * m[0] + 0.59 * m[1] + 0.11 * m[2];
-    const spread = Math.sqrt(Math.max(0, sum(3, x0, y0, x1, y1) / n - L * L));
-    // plain sky or a bare wall gives the cat away, so busy spots score better
-    const score = Math.hypot(m[0] - mc[0], m[1] - mc[1], m[2] - mc[2]) + 1.5 * Math.max(0, 35 - spread) - 0.3 * Math.min(spread, 80) + Math.random() * 30;
+    const m = [0, 1, 2].map(k => sum(k, x0, y0, x1, y1) / n), spread = spreadIn(x0, y0, x1, y1);
+    // plain sky or a bare wall gives the cat away, so busy spots score better; and every quarter of the spot has
+    // to be busy, so the cat never hangs half off a roof into the sky
+    const xm = (x0 + x1) >> 1, ym = (y0 + y1) >> 1;
+    const quiet = x1 - x0 > 1 && y1 - y0 > 1 ? Math.min(spreadIn(x0, y0, xm, ym), spreadIn(xm, y0, x1, ym), spreadIn(x0, ym, xm, y1), spreadIn(xm, ym, x1, y1)) : spread;
+    const score = 0.6 * Math.hypot(m[0] - mc[0], m[1] - mc[1], m[2] - mc[2]) + 2.5 * Math.max(0, 30 - quiet) - 0.3 * Math.min(spread, 80) + Math.random() * 25;
     if (score < bestScore) { bestScore = score; best = [cx, cy]; }
   }
   return {i: p.id, c: cat, x: Math.round(best[0]), y: Math.round(best[1]), w, h, r, f};
@@ -237,8 +249,8 @@ function blur(src, w, h, R) {
 // it takes on the spot's light and shade, and the painting's brushwork shows through it; `blend` says how far.
 function sneakIn(ctx, catIm, pz, blend) {
   const cc = catCanvas(catIm, pz), bw = cc.width, bh = cc.height, cd = cc.getContext("2d").getImageData(0, 0, bw, bh).data;
-  // on the harder levels, soften the drawing's crisp outline a little, like paint
-  if (blend >= 0.6) {
+  // soften the drawing's crisp outline a little, like paint
+  if (blend >= 0.5) {
     const ch = [0, 1, 2, 3].map(k => { const c = new Float32Array(bw * bh); for (let i = 0; i < bw * bh; i++) c[i] = k < 3 ? cd[i * 4 + k] * cd[i * 4 + 3] / 255 : cd[i * 4 + 3]; return blur(c, bw, bh, 1); });
     for (let i = 0; i < bw * bh; i++) { const a = ch[3][i]; cd[i * 4 + 3] = a; for (let k = 0; k < 3; k++) cd[i * 4 + k] = a ? ch[k][i] * 255 / a : 0; }
   }
