@@ -182,13 +182,16 @@ function catCanvas(im, pz) {
   x.drawImage(peel(im), -pz.w / 2, -pz.h / 2, pz.w, pz.h);
   return c;
 }
-// Average colour (and spread of brightness) of a picture's opaque pixels.
+// Average colour of a picture's opaque pixels, and how far its colours stray from that (a calico's patches stray a
+// long way; a grey cat's hardly at all).
 function catColour(im) {
   const k = 40 / Math.max(im.naturalWidth, im.naturalHeight), w = Math.max(1, Math.round(im.naturalWidth * k)), h = Math.max(1, Math.round(im.naturalHeight * k));
   const c = canvasOf(w, h), x = c.getContext("2d"); x.drawImage(im, 0, 0, w, h);
   const d = x.getImageData(0, 0, w, h).data; let n = 0, r = 0, g = 0, b = 0;
   for (let i = 0; i < d.length; i += 4) { const a = d[i + 3] / 255; n += a; r += d[i] * a; g += d[i + 1] * a; b += d[i + 2] * a; }
-  return [r / n, g / n, b / n];
+  r /= n; g /= n; b /= n; let v = 0;
+  for (let i = 0; i < d.length; i += 4) v += ((d[i] - r) ** 2 + (d[i + 1] - g) ** 2 + (d[i + 2] - b) ** 2) * d[i + 3] / 255;
+  return [r, g, b, Math.sqrt(v / n)];
 }
 // A new puzzle: a painting, then a dozen cats tried in it, each at its best spot from a few hundred tries (with a
 // little luck mixed in), and the best of those. A busy spot hides any cat; a calm one (sky, a wall, a dress) only
@@ -226,7 +229,8 @@ async function makePuzzle(level, avoid) {
       const xm = (x0 + x1) >> 1, ym = (y0 + y1) >> 1;
       const quiet = x1 - x0 > 1 && y1 - y0 > 1 ? Math.min(spreadIn(x0, y0, xm, ym), spreadIn(xm, y0, x1, ym), spreadIn(x0, ym, xm, y1), spreadIn(xm, ym, x1, y1)) : spread;
       // colour that doesn't match costs more the calmer the spot, so calm spots go only to cats of their colour
-      const off = Math.hypot(m[0] - mc[0], m[1] - mc[1], m[2] - mc[2]);
+      // (and a cat of many colours, like a calico, doesn't suit a calm spot even if its colours average out to it)
+      const off = Math.hypot(m[0] - mc[0], m[1] - mc[1], m[2] - mc[2]) + 0.8 * Math.max(0, mc[3] - 1.7 * spread);
       const score = off * (0.5 + 0.06 * Math.max(0, 30 - quiet)) - 0.3 * Math.min(spread, 80) + Math.random() * 20;
       if (!best || score < best.score) best = {score, c: cat, x: Math.round(cx), y: Math.round(cy), w, h, r, f};
     }
@@ -284,15 +288,30 @@ function sneakIn(ctx, catIm, pz, blend) {
   // just a blur of the painting
   const st = sc.map((s, k) => Math.max(s * 0.5, s * (1 - blend) + sp[k] * blend));
   const lum = (r, g, b) => 0.3 * r + 0.59 * g + 0.11 * b, meanLo = lum(...mp) || 1;
+  // how colourful the cat and the painting under it are (how far a colour is from grey)
+  const chroma = (r, g, b) => Math.max(r, g, b) - Math.min(r, g, b);
+  let catC = 0, artC = 0;
+  for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
+    const a = cd[(y * bw + x) * 4 + 3] / 255; if (!a) continue;
+    const ci = (y * bw + x) * 4, pi = ((y + R) * rw + x + R) * 4;
+    catC += chroma(cd[ci], cd[ci + 1], cd[ci + 2]) * a; artC += chroma(pd[pi], pd[pi + 1], pd[pi + 2]) * a;
+  }
+  // no part of the cat comes out much more colourful than the painting there (an orange patch on a calico, in an ink
+  // painting, comes out a soft brown)
+  const cap = artC / n * 1.5 + 12;
   for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
     const a = cd[(y * bw + x) * 4 + 3] / 255; if (!a) continue;
     const ci = (y * bw + x) * 4, j = (y + R) * rw + x + R, pi = j * 4;
-    const shade = Math.min(1.6, Math.max(0.5, lum(lo[0][j], lo[1][j], lo[2][j]) / meanLo)), light = 1 + (shade - 1) * blend * 0.8;
+    const shade = Math.min(1.6, Math.max(0.5, lum(lo[0][j], lo[1][j], lo[2][j]) / meanLo)), light = 1 + (shade - 1) * blend * 0.4;
+    const out = [];
     for (let k = 0; k < 3; k++) {
-      const own = cd[ci + k], moved = (own - mc[k]) / sc[k] * st[k] + mp[k], brush = pd[pi + k] - lo[k][j];
-      const v = (own * (1 - blend) + moved * blend) * light + brush * blend * 0.5;
-      pd[pi + k] = Math.round(pd[pi + k] * (1 - a) + Math.min(255, Math.max(0, v)) * a);
+      // shifted toward the painting right behind it (half the spot's average, half the soft light just there), so an
+      // outline next to a dark patch stays dark rather than turning into a pale ring
+      const own = cd[ci + k], moved = (own - mc[k]) / sc[k] * st[k] + (mp[k] + lo[k][j]) / 2, brush = pd[pi + k] - lo[k][j];
+      out.push((own * (1 - blend) + moved * blend) * light + brush * blend * 0.3);
     }
+    const L = lum(...out), c = chroma(...out), mute = c > cap ? 1 + (cap / c - 1) * blend : 1;
+    for (let k = 0; k < 3; k++) pd[pi + k] = Math.round(pd[pi + k] * (1 - a) + Math.min(255, Math.max(0, L + (out[k] - L) * mute)) * a);
   }
   ctx.putImageData(reg, x0 - R, y0 - R);
   // where the cat is, for checking taps: its pixels at least a third opaque
