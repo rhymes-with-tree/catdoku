@@ -8,6 +8,12 @@ description: Add a new game to the Catdoku site, from a playable preview to a fi
 Each game is one page, `<slug>/index.html`, using the shared `games.css` and `games.js` (the `G` object).
 The front page and every game's menu list the games in `G.GAMES`.
 
+**Access is never a reason to drop or shrink an idea.** The owner is always happy to add network access, connectors
+or other permissions a game needs (a museum's API, an image host, a data source). When something is blocked, or a
+better option needs access the session doesn't have, don't work around it or rule it out: say exactly what to add
+(each host name, such as `collectionapi.metmuseum.org` and `images.metmuseum.org`, or the connector) and what it
+would make possible, then carry on with whatever doesn't depend on it.
+
 ## 1. Theme
 
 Check the README's game sections and `G.GAMES`; if an existing game already uses the same mechanic,
