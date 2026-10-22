@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.8";
+  var BUILD = "2026-10-22.9";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&family=Permanent+Marker&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-22.8">
+<link rel="stylesheet" href="../games.css?v=2026-10-22.9">
 <style>
 /* A wooden floor covered in cardboard boxes. Checked boxes get a number written on them in marker, like a
    labelled box; marked ones get a cat doodled on; a startled cat's box gets HISS scrawled across it. */
@@ -83,7 +83,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-22.8"></script>
+<script src="../games.js?v=2026-10-22.9"></script>
 <script>
 /* ---------- sizes ---------- */
 // Width, height and cats, from Minesweeper's beginner board up to its expert one stood on end (16 across, 30 down),
@@ -183,6 +183,7 @@ let game = state.game || null, markMode = false, cat = null;
 const save = () => G.save(STORE, {settings, game});
 const setOf = a => new Set(a || []);
 let open, mark, caught;
+const MAX_LIVES = 9, livesUsed = () => game.livesUsed || 3;   // lives given out on this floor: 3, and 3 more a revive
 const label = i => nbrs(i).reduce((s, j) => s + cat[j], 0);
 
 function load() {   // the working copies of the saved game
@@ -264,7 +265,7 @@ function checkWin() {
 // a gold paw gets Jan Brady, found and looking up at you, in place of the random cat photo
 function janPic() { const im = new Image(); im.className = "janpic"; im.src = "../cats/jan-brady-31.webp"; im.alt = "Jan Brady looking up, found"; return im; }
 function winCard() {
-  const next = settings.size, startled = 3 - game.lives;
+  const next = settings.size, startled = game.caught.length;
   let text = `All ${game.C} cats found${startled ? `, with ${startled} startled` : ""}.`;
   text += next > game.N ? ` Next up: ${sizeLabel(next)}.` : clean() ? " That's the biggest floor; here's another." : ` Next up: another ${sizeLabel(next)}.`;
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the sleepy cats", game.result,
@@ -276,16 +277,28 @@ function outOfLives() {
   const done = game;   // two seconds to see where the cats were first
   setTimeout(() => { if (game === done) livesCard(); }, 2000);
 }
+// Out of lives, as in Catdoku: try the floor again, a new one, or come back with three more lives (up to nine on
+// one floor). Any of these keeps you at this size.
 function livesCard() {
-  G.openCard("Out of lives", "Three cats were startled awake. Try this floor again, or have a new one.", [
-    ["Try this floor again", tryAgain, true], ["New floor", () => { G.closeCard(); newFloor(); }],
-    ["Look at the floor", () => { G.closeCard(); G.note("Tap the floor when you're ready to go again.", 0); }]],
-    null, G.otherSize($("size"), game.N, startLevel));
+  const btns = [["Try this floor again", tryAgain, true], ["New floor", () => { G.closeCard(); newFloor(); }]];
+  let text = "Three cats were startled awake. Pick how you want to keep going.";
+  if (livesUsed() < MAX_LIVES) btns.push(["Wait, I'm only mostly dead! Mostly dead is slightly alive, folks!", revive]);
+  else text = `All ${MAX_LIVES} lives on this floor are used up.`;
+  btns.push(["Look at the floor", () => { G.closeCard(); G.note("Tap the floor when you're ready to go again.", 0); }]);
+  G.openCard("Out of lives", text, btns, null, G.otherSize($("size"), game.N, startLevel));
+}
+function revive() {
+  const added = Math.min(3, MAX_LIVES - livesUsed());
+  Object.assign(game, {livesUsed: livesUsed() + added, lives: added, lost: false, hinted: true});
+  store(); draw();
+  const more = Math.ceil((MAX_LIVES - game.livesUsed) / 3);
+  G.openCard("Slightly alive!", `Back with ${added} more ${added === 1 ? "life" : "lives"}. ${more ? `${more} ${more === 1 ? "revive" : "revives"} left on this floor.` : "No revives left on this floor."}`,
+    [["Keep playing", G.closeCard, true]]);
 }
 // The same cats, back to the first box checked, with three new lives.
 function tryAgain() {
   G.closeCard();
-  Object.assign(game, {open: [], mark: [], caught: [], lives: 3, lost: false, hinted: true, ...G.freshClock()});
+  Object.assign(game, {open: [], mark: [], caught: [], lives: 3, livesUsed: 3, lost: false, hinted: true, ...G.freshClock()});
   load(); spread(game.first); store(); draw(); G.note("Same floor, three new lives.", 3000);
 }
 
@@ -325,7 +338,7 @@ function layout() {
 function draw() {
   const kids = $("board").children, reveal = game.won || game.lost;
   $("count").textContent = game.won ? `🐱 all ${game.C} found` : `🐱 ${game.C - mark.size - caught.size} left`;
-  $("hearts").innerHTML = "♥".repeat(game.lives) + '<span class="lost">♥</span>'.repeat(3 - game.lives);
+  $("hearts").innerHTML = "♥".repeat(game.lives) + '<span class="lost">♥</span>'.repeat(Math.max(3, livesUsed()) - game.lives);
   $("hearts").setAttribute("aria-label", `${game.lives} lives left`);
   for (let i = 0; i < W * H; i++) {
     const sq = kids[i], n = open.has(i) ? label(i) : 0;
