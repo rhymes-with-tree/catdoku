@@ -1,6 +1,6 @@
-# Catlas: work in progress
+# Catlas: notes and map data
 
-A new Catdoku game, not on the site yet, for a new Cat Travels shelf ("Countries, maps and places"). A country lights up on the world map, with a clue such as "Where's the lynx?" (a wild cat that lives there), and the player names the country. 
+How Catlas (`atlas/`, on the Cat Travels shelf) was made, and the owner's decisions behind it. A country lights up on the world map, with a clue such as "Where's the lynx?" (a wild cat that lives there), and the player names the country. The game itself is `atlas/index.html`; this folder holds the data and scripts that went into it.
 
 ## Decisions the owner made
 
@@ -16,27 +16,28 @@ A new Catdoku game, not on the site yet, for a new Cat Travels shelf ("Countries
 | Tries | 2 per place, then it's shown and counts as missed |
 | Moving up | No hints and no Restart, and: 8+ on the first try, or 7 and any bonus, or all 10 found within their tries. Otherwise the same level and region again. Gold paw: 10 on the first try, no hints |
 | Pairs kept apart on Pick | Countries that both claim land the map stripes: Russia–Ukraine, Israel–Syria, Morocco–Western Sahara, India–Pakistan, India–China, Sudan–South Sudan, plus Israel–Palestine |
-| Disputed territory round | A separate mode (Round: Disputed land), written without the owner's review at their request. 24 places in `DISPUTES` (`src/atlas.js`), shapes in `dz.json` from `scripts/dz_shapes.py`. Each is a sentence with blanks (the place, then the countries), filled in any order from one box (or chips on Pick, or the list); 3 wrong guesses and the sentence is shown; each other name for the place is a bonus. Sentences say who controls and who claims, never who's right |
+| Disputed territory round | A separate mode (Round: Disputed land), written without the owner's review at their request. 24 places in `DISPUTES` (`atlas/index.html`), shapes in `atlas/dz.json` from `scripts/dz_shapes.py`. Each is a sentence with blanks (the place, then the countries), filled in any order from one box (or chips on Pick, or the list); 3 wrong guesses and the sentence is shown; each other name for the place is a bonus. Sentences say who controls and who claims, never who's right |
 | Walkthrough | "A cat is hiding here." / how to answer / "You get two tries for each." / "Drag or pinch the map to look around." / answer style / Hint |
 
 The owner's reasoning: large countries are easier than medium ones, which are easier than small ones; wrong answers that are close together or of a similar size are harder; everyone is bad at islands and small countries.
 
-## Files here
+## Files
 
 | File | What it is |
 |---|---|
-| `src/atlas.js` | The game script. `/*NAMES*/` and `/*SIZES*/` are filled in by the build |
-| `src/atlas.css`, `src/atlas.body.html` | The page's own CSS and markup |
+| `atlas/index.html` | The game. The lists from `names.json`, `deps.json`, `tiers.json` and `sizes.json` are written into it (`NAMES`, `DEPS`, `TIERS`, `SIZE`), so a change to one of them is copied into the page by hand |
+| `atlas/world.json` | The map: World Map Recall's `world.json` with borders redrawn the UN's way by `scripts/un_borders.py` |
+| `atlas/disputed.json` | The striped disputed areas, from `scripts/disputed.py` |
+| `atlas/dz.json` | The disputed round's shapes, from `scripts/dz_shapes.py` |
 | `names.json` | The 200 countries (same list and codes as World Map Recall in rhymes-with-tree/mapstudy) |
-| `deps.json` | The 45 territories: code to [name, country it belongs to] |
+| `deps.json` | The 45 territories: code to [name, country it belongs to], from `scripts/deps.py` |
 | `difficulty_by_owner.tsv` | The owner's own difficulty for each place (Easy, Medium, Difficult), one row per place in the game; `tiers.json` is the same as codes, used by the game |
 | `sizes.json` | Area in km² and island flag (no land border) per country, from `scripts/sizes.py` |
 | `gbif_counts.json` | GBIF wild cat records per country and species (1990 onward, sightings and camera traps only), from `scripts/gbif.py` |
 | `iso2.json` | Country code to ISO 2-letter code, for GBIF |
-| `scripts/build_preview.py` | Builds a standalone preview page: `python3 atlas/wip/scripts/build_preview.py atlas/wip . ../mapstudy (the third argument is no longer used)` writes `atlas/wip/preview/` (ignored by git), with `world_un.json` copied in as `world.json`, and `disputed.json` |
-| `scripts/play.js`, `scripts/trips.js` | Playwright checks. Wrap `preview/cat-atlas.html` in `<!doctype html><html><head><meta charset="utf-8"></head><body>…</body></html>` as `preview/test.html`, serve `preview/` on port 8766, then run them |
+| `iucn_check.json` | The IUCN Red List check of every wild cat clue, from `scripts/iucn.py` and `scripts/iucn_alts.py` |
 
-## The cat table (`CLUE` in `src/atlas.js`)
+## The cat table (`CLUE` in `atlas/index.html`)
 
 Each pick is a wild cat native to the country and, where GBIF has records, one recorded there. GBIF also has zoo animals and misidentifications (a serval in the Netherlands, a lion in Germany, an ocelot in Oman), so its top species wasn't taken blindly.
 
@@ -46,10 +47,10 @@ The IUCN key is a Bearer secret in the environment's network settings, added to 
 
 ## Sensitive pairs
 
-- Pairs kept apart on Pick: see the table above (`NEVER_WITH` in `src/atlas.js`).
-- Borders follow the UN (the owner's call). World Map Recall's `world.json` draws Crimea as Russia, the Golan Heights as Israel and the Moroccan-held part of Western Sahara as Morocco; `scripts/un_borders.py` (needs shapely) moves them to Ukraine, Syria and Western Sahara (and the Chagos Islands to Mauritius, per the 2019 UN General Assembly vote) using Natural Earth's `ne_50m_admin_0_breakaway_disputed_areas.geojson`, writing `world_un.json`, the game's map. `sizes.json` is measured from it.
+- Pairs kept apart on Pick: see the table above (`NEVER_WITH` in `atlas/index.html`).
+- Borders follow the UN (the owner's call). World Map Recall's `world.json` draws Crimea as Russia, the Golan Heights as Israel and the Moroccan-held part of Western Sahara as Morocco; `scripts/un_borders.py` (needs shapely) moves them to Ukraine, Syria and Western Sahara (and the Chagos Islands to Mauritius, per the 2019 UN General Assembly vote) using Natural Earth's `ne_50m_admin_0_breakaway_disputed_areas.geojson`, writing the game's map, `atlas/world.json`. `sizes.json` is measured from it.
 - Western Sahara keeps its plain name and Somaliland stays part of Somalia, as the UN has them (the owner's call).
-- Disputed land is drawn with grey stripes and a dashed edge, with a "Disputed" key on the map. The owner's rule: stripe land where the map, drawn the UN's way, and whoever actually runs it disagree; or a region split by a ceasefire line where the UN takes no view on which side is whose. The Koreas and Palestine are not striped (reasons in `scripts/disputed.py`) but go in the disputed round. Applied in `scripts/disputed.py`, written to `disputed.json`: Crimea, Donetsk, Luhansk (Natural Earth's 2014 lines), Golan Heights, Northern Cyprus, Somaliland, Abkhazia, South Ossetia, Transnistria, Abyei, the Kashmir areas, Aksai Chin, Arunachal Pradesh and the small India–China valleys, and all of Western Sahara. Not striped: Kosovo, Taiwan, Palestine, the Kuril Islands, the Ilemi Triangle, the Guyana/French Guiana–Suriname headwaters, Junagadh, Nagorno-Karabakh (Azerbaijan has run it since 2023), the Falklands.
+- Disputed land is drawn with grey stripes and a dashed edge, with a "Disputed" key on the map. The owner's rule: stripe land where the map, drawn the UN's way, and whoever actually runs it disagree; or a region split by a ceasefire line where the UN takes no view on which side is whose. The Koreas and Palestine are not striped (reasons in `scripts/disputed.py`) but go in the disputed round. Applied in `scripts/disputed.py`, written to `atlas/disputed.json`: Crimea, Donetsk, Luhansk (Natural Earth's 2014 lines), Golan Heights, Northern Cyprus, Somaliland, Abkhazia, South Ossetia, Transnistria, Abyei, the Kashmir areas, Aksai Chin, Arunachal Pradesh and the small India–China valleys, and all of Western Sahara. Not striped: Kosovo, Taiwan, Palestine, the Kuril Islands, the Ilemi Triangle, the Guyana/French Guiana–Suriname headwaters, Junagadh, Nagorno-Karabakh (Azerbaijan has run it since 2023), the Falklands.
 - A "disputed territory" round (the owner's idea): a fill-in-the-blank sentence per place ("___ is controlled by ___ and claimed by ___"), one answer box, each right guess fills its blank; bonus points for naming every other name a place goes by (all names accepted). Everything disputed goes in, unstriped ones too (the Kurils, Kosovo, Taiwan, the Koreas, Israel and Palestine, Belize–Guatemala, the Falklands…). Built (see the table above).
 
 ## Territories
@@ -64,12 +65,11 @@ Quizzed alongside the 200 countries (the owner's choice): every place with an IS
 
 Each clue shows the cat's photo from Wikipedia beside it, with a link to its Wikipedia page ("Iberian lynx on Wikipedia") and the photo credit (photographer and licence, from Wikimedia Commons). The owner chose this over redrawing the photos: it saves the drawing, and the link lets players read more. Spoilers don't matter (the owner: "we aren't competing"), so the link names the exact species for that country.
 
-- `WIKI` in `src/atlas.js` is each clue's page; `WIKI_HERE` overrides it for one country where the clue's plain name covers several species (Canada lynx, Iberian lynx, African wildcat, Sunda clouded leopard, Sunda leopard cat). Housecats and explorers get the page on cats.
+- `WIKI` in `atlas/index.html` is each clue's page; `WIKI_HERE` overrides it for one country where the clue's plain name covers several species (Canada lynx, Iberian lynx, African wildcat, Sunda clouded leopard, Sunda leopard cat). Housecats and explorers get the page on cats.
 - The player's browser fetches the photo from Wikipedia's page summary (`en.wikipedia.org/api/rest_v1/page/summary/<title>`) and the credit from Commons (`commons.wikimedia.org/w/api.php`, `origin=*`). If either fails, the link still shows, without the photo or credit.
-- This environment can't reach Wikipedia, so the photos were tested with stand-ins; check them on the real site.
-- The owner's restyled drawings of the first cats (`cat-photos/`) aren't used.
+- They were first tested with stand-ins (the build environment can't reach Wikipedia); check them on the real site.
+- The owner started restyling iNaturalist photos as drawings before choosing Wikipedia's photos; the drawings aren't used.
 
 ## Still to do
 
-1. Look over the Wikipedia photos on the real site, and swap any page whose lead picture doesn't suit.
-2. Port to the site following `.claude/skills/new-game/SKILL.md` (step 3 onward): `atlas/index.html`, the map data in `atlas/`, `G.GAMES` entry, icon, README section, the `IDEAS.md` row (group Geography), build bump, PR. Ask the owner which shelf it goes on.
+1. Look over the Wikipedia photos on the real site, and swap any page whose lead picture doesn't suit (`WIKI`, `WIKI_HERE`).

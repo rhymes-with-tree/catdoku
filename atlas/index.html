@@ -1,10 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Catlas</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-22.1"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-22.1">
+<style>
+/* The map is the board: the country to name is lit in coral, and a gold ring goes round it when it's too small
+   to see. Under it, the cat to find and the answer, given the way the player picks: four names (Pick), typing with
+   the list of every place (List) or typing with no list (Type). */
+.map{--water:#C9DEE1;--land:#F4F2E8;--border:rgba(42,37,48,.38);--lit:#E16A4A;--lit-edge:#9E4129;--found:#6AA673;--stripe:rgba(42,37,48,.42);--found-edge:#3F7748;
+  background:var(--water);border:3px solid var(--ink);border-radius:10px;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+.map .grid{position:absolute;inset:0}
+.map canvas{display:block;width:100%;height:100%;cursor:grab}
+.map canvas:active{cursor:grabbing}
+.recentre{position:absolute;right:8px;bottom:8px;width:40px;height:40px;padding:0;border-radius:50%;display:grid;place-items:center;background:var(--panel)}
+.recentre svg{width:22px;height:22px;fill:none;stroke:var(--ink);stroke-width:2.2;stroke-linecap:round}
+.key{position:absolute;left:8px;bottom:8px;display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--ink);background:color-mix(in srgb,var(--panel) 88%,transparent);border-radius:999px;padding:2px 10px 2px 4px;pointer-events:none}
+.key i{width:18px;height:14px;border-radius:4px;border:1.5px dashed var(--ink-soft);background:repeating-linear-gradient(135deg,var(--land) 0 3px,rgba(42,37,48,.42) 3px 4.6px)}
+.loading{position:absolute;inset:0;display:grid;place-items:center;color:var(--ink-soft);font-weight:600}
+
+.pad [hidden]{display:none!important}
+.pad{width:var(--board);display:flex;flex-direction:column;align-items:center;gap:10px}
+.clue{margin:0;font-size:26px;font-weight:800;line-height:1.15;text-align:center;text-wrap:balance}
+.clue b{color:#B23A28}
+.reveal{margin:-4px 0 0;font-size:22px;font-weight:800;letter-spacing:.18em;color:#9A6B06;text-align:center;font-variant-numeric:tabular-nums}
+.reveal:empty{display:none}
+.choices{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.choices button{padding:10px 8px;line-height:1.2;min-height:52px}
+.choices button.out{text-decoration:line-through;opacity:.45}
+.choices button.wrong{border-color:#C8392B;color:#B23A28;text-decoration:line-through}
+.choices button.gold{box-shadow:0 0 0 4px #ECA818}
+.choices button.right{background:var(--sage-green);border-color:#3F7748;color:#fff}
+.typebox{width:100%;position:relative;display:flex;gap:8px}
+.typebox input{flex:1;min-width:0;font:inherit;font-size:18px;font-weight:600;color:var(--ink);background:#fff;border:2px solid var(--ink);border-radius:10px;padding:7px 12px}
+.list{width:100%;max-height:min(34vh,236px);overflow-y:auto;margin:0;padding:4px;list-style:none;background:var(--panel);border:2px solid var(--line);border-radius:10px}
+.list li{padding:5px 10px;border-radius:7px;cursor:pointer;font-weight:600}
+.list li:hover{background:#fff}
+.list li[aria-selected="true"]{background:var(--ink);color:var(--paper)}
+.list li.none{color:var(--ink-soft);cursor:default;font-weight:500}
+.tried{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
+.tried:empty{display:none}
+.tried span{font-size:14px;font-weight:600;color:#B23A28;border:2px solid #E8A598;border-radius:999px;padding:0 10px;text-decoration:line-through}
+.dots{display:flex;gap:5px;align-items:center}
+.dots i{width:11px;height:11px;border-radius:50%;border:2px solid var(--ink-soft)}
+.dots i.ok{background:var(--sage-green);border-color:#3F7748}
+.dots i.miss{background:#E16A4A;border-color:#9E4129}
+.dots i.now{border-color:var(--ink);transform:scale(1.25)}
+
+/* the disputed round's sentence, with blanks to fill in */
+.clue.dz{font-size:21px;font-weight:700;line-height:1.35}
+.clue.dz b{color:#B23A28}
+.clue .blank{display:inline-block;min-width:4.5em;border-bottom:3px solid var(--ink);color:#9A6B06;letter-spacing:.06em;line-height:1}
+.choices button.right{background:var(--sage-green);border-color:#3F7748;color:#fff}
+.reveal.note{font-size:16px;font-weight:600;letter-spacing:0;color:var(--ink-soft);margin:0}
+
+/* the cat's photo from Wikipedia beside the clue, with a link to its page and the photo credit under it */
+.cluerow{display:flex;align-items:center;justify-content:center;gap:12px;max-width:100%}
+.wildpic a{display:block}
+.wildpic img{display:block;width:76px;height:76px;object-fit:cover;border-radius:12px;border:2px solid var(--ink);background:var(--panel)}
+.wiki{margin:-6px 0 0;font-size:13px;color:var(--ink-soft);text-align:center;line-height:1.35}
+.wiki a{color:inherit}
+.wiki #catMore{font-weight:700;color:var(--ink)}
+.wiki .credit{text-decoration:none}
+.wiki .credit:empty{display:none}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Catlas</h1><div class="stripe"></div><p class="tagline">Name the country where each cat is hiding</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span class="dots" id="count" aria-label=""></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap map" id="board">
+    <div class="grid" id="grid"><canvas id="canvas" tabindex="0" role="img" aria-label="World map with one country lit up. Drag to move, pinch or scroll to zoom."></canvas></div>
+    <div class="key" aria-hidden="true"><i></i>Disputed</div>
+    <div class="loading" id="loading">Unrolling the map…</div>
+    <button class="recentre" id="recentreBtn" aria-label="Back to the lit country" title="Back to the lit country"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
+  </div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="pad" id="pad">
+    <div class="cluerow">
+      <div class="wildpic" id="wildpic" hidden><a id="catImgLink" target="_blank" rel="noopener"><img id="catImg" alt="" hidden></a></div>
+      <p class="clue" id="clue"></p>
+    </div>
+    <p class="wiki" id="catWiki"><a id="catMore" target="_blank" rel="noopener"></a> <a class="credit" id="catCredit" target="_blank" rel="noopener"></a></p>
+    <p class="reveal" id="reveal" aria-live="polite"></p>
+    <div class="choices" id="choices" hidden></div>
+    <form class="typebox" id="typebox" hidden autocomplete="off">
+      <input id="guess" type="text" enterkeyhint="go" spellcheck="false" autocapitalize="words" aria-label="Country name" placeholder="Type a country">
+      <button type="submit" class="primary" id="goBtn">Go</button>
+    </form>
+    <ul class="list" id="list" role="listbox" aria-label="Countries" hidden></ul>
+    <div class="tried" id="tried" aria-label="Wrong guesses"></div>
+    <button id="skipBtn" hidden>Skip the bonus</button>
+  </div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="restartBtn">Restart</button>
+    <button id="shareBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"><option value="1">Easy</option><option value="2">Medium</option><option value="3">Hard</option></select></label>
+    <label>Region <select id="regionSel" aria-label="Region"></select></label>
+    <button id="newBtn" class="primary">New trip</button>
+  </div>
+  <div class="bar toggles">
+    <div class="opt"><label>Round <select id="roundSel" aria-label="Round"><option value="countries">Countries</option><option value="disputed">Disputed land</option></select></label><span class="hint">Disputed land: fill in who controls and who claims each place.</span></div>
+    <div class="opt"><label>Answer <select id="styleSel" aria-label="How you answer"></select></label><span class="hint" id="styleHint"></span></div>
+  </div>
+</main>
+
+<script src="../games.js?v=2026-10-22.1"></script>
+<script>
 /* ---------- countries and their cats ---------- */
 // The 200 countries a trip can ask: the 193 UN members plus Vatican City, Palestine, Taiwan, Kosovo,
 // Western Sahara, the Cook Islands and Niue (the same list as World Map Recall).
-const NAMES = /*NAMES*/;
+const NAMES = {"DZA":"Algeria","AGO":"Angola","BEN":"Benin","BWA":"Botswana","BFA":"Burkina Faso","BDI":"Burundi","CPV":"Cape Verde","CMR":"Cameroon","CAF":"Central African Republic","TCD":"Chad","COM":"Comoros","COG":"Republic of the Congo","COD":"DR Congo","CIV":"Ivory Coast","DJI":"Djibouti","EGY":"Egypt","GNQ":"Equatorial Guinea","ERI":"Eritrea","SWZ":"Eswatini","ETH":"Ethiopia","GAB":"Gabon","GMB":"Gambia","GHA":"Ghana","GIN":"Guinea","GNB":"Guinea-Bissau","KEN":"Kenya","LSO":"Lesotho","LBR":"Liberia","LBY":"Libya","MDG":"Madagascar","MWI":"Malawi","MLI":"Mali","MRT":"Mauritania","MUS":"Mauritius","MAR":"Morocco","MOZ":"Mozambique","NAM":"Namibia","NER":"Niger","NGA":"Nigeria","RWA":"Rwanda","STP":"São Tomé and Príncipe","SEN":"Senegal","SYC":"Seychelles","SLE":"Sierra Leone","SOM":"Somalia","ZAF":"South Africa","SDS":"South Sudan","SDN":"Sudan","TZA":"Tanzania","TGO":"Togo","TUN":"Tunisia","UGA":"Uganda","ZMB":"Zambia","ZWE":"Zimbabwe","SAH":"Western Sahara","ATG":"Antigua and Barbuda","ARG":"Argentina","BHS":"Bahamas","BRB":"Barbados","BLZ":"Belize","BOL":"Bolivia","BRA":"Brazil","CAN":"Canada","CHL":"Chile","COL":"Colombia","CRI":"Costa Rica","CUB":"Cuba","DMA":"Dominica","DOM":"Dominican Republic","ECU":"Ecuador","SLV":"El Salvador","GRD":"Grenada","GTM":"Guatemala","GUY":"Guyana","HTI":"Haiti","HND":"Honduras","JAM":"Jamaica","MEX":"Mexico","NIC":"Nicaragua","PAN":"Panama","PRY":"Paraguay","PER":"Peru","KNA":"Saint Kitts and Nevis","LCA":"Saint Lucia","VCT":"Saint Vincent and the Grenadines","SUR":"Suriname","TTO":"Trinidad and Tobago","USA":"United States","URY":"Uruguay","VEN":"Venezuela","AFG":"Afghanistan","ARM":"Armenia","AZE":"Azerbaijan","BHR":"Bahrain","BGD":"Bangladesh","BTN":"Bhutan","BRN":"Brunei","KHM":"Cambodia","CHN":"China","GEO":"Georgia","IND":"India","IDN":"Indonesia","IRN":"Iran","IRQ":"Iraq","ISR":"Israel","JPN":"Japan","JOR":"Jordan","KAZ":"Kazakhstan","KWT":"Kuwait","KGZ":"Kyrgyzstan","LAO":"Laos","LBN":"Lebanon","MYS":"Malaysia","MDV":"Maldives","MNG":"Mongolia","MMR":"Myanmar","NPL":"Nepal","PRK":"North Korea","OMN":"Oman","PAK":"Pakistan","PHL":"Philippines","QAT":"Qatar","SAU":"Saudi Arabia","SGP":"Singapore","KOR":"South Korea","LKA":"Sri Lanka","SYR":"Syria","TJK":"Tajikistan","THA":"Thailand","TLS":"Timor-Leste","TUR":"Turkey","TKM":"Turkmenistan","ARE":"United Arab Emirates","UZB":"Uzbekistan","VNM":"Vietnam","YEM":"Yemen","PSX":"Palestine","TWN":"Taiwan","ALB":"Albania","AND":"Andorra","AUT":"Austria","BLR":"Belarus","BEL":"Belgium","BIH":"Bosnia and Herzegovina","BGR":"Bulgaria","HRV":"Croatia","CYP":"Cyprus","CZE":"Czechia","DNK":"Denmark","EST":"Estonia","FIN":"Finland","FRA":"France","DEU":"Germany","GRC":"Greece","HUN":"Hungary","ISL":"Iceland","IRL":"Ireland","ITA":"Italy","LVA":"Latvia","LIE":"Liechtenstein","LTU":"Lithuania","LUX":"Luxembourg","MLT":"Malta","MDA":"Moldova","MCO":"Monaco","MNE":"Montenegro","NLD":"Netherlands","MKD":"North Macedonia","NOR":"Norway","POL":"Poland","PRT":"Portugal","ROU":"Romania","RUS":"Russia","SMR":"San Marino","SRB":"Serbia","SVK":"Slovakia","SVN":"Slovenia","ESP":"Spain","SWE":"Sweden","CHE":"Switzerland","UKR":"Ukraine","GBR":"United Kingdom","VAT":"Vatican City","KOS":"Kosovo","AUS":"Australia","FJI":"Fiji","KIR":"Kiribati","MHL":"Marshall Islands","FSM":"Micronesia","NRU":"Nauru","NZL":"New Zealand","PLW":"Palau","PNG":"Papua New Guinea","WSM":"Samoa","SLB":"Solomon Islands","TON":"Tonga","TUV":"Tuvalu","VUT":"Vanuatu","COK":"Cook Islands","NIU":"Niue"};
 // Territories quizzed alongside the countries: every place with an ISO country code of its own, named with the
 // country it belongs to ("Greenland (Denmark)"). Either answer is right on its own; naming the country too is a bonus.
-const DEPS = /*DEPS*/;
+const DEPS = {"GRL":["Greenland","DNK"],"GUF":["French Guiana","FRA"],"SJM":["Svalbard","NOR"],"NCL":["New Caledonia","FRA"],"FLK":["Falkland Islands","GBR"],"PRI":["Puerto Rico","USA"],"ATF":["French Southern and Antarctic Lands","FRA"],"SGS":["South Georgia and the South Sandwich Islands","GBR"],"PYF":["French Polynesia","FRA"],"REU":["Réunion","FRA"],"GLP":["Guadeloupe","FRA"],"MTQ":["Martinique","FRA"],"FRO":["Faroe Islands","DNK"],"HKG":["Hong Kong","CHN"],"IMN":["Isle of Man","GBR"],"GUM":["Guam","USA"],"CUW":["Curaçao","NLD"],"HMD":["Heard Island and McDonald Islands","AUS"],"MYT":["Mayotte","FRA"],"MNP":["Northern Mariana Islands","USA"],"TCA":["Turks and Caicos Islands","GBR"],"VIR":["U.S. Virgin Islands","USA"],"CYM":["Cayman Islands","GBR"],"BES":["Bonaire, Sint Eustatius and Saba","NLD"],"SPM":["Saint Pierre and Miquelon","FRA"],"SHN":["Saint Helena, Ascension and Tristan da Cunha","GBR"],"ABW":["Aruba","NLD"],"IOA":["Christmas and Cocos (Keeling) Islands","AUS"],"VGB":["British Virgin Islands","GBR"],"IOT":["Chagos Islands","MUS"],"WLF":["Wallis and Futuna","FRA"],"JEY":["Jersey","GBR"],"ASM":["American Samoa","USA"],"AIA":["Anguilla","GBR"],"MSR":["Montserrat","GBR"],"BMU":["Bermuda","GBR"],"MAF":["Saint Martin","FRA"],"GGY":["Guernsey","GBR"],"SXM":["Sint Maarten","NLD"],"NFK":["Norfolk Island","AUS"],"PCN":["Pitcairn Islands","GBR"],"BLM":["Saint Barthélemy","FRA"],"MAC":["Macao","CHN"],"TKL":["Tokelau","NZL"],"ATC":["Ashmore and Cartier Islands","AUS"]};
 const nameOf = c => NAMES[c] || (DEPS[c] && DEPS[c][0]) || (c.startsWith("dz:") && DISPUTES[c.slice(3)] ? DISPUTES[c.slice(3)].name : c);
 const PLACES = [...Object.keys(NAMES), ...Object.keys(DEPS)];
 const OWNERS = [...new Set(Object.values(DEPS).map(d => d[1]))];
@@ -340,7 +479,7 @@ const KEY = "catdoku.catlas.v1", TRIP = 10, TRIES = 2;
 // Levels are the owner's three lists of places: Easy, Medium and Hard (TIERS: 1, 2, 3).
 // A level's trip mixes in easier places: Easy is 10 Easy; Medium 7 Medium + 3 Easy; Hard 6 Hard + 3 Medium + 1 Easy.
 const LEVELS = [null, "Easy", "Medium", "Hard"];
-const TIERS = /*TIERS*/;
+const TIERS = {"CAN":1,"USA":1,"MEX":1,"GRL":1,"RUS":1,"FRA":1,"ESP":1,"BRA":1,"CHN":1,"IND":1,"EGY":1,"ZAF":1,"MDG":1,"AUS":1,"UKR":1,"ARG":1,"CHL":1,"SAU":1,"IRN":1,"TUR":1,"THA":1,"KAZ":1,"IDN":1,"MNG":1,"PAK":1,"DEU":1,"ITA":1,"GBR":1,"GRC":1,"ISL":1,"PRK":1,"JPN":1,"NZL":1,"FIN":1,"POL":1,"IRQ":1,"SWE":1,"NOR":1,"CUB":1,"PRT":1,"IRL":1,"KOR":1,"NLD":1,"VAT":1,"MMR":2,"AFG":2,"PER":2,"COL":2,"BOL":2,"VEN":2,"ETH":2,"KEN":2,"DZA":2,"AGO":2,"BWA":2,"CAF":2,"TCD":2,"COD":2,"LBY":2,"MLI":2,"MRT":2,"MOZ":2,"NAM":2,"NER":2,"NGA":2,"SOM":2,"SDS":2,"SDN":2,"TZA":2,"ZMB":2,"ECU":2,"HND":2,"GTM":2,"YEM":2,"VNM":2,"MYS":2,"SYR":2,"KHM":2,"NPL":2,"BGD":2,"PHL":2,"ROU":2,"BLR":2,"BGR":2,"MAR":2,"PNG":2,"BEN":2,"BFA":2,"CMR":2,"ERI":2,"GAB":2,"GHA":2,"GIN":2,"CIV":2,"MWI":2,"COG":2,"SEN":2,"TUN":2,"UGA":2,"ZWE":2,"TKM":2,"UZB":2,"OMN":2,"LAO":2,"KGZ":2,"TJK":2,"PRY":2,"GUY":2,"URY":2,"SUR":2,"NIC":2,"PAN":2,"DNK":2,"HTI":2,"SJM":2,"FLK":2,"HUN":2,"AUT":2,"HRV":2,"EST":2,"CHE":2,"BEL":2,"CRI":2,"BLZ":2,"BHS":2,"JAM":2,"ARE":2,"ISR":2,"LKA":2,"TWN":2,"LBR":2,"SLB":2,"SWZ":2,"LSO":2,"SLE":2,"TGO":2,"JOR":2,"AZE":2,"GEO":2,"BTN":2,"ARM":2,"QAT":2,"LBN":2,"DOM":2,"SLV":2,"CZE":2,"SRB":2,"LTU":2,"LVA":2,"BIH":2,"SVK":2,"SGP":2,"BDI":3,"DJI":3,"GNQ":3,"GMB":3,"GNB":3,"RWA":3,"KWT":3,"TLS":3,"GUF":3,"MDA":3,"ALB":3,"MKD":3,"SVN":3,"MNE":3,"KOS":3,"PSX":3,"TTO":3,"CYP":3,"MLT":3,"LUX":3,"AND":3,"LIE":3,"BHR":3,"MDV":3,"HKG":3,"BRN":3,"VIR":3,"PRI":3,"GGY":3,"IMN":3,"SMR":3,"MCO":3,"SAH":3,"FJI":3,"VUT":3,"NCL":3,"WSM":3,"KIR":3,"FSM":3,"TON":3,"PLW":3,"MHL":3,"NIU":3,"COK":3,"NRU":3,"TUV":3,"ASM":3,"WLF":3,"PYF":3,"ATC":3,"PCN":3,"MNP":3,"NFK":3,"HMD":3,"GUM":3,"TKL":3,"ATF":3,"CPV":3,"COM":3,"MUS":3,"STP":3,"SYC":3,"IOT":3,"SHN":3,"REU":3,"MYT":3,"IOA":3,"MAC":3,"DMA":3,"LCA":3,"ATG":3,"BRB":3,"VCT":3,"GRD":3,"KNA":3,"MTQ":3,"GLP":3,"VGB":3,"ABW":3,"BES":3,"BLM":3,"SGS":3,"CYM":3,"TCA":3,"SXM":3,"CUW":3,"MAF":3,"MSR":3,"AIA":3,"FRO":3,"JEY":3,"SPM":3,"BMU":3};
 const MIX = [null, [[1, 10]], [[2, 7], [1, 3]], [[3, 6], [2, 3], [1, 1]]];
 // Never asked on Hard, however a trip is mixed.
 const NOT_ON_HARD = ["USA", "MEX", "CAN", "RUS", "BRA", "AUS", "IND", "CHN"];
@@ -370,7 +509,7 @@ const bestKey = g => (g.mode === "disputed" ? 90 : g.level * 10) + STYLE_ORDER.i
 const keyName = n => `${n >= 90 ? "Disputed land" : LEVELS[Math.floor(n / 10)]} · ${STYLES[STYLE_ORDER[n % 10 - 1]][0]}`;
 
 // Countries by size: [km², 1 if it has no land border], for how alike two places are.
-const SIZE = /*SIZES*/;
+const SIZE = {"DZA":[2322729,0],"AGO":[1249463,0],"BEN":[116576,0],"BWA":[580619,0],"BFA":[273679,0],"BDI":[27206,0],"CPV":[3588,1],"CMR":[465885,0],"CAF":[620982,0],"TCD":[1270974,0],"COM":[1586,1],"COG":[346876,0],"COD":[2334620,0],"CIV":[322293,0],"DJI":[21706,0],"EGY":[1003598,0],"GNQ":[26642,0],"ERI":[123681,0],"SWZ":[16992,0],"ETH":[1131789,0],"GAB":[260660,0],"GMB":[10318,0],"GHA":[239575,0],"GIN":[244926,0],"GNB":[32056,0],"KEN":[594860,0],"LSO":[30027,0],"LBR":[95661,0],"LBY":[1626483,0],"MDG":[594580,1],"MWI":[119792,0],"MLI":[1258205,0],"MRT":[1038328,0],"MUS":[1880,1],"MAR":[404398,0],"MOZ":[790658,0],"NAM":[824611,0],"NER":[1185050,0],"NGA":[911551,0],"RWA":[25386,0],"STP":[985,1],"SEN":[197324,0],"SYC":[174,1],"SLE":[71865,0],"SOM":[642076,0],"ZAF":[1221683,0],"SDS":[623975,0],"SDN":[1863050,0],"TZA":[945754,0],"TGO":[57142,0],"TUN":[156663,0],"UGA":[242550,0],"ZMB":[755599,0],"ZWE":[390182,0],"SAH":[268788,0],"ATG":[433,1],"ARG":[2782658,0],"BHS":[12669,1],"BRB":[390,1],"BLZ":[22777,0],"BOL":[1090287,0],"BRA":[8499311,0],"CAN":[9872049,0],"CHL":[737450,0],"COL":[1139446,0],"CRI":[51510,0],"CUB":[109304,1],"DMA":[698,1],"DOM":[48586,0],"ECU":[255673,0],"SLV":[20393,0],"GRD":[286,1],"GTM":[108482,0],"GUY":[211953,0],"HTI":[26807,0],"HND":[113512,0],"JAM":[10927,1],"MEX":[1962264,0],"NIC":[129252,0],"PAN":[74243,0],"PRY":[400905,0],"PER":[1296279,0],"KNA":[232,1],"LCA":[552,1],"VCT":[310,1],"SUR":[145571,0],"TTO":[5100,1],"USA":[9439358,0],"URY":[177563,0],"VEN":[914306,0],"AFG":[642052,0],"ARM":[29557,0],"AZE":[86404,0],"BHR":[542,1],"BGD":[135649,0],"BTN":[39877,0],"BRN":[5667,0],"KHM":[181368,0],"CHN":[9371212,0],"GEO":[69305,0],"IND":[3155818,0],"IDN":[1872115,0],"IRN":[1622824,0],"IRQ":[437455,0],"ISR":[20687,0],"JPN":[370116,1],"JOR":[88864,0],"KAZ":[2712760,0],"KWT":[17328,0],"KGZ":[198645,0],"LAO":[228942,0],"LBN":[10007,0],"MYS":[327661,0],"MDV":[67,1],"MNG":[1560415,0],"MMR":[662778,0],"NPL":[147193,0],"PRK":[122486,0],"OMN":[312060,0],"PAK":[873764,0],"PHL":[290294,1],"QAT":[11070,0],"SAU":[1925854,0],"SGP":[486,1],"KOR":[97144,0],"LKA":[66043,1],"SYR":[187345,0],"TJK":[142297,0],"THA":[515730,0],"TLS":[15025,0],"TUR":[779813,0],"TKM":[470625,0],"ARE":[71274,0],"UZB":[447373,0],"VNM":[328915,0],"YEM":[454134,0],"PSX":[6332,0],"TWN":[35985,1],"ALB":[28334,0],"AND":[442,0],"AUT":[83904,0],"BLR":[206696,0],"BEL":[30631,0],"BIH":[51680,0],"BGR":[112411,0],"HRV":[54431,0],"CYP":[9181,1],"CZE":[78482,0],"DNK":[42419,0],"EST":[45452,0],"FIN":[331247,0],"FRA":[545726,0],"DEU":[356168,0],"GRC":[130172,0],"HUN":[92963,0],"ISL":[101164,1],"IRL":[68703,0],"ITA":[300276,0],"LVA":[64262,0],"LIE":[138,0],"LTU":[64517,0],"LUX":[2611,0],"MLT":[273,1],"MDA":[33115,0],"MCO":[12,0],"MNE":[13671,0],"NLD":[36875,0],"MKD":[25364,0],"NOR":[322847,0],"POL":[312541,0],"PRT":[90756,0],"ROU":[235780,0],"RUS":[16852617,0],"SMR":[69,0],"SRB":[77487,0],"SVK":[48338,0],"SVN":[20193,0],"ESP":[506175,0],"SWE":[442973,0],"CHE":[41207,0],"UKR":[597136,0],"GBR":[239611,0],"VAT":[1,0],"KOS":[10914,0],"AUS":[7705992,1],"FJI":[18412,1],"KIR":[937,1],"MHL":[236,1],"FSM":[524,1],"NRU":[28,1],"NZL":[266845,1],"PLW":[341,1],"PNG":[464275,0],"WSM":[2702,1],"SLB":[25732,1],"TON":[431,1],"TUV":[10,1],"VUT":[11295,1],"COK":[61,1],"NIU":[197,1],"GRL":[2154800,1],"GUF":[83739,0],"SJM":[61412,1],"NCL":[18667,1],"FLK":[11387,1],"PRI":[8945,1],"ATF":[6971,1],"SGS":[3667,1],"PYF":[2612,1],"REU":[2548,1],"GLP":[1546,1],"MTQ":[1067,1],"FRO":[1036,1],"HKG":[1029,0],"IMN":[559,1],"GUM":[484,1],"CUW":[431,1],"HMD":[419,1],"MYT":[412,1],"MNP":[393,1],"TCA":[328,1],"VIR":[315,1],"CYM":[302,1],"BES":[248,1],"SPM":[206,1],"SHN":[186,1],"ABW":[155,1],"IOA":[143,1],"VGB":[135,1],"IOT":[132,1],"WLF":[131,1],"JEY":[126,1],"ASM":[121,1],"AIA":[83,1],"MSR":[80,1],"BMU":[67,1],"MAF":[49,0],"GGY":[48,1],"SXM":[42,0],"NFK":[41,1],"PCN":[39,1],"BLM":[24,1],"MAC":[23,0],"TKL":[5,1],"ATC":[3,1]};
 const km2 = c => SIZE[c][0];
 // How far apart two places' main pieces are on the map, the short way round.
 function apart(a, b) {
@@ -404,9 +543,11 @@ function makeTrip(level, region) {
   for (const [t, n] of MIX[level]) codes.push(...pick(pool.filter(c => tierOf(c) === t && !codes.includes(c)), n));
   // a region short of one kind of place makes up the rest from the others it has
   if (codes.length < TRIP) codes.push(...pick(pool.filter(c => !codes.includes(c)), TRIP - codes.length));
-  return shuffle(codes).map(c => DEPS[c] ? {c, opts: shuffle([c, ...wrongNames(c, level)]), owners: shuffle([DEPS[c][1], ...shuffle(OWNERS.filter(o => o !== DEPS[c][1])).slice(0, 3)])}
-    : {c, opts: shuffle([c, ...wrongNames(c, level)])});
+  return shuffle(codes).map(c => tripItem(c, level));
 }
+// One place on a trip, with Pick's four names (and, for a territory, the bonus question's four countries).
+const tripItem = (c, level) => DEPS[c] ? {c, opts: shuffle([c, ...wrongNames(c, level)]), owners: shuffle([DEPS[c][1], ...shuffle(OWNERS.filter(o => o !== DEPS[c][1])).slice(0, 3)])}
+  : {c, opts: shuffle([c, ...wrongNames(c, level)])};
 const freshCard = () => ({wrong: [], hints: 0, out: []});
 function fillRegions(level, region) {
   const sel = $("regionSel"); sel.innerHTML = "";
@@ -420,6 +561,7 @@ function newTrip(level, region, trip) {
   settings.level = level; settings.region = region; $("levelSel").value = level;
   game = {level, region, style: style(), trip: trip || makeTrip(level, region), i: 0, res: [], card: freshCard(), hinted: false, restarted: false, won: false, ...G.freshClock()};
   if (!trip) recent = [...recent, ...game.trip.map(t => t.c)].slice(-120);
+  G.track(`Catlas new trip ${LEVELS[level]}`);
   save(); show(true);
 }
 // Switching how answers are given works mid-trip; the trip's time and share count the easiest style used.
@@ -570,6 +712,7 @@ function win() {
   const level = game.level, next = up ? Math.min(3, level + 1) : level, region = next > level ? REGION_UP[game.region] && !REGIONS_AT[next].includes(game.region) ? REGION_UP[game.region] : game.region : game.region;
   game.level = level; G.finishClock(Object.assign(game, {level: bestKey(game)}));
   game.level = level; save(); show();
+  G.track(`Catlas finished ${LEVELS[level]}`);
   const deps = game.res.filter(r => "bonus" in r), bonusLine = deps.length ? ` Bonus: ${bonuses} of ${deps.length} territories' countries named.` : "";
   const where = r => `${LEVELS[next]}${r === "world" ? "" : ` (${REGIONS[r][0]})`}`;
   const why = game.hinted ? ` You had a hint, so here's another trip at ${where(region)}.`
@@ -579,7 +722,6 @@ function win() {
   G.winCard(`${first} of ${TRIP} on the first try, ${found} found.${bonusLine}${why}`, () => { G.closeCard(); newTrip(next, region); }, "Look at the map", game.result,
     {title: "Trip done!", gold, goldWhy: "Every cat found on the first try!", next: next > level ? `Next: ${LEVELS[next]}` : "New trip",
      after: G.otherSize($("levelSel"), next, l => newTrip(l, region), "Or play a different level:")});
-  if (typeof PREVIEW !== "undefined") for (const b of $("card").querySelectorAll("button")) if (/share/i.test(b.textContent)) b.remove();
 }
 
 // A hint shows, it never answers: Pick crosses out a wrong name (then rings the right one in gold);
@@ -636,18 +778,21 @@ const dzKnown = (d, i) => i === 0 ? [d.name, ...d.aka] : [nameOf(d.who[i - 1]), 
 function makeDzTrip() {
   const ids = Object.keys(DISPUTES).filter(k => world.by["dz:" + k]);
   const fresh = ids.filter(k => !recent.includes("dz:" + k));
-  return shuffle(fresh.length >= TRIP ? fresh : ids).slice(0, TRIP).map(k => {
-    const d = DISPUTES[k], apartFrom = d.who.flatMap(w => NEVER_WITH[w] || []).filter(c => !d.who.includes(c));   // never Israel beside Palestine...
-    const others = shuffle(Object.keys(DISPUTES).filter(o => o !== k && !apartFrom.some(c => nameOf(c) === DISPUTES[o].name))).slice(0, 2).map(o => DISPUTES[o].name);
-    const near = PLACES.filter(c => NAMES[c] && !d.who.includes(c) && !apartFrom.includes(c) && world.main[c] && world.main[d.who[0]]).sort((a, b) => apart(d.who[0], a) - apart(d.who[0], b)).slice(0, 2).map(nameOf);
-    const altDecoys = shuffle(Object.keys(DISPUTES).filter(o => o !== k).flatMap(o => DISPUTES[o].aka)).slice(0, 3);
-    return {c: "dz:" + k, chips: shuffle([...dzBlanks(d), ...others, ...near]), altChips: shuffle([...d.aka, ...altDecoys])};
-  });
+  return shuffle(fresh.length >= TRIP ? fresh : ids).slice(0, TRIP).map(dzItem);
+}
+// One place in the disputed round, with Pick's chips.
+function dzItem(k) {
+  const d = DISPUTES[k], apartFrom = d.who.flatMap(w => NEVER_WITH[w] || []).filter(c => !d.who.includes(c));   // never Israel beside Palestine...
+  const others = shuffle(Object.keys(DISPUTES).filter(o => o !== k && !apartFrom.some(c => nameOf(c) === DISPUTES[o].name))).slice(0, 2).map(o => DISPUTES[o].name);
+  const near = PLACES.filter(c => NAMES[c] && !d.who.includes(c) && !apartFrom.includes(c) && world.main[c] && world.main[d.who[0]]).sort((a, b) => apart(d.who[0], a) - apart(d.who[0], b)).slice(0, 2).map(nameOf);
+  const altDecoys = shuffle(Object.keys(DISPUTES).filter(o => o !== k).flatMap(o => DISPUTES[o].aka)).slice(0, 3);
+  return {c: "dz:" + k, chips: shuffle([...dzBlanks(d), ...others, ...near]), altChips: shuffle([...d.aka, ...altDecoys])};
 }
 function newDzTrip(trip) {
   settings.round = "disputed";
   game = {mode: "disputed", level: 9, region: "world", style: style(), trip: trip || makeDzTrip(), i: 0, res: [], card: dzCard(), hinted: false, restarted: false, won: false, ...G.freshClock()};
   if (!trip) recent = [...recent, ...game.trip.map(t => t.c)].slice(-120);
+  G.track("Catlas new trip Disputed land");
   save(); showMode(); show(true);
 }
 const dzCard = () => ({filled: [], wrong: [], hints: 0, alts: [], bonus: undefined});
@@ -740,9 +885,9 @@ function dzWin() {
   const gold = !game.hinted && !game.restarted && first === TRIP;
   G.finishClock(Object.assign(game, {level: 90 + STYLE_ORDER.indexOf(game.style) + 1}));
   game.level = 9; save(); show();
+  G.track("Catlas finished Disputed land");
   G.winCard(`${first} of ${TRIP} filled in with no wrong guesses, ${found} in all. ${bonuses} other ${bonuses === 1 ? "name" : "names"} named.`, () => { G.closeCard(); newDzTrip(); }, "Look at the map", game.result,
     {title: "Round done!", gold, goldWhy: "Every sentence right, first try!", next: "New round"});
-  if (typeof PREVIEW !== "undefined") for (const b of $("card").querySelectorAll("button")) if (/share/i.test(b.textContent)) b.remove();
 }
 // Countries trips or the disputed round: the round has no levels or regions.
 function showMode() {
@@ -770,6 +915,37 @@ function start() {
   }, msg => { newTrip(settings.level || 1, settings.region || "world"); G.note(msg, 0); });
   if (!settings.seenHelp) setTimeout(walkthrough, 400);
 }
+
+/* ---------- share links ---------- */
+// A link to the same ten places (level, region and order), and, if wanted, how each answered one went.
+$("shareBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Catlas", won: game.won,
+  puzzle: () => ({g: "atlas", N: game.mode === "disputed" ? 9 : game.level, r: game.region, t: game.trip.map(t => t.c).join(" ")}),
+  progress: () => game.res.map(r => [+r.first, +r.found, +r.hinted, +(r.bonus || 0)])}); };
+function openShared(d) {
+  const codes = String(d.t || "").split(" "), dz = d.N === 9, level = +d.N;
+  const ok = codes.length === TRIP && new Set(codes).size === TRIP && (dz ? codes.every(c => c.startsWith("dz:") && DISPUTES[c.slice(3)] && world.by[c])
+    : [1, 2, 3].includes(level) && REGIONS_AT[level].includes(d.r) && codes.every(c => PLACES.includes(c) && world.main[c]));
+  if (!ok) { G.note("That share link didn't work. It may have been cut off.", 6000); return; }
+  if (dz) newDzTrip(codes.map(c => dzItem(c.slice(3)))); else newTrip(level, d.r, codes.map(c => tripItem(c, level)));
+  if (!Array.isArray(d.p)) return;
+  game.res = d.p.slice(0, TRIP).filter(Array.isArray).map((r, i) => {
+    const c = game.trip[i].c;
+    return {c, first: !!r[0], found: !!r[1], hinted: !!r[2], ...(dz ? {bonus: Math.max(0, Math.min(9, Math.floor(+r[3]) || 0))} : DEPS[c] ? {bonus: !!r[3]} : {})};
+  });
+  game.i = game.res.length; game.timed = false; game.started = true; game.hinted = game.res.some(r => r.hinted);
+  if (game.i >= TRIP) dz ? dzWin() : win(); else { save(); show(true); }
+}
+const shareOpts = () => ({name: "Catlas", inProgress: !!(game && !game.won && game.res.length), open: openShared});
+G.nav("atlas");
+const shared = G.readShare("atlas");
 Promise.all(["world.json", "disputed.json", "dz.json"].map(f => fetch(f).then(r => r.json()))).then(([raw, disputed, dz]) => {
   world = buildWorld(raw, disputed, dz); $("loading").remove(); resize(); start();
+  if (shared) G.offerShare(shared, shareOpts());
+  // A share link opened while this page is already showing only changes the address, so watch for it.
+  window.addEventListener("hashchange", () => { const d = G.readShare("atlas"); if (d) G.offerShare(d, shareOpts()); });
 }).catch(e => { $("loading").textContent = "The map couldn't load. Check your connection and reload."; throw e; });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
