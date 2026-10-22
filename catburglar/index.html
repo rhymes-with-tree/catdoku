@@ -105,6 +105,7 @@
 
 <script src="../games.js?v=2026-10-22.5"></script>
 <script src="paintings.js?v=2026-10-22.5"></script>
+<script src="commons.js?v=2026-10-22.5"></script>
 <script>
 /* ---------- levels ---------- */
 // How big the cat is (the side of a square of the same area, as a share of the painting's), and how far it takes on
@@ -130,13 +131,24 @@ const CATS = ("c17-2 c17-3 c17-5 c17-7 c17-8 c17-13 c17-19 c17-24 c18-2 c18-3 c1
   "c19-11 c19-12 c19-14 c19-15 c19-16 c19-17 c19-18 c19-19 c19-20 c19-23 c19-24 c19-25 c19-26 c19-28 c19-29 c19-30 c19-32 c19-34 c19-35 c19-37 c19-39 " +
   "c19-40 c19-44 c19-45 c19-46 c20-1 c20-9 c20-10 c20-16 c20-17 c20-18 c20-20 c20-30").split(" ");
 const CAT_SRC = {}, ART_SRC = {};   // filled with embedded pictures when the page is bundled into one file
-const catSrc = c => CAT_SRC[c] || `../cats/${c}.webp`, artSrc = id => ART_SRC[id] || `art/${id}.webp`;
-const paintingOf = id => PAINTINGS.find(p => p.id === id);
+// The gallery: paintings fetched from Wikimedia Commons as they're played (COMMONS, commons.js), and the paintings
+// saved here (PAINTINGS, paintings.js), which are also where the game falls back to when Commons can't be reached.
+const COMMONS_LIST = typeof COMMONS === "undefined" ? [] : COMMONS, GALLERY = COMMONS_LIST.concat(PAINTINGS);
+const paintingOf = id => GALLERY.find(p => p.id === id), live = p => !!p.src;
+const catSrc = c => CAT_SRC[c] || `../cats/${c}.webp`;
+const artSrc = id => { const p = paintingOf(id); return ART_SRC[id] || (p && p.src) || `art/${id}.webp`; };
 const loaded = {};
+// A picture, once loaded. One from another site (Commons) is asked for with permission to read its pixels, which
+// hiding the cat needs; a slow one is given up on after 15 seconds.
 function picture(src) {
-  if (!loaded[src]) loaded[src] = new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => { delete loaded[src]; rej(new Error("couldn't load " + src.slice(0, 60))); }; im.src = src; });
+  if (!loaded[src]) loaded[src] = new Promise((res, rej) => {
+    const im = new Image(), fail = () => { clearTimeout(slow); delete loaded[src]; rej(new Error("couldn't load " + src.slice(0, 60))); }, slow = setTimeout(fail, 15000);
+    if (/^https?:/.test(src)) im.crossOrigin = "anonymous";
+    im.onload = () => { clearTimeout(slow); res(im); }; im.onerror = fail; im.src = src;
+  });
   return loaded[src];
 }
+const failed = new Set();   // paintings from Commons that didn't load this visit
 const canvasOf = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; };
 
 /* ---------- sneaking the cat in ---------- */
@@ -197,10 +209,18 @@ function catColour(im) {
 // little luck mixed in), and the best of those. A busy spot hides any cat; a calm one (sky, a wall, a dress) only
 // suits a cat of much the same colour.
 async function makePuzzle(level, avoid) {
-  const fresh = PAINTINGS.filter(p => !avoid.includes(p.id)), pool = fresh.length ? fresh : PAINTINGS;
-  const p = pool[Math.floor(Math.random() * pool.length)], tried = new Set();
+  // a painting not played lately; if one from Commons won't load, the saved paintings from then on this visit
+  let p, art;
+  for (let tries = 0; !art; tries++) {
+    const ok = GALLERY.filter(q => !failed.has(q.id) && !(live(q) && failed.size && tries)), fresh = ok.filter(q => !avoid.includes(q.id));
+    const pool = fresh.length ? fresh : ok.length ? ok : PAINTINGS;
+    p = pool[Math.floor(Math.random() * pool.length)];
+    try { art = await picture(artSrc(p.id)); }
+    catch (e) { if (!live(p) || tries > 3) throw e; failed.add(p.id); G.track("Cat Burglar painting from Commons didn't load"); }
+  }
+  const tried = new Set();
   while (tried.size < 12) tried.add(CATS[Math.floor(Math.random() * CATS.length)]);
-  const art = await picture(artSrc(p.id)), ims = await Promise.all([...tried].map(c => picture(catSrc(c)).catch(() => null)));
+  const ims = await Promise.all([...tried].map(c => picture(catSrc(c)).catch(() => null)));
   const PW = art.naturalWidth, PH = art.naturalHeight;
   // the painting, small, with running sums for quick averages over any box
   const GW = 160, g = GW / PW, GH = Math.max(1, Math.round(PH * g)), sc = canvasOf(GW, GH), sx = sc.getContext("2d");
@@ -364,6 +384,9 @@ async function hang() {
   $("placard").append(t, by);
   $("levelSel").value = g.level;
   showLoading(false); layout(); view.z = 1; view.tx = view.ty = 0; applyView(); draw();
+  // the looking is the puzzle, so the clock starts as soon as the painting is up (it waits while the walkthrough or
+  // a card is showing, or the page is hidden)
+  if (playing()) game.started = true;
 }
 function showLoading(on, text) {
   $("loading").hidden = !on && !text; $("loading").textContent = text || "Hanging the painting…";
@@ -420,7 +443,8 @@ function caughtPic() {
 function museumBits(next) {
   const p = paintingOf(game.i), box = document.createElement("div"), m = document.createElement("p");
   m.className = "museum";
-  const a = document.createElement("a"); a.href = p.url; a.target = "_blank"; a.rel = "noopener"; a.textContent = `See “${p.title}” at The Met`;
+  const a = document.createElement("a"); a.href = p.url; a.target = "_blank"; a.rel = "noopener";
+  a.textContent = `See “${p.title}” ${live(p) ? "on Wikimedia Commons" : "at The Met"}`;
   m.append(a, document.createElement("br"), "(no cats in the real one)");
   box.append(m, G.otherSize($("levelSel"), next, startLevel, "Or play a different level:"));
   return box;
