@@ -55,7 +55,6 @@ const G = (() => {
   ];
   const $ = id => document.getElementById(id);
 
-  // The games played on this device, most recent first, for the front page's and the menu's Keep playing row.
   /* ---------- the daily challenge ---------- */
   // One game a day is today's challenge, the same game for everyone on a given date: win any puzzle in it that
   // day (in Pawlette, clear 3 lines in one Swipe game) to do it. The games come round in cycles: the first, from
@@ -114,9 +113,37 @@ const G = (() => {
     return `Today's challenge solved! ${k > 1 ? `${k}-day streak!` : "Come back tomorrow for a new challenge!"}`;
   }
 
-  const RECENT = "catdoku.recent.v1";
-  const recent = () => { const r = load(RECENT).games; return Array.isArray(r) ? r.filter(s => GAMES.some(g => g[1] === s)) : []; };
-  const played = slug => save(RECENT, {games: [slug, ...recent().filter(s => s !== slug)].slice(0, 8)});
+  // Favorite games, picked with a star and kept on this device in the order they were picked, for the Favorites
+  // row on the front page and in the menu.
+  const FAVS = "catdoku.favorites.v1";
+  const favorites = () => { const f = load(FAVS).games; return Array.isArray(f) ? f.filter(s => GAMES.some(g => g[1] === s)) : []; };
+  function toggleFavorite(slug) {
+    const f = favorites(), on = !f.includes(slug);
+    save(FAVS, {games: on ? [...f, slug] : f.filter(s => s !== slug)});
+    track(`${on ? "Favorited" : "Unfavorited"} ${slug}`);
+    return on;
+  }
+  // A star button that adds a game to the favorites or takes it off; every star for that game on the page follows,
+  // and `onChange` runs after (to redraw a Favorites row). `withLabel` adds a word, for a game's own page.
+  function favStar(slug, onChange, withLabel) {
+    const b = document.createElement("button"), name = (GAMES.find(g => g[1] === slug) || [slug])[0];
+    b.type = "button"; b.className = "favStar" + (withLabel ? " labelled" : ""); b.dataset.slug = slug;
+    b.onclick = e => {
+      e.preventDefault(); e.stopPropagation();
+      const on = toggleFavorite(slug);
+      document.querySelectorAll(".favStar").forEach(x => x.dataset.slug === slug && x.refresh());
+      if (onChange) onChange();
+      if (withLabel) note(on ? `${name} is in your favorites, at the top of the front page.` : `${name} is out of your favorites.`, 3500);
+    };
+    b.refresh = () => {
+      const on = favorites().includes(slug);
+      b.innerHTML = `<span class="st">${on ? "★" : "☆"}</span>` + (withLabel ? "<span>Favorite</span>" : "");
+      b.setAttribute("aria-pressed", String(on));
+      b.setAttribute("aria-label", on ? `${name} is a favorite. Tap to take it off.` : `Add ${name} to favorites`);
+      b.title = on ? "In your favorites" : "Add to favorites";
+    };
+    b.refresh(); return b;
+  }
   // Whether a game matches what's typed in a search box: every word typed is found in its name, line, shelf (its
   // heading, plain name or line) or search words.
   const matches = (g, q) => {
@@ -138,7 +165,7 @@ const G = (() => {
     const home = document.createElement("a");
     home.className = "gameTile home"; home.href = base || "./";
     home.innerHTML = "<b>Front page</b><small>Every game at a glance</small>";
-    // a search box, then the games played lately, then every game on its shelf
+    // a search box, then your favorites, then every game on its shelf
     const search = document.createElement("input");
     search.type = "search"; search.className = "gamesSearch"; search.placeholder = "Search games (try “word” or “sudoku”)";
     search.setAttribute("aria-label", "Search games");
@@ -149,7 +176,10 @@ const G = (() => {
       if (slug === current) a.setAttribute("aria-current", "page");
       const b = document.createElement("b"); b.textContent = name;
       const sm = document.createElement("small"); sm.textContent = slug === current ? "You're here" : blurb;
-      a.append(b, sm); return a;
+      a.append(b, sm);
+      // the star sits beside the link, not in it, so tapping it doesn't open the game
+      const w = document.createElement("div"); w.className = "favWrap"; w.dataset.slug = slug;
+      w.append(a, favStar(slug, drawFavs)); return w;
     };
     const section = (title, games) => {
       const sec = document.createElement("section"); sec.className = "gamesGroup";
@@ -157,30 +187,37 @@ const G = (() => {
       const grid = document.createElement("div"); grid.className = "gamesGrid";
       grid.append(...games.map(tile)); sec.append(h, grid); return sec;
     };
-    const lately = recent().filter(s => s !== current).slice(0, 4).map(s => GAMES.find(g => g[1] === s));
-    const keep = lately.length ? section("Keep playing", lately) : null;
+    const favs = section("Favorites", []);
+    function drawFavs() {
+      const list = favorites().map(s => GAMES.find(g => g[1] === s));
+      favs.querySelector(".gamesGrid").replaceChildren(...list.map(tile));
+      favs.hidden = !list.length || !!search.value.trim();
+    }
     const shelves = GROUPS.map(([key, title]) => section(title, GAMES.filter(g => g[4] === key)));
     const none = document.createElement("p"); none.className = "gamesNone"; none.hidden = true; none.textContent = "No games match that.";
     const dslug = daily(), dgame = GAMES.find(g => g[1] === dslug);
     const todays = section(dailyDoneToday() ? "Today's challenge: done" : "Today's challenge", [dgame]);
-    panel.append(home, todays, search, ...(keep ? [keep] : []), ...shelves, none);
+    panel.append(home, todays, search, favs, ...shelves, none);
+    drawFavs();
     search.oninput = () => {
       const q = search.value.trim();
-      if (keep) keep.hidden = !!q;
+      favs.hidden = !!q || !favorites().length;
       todays.hidden = !!q;
       for (const sec of shelves) {
         let any = false;
-        for (const a of sec.querySelectorAll(".gameTile")) { const hit = !q || matches(GAMES.find(g => g[1] === a.dataset.slug), q); a.hidden = !hit; any = any || hit; }
+        for (const w of sec.querySelectorAll(".favWrap")) { const hit = !q || matches(GAMES.find(g => g[1] === w.dataset.slug), q); w.hidden = !hit; any = any || hit; }
         sec.hidden = !any;
       }
       none.hidden = !q || shelves.some(sec => !sec.hidden);
     };
     const show = open => { panel.hidden = !open; btn.setAttribute("aria-expanded", String(open)); };
-    if (current) played(current);
     btn.onclick = e => { e.stopPropagation(); show(panel.hidden); };
     document.addEventListener("click", e => { if (!panel.hidden && !el.contains(e.target)) show(false); });
     document.addEventListener("keydown", e => { if (e.key === "Escape" && !panel.hidden) { show(false); btn.focus(); } });
-    el.append(btn, panel);
+    // on a game's page, its own star beside the menu button
+    const row = document.createElement("div"); row.className = "gamesRow"; row.append(btn);
+    if (current) row.append(favStar(current, drawFavs, true));
+    el.append(row, panel);
     // on today's challenge, a badge under the menu button says so
     if (current && current === dslug) {
       const badge = document.createElement("span"); badge.className = "dailyBadge"; badge.id = "dailyBadge";
@@ -882,6 +919,6 @@ const G = (() => {
     }
   }
 
-  return {GAMES, GROUPS, recent, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen,
+  return {GAMES, GROUPS, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen,
           setupTimer, freshClock, spotlight, toysOff, saveToys, needToys, goldPaw, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();

@@ -67,7 +67,10 @@ Copy the structure of `tunnelrun/` or `opendoor/`: the head (BUILD check script,
 - **Buttons, in this order on every page:** `hintBtn` (Hint), `undoBtn` (Undo), `restartBtn` (always
   labelled Restart, never Clear), then the game's own buttons (Flip, Notes, Mark…), then `shareBtn`,
   `toysBtn` if it uses toys, `bestBtn` (Best times) and `helpBtn` (How to play). Leave out what the game
-  doesn't have, but don't reorder. Undo also answers Ctrl+Z / ⌘Z.
+  doesn't have, but don't reorder. Undo also answers Ctrl+Z / ⌘Z (but not with Shift). Restart always puts
+  back this same puzzle as it was dealt; `newBtn` deals a different one. Every game has Share, and New unless
+  levels are a fixed list. An Audit, if the game has one, never costs a life: like a hint, it keeps the player on
+  the same level and costs the gold paw.
 - **Settings row** (`.bar`, under the buttons): `levelSel` labelled "Level" (or `size` labelled "Size"),
   then `newBtn` (New puzzle, or a themed name: New box, New room…). Switches and extra pickers go in a
   second row, `<div class="bar toggles">`, each in a `<div class="opt">` with a
@@ -95,7 +98,10 @@ its notes.
   Door!: a hint, Undo or Restart costs the gold paw; a hint also keeps the player on the same level, and
   a win without one moves up. Say so on the win card: "You had a hint, so here's another at level N." Tunnel Run: `gold: !game.undid && !game.hinted`,
   `goldWhy: "No hints or undos!"`.
-- **Share links:** the Share button opens `G.shareCard({name, won, puzzle, progress})`. On load and on
+- **Share links:** the Share button opens `G.shareCard({name, won, puzzle, progress})`. A game played against
+  the clock (Pounce, Bubbles, Tail Chase) leaves out `progress` and passes `what` ("board", "rug"…), so the card
+  shares only the level as dealt; keep a copy of it as dealt for that and for Restart (see `pounce/`). A shared
+  puzzle opens in place of the saved one rather than racing a puzzle still being built. On load and on
   `hashchange`, call `G.readShare(slug)`, then `G.offerShare(d, {name, inProgress, open, after})`.
   `readShare` only returns data with `g` equal to the slug and a truthy `N`; check every other field
   before using it. A puzzle opened with progress isn't timed (`game.timed = false`).
@@ -117,23 +123,46 @@ its notes.
 - **Toys:** a game that uses `toys/` lets players switch toys off with `G.toysOff`, `G.toyPicker` and
   `G.needToys` (see `pounce/`, `bubbles/` or `tango/`).
 
+### Lives
+
+Most games have none. A game that does follows Catdoku, Twirl and Toydoku: three hearts drawn as `♥` in
+`.hearts` (lost ones in `<span class="lost">`), the line saying how many are left. Running out opens an "Out
+of lives" card with Restart, New and "Wait, I'm only mostly dead! Mostly dead is slightly alive, folks!" for
+three more, up to nine on one puzzle, and a revive shows a "Slightly alive!" card saying how many revives are
+left. Restart only refills lives after they've run out, so it's never a way round them. Running out or a
+revive keeps the player on the same level and costs the gold paw.
+
 ### Hints
 
 A hint shows; it never makes the move (README, "Across every game"). Mark what to look at (gold for where
 to go, red for a mistake), say in the message line what to do there, and leave the player to do it.
-Tunnel Run puts a box round a piece that's the wrong way round and says so for 3.5 s.
+Every game's hint goes through `G.hinter` (see `toydoku/` or `sunbeams/`).
 
 - **Visible without animation.** `games.css` turns every animation off when the device asks for reduced
   motion, so a mark that only pulses or glows disappears (Night Light's did). Use the shared steady
   styles, which pulse on top only when motion is allowed: `.hintsq` (an SVG box or ring), `.hintline`
   (an SVG line) and `.hintcell` (a tint on an HTML square), each with `.bad` for red. Draw the mark on
   top of the board, but under anything it would hide, such as a number badge.
-- **How long.** Keep it up for about 5 s, and take it down as soon as the board changes: store the
-  board's state with the mark and draw it only while they still match (see `yarn/` or `sunbeams/`).
+- **How long.** `const hints = G.hinter({game: () => game, key: () => <the board as a string>, draw})`;
+  `hints.show(mark, say)` keeps the mark up for 5 s, or until the board or the puzzle changes, and `draw`
+  reads it with `hints.current()`. An Audit's marks go through it too, with `{uncounted: true}`.
+- **Say more when asked again.** `hints.level()` is how many hints have been shown on this same board. Where
+  there's more to say, the first shows where to look and why it's settled ("Only one toy fits in the gold
+  box"), and the next names the answer (see `toydoku/`, `toebeans/`, `catwalk/`).
 - **What to show.** Work from the game's own solver or stored answer: first a mistake if there is one
-  (in red), otherwise the next move, preferring the one with the fewest options. If no hint can be found,
-  say why in the message line rather than doing nothing.
-- **Bookkeeping.** Set `game.hinted = true` and save; disable `hintBtn` once the puzzle is won.
+  (in red, adding "(and 2 more)" when there are others), otherwise the next move, preferring the one with
+  the fewest options. If no hint can be found, say why in the message line rather than doing nothing.
+- **Bookkeeping.** Set `game.hinted = true` and save only when a mark is shown (a hint with nothing to show
+  is free); disable `hintBtn` once the puzzle is won.
+
+### Keys
+
+Every game can be played without a mouse. A board of squares, or of spots (perches, balls, baskets), uses
+`G.gridKeys({on, show, act, size | move, keys})`: the arrows move a cursor (drawn with `.kbcursor` on HTML
+squares, `.kbring` in SVG, or `G.CURSOR` on a canvas), Space or Enter does what a tap does, and `keys` adds
+the game's own (Notes, Mark…). For boards that aren't squares, `move` can use `G.nearestThatWay`. A game with
+typing (numbers, letters) keeps its own handler, as `highperch/` does, with Escape letting go of the square
+picked. The README's Keys line under "Across every game" says what Space does in each game.
 
 ## 4. Housekeeping
 
@@ -147,8 +176,8 @@ Tunnel Run puts a box round a piece that's the wrong way round and says so for 3
   full-page screenshot can show a tile blank; check the SVG on its own.
 - **README:** a section after the last game, starting "A <nth> game in `<slug>/`, a cat-themed
   <genre>: …": rules, controls, how puzzles are made, levels, hint/Undo/gold paw, timer, share link and
-  cat photo. Add the game to the Gold paw and Share lists under "Across every game", and to Help if its
-  rule differs.
+  cat photo. Add the game to the Gold paw, Share and Keys lists under "Across every game", to the Hints list
+  if a second hint says more, and to Help if its rule differs.
 - **Ideas list:** keep `IDEAS.md` up to date with every decision, in the same PR. Set the game's row to
   Built, name it "<Game> (<puzzle it's based on>)", and move it below the Idea rows of its group; add a row
   if the game wasn't listed. When two ideas become one game, merge their rows; when an idea becomes a mode
@@ -166,7 +195,10 @@ Serve the repo and drive it with Playwright at about 400 × 860. Load Playwright
 
 - the walkthrough plays on a first visit and lines up with the board;
 - the buttons and settings are in the standard order (step 3);
-- Hint, Undo (and Ctrl+Z) and Restart work, and following hints alone reaches the win at every level;
+- Hint, Undo (and Ctrl+Z) and Restart work, and following hints alone reaches the win at every level
+  (pressing Hint twice where the first only shows where to look);
+- the whole puzzle can be played with the keyboard;
+- New deals a different puzzle and Restart puts back the same one;
 - hint marks show with `reducedMotion: "reduce"` on the page;
 - How to play works partway through a puzzle and leaves the progress as it was;
 - progress survives a reload;
