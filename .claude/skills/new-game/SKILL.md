@@ -211,7 +211,13 @@ Serve the repo and drive it with Playwright at about 400 × 860. Load Playwright
 - a share link opens the same puzzle;
 - a playthrough reaches the win card, and the level moves up (or stays, after a hint);
 - no page errors (failed loads of fonts, GoatCounter and cat photos are expected offline);
-- the front page shows the new tile and icon.
+- the front page shows the new tile and icon;
+- every colour is from the site's palette (step 1, "Colours"): list each one the page and its icon use
+  (`grep -o "#[0-9A-Fa-f]\{6\}\b\|#[0-9A-Fa-f]\{3\}\b\|rgba([^)]*)" <slug>/index.html icons/<slug>.svg | sort | uniq -c`)
+  and check that each is a palette colour, the ink, or a tint or shade of one (`color-mix` with white or ink, or
+  `tint()` in `tools/make-icons.py`). Look out for creams, greys, browns and greens picked by eye. A colour another
+  game already uses for the same thing (a toy kind's colour, the walkthrough's text) may stay; say which, and why,
+  when you report. Pictures (cats, toys) keep their own colours.
 
 Save screenshots and test scripts in the scratchpad, not the repo, so they don't end up in the commit.
 Syntax-check the main script with `node --check` on the extracted `<script>` block. Variables don't
