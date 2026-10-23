@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-23.5";
+  var BUILD = "2026-10-23.6";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -24,7 +24,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-23.5">
+<link rel="stylesheet" href="../games.css?v=2026-10-23.6">
 <style>
 /* Catdoku's own looks; the rest is games.css. */
 html,body{height:100%}
@@ -109,7 +109,7 @@ main{padding-top:18px}
 
 </main>
 
-<script src="../games.js?v=2026-10-23.5"></script>
+<script src="../games.js?v=2026-10-23.6"></script>
 <script>G.nav("catdoku");</script>
 <script>
 const PALETTE = ["#BD5538","#73A7AE","#ECA818","#6AA673","#B94588","#B3B94B",
@@ -275,17 +275,17 @@ function assignColors(reg, N) {
 /* ---------- state ---------- */
 const $ = id => document.getElementById(id);
 let settings = {autoGrade: false, autoExclude: true, size: 8};
-let stats = {streak: 0, best: 0};
 let game = null, busy = false, msgTimer = null, erasing = false;
 
 function blankCells(N) { return Array.from({length: N * N}, () => ({cat: false, manual: false, src: []})); }
 function show(c) { return c.cat ? "cat" : (c.manual || c.src.length) ? "paw" : "empty"; }
-function save() { try { localStorage.setItem(STORE, JSON.stringify({settings, game, stats})); } catch (e) {} }
+function save() { try { localStorage.setItem(STORE, JSON.stringify({settings, game})); } catch (e) {} }
 function load() {
   try {
     const d = JSON.parse(localStorage.getItem(STORE));
     if (d && d.settings) settings = Object.assign(settings, d.settings);
-    if (d && d.stats) stats = Object.assign(stats, d.stats);
+    // the win streak used to be kept here; it's kept with every game's in games.js now
+    if (d && d.stats && d.stats.best && !G.streak("catdoku").best) { const all = G.load("catdoku.streaks.v1"); all.catdoku = {streak: d.stats.streak || 0, best: d.stats.best}; G.save("catdoku.streaks.v1", all); }
     if (d && d.game && d.game.cells) { game = d.game; if (game.livesUsed == null) game.livesUsed = HEARTS; }
   } catch (e) {}
 }
@@ -440,7 +440,7 @@ function setNextSize(n) {
 const otherSize = () => G.otherSize($("size"), settings.size, n => { setNextSize(n); save(); newPuzzle(); });
 
 function showLost() {
-  game.status = "lost"; game.helped = true;
+  game.status = "lost"; game.helped = true; breakStreak();
   note("");
   setNextSize(game.N);
   save();
@@ -492,7 +492,6 @@ function win() {
   game.status = "won";
   G.finishClock(game);
   track(`Catdoku solved ${game.N}x${game.N}`);
-  stats.streak++; stats.best = Math.max(stats.best, stats.streak);
   // A win on the first three lives with no Audit moves up a size; a win that needed a clue, a revive
   // or a restart after running out of lives stays put.
   setNextSize(game.livesUsed <= HEARTS && !game.helped ? game.N + 1 : game.N);
@@ -508,20 +507,21 @@ function showWon() {
   const approves = document.createElement("p"); approves.className = "catname"; approves.textContent = "Higgins approves!";
   G.winCard(`Every cat on the ${game.N} × ${game.N} board has its own territory.`, newPuzzle, "Admire my board", game.result,
     {gold: game.gold, goldWhy: "No lives lost and no help!", goldPic: [pic, approves], next: `Next puzzle (${settings.size} × ${settings.size})`,
-     lines: stats.streak > 1 ? [`🔥 ${stats.streak} wins in a row`] : [], after: otherSize()});
+     after: otherSize()});
   renderStreak();
 }
 
-function breakStreak() { stats.streak = 0; renderStreak(); }
+// Under the title: the win streak (kept by games.js, as for every game) and the best.
+function breakStreak() { G.breakStreak(); renderStreak(); }
 function renderStreak() {
-  const el = $("streak");
-  el.hidden = !stats.best;
-  el.textContent = `🔥 Win streak ${stats.streak} · Best ${stats.best}`;
+  const el = $("streak"), st = G.streak("catdoku");
+  el.hidden = !st.best;
+  el.textContent = `🔥 Win streak ${st.streak} · Best ${st.best}`;
 }
 
 async function newPuzzle() {
   if (busy) return;
-  if (game && (game.status === "lost" || (game.status === "playing" && game.history.length))) breakStreak();
+  if (game && game.status === "lost") breakStreak();   // (leaving a puzzle in progress ends it too: see G.freshClock)
   busy = true;
   const N = settings.size;
   openCard("Shuffling cats…", N >= 11 ? "Big boards can take several seconds to build." : "", []);
@@ -529,7 +529,7 @@ async function newPuzzle() {
   game = {N, reg: p.reg, sol: p.sol, colors: assignColors(p.reg, N), cells: blankCells(N),
           hearts: HEARTS, livesUsed: HEARTS, status: "playing", history: [], wrong: [], ...G.freshClock()};
   busy = false;
-  closeCard(); buildBoard(); render(); save(); note("");
+  closeCard(); buildBoard(); render(); save(); note(""); renderStreak();
   track(`Catdoku new puzzle ${N}x${N}`);
   prefetch(N);
 }

@@ -118,6 +118,9 @@ its notes.
   squares fill `grid`'s client box unless a `map` function says where they are (see the comment above
   `spotlight` in `games.js`); Tunnel Run passes the div around its SVG. "Let's Play!" is placed in
   `grid`'s parent, which needs `position: relative` (`.wrap` has it).
+- **Win streaks:** `G.finishClock` adds a win and the win card shows the streak, and a new puzzle made with
+  `G.freshClock()` while one is started ends it. Call `G.breakStreak()` wherever the player loses (out of lives,
+  moves or time, giving up).
 - **Counting plays:** `G.track()` for new puzzles and solves ("Tunnel Run solved level 3"), and the
   GoatCounter script tag at the end of the page.
 - **Toys:** a game that uses `toys/` lets players switch toys off with `G.toysOff`, `G.toyPicker` and

@@ -325,7 +325,7 @@ const G = (() => {
   // the admire button. Last comes a way back to the front page.
   // After admiring, point to the page's own new-puzzle button (New floor, New table…), or the level list.
   const admireNote = () => $("newBtn") ? `Done! Tap ${$("newBtn").textContent.trim()} when you're ready for another.` : "Done! Pick a level when you're ready for another.";
-  // o.lines adds lines of the game's own under the text (Catdoku's win streak).
+  // o.lines adds lines of the game's own under the text.
   // A perfect clear (no help, nothing lost, no undo) earns a gold paw: o.gold puts one on the win card,
   // with o.goldWhy saying what earned it, o.goldTitle in place of "Gold paw!", and o.goldPic (a picture
   // and its caption) in place of the random cat photo and name.
@@ -360,7 +360,9 @@ const G = (() => {
     name.textContent = `Meet ${NAMES[Math.floor(Math.random() * NAMES.length)]}!`;
     const tl = timeLineEl(result); if (tl) media.append(tl);
     media.append(p);
-    // a game's own extra lines (Catdoku's win streak)
+    // the win streak, then a game's own extra lines
+    const st = T ? streak(T.name).streak : 0;
+    if (st > 1) { const x = document.createElement("p"); x.className = "streakline"; x.textContent = `🔥 ${st} wins in a row`; media.append(x); }
     for (const line of o.lines || []) { const x = document.createElement("p"); x.textContent = line; media.append(x); }
     const dl = dailyLine();
     if (dl) { const d = document.createElement("p"); d.className = "dailyline"; d.textContent = dl; media.append(d); }
@@ -455,14 +457,25 @@ const G = (() => {
     btn.textContent = hide ? "⏱ –:––" : "⏱ " + clock(g.ms || 0);
     btn.setAttribute("aria-label", hide ? "Timer hidden. Tap to show the time." : `Time ${clock(g.ms || 0)}. Tap to hide the time.`);
   }
-  // Fields a new puzzle starts with.
-  const freshClock = () => ({ms: 0, timed: true, started: false});
+  // Fields a new puzzle starts with. Leaving a puzzle you'd started (and not solved) for a new one ends your win streak.
+  const freshClock = () => { const g = T && T.game(); if (g && g.started && !g.result) breakStreak(); return {ms: 0, timed: true, started: false}; };
+  // Win streaks, per game: puzzles won in a row, kept on this device. A win (finishClock) adds one, and the win card
+  // says so from two on. Leaving a started puzzle for a new one ends it (freshClock), and so does losing: a game
+  // calls breakStreak when you run out of lives, moves or toys, give up, or get tangled.
+  const STREAKS = "catdoku.streaks.v1";
+  const streak = name => Object.assign({streak: 0, best: 0}, load(STREAKS)[name || (T && T.name)]);
+  function setStreak(name, n) {
+    const all = load(STREAKS), s = Object.assign({streak: 0, best: 0}, all[name]);
+    s.streak = n; s.best = Math.max(s.best, n); all[name] = s; save(STREAKS, all);
+  }
+  function breakStreak() { if (T && streak(T.name).streak) setStreak(T.name, 0); }
   // A puzzle saved before the timer existed can't set a best time.
   function checkClock(g) { if (g && g.timed === undefined) g.timed = false; }
 
   // Call once when a puzzle is solved: records the time and returns what the card shows.
   function finishClock(g) {
     dailyWon();
+    if (T) setStreak(T.name, streak(T.name).streak + 1);
     const n = g.level ?? g.N;   // bests are kept by level where a game has levels, else by size
     if (!g.timed) return (g.result = {ms: null, n});
     const all = load(BESTS), mine = (all[T.name] = all[T.name] || {}), row = (mine[n] = mine[n] || {solves: 0, times: []});
@@ -950,5 +963,5 @@ const G = (() => {
   }
 
   return {GAMES, GROUPS, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen,
-          setupTimer, freshClock, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
+          setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();
