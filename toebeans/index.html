@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-23.7";
+  var BUILD = "2026-10-23.8";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,15 +23,12 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-23.7">
+<link rel="stylesheet" href="../games.css?v=2026-10-23.8">
 <style>
 /* Six number tiles up top, then one outlined paw: its four toe beans are + − × ÷ and its main pad holds the goal.
-   An exact hit fills every pad at once in gold; the paw's own pad colour (--pc, with --pt for text on it) is
-   kept for a finish within 10, shown faintly in the little paws. */
+   An exact hit fills every pad at once in gold (--pc, with --pt for text on it). */
 :root{--board:min(94vw,420px,calc(var(--tall) / 1.45)); --plum:#B94588; --tint:rgba(185,69,136,.10); --pc:#F2AEBB; --pt:#2A2530}
 .play{width:var(--board);display:flex;flex-direction:column;gap:22px;user-select:none;-webkit-user-select:none}
-.recent{display:flex;gap:6px}
-.recent svg{width:26px;height:26px}
 
 .beans{display:grid;grid-template-columns:repeat(3,1fr);gap:14px 18px;padding:0 4%}
 .paw{position:relative;width:100%;aspect-ratio:1/0.86}
@@ -76,7 +73,7 @@
   <header><h1>Toe Beans</h1><div class="stripe"></div><p class="tagline">Make the number on the big pad</p></header>
   <nav class="games" id="games" aria-label="Games"></nav>
 
-  <div class="status"><div class="recent" id="recent" role="img"></div><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
 
   <div class="play" id="board">
     <div class="beans" id="beans" aria-label="Numbers"></div>
@@ -115,7 +112,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-23.7"></script>
+<script src="../games.js?v=2026-10-23.8"></script>
 <script>
 /* ---------- puzzles ---------- */
 // Each level: [fewest steps the goal needs, lowest goal, highest goal, the big numbers that can be dealt].
@@ -256,21 +253,18 @@ const padResult = (a, op, b) => op === "-" && a === b ? 0 : opResult(a, op, b);
 const STORE = "catdoku.toebeans.v1";
 const $ = G.$;
 let state = G.load(STORE);
-let settings = Object.assign({level: 1, recent: [], levelRev: 1, recentRev: []}, state.settings);
+let settings = Object.assign({level: 1, levelRev: 1}, state.settings);
 let game = state.game || null, busy = false, pick = null, op = null, popped = -1;
 const build = G.builder([levelInfo, opResult, reachable, makeToeBeans], "makeToeBeans");
 const buildRev = G.builder([levelInfo, opResult, revTable, revStarts, makeReverse], "makeReverse");
-// Reverse mode keeps its own level and recent paws; its best times are kept apart under level 100 + N.
+// Reverse mode keeps its own level; its best times are kept apart under level 100 + N.
 const rev = () => !!settings.rev;
 const builder = () => rev() ? buildRev : build;
-const lvKey = () => rev() ? "levelRev" : "level", recentKey = () => rev() ? "recentRev" : "recent";
+const lvKey = () => rev() ? "levelRev" : "level";
 const myLevel = () => settings[lvKey()];
 const save = () => G.save(STORE, {settings, game});
 
-// Real paw pad colours, each with the text colour that reads on it. Each game gets one, never the same twice running.
-const PADS = [["#F2AEBB", "#2A2530"], ["#C9677F", "#fff"], ["#B9805F", "#fff"], ["#6B4A3B", "#fff"], ["#8E8794", "#fff"], ["#2A2530", "#fff"]];
 const GOLD = ["#E8B422", "#2A2530"];   // a golden paw: the goal hit exactly
-function newPads(last) { const from = PADS.filter(p => !last || p[0] !== last[0]); return from[Math.floor(Math.random() * from.length)]; }
 
 const SIGN = {"+": "+", "-": "−", "*": "×", "/": "÷"};
 const playing = () => game && !game.won && !game.over && !busy;
@@ -353,14 +347,11 @@ function revHint() {
   hints.show({i, j, op: o, pad: onPad}, onPad ? (padFirst ? `Try ${a} ${SIGN[o]} ${b}: tap the pad, then ${SIGN[o]}, then ${b}.` : `Try ${a} ${SIGN[o]} ${b}: tap ${a}, then ${SIGN[o]}, then the pad.`)
     : `Try ${a} ${SIGN[o]} ${b}: tap ${a}, then ${SIGN[o]}, then ${b}.`);
 }
-function remember(score) {
-  settings[recentKey()] = settings[recentKey()].concat({c: game.pads[0], s: score}).slice(-5);
-}
 
 /* ---------- finishing ---------- */
 const levelPick = (current, text) => G.otherSize($("levelSel"), current, startLevel, text || "Or play a different level:");
 function win() {
-  game.won = true; G.finishClock(game); remember(2);
+  game.won = true; G.finishClock(game);
   const next = game.hinted ? game.N : Math.min(MAX_LEVEL, game.N + 1);
   settings[lvKey()] = next; $("levelSel").value = next; save(); render();
   G.track(`Toe Beans${game.rev ? " reverse" : ""} solved level ${game.N}`);
@@ -391,7 +382,7 @@ function finishHere() {
 function giveUp() {
   G.breakStreak();   // losing ends the win streak
   const c = closest(), d = Math.abs(c - target());
-  game.over = true; game.closest = c; remember(nearEnough(d) ? 1 : 0);
+  game.over = true; game.closest = c;
   settings[lvKey()] = nearEnough(d) ? game.N : Math.max(1, game.N - 1);
   $("levelSel").value = myLevel(); pick = null; op = null;
   save(); render();
@@ -412,7 +403,7 @@ function overCard() {
     w.textContent = "One way: " + way.map(([a, o, b, r]) => `${a} ${SIGN[o]} ${b} = ${r}`).join(", then ");
     media.append(w);
   }
-  G.openCard(nearEnough(d) ? "So close!" : "Not this time", "", [[`Next: level ${next}`, () => { G.closeCard(); startLevel(next); }, true],
+  G.openCard(nearEnough(d) ? `So close: ${d} away!` : "Not this time", "", [[`Next: level ${next}`, () => { G.closeCard(); startLevel(next); }, true],
     ["Look at my numbers", () => { G.closeCard(); G.note("Tap New puzzle when you're ready for another.", 0); }]], media, levelPick(next));
 }
 
@@ -424,8 +415,7 @@ async function newPuzzle() {
   const N = myLevel(), r = rev();
   G.openCard("Dealing the numbers…", "", []);
   const p = await builder().take(N);
-  game = {N, nums: p.nums, goal: p.goal, beans: p.nums.slice(), history: [], won: false, over: false,
-          pads: newPads(game && game.pads), ...G.freshClock()};
+  game = {N, nums: p.nums, goal: p.goal, beans: p.nums.slice(), history: [], won: false, over: false, ...G.freshClock()};
   if (r) Object.assign(game, {rev: true, level: 100 + N, start: p.start, pad: p.start});
   busy = false; pick = null; op = null;
   G.closeCard(); render(); save(); G.note("");
@@ -435,28 +425,10 @@ async function newPuzzle() {
 
 /* ---------- drawing ---------- */
 // The little paws are the big paw shrunk down: the same toe positions and tilts, and the same pad outline.
-const TOES = [[16.5, 30.5, -24], [38.5, 15, -8], [61.5, 15, 8], [83.5, 30.5, 24]];
-const PAD = $("pad").querySelector("path").getAttribute("d");
-const littlePaw = (fill, opacity) => `<svg viewBox="-3 -3 106 92" aria-hidden="true"><g fill="${fill}" stroke="var(--ink)" stroke-width="1.6" opacity="${opacity}">
-  ${TOES.map(([x, y, r]) => `<ellipse cx="${x}" cy="${y}" rx="9.5" ry="10.75" transform="rotate(${r} ${x} ${y})" vector-effect="non-scaling-stroke"/>`).join("")}
-  <path d="${PAD}" transform="translate(19 35.3) scale(.31 .298)" vector-effect="non-scaling-stroke"/></g></svg>`;
-// Your last five games: golden when you hit the goal, faint in that game's pad colour when you finished
-// within 10, an outline when further off, and pale outlines for games not played yet.
-function drawRecent() {
-  const r = settings[recentKey()], out = [];
-  for (let i = 0; i < 5; i++) {
-    const x = r[i - (5 - r.length)];
-    out.push(!x ? littlePaw("none", .25) : x.s === 2 ? littlePaw(GOLD[0], 1) : x.s === 1 ? littlePaw(x.c, .4) : littlePaw("none", .6));
-  }
-  $("recent").innerHTML = out.join("");
-  const hits = r.filter(x => x.s === 2).length;
-  $("recent").setAttribute("aria-label", r.length ? `Your last ${r.length} games: ${hits} hit exactly` : "No games finished yet");
-}
-
 function render() {
   if (!game) return;
   const paw = $("paw"), beans = $("beans");
-  const [pc, pt] = game.won || paw.classList.contains("gold") ? GOLD : game.pads;
+  const [pc, pt] = GOLD;
   for (const el of [paw, beans]) { el.style.setProperty("--pc", pc); el.style.setProperty("--pt", pt); }
   paw.classList.toggle("won", game.won);
   paw.classList.toggle("rev", !!game.rev);
@@ -500,7 +472,6 @@ function render() {
   popped = -1;
   $("undoBtn").disabled = !playing() || !game.history.length;
   $("finishBtn").disabled = !playing() || !nearEnough(Math.abs(closest() - target())); $("hintBtn").disabled = !playing();
-  drawRecent();
   if (game.won) G.note(game.rev ? "All the way down to 0!" : "Exactly right!", 0);
   else if (game.over) G.note(`Finished ${Math.abs(game.closest - target())} away.`, 0);
   else if (pick !== null && op === null) G.note("Now tap a toe bean", 0);
@@ -578,7 +549,6 @@ function helpOnFirstVisit() {
     {say: "You don't have to use every number", els: [all]},
     {say: "Stuck? Hint shows a step towards the goal", els: [$("hintBtn")]},
     {say: "Within 10 of the goal, Close enough finishes and keeps your level", els: [$("finishBtn")]},
-    {say: "Your last five boards show here", els: [$("recent")]},
     {say: "If you hit the number exactly, you get a golden paw and move up a level", els: [$("paw")], ...fill},
   ];
   G.spotlight({grid: $("beans"), w: 1, h: 1, steps, done: () => { settings.seenHelp = true; save(); render(); }});
@@ -604,16 +574,14 @@ function openShared(d) {
   if (isRev) {
     const beans = d.p && ok(d.p.beans) ? d.p.beans : d.nums.slice(), pad = d.p && Number.isInteger(d.p.pad) && d.p.pad >= 0 ? d.p.pad : d.start;
     settings.rev = true; $("revSw").checked = true;
-    game = {N: d.N, level: 100 + d.N, rev: true, nums: d.nums, start: d.start, pad, beans, history: [], won: pad === 0, over: false,
-            pads: newPads(game && game.pads), ...G.freshClock()};
+    game = {N: d.N, level: 100 + d.N, rev: true, nums: d.nums, start: d.start, pad, beans, history: [], won: pad === 0, over: false, ...G.freshClock()};
     if (d.p) game.timed = false;
     pick = null; op = null; settings.levelRev = d.N; $("levelSel").value = d.N;
     render(); save(); buildRev.prefetch(d.N); return;
   }
   settings.rev = false; $("revSw").checked = false;
   const beans = d.p && ok(d.p.beans) ? d.p.beans : d.nums.slice();
-  game = {N: d.N, nums: d.nums, goal: d.goal, beans, history: [], won: beans.includes(d.goal), over: false,
-          pads: newPads(game && game.pads), ...G.freshClock()};
+  game = {N: d.N, nums: d.nums, goal: d.goal, beans, history: [], won: beans.includes(d.goal), over: false, ...G.freshClock()};
   if (d.p) game.timed = false;
   pick = null; op = null; settings.level = d.N; $("levelSel").value = d.N;
   render(); save(); build.prefetch(d.N);
