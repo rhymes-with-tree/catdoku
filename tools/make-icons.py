@@ -688,7 +688,7 @@ def catpile():
     out += f'<rect x="{o}" y="{o}" width="{4*s}" height="{4*s}" fill="none" stroke="{INK}" stroke-width="3" rx="2"/>'
     # the clump's blanket: an L of five squares in one piece, a deeper outline under a soft coral
     cells = [(0, 2), (0, 3), (1, 3), (2, 3), (3, 3)]
-    for inset, fill in [(1.5, RED), (3, tint(ORANGE, .45))]:
+    for inset, fill in [(1.5, RED), (3, ORANGE)]:
         for (c, r) in cells:
             out += f'<rect x="{o+c*s+inset}" y="{o+r*s+inset}" width="{s-2*inset}" height="{s-2*inset}" rx="{max(1, 3-inset/2)}" fill="{fill}"/>'
         out += f'<rect x="{o+inset}" y="{o+3*s+inset}" width="{4*s-2*inset}" height="{s-2*inset}" fill="{fill}"/>'
