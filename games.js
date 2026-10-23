@@ -321,12 +321,25 @@ const G = (() => {
       <path d="${PAW}" transform="translate(19 35.3) scale(.31 .298)" vector-effect="non-scaling-stroke"/></g></svg>`;
     return box.firstChild;
   }
+  // Gold paws earned on this device, counted per game (by the win card; Catdoku, with a card of its own, calls
+  // countGold itself). A win card shown again (a finished puzzle reopened) isn't
+  // counted twice: the last few wins counted are remembered by game, result and text.
+  const GOLD = "catdoku.goldpaws.v1";
+  const goldPaws = slug => (load(GOLD).counts || {})[slug] || 0;
+  function countGold(result, text) {
+    if (!CURRENT) return;
+    const d = load(GOLD), sig = `${CURRENT}|${JSON.stringify(result || null)}|${text}`, seen = d.seen || [];
+    if (seen.includes(sig)) return;
+    const counts = d.counts || {};
+    counts[CURRENT] = (counts[CURRENT] || 0) + 1;
+    save(GOLD, {counts, seen: [...seen, sig].slice(-30)});
+  }
   // The win cards' way out to every game.
   const homeBtn = () => ["Back to the front page", () => { location.href = HOME; }];
   function winCard(text, onNext, admire = "Admire my board", result, o = {}) {
     const media = document.createElement("div");
     // what earned the gold paw ("No undos!"), under the paw
-    if (o.gold) { media.append(goldPaw()); if (o.goldWhy) { const g = document.createElement("p"); g.className = "goldwhy"; g.textContent = o.goldWhy; media.append(g); } }
+    if (o.gold) { countGold(result, text); media.append(goldPaw()); if (o.goldWhy) { const g = document.createElement("p"); g.className = "goldwhy"; g.textContent = o.goldWhy; media.append(g); } }
     const p = document.createElement("p"); p.textContent = text;
     const name = document.createElement("p"); name.className = "catname";
     name.textContent = `Meet ${NAMES[Math.floor(Math.random() * NAMES.length)]}!`;
@@ -920,5 +933,5 @@ const G = (() => {
   }
 
   return {GAMES, GROUPS, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen,
-          setupTimer, freshClock, spotlight, toysOff, saveToys, needToys, goldPaw, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
+          setupTimer, freshClock, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, countGold, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();
