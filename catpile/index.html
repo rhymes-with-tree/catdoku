@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cat Pile</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-23.10"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-23.10">
+<style>
+/* A quilted blanket in nine cushions. Clumps of napping cats are dragged onto it from the tray below; a full
+   row, column or cushion wakes its cats and they wander off, taking any toys they were lying on. */
+.blanket{display:block;width:100%;height:100%;border:3px solid var(--ink);border-radius:12px;background:color-mix(in srgb,#ECA818 12%,#fff);
+  touch-action:none;user-select:none;-webkit-user-select:none;outline:none}
+.status .info{display:flex;align-items:center;gap:10px}
+.score{display:inline-flex;align-items:center;height:26px;padding:0 10px;border:2px solid var(--ink);border-radius:999px;
+  background:var(--panel);font-variant-numeric:tabular-nums;white-space:nowrap}
+.goals{width:var(--board);display:flex;justify-content:center;gap:10px;flex-wrap:wrap;min-height:44px}
+.goals[hidden]{display:none}
+.goal{display:inline-flex;align-items:center;gap:4px;padding:2px 12px 2px 4px;border:2px solid var(--ink);border-radius:999px;
+  background:var(--panel);font-weight:800;font-size:20px;font-variant-numeric:tabular-nums;transition:background .25s}
+.goal img,.goal i{width:34px;height:34px;display:block}
+.goal i{border-radius:50%;margin:3px;width:28px;height:28px}
+.goal.done{background:color-mix(in srgb,#6AA673 50%,#fff)}
+.goal.bump{animation:bump .3s}
+@keyframes bump{50%{transform:scale(1.15)}}
+/* the tray: three clumps of cats waiting to go on the blanket */
+.tray{width:var(--board);display:grid;grid-template-columns:repeat(3,1fr);gap:8px;height:calc(var(--board) * .3)}
+.slot{position:relative;padding:4px;border:2px dashed var(--line);border-radius:12px;background:none;touch-action:none;cursor:grab}
+.slot svg{display:block;width:100%;height:100%;pointer-events:none}
+.slot.empty{cursor:default}
+.slot.nofit svg{opacity:.35;filter:grayscale(.6)}
+.slot.picked{border:3px solid var(--ink);background:var(--panel)}
+.slot.dragging svg{opacity:.15}
+.slot.hint{border:3px solid #ECA818;background:rgba(236,168,24,.18)}
+.slot:hover{background:none}
+.slot.picked:hover{background:var(--panel)}
+.dragpiece{position:fixed;left:0;top:0;z-index:8;pointer-events:none;filter:drop-shadow(0 6px 6px rgba(42,37,48,.3))}
+/* on the blanket */
+
+.ghost{opacity:.5}
+.ghost.bad{opacity:.75;filter:grayscale(1) brightness(1.15)}
+.willclear{fill:rgba(236,168,24,.35);pointer-events:none}
+.wake{animation:wake .55s ease-in forwards}
+@keyframes wake{to{opacity:0;transform:translateY(-34px) scale(1.06)}}
+.tg{animation:toyup .7s ease-in forwards}
+@keyframes toyup{30%{transform:translateY(-10px) scale(1.25)}to{opacity:0;transform:translateY(-80px) scale(.6)}}
+.cheer{font:800 64px var(--font);fill:#FFF4D2;stroke:var(--ink);stroke-width:10px;paint-order:stroke fill;stroke-linejoin:round;
+  text-anchor:middle;animation:cheer 1.1s ease-out forwards;pointer-events:none}
+@keyframes cheer{0%{opacity:0;transform:scale(.7)}20%{opacity:1;transform:scale(1.05)}70%{opacity:1}to{opacity:0;transform:translateY(-30px)}}
+.cheer{transform-box:fill-box;transform-origin:center}
+/* a napping cat beside the title */
+.title{display:flex;align-items:flex-end;gap:10px}
+.napper{display:block;height:46px;width:auto;margin-bottom:2px}
+@media (max-height:760px){.napper{height:34px}}
+</style>
+</head>
+<body>
+<main>
+  <header><div class="title"><h1>Cat Pile</h1><img class="napper" src="../cats/c14-36.webp" alt="A ginger cat curled up asleep"></div><div class="stripe"></div><p class="tagline">Pile napping cats on the blanket and clear the lines</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status">
+    <span class="info"><span class="score" id="score"></span><button class="timer" id="timer" hidden></button></span>
+    <span class="msg" id="msg" aria-live="polite"></span>
+  </div>
+  <div class="goals" id="goals" aria-label="Toys to collect"></div>
+
+  <div class="wrap">
+    <svg class="blanket" id="board" viewBox="-6 -6 912 912" tabindex="0" aria-label="A blanket of 9 by 9 squares in nine cushions. Drag a clump of cats from the tray onto it; a full row, column or cushion clears. Arrow keys move, 1 to 3 pick a clump, Space puts it down."></svg>
+    <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+  </div>
+  <div class="tray" id="tray" aria-label="Cats waiting to nap"></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="linkBtn">Share</button>
+    <button id="toysBtn">Toys</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New blanket</button>
+  </div>
+
+</main>
+
+<script src="../games.js?v=2026-10-23.10"></script>
+<script>
+const $ = G.$;
+G.nav("catpile");
+
+/* ---------- the rules (plain functions, no drawing) ---------- */
+const N = 9;   // the blanket is 9 × 9, in nine 3 × 3 cushions
+function seeded(seed) { return () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+// The shapes, as rows of # and .; each is dealt in every way it can turn. [shape, first level it's dealt on, how often]
+const SHAPE_DEFS = [
+  ["#", 1, 3], ["##", 1, 4], ["###", 1, 4], ["####", 1, 3], ["#####", 3, 2],
+  ["##/##", 1, 4], ["#./##", 1, 4], ["#../###", 1, 2], ["..#/###", 1, 2], [".#./###", 1, 3],
+  ["##./.##", 2, 2], [".##/##.", 2, 2], ["#../#../###", 4, 2], [".#./###/.#.", 5, 1],
+  ["###/###", 3, 2], ["#.#/###", 6, 1], ["###/###/###", 7, 1]
+];
+function shapeCells(src) {
+  const out = [];
+  src.split("/").forEach((row, y) => [...row].forEach((ch, x) => { if (ch === "#") out.push([x, y]); }));
+  return out;
+}
+// A shape's cells moved so its top-left is 0, 0 and sorted, so the same shape always looks the same.
+function normal(cells) {
+  const mx = Math.min(...cells.map(c => c[0])), my = Math.min(...cells.map(c => c[1]));
+  return cells.map(([x, y]) => [x - mx, y - my]).sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+}
+function allShapes() {
+  const out = [], seen = new Set();
+  for (const [src, from, often] of SHAPE_DEFS) {
+    let cells = shapeCells(src);
+    const turns = [];
+    for (let r = 0; r < 4; r++) {
+      const n = normal(cells), key = JSON.stringify(n);
+      if (!seen.has(key)) { seen.add(key); turns.push(n); }
+      cells = cells.map(([x, y]) => [-y, x]);
+    }
+    for (const t of turns) out.push({cells: t, from, often: often / turns.length});
+  }
+  return out;
+}
+// A shape's cats: the shape cut into straight cats (1 × 1 to 1 × 5) and round ones (2 × 2, 2 × 3, 3 × 3), biggest first.
+function catsFor(cells) {
+  const left = new Set(cells.map(([x, y]) => x + "," + y)), out = [];
+  const fits = (x, y, w, h) => { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) if (!left.has((x + i) + "," + (y + j))) return false; return true; };
+  const sizes = [[3, 3], [3, 2], [2, 3], [2, 2], [5, 1], [1, 5], [4, 1], [1, 4], [3, 1], [1, 3], [2, 1], [1, 2], [1, 1]];
+  while (left.size) {
+    let done = false;
+    for (const [w, h] of sizes) {
+      for (const k of [...left].sort((a, b) => { const [ax, ay] = a.split(",").map(Number), [bx, by] = b.split(",").map(Number); return ay - by || ax - bx; })) {
+        const [x, y] = k.split(",").map(Number);
+        if (!fits(x, y, w, h)) continue;
+        for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) left.delete((x + i) + "," + (y + j));
+        out.push([x, y, w, h]); done = true; break;
+      }
+      if (done) break;
+    }
+  }
+  return out;
+}
+const cellsOf = (shape, at) => shape.cells.map(([x, y]) => [x + at % N, y + Math.floor(at / N)]);
+// Whether a shape fits with its top-left at square `at`.
+function fitsAt(filled, shape, at) {
+  const ax = at % N, ay = Math.floor(at / N);
+  for (const [x, y] of shape.cells) { const X = x + ax, Y = y + ay; if (X >= N || Y >= N || filled[Y * N + X]) return false; }
+  return true;
+}
+function fitsAnywhere(filled, shape) { for (let i = 0; i < N * N; i++) if (fitsAt(filled, shape, i)) return true; return false; }
+// The full rows, columns and cushions: [kind, index] each, kind 0 row, 1 column, 2 cushion.
+function lineCells(kind, k) {
+  const out = [];
+  for (let j = 0; j < N; j++) out.push(kind === 0 ? k * N + j : kind === 1 ? j * N + k : (Math.floor(k / 3) * 3 + Math.floor(j / 3)) * N + (k % 3) * 3 + j % 3);
+  return out;
+}
+function fullLines(filled) {
+  const out = [];
+  for (let kind = 0; kind < 3; kind++) for (let k = 0; k < N; k++) if (lineCells(kind, k).every(i => filled[i])) out.push([kind, k]);
+  return out;
+}
+// Levels: what's to collect, how many toys lie about at once, how full the blanket starts, which shapes come.
+const MAX_LEVEL = 15;
+function params(n) {
+  if (!n) return {goals: [], out: 0, prefill: 0, shapes: 8};
+  const kinds = n <= 2 ? 1 : n <= 7 ? 2 : 3;
+  const need = [4, 6, 4, 5, 5, 6, 7, 5, 5, 6, 6, 7, 7, 8, 9][n - 1];
+  return {goals: kinds, need, out: Math.min(kinds * 2 + 1, 6), prefill: n <= 2 ? 0 : Math.min(30, 6 + (n - 3) * 2), shapes: n, under: n >= 5};
+}
+// The shapes a level deals, with how often.
+function shapePool(level) { const lv = level || 8; return allShapes().filter(s => s.from <= lv); }
+function pickShape(pool, rnd) {
+  const total = pool.reduce((a, s) => a + s.often, 0);
+  let r = rnd() * total;
+  for (const s of pool) if ((r -= s.often) < 0) return s;
+  return pool[pool.length - 1];
+}
+// A tray of three shapes, at least one of which fits (if any shape can).
+function dealTray(filled, level, rnd) {
+  const pool = shapePool(level);
+  for (let tries = 0; tries < 40; tries++) {
+    const tray = [0, 1, 2].map(() => pickShape(pool, rnd).cells);
+    if (tray.some(c => fitsAnywhere(filled, {cells: c}))) return tray;
+  }
+  return [[[0, 0]], pickShape(pool, rnd).cells, pickShape(pool, rnd).cells];
+}
+// A new level: the blanket (cats already napping on harder levels), the toys lying about and the goals.
+// Board: cats [{x, y, w, h, c (colour), id}], toys {square: kind}. Toy kinds are numbers into the page's KINDS.
+function makeLevel(n, seed, kindsAvail) {
+  const rnd = seeded(seed), p = params(n);
+  const st = {level: n, seed, cats: [], toys: {}, goals: [], deals: 0, drops: 0, score: 0, combo: 0, nextId: 1, nextGroup: 1};
+  const kinds = kindsAvail.slice();
+  for (let i = kinds.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [kinds[i], kinds[j]] = [kinds[j], kinds[i]]; }
+  st.goals = kinds.slice(0, p.goals).map(k => ({k, need: p.need, got: 0}));
+  // cats already napping: shapes dropped at random, never making a full line
+  const pool = shapePool(Math.min(n, 4));
+  let filled = new Array(N * N).fill(false), tries = 0;
+  while (filled.filter(Boolean).length < p.prefill && tries++ < 400) {
+    const s = pickShape(pool, rnd), at = Math.floor(rnd() * N * N);
+    if (!fitsAt(filled, s, at)) continue;
+    const f2 = filled.slice(); for (const [x, y] of cellsOf(s, at)) f2[y * N + x] = true;
+    if (fullLines(f2).length) continue;
+    addShape(st, s.cells, at, Math.floor(rnd() * COLOURS_N));
+    filled = f2;
+  }
+  // toys: some under the napping cats (they're freed when their line clears), the rest on the blanket
+  if (p.under) {
+    const under = filled.map((f, i) => f ? i : -1).filter(i => i >= 0);
+    for (let k = 0; k < Math.min(2, under.length) && st.goals.length; k++) {
+      const i = under.splice(Math.floor(rnd() * under.length), 1)[0];
+      st.toys[i] = st.goals[k % st.goals.length].k;
+    }
+  }
+  st.out = p.out;
+  dropToys(st, rnd);
+  st.tray = dealTray(filledOf(st), n, seeded(seed * 31 + 7));
+  st.deals = 1;
+  return st;
+}
+const COLOURS_N = 7;
+function filledOf(st) {
+  const f = new Array(N * N).fill(false);
+  for (const c of st.cats) for (let j = 0; j < c.h; j++) for (let i = 0; i < c.w; i++) f[(c.y + j) * N + c.x + i] = true;
+  return f;
+}
+function addShape(st, cells, at, colour) {
+  const ax = at % N, ay = Math.floor(at / N);
+  const grp = st.nextGroup = (st.nextGroup || 1) + 1;   // the cats of one clump share a blanket
+  for (const [x, y, w, h] of catsFor(cells)) st.cats.push({x: x + ax, y: y + ay, w, h, c: colour, id: st.nextId++, g: grp});
+}
+// Toys still needed that aren't already lying about, dropped on empty squares (never more than `out` about at once).
+function dropToys(st, rnd) {
+  const filled = filledOf(st);
+  const about = k => Object.values(st.toys).filter(t => t === k).length;
+  const empty = filled.map((f, i) => !f && st.toys[i] === undefined ? i : -1).filter(i => i >= 0);
+  let total = Object.keys(st.toys).length;
+  const want = st.goals.filter(g => g.need - g.got - about(g.k) > 0);
+  let turn = 0;
+  while (total < st.out && empty.length && want.length) {
+    const g = want[turn++ % want.length];
+    if (g.need - g.got - about(g.k) <= 0) { want.splice(want.indexOf(g), 1); continue; }
+    const i = empty.splice(Math.floor(rnd() * empty.length), 1)[0];
+    st.toys[i] = g.k; total++;
+  }
+}
+// Put tray shape `t` with its top-left at `at`. Returns what happened, or null if it doesn't fit.
+// The full lines clear: their cats wake and leave, taking any toys they were lying on, and cats only partly
+// in a cleared line curl up smaller in what's left of their spot.
+function place(st, t, at, colour) {
+  const shape = {cells: st.tray[t]};
+  if (!shape.cells || !fitsAt(filledOf(st), shape, at)) return null;
+  addShape(st, shape.cells, at, colour);
+  st.tray[t] = null;
+  const filled = filledOf(st), lines = fullLines(filled), clear = new Set();
+  for (const [kind, k] of lines) for (const i of lineCells(kind, k)) clear.add(i);
+  const got = [], gone = [];
+  for (const i of clear) if (st.toys[i] !== undefined) {
+    const k = st.toys[i]; delete st.toys[i];
+    const g = st.goals.find(g => g.k === k); if (g && g.got < g.need) g.got++;
+    got.push([i, k]);
+  }
+  if (clear.size) {
+    const keep = [];
+    for (const c of st.cats) {
+      const rest = [];
+      for (let j = 0; j < c.h; j++) for (let i = 0; i < c.w; i++) { const s = (c.y + j) * N + c.x + i; if (!clear.has(s)) rest.push([c.x + i, c.y + j]); }
+      if (rest.length === c.w * c.h) { keep.push(c); continue; }
+      gone.push(c);
+      if (rest.length) for (const [x, y, w, h] of catsFor(rest)) keep.push({x, y, w, h, c: c.c, id: st.nextId++, g: c.g, from: c.id});
+    }
+    st.cats = keep;
+  }
+  st.combo = lines.length ? st.combo + 1 : 0;
+  const pts = shape.cells.length + lines.length * 18 * Math.max(1, lines.length) + (lines.length ? (st.combo - 1) * 10 : 0);
+  st.score += pts;
+  dropToys(st, seeded(st.seed * 17 + (++st.drops) * 7919));
+  if (st.tray.every(s => !s)) { st.tray = dealTray(filledOf(st), st.level, seeded(st.seed * 31 + 7 + st.deals * 104729)); st.deals++; }
+  // zen never gets stuck: shapes that can't go anywhere are dealt again
+  else if (!st.level && !st.tray.some(s => s && fitsAnywhere(filledOf(st), {cells: s}))) {
+    const fresh = dealTray(filledOf(st), 0, seeded(st.seed * 31 + 7 + st.deals * 104729)); st.deals++;
+    st.tray = st.tray.map((s, i) => s ? fresh[i] : null);
+    if (!st.tray.some(s => s && fitsAnywhere(filledOf(st), {cells: s}))) st.tray = fresh;
+  }
+  return {lines, clear: [...clear], got, gone, pts};
+}
+const won = st => st.level > 0 && st.goals.every(g => g.got >= g.need);
+const stuck = st => !st.tray.some(s => s && fitsAnywhere(filledOf(st), {cells: s}));
+// How good a blanket is to carry on from: fewer lonely gaps and room for the awkward shapes.
+function roomScore(filled) {
+  let score = 0;
+  for (let i = 0; i < N * N; i++) {
+    if (filled[i]) continue;
+    const x = i % N, y = Math.floor(i / N);
+    let walls = 0;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const X = x + dx, Y = y + dy; if (X < 0 || Y < 0 || X >= N || Y >= N || filled[Y * N + X]) walls++; }
+    if (walls >= 3) score -= 2.5; else if (walls === 2) score -= 0.4;
+  }
+  for (const s of ["###/###/###", "#####", "#..../#..../#..../#..../#", "#../#../###", "##/##"]) {
+    const cells = s.includes("/") ? normal(shapeCells(s)) : normal(shapeCells(s));
+    if (fitsAnywhere(filled, {cells})) score += 2;
+  }
+  // blank cushions and partly-full lines that are nearly done are good
+  for (let kind = 0; kind < 3; kind++) for (let k = 0; k < N; k++) { const n = lineCells(kind, k).filter(i => filled[i]).length; if (n === 0) score += 0.6; }
+  score -= filled.filter(Boolean).length * 0.25;
+  return score;
+}
+// The best place for a shape from the tray now: [tray slot, square, value], or null if nothing fits.
+// It looks at what each place clears, the toys it collects, and how the blanket is left.
+function bestMove(st) {
+  let best = null;
+  const toyWant = k => { const g = st.goals.find(g => g.k === k); return g && g.got < g.need; };
+  st.tray.forEach((cells, t) => {
+    if (!cells) return;
+    const filled0 = filledOf(st), shape = {cells};
+    for (let at = 0; at < N * N; at++) {
+      if (!fitsAt(filled0, shape, at)) continue;
+      const f = filled0.slice(); for (const [x, y] of cellsOf(shape, at)) f[y * N + x] = true;
+      const lines = fullLines(f), clear = new Set();
+      for (const [kind, k] of lines) for (const i of lineCells(kind, k)) clear.add(i);
+      let v = lines.length * 6;
+      for (const i of clear) if (st.toys[i] !== undefined && toyWant(st.toys[i])) v += 9;
+      // covering a toy gets it ready to collect
+      for (const [x, y] of cellsOf(shape, at)) if (st.toys[y * N + x] !== undefined && !clear.has(y * N + x)) v += 1.5;
+      for (const i of clear) f[i] = false;
+      // lines with toys in them that are nearly full are worth filling
+      for (let kind = 0; kind < 3; kind++) for (let k = 0; k < N; k++) {
+        const cs = lineCells(kind, k), n = cs.filter(i => f[i]).length;
+        if (cs.some(i => st.toys[i] !== undefined && !clear.has(i))) v += n * n * 0.03;
+      }
+      v += roomScore(f);
+      if (!best || v > best[2]) best = [t, at, v];
+    }
+  });
+  return best;
+}
+/* ---------- toys and cats ---------- */
+// Ten kinds of toy, one per colour from the games' palette (as in Pounce). Each blanket picks one picture for each.
+const KINDS = [
+  {c: "#BD5538", looks: [["wiffle-red", "red wiffle balls"], ["swirl-red", "red swirl balls"], ["crochet-stars", "star balls"], ["tinsel", "tinsel balls"]]},
+  {c: "#ECA818", looks: [["wiffle-yellow", "yellow wiffle balls"]]},
+  {c: "#73A7AE", looks: [["wiffle-teal", "teal wiffle balls"], ["fish", "fish"]]},
+  {c: "#6AA673", looks: [["lattice", "lattice balls"]]},
+  {c: "#B3B94B", looks: [["spiky-lime", "spiky pom-poms"]]},
+  {c: "#B94588", looks: [["swirl-purple", "plum swirl balls"], ["bell-purple", "bell balls"]]},
+  {c: "#7885BA", looks: [["spring", "springs"], ["rope-blue", "rope balls"]]},
+  {c: "#825840", looks: [["cork-paw", "cork paw balls"], ["burlap-paws", "burlap balls"], ["rattan", "rattan balls"]]},
+  {c: "#5E5866", looks: [["mouse", "mice"]]},
+  {c: "#E16A4A", looks: [["felt-rainbow", "rainbow balls"], ["ribbon-tail", "ribbon balls"], ["spiky-rainbow", "spiky balls"]]},
+];
+const TOY_SRC = {}, CAT_SRC = {};  // filled with embedded pictures when the page is bundled into one file
+const toySrc = f => TOY_SRC[f] || `../toys/${f}.webp?v=${window.SITE_BUILD || ""}`;
+const catSrc = f => CAT_SRC[f] || `../cats/${f}.webp`;
+// The napping cats from Sunbeams, seen from above and lying lengthwise: [file, length ÷ width, size]
+// (1 small short-hairs, 2 the fluffy tuxedo, 3 Maine Coons, ragdoll and spotted cat).
+const SLEEPERS = [
+  ["c14-36",1.1,1], ["c16-5",1.11,2], ["c14-34",1.14,1], ["c15-6",1.17,3], ["c14-35",1.19,1], ["c15-5",1.28,3],
+  ["c16-3",1.31,2], ["c16-4",1.44,2], ["c15-4",1.64,3], ["c15-2",1.65,3], ["c14-33",1.86,1], ["c14-29",1.87,1],
+  ["c16-2",1.92,2], ["c14-28",2.1,1], ["c14-30",2.11,1], ["c14-31",2.11,1], ["c14-32",2.27,1], ["c15-3",2.55,3],
+  ["c15-36",2.96,3], ["c16-16",3.0,2], ["c16-14",3.36,2], ["c15-33",3.72,3], ["c15-32",3.78,3], ["c15-35",3.78,3],
+  ["c16-13",3.82,2], ["c16-15",3.93,2], ["c14-53",4.12,1], ["c16-1",4.2,2], ["c14-52",4.29,1], ["c15-37",4.33,3],
+  ["c14-55",4.57,1], ["c14-59",4.62,1], ["c14-57",4.67,1], ["c15-1",5.06,3], ["c14-58",5.32,1], ["c15-34",5.38,3]];
+// The colours of the cats' blankets: the palette's seven, softened.
+const COLOURS = ["#E16A4A", "#ECA818", "#B3B94B", "#6AA673", "#73A7AE", "#B94588", "#7885BA"];
+const hash = x => { x = Math.imul(x ^ (x >>> 16), 0x45d9f3b); x = Math.imul(x ^ (x >>> 16), 0x45d9f3b); return (x ^ (x >>> 16)) >>> 0; };
+// The cat for a spot w × h squares: one whose shape and size suit it, picked steadily by the cat's number.
+function sleeperFor(w, h, id) {
+  const L = Math.max(w, h), T = Math.min(w, h), want = L / T, size = w * h <= 2 ? 1 : w * h <= 4 ? 2 : 3;
+  const fit = SLEEPERS.map(c => [.35 * Math.abs(c[2] - size) + Math.abs(Math.log(c[1] / want)), c]).sort((p, q) => p[0] - q[0]);
+  const near = fit.filter(p => p[0] <= fit[0][0] + .25).slice(0, 6);
+  return near[hash(id * 131 + 7) % near.length][1];
+}
+
+/* ---------- drawing ---------- */
+const NS = "http://www.w3.org/2000/svg", U = 100;
+function el(parent, tag, attrs) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.append(e); return e;
+}
+const tint = (c, p) => `color-mix(in srgb, ${c} ${p}%, #fff)`;
+const shade = (c, p) => `color-mix(in srgb, ${c} ${p}%, #2A2530)`;
+// A clump's blanket: one piece under all its squares, with no seams between them. An outline in a deeper
+// shade is drawn first, then the blanket over it; squares side by side are bridged so they join up.
+function drawPad(g, cells, colour) {
+  const col = COLOURS[colour % COLOURS.length], has = new Set(cells.map(([x, y]) => x + "," + y));
+  for (const [inset, fill] of [[4, shade(col, 72)], [8, tint(col, 45)]]) {
+    const p = el(g, "g", {fill});
+    for (const [x, y] of cells) {
+      el(p, "rect", {x: x * U + inset, y: y * U + inset, width: U - 2 * inset, height: U - 2 * inset, rx: 20 - inset});
+      if (has.has((x + 1) + "," + y)) el(p, "rect", {x: (x + .5) * U, y: y * U + inset, width: U, height: U - 2 * inset});
+      if (has.has(x + "," + (y + 1))) el(p, "rect", {x: x * U + inset, y: (y + .5) * U, width: U - 2 * inset, height: U});
+      // where four squares meet, fill the middle too
+      if (has.has((x + 1) + "," + y) && has.has(x + "," + (y + 1)) && has.has((x + 1) + "," + (y + 1))) el(p, "rect", {x: (x + .5) * U, y: (y + .5) * U, width: U, height: U});
+    }
+  }
+}
+// One cat filling w × h squares from (x, y), a little bigger than its spot so the cats of a clump snuggle up.
+function drawCat(g, x, y, w, h, colour, id) {
+  const k = el(g, "g", {});
+  const [name, ratio] = sleeperFor(w, h, id), r = hash(id * 977 + 3);
+  const pad = -Math.min(w, h) * U * .02, L = Math.max(w, h) * U - 2 * pad, T = Math.min(w, h) * U - 2 * pad, want = L / T;
+  const rr = Math.min(Math.max(want, ratio / 1.12), ratio * 1.12);
+  const cw = Math.min(L, T * rr), ch = cw / rr;
+  const inner = el(k, "g", {transform: `translate(${(x + w / 2) * U} ${(y + h / 2) * U}) rotate(${h > w ? 90 : 0}) scale(${r & 2 ? -1 : 1} ${r & 4 ? -1 : 1})`});
+  el(inner, "image", {href: catSrc(name), x: -cw / 2, y: -ch / 2, width: cw, height: ch, preserveAspectRatio: "none"});
+  return k;
+}
+// A clump of cats for the tray or the drag: the shape's cells cut into cats, drawn from (0, 0).
+function drawClump(g, cells, colour, idBase) {
+  drawPad(g, cells, colour);
+  catsFor(cells).forEach(([x, y, w, h], j) => drawCat(g, x, y, w, h, colour, idBase + j));
+}
+function drawToy(g, i, k, small) {
+  const x = i % N, y = Math.floor(i / N), s = small ? U * .46 : U * .74;
+  const cx = small ? (x + 1) * U - s * .55 : (x + .5) * U, cy = small ? (y + 1) * U - s * .55 : (y + .5) * U;
+  const t = el(g, "g", {});
+  if (!small) el(t, "ellipse", {cx: cx + 2, cy: cy + 5, rx: s * .4, ry: s * .34, fill: "rgba(42,37,48,.14)"});
+  else el(t, "circle", {cx, cy, r: s * .56, fill: "#F7F8F3", stroke: "#2A2530", "stroke-width": 2.5});
+  el(t, "image", {href: toySrc(lookOf(k)[0]), x: cx - s / 2, y: cy - s / 2, width: s, height: s});
+  return t;
+}
+const board = $("board");
+const layers = {};
+function buildBlanket() {
+  board.innerHTML = "";
+  const bg = el(board, "g", {});
+  // one soft colour, with stitching between the squares, a little heavier round each cushion
+  for (let b = 0; b < 9; b++) {
+    const bx = (b % 3) * 3, by = Math.floor(b / 3) * 3;
+    el(bg, "rect", {x: bx * U, y: by * U, width: 3 * U, height: 3 * U, fill: tint("#ECA818", 9)});
+  }
+  for (let k = 1; k < N; k++) {
+    const thick = k % 3 === 0;
+    el(bg, "line", {x1: k * U, y1: 0, x2: k * U, y2: N * U, stroke: thick ? "rgba(141,120,173,.6)" : "rgba(141,120,173,.35)", "stroke-width": thick ? 3.5 : 2, "stroke-dasharray": "8 7"});
+    el(bg, "line", {x1: 0, y1: k * U, x2: N * U, y2: k * U, stroke: thick ? "rgba(141,120,173,.6)" : "rgba(141,120,173,.35)", "stroke-width": thick ? 3.5 : 2, "stroke-dasharray": "8 7"});
+  }
+  for (const n of ["toys", "pads", "cats", "under", "clear", "ghost", "fx", "mark"]) layers[n] = el(board, "g", {});
+}
+buildBlanket();
+
+/* ---------- playing ---------- */
+const STORE = "catdoku.catpile.v1", INTRO = "catdoku.catpile.intro.v1";
+let S = null;          // the blanket being played: {level, d (the saved state), …clock}
+let climb = 1, zenBest = 0, picked = -1, cursor = -1, drag = null, ghost = null;
+let offToys = G.toysOff();
+const MIN_COLOURS = 3;
+const lookOf = k => KINDS[k].looks[(S && S.d.look && S.d.look[k]) || 0] || KINDS[k].looks[0];
+const lookIdx = k => { const ok = KINDS[k].looks.map((_, j) => j).filter(j => !offToys.has(KINDS[k].looks[j][0])); return ok.length ? ok : KINDS[k].looks.map((_, j) => j); };
+const kindsOn = () => { const on = KINDS.map((_, k) => k).filter(k => KINDS[k].looks.some(([f]) => !offToys.has(f))); return on.length >= MIN_COLOURS ? on : KINDS.map((_, k) => k); };
+const hints = G.hinter({game: () => S, key: () => S ? JSON.stringify([S.d.cats.map(c => c.id), S.d.tray]) : "", draw: () => { drawTray(); drawMarks(); }});
+function save() { if (S) G.save(STORE, {level: S.level, d: S.d, ms: S.ms, started: S.started, timed: S.timed, climb, zenBest, over: S.over}); }
+// A blanket, dealt from its level, seed and the toy kinds in play; its moves so far are played again on it.
+function deal(level, seed, kinds) {
+  const d = makeLevel(level, seed, kinds);
+  const rnd = seeded(seed * 3 + 1);
+  d.look = KINDS.map((_, k) => { const ok = lookIdx(k); return ok[Math.floor(rnd() * ok.length)]; });
+  Object.assign(d, {kinds, moves: [], hinted: false, undid: false, restarted: false});
+  return d;
+}
+const colourOf = (d, t) => (d.seed + d.deals * 5 + t * 3) % COLOURS.length;
+function start(level, d, o = {}) {
+  S = {level, N: level, ...G.freshClock(), d, over: !!o.over, history: []};
+  if (o.ms) { S.ms = o.ms; S.started = !!o.started; }
+  if (o.timed === false || !level) S.timed = false;   // zen isn't timed
+  if (level) climb = level;
+  picked = -1; drag = null; ghost = null; hints.clear(false);
+  $("levelSel").value = level;
+  $("restartBtn").hidden = $("linkBtn").hidden = !level;   // zen just deals new blankets
+  layers.cats.innerHTML = ""; catEls.clear();
+  draw(true); save();
+  if (!level) G.note("Zen: no toys to collect, and the cats always fit. Pick a level to carry on with the levels.", 7000);
+  else if (!S.over && stuck(S.d)) noRoom();
+}
+// Each blanket keeps a copy of itself as dealt, for Restart and Share.
+function startLevel(level, keep) {
+  level = level === 0 ? 0 : Math.min(MAX_LEVEL, Math.max(1, level));
+  G.track(level ? `Cat Pile level ${level} started` : "Cat Pile zen started");
+  const d = deal(level, Math.floor(Math.random() * 2e9), kindsOn());
+  if (keep) Object.assign(d, keep);
+  start(level, d);
+}
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(n === MAX_LEVEL ? `${n} (hardest)` : String(n), n));
+$("levelSel").append(new Option("Zen (no goals)", 0));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+// A new blanket at this level; help already used on it still counts.
+$("newBtn").onclick = () => { if (!S) return; G.closeCard(); startLevel(S.level, S.level && !S.over ? {hinted: S.d.hinted, undid: S.d.undid, restarted: S.d.restarted} : null); };
+// The same blanket again as it was dealt: the same toys and, played the same way, the same cats in the tray.
+function restart() {
+  if (!S || !S.level) return;
+  G.closeCard();
+  const d = deal(S.level, S.d.seed, S.d.kinds);
+  Object.assign(d, {hinted: S.d.hinted, undid: S.d.undid, restarted: S.d.moves.length > 0 || S.d.restarted, look: S.d.look});
+  start(S.level, d, {timed: S.timed});
+}
+$("restartBtn").onclick = restart;
+function undo() {
+  if (!S || S.over && S.level && won(S.d) || !S.history.length) return;
+  G.closeCard();
+  const d = JSON.parse(S.history.pop());
+  d.undid = true; d.hinted = S.d.hinted;
+  S.d = d; S.over = false; picked = -1;
+  layers.cats.innerHTML = ""; catEls.clear();
+  draw(true); save();
+}
+$("undoBtn").onclick = undo;
+document.addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && !/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) { e.preventDefault(); undo(); }
+});
+
+// Put tray clump t with its top-left at square `at`.
+function drop(t, at) {
+  if (!S || S.over || !S.d.tray[t] || !fitsAt(filledOf(S.d), {cells: S.d.tray[t]}, at)) return false;
+  const before = JSON.stringify(S.d);
+  const colour = colourOf(S.d, t), was = new Map(S.d.cats.map(c => [c.id, c]));
+  const res = place(S.d, t, at, colour);
+  if (!res) return false;
+  S.history.push(before); if (S.history.length > 60) S.history.shift();
+  S.d.moves.push([t, at]);
+  if (S.timed && !S.started) S.started = true;
+  picked = -1; ghost = null;
+  // the cats in cleared lines wake and wander off; toys they were on go to the goals
+  for (const c of res.gone) { const k = catEls.get(c.id); if (k) { catEls.delete(c.id); k.remove(); const w = drawCat(layers.fx, c.x, c.y, c.w, c.h, c.c, c.id); w.classList.add("wake"); w.style.transformOrigin = `${(c.x + c.w / 2) * U}px ${(c.y + c.h / 2) * U}px`; setTimeout(() => w.remove(), 700); } }
+  for (const [i, k] of res.got) { const t = drawToy(layers.fx, i, k); t.classList.add("tg"); t.style.transformOrigin = `${(i % N + .5) * U}px ${(Math.floor(i / N) + .5) * U}px`; setTimeout(() => t.remove(), 800); }
+  if (res.lines.length) cheer(res.lines.length, S.d.combo);
+  if (!S.level && S.d.score > zenBest) zenBest = S.d.score;
+  draw();
+  save();
+  if (won(S.d)) win();
+  else if (S.level && stuck(S.d)) setTimeout(() => S && !S.over && stuck(S.d) && noRoom(), 650);
+  return true;
+}
+const CHEERS = ["Purr-fect!", "Meow-velous!", "Cat-tastic!", "Paws-itively amazing!"];
+function cheer(lines, combo) {
+  if (lines < 2 && combo < 2) return;
+  const text = combo >= 3 ? `${combo} in a row!` : CHEERS[Math.min(lines - 2, CHEERS.length - 1)] || CHEERS[0];
+  layers.fx.querySelectorAll(".cheer").forEach(x => x.remove());
+  const t = el(layers.fx, "text", {class: "cheer", x: 450, y: 470}); t.textContent = text;
+  setTimeout(() => t.remove(), 1200);
+}
+function win() {
+  S.over = true;
+  G.track(`Cat Pile level ${S.level} done`);
+  const result = G.finishClock(S), helped = S.d.hinted || S.d.undid || S.d.restarted;
+  const next = S.d.hinted ? S.level : Math.min(MAX_LEVEL, S.level + 1);
+  climb = next; save();
+  const text = S.d.hinted ? `Level ${S.level} done. You had a hint, so here's another at level ${next}.`
+    : next > S.level ? `Level ${S.level} done, with ${S.d.score} points. Next up: level ${next}.`
+    : `Level ${S.level} done, with ${S.d.score} points. That's the hardest level; next up is another one.`;
+  $("hintBtn").disabled = true;
+  const game = S;
+  setTimeout(() => S === game && G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my blanket", result,
+    {title: "Every toy collected!", gold: !helped, goldWhy: "No hints, undos or restarts!", next: `Next: level ${next}`,
+     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")}), 800);
+}
+function noRoom() {
+  G.breakStreak();   // losing ends the win streak
+  S.over = true; save(); draw();
+  const still = S.d.goals.filter(g => g.got < g.need).map(g => toyName(g.need - g.got, g.k));
+  const list = still.length > 1 ? still.slice(0, -1).join(", ") + " and " + still[still.length - 1] : still[0];
+  const btns = [];
+  if (S.history.length) btns.push(["Undo the last move", () => { G.closeCard(); undo(); }, true]);
+  btns.push(["Restart", restart, !btns.length], ["New blanket", () => { G.closeCard(); startLevel(S.level); }]);
+  G.openCard("No room!", `None of the cats in the tray fit on the blanket. Still to collect: ${list}.`, btns, null,
+    G.otherSize($("levelSel"), S.level, startLevel, "Or play a different level:"));
+}
+const toyName = (n, k) => { const many = lookOf(k)[1]; return `${n} ${n !== 1 ? many : {mice: "mouse", fish: "fish"}[many] || many.replace(/s$/, "")}`; };
+
+/* ---------- drawing the blanket and the tray ---------- */
+const catEls = new Map();   // cat number → its drawing, so cats that stay put aren't drawn again
+function draw(rebuild) {
+  if (!S) return;
+  const d = S.d;
+  // cats: new ones drawn, gone ones taken away
+  const now = new Set(d.cats.map(c => c.id));
+  for (const [id, k] of catEls) if (!now.has(id)) { k.remove(); catEls.delete(id); }
+  for (const c of d.cats) if (!catEls.has(c.id)) catEls.set(c.id, drawCat(layers.cats, c.x, c.y, c.w, c.h, c.c, c.id));
+  // each clump's blanket, under its cats (split where a cleared line cut through it)
+  layers.pads.innerHTML = "";
+  const groups = new Map();
+  for (const c of d.cats) {
+    const k = c.g ?? "c" + c.id;
+    if (!groups.has(k)) groups.set(k, {c: c.c, cells: []});
+    for (let j = 0; j < c.h; j++) for (let i = 0; i < c.w; i++) groups.get(k).cells.push([c.x + i, c.y + j]);
+  }
+  for (const {c, cells} of groups.values()) drawPad(layers.pads, cells, c);
+  // toys: on the blanket, or peeking out from under a cat lying on them
+  layers.toys.innerHTML = ""; layers.under.innerHTML = "";
+  const filled = filledOf(d);
+  for (const i in d.toys) drawToy(filled[i] ? layers.under : layers.toys, +i, d.toys[i], filled[i]);
+  drawTray(); drawGhost(); drawMarks(); hud(rebuild);
+  $("undoBtn").disabled = !S.history.length || (S.over && won(d));
+  $("hintBtn").disabled = S.over;
+}
+function hud(rebuild) {
+  const d = S.d;
+  $("score").textContent = S.level ? `★ ${d.score}` : `★ ${d.score} · best ${zenBest}`;
+  const box = $("goals"); box.hidden = !S.level;
+  if (rebuild || box.children.length !== d.goals.length) {
+    box.innerHTML = "";
+    for (const g of d.goals) {
+      const chip = document.createElement("span"); chip.className = "goal";
+      const img = document.createElement("img"); img.src = toySrc(lookOf(g.k)[0]); img.alt = "";
+      img.onerror = () => { const i = document.createElement("i"); i.style.background = KINDS[g.k].c; img.replaceWith(i); };
+      chip.append(img, document.createElement("b")); box.append(chip);
+    }
+  }
+  d.goals.forEach((g, i) => {
+    const chip = box.children[i], b = chip.querySelector("b"), left = g.need - g.got, txt = left > 0 ? String(left) : "✓";
+    if (b.textContent !== txt) { if (b.textContent) { chip.classList.remove("bump"); void chip.offsetWidth; chip.classList.add("bump"); } b.textContent = txt; }
+    chip.classList.toggle("done", left <= 0);
+    chip.setAttribute("aria-label", left > 0 ? `${toyName(left, g.k)} to collect` : `All the ${lookOf(g.k)[1]} collected`);
+  });
+}
+const trayEl = $("tray");
+for (let t = 0; t < 3; t++) {
+  const b = document.createElement("button"); b.className = "slot"; b.type = "button"; b.dataset.t = t;
+  el(b, "svg", {viewBox: "0 0 500 500", "aria-hidden": "true"});
+  trayEl.append(b);
+}
+const sizeOf = cells => [Math.max(...cells.map(c => c[0])) + 1, Math.max(...cells.map(c => c[1])) + 1];
+function drawTray() {
+  if (!S) return;
+  const filled = filledOf(S.d), mark = hints.current();
+  [...trayEl.children].forEach((b, t) => {
+    const cells = S.d.tray[t], svg = b.firstChild; svg.innerHTML = "";
+    b.classList.toggle("empty", !cells);
+    b.classList.toggle("picked", picked === t);
+    b.classList.toggle("dragging", !!drag && drag.t === t && drag.moved);
+    b.classList.toggle("hint", !!mark && mark.t === t);
+    b.classList.toggle("nofit", !!cells && !fitsAnywhere(filled, {cells}));
+    b.setAttribute("aria-label", cells ? `Clump ${t + 1}: ${cells.length} ${cells.length === 1 ? "square" : "squares"}` : `Clump ${t + 1}: placed`);
+    if (!cells) return;
+    const [w, h] = sizeOf(cells), s = Math.max(w, h, 3);
+    const g = el(svg, "g", {transform: `translate(${250 - w * 500 / s / 2 * .92} ${250 - h * 500 / s / 2 * .92}) scale(${5 / s * .92})`});
+    drawClump(g, cells, colourOf(S.d, t), 5000 + S.d.deals * 10 + t * 3);
+  });
+}
+// The clump being dragged or picked, shown where it would go (red where it doesn't fit), and the lines it would fill.
+function drawGhost() {
+  layers.ghost.innerHTML = ""; layers.clear.innerHTML = "";
+  if (!S || S.over || !ghost) return;
+  const cells = S.d.tray[ghost.t]; if (!cells) return;
+  const ok = fitsAt(filledOf(S.d), {cells}, ghost.at), ax = ghost.at % N, ay = Math.floor(ghost.at / N);
+  const g = el(layers.ghost, "g", {class: "ghost" + (ok ? "" : " bad"), transform: `translate(${ax * U} ${ay * U})`});
+  drawClump(g, cells.filter(([x, y]) => x + ax < N && y + ay < N), colourOf(S.d, ghost.t), 5000 + S.d.deals * 10 + ghost.t * 3);
+  if (!ok) return;
+  const f = filledOf(S.d); for (const [x, y] of cells) f[(y + ay) * N + x + ax] = true;
+  for (const [kind, k] of fullLines(f)) for (const i of lineCells(kind, k)) el(layers.clear, "rect", {class: "willclear", x: i % N * U, y: Math.floor(i / N) * U, width: U, height: U});
+}
+function drawMarks() {
+  layers.mark.innerHTML = "";
+  const m = hints.current();
+  if (m && m.at !== undefined && S && S.d.tray[m.t]) for (const [x, y] of cellsOf({cells: S.d.tray[m.t]}, m.at)) el(layers.mark, "rect", {class: "hintsq", x: x * U + 3, y: y * U + 3, width: U - 6, height: U - 6, rx: 14});
+  if (cursor >= 0) el(layers.mark, "rect", {class: "kbring", x: cursor % N * U + 3, y: Math.floor(cursor / N) * U + 3, width: U - 6, height: U - 6, rx: 12});
+}
+
+/* ---------- input ---------- */
+// Drag a clump from the tray onto the blanket (on a touch screen it rides above your finger, so you can see
+// where it goes). Or tap a clump, then tap the blanket where its middle should go.
+const boardBox = () => { const r = board.getBoundingClientRect(), k = r.width / 912; return {x: r.left + 6 * k, y: r.top + 6 * k, cell: U * k}; };
+let dragEl = null;
+function anchorFor(t, px, py) {   // the top-left square for the clump with its middle at a point on the page
+  const cells = S.d.tray[t], [w, h] = sizeOf(cells), b = boardBox();
+  const x = Math.round((px - b.x) / b.cell - w / 2), y = Math.round((py - b.y) / b.cell - h / 2);
+  if (x < 0 || y < 0 || x + w > N || y + h > N) {
+    // a little off the edge still counts, pushed back on
+    const cx = Math.max(0, Math.min(N - w, x)), cy = Math.max(0, Math.min(N - h, y));
+    if (Math.abs(cx - x) > 1 || Math.abs(cy - y) > 1) return -1;
+    return cy * N + cx;
+  }
+  return y * N + x;
+}
+trayEl.addEventListener("pointerdown", e => {
+  const b = e.target.closest(".slot"); if (!b || !S || S.over) return;
+  const t = +b.dataset.t; if (!S.d.tray[t]) return;
+  e.preventDefault();
+  try { b.setPointerCapture(e.pointerId); } catch (_) {}
+  drag = {t, x: e.clientX, y: e.clientY, moved: false, lift: e.pointerType === "touch" ? 1 : 0, id: e.pointerId};
+  if (S.timed && !S.started) S.started = true;
+  cursor = -1;
+});
+trayEl.addEventListener("pointermove", e => {
+  if (!drag || e.pointerId !== drag.id) return;
+  if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 8) return;
+  if (!drag.moved) { drag.moved = true; picked = -1; drawTray(); }
+  const cells = S.d.tray[drag.t], [w, h] = sizeOf(cells), b = boardBox();
+  const px = e.clientX, py = e.clientY - (drag.lift ? b.cell * (h / 2 + 1.1) : 0);
+  if (!dragEl) {
+    dragEl = el(document.body, "svg", {class: "dragpiece"});
+    dragEl.setAttribute("viewBox", `0 0 ${w * U} ${h * U}`);
+    drawClump(dragEl, cells, colourOf(S.d, drag.t), 5000 + S.d.deals * 10 + drag.t * 3);
+  }
+  dragEl.setAttribute("width", w * b.cell); dragEl.setAttribute("height", h * b.cell);
+  dragEl.style.transform = `translate(${px - w * b.cell / 2}px, ${py - h * b.cell / 2}px)`;
+  const at = anchorFor(drag.t, px, py);
+  const next = at >= 0 ? {t: drag.t, at} : null;
+  if (JSON.stringify(next) !== JSON.stringify(ghost)) { ghost = next; drawGhost(); }
+});
+function endDrag(e, cancel) {
+  if (!drag || e.pointerId !== drag.id) return;
+  const {t, moved} = drag; drag = null;
+  if (dragEl) { dragEl.remove(); dragEl = null; }
+  if (!moved) { picked = picked === t ? -1 : t; ghost = null; drawTray(); drawGhost(); if (picked >= 0) G.note("Now tap the blanket where it should go.", 2500); return; }
+  const g = ghost; ghost = null;
+  if (cancel || !g || !drop(t, g.at)) { drawTray(); drawGhost(); if (!cancel && g) G.note("That doesn't fit there.", 1800); }
+}
+trayEl.addEventListener("pointerup", e => endDrag(e));
+trayEl.addEventListener("pointercancel", e => endDrag(e, true));
+// tapping the blanket with a clump picked puts it down with its middle there
+board.addEventListener("pointerdown", e => {
+  if (!S || S.over || picked < 0) return;
+  e.preventDefault();
+  const at = anchorFor(picked, e.clientX, e.clientY);
+  if (at < 0 || !drop(picked, at)) G.note("That doesn't fit there. Tap somewhere else, or tap the clump to put it back.", 2500);
+});
+// Keys: the arrows move a cursor on the blanket, 1 to 3 pick a clump (shown at the cursor), Space puts it down.
+const keys = G.gridKeys({
+  on: () => !!S && !S.over, size: () => [N, N], keys: ["1", "2", "3"],
+  show(i) { cursor = i; ghost = i >= 0 && picked >= 0 ? {t: picked, at: i} : null; drawGhost(); drawMarks(); },
+  act(i, key) {
+    if (key !== " ") { const t = +key - 1; if (!S.d.tray[t]) return; picked = t; drawTray(); this.show(i); return; }
+    if (picked < 0) { picked = S.d.tray.findIndex(c => c && fitsAnywhere(filledOf(S.d), {cells: c})); if (picked < 0) return; drawTray(); this.show(i); return; }
+    if (!drop(picked, i)) G.note("That doesn't fit there.", 1800); else this.show(i);
+  },
+  escape() { picked = -1; ghost = null; drawTray(); drawGhost(); },
+});
+
+/* ---------- hints ---------- */
+// The first hint lights the clump to use; asked again, the squares to put it on.
+$("hintBtn").onclick = () => {
+  if (!S || S.over || document.querySelector(".spot")) return;
+  const mv = bestMove(S.d);
+  if (!mv) { G.note("Nothing in the tray fits anywhere.", 3000); return; }
+  const [t, at] = mv;
+  if (S.level && !S.d.hinted) S.d.hinted = true;
+  save();
+  if (hints.level() === 0) hints.show({t}, `Try the clump lit in gold. Tap Hint again to see where.`);
+  else hints.show({t, at}, `Put the gold clump on the gold squares.`);
+};
+
+/* ---------- sharing ---------- */
+// The blanket as dealt is its level, its seed and the toy kinds in play; progress is the moves made.
+$("linkBtn").onclick = () => { if (S && S.level) G.shareCard({name: "Cat Pile", what: "blanket", won: S.over && won(S.d),
+  puzzle: () => ({g: "catpile", N: S.level, s: S.d.seed, k: S.d.kinds.join(".")}),
+  progress: () => S.d.moves.map(([t, at]) => t + "." + at).join(",")}); };
+function openShared(d) {
+  const kinds = String(d.k || "").split(".").map(Number);
+  if (!(d.N >= 1 && d.N <= MAX_LEVEL) || !Number.isInteger(d.s) || kinds.length < MIN_COLOURS || kinds.some(k => !KINDS[k]))
+    throw new Error("the shared blanket doesn't fit the game");
+  const dd = deal(d.N, d.s, kinds), moves = d.p ? String(d.p).split(",").filter(Boolean).map(m => m.split(".").map(Number)) : [];
+  start(d.N, dd, {timed: !moves.length});
+  for (const [t, at] of moves) if (!(t >= 0 && t < 3 && at >= 0 && at < N * N) || !drop(t, at)) break;
+  if (moves.length) { S.history = []; draw(); save(); }
+}
+
+/* ---------- how to play ---------- */
+function intro(again) {
+  if (!again && G.load(INTRO).seen) return;
+  if (!S || document.querySelector(".spot")) return;
+  const toys = Object.keys(S.d.toys).map(Number).filter(i => !filledOf(S.d)[i]).map(i => [i % N, Math.floor(i / N)]);
+  const row = [...Array(N).keys()].map(x => [x, 4]), cushion = [];
+  for (let j = 0; j < 9; j++) cushion.push([6 + j % 3, Math.floor(j / 3)]);
+  const steps = [
+    {say: "Drag a clump of napping cats onto the blanket", els: [trayEl]},
+    {say: "Fill a row or column…", lit: row},
+    {say: "…or a whole cushion, and those cats wake up and go", lit: cushion},
+  ];
+  if (S.level) {
+    if (toys.length) steps.push({say: "Get a cat to nap on a toy", lit: toys, outline: toys.map(p => [p])});
+    steps.push({say: "Clear its line to collect the toy", els: [[...$("goals").children]]},
+      {say: "Collect them all before the cats run out of room", els: [trayEl]});
+  }
+  steps.push({say: "Stuck? Hint shows a good spot", els: [$("hintBtn")]});
+  if (S.level) steps.push({say: "Or play zen: no goals, no end", els: [$("levelSel")]});
+  G.spotlight({grid: board, w: N, h: N, steps, map: () => { const b = boardBox(); return {ox: b.x, oy: b.y, cw: b.cell, ch: b.cell}; },
+    done: () => G.save(INTRO, {seen: true})});
+}
+$("helpBtn").onclick = () => { if (drag) return; intro(true); };
+
+/* ---------- toys, times, and opening ---------- */
+const toyChest = () => ({kinds: KINDS, off: offToys, min: MIN_COLOURS, src: toySrc, save: off => {
+  offToys = off; G.saveToys(off);
+  if (S) S.d.look = KINDS.map((_, k) => S.d.look && lookIdx(k).includes(S.d.look[k]) ? S.d.look[k] : lookIdx(k)[0]);
+  if (S && S.level && S.d.goals.some(g => !kindsOn().includes(g.k))) { startLevel(S.level); G.note("Here's a new blanket with your toys.", 4000); }
+  else { if (S) draw(true); G.note("Saved.", 3000); }
+}});
+$("toysBtn").onclick = () => G.toyPicker(toyChest());
+G.needToys({...toyChest(), off: () => offToys, game: "Cat Pile"});
+G.setupTimer({name: "catpile", game: () => S, playing: g => !g.over, save,
+  label: n => `Level ${n}`, noun: "level",
+  emptyText: "Finish a level and your times will show up here. They're kept on this device only."});
+$("bestBtn").onclick = () => G.showBests("Best times", S && S.level ? S.level : climb);
+
+const saved = G.load(STORE), shared = G.readShare("catpile");
+climb = saved.climb || 1; zenBest = saved.zenBest || 0;
+const shareOpts = () => ({name: "Cat Pile", inProgress: !!(S && !S.over && S.d.moves.length), open: d => { try { openShared(d); } catch (e) { G.note("That share link didn't work.", 5000); } }});
+window.addEventListener("hashchange", () => { const d = G.readShare("catpile"); if (d) G.offerShare(d, shareOpts()); });
+let openedShare = false;
+if (shared) try { openShared(shared); openedShare = true; G.note(shared.p ? "Here's the shared blanket, with its progress so far. It isn't timed." : "Here's the shared blanket. Good luck!", 6000); G.track("Cat Pile shared puzzle opened"); } catch (e) { G.note("That share link didn't work.", 5000); }
+if (!openedShare) G.reopen(() => {
+  if (!saved.d) return startLevel(climb);
+  const d = saved.d;
+  if (!Array.isArray(d.cats) || !Array.isArray(d.tray) || d.tray.length !== 3 || !(saved.level >= 0 && saved.level <= MAX_LEVEL)) throw new Error("the saved blanket is from another version of the game");
+  if (saved.over && (!saved.level || won(d))) return startLevel(saved.level ? climb : 0);
+  start(saved.level, d, {ms: saved.ms, started: saved.started, timed: saved.timed, over: false});
+}, why => { startLevel(climb); G.note(why, 0); });
+intro();
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
