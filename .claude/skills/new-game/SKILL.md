@@ -65,7 +65,8 @@ Copy the structure of `tunnelrun/` or `opendoor/`: the head (BUILD check script,
 `games.css?v=<build>`), the action buttons and the settings row.
 
 - **Buttons, in this order on every page:** `hintBtn` (Hint), `undoBtn` (Undo), `restartBtn` (always
-  labelled Restart, never Clear), then the game's own buttons (Flip, Notes, Mark…), then `shareBtn`,
+  labelled Restart, never Clear), then the game's own buttons (Flip, Notes, Mark…), then `linkBtn` (labelled Share; content
+  blockers hide anything whose id or class has "share" in it, so never use the word there),
   `toysBtn` if it uses toys, `bestBtn` (Best times) and `helpBtn` (How to play). Leave out what the game
   doesn't have, but don't reorder. Undo also answers Ctrl+Z / ⌘Z (but not with Shift). Restart always puts
   back this same puzzle as it was dealt; `newBtn` deals a different one. Every game has Share, and New unless
