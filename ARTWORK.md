@@ -35,7 +35,7 @@ blended in: sitting, standing or crouching, with the face and ears showing (the 
 `catburglar/index.html`). Curled-up balls, backs and cats stretched flat are left out. `c19-21`, peeking round a corner,
 is beside its title.
 
-Cat Pile lays the napping cats from Sunbeams (the `SLEEPERS` list, the same in both pages) in its boxes, a straight one or a round one in each spot, and `c14-36` curls up beside its title.
+Cat Pile lays the napping cats from Sunbeams (the `SLEEPERS` list, the same in both pages) on its clumps' blankets, a straight one or a round one in each spot, and `c14-36` curls up beside its title.
 
 - **Jan Brady** (`jan-brady-…`, fluffy black and white, long dark tail; he's a he) is a one-of-a-kind
   character. The `c16-…` pictures, the fluffy black and white cats napping in Sunbeams, are

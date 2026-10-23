@@ -83,7 +83,7 @@
   <div class="goals" id="goals" aria-label="Toys to collect"></div>
 
   <div class="wrap">
-    <svg class="blanket" id="board" viewBox="-6 -6 912 912" tabindex="0" aria-label="A blanket of 9 by 9 squares in nine cushions. Drag a box of cats from the tray onto it; a full row, column or cushion clears. Arrow keys move, 1 to 3 pick a box, Space puts it down."></svg>
+    <svg class="blanket" id="board" viewBox="-6 -6 912 912" tabindex="0" aria-label="A blanket of 9 by 9 squares in nine cushions. Drag a clump of cats from the tray onto it; a full row, column or cushion clears. Arrow keys move, 1 to 3 pick a clump, Space puts it down."></svg>
     <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
   </div>
   <div class="tray" id="tray" aria-label="Cats waiting to nap"></div>
@@ -401,15 +401,14 @@ function el(parent, tag, attrs) {
 }
 const tint = (c, p) => `color-mix(in srgb, ${c} ${p}%, #fff)`;
 const shade = (c, p) => `color-mix(in srgb, ${c} ${p}%, #2A2530)`;
-// A clump's box: one box round all its squares, with a soft cushion in the clump's colour on its floor.
-// Each layer is drawn a little further in (outline, rim, the inside wall, its shadow line, the cushion);
-// squares side by side are bridged so the box has no seams.
+// A clump's blanket: one piece under all its squares, with no seams between them. An outline in a deeper
+// shade is drawn first, then the blanket over it; squares side by side are bridged so they join up.
 function drawPad(g, cells, colour) {
   const col = COLOURS[colour % COLOURS.length], has = new Set(cells.map(([x, y]) => x + "," + y));
-  for (const [inset, fill] of [[2, "#78523A"], [4, "#B28864"], [13, "#46281A"], [15, "#6B4428"], [21, tint(col, 55)]]) {
+  for (const [inset, fill] of [[4, shade(col, 72)], [8, tint(col, 45)]]) {
     const p = el(g, "g", {fill});
     for (const [x, y] of cells) {
-      el(p, "rect", {x: x * U + inset, y: y * U + inset, width: U - 2 * inset, height: U - 2 * inset, rx: Math.max(3, 16 - inset)});
+      el(p, "rect", {x: x * U + inset, y: y * U + inset, width: U - 2 * inset, height: U - 2 * inset, rx: 20 - inset});
       if (has.has((x + 1) + "," + y)) el(p, "rect", {x: (x + .5) * U, y: y * U + inset, width: U, height: U - 2 * inset});
       if (has.has(x + "," + (y + 1))) el(p, "rect", {x: x * U + inset, y: (y + .5) * U, width: U - 2 * inset, height: U});
       // where four squares meet, fill the middle too
@@ -417,11 +416,11 @@ function drawPad(g, cells, colour) {
     }
   }
 }
-// One cat lying in w × h squares of its box from (x, y).
+// One cat filling w × h squares from (x, y), a little bigger than its spot so the cats of a clump snuggle up.
 function drawCat(g, x, y, w, h, colour, id) {
   const k = el(g, "g", {});
   const [name, ratio] = sleeperFor(w, h, id), r = hash(id * 977 + 3);
-  const pad = U * .13, L = Math.max(w, h) * U - 2 * pad, T = Math.min(w, h) * U - 2 * pad, want = L / T;
+  const pad = -Math.min(w, h) * U * .02, L = Math.max(w, h) * U - 2 * pad, T = Math.min(w, h) * U - 2 * pad, want = L / T;
   const rr = Math.min(Math.max(want, ratio / 1.12), ratio * 1.12);
   const cw = Math.min(L, T * rr), ch = cw / rr;
   const inner = el(k, "g", {transform: `translate(${(x + w / 2) * U} ${(y + h / 2) * U}) rotate(${h > w ? 90 : 0}) scale(${r & 2 ? -1 : 1} ${r & 4 ? -1 : 1})`});
@@ -651,7 +650,7 @@ function drawTray() {
     b.classList.toggle("dragging", !!drag && drag.t === t && drag.moved);
     b.classList.toggle("hint", !!mark && mark.t === t);
     b.classList.toggle("nofit", !!cells && !fitsAnywhere(filled, {cells}));
-    b.setAttribute("aria-label", cells ? `Box ${t + 1}: ${cells.length} ${cells.length === 1 ? "square" : "squares"}` : `Box ${t + 1}: placed`);
+    b.setAttribute("aria-label", cells ? `Clump ${t + 1}: ${cells.length} ${cells.length === 1 ? "square" : "squares"}` : `Clump ${t + 1}: placed`);
     if (!cells) return;
     const [w, h] = sizeOf(cells), s = Math.max(w, h, 3);
     const g = el(svg, "g", {transform: `translate(${250 - w * 500 / s / 2 * .92} ${250 - h * 500 / s / 2 * .92}) scale(${5 / s * .92})`});
@@ -734,7 +733,7 @@ board.addEventListener("pointerdown", e => {
   if (!S || S.over || picked < 0) return;
   e.preventDefault();
   const at = anchorFor(picked, e.clientX, e.clientY);
-  if (at < 0 || !drop(picked, at)) G.note("That doesn't fit there. Tap somewhere else, or tap the box to put it back.", 2500);
+  if (at < 0 || !drop(picked, at)) G.note("That doesn't fit there. Tap somewhere else, or tap the clump to put it back.", 2500);
 });
 // Keys: the arrows move a cursor on the blanket, 1 to 3 pick a clump (shown at the cursor), Space puts it down.
 const keys = G.gridKeys({
@@ -757,8 +756,8 @@ $("hintBtn").onclick = () => {
   const [t, at] = mv;
   if (S.level && !S.d.hinted) S.d.hinted = true;
   save();
-  if (hints.level() === 0) hints.show({t}, `Try the box lit in gold. Tap Hint again to see where.`);
-  else hints.show({t, at}, `Put the gold box on the gold squares.`);
+  if (hints.level() === 0) hints.show({t}, `Try the clump lit in gold. Tap Hint again to see where.`);
+  else hints.show({t, at}, `Put the gold clump on the gold squares.`);
 };
 
 /* ---------- sharing ---------- */
@@ -784,7 +783,7 @@ function intro(again) {
   const row = [...Array(N).keys()].map(x => [x, 4]), cushion = [];
   for (let j = 0; j < 9; j++) cushion.push([6 + j % 3, Math.floor(j / 3)]);
   const steps = [
-    {say: "Drag a box of napping cats onto the blanket", els: [trayEl]},
+    {say: "Drag a clump of napping cats onto the blanket", els: [trayEl]},
     {say: "Fill a row or column…", lit: row},
     {say: "…or a whole cushion, and those cats wake up and go", lit: cushion},
   ];

@@ -678,7 +678,7 @@ def catburglar():
     return frame("#D5D9E8", out)
 
 
-# Cat Pile: a corner of the blanket with an L-shaped box of napping cats in it (a long ginger cat along the bottom, a grey
+# Cat Pile: a corner of the blanket with an L-shaped clump of napping cats on it (a long ginger cat along the bottom, a grey
 # cat curled up above), and a toy on the blanket waiting for a cat to lie on it.
 def catpile():
     s, o, out = 18, 14, ""
@@ -686,9 +686,9 @@ def catpile():
         for c in range(4):
             out += f'<rect x="{o+c*s}" y="{o+r*s}" width="{s}" height="{s}" fill="{tint(PERI, .22) if (c < 2) == (r < 2) else "#FBF4E6"}"/>'
     out += f'<rect x="{o}" y="{o}" width="{4*s}" height="{4*s}" fill="none" stroke="{INK}" stroke-width="3" rx="2"/>'
-    # the box: an L of four squares, tan rim and a soft cushion inside
+    # the clump's blanket: an L of five squares in one piece, a deeper outline under a soft coral
     cells = [(0, 2), (0, 3), (1, 3), (2, 3), (3, 3)]
-    for inset, fill in [(1, "#78523A"), (2.2, "#B28864"), (5, tint(ORANGE, .35))]:
+    for inset, fill in [(1.5, "#B5461F"), (3, tint(ORANGE, .45))]:
         for (c, r) in cells:
             out += f'<rect x="{o+c*s+inset}" y="{o+r*s+inset}" width="{s-2*inset}" height="{s-2*inset}" rx="{max(1, 3-inset/2)}" fill="{fill}"/>'
         out += f'<rect x="{o+inset}" y="{o+3*s+inset}" width="{4*s-2*inset}" height="{s-2*inset}" fill="{fill}"/>'
