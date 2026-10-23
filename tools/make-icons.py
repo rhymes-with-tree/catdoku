@@ -684,11 +684,11 @@ def catpile():
     s, o, out = 18, 14, ""
     for r in range(4):
         for c in range(4):
-            out += f'<rect x="{o+c*s}" y="{o+r*s}" width="{s}" height="{s}" fill="{tint(PERI, .22) if (c < 2) == (r < 2) else "#FBF4E6"}"/>'
+            out += f'<rect x="{o+c*s}" y="{o+r*s}" width="{s}" height="{s}" fill="{tint(YELLOW, .09)}"/>'
     out += f'<rect x="{o}" y="{o}" width="{4*s}" height="{4*s}" fill="none" stroke="{INK}" stroke-width="3" rx="2"/>'
     # the clump's blanket: an L of five squares in one piece, a deeper outline under a soft coral
     cells = [(0, 2), (0, 3), (1, 3), (2, 3), (3, 3)]
-    for inset, fill in [(1.5, "#B5461F"), (3, tint(ORANGE, .45))]:
+    for inset, fill in [(1.5, RED), (3, tint(ORANGE, .45))]:
         for (c, r) in cells:
             out += f'<rect x="{o+c*s+inset}" y="{o+r*s+inset}" width="{s-2*inset}" height="{s-2*inset}" rx="{max(1, 3-inset/2)}" fill="{fill}"/>'
         out += f'<rect x="{o+inset}" y="{o+3*s+inset}" width="{4*s-2*inset}" height="{s-2*inset}" fill="{fill}"/>'
@@ -698,15 +698,15 @@ def catpile():
     out += (f'<path d="M{o+s*1.2} {y}Q{o+s*.6} {y+5} {o+s*.75} {y+6.5}" fill="none" stroke="{INK}" stroke-width="5.2" stroke-linecap="round"/>'
             f'<path d="M{o+s*1.2} {y}Q{o+s*.6} {y+5} {o+s*.75} {y+6.5}" fill="none" stroke="{ORANGE}" stroke-width="3" stroke-linecap="round"/>'
             f'<rect x="{o+s*1.05}" y="{y-5.5}" width="{s*2.1}" height="11" rx="5.5" fill="{ORANGE}" stroke="{INK}" stroke-width="1.8"/>'
-            f'<path d="M{o+s*1.6} {y-5}v10M{o+s*2} {y-5}v10M{o+s*2.4} {y-5}v10" stroke="#B5461F" stroke-width="1.6"/>'
+            f'<path d="M{o+s*1.6} {y-5}v10M{o+s*2} {y-5}v10M{o+s*2.4} {y-5}v10" stroke="{RED}" stroke-width="1.6"/>'
             f'<path d="M{o+s*3.4+2} {y-5}l5 -2.2l-1.2 5Z M{o+s*3.4+2} {y+5}l5 2.2l-1.2 -5Z" fill="{ORANGE}" stroke="{INK}" stroke-width="1.5" stroke-linejoin="round"/>'
             f'<circle cx="{o+s*3.4}" cy="{y}" r="5.6" fill="{ORANGE}" stroke="{INK}" stroke-width="1.8"/>'
             f'<path d="M{o+s*3.3} {y-2.4}q1.2 1 0 2M{o+s*3.3} {y+.6}q1.2 1 0 2" fill="none" stroke="{INK}" stroke-width="1.1"/>')
     # a grey cat curled up in a ball above it, nose to tail
     cx, cy = o + s / 2, o + 2.5 * s
-    out += (f'<circle cx="{cx}" cy="{cy}" r="6.6" fill="#9A97A0" stroke="{INK}" stroke-width="1.8"/>'
+    out += (f'<circle cx="{cx}" cy="{cy}" r="6.6" fill="{tint("#5E5866", .62)}" stroke="{INK}" stroke-width="1.8"/>'
             f'<path d="M{cx-5} {cy+2.5}Q{cx} {cy+7} {cx+5} {cy+1.5}" fill="none" stroke="#5E5866" stroke-width="2.2" stroke-linecap="round"/>'
-            f'<path d="M{cx-3.6} {cy-5}l-1 -3.2l3 1.4Z M{cx+.6} {cy-6.4}l1.2 -3l1.8 2.6Z" fill="#9A97A0" stroke="{INK}" stroke-width="1.2" stroke-linejoin="round"/>')
+            f'<path d="M{cx-3.6} {cy-5}l-1 -3.2l3 1.4Z M{cx+.6} {cy-6.4}l1.2 -3l1.8 2.6Z" fill="{tint("#5E5866", .62)}" stroke="{INK}" stroke-width="1.2" stroke-linejoin="round"/>')
     out += yarnball(o + 2.5 * s, o + 1.5 * s, 6, PLUM)
     return frame(PAPER, out)
 
