@@ -93,7 +93,9 @@ its notes.
   if `fn` throws, `fresh(message)` should start a new puzzle and show the message.
 - **Winning:** `G.winCard(text, onNext, admire, result, {title, gold, goldWhy, next, after})`, with
   `after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")`. When `gold` is
-  true the card's title is "Gold paw!", so `title` only shows on other wins. Gold paw rules
+  true the card's title is "Gold paw!", so `title` only shows on other wins. A gold paw on the top level or size masters the
+  game (its tile turns gold); the win card works that out from `result.n` and the page's level or size picker,
+  so pass `top: true` or `false` if the game's levels aren't the picker's values (see `atlas/`). Gold paw rules
   differ by game (README, "Across every game"). For a logic puzzle, follow Tunnel Run and Open the
   Door!: a hint, Undo or Restart costs the gold paw; a hint also keeps the player on the same level, and
   a win without one moves up. Say so on the win card: "You had a hint, so here's another at level N." Tunnel Run: `gold: !game.undid && !game.hinted`,
@@ -118,6 +120,9 @@ its notes.
   squares fill `grid`'s client box unless a `map` function says where they are (see the comment above
   `spotlight` in `games.js`); Tunnel Run passes the div around its SVG. "Let's Play!" is placed in
   `grid`'s parent, which needs `position: relative` (`.wrap` has it).
+- **Win streaks:** `G.finishClock` adds a win and the win card shows the streak, and a new puzzle made with
+  `G.freshClock()` while one is started ends it. Call `G.breakStreak()` wherever the player loses (out of lives,
+  moves or time, giving up).
 - **Counting plays:** `G.track()` for new puzzles and solves ("Tunnel Run solved level 3"), and the
   GoatCounter script tag at the end of the page.
 - **Toys:** a game that uses `toys/` lets players switch toys off with `G.toysOff`, `G.toyPicker` and

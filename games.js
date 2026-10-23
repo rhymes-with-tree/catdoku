@@ -174,6 +174,7 @@ const G = (() => {
       a.className = "gameTile"; a.style.setProperty("--tile", color);
       a.href = `${base}${slug}/`; a.dataset.slug = slug;
       if (slug === current) a.setAttribute("aria-current", "page");
+      if (mastered(slug)) { a.classList.add("gold"); a.title = "Mastered: a gold paw at the top level"; }
       const b = document.createElement("b"); b.textContent = name;
       const sm = document.createElement("small"); sm.textContent = slug === current ? "You're here" : blurb;
       a.append(b, sm);
@@ -197,6 +198,7 @@ const G = (() => {
     const none = document.createElement("p"); none.className = "gamesNone"; none.hidden = true; none.textContent = "No games match that.";
     const dslug = daily(), dgame = GAMES.find(g => g[1] === dslug);
     const todays = section(dailyDoneToday() ? "Today's challenge: done" : "Today's challenge", [dgame]);
+    if (dailyDoneToday()) todays.querySelector(".gameTile").classList.add("gold");   // gold once it's solved, as on the front page
     panel.append(home, todays, search, favs, ...shelves, none);
     drawFavs();
     search.oninput = () => {
@@ -287,13 +289,28 @@ const G = (() => {
     return wrap;
   }
 
-  const NAMES = ["Biscuit", "Mochi", "Pickles", "Noodle", "Sprocket", "Whiskerdoodle", "Pounce", "Kerfuffle",
-    "Sir Pounce-a-Lot", "Lady Marmalade", "Duke Fluffington", "Captain Mittens", "Professor Paws", "Count Catula",
-    "Juniper", "Clover", "Figaro", "Atticus", "Ophelia", "Purrlock Holmes", "Chairman Meow", "Cleocatra",
-    "Pablo Picatso", "Meowzart", "Catrick Swayze", "Frida Catlo", "Paw Revere", "Dolly Purrton", "Luna", "Otis", "Patches",
+  // Names for the cat in the win card's photo (from Catdoku, which had the longest list).
+  const CAT_NAMES = {
+    classic: ["Oliver","Luna","Milo","Chloe","Leo","Bella","Simon","Tilly","Felix","Daisy","Oscar","Pearl","Jasper","Hazel","Gus","Mabel","Otis","Rosie","Arlo","Winnie",
+              "Walter","Ruby","Frank","Ivy","Theo","June","Murray","Poppy","Edith","Patches"],
     // every name from T. S. Eliot's "The Naming of Cats"
-    "Peter", "Augustus", "Alonzo", "James", "Victor", "Jonathan", "George", "Bill Bailey", "Plato", "Admetus", "Electra", "Demeter",
-    "Munkustrap", "Quaxo", "Coricopat", "Bombalurina", "Jellylorum"];
+    eliot: ["Peter","Augustus","Alonzo","James","Victor","Jonathan","George","Bill Bailey","Plato","Admetus","Electra","Demeter",
+            "Munkustrap","Quaxo","Coricopat","Bombalurina","Jellylorum"],
+    food: ["Biscuit","Mochi","Pickles","Nacho","Waffles","Dumpling","Pepper","Olive","Nutmeg","Muffin","Tofu","Pumpkin","Clementine","Toast","Paprika","Gnocchi","Butterbean","Cannoli","Pretzel","Sesame",
+           "Crouton","Bagel"],
+    whimsical: ["Pounce","Sprocket","Doodle","Noodle","Wiggles","Zigzag","Bumble","Pipsqueak","Fidget","Scooter","Ruckus","Jellybean","Tumble","Skedaddle","Kerfuffle","Snickerdoodle","Hullabaloo","Flapjack","Whiskerdoodle","Rascal",
+                "Bamboozle","Shenanigans"],
+    fancy: ["Sir Pounce-a-Lot","Lady Marmalade","Duke Fluffington","Baroness Von Whiskers","Captain Mittens","Professor Paws","Dame Purrington","Lord Nibbleton","Countess Crumpet","Admiral Snuggles","Madame Meow","Sir Reginald Floof","Princess Pudding","General Tso","Major Tom","Judge Biscuit","Doctor Snooze","Reverend Tuna","Count Catula","Mayor McWhiskers",
+            "Captain Whiskerbottom"],
+    nature: ["Willow","Juniper","Basil","Clover","Maple","Sage","Fern","Pebble","Aspen","Thistle","Moss","Hickory","Briar","Rain","Ember","Cedar","Birch","Marigold","Acorn","Sparrow",
+             "Wren","Laurel","Heather"],
+    literary: ["Merlin","Ophelia","Pip","Hermes","Juno","Atticus","Beatrix","Figaro","Gatsby","Ramona","Puck","Minerva","Sherlock","Matilda","Loki","Persephone","Watson","Hamlet","Freya","Tolstoy",
+               "Ishmael","Portia","Dorian","Brontë","Galahad","Hermia","Ovid"],
+    puns: ["Catrick Swayze","Cat Benatar","Chairman Meow","Purrlock Holmes","Meowzart","Leonardo DiCatprio","Santa Claws","Fuzz Aldrin","Kitty Purry","Cleocatra","Catniss Everdeen","Pablo Picatso","Pawl McCatney","Sir Isaac Mewton","Albert Meowstein","Bob Meowley","Salvador Catli","William Shakespaw","Jennifur Aniston","Furrdinand Magellan",
+           "Meowrilyn Monroe","Brad Kitt","Clawdia Schiffer","Ernest Hemingpaw","Catsanova","Purrcy Bysshe Shelley","Vincent van Meow","Frida Catlo","Andy Furhol","Paw Revere","Winston Purrchill","Napawleon","Catalina Wine Mixer","Meowly Ringwald","Dolly Purrton","Elvis Pawsley","Mister Meowgi","Katharine Hepburrn","Amelia Furhart","Jane Pawsten"]
+  };
+  // Whimsical, fancy, and pun names come up twice as often as the rest.
+  const NAMES = [...Object.values(CAT_NAMES).flat(), ...CAT_NAMES.whimsical, ...CAT_NAMES.fancy, ...CAT_NAMES.puns];
   const bust = () => "t=" + Date.now();
   function catPhoto() {
     const img = document.createElement("img"), backup = "https://cataas.com/cat?width=500&" + bust();
@@ -310,6 +327,7 @@ const G = (() => {
   // the admire button. Last comes a way back to the front page.
   // After admiring, point to the page's own new-puzzle button (New floor, New table…), or the level list.
   const admireNote = () => $("newBtn") ? `Done! Tap ${$("newBtn").textContent.trim()} when you're ready for another.` : "Done! Pick a level when you're ready for another.";
+  // o.lines adds lines of the game's own under the text.
   // A perfect clear (no help, nothing lost, no undo) earns a gold paw: o.gold puts one on the win card,
   // with o.goldWhy saying what earned it, o.goldTitle in place of "Gold paw!", and o.goldPic (a picture
   // and its caption) in place of the random cat photo and name.
@@ -321,17 +339,39 @@ const G = (() => {
       <path d="${PAW}" transform="translate(19 35.3) scale(.31 .298)" vector-effect="non-scaling-stroke"/></g></svg>`;
     return box.firstChild;
   }
+  // Gold paws earned on this device, counted per game by the win card. A win card shown again (a finished puzzle reopened) isn't
+  // counted twice: the last few wins counted are remembered by game, result and text. A gold paw on a game's top level or
+  // size masters it, and its tile turns gold (`top`; a game whose levels aren't its picker's values, like Catlas, says
+  // whether a win was on its top one).
+  const GOLD = "catdoku.goldpaws.v1";
+  const goldPaws = slug => (load(GOLD).counts || {})[slug] || 0;
+  const mastered = slug => !!(load(GOLD).top || {})[slug];
+  // the highest level or size in the page's picker
+  const topLevel = () => { const sel = $("levelSel") || $("size"); return sel ? Math.max(...[...sel.options].map(o => +o.value).filter(v => !isNaN(v))) : null; };
+  function countGold(result, text, top) {
+    if (!CURRENT) return;
+    const d = load(GOLD), sig = `${CURRENT}|${JSON.stringify(result || null)}|${text}`, seen = d.seen || [];
+    if (seen.includes(sig)) return;
+    const counts = d.counts || {}, tops = d.top || {};
+    counts[CURRENT] = (counts[CURRENT] || 0) + 1;
+    if (top ?? (result && result.n != null && result.n === topLevel())) tops[CURRENT] = true;
+    save(GOLD, {counts, top: tops, seen: [...seen, sig].slice(-30)});
+  }
   // The win cards' way out to every game.
   const homeBtn = () => ["Back to the front page", () => { location.href = HOME; }];
   function winCard(text, onNext, admire = "Admire my board", result, o = {}) {
     const media = document.createElement("div");
     // what earned the gold paw ("No undos!"), under the paw
-    if (o.gold) { media.append(goldPaw()); if (o.goldWhy) { const g = document.createElement("p"); g.className = "goldwhy"; g.textContent = o.goldWhy; media.append(g); } }
+    if (o.gold) { countGold(result, text, o.top); media.append(goldPaw()); if (o.goldWhy) { const g = document.createElement("p"); g.className = "goldwhy"; g.textContent = o.goldWhy; media.append(g); } }
     const p = document.createElement("p"); p.textContent = text;
     const name = document.createElement("p"); name.className = "catname";
     name.textContent = `Meet ${NAMES[Math.floor(Math.random() * NAMES.length)]}!`;
     const tl = timeLineEl(result); if (tl) media.append(tl);
     media.append(p);
+    // the win streak, then a game's own extra lines
+    const st = T ? streak(T.name).streak : 0;
+    if (st > 1) { const x = document.createElement("p"); x.className = "streakline"; x.textContent = `🔥 ${st} wins in a row`; media.append(x); }
+    for (const line of o.lines || []) { const x = document.createElement("p"); x.textContent = line; media.append(x); }
     const dl = dailyLine();
     if (dl) { const d = document.createElement("p"); d.className = "dailyline"; d.textContent = dl; media.append(d); }
     if (o.gold && o.goldPic) media.append(...o.goldPic); else media.append(catPhoto(), name);
@@ -425,14 +465,25 @@ const G = (() => {
     btn.textContent = hide ? "⏱ –:––" : "⏱ " + clock(g.ms || 0);
     btn.setAttribute("aria-label", hide ? "Timer hidden. Tap to show the time." : `Time ${clock(g.ms || 0)}. Tap to hide the time.`);
   }
-  // Fields a new puzzle starts with.
-  const freshClock = () => ({ms: 0, timed: true, started: false});
+  // Fields a new puzzle starts with. Leaving a puzzle you'd started (and not solved) for a new one ends your win streak.
+  const freshClock = () => { const g = T && T.game(); if (g && g.started && !g.result) breakStreak(); return {ms: 0, timed: true, started: false}; };
+  // Win streaks, per game: puzzles won in a row, kept on this device. A win (finishClock) adds one, and the win card
+  // says so from two on. Leaving a started puzzle for a new one ends it (freshClock), and so does losing: a game
+  // calls breakStreak when you run out of lives, moves or toys, give up, or get tangled.
+  const STREAKS = "catdoku.streaks.v1";
+  const streak = name => Object.assign({streak: 0, best: 0}, load(STREAKS)[name || (T && T.name)]);
+  function setStreak(name, n) {
+    const all = load(STREAKS), s = Object.assign({streak: 0, best: 0}, all[name]);
+    s.streak = n; s.best = Math.max(s.best, n); all[name] = s; save(STREAKS, all);
+  }
+  function breakStreak() { if (T && streak(T.name).streak) setStreak(T.name, 0); }
   // A puzzle saved before the timer existed can't set a best time.
   function checkClock(g) { if (g && g.timed === undefined) g.timed = false; }
 
   // Call once when a puzzle is solved: records the time and returns what the card shows.
   function finishClock(g) {
     dailyWon();
+    if (T) setStreak(T.name, streak(T.name).streak + 1);
     const n = g.level ?? g.N;   // bests are kept by level where a game has levels, else by size
     if (!g.timed) return (g.result = {ms: null, n});
     const all = load(BESTS), mine = (all[T.name] = all[T.name] || {}), row = (mine[n] = mine[n] || {solves: 0, times: []});
@@ -920,5 +971,5 @@ const G = (() => {
   }
 
   return {GAMES, GROUPS, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen,
-          setupTimer, freshClock, spotlight, toysOff, saveToys, needToys, goldPaw, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
+          setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();
