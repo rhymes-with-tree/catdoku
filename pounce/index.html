@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.6"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-23.2"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -22,7 +22,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-22.6">
+<link rel="stylesheet" href="../games.css?v=2026-10-23.2">
 <style>
 /* A quilted play mat in a wooden frame, covered in toys. */
 .wrap canvas{display:block;width:100%;height:100%;border:3px solid #5C3A22;border-radius:12px;touch-action:none;
@@ -68,17 +68,19 @@
   <div class="actions">
     <button id="hintBtn">Hint</button>
     <button id="restartBtn">Restart</button>
+    <button id="shareBtn">Share</button>
     <button id="toysBtn">Toys</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
   </div>
   <div class="bar">
     <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New board</button>
   </div>
 
 </main>
 
-<script src="../games.js?v=2026-10-22.6"></script>
+<script src="../games.js?v=2026-10-23.2"></script>
 <script>
 const $ = G.$;
 G.nav("pounce");
@@ -271,6 +273,7 @@ const TOYS_PREF = "catdoku.pounce.toys.v1", MIN_COLOURS = 6;
 let offToys = G.toysOff(TOYS_PREF);
 const deal = n => makeLevel(n, Math.random, offToys);
 let busy = false, picked = -1, cursor = -1, now = 0, effects = [], hintAt = 0, hint = null;
+const hints = G.hinter({game: () => S, key: () => S ? S.g.map(t => t ? t.k + "." + t.sp : "").join() : "", draw: () => {}});   // marks {pair}: two toys to swap (the mat redraws itself every frame)
 const save = () => { if (S && !S.over) { S.d.grid = S.g.map(t => [t.k, t.sp]); S.d.ms = S.ms; G.save(STORE, {level: S.level, d: S.d, climb}); } };
 
 function start(level, d) {
@@ -283,21 +286,44 @@ function start(level, d) {
   busy = false; picked = -1; effects = []; hint = null; hintAt = now + 6;
   $("levelSel").value = level;
   G.save(STORE, {level, d, climb}); hud(true);
-  $("restartBtn").textContent = level ? "Restart" : "New board";
+  $("restartBtn").hidden = $("shareBtn").hidden = !level;   // zen just deals new boards
   G.note(level ? "" : `Zen: no goals and no move limit. Pick level ${climb} to carry on with the levels.`, level ? 3500 : 8000);
   if (level && !d.moves) outOfMoves();   // saved after the last move ran out
 }
+// Each board keeps a copy of itself as dealt (fresh), for Restart and Share.
+const dealt = d => Object.assign(d, {fresh: JSON.stringify({kinds: d.kinds, look: d.look, goals: d.goals, moves: d.moves, grid: d.grid})});
 function startLevel(level) {
   level = level === 0 ? 0 : Math.min(MAX_LEVEL, Math.max(1, level));
   G.track(level ? `Pounce level ${level} started` : "Pounce zen started");
-  start(level, deal(level));
+  start(level, dealt(deal(level)));
 }
 for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(n === MAX_LEVEL ? `${n} (hardest)` : String(n), n));
 $("levelSel").append(new Option("Zen (no goals)", 0));
 $("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
-// A fresh board at this level (zen keeps its count of toys caught).
-const newBoard = () => start(S.level, Object.assign(deal(S.level), {helped: S.d.helped, caught: S.level ? 0 : S.d.caught}));
-$("restartBtn").onclick = () => { if (S) { G.closeCard(); newBoard(); } };
+// A new board at this level (zen keeps its count of toys caught), or this board again as it was dealt (a board
+// saved before boards kept a copy deals a new one). Either way, help used on the level still counts.
+const newBoard = () => start(S.level, dealt(Object.assign(deal(S.level), {helped: S.level ? S.d.helped : false, caught: S.level ? 0 : S.d.caught})));
+$("newBtn").onclick = () => { if (S) { G.closeCard(); newBoard(); } };
+$("restartBtn").onclick = () => {
+  if (!S) return;
+  G.closeCard();
+  if (!S.d.fresh) return newBoard();
+  start(S.level, Object.assign(JSON.parse(S.d.fresh), {fresh: S.d.fresh, helped: S.d.helped, extra: 0, caught: 0}));
+};
+// Share: a link to this board as it was dealt (the toys, the goals and the moves).
+$("shareBtn").onclick = () => { if (S && S.level) G.shareCard({name: "Pounce", what: "board", won: S.over,
+  puzzle: () => { const f = S.d.fresh ? JSON.parse(S.d.fresh) : S.d;
+    return {g: "pounce", N: S.level, b: f.grid.map(([k, sp]) => k + (sp ? "." + sp : "")).join(","), gl: f.goals.map(gl => gl.k).join(""), m: f.moves}; }}); };
+// A shared board, checked first: 64 toys of known kinds, goals among them, and a move count.
+function openShared(d) {
+  const grid = String(d.b || "").split(",").map(c => c.split(".").map(Number)).map(([k, sp]) => [k, sp || 0]);
+  const goals = [...String(d.gl || "")].map(Number), p = params(d.N);
+  if (!(d.N >= 1 && d.N <= MAX_LEVEL) || grid.length !== N * N || grid.some(([k]) => !KINDS[k]) || goals.some(k => !KINDS[k]) || !(d.m >= 1 && d.m <= 99))
+    throw new Error("the shared board doesn't fit the game");
+  const kinds = [...new Set(grid.map(([k]) => k))].sort((a, b) => a - b);
+  const look = KINDS.map((_, k) => { const ok = lookIdx(k, offToys); return ok[Math.floor(Math.random() * ok.length)]; });
+  start(d.N, dealt({kinds, look, goals: goals.map(k => ({k, need: p.need, got: 0})), moves: d.m, grid, helped: false, extra: 0, caught: 0}));
+}
 
 const left = gl => Math.max(0, gl.need - gl.got);
 const toyName = (n, k) => { const many = lookOf(k)[1]; return `${n} ${n !== 1 ? many : {mice: "mouse", fish: "fish"}[many] || many.replace(/s$/, "")}`; };
@@ -425,7 +451,7 @@ function outOfMoves() {
   if (S.d.extra < 1) btns.push(["5 more moves", () => {
     G.closeCard(); S.d.extra++; S.d.helped = true; S.d.moves += 5; S.over = false; hud(); save(); hintAt = now + 3;
   }, true]);
-  btns.push(["Try again", () => { G.closeCard(); start(S.level, Object.assign(deal(S.level), {helped: S.d.helped})); }, !btns.length]);
+  btns.push(["Try again", () => { G.closeCard(); start(S.level, dealt(Object.assign(deal(S.level), {helped: S.d.helped}))); }, !btns.length]);
   G.openCard("Out of moves!", `Still to catch: ${list}.`, btns, null,
     G.otherSize($("levelSel"), S.level, startLevel, "Or play a different level:"));
 }
@@ -508,6 +534,7 @@ function draw() {
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
   if (!S) return;
   ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, W); ctx.clip();   // toys falling in appear from the top edge
+  const hint = !S.over ? (hints.current() || {}).pair : null;
   const hl = (i, col) => { ctx.strokeStyle = col; ctx.lineWidth = 3.5; ctx.beginPath(); ctx.roundRect((i % N) * U + 3, Math.floor(i / N) * U + 3, U - 6, U - 6, 10); ctx.stroke(); };
   if (picked >= 0) { ctx.fillStyle = "rgba(115,167,174,.3)"; ctx.fillRect((picked % N) * U, Math.floor(picked / N) * U, U, U); }
   S.g.forEach((t, i) => {
@@ -629,10 +656,10 @@ $("helpBtn").onclick = () => helpCard();
 // Hint: two toys that can be swapped give a little wiggle. Like any help, it keeps you on this level (not in zen).
 $("hintBtn").onclick = () => {
   if (!S || S.over || busy || document.querySelector(".spot")) return;
-  hint = findMove(S.g); hintAt = now;
-  if (!hint) { G.note("No swaps here. The toys will shuffle.", 3000); return; }
+  const pair = findMove(S.g); hintAt = now;
+  if (!pair) { G.note("No swaps here. The toys will shuffle.", 3000); return; }
   if (S.level && !S.d.helped) { S.d.helped = true; save(); }
-  G.note("Swap the two outlined toys.", 4000);
+  hints.show({pair}, "Swap the two outlined toys.");
 };
 
 /* ---------- first-time spotlight ---------- */
@@ -690,9 +717,14 @@ G.setupTimer({name: "pounce", game: () => S, playing: g => !g.over, save,
   emptyText: "Finish a level and your times will show up here. They're kept on this device only."});
 $("bestBtn").onclick = () => G.showBests("Best times", S && S.level ? S.level : climb);
 
-const saved = G.load(STORE), first = saved.level ?? 1;
+const saved = G.load(STORE), first = saved.level ?? 1, shared = G.readShare("pounce");
 climb = saved.climb || saved.level || 1;
-G.reopen(() => { if (saved.d && first <= MAX_LEVEL) start(first, saved.d); else startLevel(first); },
+const shareOpts = () => ({name: "Pounce", inProgress: !!(S && !S.over && S.started), open: d => { try { openShared(d); } catch (e) { G.note("That share link didn't work.", 5000); } }});
+window.addEventListener("hashchange", () => { const d = G.readShare("pounce"); if (d) G.offerShare(d, shareOpts()); });
+// a shared board opens in place of the saved one
+let openedShare = false;
+if (shared) try { openShared(shared); openedShare = true; G.note("Here's the shared board. Good luck!", 6000); G.track("Pounce shared puzzle opened"); } catch (e) { G.note("That share link didn't work.", 5000); }
+if (!openedShare) G.reopen(() => { if (saved.d && first <= MAX_LEVEL) start(first, saved.d); else startLevel(first); },
   why => { startLevel(first); G.note(why, 0); });
 // Players from before the spotlight had the How to play card instead, so it's only for new players.
 if (saved.level !== undefined && !G.load(INTRO).seen) G.save(INTRO, {seen: true});

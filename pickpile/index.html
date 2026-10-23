@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.6"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-23.2"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-22.6">
+<link rel="stylesheet" href="../games.css?v=2026-10-23.2">
 <style>
 /* Fred, the star, beside the title */
 .title{display:flex;align-items:flex-end;gap:8px}
@@ -91,7 +91,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-22.6"></script>
+<script src="../games.js?v=2026-10-23.2"></script>
 <script>
 /* ---------- piles ---------- */
 // The pile for each level: blocks [x, y, z] in half-block steps, from rectangles [z, x, y, w, h] (x and y in
@@ -232,7 +232,8 @@ const STORE = "catdoku.pickpile.v1";
 const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1, dim: true}, state.settings);
-let game = state.game || null, mark = null;  // mark: a hint's blocks, while the pile is as it was
+let game = state.game || null, kbAt = -1;   // kbAt: the block the keyboard cursor is on
+const hints = G.hinter({game: () => game, key: () => game ? stateKey() : "", draw: () => draw()});   // marks {blocks, bad}: a hint's blocks
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !$("overlay").classList.contains("show");
 const B = () => LAYOUT[game.level], Lk = () => LINKS[game.level];
@@ -256,7 +257,7 @@ function newPuzzle() {
   const n = settings.level, ask = ++asking;
   piles.take(n).then(p => {
     if (ask !== asking) return;
-    game = fresh(n, p); mark = null; draw(); save();
+    game = fresh(n, p); draw(); save();
     piles.prefetch(n);
     G.track(`Pick of the Pile new puzzle level ${n}`);
     helpOnFirstVisit();
@@ -283,11 +284,11 @@ function draw() {
   el.style.width = `${geo.w}px`; el.style.height = `${geo.h}px`;
   el.classList.toggle("dim", !!settings.dim);
   el.innerHTML = "";
-  const b = B(), live = mark && mark.key === stateKey() ? mark : null;
+  const b = B(), live = hints.current();
   b.forEach(([x, y, z], i) => {
     if (!game.left[i]) return;
     const d = document.createElement("div"), free = isFree(i), toy = game.toys[game.f[i]];
-    d.className = "blk" + (free ? "" : " stuck") + (game.sel === i ? " sel" : "");
+    d.className = "blk" + (free ? "" : " stuck") + (game.sel === i ? " sel" : "") + (kbAt === i ? " kbcursor" : "");
     d.dataset.i = i; d.dataset.z = z;
     d.setAttribute("role", "button");
     d.setAttribute("aria-label", `${nameOf(toy)}, ${free ? "free" : "stuck"}`);
@@ -326,6 +327,11 @@ function tap(i) {
   if (!leftCount()) win();
 }
 $("board").addEventListener("click", e => { const d = e.target.closest(".blk"); if (d) tap(+d.dataset.i); });
+// Keys: the arrows move a cursor between the blocks that are free, and Space or Enter picks the one under it.
+const freeSpots = () => B().map(([x, y, z], i) => game.left[i] && isFree(i) ? [x - z * .4, y - z * .4] : null);
+const keys = G.gridKeys({on: () => playing(), start: () => Math.max(0, freeSpots().findIndex(Boolean)),
+  move: (i, dx, dy) => { const sp = freeSpots(); return sp[i] ? G.nearestThatWay(sp, i, dx, dy) : Math.max(0, sp.findIndex(Boolean)); },
+  show: i => { kbAt = i; draw(); }, act: i => { if (game.left[i]) tap(i); }});
 // Say so when there's no pair left to take.
 function afterMove() {
   if (game.won) return;
@@ -342,7 +348,7 @@ function undo() {
   draw(); save(); G.note("");
 }
 $("undoBtn").onclick = undo;
-addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); undo(); } });
+addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); undo(); } });
 $("restartBtn").onclick = () => {
   if (!playing() || !game.moves.length) return;
   while (game.moves.length) { const m = game.moves.pop(); if (m.shuffle) { game.f = m.shuffle; game.sol = m.sol; } else for (const k of m) game.left[k] = true; }
@@ -402,9 +408,9 @@ function hint() {
   }
   game.hinted = true; save();
   say = say || (pair.includes(game.sel) || game.sel < 0 ? "Take these two off." : "Try these two instead.");
-  mark = {key: stateKey(), blocks: pair, bad};
-  draw(); G.note(say, 5000);
-  const m = mark; setTimeout(() => { if (mark === m) { mark = null; if (game) draw(); } }, 5000);
+  // the first time, one block of the pair; asked again, both
+  if (!bad && !hints.level() && !pair.includes(game.sel)) return hints.show({blocks: [pair[0]]}, "Take off the glowing block next. Which one matches it?");
+  hints.show({blocks: pair, bad}, say);
 }
 $("hintBtn").onclick = hint;
 
@@ -449,7 +455,7 @@ function openShared(d) {
     game.left = [...p.left].map(c => c === "1"); game.f = p.f.slice(); game.timed = false;
     if (game.f.join() !== d.f.join()) game.sol = [];
   }
-  settings.level = d.N; $("levelSel").value = d.N; mark = null;
+  settings.level = d.N; $("levelSel").value = d.N;
   draw(); save();
   if (!leftCount()) { game.won = true; draw(); save(); }
 }

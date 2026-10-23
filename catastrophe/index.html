@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.6"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-23.2"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-22.6">
+<link rel="stylesheet" href="../games.css?v=2026-10-23.2">
 <style>
 /* A rug, and a cat sitting at its top corner beside a pot of dye. Each square of the rug is a tuft of pile in
    its colour, with a woven texture laid over the whole rug; fringe hangs off both ends. Knock a pot over and
@@ -91,7 +91,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-22.6"></script>
+<script src="../games.js?v=2026-10-23.2"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // Levels: [columns, rows, colours, spare pots on top of the fewest the solver finds].
@@ -194,7 +194,8 @@ const STORE = "catdoku.catastrophe.v1", MAX_LEVEL = 10, SVGNS = "http://www.w3.o
 const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1}, state.settings);
-let game = state.game || null, busy = false, hintMark = null;
+let game = state.game || null, busy = false;
+const hints = G.hinter({game: () => game, key: () => game ? game.history.join() : "", draw: () => drawHint()});   // marks {pot, cells}
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !busy && !$("overlay").classList.contains("show");
 const levelName = n => { const [W, H, K] = levelOf(n); return `Level ${n} · ${W} × ${H}, ${K} colours`; };
@@ -309,7 +310,6 @@ function knock(c) {
   clearTimeout(tipTimer);
   tipTimer = setTimeout(() => { paw.classList.remove("swat"); pot.classList.remove("tipped"); spill.classList.remove("on"); }, 650);
   game.history.push(c); game.cells = dye(game.cells, c);
-  hintMark = null;
   draw(true); save();
   if (done(game.cells)) win();
   else if (potsLeft() === 0) G.note("That was the last pot. Keep going, but there's no gold paw this time.", 6000);
@@ -318,20 +318,20 @@ $("pots").addEventListener("click", e => { const b = e.target.closest("button");
 // Tapping a square knocks over its colour.
 $("board").addEventListener("click", e => { const g = e.target.closest(".sq"); if (g && game) knock(game.cells[+g.dataset.i]); });
 document.addEventListener("keydown", e => {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !$("undoBtn").disabled) { e.preventDefault(); $("undoBtn").click(); return; }
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && !$("undoBtn").disabled) { e.preventDefault(); $("undoBtn").click(); return; }
   if (game && /^[1-9]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey && +e.key <= game.K && !document.querySelector(".spot")) knock(+e.key - 1);
 });
 
 function undo() {
   if (!game || game.won || !used()) return;
   G.closeCard();
-  game.history.pop(); game.undid = true; game.cells = replay(); hintMark = null; draw(); save();
+  game.history.pop(); game.undid = true; game.cells = replay(); draw(); save();
 }
 $("undoBtn").onclick = () => { if (playing() || $("overlay").classList.contains("show")) undo(); };
 function restart() {
   if (!game || game.won || !used()) return;
   G.closeCard();
-  game.history = []; game.undid = true; game.cells = game.start.slice(); hintMark = null; draw(); save();
+  game.history = []; game.undid = true; game.cells = game.start.slice(); draw(); save();
   G.note("Back to the start.", 3000);
 }
 $("restartBtn").onclick = restart;
@@ -344,13 +344,14 @@ function hint() {
   if (!way || !way.length) { G.note("No hint can be found for this rug.", 4000); return; }
   game.hinted = true; save();
   const c = way[0], before = dyedPart(game.cells), after = dyedPart(dye(game.cells, c)), left = potsLeft();
-  hintMark = {key: game.history.join(), cells: [...after.keys()].filter(i => !before.has(i)), pot: c, until: Date.now() + 5000};
-  G.note(`Knock over the ${DYES[c][1]} dye: it soaks into the marked squares.${way.length > left && left >= 0 ? ` About ${way.length} more to go, so you'll run over.` : ""}`, 5000);
-  drawHint(); setTimeout(drawHint, 5100);
+  const over = way.length > left && left >= 0 ? ` About ${way.length} more to go, so you'll run over.` : "";
+  // the first time, the pot; asked again, the squares it would soak into too
+  if (!hints.level()) return hints.show({pot: c, cells: []}, `Knock over the ${DYES[c][1]} dye next.${over}`);
+  hints.show({pot: c, cells: [...after.keys()].filter(i => !before.has(i))}, `Knock over the ${DYES[c][1]} dye: it soaks into the marked squares.${over}`);
 }
 function drawHint() {
   const layer = $("board").querySelector("#hintLayer"); if (!layer) return;
-  const on = hintMark && game && hintMark.key === game.history.join() && Date.now() < hintMark.until;
+  const hintMark = game && hints.current(), on = !!hintMark;
   const s = cellPx();
   layer.innerHTML = on ? hintMark.cells.map(i => `<rect class="hintsq" x="${(i % game.W) * s + 1}" y="${Math.floor(i / game.W) * s + 1}" width="${s - 2}" height="${s - 2}" rx="2"/>`).join("") : "";
   [...$("pots").children].forEach((b, c) => b.classList.toggle("hintcell", !!(on && hintMark.pot === c)));
@@ -393,7 +394,7 @@ async function newPuzzle() {
   busy = true;
   const n = settings.level;
   const p = await build.take(n);
-  game = fresh(n, p); hintMark = null;
+  game = fresh(n, p);
   busy = false; G.closeCard(); G.note(""); draw(); save();
   build.prefetch(n);
   G.track(`Cat-astrophe new puzzle level ${n}`);
@@ -410,7 +411,7 @@ function openShared(d) {
   if (!best || !best.length) { G.note("That share link didn't work.", 5000); return; }
   game = fresh(d.N, {W: lv[0], H: lv[1], K: lv[2], cells, par: best.length, pots: best.length + lv[3]});
   if (d.p && ok(d.p.h, -1) && d.p.h.length <= 4 * game.W * game.H) { game.history = [...d.p.h].map(Number); game.cells = replay(); game.timed = false; }
-  settings.level = d.N; $("levelSel").value = d.N; hintMark = null;
+  settings.level = d.N; $("levelSel").value = d.N;
   draw(); save(); build.prefetch(d.N);
   if (done(game.cells)) { game.won = true; draw(); save(); }
 }

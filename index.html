@@ -10,7 +10,7 @@ if (/^#share=/.test(location.hash)) location.replace("catdoku/" + location.hash)
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.6";
+  var BUILD = "2026-10-23.2";
   fetch("version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,14 +25,15 @@ if (/^#share=/.test(location.hash)) location.replace("catdoku/" + location.hash)
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="games.css?v=2026-10-22.6">
+<link rel="stylesheet" href="games.css?v=2026-10-23.2">
 <style>
 /* The front page: a search box, the games played lately, then every game on its shelf (Logic grids, Words…), each a
    tile with an icon drawn from its board, a line about it and how many you've solved. */
 main{max-width:1240px}   /* on a wide screen the shelves spread out, five or six tiles across */
 .find{width:100%;max-width:460px;font:inherit;font-size:17px;padding:9px 16px;border:2px solid var(--ink);border-radius:999px;background:var(--panel);color:var(--ink)}
 .group{width:100%;display:flex;flex-direction:column;gap:10px}
-.group[hidden],.tile[hidden],.daily[hidden]{display:none}
+.group[hidden],.tile[hidden],.daily[hidden],.group h2 small[hidden]{display:none}
+.favWrap > .favStar{top:8px;right:6px;font-size:24px}   /* front-page tiles are bigger than the menu's */
 .group h2{margin:10px 0 0;font-size:24px;font-weight:800;line-height:1.1}
 .group h2 small{display:block;font-size:15px;font-weight:500;color:var(--ink-soft);margin-top:2px}
 .none{color:var(--ink-soft)}
@@ -77,7 +78,7 @@ main{max-width:1240px}   /* on a wide screen the shelves spread out, five or six
   <p class="none" id="none" hidden>No games match that. Try another word, or clear the search to see them all.</p>
 </main>
 
-<script src="games.js?v=2026-10-22.6"></script>
+<script src="games.js?v=2026-10-23.2"></script>
 <script>
 // Each tile shows a little picture of the game's board, drawn by tools/make-icons.py.
 // How many puzzles you've finished in each game, from the best-times records kept on this device.
@@ -95,7 +96,9 @@ function tile(g) {
   done.className = "done" + (n === 0 ? " new" : "");
   done.textContent = n < 0 ? "Just play" : n ? `${n} solved` : "Not played yet";
   a.append(pic, b, sm, done);
-  return a;
+  // the star sits beside the link, not in it, so tapping it doesn't open the game
+  const w = document.createElement("div"); w.className = "favWrap"; w.dataset.slug = slug;
+  w.append(a, G.favStar(slug, drawFavs)); return w;
 }
 function shelf(title, line, games) {
   const sec = document.createElement("section"); sec.className = "group";
@@ -119,18 +122,26 @@ function shelf(title, line, games) {
   a.classList.toggle("done", done);
   if (done) a.append(G.goldPaw());
 }
-// Keep playing: the last few games played on this device. Then every game on its shelf.
-const lately = G.recent().slice(0, 4).map(s => G.GAMES.find(g => g[1] === s));
-const keep = lately.length ? shelf("Keep playing", "", lately) : null;
+// Favorites: the games starred on this device, in the order they were starred (until there are some, a line says
+// how). Then every game on its shelf.
+const favs = shelf("Favorites", "", []);
+function drawFavs() {
+  const list = G.favorites().map(s => G.GAMES.find(g => g[1] === s));
+  favs.querySelector(".shelf").replaceChildren(...list.map(tile));
+  favs.querySelector("h2 small") || favs.querySelector("h2").append(document.createElement("small"));
+  favs.querySelector("h2 small").textContent = list.length ? "" : "Tap the ☆ on any game to keep it here.";
+  favs.querySelector("h2 small").hidden = !!list.length;
+}
+drawFavs();
 const shelves = G.GROUPS.map(([key, title, line]) => shelf(title, line, G.GAMES.filter(g => g[4] === key)));
-// Search: show only the games that match, on their shelves (Keep playing hides while searching).
+// Search: show only the games that match, on their shelves (Favorites hides while searching).
 $("find").oninput = () => {
   const q = $("find").value.trim();
-  if (keep) keep.hidden = !!q;
+  favs.hidden = !!q;
   $("daily").hidden = !!q;
   for (const sec of shelves) {
     let any = false;
-    for (const a of sec.querySelectorAll(".tile")) { const hit = !q || G.matches(G.GAMES.find(g => g[1] === a.dataset.slug), q); a.hidden = !hit; any = any || hit; }
+    for (const w of sec.querySelectorAll(".favWrap")) { const hit = !q || G.matches(G.GAMES.find(g => g[1] === w.dataset.slug), q); w.hidden = !hit; any = any || hit; }
     sec.hidden = !any;
   }
   $("none").hidden = !q || shelves.some(sec => !sec.hidden);

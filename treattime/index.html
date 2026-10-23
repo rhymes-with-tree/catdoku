@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.6"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-23.2"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-22.6">
+<link rel="stylesheet" href="../games.css?v=2026-10-23.2">
 <style>
 /* A tray of treat piles, each with a number. A tabby from Higgins's gang sits at the end of every row and column
    with a bowl showing how many treats it wants. Tap a pile to put it back in the jar; the piles left in a cat's
@@ -94,7 +94,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-22.6"></script>
+<script src="../games.js?v=2026-10-23.2"></script>
 <script>
 /* ---------- treat puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N tray of treat piles, each with a number. Some piles go back in the jar; the rest stay. The cat at the
@@ -229,7 +229,9 @@ function lineSums() {
 }
 function update() {
   const N = game.N, {row, col} = lineSums();
-  cells.forEach((d, i) => { d.classList.toggle("gone", game.mark[i] === 1); d.classList.toggle("keep", game.mark[i] === 2); });
+  const hm = hints.current();
+  cells.forEach((d, i) => { d.classList.toggle("gone", game.mark[i] === 1); d.classList.toggle("keep", game.mark[i] === 2);
+    d.classList.toggle("hintcell", !!(hm && hm.cells.includes(i))); d.classList.toggle("bad", !!(hm && hm.bad && hm.cells.includes(i))); });
   let fed = 0;
   for (let k = 0; k < 2 * N; k++) {
     const have = k < N ? row[k] : col[k - N], want = k < N ? game.rowT[k] : game.colT[k - N];
@@ -241,7 +243,6 @@ function update() {
   $("restartBtn").disabled = !game.history.length || game.won;
   $("hintBtn").disabled = game.won;
   $("keepBtn").setAttribute("aria-pressed", keepMode);
-  if (hintShown && hintShown !== game.mark.join("")) clearHint();
   showCursor();
   return fed === 2 * N;
 }
@@ -285,7 +286,7 @@ $("board").addEventListener("keydown", e => {
   e.preventDefault(); showCursor();
 });
 $("board").addEventListener("blur", () => { cursor = -1; showCursor(); });
-document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
 
 // Undo takes back a tap, or a Restart.
 function undo() {
@@ -305,28 +306,29 @@ $("restartBtn").onclick = () => {
   G.note("Every pile's back on the tray. Undo brings your moves back.", 4000);
 };
 // Hint: first a mistake, in red (a pile put back that should stay, or marked to stay that should go back);
-// otherwise, in gold, a pile to put back, from the line with the fewest left to put back.
-let hintShown = null, hintTimer = 0;
-function clearHint() { hintShown = null; clearTimeout(hintTimer); cells.forEach(d => d.classList.remove("hintcell", "bad")); }
+// otherwise, in gold, the row or column with the fewest piles left to put back, and asked again, one of its piles.
+const hints = G.hinter({game: () => game, key: () => game ? game.mark.join("") : "", draw: () => update()});   // marks {cells, bad}
+const clearHint = () => hints.clear(false);
 $("hintBtn").onclick = () => {
   if (!playing()) return;
   const N = game.N, all = [...Array(N * N).keys()];
   const wrong = all.filter(i => (game.mark[i] === 1 && game.keep[i]) || (game.mark[i] === 2 && !game.keep[i]));
-  let i, bad = false, say;
-  if (wrong.length) { i = wrong[0]; bad = true; say = game.mark[i] === 1 ? "The red pile should stay on the tray." : "The red pile goes back in the jar."; }
+  let i, bad = false, say, line = null;
+  if (wrong.length) { i = wrong[0]; bad = true; say = (game.mark[i] === 1 ? "The red pile should stay on the tray" : "The red pile goes back in the jar") + (wrong.length > 1 ? ` (and ${wrong.length - 1} more).` : "."); }
   else {
     const todo = all.filter(j => !game.keep[j] && game.mark[j] !== 1);
     if (!todo.length) { G.note("Every pile that goes back is back already.", 4000); return; }
-    const left = j => { const r = Math.floor(j / N), c = j % N; return Math.min(todo.filter(k => Math.floor(k / N) === r).length, todo.filter(k => k % N === c).length); };
+    const inRow = j => todo.filter(k => Math.floor(k / N) === Math.floor(j / N)), inCol = j => todo.filter(k => k % N === j % N);
+    const left = j => Math.min(inRow(j).length, inCol(j).length);
     i = todo.reduce((a, b) => left(b) < left(a) ? b : a);
     say = "Put the gold pile back in the jar.";
+    const byRow = inRow(i).length <= inCol(i).length, n = left(i);
+    line = {cells: all.filter(k => byRow ? Math.floor(k / N) === Math.floor(i / N) : k % N === i % N),
+      say: `This ${byRow ? "row" : "column"} has ${n === 1 ? "one pile" : `${n} piles`} left to put back. Which ${n === 1 ? "one" : "ones"}?`};
   }
   game.hinted = true; game.started = true; save();
-  clearHint();
-  cells[i].classList.add("hintcell"); if (bad) cells[i].classList.add("bad");
-  hintShown = game.mark.join("");
-  G.note(say, 5000);
-  hintTimer = setTimeout(clearHint, 5000);
+  if (line && !hints.level()) return hints.show({cells: line.cells}, line.say);
+  hints.show({cells: [i], bad}, say);
 };
 
 /* ---------- endings ---------- */

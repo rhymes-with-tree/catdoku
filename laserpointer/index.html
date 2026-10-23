@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.6"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-23.2"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-22.6">
+<link rel="stylesheet" href="../games.css?v=2026-10-23.2">
 <style>
 /* A room seen from above: a wooden floor inside a wall, with a laser pointer poking in at one edge. Cats sit on
    some squares and mirrors stand on others; tap a mirror to tip it the other way. The red dot runs straight and
@@ -89,6 +89,7 @@
     <button id="undoBtn">Undo</button>
     <button id="restartBtn">Restart</button>
     <button id="shareBtn">Share</button>
+    <button id="toysBtn">Toys</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
   </div>
@@ -99,7 +100,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-22.6"></script>
+<script src="../games.js?v=2026-10-23.2"></script>
 <script>
 /* ---------- laser puzzles (plain functions, also run in a background worker) ---------- */
 // The room is N × N squares. The laser pointer sits just off one edge and shines in along a row or column.
@@ -476,7 +477,7 @@ function buttons(seen) {
   $("undoBtn").disabled = !game.history.length || game.won;
   $("restartBtn").disabled = !(game.history.length || (live && live.on)) || game.won;
   $("hintBtn").disabled = game.won;
-  if (hintShown && hintShown !== tiltKey()) clearHint();
+  paintHint();
 }
 const drawPath = (id, pts) => $(id).setAttribute("d", pts.length > 1 ? pts.map(([x, y], k) => `${k ? "L" : "M"}${x} ${y}`).join("") : "");
 const tiltKey = () => game.tilt.join("") + (live ? live.visits.length : "");
@@ -630,7 +631,7 @@ $("svg").addEventListener("keydown", e => {
   e.preventDefault(); showCursor();
 });
 $("svg").addEventListener("blur", () => { cursor = -1; showCursor(); });
-document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
 
 // Undo takes back a tap, or a Restart.
 function undo() {
@@ -665,8 +666,9 @@ $("restartBtn").onclick = () => {
 // first wrong one the dot meets now: up to it, the dot is on the answer's run.) On a moving level it goes by the
 // answer's bounces still to come: the next one the mirror isn't ready for, which may be a mirror to tip only
 // once the dot has bounced off it; and if the dot has already gone off the answer's way, this run can't win.
-let hintShown = null, hintTimer = 0;
-function clearHint() { hintShown = null; clearTimeout(hintTimer); const h = $("hintsq"); if (h) h.setAttribute("x", -400); }
+const hints = G.hinter({game: () => game, key: () => game ? tiltKey() : "", draw: () => paintHint()});   // marks {i}: a mirror
+function paintHint() { const h = $("hintsq"), m = hints.current(); if (!h) return; if (!m) { h.setAttribute("x", -400); return; } const [x, y] = centre(m.i); h.setAttribute("x", x - 46); h.setAttribute("y", y - 46); }
+const clearHint = () => hints.clear();
 $("hintBtn").onclick = () => {
   if (!playing()) return;
   let wrong, say = "Tip the mirror in the gold box the other way.";
@@ -683,11 +685,7 @@ $("hintBtn").onclick = () => {
     if (wrong === undefined) { G.note("Every mirror the dot meets is right already.", 4000); return; }
   }
   game.hinted = true; game.started = true; save();
-  clearHint();
-  const [x, y] = centre(wrong); $("hintsq").setAttribute("x", x - 46); $("hintsq").setAttribute("y", y - 46);
-  hintShown = tiltKey();
-  G.note(say, 5000);
-  hintTimer = setTimeout(clearHint, 5000);
+  hints.show({i: wrong}, say);
 };
 
 /* ---------- endings ---------- */
@@ -706,8 +704,22 @@ function win() {
     isLive() || still ? 300 : runLen / runSpeed() + 200);
 }
 // Toys to throw: from the toy library, leaving out any the player has switched off in another game.
-const TOSS = ["mouse", "fish", "feather-rainbow", "wiffle-red", "spiky-lime", "crochet-stars", "fluffy-bell", "swirl-purple", "tennis", "wiffle-teal", "bell-purple", "ribbon-tail"];
+// By colour, as in the other games' toy chests.
+const TOSS_KINDS = [
+  {c: "#BD5538", looks: [["wiffle-red", "red wiffle ball"], ["crochet-stars", "star ball"]]},
+  {c: "#ECA818", looks: [["tennis", "tennis ball"]]},
+  {c: "#73A7AE", looks: [["wiffle-teal", "teal wiffle ball"], ["fish", "fish"]]},
+  {c: "#B3B94B", looks: [["spiky-lime", "spiky pom-pom"]]},
+  {c: "#B94588", looks: [["swirl-purple", "plum swirl ball"], ["bell-purple", "bell ball"]]},
+  {c: "#825840", looks: [["fluffy-bell", "fluffy bell ball"]]},
+  {c: "#5E5866", looks: [["mouse", "mouse"]]},
+  {c: "#E16A4A", looks: [["feather-rainbow", "rainbow feather ball"], ["ribbon-tail", "ribbon ball"]]},
+];
+const TOSS = TOSS_KINDS.flatMap(k => k.looks.map(([f]) => f));
 const toySrc = f => (window.TOY_SRC || {})[f] || `../toys/${f}.webp?v=${window.SITE_BUILD || ""}`;
+$("toysBtn").onclick = () => G.toyPicker({kinds: TOSS_KINDS, off: G.toysOff(), min: 1, src: toySrc, save: off => {
+  G.saveToys(off); G.note("Saved. Your toys are used from the next room.", 3500);
+}});
 // Each cat gets a toy that lands right by its paws (the cat pounces on it and keeps watching it), and a few more
 // land about the floor. Seen from above, a toy grows as it flies up and shrinks as it comes down, landing at half
 // the size it was thrown at, with its shadow sliding along the floor beneath it. With reduced motion they're

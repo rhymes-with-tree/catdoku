@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.6"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-23.2"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-22.6">
+<link rel="stylesheet" href="../games.css?v=2026-10-23.2">
 <style>
 /* A cat chases toys round a rug, a strand of yarn trailing behind it that grows with every toy. Don't run into
    the edge of the rug, the yarn, or anything left lying about. */
@@ -62,16 +62,18 @@
   <div class="actions">
     <button id="pauseBtn">Pause</button>
     <button id="restartBtn">Restart</button>
+    <button id="shareBtn">Share</button>
     <button id="toysBtn">Toys</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
   </div>
   <div class="bar">
     <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New rug</button>
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-22.6"></script>
+<script src="../games.js?v=2026-10-23.2"></script>
 <script>
 /* ---------- levels ---------- */
 // Level n: [squares across the rug, toys to catch, milliseconds per step at the start and at the end, things in
@@ -179,7 +181,8 @@ const save = () => G.save(STORE, {settings});
 const DIRS = {up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0]};
 const free = (x, y) => x >= 0 && y >= 0 && x < game.N && y < game.N && !game.snake.some(([a, b]) => a === x && b === y) && !game.sleepers.some(([a, b]) => a === x && b === y);
 
-function newRun(n) {
+// A run on a new rug, or (given `rug`, its sleepers and catnip) on the same rug again.
+function newRun(n, rug) {
   clearTimeout(timer);
   const [N, target, , , S] = LEVELS[n], mid = Math.floor(N / 2);
   game = {level: n, N, snake: [[mid, mid], [mid - 1, mid], [mid - 2, mid]], dir: "right", queue: [], toy: null, caught: 0, target,
@@ -187,7 +190,8 @@ function newRun(n) {
   // things in the way: lemons, piles of books and strips of tape two or three squares long; not on the starting
   // row, not against the edge, and never next to each other
   const near = (x, y) => game.sleepers.some(([a, b]) => Math.abs(a - x) < 2 && Math.abs(b - y) < 2);
-  for (let tries = 0, placed = 0; placed < S && tries < 800; tries++) {
+  if (rug) { game.sleepers = rug.sleepers.map(c => c.slice()); game.nip = rug.nip.map(c => c.slice()); }
+  for (let tries = 0, placed = 0; !rug && placed < S && tries < 800; tries++) {
     const x = 1 + Math.floor(Math.random() * (N - 2)), y = 1 + Math.floor(Math.random() * (N - 2)), r = Math.random();
     let cells = [[x, y]], k = r < .45 ? "l" : r < .75 ? "b" : null;
     if (!k) { const across = Math.random() < .5, len = 2 + Math.floor(Math.random() * 2); k = across ? "t" : "T"; cells = Array.from({length: len}, (_, i) => across ? [x + i, y] : [x, y + i]); }
@@ -197,7 +201,7 @@ function newRun(n) {
   }
   // catnip: patches the cat can cross, but it stops to roll about on them (as in Knock It Off)
   const nips = LEVELS[n][5] || 0;
-  for (let tries = 0; game.nip.length < nips && tries < 500; tries++) {
+  for (let tries = 0; !rug && game.nip.length < nips && tries < 500; tries++) {
     const x = 1 + Math.floor(Math.random() * (N - 2)), y = 1 + Math.floor(Math.random() * (N - 2));
     if (Math.abs(y - mid) < 2 || game.sleepers.some(([a, b]) => Math.abs(a - x) < 2 && Math.abs(b - y) < 2) || game.nip.some(([a, b]) => Math.abs(a - x) < 3 && Math.abs(b - y) < 3)) continue;
     game.nip.push([x, y]);
@@ -352,7 +356,7 @@ function tangle(x, y) {
   setTimeout(() => {
     if (game !== g) return;
     G.openCard(what === "accidentally touched tape" ? "Oh no! Sticky Paws!" : "Tangled!", `Jan Brady ${what}, after ${game.caught} of ${game.target} toys.`,
-      [["Try again", () => { bump = null; G.closeCard(); newRun(game.level); }, true], ["Admire the mess", () => { G.closeCard(); G.note("Tap Restart to try again.", 0); }]],
+      [["Try again", () => { bump = null; G.closeCard(); newRun(game.level, rugOf()); }, true], ["Admire the mess", () => { G.closeCard(); G.note("Tap Restart to try again.", 0); }]],
       null, G.otherSize($("levelSel"), game.level, startLevel, "Or play a different level:"));
   }, 700);
 }
@@ -372,7 +376,20 @@ function win() {
   }, 800);
 }
 function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); bump = null; G.closeCard(); newRun(n); }
-$("restartBtn").onclick = () => { if (game) { if (game.state === "running" || game.state === "paused") { settings.tries[game.level] = (settings.tries[game.level] || 0) + 1; save(); } bump = null; G.closeCard(); newRun(game.level); } };
+// Restart runs again on the same rug; New rug lays out a new one. Leaving a run partway counts as a try.
+const rugOf = () => ({sleepers: game.sleepers, nip: game.nip});
+const leaveRun = () => { if (game.state === "running" || game.state === "paused") { settings.tries[game.level] = (settings.tries[game.level] || 0) + 1; save(); } bump = null; G.closeCard(); };
+$("restartBtn").onclick = () => { if (game) { leaveRun(); newRun(game.level, rugOf()); } };
+$("newBtn").onclick = () => { if (game) { leaveRun(); newRun(game.level); } };
+// Share: a link to this rug (where the things in the way and the catnip are); the toys turn up at random.
+$("shareBtn").onclick = () => { if (game) { pause(); G.shareCard({name: "Tail Chase", what: "rug", won: game.state === "won",
+  puzzle: () => ({g: "tailchase", N: game.level, s: game.sleepers.map(c => c.join(".")).join(","), n: game.nip.map(c => c.join(".")).join(",")})}); } };
+function openShared(d) {
+  const N = d.N >= 1 && d.N <= MAX_LEVEL && LEVELS[d.N][0], parse = t => t ? String(t).split(",").map(c => c.split(".").map((v, i) => i < 2 ? +v : v)) : [];
+  const sleepers = parse(d.s), nip = parse(d.n), inside = ([x, y]) => x >= 0 && y >= 0 && x < N && y < N;
+  if (!N || !sleepers.every(c => inside(c) && THINGS[c[2]] !== undefined) || !nip.every(inside)) throw new Error("the shared rug doesn't fit the game");
+  settings.level = d.N; $("levelSel").value = d.N; save(); bump = null; newRun(d.N, {sleepers, nip});
+}
 
 /* ---------- how to play ---------- */
 // How to play works before a run and during one: a run in progress is paused first, and stays paused
@@ -403,7 +420,11 @@ G.setupTimer({name: "tailchase", game: () => game, playing: g => g.state === "ru
 $("bestBtn").onclick = () => { pause(); G.showBests("Best times", game ? game.level : settings.level); };
 if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
 $("levelSel").value = settings.level;
-newRun(settings.level);
+const shared = G.readShare("tailchase");
+let openedShare = false;
+if (shared) try { openShared(shared); openedShare = true; G.note("Here's the shared rug. Good luck!", 6000); G.track("Tail Chase shared puzzle opened"); } catch (e) { G.note("That share link didn't work.", 5000); }
+if (!openedShare) newRun(settings.level);
+window.addEventListener("hashchange", () => { const d = G.readShare("tailchase"); if (d) G.offerShare(d, {name: "Tail Chase", inProgress: !!(game && game.started && game.state !== "won"), open: d => { try { openShared(d); } catch (e) { G.note("That share link didn't work.", 5000); } }}); });
 setTimeout(helpOnFirstVisit, 300);
 </script>
 <!-- Visit counts (GoatCounter: no cookies, nothing personal) -->

@@ -55,7 +55,6 @@ const G = (() => {
   ];
   const $ = id => document.getElementById(id);
 
-  // The games played on this device, most recent first, for the front page's and the menu's Keep playing row.
   /* ---------- the daily challenge ---------- */
   // One game a day is today's challenge, the same game for everyone on a given date: win any puzzle in it that
   // day (in Pawlette, clear 3 lines in one Swipe game) to do it. The games come round in cycles: the first, from
@@ -114,9 +113,37 @@ const G = (() => {
     return `Today's challenge solved! ${k > 1 ? `${k}-day streak!` : "Come back tomorrow for a new challenge!"}`;
   }
 
-  const RECENT = "catdoku.recent.v1";
-  const recent = () => { const r = load(RECENT).games; return Array.isArray(r) ? r.filter(s => GAMES.some(g => g[1] === s)) : []; };
-  const played = slug => save(RECENT, {games: [slug, ...recent().filter(s => s !== slug)].slice(0, 8)});
+  // Favorite games, picked with a star and kept on this device in the order they were picked, for the Favorites
+  // row on the front page and in the menu.
+  const FAVS = "catdoku.favorites.v1";
+  const favorites = () => { const f = load(FAVS).games; return Array.isArray(f) ? f.filter(s => GAMES.some(g => g[1] === s)) : []; };
+  function toggleFavorite(slug) {
+    const f = favorites(), on = !f.includes(slug);
+    save(FAVS, {games: on ? [...f, slug] : f.filter(s => s !== slug)});
+    track(`${on ? "Favorited" : "Unfavorited"} ${slug}`);
+    return on;
+  }
+  // A star button that adds a game to the favorites or takes it off; every star for that game on the page follows,
+  // and `onChange` runs after (to redraw a Favorites row). `withLabel` adds a word, for a game's own page.
+  function favStar(slug, onChange, withLabel) {
+    const b = document.createElement("button"), name = (GAMES.find(g => g[1] === slug) || [slug])[0];
+    b.type = "button"; b.className = "favStar" + (withLabel ? " labelled" : ""); b.dataset.slug = slug;
+    b.onclick = e => {
+      e.preventDefault(); e.stopPropagation();
+      const on = toggleFavorite(slug);
+      document.querySelectorAll(".favStar").forEach(x => x.dataset.slug === slug && x.refresh());
+      if (onChange) onChange();
+      if (withLabel) note(on ? `${name} is in your favorites, at the top of the front page.` : `${name} is out of your favorites.`, 3500);
+    };
+    b.refresh = () => {
+      const on = favorites().includes(slug);
+      b.innerHTML = `<span class="st">${on ? "★" : "☆"}</span>` + (withLabel ? "<span>Favorite</span>" : "");
+      b.setAttribute("aria-pressed", String(on));
+      b.setAttribute("aria-label", on ? `${name} is a favorite. Tap to take it off.` : `Add ${name} to favorites`);
+      b.title = on ? "In your favorites" : "Add to favorites";
+    };
+    b.refresh(); return b;
+  }
   // Whether a game matches what's typed in a search box: every word typed is found in its name, line, shelf (its
   // heading, plain name or line) or search words.
   const matches = (g, q) => {
@@ -138,7 +165,7 @@ const G = (() => {
     const home = document.createElement("a");
     home.className = "gameTile home"; home.href = base || "./";
     home.innerHTML = "<b>Front page</b><small>Every game at a glance</small>";
-    // a search box, then the games played lately, then every game on its shelf
+    // a search box, then your favorites, then every game on its shelf
     const search = document.createElement("input");
     search.type = "search"; search.className = "gamesSearch"; search.placeholder = "Search games (try “word” or “sudoku”)";
     search.setAttribute("aria-label", "Search games");
@@ -149,7 +176,10 @@ const G = (() => {
       if (slug === current) a.setAttribute("aria-current", "page");
       const b = document.createElement("b"); b.textContent = name;
       const sm = document.createElement("small"); sm.textContent = slug === current ? "You're here" : blurb;
-      a.append(b, sm); return a;
+      a.append(b, sm);
+      // the star sits beside the link, not in it, so tapping it doesn't open the game
+      const w = document.createElement("div"); w.className = "favWrap"; w.dataset.slug = slug;
+      w.append(a, favStar(slug, drawFavs)); return w;
     };
     const section = (title, games) => {
       const sec = document.createElement("section"); sec.className = "gamesGroup";
@@ -157,30 +187,37 @@ const G = (() => {
       const grid = document.createElement("div"); grid.className = "gamesGrid";
       grid.append(...games.map(tile)); sec.append(h, grid); return sec;
     };
-    const lately = recent().filter(s => s !== current).slice(0, 4).map(s => GAMES.find(g => g[1] === s));
-    const keep = lately.length ? section("Keep playing", lately) : null;
+    const favs = section("Favorites", []);
+    function drawFavs() {
+      const list = favorites().map(s => GAMES.find(g => g[1] === s));
+      favs.querySelector(".gamesGrid").replaceChildren(...list.map(tile));
+      favs.hidden = !list.length || !!search.value.trim();
+    }
     const shelves = GROUPS.map(([key, title]) => section(title, GAMES.filter(g => g[4] === key)));
     const none = document.createElement("p"); none.className = "gamesNone"; none.hidden = true; none.textContent = "No games match that.";
     const dslug = daily(), dgame = GAMES.find(g => g[1] === dslug);
     const todays = section(dailyDoneToday() ? "Today's challenge: done" : "Today's challenge", [dgame]);
-    panel.append(home, todays, search, ...(keep ? [keep] : []), ...shelves, none);
+    panel.append(home, todays, search, favs, ...shelves, none);
+    drawFavs();
     search.oninput = () => {
       const q = search.value.trim();
-      if (keep) keep.hidden = !!q;
+      favs.hidden = !!q || !favorites().length;
       todays.hidden = !!q;
       for (const sec of shelves) {
         let any = false;
-        for (const a of sec.querySelectorAll(".gameTile")) { const hit = !q || matches(GAMES.find(g => g[1] === a.dataset.slug), q); a.hidden = !hit; any = any || hit; }
+        for (const w of sec.querySelectorAll(".favWrap")) { const hit = !q || matches(GAMES.find(g => g[1] === w.dataset.slug), q); w.hidden = !hit; any = any || hit; }
         sec.hidden = !any;
       }
       none.hidden = !q || shelves.some(sec => !sec.hidden);
     };
     const show = open => { panel.hidden = !open; btn.setAttribute("aria-expanded", String(open)); };
-    if (current) played(current);
     btn.onclick = e => { e.stopPropagation(); show(panel.hidden); };
     document.addEventListener("click", e => { if (!panel.hidden && !el.contains(e.target)) show(false); });
     document.addEventListener("keydown", e => { if (e.key === "Escape" && !panel.hidden) { show(false); btn.focus(); } });
-    el.append(btn, panel);
+    // on a game's page, its own star beside the menu button
+    const row = document.createElement("div"); row.className = "gamesRow"; row.append(btn);
+    if (current) row.append(favStar(current, drawFavs, true));
+    el.append(row, panel);
     // on today's challenge, a badge under the menu button says so
     if (current && current === dslug) {
       const badge = document.createElement("span"); badge.className = "dailyBadge"; badge.id = "dailyBadge";
@@ -503,17 +540,19 @@ const G = (() => {
     track(`${name} result shared`);
     sendLink(name, bits.join(" · "), location.origin + location.pathname, {btn});
   }
-  // The Share card: a fresh copy of the puzzle, or the puzzle with the moves so far.
+  // The Share card: a fresh copy of the puzzle, or the puzzle with the moves so far (when o.progress is given;
+  // a game played against the clock, like Pounce, shares only the fresh level).
   function shareCard(o) {
     const send = (data, what) => {
       track(`${o.name} shared${what ? " " + what : ""}`);
-      const text = !data.p ? `Try this ${o.name} puzzle!` : o.won ? `Here's my finished ${o.name} puzzle!` : `Can you help me with this ${o.name} puzzle?`;
+      const text = !data.p ? `Try this ${o.name} ${o.what || "puzzle"}!` : o.won ? `Here's my finished ${o.name} puzzle!` : `Can you help me with this ${o.name} puzzle?`;
       sendLink(o.name, text, shareUrl(data));
     };
     const won = o.won;
-    openCard("Share this puzzle", "Send a link so someone else can play this exact puzzle.", [
-      ["Share this puzzle", () => send(o.puzzle(), ""), true],
-      [won ? "Share my solved board" : "Share with my progress", () => send(Object.assign(o.puzzle(), {p: o.progress()}), "with progress")],
+    const what = o.what || "puzzle";
+    openCard(`Share this ${what}`, `Send a link so someone else can play this exact ${what}.`, [
+      [`Share this ${what}`, () => send(o.puzzle(), ""), true],
+      ...(o.progress ? [[won ? "Share my solved board" : "Share with my progress", () => send(Object.assign(o.puzzle(), {p: o.progress()}), "with progress")]] : []),
       ["Cancel", closeCard],
     ]);
   }
@@ -781,6 +820,81 @@ const G = (() => {
     if (text && ms !== 0) msgTimer = setTimeout(() => note(""), ms || 3500);
   }
 
+  /* ---------- hints ---------- */
+  // Every game's Hint works the same way. The game works out what to show and hands it to its hinter, which keeps
+  // the mark on the board for HINT_MS (or until the board changes) with a line saying what to do. Marks are gold
+  // (HINT.gold) for where to go and red (HINT.red) for a mistake. Pressing Hint again on the same board can say more
+  // each time: level() is how many hints have already been shown on this board (0 the first time).
+  // o: {key() (the board as it stands, as a string), draw() (redraws; it reads the mark with current()),
+  //     game() (the puzzle being played, so a new one that happens to look the same starts afresh)}
+  // show(mark, say, {ms, uncounted}): uncounted shows a mark that isn't a hint (Audit's), so it doesn't add a level.
+  const HINT_MS = 5000, HINT = {gold: "#ECA818", red: "#C8392B"};
+  function hinter(o) {
+    let mark = null, at = null, of = null, shown = 0, timer = 0;
+    const same = () => o.game() === of && o.key() === at;
+    return {
+      level() { if (!same()) shown = 0; return shown; },
+      show(m, say, {ms = HINT_MS, uncounted = false} = {}) {
+        clearTimeout(timer);
+        if (!same()) shown = 0;
+        mark = m; at = o.key(); of = o.game(); if (!uncounted) shown++;
+        o.draw(); if (say) note(say, ms);
+        timer = setTimeout(() => { if (mark === m) { mark = null; o.draw(); } }, ms);
+      },
+      // the mark to draw, while the board is as it was when it was shown
+      current() { if (mark && !same()) mark = null; return mark; },
+      clear(redraw = true) { clearTimeout(timer); if (mark) { mark = null; if (redraw) o.draw(); } },
+    };
+  }
+
+  /* ---------- keyboard play ---------- */
+  // Keyboard play on a board, the same in every game: the arrow keys move a cursor (it shows from the first arrow
+  // press, and a tap or Escape hides it), Space or Enter acts on what's under it, and a game can list keys of its
+  // own. Keys go to the board unless a card, the walkthrough, or a text box or menu has them; Space and Enter on a
+  // focused button press the button.
+  // o: {on() (whether the board takes keys now), show(i) (draws the cursor on spot i; -1 hides it),
+  //     act(i, key, e) (Space, which Enter also means, or one of o.keys, on spot i; return false to let the key go),
+  //     keys (a list of other keys, by name in lower case: "m", "backspace"), size() ([W, H] of a board of squares, spots numbered by row), or
+  //     move(i, dx, dy, e) (where an arrow goes from spot i, for boards that aren't squares), start() (the first spot),
+  //     escape() (anything to put away besides the cursor)}
+  const CURSOR = "#73A7AE";
+  function gridKeys(o) {
+    let at = -1;
+    const k = {at: () => at, set(i) { at = i; o.show(at); }, hide() { if (at >= 0) { at = -1; o.show(-1); } }};
+    const step = (i, dx, dy) => { const [W, H] = o.size(), x = Math.max(0, Math.min(W - 1, i % W + dx)), y = Math.max(0, Math.min(H - 1, Math.floor(i / W) + dy)); return y * W + x; };
+    document.addEventListener("keydown", e => {
+      if (e.ctrlKey || e.metaKey || e.altKey || !o.on() || document.querySelector(".spot") || $("overlay").classList.contains("show")) return;
+      const tag = e.target.tagName;
+      if (/^(INPUT|SELECT|TEXTAREA)$/.test(tag)) return;
+      if (e.key === "Escape") { if (o.escape) o.escape(); k.hide(); return; }
+      const dir = {ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0]}[e.key];
+      if (dir) {
+        e.preventDefault();
+        at = at < 0 ? (o.start ? o.start() : 0) : (o.move || step)(at, ...dir, e);
+        o.show(at); return;
+      }
+      const key = e.key === "Enter" ? " " : e.key.toLowerCase();
+      if (at < 0 || (key === " " && tag === "BUTTON") || !(key === " " || (o.keys || []).includes(key))) return;
+      if (o.act(at, key, e) !== false) e.preventDefault();
+    });
+    document.addEventListener("pointerdown", () => k.hide(), true);
+    return k;
+  }
+  // For boards that aren't squares: the nearest of `spots` ([x, y] each) from spot i in the direction of an arrow,
+  // or i if there's none that way.
+  function nearestThatWay(spots, i, dx, dy) {
+    const [x0, y0] = spots[i];
+    let best = i, bestD = Infinity;
+    spots.forEach(([x, y], j) => {
+      if (j === i || !spots[j]) return;
+      const along = (x - x0) * dx + (y - y0) * dy, across = Math.abs((x - x0) * dy - (y - y0) * dx);
+      if (along <= 0) return;
+      const d = along + 2 * across;   // straight that way counts for more than off to the side
+      if (d < bestD) { bestD = d; best = j; }
+    });
+    return best;
+  }
+
   // The square under a pointer, or -1.
   function cellAt(x, y) {
     const el = document.elementFromPoint(x, y), c = el && el.closest && el.closest(".board .cell");
@@ -805,6 +919,6 @@ const G = (() => {
     }
   }
 
-  return {GAMES, GROUPS, recent, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, track, reopen,
-          setupTimer, freshClock, spotlight, toysOff, saveToys, needToys, goldPaw, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, toyPicker, pickLook};
+  return {GAMES, GROUPS, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen,
+          setupTimer, freshClock, spotlight, toysOff, saveToys, needToys, goldPaw, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();

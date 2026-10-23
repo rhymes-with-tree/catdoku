@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.6"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-23.2"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-22.6">
+<link rel="stylesheet" href="../games.css?v=2026-10-23.2">
 <style>
 /* Sudoku with toys: every row, column and box holds one of each toy. The Numbers switch shows 1 to N instead. */
 .gridwrap{background:var(--panel);border:3px solid var(--ink);border-radius:10px;overflow:hidden;
@@ -124,7 +124,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-22.6"></script>
+<script src="../games.js?v=2026-10-23.2"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N grid in boxes of bw × bh squares: every row, column and box holds each of the N toys once. Toys are
@@ -383,7 +383,8 @@ function clashes() {
   }
   return clash;
 }
-let hintMark = null, missMark = -1, missTimer = null;   // missMark: a square Auto grade just turned a toy away from   // {i, bad, key}: a square to look at, while the grid is as it was
+let missMark = -1, missTimer = null;   // missMark: a square Auto grade just turned a toy away from
+const hints = G.hinter({game: () => game, key: () => game ? game.grid.join() : "", draw: () => draw()});   // marks {i, bad}: a square to look at
 function draw() {
   const {N, bw, bh} = game, S = N * 100, svg = $("svg"), g = game.grid, clash = clashes(), nums = settings.numbers;
   svg.setAttribute("viewBox", `0 0 ${S} ${S}`);
@@ -420,7 +421,8 @@ function draw() {
     }
   }
   if (missMark >= 0) { const [r, c] = rc(missMark); out += `<rect class="hintsq bad" x="${c * 100 + 5}" y="${r * 100 + 5}" width="90" height="90" rx="10"/>`; }
-  if (hintMark && hintMark.key === g.join()) {
+  const hintMark = hints.current();
+  if (hintMark) {
     const [r, c] = rc(hintMark.i);
     out += `<rect class="hintsq${hintMark.bad ? " bad" : ""}" x="${c * 100 + 5}" y="${r * 100 + 5}" width="90" height="90" rx="10"/>`;
   }
@@ -600,7 +602,7 @@ document.addEventListener("keydown", e => {
     draw();
   }
 });
-document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
 function undo() { if (playing() && game.history.length) { restore(game.history.pop()); draw(); save(); } }
 $("undoBtn").onclick = undo;
 // Guess: the next toy put out glows until it's undone. Undo to guess takes everything back to just before the
@@ -623,13 +625,14 @@ $("numTgl").onchange = e => { settings.numbers = e.target.checked; save(); if (g
 
 // Hint: first a toy that's wrong, in red. Otherwise a gold box round a square the board already settles: one
 // with only one toy left that fits, or where a toy has its only place left in a row, column or box. If none,
-// the empty square with the fewest toys left. The message says which toy and why; the player puts it out.
+// the empty square with the fewest toys left. The first time, the message says why the square is settled; asked
+// again, which toy goes there. The player puts it out.
 // A hint keeps you on the same level and costs the gold paw; Undo, Undo to guess and Restart are free.
-let hintTimer = null;
 function hint() {
   if (!playing()) return;
   const N = game.N, g = game.grid, U = unitsNow(), wrong = g.map((v, i) => v && v !== game.sol[i] ? i : -1).filter(i => i >= 0);
-  let i, bad = false, say;
+  let i, bad = false, say, say0;
+  const what = settings.numbers ? "number" : "toy";
   if (wrong.length) { i = wrong.includes(sel) ? sel : wrong.find(k => !(game.guesses || []).includes(k)) ?? wrong[0]; bad = true; say = wrong.length > 1 ? `That ${settings.numbers ? "number" : "toy"}'s wrong (and ${wrong.length - 1} more)` : `That ${settings.numbers ? "number" : "toy"}'s wrong`; }
   else {
     const open = k => { if (g[k]) return 0; let m = (1 << (N + 1)) - 2; for (const u of U) if (u.includes(k)) for (const p of u) if (g[p]) m &= ~(1 << g[p]); return m; };
@@ -641,25 +644,22 @@ function hint() {
     if (only.length) {
       i = only.includes(sel) ? sel : only[0];
       say = `Only ${settings.numbers ? "a " + game.sol[i] : "the " + toyName(game.sol[i])} fits in the gold box: its row, column and box have the rest.`;
+      say0 = `Only one ${what} fits in the gold box: its row, column and box have the rest.`;
     } else {
       const KIND = ["row", "column", "box"];
       for (let u = 0; u < U.length && i === undefined; u++) for (let v = 1; v <= N && i === undefined; v++) {
         if (U[u].some(p => g[p] === v)) continue;
         const at = U[u].filter(p => open(p) >> v & 1);
-        if (at.length === 1) { i = at[0]; say = `${the(v)} has only one place left in this ${KIND[u % 3]}: the gold box.`; }
+        if (at.length === 1) { i = at[0]; say = `${the(v)} has only one place left in this ${KIND[u % 3]}: the gold box.`; say0 = `One ${what} has only one place left in this ${KIND[u % 3]}: the gold box. Which one?`; }
       }
       if (i === undefined) {
         empty.sort((a, b) => ones(open(a)) - ones(open(b)) || a - b);
-        i = empty[0]; say = `${the(game.sol[i])} goes in the gold box.`;
+        i = empty[0]; say = `${the(game.sol[i])} goes in the gold box.`; say0 = `The gold box has the fewest ${what}s left that fit.`;
       }
     }
   }
-  game.hinted = true; game.started = true; sel = i; armed = null;
-  hintMark = {i, bad, key: g.join()};
-  draw(); save();
-  G.note(say, 5000);
-  clearTimeout(hintTimer);
-  const mark = hintMark; hintTimer = setTimeout(() => { if (hintMark === mark) { hintMark = null; if (game) draw(); } }, 5000);
+  game.hinted = true; game.started = true; sel = i; armed = null; save();
+  hints.show({i, bad}, say0 && !hints.level() ? say0 : say);
 }
 $("hintBtn").onclick = hint;
 
@@ -701,7 +701,9 @@ function revive() {
   const added = Math.min(HEARTS, MAX_LIVES - game.livesUsed);
   game.livesUsed += added; game.hearts = added;
   G.closeCard(); draw(); save();
-  G.note(`Back with ${added} more ${added === 1 ? "life" : "lives"}.`, 4000);
+  const more = Math.ceil((MAX_LIVES - game.livesUsed) / HEARTS);
+  G.openCard("Slightly alive!", `Back with ${added} more ${added === 1 ? "life" : "lives"}. ${more ? `${more} ${more === 1 ? "revive" : "revives"} left on this puzzle.` : "No revives left on this puzzle."}`,
+    [["Keep playing", G.closeCard, true]]);
 }
 function restartFresh() {
   snapshot();
@@ -713,7 +715,7 @@ function restartFresh() {
 /* ---------- endings ---------- */
 // Every toy right: the toys hop in a wave across the grid, then the finishing card.
 function win() {
-  game.won = true; guessing = false; G.finishClock(game); G.note(""); clearTimeout(hintTimer); sel = -1; noting = false; armed = null; hintMark = null;
+  game.won = true; guessing = false; G.finishClock(game); G.note(""); hints.clear(false); sel = -1; noting = false; armed = null;
   const next = game.hinted || game.helped ? game.level : Math.min(MAX_LEVEL, game.level + 1);
   settings.level = next; $("levelSel").value = next; save();
   G.track(`Toydoku solved level ${game.level}`);
@@ -738,7 +740,7 @@ function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); ne
 function begin(p, level, toys) {
   game = {level, N: p.N, bw: p.bw, bh: p.bh, sol: p.sol, givens: p.givens, toys: toys || pickToys(p.N), grid: p.givens.slice(), guesses: [], wrong: [], hearts: HEARTS, livesUsed: HEARTS,
     notes: new Array(p.N * p.N).fill(0), history: [], won: false, ...G.freshClock()};
-  sel = -1; noting = false; armed = null; guessing = false; hintMark = null; missMark = -1; makePad();
+  sel = -1; noting = false; armed = null; guessing = false; hints.clear(false); missMark = -1; makePad();
 }
 async function newPuzzle() {
   if (busy) return;

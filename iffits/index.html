@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.6"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-23.2"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-22.6">
+<link rel="stylesheet" href="../games.css?v=2026-10-23.2">
 <style>
 /* A floor with the outline of an odd-shaped box pencilled on it, and seven pieces of cardboard (the tangram
    pieces) to build it from. When it's built, Bugsy (or now and then Bowtie, the guest star) hops in and sits in it. */
@@ -78,7 +78,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-22.6"></script>
+<script src="../games.js?v=2026-10-23.2"></script>
 <script>
 /* ---------- shapes (plain functions, also run in a background worker) ---------- */
 // The seven cats are the seven tangram pieces: two big triangles (L), a middle one (M), two small ones (S),
@@ -455,7 +455,7 @@ $("svg").addEventListener("keydown", e => {
   else return;
   e.preventDefault(); changed();
 });
-document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
 
 function undo() {
   if (!playing() || !game.history.length) return;
@@ -470,25 +470,35 @@ $("restartBtn").onclick = () => {
 };
 // Hint: a gold outline shows where one piece goes, and that piece is outlined in gold too; you move it there.
 // A hint keeps you on the same level and costs the gold paw.
+// The first time, only the piece is outlined; asked again (before another piece fits), its place too. The marks stay
+// while pieces are moved, so you can drag the piece to its place.
 const near = (a, b) => a.length === b.length && a.every(p => b.some(q => Math.hypot(p[0] - q[0], p[1] - q[1]) < 0.05));
-let hintTimer = null;
+const openPlaces = () => { const polys = [0, 1, 2, 3, 4, 5, 6].map(polyOf); return target.map((t, j) => j).filter(j => !polys.some((p, i) => SET[i] === SET[j] && near(p, target[j]))); };
+const hints = G.hinter({game: () => game, key: () => game && target ? openPlaces().join() : "", draw: () => paintHint()});   // marks {i, j}: a piece, and its place
+function paintHint() {
+  const m = hints.current(), box = $("hintsq"); if (!box) return;
+  if (m && m.j !== undefined) box.setAttribute("points", pts(target[m.j]));
+  box.style.display = m && m.j !== undefined ? "" : "none";
+  parts.forEach((g, k) => g.classList.toggle("hinted", !!m && k === m.i));
+}
+let lastPick = null;
 $("hintBtn").onclick = () => {
   if (!playing()) return;
   const polys = [0, 1, 2, 3, 4, 5, 6].map(polyOf);
-  const open = target.map((t, j) => j).filter(j => !polys.some((p, i) => SET[i] === SET[j] && near(p, target[j])));
+  const open = openPlaces();
   if (!open.length) return;
   // a place next to pieces already in place, if there is one
   const done = target.filter((t, j) => !open.includes(j)), byDone = open.filter(j => done.some(t => outlineOf([t, target[j]]).length < t.length + target[j].length));
-  const pool = byDone.length ? byDone : open, j = pool[Math.floor(Math.random() * pool.length)];
-  const i = [0, 1, 2, 3, 4, 5, 6].find(i => SET[i] === SET[j] && !target.some(t => near(polys[i], t)));
+  const pool = byDone.length ? byDone : open;
+  // asked again, the same piece as before
+  const again = hints.level() && lastPick && open.includes(lastPick.j) && !target.some(t => near(polys[lastPick.i], t));
+  const j = again ? lastPick.j : pool[Math.floor(Math.random() * pool.length)];
+  const i = again ? lastPick.i : [0, 1, 2, 3, 4, 5, 6].find(i => SET[i] === SET[j] && !target.some(t => near(polys[i], t)));
+  lastPick = {i, j};
   game.hinted = true; game.started = true; sel = i; toFront(i); update(); save();
-  const box = $("hintsq"); box.setAttribute("points", pts(target[j])); box.style.display = "";
-  parts.forEach((g, m) => g.classList.toggle("hinted", m === i));
   const inWay = polys.some((p, m) => m !== i && overlapArea(p, target[j]) > 0.02);
-  G.note(`The gold ${PIECENAME[i]} goes in the gold outline${inWay ? ", once what's in the way is moved" : ""}.`, 6000);
-  const g = game;
-  clearTimeout(hintTimer);
-  hintTimer = setTimeout(() => { if (game === g) { box.style.display = "none"; parts.forEach(p => p.classList.remove("hinted")); } }, 6000);
+  if (!hints.level()) return hints.show({i}, `Place the gold ${PIECENAME[i]} next. Ask again to see where.`);
+  hints.show({i, j}, `The gold ${PIECENAME[i]} goes in the gold outline${inWay ? ", once what's in the way is moved" : ""}.`);
 };
 const PIECENAME = ["big triangle", "big triangle", "middle triangle", "small triangle", "small triangle", "square", "slanted piece"];
 

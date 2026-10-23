@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.6"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-23.2"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-22.6">
+<link rel="stylesheet" href="../games.css?v=2026-10-23.2">
 <style>
 /* A cattery floor of cat trees, 1 to N perches tall: one of each height in every row and column. Arrows between
    trees point down to the shorter one, and lookout cats round the walls count the trees they can see. When
@@ -89,8 +89,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-22.6"></script>
-<script src="../cattower.js?v=2026-10-22.6"></script>
+<script src="../games.js?v=2026-10-23.2"></script>
+<script src="../cattower.js?v=2026-10-23.2"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N floor of cat trees, 1 to N perches tall: every row and column has one tree of each height.
@@ -263,7 +263,7 @@ function check() {
   const lookState = game.looks.map(([side, l, c]) => { const hs = viewCells(N, side, l).map(i => g[i]); return hs.every(Boolean) ? (seen(hs) === c ? "ok" : "bad") : ""; });
   return {clash, badSign, lookState};
 }
-let hintMark = null;   // {i, bad, key}: a square to look at, while the grid is as it was
+const hints = G.hinter({game: () => game, key: () => game ? game.grid.join() : "", draw: () => draw()});   // marks {i, bad}: a square to look at
 function draw() {
   const N = game.N, m = M(), S = N * 100, svg = $("svg"), g = game.grid, {clash, badSign, lookState} = check();
   svg.setAttribute("viewBox", `${-m} ${-m} ${S + 2 * m} ${S + 2 * m}`);
@@ -299,7 +299,8 @@ function draw() {
       <path class="ear" d="M${cx - 27} ${cy - 4}L${cx - 24} ${cy - 33}L${cx - 5} ${cy - 21}Z M${cx + 27} ${cy - 4}L${cx + 24} ${cy - 33}L${cx + 5} ${cy - 21}Z"/>
       <circle class="face" cx="${cx}" cy="${cy + 3}" r="27"/><text x="${cx}" y="${cy + 5}">${c}</text></g>`;
   });
-  if (hintMark && hintMark.key === g.join()) {
+  const hintMark = hints.current();
+  if (hintMark) {
     const i = hintMark.i;
     out += `<rect class="hintsq${hintMark.bad ? " bad" : ""}" x="${i % N * 100 + 5}" y="${Math.floor(i / N) * 100 + 5}" width="90" height="90" rx="10"/>`;
   }
@@ -359,6 +360,7 @@ $("allNotesBtn").onclick = () => {
 document.addEventListener("keydown", e => {
   if (!playing() || document.querySelector(".spot") || e.target.tagName === "SELECT" || e.ctrlKey || e.metaKey || e.altKey) return;
   const N = game.N, k = e.key;
+  if (k === "Escape") { sel = -1; draw(); return; }   // as in Toydoku: let go of the square picked
   if (/^[1-9]$/.test(k) && +k <= N) { if (sel < 0) sel = 0; put(+k); e.preventDefault(); return; }
   if (k === "Backspace" || k === "Delete" || k === "0") { put(0); e.preventDefault(); return; }
   if (k === "n" || k === "N") { noting = !noting; draw(); return; }
@@ -370,7 +372,7 @@ document.addEventListener("keydown", e => {
     draw();
   }
 });
-document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
 function undo() { if (playing() && game.history.length) { game.undid = true; const h = game.history.pop(); game.grid = h.grid; game.notes = h.notes; draw(); save(); } }
 $("undoBtn").onclick = undo;
 $("restartBtn").onclick = () => {
@@ -380,13 +382,12 @@ $("restartBtn").onclick = () => {
   draw(); save(); G.note("Back to the bare floor. Undo brings your trees back.", 3500);
 };
 // Hint: first a tree that's the wrong height, in red. Otherwise a gold box round an empty square (one with the
-// fewest heights its row and column leave open), and the message says its height.
-// The player puts it in. A hint keeps you on the same level and costs the gold paw.
-let hintTimer = null;
+// fewest heights its row and column leave open). The first time, the message says how many heights are left
+// there; asked again, its height. The player puts it in. A hint keeps you on the same level and costs the gold paw.
 function hint() {
   if (!playing()) return;
   const N = game.N, g = game.grid, wrong = g.map((v, i) => v && v !== game.sol[i] ? i : -1).filter(i => i >= 0);
-  let i, bad = false;
+  let i, bad = false, only = false;
   if (wrong.length) { i = wrong.includes(sel) ? sel : wrong[0]; bad = true; }
   else {
     const empty = g.map((v, k) => v ? -1 : k).filter(k => k >= 0);
@@ -395,20 +396,19 @@ function hint() {
     const choices = k => { let m = 0; const r = Math.floor(k / N), c = k % N; for (let v = 1; v <= N; v++) { let ok = true; for (let j = 0; j < N; j++) if (g[r * N + j] === v || g[j * N + c] === v) ok = false; if (ok) m |= 1 << v; } return ones(m); };
     empty.sort((a, b) => choices(a) - choices(b) || a - b);
     i = empty.includes(sel) && choices(sel) === choices(empty[0]) ? sel : empty[0];
+    only = choices(i);
   }
-  game.hinted = true; game.started = true; sel = i;
-  hintMark = {i, bad, key: g.join()};
-  draw(); save();
-  G.note(bad ? (wrong.length > 1 ? `That tree's the wrong height (and ${wrong.length - 1} more)` : "That tree's the wrong height") : `The square in the gold box is a ${game.sol[i]}.`, 5000);
-  clearTimeout(hintTimer);
-  const mark = hintMark; hintTimer = setTimeout(() => { if (hintMark === mark) { hintMark = null; if (game) draw(); } }, 5000);
+  game.hinted = true; game.started = true; sel = i; save();
+  hints.show({i, bad}, bad ? (wrong.length > 1 ? `That tree's the wrong height (and ${wrong.length - 1} more)` : "That tree's the wrong height")
+    : !hints.level() ? (only === 1 ? "Only one height fits in the gold box: its row and column have the rest." : `The gold box has the fewest heights left (${only}).`)
+    : `The square in the gold box is a ${game.sol[i]}${only === 1 ? ": its row and column have the rest" : ""}.`);
 }
 $("hintBtn").onclick = hint;
 
 /* ---------- endings ---------- */
 // Every tree right: a napping cat curls up on each top platform, one after another, then the finishing card.
 function win() {
-  game.won = true; G.finishClock(game); sel = -1; noting = false; hintMark = null;
+  game.won = true; G.finishClock(game); sel = -1; noting = false; hints.clear(false);
   const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
   settings.level = next; $("levelSel").value = next; save();
   G.track(`High Perch solved level ${game.level}`);
@@ -431,7 +431,7 @@ function begin(p, level) {
   const grid = new Array(p.N * p.N).fill(0);
   for (const [i, h] of p.givens) grid[i] = h;
   game = {level, N: p.N, sol: p.sol, givens: p.givens, signs: p.signs, looks: p.looks, grid, notes: new Array(p.N * p.N).fill(0), history: [], won: false, ...G.freshClock()};
-  sel = -1; noting = false; hintMark = null; makePad();
+  sel = -1; noting = false; hints.clear(false); makePad();
 }
 async function newPuzzle() {
   if (busy) return;

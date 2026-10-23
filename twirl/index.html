@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.6"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-23.2"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -22,7 +22,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-22.6">
+<link rel="stylesheet" href="../games.css?v=2026-10-23.2">
 <style>
 /* A play mat covered in satin ribbons; each one slides off the way its pointed end points, along its own path.
    Big mats zoom, and scroll inside their frame. */
@@ -60,7 +60,7 @@
   <nav class="games" id="games" aria-label="Games"></nav>
 
   <div class="status">
-    <span class="info"><span class="hearts" id="hearts" aria-label="Lives left"></span><span id="count"></span><button class="timer" id="timer" hidden></button></span>
+    <span class="info"><span class="hearts" id="hearts" aria-label="Lives left"></span><span id="count"></span></span><button class="timer" id="timer" hidden></button>
     <span class="msg" id="msg" aria-live="polite"></span>
   </div>
 
@@ -75,11 +75,13 @@
   <div class="actions">
     <button id="hintBtn">Hint</button>
     <button id="restartBtn">Restart</button>
+    <button id="shareBtn">Share</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
   </div>
   <div class="bar">
     <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New ribbons</button>
     <span class="zoom" aria-label="Zoom"><button id="zoomOut" aria-label="Zoom out">−</button><button id="zoomFit">Fit</button><button id="zoomIn" aria-label="Zoom in">+</button></span>
   </div>
   <div class="bar toggles">
@@ -88,8 +90,8 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-22.6"></script>
-<script src="../colorways.js?v=2026-10-22.6"></script>
+<script src="../games.js?v=2026-10-23.2"></script>
+<script src="../colorways.js?v=2026-10-23.2"></script>
 <script>
 const $ = G.$;
 G.nav("twirl");
@@ -287,6 +289,36 @@ function restart() {
   start(S.level, d);
 }
 
+// New ribbons: another mat at this level (help or a revive on this one doesn't carry over, as with a new level).
+$("newBtn").onclick = () => { if (!loading) { G.closeCard(); startLevel(S ? S.level : 0); } };
+// Share: a link to this mat. Each ribbon is its first square, the way it points and its steps (up, right, down,
+// left as 0 to 3), two steps to a hex digit; colours are picked afresh for whoever opens it.
+const HEX = "0123456789abcdef";
+$("shareBtn").onclick = () => { if (S && !loading) G.shareCard({name: "Twirl", what: "mat", won: !left(),
+  puzzle: () => {
+    const {W} = S.d, way = (a, b) => b === a - W ? 0 : b === a + 1 ? 1 : b === a + W ? 2 : 3;
+    const r = S.d.ribbons.map(({cells, dir}) => {
+      const st = cells.slice(1).map((c, i) => way(cells[i], c));
+      let h = ""; for (let i = 0; i < st.length; i += 2) h += HEX[st[i] * 4 + (st[i + 1] ?? 0)];
+      return cells[0].toString(36) + "." + dir + st.length.toString(36) + "." + h;
+    }).join(",");
+    return {g: "twirl", N: S.level + 1, W: S.d.W, H: S.d.H, r};   // N is the level plus one, since level 0 is a level
+  }}); };
+// A shared mat, checked first: every square covered by exactly one ribbon.
+function openShared(d) {
+  const level = d.N - 1, {W, H} = d;
+  if (!(level >= 0 && level <= MAX_LEVEL) || !(W >= 4 && W <= 40 && H >= 4 && H <= 60)) throw new Error("the shared mat doesn't fit the game");
+  const step = [-W, 1, W, -1], seen = new Uint8Array(W * H);
+  const ribbons = String(d.r || "").split(",").map(t => {
+    const [a, b, h] = t.split("."), dir = +b[0], n = parseInt(b.slice(1), 36), cells = [parseInt(a, 36)];
+    for (let i = 0; i < n; i++) { const v = HEX.indexOf(h[i >> 1]), s = i % 2 ? v % 4 : v >> 2; cells.push(cells[i] + step[s]); }
+    return {cells, dir};
+  });
+  for (const r of ribbons) for (const c of r.cells) { if (!(c >= 0 && c < W * H) || seen[c]) throw new Error("the shared mat doesn't fit the game"); seen[c] = 1; }
+  if (seen.some(v => !v) || ribbons.some(r => !(r.dir >= 0 && r.dir <= 3))) throw new Error("the shared mat doesn't fit the game");
+  const m = {n: level, W, H, ribbons}; dress(m); start(level, m);
+}
+
 const left = () => S.d.ribbons.length - S.d.gone.length;
 function hud() {
   const d = S.d;
@@ -321,14 +353,13 @@ function tap(k) {
 }
 // Hint: a ribbon that's free to go now glows gold. The player taps it. A hint keeps you on this level and
 // costs the gold paw.
-let hintK = -1, hintAt = 0;
+const hints = G.hinter({game: () => S, key: () => S ? S.d.gone.join() : "", draw: () => {}});   // marks {k}: a ribbon free to go (the mat redraws itself every frame)
 function hint() {
   if (!S || S.over || loading || document.querySelector(".spot")) return;
   const gone = new Set(S.d.gone), free = S.d.ribbons.map((_, k) => k).filter(k => !gone.has(k) && !blockerOf(k));
   if (!free.length) { G.note("Every ribbon is blocked. Try Restart.", 4000); return; }
   S.d.helped = true; save();
-  hintK = free[Math.floor(Math.random() * free.length)]; hintAt = now;
-  G.note("The glowing ribbon is free to go. Tap it.", 4000);
+  hints.show({k: free[Math.floor(Math.random() * free.length)]}, "The glowing ribbon is free to go. Tap it.");
 }
 // a gold paw gets Bugsy, dozing in a box, in place of the random cat photo
 function bugsyPic() { const im = new Image(); im.className = "bugsypic"; im.src = "../cats/bugsy-4.webp"; im.alt = "Bugsy dozing in a cardboard box"; return im; }
@@ -492,13 +523,15 @@ function draw() {
     if (!gone.has(t.blocker) && Math.floor(now * 12) % 2 === 0) drawRibbon(ctx, line(d.ribbons[t.blocker]), d.looks[t.blocker], true);
   }
   // the hint: a free ribbon drawn again over a gold band, for a few seconds or until it's tapped
-  if (hintK >= 0 && !gone.has(hintK) && now < hintAt + 5) {
+  const hm = hints.current(), hintK = hm ? hm.k : -1;
+  if (hm && !gone.has(hintK)) {
     const pts = line(d.ribbons[hintK]);
     ctx.beginPath(); ctx.moveTo(...pts[0]); for (const p of pts.slice(1)) ctx.lineTo(...p);
     ctx.lineCap = ctx.lineJoin = "round"; ctx.lineWidth = U * 0.85; ctx.strokeStyle = "rgba(236,168,24,.6)"; ctx.stroke();
     ctx.lineWidth = 3 / scale; ctx.strokeStyle = "#ECA818"; ctx.stroke();
     drawRibbon(ctx, pts, d.looks[hintK]);
   }
+  if (kbAt >= 0) { ctx.lineWidth = 3 / scale; ctx.strokeStyle = G.CURSOR; ctx.strokeRect(kbAt % d.W * U + 1, Math.floor(kbAt / d.W) * U + 1, U - 2, U - 2); }
   // ribbons on their way out, on top, speeding up as they go
   moving = moving.filter(m => now < m.t0 + 2.5);
   for (const m of moving) {
@@ -586,6 +619,17 @@ function tapAt(cx, cy) {
   if (k >= 0 && !tugs.some(t => t.k === k)) tap(k);
 }
 
+// Keys: the arrows move a cursor over the mat (it scrolls along when zoomed), and Space or Enter taps the ribbon
+// under it.
+let kbAt = -1;
+const keys = G.gridKeys({on: () => S && !S.over && !loading, size: () => [S.d.W, S.d.H], start: () => Math.floor(S.d.H / 2) * S.d.W + Math.floor(S.d.W / 2),
+  show: i => {
+    kbAt = i; if (i < 0) return;
+    const cw = canvas.clientWidth / matW(), x = (i % S.d.W + PAD) * cw, y = (Math.floor(i / S.d.W) + PAD) * cw;
+    if (x < scroller.scrollLeft || x + cw > scroller.scrollLeft + scroller.clientWidth) scroller.scrollLeft = x - scroller.clientWidth / 2;
+    if (y < scroller.scrollTop || y + cw > scroller.scrollTop + scroller.clientHeight) scroller.scrollTop = y - scroller.clientHeight / 2;
+  },
+  act: i => { const k = occupancy()[i]; if (k >= 0 && !tugs.some(t => t.k === k)) tap(k); }});
 let last = performance.now();
 function loop(t) { now += Math.min(0.05, (t - last) / 1000); last = t; draw(); requestAnimationFrame(loop); }
 
@@ -641,7 +685,12 @@ G.setupTimer({name: "twirl", game: () => S, playing: g => !g.over && !loading, s
 $("bestBtn").onclick = () => G.showBests("Best times", S ? S.level : saved.level ?? 1);
 
 // New players start on level 0, the small mat with the biggest ribbons.
-G.reopen(() => { if (saved.d && saved.level <= MAX_LEVEL) start(saved.level, saved.d); else startLevel(saved.level ?? 0); },
+const shared = G.readShare("twirl");
+window.addEventListener("hashchange", () => { const d = G.readShare("twirl"); if (d) G.offerShare(d, {name: "Twirl", inProgress: !!(S && !S.over && S.d.gone.length), open: d => { try { openShared(d); } catch (e) { G.note("That share link didn't work.", 5000); } }}); });
+// a shared mat opens in place of the saved one
+let openedShare = false;
+if (shared) try { openShared(shared); openedShare = true; G.note("Here's the shared mat. Good luck!", 6000); G.track("Twirl shared puzzle opened"); } catch (e) { G.note("That share link didn't work.", 5000); }
+if (!openedShare) G.reopen(() => { if (saved.d && saved.level <= MAX_LEVEL) start(saved.level, saved.d); else startLevel(saved.level ?? 0); },
   why => { startLevel(saved.level ?? 0).then(() => G.note(why, 0)); });
 // Players from before the spotlight had the How to play card instead, so it's only for new players.
 if (saved.level !== undefined && !G.load(INTRO).seen) G.save(INTRO, {seen: true});

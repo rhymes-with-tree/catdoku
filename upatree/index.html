@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.6"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-23.2"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-22.6">
+<link rel="stylesheet" href="../games.css?v=2026-10-23.2">
 <style>
 /* A cat tree: the start word on the bottom perch, the goal word on the top one, and empty perches between. Each
    word changes one letter of the word below it. Type a word and it goes on the next perch up, and the cat climbs
@@ -87,8 +87,8 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-22.6"></script>
-<script src="../cattower.js?v=2026-10-22.6"></script>
+<script src="../games.js?v=2026-10-23.2"></script>
+<script src="../cattower.js?v=2026-10-23.2"></script>
 <script>
 /* ---------- ladders ---------- */
 // Words come from the shared list (words/words.json): starts and goals are familiar words, par is the shortest
@@ -223,7 +223,7 @@ function update() {
   $("undoBtn").disabled = !game.history.length || game.won;
   $("restartBtn").disabled = !game.history.length || game.won;
   $("hintBtn").disabled = game.won;
-  if (hintShown && hintShown !== game.rungs.join(",")) clearHint();
+  paintHint();
 }
 
 /* ---------- the keyboard ---------- */
@@ -240,7 +240,7 @@ for (const r of ROWS) {
   $("keys").append(row);
 }
 document.addEventListener("keydown", e => {
-  if (e.ctrlKey || e.metaKey || e.altKey) { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } return; }
+  if (e.ctrlKey || e.metaKey || e.altKey) { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } return; }
   if (!playing() || document.querySelector(".spot") || /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
   if (/^[a-z]$/i.test(e.key)) { type(e.key.toLowerCase()); e.preventDefault(); }
   else if (e.key === "Backspace") { back(); e.preventDefault(); }
@@ -316,30 +316,27 @@ $("restartBtn").onclick = () => {
 // Hint, on the highest word so far: if that word didn't get you any closer to the top (or there's no way up from
 // it at all), its changed letter goes red, to Undo; otherwise a gold box goes on the letter to change next, for the
 // shortest way up from there (going by every word).
-let hintShown = null, hintTimer = 0;
-function clearHint() { hintShown = null; clearTimeout(hintTimer); document.querySelectorAll(".hintsq").forEach(e => e.remove()); }
+// Asked again on the same word, it also says what to change the letter to.
+const hints = G.hinter({game: () => game, key: () => game ? game.rungs.join(",") : "", draw: () => paintHint()});   // marks {i, bad}: a letter of the highest word
+// the highest word is on perch rungs.length
+function paintHint() {
+  document.querySelectorAll(".hintsq").forEach(e => e.remove());
+  const m = hints.current(), t = m && document.querySelector(`.word[data-k="${game.rungs.length}"] rect[data-i="${m.i}"]`);
+  if (t) el("rect", {class: "hintsq" + (m.bad ? " bad" : ""), x: +t.getAttribute("x") - 4, y: +t.getAttribute("y") - 4, width: 44, height: 48, rx: 9}, $("svg"));
+}
+const clearHint = () => hints.clear();
 $("hintBtn").onclick = () => {
   if (!playing()) return;
   const w = topWord(), g = GR[game.L], {dist, prev} = climbs(g.all, game.goal);
   game.hinted = true; game.started = true; save();
-  clearHint();
-  // the highest word is on perch rungs.length
-  const box = (i, bad) => {
-    const t = document.querySelector(`.word[data-k="${game.rungs.length}"] rect[data-i="${i}"]`);
-    el("rect", {class: "hintsq" + (bad ? " bad" : ""), x: +t.getAttribute("x") - 4, y: +t.getAttribute("y") - 4, width: 44, height: 48, rx: 9}, $("svg"));
-  };
-  hintShown = game.rungs.join(",");
   const below = game.rungs.length > 1 ? game.rungs[game.rungs.length - 2] : game.start;
   if (game.rungs.length && (!dist.has(w) || dist.get(w) >= dist.get(below))) {
-    box([...w].findIndex((c, j) => c !== below[j]), true);
-    G.note(dist.has(w) ? `${w.toUpperCase()} doesn't get Dottie any closer. Undo it and change another letter of ${below.toUpperCase()}.`
-      : `There's no way up from ${w.toUpperCase()}. Undo it and try another word.`, 5000);
+    hints.show({i: [...w].findIndex((c, j) => c !== below[j]), bad: true}, dist.has(w) ? `${w.toUpperCase()} doesn't get Dottie any closer. Undo it and change another letter of ${below.toUpperCase()}.`
+      : `There's no way up from ${w.toUpperCase()}. Undo it and try another word.`);
   } else {
-    const next = prev.get(w), i = [...w].findIndex((c, j) => c !== next[j]);
-    box(i, false);
-    G.note(`Change the gold letter of ${w.toUpperCase()} to make the next word.`, 5000);
+    const next = prev.get(w), i = [...w].findIndex((c, j) => c !== next[j]), to = next[i].toUpperCase();
+    hints.show({i}, hints.level() ? `Change the gold letter of ${w.toUpperCase()} to ${/[AEFHILMNORSX]/.test(to) ? "an" : "a"} ${to}.` : `Change the gold letter of ${w.toUpperCase()} to make the next word.`);
   }
-  hintTimer = setTimeout(clearHint, 5000);
 };
 
 /* ---------- endings ---------- */

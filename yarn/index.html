@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.6";
+  var BUILD = "2026-10-23.2";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-22.6">
+<link rel="stylesheet" href="../games.css?v=2026-10-23.2">
 <style>
 .board{background:var(--panel)}
 .cell{border-top:1px solid var(--line);border-left:1px solid var(--line);cursor:pointer}
@@ -114,8 +114,8 @@ main{--kw:min(calc(var(--board) * .34), 170px);--tw:min(calc(var(--board) * .52)
 
 </main>
 
-<script src="../games.js?v=2026-10-22.6"></script>
-<script src="../colorways.js?v=2026-10-22.6"></script>
+<script src="../games.js?v=2026-10-23.2"></script>
+<script src="../colorways.js?v=2026-10-23.2"></script>
 <script>
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 function nbrs(i,N){const r=Math.floor(i/N),c=i%N,o=[];if(r>0)o.push(i-N);if(r<N-1)o.push(i+N);if(c>0)o.push(i-1);if(c<N-1)o.push(i+1);return o;}
@@ -274,18 +274,15 @@ function undo() { if (!game.history.length || game.won) return; game.undid = tru
 // Hint: the strand's answer is unique, so compare it with the answer. A strand that's gone wrong gets the last
 // square it was right on marked in red (wind it back to there); otherwise the next square glows gold. The player
 // moves the strand. A hint keeps the next puzzle at this size and costs the gold paw.
-let hintMark = null;
+const hints = G.hinter({game: () => game, key: () => game ? game.trail.join() : "", draw: () => render()});   // marks {k, bad}: a square
 function hint() {
   if (!game || game.won || busy) return;
   const t = game.trail, p = game.path;
   let k = 0; while (k < t.length && t[k] === p[k]) k++;
   game.hinted = true; save();
-  hintMark = k < t.length ? {at: t.join(), k: p[k - 1], bad: true} : {at: t.join(), k: p[k]};
-  render();
-  render();
-  G.note(k < t.length ? "The strand goes wrong after the red square. Wind it back to there."
-    : k ? "Lead the strand into the glowing square." : "Start the strand on the glowing ball.", 5000);
-  const m = hintMark; setTimeout(() => { if (hintMark === m) { hintMark = null; render(); } }, 5000);
+  if (k < t.length && !k) return hints.show({k: p[0]}, "The strand starts on the glowing ball. Restart and lead it from there.");
+  hints.show(k < t.length ? {k: p[k - 1], bad: true} : {k: p[k]}, k < t.length ? "The strand goes wrong after the red square. Wind it back to there."
+    : k ? "Lead the strand into the glowing square." : "Start the strand on the glowing ball.");
 }
 function clearAll() { if (game.won || !game.trail.length) return; game.undid = true; snapshot(); game.trail = []; render(); save(); }
 
@@ -404,7 +401,8 @@ function render() {
     svg.append(g);
   });
   // the hint's square, while the strand is as it was when Hint was tapped
-  if (hintMark && hintMark.at === t.join()) { const [x, y] = xy(hintMark.k); svg.append(svgEl("rect", {x: x - .46, y: y - .46, width: .92, height: .92, rx: .12, class: "hintsq" + (hintMark.bad ? " bad" : "")})); }
+  const hintMark = hints.current();
+  if (hintMark) { const [x, y] = xy(hintMark.k); svg.append(svgEl("rect", {x: x - .46, y: y - .46, width: .92, height: .92, rx: .12, class: "hintsq" + (hintMark.bad ? " bad" : "")})); }
   renderSkein(segs.length);
   $("count").textContent = `🧶 ${t.length} / ${N * N}`;
   $("undoBtn").disabled = !game.history.length || game.won; $("hintBtn").disabled = game.won;
@@ -465,6 +463,18 @@ board.addEventListener("pointermove", e => {
   if (t.length > 1 && t[t.length - 2] === i) t.pop(); else stepToward(i);
   render(); checkWin();
 });
+// Keys: the arrows move a cursor, and while it's on the end of the strand they lead the strand along (or back);
+// Space or Enter does what a tap does there (start the strand on a ball, or cut it back to that square).
+const kbDo = fn => { snapshot(); fn(); const h = game.history; if (h.length && h[h.length - 1].join() === game.trail.join()) h.pop(); render(); save(); checkWin(); };
+const keys = G.gridKeys({on: () => game && !game.won && !busy, start: () => game.trail.length ? game.trail[game.trail.length - 1] : Math.max(0, game.clue.indexOf(1)),
+  show: i => [...board.children].forEach((c, k) => c.classList.toggle("kbcursor", k === i)),
+  move: (i, dx, dy) => {
+    const N = game.N, x = i % N + dx, y = Math.floor(i / N) + dy; if (x < 0 || y < 0 || x >= N || y >= N) return i;
+    const j = y * N + x, t = game.trail;
+    if (t.length && t[t.length - 1] === i) kbDo(() => { if (t.length > 1 && t[t.length - 2] === j) t.pop(); else step(j); });
+    return j;
+  },
+  act: i => kbDo(() => { const t = game.trail, onIt = t.indexOf(i); if (onIt >= 0) t.length = onIt + 1; else if (!t.length && game.clue[i] !== 1) G.note("Start on the ball matching the Start end of the skein."); else stepToward(i); })});
 function endPress() {
   if (!press) return;
   const h = game.history;
@@ -487,7 +497,7 @@ $("numTgl").onchange = e => { settings.numbers = e.target.checked; save(); if (g
 $("restartBtn").onclick = clearAll;
 $("helpBtn").onclick = () => { if (!busy) showHelp(); };
 $("hintBtn").onclick = hint;
-document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); } });
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); } });
 
 G.nav("yarn");
 G.checkClock(game);

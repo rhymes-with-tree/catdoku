@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.6"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-23.2"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-22.6">
+<link rel="stylesheet" href="../games.css?v=2026-10-23.2">
 <style>
 /* A KenKen house: every row and column holds 1 to N once, and walls split the floor into rooms whose numbers
    must make the room's sign. Each room has a door that opens when the room is right; with every door open,
@@ -105,7 +105,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-22.6"></script>
+<script src="../games.js?v=2026-10-23.2"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N grid where every row and column holds 1 to N once, cut into rooms (cages). Each room has a sign:
@@ -344,6 +344,7 @@ function draw() {
   $("board").style.setProperty("--cell", ($("board").clientWidth / N) + "px");
   el.style.gridTemplateColumns = el.style.gridTemplateRows = `repeat(${N}, 1fr)`;
   const cols = Math.ceil(Math.sqrt(N)), sr = sel >= 0 ? Math.floor(sel / N) : -1, sc = sel % N;
+  const flash = hints.current();
   let html = "";
   for (let i = 0; i < N * N; i++) {
     const k = plan.at[i], room = plan.rooms[k], [floor, lit] = FLOORS[plan.floor[k]];
@@ -367,7 +368,8 @@ function draw() {
   return {clash, right, wrong};
 }
 // The walls between rooms (thin seams inside a room), with each room's door hung in one of them.
-let forceOpen = -1, rattle = new Set(), wasOpen = [], flash = null;
+let forceOpen = -1, rattle = new Set(), wasOpen = [];
+const hints = G.hinter({game: () => game, key: () => game ? game.grid.join() : "", draw: () => draw()});   // marks {i, kind}: a square to look at
 function drawWalls(right) {
   const N = game.N, svg = $("walls"), at = plan.at;
   svg.setAttribute("viewBox", `0 0 ${N} ${N}`);
@@ -455,6 +457,7 @@ $("allNotesBtn").onclick = () => {
 document.addEventListener("keydown", e => {
   if (!playing() || document.querySelector(".spot") || e.target.tagName === "SELECT" || e.ctrlKey || e.metaKey || e.altKey) return;
   const N = game.N, k = e.key;
+  if (k === "Escape") { sel = -1; draw(); return; }   // as in Toydoku: let go of the square picked
   if (/^[1-9]$/.test(k) && +k <= N) { if (sel < 0) sel = 0; put(+k); e.preventDefault(); return; }
   if (k === "Backspace" || k === "Delete" || k === "0") { put(0); e.preventDefault(); return; }
   if (k === "n" || k === "N") { noting = !noting; draw(); return; }
@@ -466,31 +469,42 @@ document.addEventListener("keydown", e => {
     draw();
   }
 });
-document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
 function undo() { if (playing() && game.history.length) { game.undid = true; const h = game.history.pop(); game.grid = h.grid; game.notes = h.notes; draw(); save(); } }
 $("undoBtn").onclick = undo;
 // Hint: first points out a number that's wrong, if there is one; otherwise picks a square in a room that's nearly
-// full (so a door is close to opening), glows it and says its number. It never fills it in for you. Any hint keeps you on the same level and costs the gold paw.
+// full (so a door is close to opening) and glows it: the first time, the message says why it can be worked out;
+// asked again, its number. It never fills it in for you. Any hint keeps you on the same level and costs the gold paw.
 let answer = null;
 const solution = () => answer && answer.g === game ? answer.sol : (answer = {g: game, sol: solveRooms(game.N, plan.rooms, 1).first}).sol;
 function hint() {
   if (!playing()) return;
   const sol = solution(), g = game.grid;
   if (!sol) { G.note("Couldn't work out a hint for this puzzle. Try Undo, or check for a wrong number.", 4000); return; }
-  game.hinted = true; game.started = true;
+  game.hinted = true; game.started = true; save();
   const wrong = g.map((v, i) => v && v !== sol[i] ? i : -1).filter(i => i >= 0);
   if (wrong.length) {
     const i = wrong.includes(sel) ? sel : wrong[0];
-    sel = i; flash = {i, kind: "hintBad"}; draw(); save();
-    G.note(wrong.length > 1 ? `That one's wrong (and ${wrong.length - 1} more)` : "That one's wrong", 4000);
+    sel = i; hints.show({i, kind: "hintBad"}, wrong.length > 1 ? `That one's wrong (and ${wrong.length - 1} more)` : "That one's wrong");
   } else {
     const empty = (i => !g[i]), left = k => plan.rooms[k].cells.filter(empty).length;
     const cands = g.map((_, i) => i).filter(empty).sort((a, b) => left(plan.at[a]) - left(plan.at[b]) || a - b);
     const i = cands.includes(sel) ? sel : cands[0];
-    sel = i; flash = {i, kind: "hinted"}; draw(); save();   // pick the square and say its number; the player puts it in
-    G.note(`The glowing square is a ${sol[i]}.`, 6000);
+    const why = whyNumber(i);   // pick the square and say why, then its number; the player puts it in
+    sel = i; hints.show({i, kind: "hinted"}, hints.level() ? `The glowing square is a ${sol[i]}${why[1]}.` : why[0]);
   }
-  const f = flash; setTimeout(() => { if (flash === f) { flash = null; draw(); } }, 3200);
+}
+// Why a hinted square takes its number: the only number its row and column leave, or the only one that makes its
+// room's sign once it's the room's last square. [what to say first, without the number; what to add to the number]
+function whyNumber(i) {
+  const N = game.N, g = game.grid, r = Math.floor(i / N), c = i % N, room = plan.rooms[plan.at[i]];
+  const free = [...Array(N)].map((_, v) => v + 1).filter(v => ![...Array(N)].some((_, j) => g[r * N + j] === v || g[j * N + c] === v));
+  if (free.length === 1) return ["Only one number fits in the glowing square: its row and column have the rest.", ": its row and column have the rest"];
+  if (room.cells.length > 1 && room.cells.every(k => k === i || g[k])) {
+    const fits = free.filter(v => cageValue(room.op, room.cells.map(k => k === i ? v : g[k])) === room.t);
+    if (fits.length === 1) return [`The glowing square is the last in its room, and only one number makes ${room.t}${OPS[room.op]}.`, `: it's the last square in its room, and only a ${fits[0]} makes ${room.t}${OPS[room.op]}`];
+  }
+  return [`The glowing square's room is the nearest to full. Its row and column leave ${free.length} numbers.`, ""];
 }
 $("hintBtn").onclick = hint;
 $("restartBtn").onclick = () => { if (playing() && game.history.length) { game.undid = true; snapshot(); game.grid = game.grid.map(() => 0); game.notes = game.notes.map(() => 0); draw(); save(); G.note("Every door's shut again. Undo brings your numbers back.", 3500); } };

@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.6"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-23.2"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-22.6">
+<link rel="stylesheet" href="../games.css?v=2026-10-23.2">
 <style>
 /* Dottie, the star, beside the title */
 .title{display:flex;align-items:flex-end;gap:8px}
@@ -93,8 +93,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-22.6"></script>
-<script src="../cattower.js?v=2026-10-22.6"></script>
+<script src="../games.js?v=2026-10-23.2"></script>
+<script src="../cattower.js?v=2026-10-23.2"></script>
 <script>
 /* ---------- rooms ---------- */
 // A room is N × N squares, each floor (-1), furniture (-2) or furniture with a number (0 to 4).
@@ -252,7 +252,8 @@ const STORE = "catdoku.scratchthat.v1";
 const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1}, state.settings);
-let game = state.game || null, mark = null;  // mark: a hint's squares, while the room is as it was
+let game = state.game || null;
+const hints = G.hinter({game: () => game, key: () => game ? stateKey() : "", draw: () => draw()});   // marks {cells, bad}: a hint's squares
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !$("overlay").classList.contains("show");
 
@@ -269,7 +270,7 @@ function newPuzzle() {
     clearTimeout(slow);
     if (ask !== asking) return;
     G.note("");
-    game = fresh(r); mark = null; draw(); save();
+    game = fresh(r); draw(); save();
     rooms.prefetch(n);
     G.track(`Scratch That new puzzle level ${n}`);
     helpOnFirstVisit();
@@ -292,7 +293,7 @@ const dottieAt = () => { const {N, s} = game, c = (N - 1) / 2; let best = -1, d 
   s.forEach((v, i) => { const e = Math.hypot(i % N - c, Math.floor(i / N) - c); if (v === 1 && e < d) { d = e; best = i; } }); return best; };
 
 function draw() {
-  const el = $("board"), {N, g, s} = game, l = look(), sofas = furniture(), live = mark && mark.key === stateKey() ? mark : null;
+  const el = $("board"), {N, g, s} = game, l = look(), sofas = furniture(), live = hints.current();
   el.style.gridTemplateColumns = el.style.gridTemplateRows = `repeat(${N}, 1fr)`;
   if (el.children.length !== N * N) {
     el.innerHTML = "";
@@ -406,7 +407,7 @@ function undo() {
   draw(); save(); G.note("");
 }
 $("undoBtn").onclick = undo;
-addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); undo(); } });
+addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); undo(); } });
 $("restartBtn").onclick = () => {
   if (!playing() || !game.moves.length) return;
   game.s = game.g.map(() => -1); game.moves = []; game.restarted = true;
@@ -423,7 +424,8 @@ function hint() {
   const wrong = g.findIndex((v, i) => v === -1 && (s[i] === 1 && !ans(i) || s[i] === 0 && ans(i)));
   if (wrong >= 0) {
     bad = true; cells = [wrong];
-    say = s[wrong] === 1 ? "This post doesn't belong. Take it away." : "A post goes here, not a dot.";
+    const more = g.filter((v, i) => v === -1 && (s[i] === 1 && !ans(i) || s[i] === 0 && ans(i))).length - 1, also = more ? ` (and ${more} more)` : "";
+    say = s[wrong] === 1 ? `This post doesn't belong${also}. Take it away.` : `A post goes here, not a dot${also}.`;
   } else {
     const steps = [];
     stDeduce(N, g, s.map((v, i) => g[i] === -1 ? v : -1), LEVELS[game.level][1], steps);
@@ -445,9 +447,8 @@ function hint() {
     }
   }
   game.hinted = true; save();
-  mark = {key: stateKey(), cells, bad};
-  draw(); G.note(say, 5000);
-  const m = mark; setTimeout(() => { if (mark === m) { mark = null; if (game) draw(); } }, 5000);
+  // the first time, just where to look; asked again, what goes there and why
+  hints.show({cells, bad}, bad || hints.level() ? say : cells.length > 1 ? "The two gold squares settle something: look at them together." : "The gold square can be settled now. Ask again to see how.");
 }
 $("hintBtn").onclick = hint;
 
@@ -487,7 +488,7 @@ function openShared(d) {
   if (d.p && typeof d.p.s === "string" && d.p.s.length === N * N && /^[px-]*$/.test(d.p.s)) {
     game.s = [...d.p.s].map((c, i) => g[i] !== -1 ? -1 : c === "p" ? 1 : c === "x" ? 0 : -1); game.timed = false;
   }
-  settings.level = d.N; $("levelSel").value = d.N; mark = null;
+  settings.level = d.N; $("levelSel").value = d.N;
   draw(); save();
   const l = look();
   if (!floorLeft(l) && !l.bad.some(Boolean) && g.every((v, i) => v < 0 || l.num[i] === v)) { game.won = true; draw(); save(); }
