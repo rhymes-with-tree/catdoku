@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.12"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-22.13"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -22,7 +22,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-22.12">
+<link rel="stylesheet" href="../games.css?v=2026-10-22.13">
 <style>
 /* A living room floor: a winding ball track on the rug, with wicker baskets of toys around it. */
 .wrap.room{height:auto;aspect-ratio:2/3;max-width:calc(var(--tall) * 2 / 3)}
@@ -82,7 +82,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-22.12"></script>
+<script src="../games.js?v=2026-10-22.13"></script>
 <script>
 const $ = G.$;
 G.nav("toybox");
@@ -355,7 +355,7 @@ const build = G.builder([shuffle, runOf, revealFront, takes, claimable, placeToy
   params, cloneModel, solveModel, makeLevel], "makeLevel");
 
 /* ---------- game state ---------- */
-let S = null, effects = [], leaving = [], now = 0;
+let S = null, effects = [], leaving = [], now = 0, kbAt = -1;   // kbAt: the basket the keyboard cursor is on (in S.baskets)
 const toy = (kind, hidden) => ({kind, hidden, where: null, dest: null, from: null, t0: 0, dur: 0, spin: Math.random() * 2 * PI, revealT: -9, x: 0, y: 0});
 const slotS = j => mod(S.offset + j * L / S.C, L);
 function target(t) {
@@ -800,6 +800,11 @@ function draw() {
       ctx.beginPath(); ctx.roundRect(23, -41, basketEnd(b) - 20, 82, 5); ctx.stroke(); ctx.restore();
     }
   }
+  const kb = kbAt >= 0 && S.baskets[kbAt];
+  if (kb && !kb.gone) {
+    ctx.save(); ctx.translate(kb.mx, kb.my); ctx.rotate(Math.atan2(kb.dy, kb.dx));
+    ctx.strokeStyle = G.CURSOR; ctx.lineWidth = 4; ctx.beginPath(); ctx.roundRect(20, -44, basketEnd(kb) - 14, 88, 6); ctx.stroke(); ctx.restore();
+  }
   S.slots.forEach(t => t && toys.push([t, 0, 0]));
   for (const [t, ox, oy] of toys) {
     if (t.where.t === "b" && settled(t)) {
@@ -854,6 +859,13 @@ canvas.addEventListener("pointerdown", e => {
   }
 });
 
+// Keys: the arrows move a cursor to the nearest basket that way, and Space or Enter taps it; with two different
+// toys at the front, Space sends the one on the left (as you look along the basket) and Shift+Space the other.
+const basketSpots = () => S.baskets.map(b => b.gone ? null : [b.mx + b.dx * basketEnd(b) / 2, b.my + b.dy * basketEnd(b) / 2]);
+const keys = G.gridKeys({on: () => S && !S.over && !loading, start: () => Math.max(0, basketSpots().findIndex(Boolean)),
+  move: (i, dx, dy) => { const sp = basketSpots(); return sp[i] ? G.nearestThatWay(sp, i, dx, dy) : Math.max(0, sp.findIndex(Boolean)); },
+  show: i => { kbAt = i; },
+  act: (i, key, e) => { const b = S.baskets[i]; if (!b || b.gone) return; if (picking) shakeBasket(b); else tap(b, e.shiftKey ? 1 : 0); }});
 let last = performance.now();
 function loop(t) {
   const dt = Math.min(0.05, (t - last) / 1000); last = t; now += dt;

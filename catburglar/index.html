@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-22.12";
+  var BUILD = "2026-10-22.13";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-22.12">
+<link rel="stylesheet" href="../games.css?v=2026-10-22.13">
 <style>
 /* Night at the museum: a painting in a gilt frame on a dark gallery wall, lit by a brass picture light.
    A cat has sneaked into the painting; pinch or use + and − to look closer, and tap it to catch it. */
@@ -105,8 +105,8 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-22.12"></script>
-<script src="paintings.js?v=2026-10-22.12"></script>
+<script src="../games.js?v=2026-10-22.13"></script>
+<script src="paintings.js?v=2026-10-22.13"></script>
 <script>
 /* ---------- levels ---------- */
 // How big the cat is (the side of a square of the same area, as a share of the painting's), and how far it takes on
@@ -532,7 +532,7 @@ function hint() {
 
 /* ---------- looking closer: pinch, drag, the mouse wheel, + and − ---------- */
 const view = {z: 1, tx: 0, ty: 0}, MAXZ = 8;
-let VW = 0, VH = 0;
+let VW = 0, VH = 0, kb = null;   // kb: the keyboard crosshair, in painting pixels
 // Size the painting to fit the page: the full width, or less when a tall painting would run off the screen.
 function layout() {
   if (!scene) return;
@@ -599,6 +599,22 @@ addEventListener("keydown", e => {
   if (e.key === "+" || e.key === "=") zoomBy(1.6); else if (e.key === "-" || e.key === "_") zoomBy(1 / 1.6);
 });
 addEventListener("resize", layout);
+// Keys: the arrows move a crosshair over the painting, in steps that get finer as you zoom in (and the view follows
+// it), and Space or Enter taps where it is. + and − zoom.
+const keys = G.gridKeys({on: () => playing() && ready(),
+  start: () => { kb = {x: scene.PW / 2, y: scene.PH / 2}; return 0; },
+  move: (i, dx, dy, e) => {
+    const stepPx = Math.min(scene.PW, scene.PH) / (e && e.shiftKey ? 8 : 30) / view.z;
+    kb = {x: Math.max(0, Math.min(scene.PW, kb.x + dx * stepPx)), y: Math.max(0, Math.min(scene.PH, kb.y + dy * stepPx))};
+    // keep it in view
+    const k = VW / scene.PW * view.z, sx = kb.x * k + view.tx, sy = kb.y * k + view.ty;
+    if (sx < 20 || sx > VW - 20) view.tx = VW / 2 - kb.x * k;
+    if (sy < 20 || sy > VH - 20) view.ty = VH / 2 - kb.y * k;
+    applyView();
+    return 0;
+  },
+  show: i => { if (i < 0) kb = null; drawMarks(); },
+  act: () => { if (kb) tapAt(kb.x, kb.y); }});
 
 /* ---------- drawing ---------- */
 const ns = "http://www.w3.org/2000/svg";
@@ -612,6 +628,12 @@ function drawMarks() {
   for (const [x, y] of game.misses) {
     const g = svgEl("g", {class: "miss"}), r = 9 * u, q = 4.5 * u;
     g.append(svgEl("circle", {cx: x, cy: y, r, "stroke-width": 2}), svgEl("path", {d: `M${x - q} ${y - q}L${x + q} ${y + q}M${x + q} ${y - q}L${x - q} ${y + q}`, "stroke-width": 3}));
+    svg.append(g);
+  }
+  if (kb && playing()) {   // the keyboard crosshair
+    const r = 14 * u, q = 6 * u, g = svgEl("g", {class: "kbcross"});
+    g.append(svgEl("circle", {cx: kb.x, cy: kb.y, r, fill: "none", stroke: G.CURSOR, "stroke-width": 3 * u}),
+      svgEl("path", {d: `M${kb.x - r - q} ${kb.y}H${kb.x - r + q}M${kb.x + r - q} ${kb.y}H${kb.x + r + q}M${kb.x} ${kb.y - r - q}V${kb.y - r + q}M${kb.x} ${kb.y + r - q}V${kb.y + r + q}`, stroke: G.CURSOR, "stroke-width": 3 * u}));
     svg.append(g);
   }
   const shown = playing() && hints.current();

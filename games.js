@@ -810,6 +810,54 @@ const G = (() => {
     };
   }
 
+  /* ---------- keyboard play ---------- */
+  // Keyboard play on a board, the same in every game: the arrow keys move a cursor (it shows from the first arrow
+  // press, and a tap or Escape hides it), Space or Enter acts on what's under it, and a game can list keys of its
+  // own. Keys go to the board unless a card, the walkthrough, or a text box or menu has them; Space and Enter on a
+  // focused button press the button.
+  // o: {on() (whether the board takes keys now), show(i) (draws the cursor on spot i; -1 hides it),
+  //     act(i, key, e) (Space, which Enter also means, or one of o.keys, on spot i; return false to let the key go),
+  //     keys (a list of other keys, by name in lower case: "m", "backspace"), size() ([W, H] of a board of squares, spots numbered by row), or
+  //     move(i, dx, dy, e) (where an arrow goes from spot i, for boards that aren't squares), start() (the first spot),
+  //     escape() (anything to put away besides the cursor)}
+  const CURSOR = "#73A7AE";
+  function gridKeys(o) {
+    let at = -1;
+    const k = {at: () => at, set(i) { at = i; o.show(at); }, hide() { if (at >= 0) { at = -1; o.show(-1); } }};
+    const step = (i, dx, dy) => { const [W, H] = o.size(), x = Math.max(0, Math.min(W - 1, i % W + dx)), y = Math.max(0, Math.min(H - 1, Math.floor(i / W) + dy)); return y * W + x; };
+    document.addEventListener("keydown", e => {
+      if (e.ctrlKey || e.metaKey || e.altKey || !o.on() || document.querySelector(".spot") || $("overlay").classList.contains("show")) return;
+      const tag = e.target.tagName;
+      if (/^(INPUT|SELECT|TEXTAREA)$/.test(tag)) return;
+      if (e.key === "Escape") { if (o.escape) o.escape(); k.hide(); return; }
+      const dir = {ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0]}[e.key];
+      if (dir) {
+        e.preventDefault();
+        at = at < 0 ? (o.start ? o.start() : 0) : (o.move || step)(at, ...dir, e);
+        o.show(at); return;
+      }
+      const key = e.key === "Enter" ? " " : e.key.toLowerCase();
+      if (at < 0 || (key === " " && tag === "BUTTON") || !(key === " " || (o.keys || []).includes(key))) return;
+      if (o.act(at, key, e) !== false) e.preventDefault();
+    });
+    document.addEventListener("pointerdown", () => k.hide(), true);
+    return k;
+  }
+  // For boards that aren't squares: the nearest of `spots` ([x, y] each) from spot i in the direction of an arrow,
+  // or i if there's none that way.
+  function nearestThatWay(spots, i, dx, dy) {
+    const [x0, y0] = spots[i];
+    let best = i, bestD = Infinity;
+    spots.forEach(([x, y], j) => {
+      if (j === i || !spots[j]) return;
+      const along = (x - x0) * dx + (y - y0) * dy, across = Math.abs((x - x0) * dy - (y - y0) * dx);
+      if (along <= 0) return;
+      const d = along + 2 * across;   // straight that way counts for more than off to the side
+      if (d < bestD) { bestD = d; best = j; }
+    });
+    return best;
+  }
+
   // The square under a pointer, or -1.
   function cellAt(x, y) {
     const el = document.elementFromPoint(x, y), c = el && el.closest && el.closest(".board .cell");
@@ -834,6 +882,6 @@ const G = (() => {
     }
   }
 
-  return {GAMES, GROUPS, recent, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, track, reopen,
+  return {GAMES, GROUPS, recent, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen,
           setupTimer, freshClock, spotlight, toysOff, saveToys, needToys, goldPaw, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();
