@@ -174,6 +174,7 @@ const G = (() => {
       a.className = "gameTile"; a.style.setProperty("--tile", color);
       a.href = `${base}${slug}/`; a.dataset.slug = slug;
       if (slug === current) a.setAttribute("aria-current", "page");
+      if (mastered(slug)) { a.classList.add("gold"); a.title = "Mastered: a gold paw at the top level"; }
       const b = document.createElement("b"); b.textContent = name;
       const sm = document.createElement("small"); sm.textContent = slug === current ? "You're here" : blurb;
       a.append(b, sm);
@@ -197,6 +198,7 @@ const G = (() => {
     const none = document.createElement("p"); none.className = "gamesNone"; none.hidden = true; none.textContent = "No games match that.";
     const dslug = daily(), dgame = GAMES.find(g => g[1] === dslug);
     const todays = section(dailyDoneToday() ? "Today's challenge: done" : "Today's challenge", [dgame]);
+    if (dailyDoneToday()) todays.querySelector(".gameTile").classList.add("gold");   // gold once it's solved, as on the front page
     panel.append(home, todays, search, favs, ...shelves, none);
     drawFavs();
     search.oninput = () => {
@@ -338,23 +340,29 @@ const G = (() => {
     return box.firstChild;
   }
   // Gold paws earned on this device, counted per game by the win card. A win card shown again (a finished puzzle reopened) isn't
-  // counted twice: the last few wins counted are remembered by game, result and text.
+  // counted twice: the last few wins counted are remembered by game, result and text. A gold paw on a game's top level or
+  // size masters it, and its tile turns gold (`top`; a game whose levels aren't its picker's values, like Catlas, says
+  // whether a win was on its top one).
   const GOLD = "catdoku.goldpaws.v1";
   const goldPaws = slug => (load(GOLD).counts || {})[slug] || 0;
-  function countGold(result, text) {
+  const mastered = slug => !!(load(GOLD).top || {})[slug];
+  // the highest level or size in the page's picker
+  const topLevel = () => { const sel = $("levelSel") || $("size"); return sel ? Math.max(...[...sel.options].map(o => +o.value).filter(v => !isNaN(v))) : null; };
+  function countGold(result, text, top) {
     if (!CURRENT) return;
     const d = load(GOLD), sig = `${CURRENT}|${JSON.stringify(result || null)}|${text}`, seen = d.seen || [];
     if (seen.includes(sig)) return;
-    const counts = d.counts || {};
+    const counts = d.counts || {}, tops = d.top || {};
     counts[CURRENT] = (counts[CURRENT] || 0) + 1;
-    save(GOLD, {counts, seen: [...seen, sig].slice(-30)});
+    if (top ?? (result && result.n != null && result.n === topLevel())) tops[CURRENT] = true;
+    save(GOLD, {counts, top: tops, seen: [...seen, sig].slice(-30)});
   }
   // The win cards' way out to every game.
   const homeBtn = () => ["Back to the front page", () => { location.href = HOME; }];
   function winCard(text, onNext, admire = "Admire my board", result, o = {}) {
     const media = document.createElement("div");
     // what earned the gold paw ("No undos!"), under the paw
-    if (o.gold) { countGold(result, text); media.append(goldPaw()); if (o.goldWhy) { const g = document.createElement("p"); g.className = "goldwhy"; g.textContent = o.goldWhy; media.append(g); } }
+    if (o.gold) { countGold(result, text, o.top); media.append(goldPaw()); if (o.goldWhy) { const g = document.createElement("p"); g.className = "goldwhy"; g.textContent = o.goldWhy; media.append(g); } }
     const p = document.createElement("p"); p.textContent = text;
     const name = document.createElement("p"); name.className = "catname";
     name.textContent = `Meet ${NAMES[Math.floor(Math.random() * NAMES.length)]}!`;
@@ -963,5 +971,5 @@ const G = (() => {
   }
 
   return {GAMES, GROUPS, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen,
-          setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
+          setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();
