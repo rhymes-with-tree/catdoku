@@ -287,13 +287,28 @@ const G = (() => {
     return wrap;
   }
 
-  const NAMES = ["Biscuit", "Mochi", "Pickles", "Noodle", "Sprocket", "Whiskerdoodle", "Pounce", "Kerfuffle",
-    "Sir Pounce-a-Lot", "Lady Marmalade", "Duke Fluffington", "Captain Mittens", "Professor Paws", "Count Catula",
-    "Juniper", "Clover", "Figaro", "Atticus", "Ophelia", "Purrlock Holmes", "Chairman Meow", "Cleocatra",
-    "Pablo Picatso", "Meowzart", "Catrick Swayze", "Frida Catlo", "Paw Revere", "Dolly Purrton", "Luna", "Otis", "Patches",
+  // Names for the cat in the win card's photo (from Catdoku, which had the longest list).
+  const CAT_NAMES = {
+    classic: ["Oliver","Luna","Milo","Chloe","Leo","Bella","Simon","Tilly","Felix","Daisy","Oscar","Pearl","Jasper","Hazel","Gus","Mabel","Otis","Rosie","Arlo","Winnie",
+              "Walter","Ruby","Frank","Ivy","Theo","June","Murray","Poppy","Edith","Patches"],
     // every name from T. S. Eliot's "The Naming of Cats"
-    "Peter", "Augustus", "Alonzo", "James", "Victor", "Jonathan", "George", "Bill Bailey", "Plato", "Admetus", "Electra", "Demeter",
-    "Munkustrap", "Quaxo", "Coricopat", "Bombalurina", "Jellylorum"];
+    eliot: ["Peter","Augustus","Alonzo","James","Victor","Jonathan","George","Bill Bailey","Plato","Admetus","Electra","Demeter",
+            "Munkustrap","Quaxo","Coricopat","Bombalurina","Jellylorum"],
+    food: ["Biscuit","Mochi","Pickles","Nacho","Waffles","Dumpling","Pepper","Olive","Nutmeg","Muffin","Tofu","Pumpkin","Clementine","Toast","Paprika","Gnocchi","Butterbean","Cannoli","Pretzel","Sesame",
+           "Crouton","Bagel"],
+    whimsical: ["Pounce","Sprocket","Doodle","Noodle","Wiggles","Zigzag","Bumble","Pipsqueak","Fidget","Scooter","Ruckus","Jellybean","Tumble","Skedaddle","Kerfuffle","Snickerdoodle","Hullabaloo","Flapjack","Whiskerdoodle","Rascal",
+                "Bamboozle","Shenanigans"],
+    fancy: ["Sir Pounce-a-Lot","Lady Marmalade","Duke Fluffington","Baroness Von Whiskers","Captain Mittens","Professor Paws","Dame Purrington","Lord Nibbleton","Countess Crumpet","Admiral Snuggles","Madame Meow","Sir Reginald Floof","Princess Pudding","General Tso","Major Tom","Judge Biscuit","Doctor Snooze","Reverend Tuna","Count Catula","Mayor McWhiskers",
+            "Captain Whiskerbottom"],
+    nature: ["Willow","Juniper","Basil","Clover","Maple","Sage","Fern","Pebble","Aspen","Thistle","Moss","Hickory","Briar","Rain","Ember","Cedar","Birch","Marigold","Acorn","Sparrow",
+             "Wren","Laurel","Heather"],
+    literary: ["Merlin","Ophelia","Pip","Hermes","Juno","Atticus","Beatrix","Figaro","Gatsby","Ramona","Puck","Minerva","Sherlock","Matilda","Loki","Persephone","Watson","Hamlet","Freya","Tolstoy",
+               "Ishmael","Portia","Dorian","Brontë","Galahad","Hermia","Ovid"],
+    puns: ["Catrick Swayze","Cat Benatar","Chairman Meow","Purrlock Holmes","Meowzart","Leonardo DiCatprio","Santa Claws","Fuzz Aldrin","Kitty Purry","Cleocatra","Catniss Everdeen","Pablo Picatso","Pawl McCatney","Sir Isaac Mewton","Albert Meowstein","Bob Meowley","Salvador Catli","William Shakespaw","Jennifur Aniston","Furrdinand Magellan",
+           "Meowrilyn Monroe","Brad Kitt","Clawdia Schiffer","Ernest Hemingpaw","Catsanova","Purrcy Bysshe Shelley","Vincent van Meow","Frida Catlo","Andy Furhol","Paw Revere","Winston Purrchill","Napawleon","Catalina Wine Mixer","Meowly Ringwald","Dolly Purrton","Elvis Pawsley","Mister Meowgi","Katharine Hepburrn","Amelia Furhart","Jane Pawsten"]
+  };
+  // Whimsical, fancy, and pun names come up twice as often as the rest.
+  const NAMES = [...Object.values(CAT_NAMES).flat(), ...CAT_NAMES.whimsical, ...CAT_NAMES.fancy, ...CAT_NAMES.puns];
   const bust = () => "t=" + Date.now();
   function catPhoto() {
     const img = document.createElement("img"), backup = "https://cataas.com/cat?width=500&" + bust();
@@ -310,6 +325,7 @@ const G = (() => {
   // the admire button. Last comes a way back to the front page.
   // After admiring, point to the page's own new-puzzle button (New floor, New table…), or the level list.
   const admireNote = () => $("newBtn") ? `Done! Tap ${$("newBtn").textContent.trim()} when you're ready for another.` : "Done! Pick a level when you're ready for another.";
+  // o.lines adds lines of the game's own under the text (Catdoku's win streak).
   // A perfect clear (no help, nothing lost, no undo) earns a gold paw: o.gold puts one on the win card,
   // with o.goldWhy saying what earned it, o.goldTitle in place of "Gold paw!", and o.goldPic (a picture
   // and its caption) in place of the random cat photo and name.
@@ -321,8 +337,7 @@ const G = (() => {
       <path d="${PAW}" transform="translate(19 35.3) scale(.31 .298)" vector-effect="non-scaling-stroke"/></g></svg>`;
     return box.firstChild;
   }
-  // Gold paws earned on this device, counted per game (by the win card; Catdoku, with a card of its own, calls
-  // countGold itself). A win card shown again (a finished puzzle reopened) isn't
+  // Gold paws earned on this device, counted per game by the win card. A win card shown again (a finished puzzle reopened) isn't
   // counted twice: the last few wins counted are remembered by game, result and text.
   const GOLD = "catdoku.goldpaws.v1";
   const goldPaws = slug => (load(GOLD).counts || {})[slug] || 0;
@@ -345,6 +360,8 @@ const G = (() => {
     name.textContent = `Meet ${NAMES[Math.floor(Math.random() * NAMES.length)]}!`;
     const tl = timeLineEl(result); if (tl) media.append(tl);
     media.append(p);
+    // a game's own extra lines (Catdoku's win streak)
+    for (const line of o.lines || []) { const x = document.createElement("p"); x.textContent = line; media.append(x); }
     const dl = dailyLine();
     if (dl) { const d = document.createElement("p"); d.className = "dailyline"; d.textContent = dl; media.append(d); }
     if (o.gold && o.goldPic) media.append(...o.goldPic); else media.append(catPhoto(), name);
@@ -933,5 +950,5 @@ const G = (() => {
   }
 
   return {GAMES, GROUPS, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen,
-          setupTimer, freshClock, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, countGold, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
+          setupTimer, freshClock, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();

@@ -29,7 +29,7 @@ Open `index.html` in any modern browser: the front page has a tile for every gam
 - Wins move you up a size; a win that needed a hint, Audit or a revive, or running out of lives, keeps you at the same size; a win without losing a life, a hint or Audit earns a gold paw, with Higgins stretched out on the win card in place of the cat photo
 - Higgins, a brown tabby, is Catdoku's mascot: every cat you place on the board is Higgins's face (and so is every cat in the counter, the How to play walkthrough and the cat facts), Higgins sits beside the title, and Higgins is the tabby on the front-page icon
 - Progress saved in `localStorage`
-- Cat photos, facts, and breeds from public cat APIs (all optional; the game works offline)
+- Cat photos and breeds from public cat APIs (all optional; the game works offline), and a 🔥 win streak on the win card
 
 ## Yarn
 
