@@ -56,8 +56,9 @@ the same file path so the link stays the same.
   number pad just under it), action buttons, then level select and New puzzle.
 - Write the puzzle generator as plain functions and test it in Node: time per puzzle at every level,
   and for logic puzzles, exactly one solution.
-- Before publishing, screenshot it at phone width with Playwright and script a playthrough to the win
-  card (see step 5 for Playwright).
+- Before publishing, screenshot it with Playwright at the small phone sizes in step 5 (an iPhone SE upright
+  and sideways), not only at a roomy phone width, and script a playthrough to the win card (see step 5 for
+  Playwright).
 
 ## 3. Port
 
@@ -129,6 +130,32 @@ its notes.
 - **Toys:** a game that uses `toys/` lets players switch toys off with `G.toysOff`, `G.toyPicker` and
   `G.needToys` (see `pounce/`, `bubbles/` or `tango/`).
 
+### Full screen
+
+Decide whether the game gains from a full-screen mode, and say what you found when you report. Measure the board
+at the game's biggest level or size, at the four screens in step 5 (both iPhone SEs and the laptop). Boards
+stop at 560 pixels (`--board`), so on a laptop most get about a third of the screen. On a phone a square board
+already fills the width, so it gains little there. Full screen is worth it when any of these is true:
+
+- the board pans or zooms (Twirl's mat, Cat Burglar's painting), so a bigger window shows more of it;
+- the biggest board doesn't fit on the screen without scrolling the page (a tall mat, a 16 × 30 floor);
+- on a laptop its squares or pieces are small at 560 pixels and would be much bigger with the whole screen;
+- a board that isn't square would fit a wide screen far better on its side (Twirl lays its mat sideways).
+
+Leave it out when the board is small and square and fills a phone's width, or when typing with the phone's
+keyboard goes with play (it covers half the screen anyway).
+
+To add it: a button beside the zoom controls, or in the board's corner, run by
+`G.fullScreen({btn, name, change})` in `games.js`. It adds the icon, F and Escape, the browser's own full
+screen where there is one, and `body.full` (the page filling the window, which is all an iPhone gets).
+`games.css` puts the title and menu away; the page lays out the rest under `body.full`. In `change`, lay the
+board out again to fill the room the frame now has. Keep the lives or count, the message line, Hint and the zoom
+buttons on show, and put the other buttons and settings away. On a phone (`max-width:600px` or
+`max-height:500px`), drop decoration round the board, and when it's held sideways move the status and buttons
+into a narrow column beside the board so it gets the whole height (see `catburglar/` and `twirl/`). If the
+board is turned to lie sideways, taps, the arrow keys (which still go the way they point on the screen) and the
+walkthrough's squares and arrows must all be turned with it (see `shownXY` and `matXY` in `twirl/`).
+
 ### Lives
 
 Most games have none. A game that does follows Catdoku, Twirl and Toydoku: three hearts drawn as `♥` in
@@ -195,10 +222,20 @@ picked. The README's Keys line under "Across every game" says what Space does in
 
 ## 5. Test
 
-Serve the repo and drive it with Playwright at about 400 × 860. Load Playwright with
+Serve the repo and drive it with Playwright at about 400 × 860, and check the layout at an iPhone SE: 375 × 553
+upright and 667 × 323 sideways (Safari's address bar and toolbar take the rest of its 375 × 667), and the first
+SE, 320 × 460, as well as a laptop at 1280 × 720. Load Playwright with
 `require("/opt/node-tools/node_modules/playwright")`; it finds Chromium through
 `PLAYWRIGHT_BROWSERS_PATH`, so `chromium.launch()` needs no options. Check:
 
+- on the iPhone SE sizes, nothing runs off the side (no sideways scroll, no button cut off), button rows wrap
+  tidily at 320 wide, the board at the biggest level is big enough to tap (note its square size in pixels),
+  and the page scrolls only as far as it must; take screenshots and look at them;
+- full screen, if the game has it (step 3, "Full screen"): measure the board at each size before and after,
+  taps still land on the square under the finger (also when zoomed, and when the board is turned), F and Escape
+  leave it, and the cards and the walkthrough show on top. Test the iPhone way too, with
+  `Element.prototype.requestFullscreen = undefined` in an init script (headless Chromium's own full screen also
+  blocks resizing the viewport);
 - the walkthrough plays on a first visit and lines up with the board;
 - the buttons and settings are in the standard order (step 3);
 - Hint, Undo (and Ctrl+Z) and Restart work, and following hints alone reaches the win at every level
