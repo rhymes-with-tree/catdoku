@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-24.1"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-24.2"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -22,7 +22,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-24.1">
+<link rel="stylesheet" href="../games.css?v=2026-10-24.2">
 <style>
 /* A quilted blanket in nine cushions. Clumps of napping cats are dragged onto it from the tray below; a full
    row, column or cushion wakes its cats and they wander off, taking any toys they were lying on. */
@@ -42,6 +42,9 @@
 @keyframes bump{50%{transform:scale(1.15)}}
 /* the tray: three clumps of cats waiting to go on the blanket */
 .tray{width:var(--board);display:grid;grid-template-columns:repeat(3,1fr);gap:8px;height:calc(var(--board) * .3)}
+.slotWrap{position:relative;display:grid;min-width:0}
+.turnBtn{position:absolute;top:5px;right:5px;z-index:1;width:34px;height:34px;padding:0;border-radius:50%;font-size:19px;line-height:1;
+  display:flex;align-items:center;justify-content:center}
 .slot{position:relative;padding:4px;border:2px dashed var(--line);border-radius:12px;background:none;touch-action:none;cursor:grab}
 .slot svg{display:block;width:100%;height:100%;pointer-events:none}
 .slot.empty{cursor:default}
@@ -103,11 +106,12 @@
   </div>
   <div class="bar toggles">
     <div class="opt"><label class="toggle"><input type="checkbox" id="catsTgl"><span class="sw"></span>Cats</label><span class="hint">Off shows plain coloured blocks instead</span></div>
+    <div class="opt"><label class="toggle"><input type="checkbox" id="turnTgl"><span class="sw"></span>Turning</label><span class="hint">Turn a clump with ↻ (or R); no gold paw if you do</span></div>
   </div>
 
 </main>
 
-<script src="../games.js?v=2026-10-24.1"></script>
+<script src="../games.js?v=2026-10-24.2"></script>
 <script>
 const $ = G.$;
 G.nav("catpile");
@@ -309,7 +313,15 @@ function place(st, t, at, colour) {
   return {lines, clear: [...clear], got, gone, pts};
 }
 const won = st => st.level > 0 && st.goals.every(g => g.got >= g.need);
-const stuck = st => !st.tray.some(s => s && fitsAnywhere(filledOf(st), {cells: s}));
+// A shape turned a quarter turn clockwise, and the ways a shape can lie with up to three turns: [cells, turns] each.
+function turnCells(cells) { return normal(cells.map(([x, y]) => [-y, x])); }
+function turnsOf(cells) {
+  const out = [], seen = new Set();
+  for (let k = 0, c = cells; k < 4; k++, c = turnCells(c)) { const key = JSON.stringify(c); if (!seen.has(key)) { seen.add(key); out.push([c, k]); } }
+  return out;
+}
+// Whether nothing in the tray fits anywhere (with turning on, in any of the ways it can turn).
+const stuck = (st, turns) => !st.tray.some(s => s && (turns ? turnsOf(s) : [[s, 0]]).some(([c]) => fitsAnywhere(filledOf(st), {cells: c})));
 // How good a blanket is to carry on from: fewer lonely gaps and room for the awkward shapes.
 function roomScore(filled) {
   let score = 0;
@@ -329,13 +341,15 @@ function roomScore(filled) {
   score -= filled.filter(Boolean).length * 0.25;
   return score;
 }
-// The best place for a shape from the tray now: [tray slot, square, value], or null if nothing fits.
-// It looks at what each place clears, the toys it collects, and how the blanket is left.
-function bestMove(st) {
+// The best place for a shape from the tray now: [tray slot, square, value, quarter turns first, the shape as turned],
+// or null if nothing fits. It looks at what each place clears, the toys it collects, and how the blanket is left.
+// With turning on, it tries each shape every way it can turn (a turn has to be worth a little more than not turning).
+function bestMove(st, turns) {
   let best = null;
   const toyWant = k => { const g = st.goals.find(g => g.k === k); return g && g.got < g.need; };
-  st.tray.forEach((cells, t) => {
-    if (!cells) return;
+  st.tray.forEach((tc, t) => {
+    if (!tc) return;
+    for (const [cells, k] of turns ? turnsOf(tc) : [[tc, 0]]) {
     const filled0 = filledOf(st), shape = {cells};
     for (let at = 0; at < N * N; at++) {
       if (!fitsAt(filled0, shape, at)) continue;
@@ -352,8 +366,9 @@ function bestMove(st) {
         const cs = lineCells(kind, k), n = cs.filter(i => f[i]).length;
         if (cs.some(i => st.toys[i] !== undefined && !clear.has(i))) v += n * n * 0.03;
       }
-      v += roomScore(f);
-      if (!best || v > best[2]) best = [t, at, v];
+      v += roomScore(f) - (k ? 0.5 : 0);
+      if (!best || v > best[2]) best = [t, at, v, k, cells];
+    }
     }
   });
   return best;
@@ -471,6 +486,8 @@ function buildBlanket() {
 }
 // The Cats switch: off draws each clump as plain coloured blocks, for a calmer board. Kept on this device.
 let catsOn = G.load("catdoku.catpile.prefs.v1").cats !== false;
+// The Turning switch: on puts a ↻ on each clump in the tray (R with the keyboard) to turn it a quarter turn. Kept on this device.
+let turnsOn = G.load("catdoku.catpile.prefs.v1").turns === true;
 buildBlanket();
 
 /* ---------- playing ---------- */
@@ -504,7 +521,7 @@ function start(level, d, o = {}) {
   layers.cats.innerHTML = ""; catEls.clear();
   draw(true); save();
   if (!level) G.note("Zen: no toys to collect, and the cats always fit. Pick a level to carry on with the levels.", 7000);
-  else if (!S.over && stuck(S.d)) noRoom();
+  else if (!S.over && stuck(S.d, turnsOn)) noRoom();
 }
 // Each blanket keeps a copy of itself as dealt, for Restart and Share.
 function startLevel(level, keep) {
@@ -542,6 +559,17 @@ document.addEventListener("keydown", e => {
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && !/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) { e.preventDefault(); undo(); }
 });
 
+// Turn tray clump t a quarter turn clockwise (with Turning on, or when a shared blanket's moves are played again).
+// A turn can be undone, and costs the gold paw.
+function turn(t, replay) {
+  if (!S || S.over || !S.d.tray[t] || !(turnsOn || replay)) return false;
+  S.history.push(JSON.stringify(S.d)); if (S.history.length > 60) S.history.shift();
+  S.d.tray[t] = turnCells(S.d.tray[t]); S.d.turned = true; S.d.moves.push([t, -1]);
+  if (S.timed && !S.started) S.started = true;
+  if (ghost && ghost.t === t) drawGhost();
+  draw(); save();
+  return true;
+}
 // Put tray clump t with its top-left at square `at`.
 function drop(t, at) {
   if (!S || S.over || !S.d.tray[t] || !fitsAt(filledOf(S.d), {cells: S.d.tray[t]}, at)) return false;
@@ -567,7 +595,7 @@ function drop(t, at) {
   draw();
   save();
   if (won(S.d)) win();
-  else if (S.level && stuck(S.d)) setTimeout(() => S && !S.over && stuck(S.d) && noRoom(), 650);
+  else if (S.level && stuck(S.d, turnsOn)) setTimeout(() => S && !S.over && stuck(S.d, turnsOn) && noRoom(), 650);
   return true;
 }
 const CHEERS = ["Purr-fect!", "Meow-velous!", "Cat-tastic!", "Paws-itively amazing!"];
@@ -590,7 +618,7 @@ function win() {
   $("hintBtn").disabled = true;
   const game = S;
   setTimeout(() => S === game && G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my blanket", result,
-    {title: "Every toy collected!", gold: !helped, goldWhy: "No hints, undos or restarts!", next: `Next: level ${next}`,
+    {title: "Every toy collected!", gold: !helped && !S.d.turned, goldWhy: turnsOn ? "No hints, undos, restarts or turns!" : "No hints, undos or restarts!", next: `Next: level ${next}`,
      after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")}), 800);
 }
 function noRoom() {
@@ -653,22 +681,28 @@ function hud(rebuild) {
   });
 }
 const trayEl = $("tray");
+const slots = [], turnBtns = [];
 for (let t = 0; t < 3; t++) {
+  const w = document.createElement("div"); w.className = "slotWrap";
   const b = document.createElement("button"); b.className = "slot"; b.type = "button"; b.dataset.t = t;
   el(b, "svg", {viewBox: "0 0 500 500", "aria-hidden": "true"});
-  trayEl.append(b);
+  // with Turning on, a ↻ in the slot's corner turns its clump a quarter turn
+  const r = document.createElement("button"); r.className = "turnBtn"; r.type = "button"; r.textContent = "↻"; r.hidden = true;
+  r.setAttribute("aria-label", `Turn clump ${t + 1}`); r.onclick = () => turn(t);
+  w.append(b, r); trayEl.append(w); slots.push(b); turnBtns.push(r);
 }
 const sizeOf = cells => [Math.max(...cells.map(c => c[0])) + 1, Math.max(...cells.map(c => c[1])) + 1];
 function drawTray() {
   if (!S) return;
   const filled = filledOf(S.d), mark = hints.current();
-  [...trayEl.children].forEach((b, t) => {
+  slots.forEach((b, t) => {
     const cells = S.d.tray[t], svg = b.firstChild; svg.innerHTML = "";
+    turnBtns[t].hidden = !turnsOn || !cells || S.over || turnsOf(cells).length < 2;   // nothing to turn on a square
     b.classList.toggle("empty", !cells);
     b.classList.toggle("picked", picked === t);
     b.classList.toggle("dragging", !!drag && drag.t === t && drag.moved);
     b.classList.toggle("hint", !!mark && mark.t === t);
-    b.classList.toggle("nofit", !!cells && !fitsAnywhere(filled, {cells}));
+    b.classList.toggle("nofit", !!cells && !(turnsOn ? turnsOf(cells) : [[cells]]).some(([c]) => fitsAnywhere(filled, {cells: c})));
     b.setAttribute("aria-label", cells ? `Clump ${t + 1}: ${cells.length} ${cells.length === 1 ? "square" : "squares"}` : `Clump ${t + 1}: placed`);
     if (!cells) return;
     const [w, h] = sizeOf(cells), s = Math.max(w, h, 3);
@@ -691,7 +725,7 @@ function drawGhost() {
 function drawMarks() {
   layers.mark.innerHTML = "";
   const m = hints.current();
-  if (m && m.at !== undefined && S && S.d.tray[m.t]) for (const [x, y] of cellsOf({cells: S.d.tray[m.t]}, m.at)) el(layers.mark, "rect", {class: "hintsq", x: x * U + 3, y: y * U + 3, width: U - 6, height: U - 6, rx: 14});
+  if (m && m.at !== undefined && S && S.d.tray[m.t]) for (const [x, y] of cellsOf({cells: m.cells}, m.at)) el(layers.mark, "rect", {class: "hintsq", x: x * U + 3, y: y * U + 3, width: U - 6, height: U - 6, rx: 14});
   if (cursor >= 0) el(layers.mark, "rect", {class: "kbring", x: cursor % N * U + 3, y: Math.floor(cursor / N) * U + 3, width: U - 6, height: U - 6, rx: 12});
 }
 
@@ -756,9 +790,10 @@ board.addEventListener("pointerdown", e => {
 });
 // Keys: the arrows move a cursor on the blanket, 1 to 3 pick a clump (shown at the cursor), Space puts it down.
 const keys = G.gridKeys({
-  on: () => !!S && !S.over, size: () => [N, N], keys: ["1", "2", "3"],
+  on: () => !!S && !S.over, size: () => [N, N], keys: ["1", "2", "3", "r"],
   show(i) { cursor = i; ghost = i >= 0 && picked >= 0 ? {t: picked, at: i} : null; drawGhost(); drawMarks(); },
   act(i, key) {
+    if (key === "r") { if (picked >= 0) turn(picked); this.show(i); return; }
     if (key !== " ") { const t = +key - 1; if (!S.d.tray[t]) return; picked = t; drawTray(); this.show(i); return; }
     if (picked < 0) { picked = S.d.tray.findIndex(c => c && fitsAnywhere(filledOf(S.d), {cells: c})); if (picked < 0) return; drawTray(); this.show(i); return; }
     if (!drop(picked, i)) G.note("That doesn't fit there.", 1800); else this.show(i);
@@ -770,13 +805,13 @@ const keys = G.gridKeys({
 // The first hint lights the clump to use; asked again, the squares to put it on.
 $("hintBtn").onclick = () => {
   if (!S || S.over || document.querySelector(".spot")) return;
-  const mv = bestMove(S.d);
+  const mv = bestMove(S.d, turnsOn);
   if (!mv) { G.note("Nothing in the tray fits anywhere.", 3000); return; }
-  const [t, at] = mv;
+  const [t, at, , k, cells] = mv, times = ["", "once", "twice", "three times"][k];
   if (S.level && !S.d.hinted) S.d.hinted = true;
   save();
-  if (hints.level() === 0) hints.show({t}, `Try the clump lit in gold. Tap Hint again to see where.`);
-  else hints.show({t, at}, `Put the gold clump on the gold squares.`);
+  if (hints.level() === 0) hints.show({t}, `Try the clump lit in gold${k ? `, turned ${times} (↻)` : ""}. Tap Hint again to see where.`);
+  else hints.show({t, at, cells}, k ? `Turn the gold clump ${times} (↻), then put it on the gold squares.` : `Put the gold clump on the gold squares.`);
 };
 
 /* ---------- sharing ---------- */
@@ -790,7 +825,7 @@ function openShared(d) {
     throw new Error("the shared blanket doesn't fit the game");
   const dd = deal(d.N, d.s, kinds), moves = d.p ? String(d.p).split(",").filter(Boolean).map(m => m.split(".").map(Number)) : [];
   start(d.N, dd, {timed: !moves.length});
-  for (const [t, at] of moves) if (!(t >= 0 && t < 3 && at >= 0 && at < N * N) || !drop(t, at)) break;
+  for (const [t, at] of moves) if (!(t >= 0 && t < 3 && at >= -1 && at < N * N) || !(at < 0 ? turn(t, true) : drop(t, at))) break;
   if (moves.length) { S.history = []; draw(); save(); }
 }
 
@@ -828,9 +863,11 @@ const toyChest = () => ({kinds: KINDS, off: offToys, min: MIN_COLOURS, src: toyS
 $("toysBtn").onclick = () => G.toyPicker(toyChest());
 $("catsTgl").checked = catsOn;
 $("catsTgl").onchange = e => {
-  catsOn = e.target.checked; G.save(PREFS, {cats: catsOn});
+  catsOn = e.target.checked; G.save(PREFS, {cats: catsOn, turns: turnsOn});
   layers.cats.innerHTML = ""; catEls.clear(); draw(true);
 };
+$("turnTgl").checked = turnsOn;
+$("turnTgl").onchange = e => { turnsOn = e.target.checked; G.save(PREFS, {cats: catsOn, turns: turnsOn}); hints.clear(); draw(); };
 G.needToys({...toyChest(), off: () => offToys, game: "Cat Pile"});
 G.setupTimer({name: "catpile", game: () => S, playing: g => !g.over, save,
   label: n => `Level ${n}`, noun: "level",
