@@ -953,6 +953,44 @@ const G = (() => {
     return c ? +c.dataset.i : -1;
   }
 
+  /* ---------- full screen ---------- */
+  // A game's board filling the screen, for games whose board gains from the room (a big mat to look around, a
+  // painting). The browser's own full screen where it has one (not on an iPhone), and the page filling the window
+  // either way: body.full, with the title and menu put away (games.css); each game lays out the rest. The button
+  // gets its icon here; it, F, or Escape goes in and out. o: {btn, name (for the dashboard),
+  // change(on, toggled) (lay out again; toggled when it went in or out, not when the window only changed)}
+  function fullScreen(o) {
+    const isOn = () => document.body.classList.contains("full");
+    const screenFull = () => document.fullscreenElement || document.webkitFullscreenElement;
+    o.btn.classList.add("fsBtn");
+    o.btn.innerHTML = '<svg class="enter" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8V3h5M12 3h5v5M17 12v5h-5M8 17H3v-5"/></svg>' +
+      '<svg class="leave" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 3v5H3M17 8h-5V3M12 17v-5h5M3 12h5v5"/></svg>';
+    function set(on) {
+      document.body.classList.toggle("full", on);
+      o.btn.setAttribute("aria-label", on ? "Leave full screen" : "Full screen");
+      o.btn.title = on ? "Leave full screen (F)" : "Full screen (F)";
+      const el = document.documentElement;
+      try {
+        if (on && !screenFull()) { const go = el.requestFullscreen || el.webkitRequestFullscreen; if (go) Promise.resolve(go.call(el)).catch(() => {}); }
+        if (!on && screenFull()) { const leave = document.exitFullscreen || document.webkitExitFullscreen; Promise.resolve(leave.call(document)).catch(() => {}); }
+      } catch (e) {}
+      if (on) track(`${o.name} full screen`);
+      o.change(on, true);
+    }
+    set(false);
+    o.btn.addEventListener("click", () => set(!isOn()));
+    document.addEventListener("keydown", e => {
+      if (e.ctrlKey || e.metaKey || e.altKey || document.querySelector(".spot") || $("overlay").classList.contains("show") || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+      if (e.key === "f" || e.key === "F") set(!isOn());
+      else if (e.key === "Escape" && isOn() && !screenFull()) set(false);
+    });
+    // leaving the browser's full screen (Escape, or a swipe) leaves the game's too
+    const changed = () => { if (!screenFull() && isOn()) set(false); else o.change(isOn(), false); };
+    document.addEventListener("fullscreenchange", changed);
+    document.addEventListener("webkitfullscreenchange", changed);
+    return {on: isOn, set};
+  }
+
   // If something breaks, say what on the page and count it on the dashboard, so it can be fixed.
   function reportError(msg, where) {
     track(`Error: ${msg}${where ? ` (${where})` : ""}`);
@@ -971,6 +1009,6 @@ const G = (() => {
     }
   }
 
-  return {GAMES, GROUPS, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen,
+  return {GAMES, GROUPS, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();
