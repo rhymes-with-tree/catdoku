@@ -40,7 +40,7 @@ const G = (() => {
     ["Fridge Magnets", "magnets", "Help Crunch put every letter back on the fridge", "#BD5538", "words", "unolingo crossword alphabet letters", "2026-10-19"],
     ["Purrfect Square", "purrfect", "Make every row, column and diagonal add up the same", "#ECA818", "numbers", "magic square sums arithmetic maths math", "2026-10-20"],
     ["Catlas", "atlas", "Name the country where each cat is hiding", "#5FA0C8", "travels", "geography countries world map quiz seterra flags places territories wild cats", "2026-10-22"],
-    ["Cat Burglar", "catburglar", "Catch the cat that's sneaked into the painting", "#4E577D", "quick", "hidden object find spot seek paintings art museum met where's waldo wally", "2026-10-22"],
+    ["Cat Burglar", "catburglar", "Catch the cat that's snuck into the painting", "#4E577D", "quick", "hidden object find spot seek paintings art museum met where's waldo wally", "2026-10-22"],
     ["Cat Pile", "catpile", "Pile napping cats on the blanket and clear the lines", "#E16A4A", "teasers", "blockudoku block blast woodoku 1010 blocks shapes tetris polyomino sudoku lines", "2026-10-23"],
   ];
   // The shelves the front page and the games menu sort the games onto, in order: key (also a plain name for it,
