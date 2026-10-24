@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-23.10"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-24.1"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -22,7 +22,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-23.10">
+<link rel="stylesheet" href="../games.css?v=2026-10-24.1">
 <style>
 /* A quilted blanket in nine cushions. Clumps of napping cats are dragged onto it from the tray below; a full
    row, column or cushion wakes its cats and they wander off, taking any toys they were lying on. */
@@ -101,10 +101,13 @@
     <label>Level <select id="levelSel" aria-label="Level"></select></label>
     <button id="newBtn" class="primary">New blanket</button>
   </div>
+  <div class="bar toggles">
+    <div class="opt"><label class="toggle"><input type="checkbox" id="catsTgl"><span class="sw"></span>Cats</label><span class="hint">Off shows plain coloured blocks instead</span></div>
+  </div>
 
 </main>
 
-<script src="../games.js?v=2026-10-23.10"></script>
+<script src="../games.js?v=2026-10-24.1"></script>
 <script>
 const $ = G.$;
 G.nav("catpile");
@@ -405,6 +408,14 @@ const shade = (c, p) => `color-mix(in srgb, ${c} ${p}%, #2A2530)`;
 // shade is drawn first, then the blanket over it; squares side by side are bridged so they join up.
 function drawPad(g, cells, colour) {
   const col = COLOURS[colour % COLOURS.length], has = new Set(cells.map(([x, y]) => x + "," + y));
+  if (!catsOn) {   // with the cats off, a plain block on each square: a deeper edge, the colour, a soft shine along the top
+    for (const [x, y] of cells) {
+      el(g, "rect", {x: x * U + 4, y: y * U + 4, width: U - 8, height: U - 8, rx: 14, fill: shade(col, 62)});
+      el(g, "rect", {x: x * U + 8, y: y * U + 8, width: U - 16, height: U - 16, rx: 11, fill: col});
+      el(g, "rect", {x: x * U + 16, y: y * U + 14, width: U - 32, height: 12, rx: 6, fill: tint(col, 55), opacity: .8});
+    }
+    return;
+  }
   for (const [inset, fill] of [[4, shade(col, 62)], [8, col]]) {
     const p = el(g, "g", {fill});
     for (const [x, y] of cells) {
@@ -430,7 +441,7 @@ function drawCat(g, x, y, w, h, colour, id) {
 // A clump of cats for the tray or the drag: the shape's cells cut into cats, drawn from (0, 0).
 function drawClump(g, cells, colour, idBase) {
   drawPad(g, cells, colour);
-  catsFor(cells).forEach(([x, y, w, h], j) => drawCat(g, x, y, w, h, colour, idBase + j));
+  if (catsOn) catsFor(cells).forEach(([x, y, w, h], j) => drawCat(g, x, y, w, h, colour, idBase + j));
 }
 function drawToy(g, i, k, small) {
   const x = i % N, y = Math.floor(i / N), s = small ? U * .46 : U * .74;
@@ -458,10 +469,12 @@ function buildBlanket() {
   }
   for (const n of ["toys", "pads", "cats", "under", "clear", "ghost", "fx", "mark"]) layers[n] = el(board, "g", {});
 }
+// The Cats switch: off draws each clump as plain coloured blocks, for a calmer board. Kept on this device.
+let catsOn = G.load("catdoku.catpile.prefs.v1").cats !== false;
 buildBlanket();
 
 /* ---------- playing ---------- */
-const STORE = "catdoku.catpile.v1", INTRO = "catdoku.catpile.intro.v1";
+const STORE = "catdoku.catpile.v1", INTRO = "catdoku.catpile.intro.v1", PREFS = "catdoku.catpile.prefs.v1";
 let S = null;          // the blanket being played: {level, d (the saved state), …clock}
 let climb = 1, zenBest = 0, picked = -1, cursor = -1, drag = null, ghost = null;
 let offToys = G.toysOff();
@@ -541,7 +554,13 @@ function drop(t, at) {
   if (S.timed && !S.started) S.started = true;
   picked = -1; ghost = null;
   // the cats in cleared lines wake and wander off; toys they were on go to the goals
-  for (const c of res.gone) { const k = catEls.get(c.id); if (k) { catEls.delete(c.id); k.remove(); const w = drawCat(layers.fx, c.x, c.y, c.w, c.h, c.c, c.id); w.classList.add("wake"); w.style.transformOrigin = `${(c.x + c.w / 2) * U}px ${(c.y + c.h / 2) * U}px`; setTimeout(() => w.remove(), 700); } }
+  for (const c of res.gone) {
+    const k = catEls.get(c.id); if (k) { catEls.delete(c.id); k.remove(); }
+    let w;
+    if (catsOn) w = drawCat(layers.fx, c.x, c.y, c.w, c.h, c.c, c.id);
+    else { w = el(layers.fx, "g", {}); const cells = []; for (let j = 0; j < c.h; j++) for (let i = 0; i < c.w; i++) cells.push([c.x + i, c.y + j]); drawPad(w, cells.filter(([x, y]) => res.clear.includes(y * N + x)), c.c); }
+    w.classList.add("wake"); w.style.transformOrigin = `${(c.x + c.w / 2) * U}px ${(c.y + c.h / 2) * U}px`; setTimeout(() => w.remove(), 700);
+  }
   for (const [i, k] of res.got) { const t = drawToy(layers.fx, i, k); t.classList.add("tg"); t.style.transformOrigin = `${(i % N + .5) * U}px ${(Math.floor(i / N) + .5) * U}px`; setTimeout(() => t.remove(), 800); }
   if (res.lines.length) cheer(res.lines.length, S.d.combo);
   if (!S.level && S.d.score > zenBest) zenBest = S.d.score;
@@ -595,7 +614,7 @@ function draw(rebuild) {
   // cats: new ones drawn, gone ones taken away
   const now = new Set(d.cats.map(c => c.id));
   for (const [id, k] of catEls) if (!now.has(id)) { k.remove(); catEls.delete(id); }
-  for (const c of d.cats) if (!catEls.has(c.id)) catEls.set(c.id, drawCat(layers.cats, c.x, c.y, c.w, c.h, c.c, c.id));
+  if (catsOn) for (const c of d.cats) if (!catEls.has(c.id)) catEls.set(c.id, drawCat(layers.cats, c.x, c.y, c.w, c.h, c.c, c.id));
   // each clump's blanket, under its cats (split where a cleared line cut through it)
   layers.pads.innerHTML = "";
   const groups = new Map();
@@ -807,6 +826,11 @@ const toyChest = () => ({kinds: KINDS, off: offToys, min: MIN_COLOURS, src: toyS
   else { if (S) draw(true); G.note("Saved.", 3000); }
 }});
 $("toysBtn").onclick = () => G.toyPicker(toyChest());
+$("catsTgl").checked = catsOn;
+$("catsTgl").onchange = e => {
+  catsOn = e.target.checked; G.save(PREFS, {cats: catsOn});
+  layers.cats.innerHTML = ""; catEls.clear(); draw(true);
+};
 G.needToys({...toyChest(), off: () => offToys, game: "Cat Pile"});
 G.setupTimer({name: "catpile", game: () => S, playing: g => !g.over, save,
   label: n => `Level ${n}`, noun: "level",
