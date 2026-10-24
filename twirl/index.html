@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-24.7"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-24.8"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -22,7 +22,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-24.7">
+<link rel="stylesheet" href="../games.css?v=2026-10-24.8">
 <style>
 /* A play mat covered in satin ribbons; each one slides off the way its pointed end points, along its own path.
    Big mats zoom, and scroll inside their frame. */
@@ -51,6 +51,39 @@
 .peek{position:absolute;right:10px;top:calc(var(--peek) * -.6);width:var(--peek);height:auto;z-index:0;pointer-events:none;user-select:none}
 .scroller{position:relative;z-index:1}
 .status{padding-right:calc(var(--peek) + 16px)}   /* keep the line above clear of Bugsy */
+/* Full screen (G.fullScreen): the mat as big as the screen takes, laid sideways when that makes it bigger, with
+   the lives above it and Hint, Restart and zoom below. */
+body.full main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;align-items:stretch;gap:6px 10px}
+body.full .status{grid-column:1 / 3;width:100%}
+body.full .wrap.mat{grid-column:1 / 3;width:100%;min-height:0;display:flex;align-items:center;justify-content:center}
+body.full .actions{width:auto;justify-self:end}
+body.full .actions > :not(#hintBtn,#restartBtn),body.full .bar > :not(.zoom),body.full .toggles{display:none}
+body.full .bar{width:auto;justify-self:start}
+.zoom .fsBtn{padding:2px 10px}
+body.full .actions{gap:8px;align-self:center}
+body.full .actions button{padding:6px 12px}
+body.full .bar{align-self:center}
+body.full .zoom{gap:4px}
+body.full .zoom button{min-width:34px;padding:2px 8px}
+body.full .peek{display:none}   /* Bugsy's corner of the mat moves about in full screen */
+/* on a phone, tighter buttons; held sideways, the lives and buttons go in a
+   narrow column beside the mat, which gets the whole height */
+@media (max-width:600px),(max-height:500px){
+  body.full main{gap:4px 8px}
+  body.full .status{padding-right:0}
+  body.full .actions button{padding:6px 10px}
+  body.full .zoom button{min-width:30px;padding:2px 6px}
+}
+@media (max-width:600px) and (orientation:landscape),(max-height:500px) and (orientation:landscape){
+  body.full main{grid-template-columns:minmax(0,1fr) 116px;grid-template-rows:auto minmax(0,1fr) auto auto}
+  body.full .status{grid-column:2;grid-row:1;flex-direction:column;align-items:flex-start;gap:2px}
+  body.full .status .info{flex-direction:column;align-items:flex-start;gap:0;font-size:15px}
+  body.full .msg{flex:none;text-align:left;font-size:14px}
+  body.full .wrap.mat{grid-column:1;grid-row:1 / 5}
+  body.full .actions{grid-column:2;grid-row:3;flex-direction:column;align-items:stretch;justify-self:stretch}
+  body.full .bar{grid-column:2;grid-row:4;justify-self:stretch}
+  body.full .zoom{display:grid;grid-template-columns:1fr 1fr;width:100%}
+}
 .card img.bugsypic{display:block;width:72%;max-width:250px;height:auto;margin:0 auto 14px}
 </style>
 </head>
@@ -82,7 +115,7 @@
   <div class="bar">
     <label>Level <select id="levelSel" aria-label="Level"></select></label>
     <button id="newBtn" class="primary">New ribbons</button>
-    <span class="zoom" aria-label="Zoom"><button id="zoomOut" aria-label="Zoom out">−</button><button id="zoomFit">Fit</button><button id="zoomIn" aria-label="Zoom in">+</button></span>
+    <span class="zoom" aria-label="Zoom"><button id="zoomOut" aria-label="Zoom out">−</button><button id="zoomFit">Fit</button><button id="zoomIn" aria-label="Zoom in">+</button><button id="fullBtn"></button></span>
   </div>
   <div class="bar toggles">
     <div class="opt"><label class="toggle"><input type="checkbox" id="twistTgl"><span class="sw"></span>Twisty ribbons</label><span class="hint">Off draws every ribbon flat</span></div>
@@ -90,8 +123,8 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-24.7"></script>
-<script src="../colorways.js?v=2026-10-24.7"></script>
+<script src="../games.js?v=2026-10-24.8"></script>
+<script src="../colorways.js?v=2026-10-24.8"></script>
 <script>
 const $ = G.$;
 G.nav("twirl");
@@ -401,7 +434,12 @@ function revive() {
 const canvas = $("board"), ctx = canvas.getContext("2d"), scroller = $("scroller");
 const U = 24, PAD = 0.6;   // drawing units per square, and a margin round the mat in squares
 const DIRS = [[0, -1], [1, 0], [0, 1], [-1, 0]];
-let scale = 1, zoom = 1;
+let scale = 1, zoom = 1, side = false;   // side: the mat laid sideways (turned a quarter clockwise), in full screen
+// Drawing units to the canvas: the margin, the scale, and the quarter turn when the mat lies sideways.
+function toCanvas(g) {
+  if (side) g.setTransform(0, scale, -scale, 0, (matH() - PAD) * U * scale, PAD * U * scale);
+  else g.setTransform(scale, 0, 0, scale, PAD * U * scale, PAD * U * scale);
+}
 const mix = (a, b, f) => labHex(hexLab(a).map((v, k) => v + (hexLab(b)[k] - v) * f));
 // A ribbon's center line, from tail to tip, in drawing units; `extra` carries it on past the tip and off
 // the mat, for sliding out. A one-square ribbon is a short stub pointing its way.
@@ -499,7 +537,7 @@ let still = null, stillCtx = null;
 function paintStill() {
   if (!S) return;
   still = document.createElement("canvas"); still.width = canvas.width; still.height = canvas.height;
-  stillCtx = still.getContext("2d"); stillCtx.setTransform(scale, 0, 0, scale, PAD * U * scale, PAD * U * scale);
+  stillCtx = still.getContext("2d"); toCanvas(stillCtx);
   const gone = new Set(S.d.gone), tugging = new Set(tugs.map(t => t.k));
   S.d.ribbons.forEach((r, k) => { if (!gone.has(k) && !tugging.has(k)) drawRibbon(stillCtx, line(r), S.d.looks[k]); });
 }
@@ -516,7 +554,7 @@ function draw() {
   for (const t of tugs) if (now >= t.t0 + 0.4 && stillCtx && !gone.has(t.k)) drawRibbon(stillCtx, line(d.ribbons[t.k]), d.looks[t.k]);
   tugs = tugs.filter(t => now < t.t0 + 0.4);
   if (still) ctx.drawImage(still, 0, 0);
-  ctx.setTransform(scale, 0, 0, scale, PAD * U * scale, PAD * U * scale);
+  toCanvas(ctx);
   for (const t of tugs) {   // it tugs forward and springs back, and whatever is in the way flashes
     const r = d.ribbons[t.k], u = (now - t.t0) / 0.4, s = t.dist * U * (u < 0.45 ? Math.sin(u / 0.45 * Math.PI / 2) : Math.cos((u - 0.45) / 0.55 * Math.PI / 2));
     const pts = line(r, t.dist + 1);
@@ -543,21 +581,28 @@ function draw() {
 }
 
 /* ---------- size and zoom ---------- */
-// At "Fit" the whole mat shows; zooming makes it bigger inside its frame, which scrolls.
+// At "Fit" the whole mat shows; zooming makes it bigger inside its frame, which scrolls. In full screen the frame
+// takes all the room there is, and the mat lies sideways when its squares come out bigger that way.
 const matW = () => S.d.W + 2 * PAD, matH = () => S.d.H + 2 * PAD;
-function fitWidth() {
-  const avail = scroller.parentElement.clientWidth - 6, maxH = window.innerHeight * 0.78 - 6;
-  return Math.min(avail, maxH * matW() / matH());
+const shownW = () => side ? matH() : matW(), shownH = () => side ? matW() : matH();   // across and down, as shown
+const full = () => document.body.classList.contains("full");
+function room() {
+  if (full()) { const w = $("wrap"); return [w.clientWidth - 6, w.clientHeight - 6]; }
+  return [scroller.parentElement.clientWidth - 6, window.innerHeight * 0.78 - 6];
 }
 function layout(keep) {
   if (!S) return;
-  const fw = fitWidth(), cssW = fw * zoom, cssH = cssW * matH() / matW();
+  const [aw, ah] = room(), was = side;
+  side = full() && Math.min(aw / matH(), ah / matW()) > Math.min(aw / matW(), ah / matH()) * 1.05;
+  if (side !== was) { zoom = 1; keep = null; keys.hide(); }
+  const cssW = Math.min(aw, ah * shownW() / shownH()) * zoom, cssH = cssW * shownH() / shownW();
   const before = keep && canvas.clientWidth && {fx: (scroller.scrollLeft + keep.x) / canvas.clientWidth, fy: (scroller.scrollTop + keep.y) / canvas.clientHeight};
-  scroller.style.height = `${Math.min(cssH, window.innerHeight * 0.78 - 6) + 6}px`;
+  scroller.style.height = `${Math.min(cssH, ah) + 6}px`;
+  scroller.style.width = full() ? `${Math.min(cssW, aw) + 6}px` : "";
   canvas.style.width = `${cssW}px`; canvas.style.height = `${cssH}px`;
   const dpr = Math.min(window.devicePixelRatio || 1, 4096 / Math.max(cssW, cssH));
   canvas.width = Math.round(cssW * dpr); canvas.height = Math.round(cssH * dpr);
-  scale = canvas.width / (matW() * U);
+  scale = canvas.width / (shownW() * U);
   if (before) { scroller.scrollLeft = before.fx * cssW - keep.x; scroller.scrollTop = before.fy * cssH - keep.y; }
   paintStill();
   $("zoomOut").disabled = zoom <= 1; $("zoomIn").disabled = zoom >= 4; $("zoomFit").disabled = zoom === 1;
@@ -572,6 +617,13 @@ $("zoomOut").onclick = () => setZoom(zoom / 1.5);
 $("zoomFit").onclick = () => setZoom(1);
 let resizeTimer = null;
 window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => layout(), 150); });
+G.fullScreen({btn: $("fullBtn"), name: "Twirl", change: () => layout()});
+// A square as shown (x across, y down) and on the mat, which differ when the mat lies sideways; and a point
+// (in squares) and a direction, for the walkthrough's arrows.
+const shownXY = (x, y) => side ? [S.d.H - 1 - y, x] : [x, y];
+const matXY = (x, y) => side ? [y, S.d.H - 1 - x] : [x, y];
+const shownPt = (x, y) => side ? [S.d.H - y, x] : [x, y];
+const shownDir = (dx, dy) => side ? [-dy, dx] : [dx, dy];
 scroller.addEventListener("wheel", e => {   // ctrl/⌘ + scroll (and trackpad pinches) zoom
   if (!e.ctrlKey && !e.metaKey) return;
   e.preventDefault(); const r = scroller.getBoundingClientRect();
@@ -614,7 +666,7 @@ scroller.addEventListener("pointercancel", e => release(e, false));
 function tapAt(cx, cy) {
   if (!S || S.over || loading) return;
   const r = canvas.getBoundingClientRect(), d = S.d;
-  const x = Math.floor((cx - r.left) / r.width * matW() - PAD), y = Math.floor((cy - r.top) / r.height * matH() - PAD);
+  const [x, y] = matXY(Math.floor((cx - r.left) / r.width * shownW() - PAD), Math.floor((cy - r.top) / r.height * shownH() - PAD));
   if (x < 0 || y < 0 || x >= d.W || y >= d.H) return;
   const k = occupancy()[y * d.W + x];
   if (k >= 0 && !tugs.some(t => t.k === k)) tap(k);
@@ -623,10 +675,14 @@ function tapAt(cx, cy) {
 // Keys: the arrows move a cursor over the mat (it scrolls along when zoomed), and Space or Enter taps the ribbon
 // under it.
 let kbAt = -1;
-const keys = G.gridKeys({on: () => S && !S.over && !loading, size: () => [S.d.W, S.d.H], start: () => Math.floor(S.d.H / 2) * S.d.W + Math.floor(S.d.W / 2),
+const keys = G.gridKeys({on: () => S && !S.over && !loading, start: () => Math.floor(S.d.H / 2) * S.d.W + Math.floor(S.d.W / 2),
+  move: (i, dx, dy) => {   // the way the arrow points on the screen, which on a mat lying sideways is another way on the mat
+    const [mx, my] = side ? [dy, -dx] : [dx, dy], W = S.d.W;
+    return Math.max(0, Math.min(S.d.H - 1, Math.floor(i / W) + my)) * W + Math.max(0, Math.min(W - 1, i % W + mx));
+  },
   show: i => {
     kbAt = i; if (i < 0) return;
-    const cw = canvas.clientWidth / matW(), x = (i % S.d.W + PAD) * cw, y = (Math.floor(i / S.d.W) + PAD) * cw;
+    const cw = canvas.clientWidth / shownW(), [sx, sy] = shownXY(i % S.d.W, Math.floor(i / S.d.W)), x = (sx + PAD) * cw, y = (sy + PAD) * cw;
     if (x < scroller.scrollLeft || x + cw > scroller.scrollLeft + scroller.clientWidth) scroller.scrollLeft = x - scroller.clientWidth / 2;
     if (y < scroller.scrollTop || y + cw > scroller.scrollTop + scroller.clientHeight) scroller.scrollTop = y - scroller.clientHeight / 2;
   },
@@ -660,15 +716,15 @@ function intro(again) {
   // a free ribbon of three squares or more near the middle; its arrow lies along it, ending just past its tip
   const free = here.filter(k => !blockerOf(k)).sort((a, b) => (d.ribbons[b].cells.length >= 3) - (d.ribbons[a].cells.length >= 3) || mid(a) - mid(b))[0];
   const stuck = here.filter(k => blockerOf(k)).sort((a, b) => mid(a) - mid(b))[0];
-  const map = () => { const r = canvas.getBoundingClientRect(); return {ox: r.left + PAD / matW() * r.width, oy: r.top + PAD / matH() * r.height, cw: r.width / matW(), ch: r.height / matH()}; };
-  const cellsOf = k => d.ribbons[k].cells.map(xy), steps = [];
+  const map = () => { const r = canvas.getBoundingClientRect(); return {ox: r.left + PAD / shownW() * r.width, oy: r.top + PAD / shownH() * r.height, cw: r.width / shownW(), ch: r.height / shownH()}; };
+  const cellsOf = k => d.ribbons[k].cells.map(i => shownXY(...xy(i))), steps = [];
   if (free !== undefined) {
-    const r = d.ribbons[free], [hx, hy] = xy(r.cells[r.cells.length - 1]), [dx, dy] = DIRS[r.dir];
+    const r = d.ribbons[free], [hx, hy] = xy(r.cells[r.cells.length - 1]), [dx, dy] = DIRS[r.dir], [ax, ay] = shownDir(-dx, -dy);
     steps.push({say: "Tap a ribbon to send it off", lit: cellsOf(free)},
-               {say: "It slides the way its pointed end points", lit: cellsOf(free), arrows: [{to: [hx + 0.5 + dx * 0.9, hy + 0.5 + dy * 0.9], from: [-dx, -dy], size: 1.7}]});
+               {say: "It slides the way its pointed end points", lit: cellsOf(free), arrows: [{to: shownPt(hx + 0.5 + dx * 0.9, hy + 0.5 + dy * 0.9), from: [ax, ay], size: 1.7}]});
   }
   if (stuck !== undefined) {
-    const [b, at] = blockerOf(stuck), [bx, by] = xy(at);
+    const [b, at] = blockerOf(stuck), [bx, by] = shownXY(...xy(at));
     steps.push({say: "Only if nothing is in the way", lit: [...cellsOf(stuck), ...cellsOf(b)], outline: [cellsOf(stuck), cellsOf(b)], marks: [[bx, by, "❌", 0.7]]});
   }
   steps.push({say: "A blocked tap costs a life", els: [$("hearts")]},
@@ -676,7 +732,7 @@ function intro(again) {
              {say: "Clear every ribbon to finish", lit: here.flatMap(cellsOf)},
              {say: "Pinch or use − and + to zoom", els: [document.querySelector(".zoom")]},
                {say: "Turn off Twisty ribbons to draw every ribbon flat", els: [$("twistTgl").closest(".opt")]});
-  G.spotlight({grid: canvas, w: d.W, h: d.H, map, steps, done: () => G.save(INTRO, {seen: true})});
+  G.spotlight({grid: canvas, w: side ? d.H : d.W, h: side ? d.W : d.H, map, steps, done: () => G.save(INTRO, {seen: true})});
 }
 $("helpBtn").onclick = () => helpCard();
 $("hintBtn").onclick = hint;
