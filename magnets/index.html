@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-24.3"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-24.4"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-24.3">
+<link rel="stylesheet" href="../games.css?v=2026-10-24.4">
 <style>
 /* A fridge door with a crossword of squares on it, and the alphabet magnets Crunch knocked off it on the floor
    below. Every letter goes back on once, and every line of squares spells a word. */
@@ -48,9 +48,9 @@
 .won .mag{animation:jig .45s ease-in-out 2 alternate}
 @keyframes jig{to{transform:translateY(-5px)}}
 /* the floor, with every magnet in alphabet order: the ones still down are bright, the ones back up are outlines */
-.floor{display:grid;grid-template-columns:repeat(9,1fr);gap:4px;padding:8px;background:linear-gradient(#EFE6D2,#E4D8BE);
+.floor{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:4px;padding:8px;background:linear-gradient(#EFE6D2,#E4D8BE);
   border:3px solid var(--ink);border-radius:12px;position:relative}
-.floor button{all:unset;box-sizing:border-box;aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:9px;cursor:pointer;
+.floor button{all:unset;box-sizing:border-box;aspect-ratio:1;min-width:0;display:flex;align-items:center;justify-content:center;border-radius:9px;cursor:pointer;
   font:800 clamp(24px,7.4vw,36px)/1 var(--font);text-transform:uppercase;color:var(--c);-webkit-text-stroke:2.5px var(--ink);paint-order:stroke fill;
   text-shadow:1.5px 2.5px 0 rgba(42,37,48,.22);transform:rotate(var(--r));transition:transform .12s}
 .floor button:focus-visible{outline:3px solid var(--pacific-blue)}
@@ -98,7 +98,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-24.3"></script>
+<script src="../games.js?v=2026-10-24.4"></script>
 <script>
 /* ---------- fridges ---------- */
 // A fridge is a 10 × 10 crossword with 26 empty squares, and the 26 letters a–z on the floor to fill them, each
@@ -325,14 +325,15 @@ function solveSteps(idx, slots, sq, open) {
 
 /* ---------- game state ---------- */
 // game: {level, g (the answer: 100 letters, "." for a black square), open (the 26 squares to fill), put ({square: letter} for the letters you've put up),
-//        history (put before each change, for Undo), won, hinted, undid…}
+//        history (put before each change, for Undo), checked (put at the last Audit), won, hinted, undid…}
 // sel: the square picked (or -1), dir: 0 across or 1 down, for the word it's in; held: a letter picked up
 // from the floor with no square picked.
 const STORE = "catdoku.magnets.v1", MAX_LEVEL = 3, N = 10, NS = "http://www.w3.org/2000/svg", CS = 54, PADL = 50, PAD = 24;
 const ABC = "abcdefghijklmnopqrstuvwxyz";
-// each letter's colour, from the site's palette, and its tilt lying on the floor
-const PAL = ["#BD5538", "#73A7AE", "#ECA818", "#6AA673", "#B94588", "#7885BA", "#E16A4A", "#B3B94B", "#8D78AD", "#4E577D"];
-const colour = ch => PAL[ABC.indexOf(ch) * 3 % PAL.length];
+// The magnets' colours: one for the letters that start on the fridge, one for the 26 on the floor (wherever they
+// go), and after an Audit, coral for one of yours in the right square and sage for one in the wrong square.
+const GIVEN = "#4E577D", LOOSE = "#B94588", RIGHT = "#E16A4A", WRONG = "#6AA673";
+// a letter's tilt lying on the floor
 const tilt = ch => [-9, 6, -4, 10, -7, 3, 8, -5, 0][ABC.indexOf(ch) % 9];
 const $ = G.$;
 let state = G.load(STORE);
@@ -353,6 +354,8 @@ function derive() {
   F = {sol: new Map(g.map((ch, k) => [k, ch]).filter(([, ch]) => ch)), slots, d: slots.map(s => s[1] - s[0] === 1 ? 0 : 1), of, open: new Set(game.open)};
 }
 const letterAt = k => F.open.has(k) ? game.put[k] || "" : F.sol.get(k) || "";
+// A square's magnet colour: a letter you've put up keeps its Audit colour while it stays on the square it was audited on.
+const magColour = k => !F.open.has(k) ? GIVEN : game.checked && game.checked[k] === game.put[k] ? (game.put[k] === F.sol.get(k) ? RIGHT : WRONG) : LOOSE;
 const upLetters = () => new Set(Object.values(game.put));
 const empties = () => game.open.filter(k => !game.put[k]);
 // A fridge that came from a share link or a save: every line of two or more squares a word that counts, and 26
@@ -384,7 +387,7 @@ function draw() {
     if (k === sel) cls += " sel";
     if (bad.has(k) && empties().length === 0) cls += " bad";
     el("rect", {class: cls, x: x + 1.5, y: y + 1.5, width: CS - 3, height: CS - 3, rx: 3}, g);
-    if (ch) el("text", {class: "mag", x: x + CS / 2, y: y + CS / 2 + 1, fill: colour(ch), transform: `rotate(${tilt(ch) / 3} ${x + CS / 2} ${y + CS / 2})`}, g).textContent = ch;
+    if (ch) el("text", {class: "mag", x: x + CS / 2, y: y + CS / 2 + 1, fill: magColour(k), transform: `rotate(${tilt(ch) / 3} ${x + CS / 2} ${y + CS / 2})`}, g).textContent = ch;
   }
   const mark = hints.current();
   if (mark) for (const [k, b] of mark.sq) {
@@ -400,7 +403,7 @@ function drawFloor() {
   if (!fl.children.length) {
     for (const ch of ABC) {
       const b = document.createElement("button"); b.type = "button"; b.textContent = ch; b.dataset.l = ch;
-      b.style.setProperty("--c", colour(ch)); b.style.setProperty("--r", tilt(ch) + "deg");
+      b.style.setProperty("--c", LOOSE); b.style.setProperty("--r", tilt(ch) + "deg");
       fl.append(b);
     }
     const bat = new Image(); bat.src = catSrc("crunch-7"); bat.alt = "Crunch batting at the letters"; bat.id = "bat";
@@ -527,7 +530,7 @@ window.addEventListener("pointermove", e => {
   if (!drag.ghost && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 8) return;
   if (!drag.ghost) {
     drag.ghost = document.createElement("div"); drag.ghost.className = "dragmag"; drag.ghost.textContent = drag.ch;
-    drag.ghost.style.setProperty("--c", colour(drag.ch)); document.body.append(drag.ghost);
+    drag.ghost.style.setProperty("--c", LOOSE); document.body.append(drag.ghost);
   }
   drag.ghost.style.left = e.clientX + "px"; drag.ghost.style.top = e.clientY + "px";
 });
@@ -615,11 +618,12 @@ $("hintBtn").onclick = () => {
   }
 };
 
-// Audit: every letter you've put up in the wrong square gets a red box (or the message line says they're all right).
+// Audit: every letter you've put up turns coral if it's in the right square and sage if not, and stays that colour
+// until it's moved (the wrong ones get a red box too, or the message line says they're all right).
 $("auditBtn").onclick = () => {
   if (!playing()) return;
   if (!Object.keys(game.put).length) return G.note("Put some letters up first, then Audit checks them.", 3500);
-  game.audited = true; game.started = true; save();
+  game.audited = true; game.started = true; game.checked = {...game.put}; save(); draw();
   const wrong = game.open.filter(k => game.put[k] && game.put[k] !== F.sol.get(k));
   if (!wrong.length) { hints.clear(); return G.note("Every letter you've put up is in the right square.", 5000); }
   hints.show({sq: wrong.map(k => [k, true])}, `${wrong.length} letter${wrong.length > 1 ? "s are" : " is"} in the wrong square. Take ${wrong.length > 1 ? "them" : "it"} down and try again.`, {uncounted: true});
