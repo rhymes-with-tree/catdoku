@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-24.2";
+  var BUILD = "2026-10-24.3";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-24.2">
+<link rel="stylesheet" href="../games.css?v=2026-10-24.3">
 <style>
 /* Night at the museum: a painting in a gilt frame on a dark gallery wall, lit by a brass picture light.
    A cat has sneaked into the painting; pinch or use + and − to look closer, and tap it to catch it. */
@@ -77,8 +77,25 @@ body.full main{position:fixed;inset:0;z-index:5;max-width:none;gap:6px;justify-c
 body.full main > header,body.full .games,body.full .bar,body.full .actions > :not(#hintBtn,#giveUpBtn){display:none}
 body.full .status,body.full .actions{width:100%;max-width:900px}
 body.full .wall{width:100%}
-/* a phone held sideways: the painting before its label */
-@media (max-height:500px){body.full .placard{display:none}body.full .wall{padding:24px 8px 8px}body.full main{gap:2px}}
+/* On a phone, the painting edge to edge: no lamp, label or wall round it, and only a thin gilt edge. Held upright,
+   the lives sit above it and the buttons below; held sideways, they share a narrow column beside it. */
+@media (max-width:600px),(max-height:500px){
+  body.full main{gap:4px;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+  body.full .status{padding:2px 8px 0;min-height:0}
+  body.full .actions{padding:0 8px 6px}
+  body.full .wall{flex:1 1 0;min-height:0;justify-content:center;padding:0;background:none;border-radius:0}
+  body.full .lamp,body.full .placard{display:none}
+  body.full .frame{padding:3px;border-radius:2px}
+}
+@media (max-width:600px) and (orientation:landscape),(max-height:500px) and (orientation:landscape){
+  body.full main{display:grid;grid-template-columns:minmax(0,1fr) 108px;grid-template-rows:auto minmax(0,1fr);gap:8px 4px}
+  body.full .wall{grid-column:1;grid-row:1 / 3;height:100%}
+  body.full .status{grid-column:2;grid-row:1;flex-direction:column;align-items:flex-start;gap:4px;padding:8px 8px 0 0}
+  body.full .status .left{flex-direction:column;align-items:flex-start;gap:0;font-size:14px;white-space:nowrap}
+  body.full .msg{flex:none;text-align:left;font-size:14px}
+  body.full .actions{grid-column:2;grid-row:2;flex-direction:column;align-self:end;padding:0 8px 8px 0}
+  body.full .actions button{padding:6px 8px}
+}
 body.full .msg{color:rgba(247,248,243,.8)}
 body.full .hearts .lost{color:rgba(247,248,243,.3)}
 body.full .zoom .enter{display:none}
@@ -122,8 +139,8 @@ body.full .zoom .leave{display:block}
 
 </main>
 
-<script src="../games.js?v=2026-10-24.2"></script>
-<script src="paintings.js?v=2026-10-24.2"></script>
+<script src="../games.js?v=2026-10-24.3"></script>
+<script src="paintings.js?v=2026-10-24.3"></script>
 <script>
 /* ---------- levels ---------- */
 // How big the cat is (the side of a square of the same area, as a share of the painting's), and how far it takes on
@@ -555,9 +572,12 @@ let VW = 0, VH = 0, kb = null;   // kb: the keyboard crosshair, in painting pixe
 // screen, as big as fits on the screen with the lives above and the buttons below.
 function layout() {
   if (!scene) return;
-  const wall = $("wall"), room = wall.clientWidth - 24 - 18;
-  let tall = Math.max(240, innerHeight * 0.6);
-  if (isFull()) {
+  const wall = $("wall");
+  let room = wall.clientWidth - 24 - 18, tall = Math.max(240, innerHeight * 0.6);
+  if (isFull() && SMALL.matches) {   // edge to edge: all of the wall, less the thin gilt edge
+    const edge = 2 * parseFloat(getComputedStyle(wall.querySelector(".frame")).paddingLeft);
+    room = wall.clientWidth - edge; tall = wall.clientHeight - edge;
+  } else if (isFull()) {
     const m = wall.parentNode, cs = getComputedStyle(m), around = wall.offsetHeight - $("board").offsetHeight;   // the lamp, frame and placard
     tall = Math.max(120, m.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 2 * parseFloat(cs.rowGap)
       - document.querySelector(".status").offsetHeight - document.querySelector(".actions").offsetHeight - around);
@@ -630,6 +650,7 @@ addEventListener("resize", layout);
 /* ---------- full screen ---------- */
 // The browser's own full screen where it has one (not on an iPhone), and the page filling the window either way.
 const isFull = () => document.body.classList.contains("full");
+const SMALL = matchMedia("(max-width:600px),(max-height:500px)");   // a phone: edge to edge (as in the style above)
 const screenFull = () => document.fullscreenElement || document.webkitFullscreenElement;
 function setFull(on) {
   document.body.classList.toggle("full", on);
@@ -642,6 +663,8 @@ function setFull(on) {
   } catch (e) {}
   layout();
   if (on) G.track("Cat Burglar full screen");
+  // a wide painting on a phone held upright is much bigger sideways
+  if (on && scene && SMALL.matches && innerHeight > innerWidth && scene.PW > scene.PH * 1.15) G.note("Turn your phone sideways for a bigger painting.", 5000);
 }
 $("fullBtn").onclick = () => setFull(!isFull());
 // leaving the browser's full screen (Escape, or a swipe) leaves the game's too
