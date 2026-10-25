@@ -50,6 +50,16 @@
 @keyframes hop{40%{translate:0 -26px}}
 .swaps{font-variant-numeric:tabular-nums}
 .swaps.over{color:#B23A28}
+/* The fish's words, under everything: each one, once its bones are all green, links to Wiktionary with what it means */
+.wordlist{width:var(--board)}
+.wordlist h2{margin:0 0 4px;font-size:18px;font-weight:800}
+.wordlist ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.wordlist li{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 8px;line-height:1.3}
+.wordlist .where{font-size:13px;font-weight:600;color:var(--ink-soft);min-width:4.2em}
+.wordlist a{font-weight:800;color:var(--ink);letter-spacing:.04em;text-transform:uppercase}
+.wordlist .blank{font-weight:800;letter-spacing:.18em;color:var(--ink-soft)}
+.wordlist .means{flex:1 1 220px;min-width:0;font-size:15px;color:var(--ink-soft)}
+.wordlist .means i{font-style:normal;font-weight:600}
 /* the hint's ring goes round a bone without hiding its colour */
 .hintsq.ring{fill:none}
 @media (prefers-reduced-motion:reduce){.bone,.bone rect{transition:none}.bone.hop{animation:none}}
@@ -94,6 +104,7 @@ body.full .actions > :not(#hintBtn,#undoBtn),body.full .bar{display:none}
     <label>Level <select id="levelSel" aria-label="Level"></select></label>
     <button id="newBtn" class="primary">New fish</button>
   </div>
+  <section class="wordlist" aria-label="The fish's words"><h2>The words</h2><ol id="wordlist"></ol></section>
 
 </main>
 
@@ -101,8 +112,10 @@ body.full .actions > :not(#hintBtn,#undoBtn),body.full .bar{display:none}
 <script>
 /* ---------- fish (plain functions, also run in a background worker) ---------- */
 // A fish is a spine word read across, with rib words read down through it. `ribs` gives each spine bone's rib
-// as [bones above the spine, bones below] ([0, 0] for none). Ribs side by side make across words too: every run
-// of two or more bones in a row, off the spine, has to be a word as well.
+// as [bones above the spine, bones below] ([0, 0] for none), or `cols` lists the rows each spine bone's rib has a
+// bone on (above the spine negative), so a rib can have a gap in it like a crossword's black square. The words
+// are every run of two or more bones down a column or across a row: the spine, the words down, and the words
+// across where ribs sit side by side.
 // Levels: a bigger fish each time, and about the fewest swaps it takes to put back (with 5 spare on top). The
 // 9-letter spines come from words/long.json, and two-letter words from Fridge Magnets' list.
 function levelSpec(n) {
@@ -118,11 +131,14 @@ function levelSpec(n) {
 // spine, the ribs, then the across words (from `across` on).
 function fishCells(spec) {
   const cells = [], at = {}, add = (x, y) => { const k = x + "," + y; if (!(k in at)) { at[k] = cells.length; cells.push([x, y]); } return at[k]; };
-  const spine = []; for (let x = 0; x < spec.L; x++) spine.push(add(x, 0));
-  const words = [spine];
-  spec.ribs.forEach(([up, down], x) => { if (up + down) { const w = []; for (let y = -up; y <= down; y++) w.push(add(x, y)); words.push(w); } });
-  const across = words.length, has = (x, y) => (x + "," + y) in at;
-  for (const [x, y] of cells.slice()) if (y && has(x + 1, y) && !has(x - 1, y)) { const w = []; for (let k = x; has(k, y); k++) w.push(at[k + "," + y]); words.push(w); }
+  const cols = spec.cols || spec.ribs.map(([up, down]) => { const ys = []; for (let y = -up; y <= down; y++) if (y) ys.push(y); return ys; });
+  for (let x = 0; x < spec.L; x++) add(x, 0);
+  cols.forEach((ys, x) => ys.forEach(y => add(x, y)));
+  const has = (x, y) => (x + "," + y) in at, run = (x, y, dx, dy) => { const w = []; while (has(x, y)) { w.push(at[x + "," + y]); x += dx; y += dy; } return w; };
+  const words = [run(0, 0, 1, 0)];
+  for (const [x, y] of cells) if (!has(x, y - 1) && has(x, y + 1)) words.push(run(x, y, 0, 1));
+  const across = words.length;
+  for (const [x, y] of cells) if (y && !has(x - 1, y) && has(x + 1, y)) words.push(run(x, y, 1, 0));
   return {cells, words, across};
 }
 // Swaps needed to put `cur` (a letter on each square) back as `sol`: each square that's wrong wants a letter
@@ -164,7 +180,12 @@ function makeFish(n) {
   const spec = levelSpec(n), {cells, words} = fishCells(spec), N = cells.length;
   const board = new Array(N).fill(""), used = new Set(), open = new Set(words.map((_, k) => k));
   let steps = 0;
-  const fits = sq => (WL[sq.length] || []).filter(w => !used.has(w) && sq.every((i, j) => !board[i] || board[i] === w[j]));
+  // the words that fit a run of squares: from the shortest list of words with one of its letters in its place
+  const IX = self.IX || (self.IX = {});
+  const withAt = (L, j, c) => { const k = L + "," + j; if (!IX[k]) { IX[k] = {}; for (const w of WL[L] || []) (IX[k][w[j]] = IX[k][w[j]] || []).push(w); } return IX[k][c] || []; };
+  const fits = sq => { let from = WL[sq.length] || [];
+    sq.forEach((i, j) => { if (board[i]) { const l = withAt(sq.length, j, board[i]); if (l.length < from.length) from = l; } });
+    return from.filter(w => !used.has(w) && sq.every((i, j) => !board[i] || board[i] === w[j])); };
   (function lay() {
     if (!open.size) return true;
     if (++steps > 5000) return false;
@@ -352,8 +373,26 @@ function update() {
   $("hintBtn").disabled = game.won;
   $("undoBtn").disabled = !(game.history.length || (game.back || []).length) || game.won;
   $("restartBtn").disabled = !game.history.length || game.won;
-  paintHint();
+  paintHint(); wordList();
 }
+// The fish's words: the spine, the words down and the words across. One whose bones are all green (or every word,
+// once the fish is solved) shows, linked to Wiktionary, with its first meaning from there; the rest show as a
+// blank for each letter.
+const said = {};   // meanings already looked up: a list, or false when there wasn't one
+function wordList() {
+  const {words, across} = shape(), ol = $("wordlist"), out = [];
+  words.forEach((sq, k) => {
+    const w = sq.map(i => game.cur[i]).join(""), known = game.won || sq.every(i => game.cur[i] === game.sol[i]);
+    const where = k === 0 ? "Spine" : k < across ? "Down" : "Across";
+    if (!known) { out.push(`<li><span class="where">${where}</span><span class="blank" aria-label="${sq.length} letters">${"_".repeat(sq.length)}</span></li>`); return; }
+    const m = said[w], link = `<a href="https://en.wiktionary.org/wiki/${w}" target="_blank" rel="noopener" title="What does ${w} mean? (Wiktionary)">${w}</a>`;
+    const means = m ? `<i>${m[0].pos.toLowerCase()}</i> ${esc(m[0].text)}` : m === false ? "Tap the word to look it up on Wiktionary." : "Looking it up…";
+    out.push(`<li><span class="where">${where}</span>${link}<span class="means">${means}</span></li>`);
+    if (m === undefined) { said[w] = null; G.meaning(w).then(r => { said[w] = r; }, () => { said[w] = false; }).then(() => { if (game && $("wordlist")) wordList(); }); }
+  });
+  ol.innerHTML = out.join("");
+}
+const esc = t => t.replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
 
 /* ---------- playing ---------- */
 // A bone that's green stays put. Swap two others: drag one onto the other, or tap one and then the other.
@@ -573,7 +612,7 @@ function helpOnFirstVisit() {
     ...(one("ok") ? [{say: "Green: the right letter in the right place", lit: one("ok"), tone: "ok"}] : []),
     ...(one("near") ? [{say: "Gold: this word needs it, somewhere else", lit: one("near")}] : []),
     ...(one("no") ? [{say: "Grey: it belongs in another word", lit: one("no")}] : []),
-    {say: "Where two words cross, gold means either word wants it", lit: ribs.map(w => sq(w.find(i => cells[i][1] === 0)))},
+    {say: "Where two words cross, gold means either word wants it", lit: ribs.filter(w => w.some(i => cells[i][1] === 0)).map(w => sq(w.find(i => cells[i][1] === 0)))},
     {say: `You have ${left()} swaps. Fix the fish in ${game.min} for a gold paw`, els: [$("count")]},
     {say: "Stuck? Hint shows a bone to move", els: [$("hintBtn")]},
   ];
