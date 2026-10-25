@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-24.9"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-25.1"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-24.9">
+<link rel="stylesheet" href="../games.css?v=2026-10-25.1">
 <style>
 /* The map is the board: the country to name is lit in coral, and a gold ring goes round it when it's too small
    to see. Under it, the cat to find and the answer, given the way the player picks: four names (Pick), typing with
@@ -34,6 +34,8 @@
 .map canvas{display:block;width:100%;height:100%;cursor:grab}
 .map canvas:active{cursor:grabbing}
 .recentre{position:absolute;right:8px;bottom:8px;width:40px;height:40px;padding:0;border-radius:50%;display:grid;place-items:center;background:var(--panel)}
+.zoombtns{position:absolute;right:8px;bottom:56px;display:flex;flex-direction:column;gap:8px}
+.zoombtns button{width:40px;height:40px;padding:0;border-radius:50%;background:var(--panel);font-size:24px;line-height:1;font-weight:800}
 .recentre svg{width:22px;height:22px;fill:none;stroke:var(--ink);stroke-width:2.2;stroke-linecap:round}
 .key{position:absolute;left:8px;bottom:8px;display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--ink);background:color-mix(in srgb,var(--panel) 88%,transparent);border-radius:999px;padding:2px 10px 2px 4px;pointer-events:none}
 .key i{width:18px;height:14px;border-radius:4px;border:1.5px dashed var(--ink-soft);background:repeating-linear-gradient(135deg,var(--land) 0 3px,rgba(42,37,48,.42) 3px 4.6px)}
@@ -57,6 +59,8 @@
 .list li{padding:5px 10px;border-radius:7px;cursor:pointer;font-weight:600}
 .list li:hover{background:#fff}
 .list li[aria-selected="true"]{background:var(--ink);color:var(--paper)}
+/* on a phone, while typing: the map shrinks to fit above the answer box (see fitTyping) and the list is short */
+body.typing .list{max-height:var(--list-h,108px)}
 .list li.none{color:var(--ink-soft);cursor:default;font-weight:500}
 .tried{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
 .tried:empty{display:none}
@@ -101,6 +105,7 @@
     <div class="grid" id="grid"><canvas id="canvas" tabindex="0" role="img" aria-label="World map with one country lit up. Drag to move, pinch or scroll to zoom."></canvas></div>
     <div class="key" aria-hidden="true"><i></i>Disputed</div>
     <div class="loading" id="loading">Unrolling the map…</div>
+    <div class="zoombtns"><button id="zoomInBtn" aria-label="Zoom in" title="Zoom in">+</button><button id="zoomOutBtn" aria-label="Zoom out" title="Zoom out">−</button></div>
     <button class="recentre" id="recentreBtn" aria-label="Back to the lit country" title="Back to the lit country"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
   </div>
   <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
@@ -111,7 +116,7 @@
     <p class="reveal" id="reveal" aria-live="polite"></p>
     <div class="choices" id="choices" hidden></div>
     <form class="typebox" id="typebox" hidden autocomplete="off">
-      <input id="guess" type="text" enterkeyhint="go" spellcheck="false" autocapitalize="words" aria-label="Country name" placeholder="Type a country">
+      <input id="guess" name="answer" type="text" enterkeyhint="go" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="words" aria-label="Your answer" placeholder="Type the name">
       <button type="submit" class="primary" id="goBtn">Go</button>
     </form>
     <ul class="list" id="list" role="listbox" aria-label="Countries" hidden></ul>
@@ -135,7 +140,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-24.9"></script>
+<script src="../games.js?v=2026-10-25.1"></script>
 <script>
 /* ---------- countries and their cats ---------- */
 // The 200 countries a trip can ask: the 193 UN members plus Vatican City, Palestine, Taiwan, Kosovo,
@@ -284,7 +289,7 @@ const DISPUTES = {
   crimea: {name: "Crimea", aka: ["Crimean Peninsula", "Krym"], s: "{0} is controlled by {1} and claimed by {2}.", who: ["RUS", "UKR"]},
   donbas: {name: "Donbas", aka: ["Donbass", "Donetsk and Luhansk", "Donetsk", "Luhansk"], s: "Most of the {0} is controlled by {1} and claimed by {2}.", who: ["RUS", "UKR"]},
   golan: {name: "Golan Heights", aka: ["Golan", "Jawlan"], s: "The {0} are controlled by {1} and claimed by {2}.", who: ["ISR", "SYR"]},
-  wsahara: {name: "Western Sahara", aka: ["Sahrawi Arab Democratic Republic", "Sahrawi Republic", "SADR", "Southern Provinces"], s: "Most of {0} is controlled by {1}, and the Sahrawi Republic claims all of it.", who: ["MAR"]},
+  wsahara: {name: "Western Sahara", aka: ["Sahrawi Arab Democratic Republic", "Sahrawi Republic", "SADR", "Southern Provinces"], s: "Most of {0} is controlled by {1}, and a movement for its independence claims all of it.", who: ["MAR"]},
   kashmir: {name: "Kashmir", aka: ["Jammu and Kashmir", "Azad Kashmir", "Gilgit-Baltistan", "Ladakh"], s: "{0} is divided between {1}, {2} and {3}, and none of the lines between them is an agreed border.", who: ["IND", "PAK", "CHN"]},
   aksaichin: {name: "Aksai Chin", aka: [], s: "{0} is controlled by {1} and claimed by {2}.", who: ["CHN", "IND"]},
   arunachal: {name: "Arunachal Pradesh", aka: ["Zangnan", "South Tibet"], s: "{0} is controlled by {1} and claimed by {2}.", who: ["IND", "CHN"]},
@@ -296,7 +301,7 @@ const DISPUTES = {
   abyei: {name: "Abyei", aka: [], s: "{0} is claimed by both {1} and {2}.", who: ["SDN", "SDS"]},
   ilemi: {name: "Ilemi Triangle", aka: ["Ilemi"], s: "The {0} is controlled by {1} and claimed by {2}.", who: ["KEN", "SDS"]},
   kurils: {name: "Kuril Islands", aka: ["Kurils", "Southern Kurils", "Northern Territories", "Chishima"], s: "The southern {0} are controlled by {1} and claimed by {2}.", who: ["RUS", "JPN"]},
-  karabakh: {name: "Nagorno-Karabakh", aka: ["Artsakh", "Karabakh", "Mountainous Karabakh"], s: "{0} was fought over by {1} and {2}; Azerbaijan has controlled it since 2023.", who: ["ARM", "AZE"]},
+  karabakh: {name: "Nagorno-Karabakh", aka: ["Artsakh", "Karabakh", "Mountainous Karabakh"], s: "{0} was fought over by {1} and {2}, and {2} has controlled it since 2023.", who: ["ARM", "AZE"]},
   kosovo: {name: "Kosovo", aka: ["Kosova", "Republic of Kosovo"], s: "{0} declared independence from {1}, which still claims it.", who: ["SRB"]},
   taiwan: {name: "Taiwan", aka: ["Republic of China", "Formosa", "Chinese Taipei"], s: "{0} governs itself and is claimed by {1}.", who: ["CHN"]},
   palestine: {name: "Palestine", aka: ["State of Palestine", "Palestinian territories", "West Bank and Gaza"], s: "{0} is recognised as a state by most UN members; its borders with {1} are not agreed.", who: ["ISR"]},
@@ -495,6 +500,9 @@ function flyTo(t, instant) {
     e.preventDefault(); clampView(); redraw();
   });
   new ResizeObserver(resize).observe(canvas);
+  const zoomBy = f => { if (tween) { cancelAnimationFrame(tween.raf); tween = null; } flyTo({x: view.x, y: view.y, s: view.s * f}); };
+  G.$("zoomInBtn").onclick = () => zoomBy(2);
+  G.$("zoomOutBtn").onclick = () => zoomBy(1 / 2);
 }
 G.$("recentreBtn").onclick = () => { if (game && world) flyTo(frameFor(current())); };
 
@@ -657,12 +665,12 @@ function fillList() {
   const list = $("list"), dz = game.mode === "disputed";
   const cs = dz ? (q => DZ_LIST().filter(c => !norm(q) || (" " + norm(nameOf(c))).includes(" " + norm(q))))($("guess").value) : matching($("guess").value, game.card.bonus === "ask");
   list.innerHTML = "";
-  if (!cs.length) { const li = document.createElement("li"); li.className = "none"; li.textContent = "No country starts like that"; list.append(li); }
+  if (!cs.length) { const li = document.createElement("li"); li.className = "none"; li.textContent = dz ? "Nothing on the list starts like that" : "No country or territory starts like that"; list.append(li); }
   cs.forEach((c, i) => {
     const li = document.createElement("li"); li.setAttribute("role", "option"); li.textContent = nameOf(c); li.dataset.c = c;
     li.setAttribute("aria-selected", i === active);
     li.onpointerdown = e => e.preventDefault();      // keep the keyboard up on phones
-    li.onclick = () => dz ? dzGuess(nameOf(c)) : submit(c);
+    li.onclick = () => { $("guess").value = nameOf(c); active = 0; fillList(); list.scrollTop = 0; };   // fills the box; Go sends it
     list.append(li);
   });
 }
@@ -695,6 +703,26 @@ $("typebox").addEventListener("submit", e => {
 });
 function submit(c) { $("guess").value = ""; active = -1; if (game.card.bonus === "ask") answerBonus(c); else answer(c); }
 const focusTyping = () => { if (style() !== "pick" && matchMedia("(hover: hover)").matches) $("guess").focus(); };
+// On a phone the keyboard leaves little room, and the list used to fill it, hiding the map. While the answer box has
+// the focus there, the map shrinks to fit above the clue, the box and a short list, and the page scrolls to the map.
+function fitTyping() {
+  const vv = window.visualViewport, board = $("board"), on = document.activeElement === $("guess") && vv && !matchMedia("(hover: hover)").matches;
+  document.body.classList.toggle("typing", !!on);
+  if (!on) { board.style.height = ""; return; }
+  const below = $("typebox").getBoundingClientRect().bottom - board.getBoundingClientRect().bottom + 18;
+  const room = vv.height - below, list = $("list").hidden ? 0 : Math.max(36, Math.min(108, room - 180));
+  board.style.height = Math.round(Math.min(board.offsetWidth, Math.max(160, room - list - 8))) + "px";
+  document.body.style.setProperty("--list-h", list + "px");
+  const top = board.getBoundingClientRect().top - vv.offsetTop - 4;
+  if (Math.abs(top) > 2) scrollBy(0, top);
+}
+{
+  let raf = 0;
+  const fit = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(fitTyping); };
+  $("guess").addEventListener("focus", () => { fit(); setTimeout(fit, 350); });   // and again once the keyboard is up
+  $("guess").addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== $("guess")) fitTyping(); }, 0));
+  if (window.visualViewport) visualViewport.addEventListener("resize", fit);
+}
 
 // Each place gets TRIES guesses; after that it's shown and counts as missed.
 function answer(c, btn) {
@@ -740,6 +768,7 @@ function answerBonus(o, btn) {
 $("skipBtn").onclick = () => { if (game.card.bonus !== "ask" || busy) return; if (game.mode === "disputed") { game.card.bonus = "done"; save(); return seeCat(); } game.card.bonus = "done"; G.note(`It belongs to ${nameOf(DEPS[current()][1])}.`, 2200); save(); seeCat(); };
 // Once a place is answered, its cat's photo and Wikipedia link come up, until Next (the clock waits meanwhile).
 function seeCat() {
+  $("guess").blur();      // the keyboard goes, and the map is full size again under the card
   game.card.seen = true; game.card.bonus = undefined; save(); show();
 }
 function advance() {
@@ -804,7 +833,7 @@ function walkthrough() {
     {say: style() === "pick" ? "Tap the country's name." : style() === "list" ? "Type its name, or pick it from the list." : "Type its name, then Go.",
      lit: [], els: [style() === "pick" ? $("choices") : $("typebox")]},
     {say: "You get two tries for each.", lit: [], els: [style() === "pick" ? $("choices") : $("typebox")]},
-    {say: "Drag or pinch the map to look around.", lit: [[0, 0]], els: [$("recentreBtn")]},
+    {say: "Drag or pinch the map (or use + and −) to look around.", lit: [[0, 0]], els: [document.querySelector(".zoombtns"), $("recentreBtn")]},
     {say: "Choose how you answer here.", lit: [], els: [$("styleSel")]},
     {say: "Stuck? Hint helps, but costs the gold paw.", lit: [], els: [$("hintBtn")]}];
   G.spotlight({grid: $("grid"), w: 1, h: 1, steps, done: () => { settings.seenHelp = true; save(); }});
@@ -946,7 +975,6 @@ function showMode() {
   const dz = settings.round === LAST;
   $("clue").classList.toggle("dz", dz);
   $("newBtn").textContent = dz ? "New round" : "New trip";
-  $("guess").placeholder = dz ? "Type a place or country" : "Type a country";
   if (!dz) $("reveal").classList.remove("note");
 }
 
