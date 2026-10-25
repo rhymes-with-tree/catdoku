@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fish Bones</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-25.2"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-25.2">
+<style>
+/* A fish skeleton: a spine word across and rib words down through it, with the letters on the bones muddled.
+   Swap bones until every line spells a word. Green: in the right place. Gold: in that word, somewhere else.
+   Grey: not in that word. */
+.title{display:flex;align-items:flex-end;gap:8px}
+.bowtie{display:block;height:64px;width:auto;margin-bottom:-6px}
+@media (max-height:760px){.bowtie{height:46px;margin-bottom:-4px}}
+.card img.bowtiepic{display:block;width:56%;max-width:220px;height:auto;margin:0 auto 14px}
+.fish{--ok:#6AA673; --near:#ECA818; --no:color-mix(in srgb,#2A2530 22%,#fff);
+  height:auto;touch-action:none;user-select:none;-webkit-user-select:none}
+.fish #svg{display:block;width:100%;height:auto;outline:none;overflow:visible}
+.body{fill:var(--ink)} .eye{fill:var(--paper)}
+.spine{stroke:var(--ink);stroke-width:16;stroke-linecap:round;fill:none}
+.bone{cursor:grab;transition:transform .22s ease-out}
+.bone rect{fill:var(--no);stroke:var(--ink);stroke-width:3;transition:fill .2s}
+.bone text{font:800 56px var(--font);fill:var(--ink);text-anchor:middle;dominant-baseline:central;pointer-events:none;text-transform:uppercase}
+.bone.ok rect{fill:var(--ok)} .bone.ok text{fill:#fff}
+.bone.near rect{fill:var(--near)}
+.bone.ok{cursor:default}
+.bone.sel rect{stroke-width:7}
+.bone.sel{transform-box:fill-box}
+.bone.lift{transition:none;filter:drop-shadow(0 6px 6px rgba(42,37,48,.35))}
+.bone.hop{animation:hop .5s ease-in-out both}
+@keyframes hop{40%{translate:0 -26px}}
+.swaps{font-variant-numeric:tabular-nums}
+.swaps.over{color:#B23A28}
+/* the hint's ring goes round a bone without hiding its colour */
+.hintsq.ring{fill:none}
+@media (prefers-reduced-motion:reduce){.bone,.bone rect{transition:none}.bone.hop{animation:none}}
+/* Full screen (G.fullScreen), for the big fish: the button sits in the fish's top corner. The fish fills the
+   room, with the swaps and message above it and Hint and Undo below; on a phone held sideways those go in a
+   narrow column beside the fish, which gets the whole height. */
+.fish{position:relative}
+.fish .fsBtn{position:absolute;top:0;right:0;z-index:1;padding:4px 8px}
+body.full main{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;justify-items:stretch}
+body.full .status,body.full .actions{width:100%}
+body.full .wrap.fish{width:100%;height:100%;min-height:0}
+body.full .fish #grid,body.full .fish #svg{height:100%}
+body.full .actions > :not(#hintBtn,#undoBtn),body.full .bar{display:none}
+@media (max-width:600px) and (orientation:landscape),(max-height:500px) and (orientation:landscape){
+  body.full main{grid-template-columns:minmax(0,1fr) 116px;grid-template-rows:auto minmax(0,1fr);gap:4px 8px}
+  body.full .status{grid-column:2;grid-row:1;flex-direction:column;align-items:flex-start;gap:2px}
+  body.full .msg{flex:none;text-align:left;font-size:14px}
+  body.full .wrap.fish{grid-column:1;grid-row:1 / 3}
+  body.full .actions{grid-column:2;grid-row:2;flex-direction:column;align-items:stretch;align-self:start}
+}
+</style>
+</head>
+<body>
+<main>
+  <header><div class="title"><h1>Fish Bones</h1><img class="bowtie" src="../cats/bowtie-5.webp" alt="Bowtie, a black and white tuxedo cat, peeking up"></div><div class="stripe"></div><p class="tagline">Swap the bones until Bowtie's fish spells words again</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span class="swaps" id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap fish" id="board"><button id="fullBtn"></button><div id="grid"><svg id="svg" tabindex="0" role="application" aria-label="A fish skeleton with a letter on each bone. Drag a bone onto another to swap them, or tap one and then the other; arrow keys and Space work too."></svg></div></div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="linkBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New fish</button>
+  </div>
+
+</main>
+
+<script src="../games.js?v=2026-10-25.2"></script>
+<script>
+/* ---------- fish (plain functions, also run in a background worker) ---------- */
+// A fish is a spine word read across, with rib words read down through it. `ribs` gives each spine bone's rib
+// as [bones above the spine, bones below] ([0, 0] for none). Ribs side by side make across words too: every run
+// of two or more bones in a row, off the spine, has to be a word as well.
+// Levels: a bigger fish each time, and about the fewest swaps it takes to put back (with 5 spare on top). The
+// 9-letter spines come from words/long.json, and two-letter words from Fridge Magnets' list.
+function levelSpec(n) {
+  return [null, {fish: "Minnow", L: 5, ribs: [[1, 1], [0, 0], [1, 1]], swaps: 4},
+    {fish: "Sardine", L: 7, ribs: [[1, 1], [0, 0], [1, 1], [0, 0], [1, 1]], swaps: 7},
+    {fish: "Herring", L: 7, ribs: [[1, 1], [1, 1], [1, 1]], swaps: 7},
+    {fish: "Mackerel", L: 9, ribs: [[1, 1], [0, 0], [2, 2], [0, 0], [1, 1], [0, 0], [1, 1]], swaps: 11},
+    {fish: "Discus", L: 7, ribs: [[2, 2], [0, 0], [3, 3], [0, 0], [2, 2], [1, 1]], swaps: 14},
+    {fish: "Angelfish", L: 7, ribs: [[3, 3], [0, 0], [3, 3], [0, 0], [2, 2], [0, 0], [1, 1]], swaps: 15},
+    {fish: "Swordfish", L: 9, ribs: [[2, 2], [0, 0], [2, 2], [0, 0], [2, 2], [0, 0], [2, 2], [0, 0], [1, 1]], swaps: 16}][n];
+}
+// The squares of a fish, as [x, y] with the spine at y = 0, and its words, each a list of square numbers: the
+// spine, the ribs, then the across words (from `across` on).
+function fishCells(spec) {
+  const cells = [], at = {}, add = (x, y) => { const k = x + "," + y; if (!(k in at)) { at[k] = cells.length; cells.push([x, y]); } return at[k]; };
+  const spine = []; for (let x = 0; x < spec.L; x++) spine.push(add(x, 0));
+  const words = [spine];
+  spec.ribs.forEach(([up, down], x) => { if (up + down) { const w = []; for (let y = -up; y <= down; y++) w.push(add(x, y)); words.push(w); } });
+  const across = words.length, has = (x, y) => (x + "," + y) in at;
+  for (const [x, y] of cells.slice()) if (y && has(x + 1, y) && !has(x - 1, y)) { const w = []; for (let k = x; has(k, y); k++) w.push(at[k + "," + y]); words.push(w); }
+  return {cells, words, across};
+}
+// Swaps needed to put `cur` (a letter on each square) back as `sol`: each square that's wrong wants a letter
+// from somewhere else, so draw an arrow from the letter it has to the letter it wants. Every swap can fix at
+// most one more square than the arrows it ends, so the fewest swaps is the arrows less the most loops they
+// split into (a loop of k arrows takes k - 1 swaps).
+function minSwaps(cur, sol) {
+  const E = {}; let n = 0;
+  for (let i = 0; i < sol.length; i++) if (cur[i] !== sol[i]) { const k = cur[i] + sol[i]; E[k] = (E[k] || 0) + 1; n++; }
+  const memo = new Map();
+  function loops(E) {
+    const keys = Object.keys(E).filter(k => E[k] > 0).sort();
+    if (!keys.length) return 0;
+    const sig = keys.map(k => k + E[k]).join();
+    if (memo.has(sig)) return memo.get(sig);
+    // two arrows each way between letters always make a loop of their own in some best split
+    for (const k of keys) { const r = k[1] + k[0]; if (k[0] < k[1] && E[r] > 0) { E[k]--; E[r]--; const v = 1 + loops(E); E[k]++; E[r]++; memo.set(sig, v); return v; } }
+    // otherwise the first arrow is in some loop: try every loop through it
+    const start = keys[0][0]; let best = 0;
+    (function walk(at, len) {
+      for (const k of Object.keys(E)) if (E[k] > 0 && k[0] === at) {
+        E[k]--;
+        if (k[1] === start) best = Math.max(best, 1 + loops(E));
+        else walk(k[1], len + 1);
+        E[k]++;
+      }
+    })(start, 0);
+    memo.set(sig, best);
+    return best;
+  }
+  return n - loops(E);
+}
+// A fish for level n, from WL (the familiar words and two-letter words, split by length): words laid on it one at
+// a time, each time the word with the fewest that fit (none used twice), going back a step when one has none.
+// Then it's muddled with random swaps among all but a few squares (left as they are, the way Waffle leaves some
+// green to start from) until putting it back takes the level's number of swaps (give or take one), with no
+// other square right and no word right as it stands.
+function makeFish(n) {
+  const spec = levelSpec(n), {cells, words} = fishCells(spec), N = cells.length;
+  const board = new Array(N).fill(""), used = new Set(), open = new Set(words.map((_, k) => k));
+  let steps = 0;
+  const fits = sq => (WL[sq.length] || []).filter(w => !used.has(w) && sq.every((i, j) => !board[i] || board[i] === w[j]));
+  (function lay() {
+    if (!open.size) return true;
+    if (++steps > 5000) return false;
+    let best = -1, bc = null;
+    for (const k of open) { const c = fits(words[k]); if (!c.length) return false; if (!bc || c.length < bc.length) { best = k; bc = c; } }
+    open.delete(best);
+    const sq = words[best], was = sq.map(i => board[i]);
+    for (let t = 0; t < 30 && bc.length && steps <= 5000; t++) {
+      const w = bc.splice(Math.floor(Math.random() * bc.length), 1)[0];
+      sq.forEach((i, j) => { board[i] = w[j]; }); used.add(w);
+      if (lay()) return true;
+      used.delete(w); sq.forEach((i, j) => { board[i] = was[j]; });
+    }
+    open.add(best);
+    return false;
+  })();
+  const sol = open.size ? null : board.join("");
+  if (!sol) return null;
+  // muddle: keep a few squares as they are and shuffle the rest, a few more than the swaps wanted (shuffles
+  // fall into loops, and each loop saves a swap), until it's within a swap of the right distance away
+  const want = spec.swaps;
+  for (let t = 0; t < 400; t++) {
+    const order = [...Array(N).keys()].sort(() => Math.random() - 0.5);
+    const free = order.slice(Math.max(3, N - want - 2 - Math.floor(Math.random() * 4)));
+    const cur = sol.split("");
+    for (let k = free.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [cur[free[k]], cur[free[j]]] = [cur[free[j]], cur[free[k]]]; }
+    if (free.some(i => cur[i] === sol[i])) continue;
+    // no word already right
+    if (words.some(sq => sq.every(i => cur[i] === sol[i]))) continue;
+    if (Math.abs(minSwaps(cur.join(""), sol) - want) > 1) continue;
+    return {n, sol, start: cur.join("")};
+  }
+  return null;
+}
+
+/* ---------- game state ---------- */
+// game: {level, sol (the letters as dealt to spell, square by square), start (as muddled), cur (now), min (the
+//        fewest swaps from start), budget (swaps you get; you can keep going past them, with no gold paw), history
+//        (swaps made, [i, j]), back (what each Restart put away), won, hinted, undid…}
+const STORE = "catdoku.fishbones.v1", MAX_LEVEL = 7, NS = "http://www.w3.org/2000/svg";
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1}, state.settings);
+let game = state.game || null, busy = false, running = false, build = null, VALID = null, sel = -1;
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
+const SPARE = 5;   // swaps on top of the fewest
+const levelName = n => `Level ${n} · ${levelSpec(n).fish}, ${fishCells(levelSpec(n)).cells.length} bones`;
+const el = (t, a, parent) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (parent) parent.append(e); return e; };
+const left = () => game.budget - game.history.length;
+let FISH = null;   // the fish being played: {cells, words}
+const shape = () => FISH || (FISH = fishCells(levelSpec(game.level)));
+
+/* ---------- words ---------- */
+// The shared list (words/words.json, and words/long.json for 9 letters): fish are made from familiar words (less
+// a few that read oddly on their own), and any word in the lists counts, so a fish that spells other words is
+// solved too.
+const TWO = "am an as at be by do go he hi if in is it me my no of oh ok on or ox so to up us we".split(" ");   // as in Fridge Magnets
+const SKIP = new Set("gay god sic thy huh ugh nay ken don bob mod pro sod amp cam mum".split(" "));
+async function loadWords() {
+  const get = (f, inline) => inline || fetch(`../words/${f}?v=${window.SITE_BUILD || ""}`).then(r => { if (!r.ok) throw new Error("couldn't load the word list"); return r.json(); });
+  const lists = await Promise.all([get("words.json", window.WORDS_INLINE), get("long.json", window.LONG_INLINE)]);
+  const byLen = list => { const o = {}; for (const x of list) if (/^[a-z]+$/.test(x)) (o[x.length] = o[x.length] || []).push(x); return o; };
+  const all = k => lists.flatMap(w => w[k].split(" ")), familiar = all("familiar");
+  self.WL = byLen(familiar.filter(x => !SKIP.has(x)).concat(TWO));
+  VALID = new Set(familiar.concat(all("common"), all("more"), TWO));
+  // the worker gets the familiar words along with the functions that make fish from them
+  build = G.builder([levelSpec, fishCells, minSwaps, makeFish, {toString: () => `var WL = ${JSON.stringify(self.WL)};`}], "makeFish");
+}
+
+/* ---------- drawing ---------- */
+// Each fish's head, tail and fins, drawn side on about 1000 long (snout at x 0, the middle line at y 0): the body
+// is stations [x, top, bottom] joined by a smooth curve, and the head is the body in front of the gill. The
+// bones go bare between the gill and the tail (where the last station is). Only the fins that make the fish
+// what it is are drawn; on a slim fish they'd float in the air beside the bones.
+const ART = {
+  Minnow: {gill: 210, body: [[0, -18, 22], [40, -52, 50], [130, -82, 78], [260, -98, 94], [420, -100, 98], [580, -90, 88], [720, -66, 64], [820, -42, 42], [850, -38, 38]],
+    tail: "M840 -40C880 -60 930 -105 985 -118C972 -60 950 -20 952 0C950 20 972 60 985 118C930 105 880 60 840 40Z", fins: []},
+  Sardine: {gill: 200, body: [[0, -8, 12], [60, -48, 50], [200, -86, 98], [380, -98, 116], [560, -86, 100], [720, -56, 62], [820, -32, 34], [845, -28, 30]],
+    tail: "M835 -30C870 -50 920 -110 990 -150C960 -80 925 -25 915 0C925 25 960 80 990 150C920 110 870 50 835 30Z", fins: []},
+  Herring: {gill: 220, body: [[0, -14, 16], [80, -70, 74], [240, -118, 132], [420, -128, 140], [600, -108, 118], [750, -62, 66], [835, -34, 34], [855, -30, 30]],
+    tail: "M845 -32C880 -55 930 -120 995 -165C965 -90 928 -30 918 0C928 30 965 90 995 165C930 120 880 55 845 32Z", fins: []},
+  Mackerel: {gill: 250, body: [[0, -4, 6], [100, -58, 54], [260, -108, 104], [440, -118, 112], [610, -94, 90], [750, -52, 48], [850, -18, 16], [870, -14, 14]],
+    tail: "M860 -16C890 -40 940 -140 1000 -195C975 -110 945 -35 935 0C945 35 975 110 1000 195C940 140 890 40 860 16Z", fins: []},
+  Discus: {gill: 165, body: [[0, -24, 24], [60, -150, 140], [180, -262, 250], [350, -302, 290], [520, -272, 262], [660, -172, 164], [740, -64, 60], [762, -46, 46]],
+    tail: "M752 -48C800 -80 860 -120 910 -125C895 -60 890 0 890 0C890 0 895 60 910 125C860 120 800 80 752 48Z",
+    fins: ["M160 -240C280 -360 520 -380 700 -210C740 -170 770 -110 776 -64L742 -70C720 -150 640 -232 520 -268C400 -300 260 -296 172 -252Z",
+      "M160 232C280 350 520 370 700 202C740 162 770 104 776 58L742 64C720 144 640 224 520 258C400 288 260 286 172 242Z"]},
+  Angelfish: {gill: 185, body: [[0, -14, 14], [60, -90, 82], [190, -220, 205], [340, -268, 252], [490, -226, 214], [610, -132, 124], [690, -52, 48], [712, -40, 40]],
+    tail: "M700 -42C760 -90 860 -150 960 -160C930 -60 925 0 925 0C925 0 930 60 960 160C860 150 760 90 700 42Z",
+    fins: ["M300 -262C360 -400 470 -540 600 -600C560 -460 560 -300 640 -110C560 -170 460 -230 420 -246Z",
+      "M300 248C360 390 470 530 600 590C560 450 560 290 640 104C560 162 460 220 420 236Z", "M210 196C220 300 250 420 300 520C300 420 280 300 250 200Z"]},
+  Swordfish: {gill: 420, body: [[250, -12, 10], [300, -48, 40], [420, -118, 100], [580, -150, 128], [740, -126, 106], [870, -60, 52], [930, -22, 20], [945, -20, 18]],
+    tail: "M935 -20C950 -60 975 -170 1000 -250C1000 -150 985 -60 978 0C985 60 1000 150 1000 250C975 170 950 60 935 20Z",
+    fins: ["M470 -140C480 -230 500 -310 560 -330C552 -260 548 -190 560 -148Z"], sword: "M0 -2L262 -12L262 10Z", eye: 365},
+};
+// A smooth curve through the stations (Catmull-Rom), sampled finely.
+function curve(pts) {
+  const out = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+    for (let t = 0; t < 1; t += 0.05) {
+      const t2 = t * t, t3 = t2 * t, f = (a, b, c, d) => 0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3);
+      out.push([f(p0[0], p1[0], p2[0], p3[0]), f(p0[1], p1[1], p2[1], p3[1])]);
+    }
+  }
+  out.push(pts[pts.length - 1]);
+  return out;
+}
+// Squares are 100 across, the spine at y 0 (its middle at y 50). The fish's drawing is scaled so its bones
+// fit exactly between the gill and the tail. Then, so the whole fish isn't much bigger than its bones (which
+// would make them small on a phone), the head and tail are made smaller about where they join the bones if
+// they're more than 200 long, a fin reaching more than 150 past the bones is made smaller about where it joins
+// the fish, and the sword is kept to 190.
+let bones = [], at = [];   // the bone drawn for each letter as dealt, and which bone is on each square
+function draw() {
+  const svg = $("svg"), {cells} = shape(), spec = levelSpec(game.level), L = spec.L, A = ART[spec.fish];
+  const end = A.body[A.body.length - 1][0], q = (end - A.gill - 24) / L, k = 100 / q, x0 = A.gill + 12;
+  const ys = cells.map(c => c[1]), top = Math.min(...ys) * 100, bot = (Math.max(...ys) + 1) * 100;
+  svg.innerHTML = "";
+  const fish = el("g", {}, svg), g = el("g", {transform: `translate(${-x0 * k} 50) scale(${k})`}, fish);
+  el("path", {class: "spine", d: `M${A.gill - 6} 0H${end + 4}`, "stroke-width": 16 / k}, g);
+  const tp = curve(A.body.map(([x, t]) => [x, t])), bp = curve(A.body.map(([x, , b]) => [x, b]));
+  const body = "M" + tp.map(p => p.join(" ")).join("L") + "L" + bp.slice().reverse().map(p => p.join(" ")).join("L") + "Z";
+  // the head: the body in front of the gill, its cut edge curving in a little
+  const front = A.body[0][0], hs = Math.min(1, 200 / k / (A.gill - front));
+  const hTop = Math.min(...tp.filter(p => p[0] <= A.gill).map(p => p[1])), hBot = Math.max(...bp.filter(p => p[0] <= A.gill).map(p => p[1]));
+  const head = el("g", {transform: `translate(${A.gill} 0) scale(${hs}) translate(${-A.gill} 0)`}, g);
+  const clip = el("clipPath", {id: "head"}, el("defs", {}, head));
+  el("path", {d: `M-20 -2000H${A.gill}V${hTop}C${A.gill - 30} ${hTop / 2} ${A.gill - 30} ${hBot / 2} ${A.gill} ${hBot}V2000H-20Z`}, clip);
+  el("path", {class: "body", d: body, "clip-path": "url(#head)"}, head);
+  el("circle", {class: "eye", cx: A.eye || A.gill * 0.42, cy: -24, r: A.eye ? 17 : 14}, head);
+  // a piece scaled by s() of its outline, about the point it joins the fish at
+  const shrink = (parent, d, at, s) => { const e = el("path", {class: "body", d}, parent); s = Math.max(0.3, Math.min(1, s(e.getBBox())));
+    if (s < 1) e.setAttribute("transform", `translate(${at[0]} ${at[1]}) scale(${s}) translate(${-at[0]} ${-at[1]})`); };
+  if (A.sword) shrink(head, A.sword, [262, 0], b => 190 / (k * hs) / b.width);
+  const room = 150 / k, limTop = (top - 50) / k - room, limBot = (bot - 50) / k + room;
+  shrink(g, A.tail, [end, 0], b => Math.min(200 / k / b.width, b.y < limTop ? limTop / b.y : 1, b.y + b.height > limBot ? limBot / (b.y + b.height) : 1));
+  for (const d of A.fins) {
+    const e = el("path", {d}, g), b = e.getBBox(); e.remove();
+    const up = b.y + b.height / 2 < 0, ay = up ? b.y + b.height : b.y, ax = b.x + b.width / 2;
+    shrink(g, d, [ax, ay], b => up ? (b.y < limTop ? (ay - limTop) / (ay - b.y) : 1) : (b.y + b.height > limBot ? (limBot - ay) / (b.y + b.height - ay) : 1));
+  }
+  // the frame: the fish and its bones, with a little room round them
+  const fb = fish.getBBox(), X0 = Math.min(fb.x, 0) - 8, X1 = Math.max(fb.x + fb.width, L * 100) + 8, Y0 = Math.min(fb.y, top) - 8, Y1 = Math.max(fb.y + fb.height, bot) + 8;
+  svg.setAttribute("viewBox", `${X0} ${Y0} ${X1 - X0} ${Y1 - Y0}`);
+  bones = []; at = [];
+  const layer = el("g", {id: "bones"}, svg);
+  for (let p = 0; p < cells.length; p++) {
+    const g = el("g", {class: "bone", "data-p": p}, layer);
+    el("rect", {x: 6, y: 6, width: 88, height: 88, rx: 16}, g);
+    el("text", {x: 50, y: 53}, g);
+    bones.push(g);
+  }
+  // each square starts with the bone of the same number; its letter is the one on it now
+  for (let i = 0; i < cells.length; i++) { at[i] = i; bones[i].lastChild.textContent = game.cur[i]; }
+  el("rect", {id: "kb", class: "kbring", x: -999, y: 0, width: 96, height: 96, rx: 18}, svg);
+  el("g", {id: "hints"}, svg);
+  place(); update();
+}
+const xy = i => { const [x, y] = shape().cells[i]; return [x * 100, y * 100]; };
+function place() { at.forEach((p, i) => { const [x, y] = xy(i); bones[p].style.transform = `translate(${x}px, ${y}px)`; }); }
+// Waffle's colours, word by word: green where the letter is right; gold where it's wrong but the word still
+// needs that letter somewhere it hasn't got it (as many times as it needs it, from the start of the word).
+// A square on two words is gold if either word wants it.
+function colours() {
+  const c = game.cur, s = game.sol, out = [...c].map((ch, i) => ch === s[i] ? "ok" : "no");
+  for (const sq of shape().words) {
+    const need = {};
+    for (const i of sq) if (c[i] !== s[i]) need[s[i]] = (need[s[i]] || 0) + 1;
+    for (const i of sq) if (c[i] !== s[i] && need[c[i]] > 0) { need[c[i]]--; out[i] = "near"; }
+  }
+  return out;
+}
+const wordsNow = () => shape().words.map(sq => sq.map(i => game.cur[i]).join(""));
+const solved = () => game.cur === game.sol || wordsNow().every(w => VALID.has(w));
+function update() {
+  const col = game.won ? game.cur.split("").map(() => "ok") : colours();
+  at.forEach((p, i) => { bones[p].classList.remove("ok", "near", "no"); bones[p].classList.add(col[i]); bones[p].classList.toggle("sel", i === sel); });
+  // past the last swap the count goes on, as swaps over: no gold paw, but the fish can still be finished
+  const n = left(), u = game.history.length;
+  $("count").textContent = game.won ? `Solved with ${u} swap${u === 1 ? "" : "s"}` : n > 0 ? `${n} swap${n === 1 ? "" : "s"} left`
+    : n === 0 ? "No swaps left" : `${-n} swap${n === -1 ? "" : "s"} over`;
+  $("count").classList.toggle("over", n < 0 && !game.won);
+  $("hintBtn").disabled = game.won;
+  $("undoBtn").disabled = !(game.history.length || (game.back || []).length) || game.won;
+  $("restartBtn").disabled = !game.history.length || game.won;
+  paintHint();
+}
+
+/* ---------- playing ---------- */
+// A bone that's green stays put. Swap two others: drag one onto the other, or tap one and then the other.
+const fixed = i => game.cur[i] === game.sol[i];
+function swap(i, j, record = true) {
+  const c = game.cur.split(""); [c[i], c[j]] = [c[j], c[i]]; game.cur = c.join("");
+  [at[i], at[j]] = [at[j], at[i]];
+  if (record) game.history.push([i, j]);
+  sel = -1; place(); hints.clear(false);
+  if (record && solved()) { update(); win(); return; }
+  update();
+  if (record && !left()) G.note("That was the last swap. Keep going, but there's no gold paw this time.", 6000);
+  save();
+}
+function pick(i) {
+  if (!playing()) return;
+  if (fixed(i)) { G.note("That bone is green: it's already in the right place.", 3000); return; }
+  game.started = true;
+  if (sel < 0) { sel = i; update(); return; }
+  if (sel === i) { sel = -1; update(); return; }
+  swap(sel, i);
+}
+// Dragging: the bone follows the pointer, and lands on the square it's dropped nearest.
+let press = null;
+const svgPoint = e => { const p = $("svg").createSVGPoint(); p.x = e.clientX; p.y = e.clientY; return p.matrixTransform($("svg").getScreenCTM().inverse()); };
+function squareAt(pt) {
+  let best = -1, bd = 70 * 70;
+  shape().cells.forEach((_, i) => { const [x, y] = xy(i), d = (pt.x - x - 50) ** 2 + (pt.y - y - 50) ** 2; if (d < bd) { bd = d; best = i; } });
+  return best;
+}
+$("svg").addEventListener("pointerdown", e => {
+  if (!playing()) return;
+  const i = squareAt(svgPoint(e)); if (i < 0) return;
+  press = {i, pt: svgPoint(e), moved: false, id: e.pointerId};
+  if (!fixed(i)) $("svg").setPointerCapture(e.pointerId);
+});
+$("svg").addEventListener("pointermove", e => {
+  if (!press || fixed(press.i) || !playing()) return;
+  const pt = svgPoint(e), dx = pt.x - press.pt.x, dy = pt.y - press.pt.y;
+  if (!press.moved && dx * dx + dy * dy < 15 * 15) return;
+  const g = bones[at[press.i]], [x, y] = xy(press.i);
+  if (!press.moved) { press.moved = true; g.classList.add("lift"); g.parentNode.append(g); sel = -1; update(); game.started = true; }
+  g.style.transform = `translate(${x + dx}px, ${y + dy}px)`;
+});
+$("svg").addEventListener("pointerup", e => {
+  if (!press) return;
+  const p = press; press = null;
+  if (!p.moved) { if (squareAt(svgPoint(e)) === p.i) pick(p.i); return; }
+  bones[at[p.i]].classList.remove("lift");
+  const j = squareAt(svgPoint(e));
+  if (j >= 0 && j !== p.i && !fixed(j)) swap(p.i, j);
+  else { place(); if (j >= 0 && j !== p.i) G.note("That bone is green: it's already in the right place.", 3000); }
+});
+$("svg").addEventListener("pointercancel", () => { if (press && press.moved) { bones[at[press.i]].classList.remove("lift"); place(); } press = null; });
+
+// Keys: arrows move a ring from bone to bone, Space or Enter picks one up and puts it down on another,
+// and Escape lets go.
+const keys = G.gridKeys({
+  on: () => playing(),
+  show: i => { const r = $("kb"); if (!r) return; if (i < 0) { r.setAttribute("x", -999); return; } const [x, y] = xy(i); r.setAttribute("x", x + 2); r.setAttribute("y", y + 2); },
+  move: (i, dx, dy) => G.nearestThatWay(shape().cells, i, dx, dy),
+  start: () => Math.max(0, shape().cells.findIndex((_, i) => !fixed(i))),
+  act: i => pick(i),
+  escape: () => { if (sel >= 0) { sel = -1; update(); } },
+});
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
+
+// Undo takes back a swap (and gives it back to spend again), or a Restart. `back` keeps what each Restart
+// put away.
+function undo() {
+  if (!playing()) return;
+  if (game.history.length) { game.undid = true; const [i, j] = game.history.pop(); swap(i, j, false); save(); return; }
+  const b = (game.back || []).pop(); if (!b) return;
+  game.undid = true; game.history = b.history; game.cur = b.cur;
+  draw(); save();
+}
+$("undoBtn").onclick = undo;
+$("restartBtn").onclick = () => restart();
+function restart() {
+  if (!game || busy || running || game.won || !game.history.length) return;
+  G.closeCard();
+  game.back = (game.back || []).concat([{history: game.history, cur: game.cur}]).slice(-5);
+  game.undid = true; game.cur = game.start; game.history = [];
+  sel = -1; draw(); save();
+  G.note("Back to how the fish was dealt. Undo brings your swaps back.", 3500);
+}
+
+/* ---------- hints ---------- */
+// The first hint rings a bone that's wrong and says which letter that square wants; asked again, it also rings
+// the bone to swap it with. The swap shown is always one of the fewest that finish the fish (fixing two bones at
+// once where it can). A hint keeps you on the same level and costs the gold paw.
+const hints = G.hinter({game: () => game, key: () => game ? game.cur : "", draw: () => paintHint()});
+function paintHint() {
+  const g = $("hints"); if (!g) return;
+  g.innerHTML = "";
+  const m = hints.current(); if (!m) return;
+  for (const i of m.sq) { const [x, y] = xy(i); el("rect", {class: "hintsq ring", x: x - 1, y: y - 1, width: 102, height: 102, rx: 22}, g); }
+}
+function bestSwap() {
+  const c = game.cur, s = game.sol, now = minSwaps(c, s);
+  if (!now) return null;
+  let good = null, any = null;
+  for (let i = 0; i < c.length; i++) if (c[i] !== s[i]) for (let j = 0; j < c.length; j++) {
+    if (j === i || c[j] !== s[i] || c[j] === s[j]) continue;
+    if (c[i] === s[j]) return [i, j];   // both bones land right
+    any = any || [i, j];
+    if (!good) { const t = c.split(""); [t[i], t[j]] = [t[j], t[i]]; if (minSwaps(t.join(""), s) === now - 1) good = [i, j]; }
+  }
+  return good || any;
+}
+$("hintBtn").onclick = () => {
+  if (!playing()) return;
+  const m = bestSwap();
+  if (!m) { G.note("Every bone is already in place.", 3000); return; }
+  const more = hints.level() > 0, [i, j] = m;
+  game.hinted = true; game.started = true; save();
+  const a = /[aeiou]/.test(game.sol[i]) ? "an" : "a", L = game.sol[i].toUpperCase();
+  hints.show({sq: more ? [i, j] : [i]}, more ? "Swap the two ringed bones." : `The ringed bone's place wants ${a} ${L}.`);
+};
+
+/* ---------- endings ---------- */
+function win() {
+  game.won = true; G.finishClock(game); sel = -1; keys.hide(); hints.clear(); G.note("");
+  // a hint, or running over the swaps, keeps you on the same level
+  const next = game.hinted || left() < 0 ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save();
+  update();
+  G.track(`Fish Bones solved level ${game.level}`);
+  build.prefetch(next);
+  running = true;
+  const g = game, done = () => { running = false; if (game === g) finishCard(); };
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) { setTimeout(done, 700); return; }
+  // the bones hop in a wave from head to tail
+  at.forEach((p, i) => { const b = bones[p]; b.style.animationDelay = `${shape().cells[i][0] * 90 + (shape().cells[i][1] + 3) * 25}ms`; b.classList.add("hop"); });
+  setTimeout(done, 1300);
+}
+function finishCard() {
+  // any real words count, so a fish can now and then be fixed in fewer swaps than the words it was dealt
+  const next = settings.level, used = game.history.length, fewest = used <= game.min, over = used - game.budget;
+  const gold = !game.hinted && !game.undid && fewest;
+  let text = `${gold ? "Bowtie's" : "The"} fish spells words again, in ${used} swap${used === 1 ? "" : "s"}` +
+    (over > 0 ? `, ${over} over the ${game.budget} you had (it could be done in ${game.min}).` : fewest ? ", the fewest it could be." : ` (it could be done in ${game.min}).`);
+  if (game.cur !== game.sol) text += ` You found other words than the ones it was dealt (${wordsNow().join(", ")}), and they count.`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : over > 0 ? ` Here's another at level ${next}, to try within the swaps.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  const pic = new Image(); pic.className = "bowtiepic"; pic.src = "../cats/bowtie-1.webp"; pic.alt = "Bowtie lying on his back, full of fish";
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my fish", game.result,
+    {title: "Fish fixed!", gold, goldWhy: "Fewest swaps, no hints or undos!", goldTitle: "Gold paw, Bowtie!", goldPic: [pic],
+     next: `Next: level ${next}`, after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+/* ---------- new fish ---------- */
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
+function begin(p, level) {
+  const min = minSwaps(p.start, p.sol);
+  game = {level, sol: p.sol, start: p.start, cur: p.start, min, budget: min + SPARE, history: [], won: false, ...G.freshClock()};
+  FISH = null; sel = -1; hints.clear(false);
+}
+async function newPuzzle() {
+  if (busy) return;
+  busy = true;
+  const n = settings.level;
+  G.openCard("Muddling the bones…", "", []);
+  const p = await build.take(n);
+  begin(p, n);
+  busy = false; G.closeCard(); G.note("");
+  draw(); save();
+  build.prefetch(n);
+  G.track(`Fish Bones new puzzle level ${n}`);
+  helpOnFirstVisit(); sideways();
+}
+
+/* ---------- sharing ---------- */
+// The letters as dealt to spell and as muddled; with progress, the swaps made so far.
+$("linkBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Fish Bones", won: game.won,
+  puzzle: () => ({g: "fishbones", N: game.level, s: game.sol, t: game.start}),
+  progress: () => ({m: game.history.map(h => h.map(v => v.toString(36)).join("")).join("")})}); };
+function openShared(d) {
+  const spec = levelSpec(d.N), n = spec ? fishCells(spec).cells.length : 0, fail = () => G.note("That share link didn't work.", 5000);
+  const ok = s => typeof s === "string" && s.length === n && /^[a-z]+$/.test(s);
+  if (!ok(d.s) || !ok(d.t) || [...d.s].sort().join("") !== [...d.t].sort().join("")) { fail(); return; }
+  FISH = fishCells(spec);
+  if (!FISH.words.every(sq => VALID.has(sq.map(i => d.s[i]).join("")))) { fail(); return; }
+  begin({sol: d.s, start: d.t}, d.N);
+  const p = d.p, m = p && typeof p.m === "string" && /^([0-9a-z]{2})*$/.test(p.m) ? p.m.match(/../g) || [] : null;
+  settings.level = d.N; $("levelSel").value = d.N;
+  draw();
+  if (m && m.length && m.length <= 99) {
+    const sw = m.map(t => [parseInt(t[0], 36), parseInt(t[1], 36)]);
+    if (sw.every(([i, j]) => i < n && j < n && i !== j)) { for (const [i, j] of sw) swap(i, j, false); game.history = sw; game.timed = false; update(); }
+  }
+  save(); build.prefetch(d.N);
+  if (game.history.length && solved()) win();
+}
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  settings.seenHelp = false; helpOnFirstVisit();
+  if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
+}
+// The squares sit on a grid of 100 in the drawing, from the first column and the top row of the fish.
+function box() { const ys = shape().cells.map(c => c[1]); return {L: levelSpec(game.level).L, top: Math.min(...ys), h: Math.max(...ys) - Math.min(...ys) + 1}; }
+function map() {
+  const m = $("svg").getScreenCTM(), {top} = box();
+  return {ox: m.e, oy: m.f + top * 100 * m.d, cw: 100 * m.a, ch: 100 * m.d};
+}
+function helpOnFirstVisit() {
+  if (!game || !playing() || settings.seenHelp || document.querySelector(".spot")) return;
+  const {L, top, h} = box(), {cells, words, across} = shape(), col = colours(), ribs = words.slice(1, across);
+  const sq = i => [cells[i][0], cells[i][1] - top], all = cells.map((_, i) => sq(i));
+  const one = k => { const i = col.indexOf(k); return i < 0 ? null : [sq(i)]; };
+  const loose = cells.map((_, i) => i).filter(i => !fixed(i)), two = loose.slice(0, 2).map(sq);
+  const steps = [
+    {say: "Bowtie's fish bones are all muddled up 🐟", lit: all},
+    {say: "Each line of bones spells a word: across the spine…", lit: words[0].map(sq)},
+    {say: "…and down every rib", lit: ribs.flatMap(w => w.map(sq))},
+    ...(words.length > across ? [{say: "Bones side by side spell words across too", lit: words.slice(across).flatMap(w => w.map(sq))}] : []),
+    {say: "Drag a bone onto another to swap them, or tap one then the other", lit: two},
+    ...(one("ok") ? [{say: "Green: the right letter in the right place", lit: one("ok"), tone: "ok"}] : []),
+    ...(one("near") ? [{say: "Gold: this word needs it, somewhere else", lit: one("near")}] : []),
+    ...(one("no") ? [{say: "Grey: it belongs in another word", lit: one("no")}] : []),
+    {say: "Where two words cross, gold means either word wants it", lit: ribs.map(w => sq(w.find(i => cells[i][1] === 0)))},
+    {say: `You have ${left()} swaps. Fix the fish in ${game.min} for a gold paw`, els: [$("count")]},
+    {say: "Stuck? Hint shows a bone to move", els: [$("hintBtn")]},
+  ];
+  G.spotlight({grid: $("grid"), w: L, h, steps, map, done: () => { settings.seenHelp = true; save(); }});
+}
+
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", ""), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
+$("helpBtn").onclick = showHelp;
+
+// The big fish are long: on a phone held upright, suggest turning it and going full screen.
+const fs = G.fullScreen({btn: $("fullBtn"), name: "Fish Bones", change: () => {}});
+function sideways() {
+  if (game && $("svg").viewBox.baseVal.width > 1150 && !fs.on() && matchMedia("(max-width:600px) and (orientation:portrait)").matches)
+    G.note("Big fish! Turn your phone sideways and tap full screen (top right) for bigger bones.", 7000);
+}
+
+G.nav("fishbones");
+G.checkClock(game);
+G.setupTimer({name: "fishbones", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+loadWords().then(() => {
+  const shared = G.readShare("fishbones");
+  if (game) G.reopen(() => {
+      const spec = levelSpec(game.level), n = spec && fishCells(spec).cells.length;
+      if (!spec || game.sol.length !== n || game.cur.length !== n || !Array.isArray(game.history)) throw new Error("the saved fish doesn't fit its level");
+      draw();
+      delete game.lost;   // from the first preview, when running out ended the fish
+      if (game.won) finishCard();
+      build.prefetch(settings.level); helpOnFirstVisit();
+    }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
+  else if (!shared) newPuzzle();
+  const shareOpts = () => ({name: "Fish Bones", inProgress: !!(game && !game.won && game.history.length), open: openShared, after: helpOnFirstVisit});
+  if (shared) G.offerShare(shared, shareOpts());
+  // A share link opened while this page is already showing only changes the address, so watch for it.
+  window.addEventListener("hashchange", () => { const d = G.readShare("fishbones"); if (d) G.offerShare(d, shareOpts()); });
+}).catch(e => G.note(`Fish Bones ${e.message}. Check your connection and reload.`, 0));
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>

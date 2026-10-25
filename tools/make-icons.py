@@ -711,10 +711,29 @@ def catpile():
     return frame(PAPER, out)
 
 
+# Fish Bones: the fish skeleton from the owner's sketch, a black head and tail with the spine between, and letter
+# bones in Waffle's colours spelling BONES along it, with a rib down through the B and the N, and Bowtie peeking in.
+def fishbones():
+    s, x0, y0 = 11, 25, 50
+    out = (f'<path d="M14 {y0}H86" stroke="{INK}" stroke-width="3" stroke-linecap="round"/>'
+           f'<path d="M24 {y0-19}C17 {y0-22} 8 {y0-13} 8 {y0}C8 {y0+13} 17 {y0+22} 24 {y0+19}C20 {y0+9} 20 {y0-9} 24 {y0-19}Z" fill="{INK}"/>'
+           f'<circle cx="14" cy="{y0-2}" r="2" fill="{PAPER}"/>'
+           f'<path d="M81 {y0}C84 {y0-6} 88 {y0-15} 94 {y0-17}C93 {y0-8} 91 {y0-3} 90 {y0}C91 {y0+3} 93 {y0+8} 94 {y0+17}C88 {y0+15} 84 {y0+6} 81 {y0}Z" fill="{INK}"/>')
+    grey = tint(INK, .22)
+    bones = [(0, -1, "", YELLOW), (0, 1, "", grey), (2, -1, "", GREEN), (2, 1, "", YELLOW)]
+    bones += [(i, 0, ch, c) for i, (ch, c) in enumerate(zip("BONES", (GREEN, YELLOW, GREEN, grey, GREEN)))]
+    for c, r, ch, fill in bones:
+        x, y = x0 + c * s, y0 + r * s - s / 2
+        out += f'<rect x="{x+.6}" y="{y+.6}" width="{s-1.2}" height="{s-1.2}" rx="2.4" fill="{fill}" stroke="{INK}" stroke-width="1.3"/>'
+        if ch: out += text(x + s / 2, y + s / 2 + .3, ch, 8.5, "#fff" if fill == GREEN else INK)
+    out += tuxface(78, 22, 9)
+    return frame(PAPER, out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")

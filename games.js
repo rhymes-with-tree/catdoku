@@ -42,6 +42,7 @@ const G = (() => {
     ["Catlas", "atlas", "Name the country where each cat is hiding", "#5FA0C8", "travels", "geography countries world map quiz seterra flags places territories wild cats", "2026-10-22"],
     ["Cat Burglar", "catburglar", "Catch the cat that's sneaked into the painting", "#4E577D", "quick", "hidden object find spot seek paintings art museum met where's waldo wally", "2026-10-22"],
     ["Cat Pile", "catpile", "Pile napping cats on the blanket and clear the lines", "#E16A4A", "teasers", "blockudoku block blast woodoku 1010 blocks shapes tetris polyomino sudoku lines", "2026-10-23"],
+    ["Fish Bones", "fishbones", "Swap the bones until Bowtie's fish spells words again", "#73A7AE", "words", "waffle swap letters crossword word puzzle fish skeleton", "2026-10-25"],
   ];
   // The shelves the front page and the games menu sort the games onto, in order: key (also a plain name for it,
   // for search), heading, one line.
