@@ -492,7 +492,7 @@ def fuzzyspelling():
             out += f'<path d="M{cx} {tail}q{t} 6 {t * 1.6} 12" fill="none" stroke="{c2}" stroke-width="1.8" stroke-linecap="round"/>'
     return frame(tint(TEAL, .22), out)
 
-# Cat-astrophe: a fringed rug of coloured squares, the top corner already flooded one colour, a pot of dye
+# Cat Mat: a fringed rug of coloured squares, the top corner already flooded one colour, a pot of dye
 # tipped over at the corner and Crunch's face beside it.
 def catastrophe():
     rows = ["TTTYO", "TTYOP", "YTOOY", "OPYTO"]
