@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-25.5";
+  var BUILD = "2026-10-25.6";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-25.5">
+<link rel="stylesheet" href="../games.css?v=2026-10-25.6">
 <style>
 /* Six number tiles up top, then one outlined paw: its four toe beans are + − × ÷ and its main pad holds the goal.
    An exact hit fills every pad at once in gold (--pc, with --pt for text on it). */
@@ -112,17 +112,17 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-25.5"></script>
+<script src="../games.js?v=2026-10-25.6"></script>
 <script>
 /* ---------- puzzles ---------- */
 // Each level: [fewest steps the goal needs, lowest goal, highest goal, the big numbers that can be dealt].
 // Four small numbers (1 to 9, all different) and two big ones are dealt, and the goal is picked from
-// everything they can make that needs exactly that many steps. (A function, so the puzzle worker gets it too.)
+// everything they can make that needs exactly that many steps, out of the ones with the most ways to make them. (A function, so the puzzle worker gets it too.)
 function levelInfo(n) { return [null,
   [2, 10, 60, [10, 11, 12, 15, 20]], [2, 20, 99, [10, 11, 12, 15, 20, 25]], [3, 30, 150, [10, 11, 12, 13, 15, 20, 25]],
   [3, 60, 220, [10, 11, 12, 13, 15, 20, 25]], [3, 100, 320, [11, 12, 13, 15, 17, 20, 25]], [4, 100, 400, [11, 12, 13, 15, 17, 20, 25]],
   [4, 150, 550, [11, 12, 13, 15, 17, 19, 20, 25]], [4, 200, 750, [11, 12, 13, 15, 17, 19, 20, 25]],
-  [5, 200, 850, [11, 12, 13, 15, 17, 19, 20, 25]], [5, 300, 999, [11, 12, 13, 14, 15, 17, 19, 20, 23, 25]]][n]; }
+  [4, 200, 850, [11, 12, 13, 15, 17, 19, 20, 25]], [5, 300, 999, [11, 12, 13, 14, 15, 17, 19, 20, 23, 25]]][n]; }
 const MAX_LEVEL = 10;
 
 // a op b, or null when the answer would be zero, negative or a fraction.
@@ -147,6 +147,22 @@ function reachable(nums) {
   })(nums, 0);
   return best;
 }
+// How many ways each value can be made as the last of exactly `steps` steps (counting each order of the
+// steps), so the goal can be one with plenty of ways rather than one lone trick.
+function wayCounts(nums, steps) {
+  const count = new Map();
+  (function walk(arr, done) {
+    for (let i = 0; i < arr.length; i++) for (let j = i + 1; j < arr.length; j++) {
+      const a = Math.max(arr[i], arr[j]), b = Math.min(arr[i], arr[j]), rest = arr.filter((_, k) => k !== i && k !== j);
+      for (const op of "+-*/") {
+        const r = opResult(a, op, b);
+        if (r === null || r === a || r === b) continue;
+        if (done + 1 === steps) count.set(r, (count.get(r) || 0) + 1); else walk(rest.concat(r), done + 1);
+      }
+    }
+  })(nums, 0);
+  return count;
+}
 function makeToeBeans(level) {
   const [steps, lo, hi, bigPool] = levelInfo(level);
   for (let tries = 0; tries < 200; tries++) {
@@ -154,7 +170,10 @@ function makeToeBeans(level) {
     const big = new Set(); while (big.size < 2) big.add(bigPool[Math.floor(Math.random() * bigPool.length)]);
     const nums = [...small, ...big].sort((x, y) => x - y), best = reachable(nums);
     const fits = [...best].filter(([v, s]) => s === steps && v >= lo && v <= hi).map(([v]) => v);
-    if (fits.length) return {nums, goal: fits[Math.floor(Math.random() * fits.length)]};
+    if (!fits.length) continue;
+    // the quarter of them with the most ways
+    const ways = wayCounts(nums, steps), easy = fits.sort((a, b) => ways.get(b) - ways.get(a)).slice(0, Math.ceil(fits.length / 4));
+    return {nums, goal: easy[Math.floor(Math.random() * easy.length)]};
   }
   return null;
 }
@@ -255,7 +274,7 @@ const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1, levelRev: 1}, state.settings);
 let game = state.game || null, busy = false, pick = null, op = null, popped = -1;
-const build = G.builder([levelInfo, opResult, reachable, makeToeBeans], "makeToeBeans");
+const build = G.builder([levelInfo, opResult, reachable, wayCounts, makeToeBeans], "makeToeBeans");
 const buildRev = G.builder([levelInfo, opResult, revTable, revStarts, makeReverse], "makeReverse");
 // Reverse mode keeps its own level; its best times are kept apart under level 100 + N.
 const rev = () => !!settings.rev;
