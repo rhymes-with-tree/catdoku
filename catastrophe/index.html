@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Cat-astrophe</title>
+<title>Cat Mat</title>
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-25.2"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-25.3"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-25.2">
+<link rel="stylesheet" href="../games.css?v=2026-10-25.3">
 <style>
 /* A rug, and a cat sitting at its top corner beside a pot of dye. Each square of the rug is a tuft of pile in
    its colour, with a woven texture laid over the whole rug; fringe hangs off both ends. Knock a pot over and
@@ -68,7 +68,7 @@
 </head>
 <body>
 <main>
-  <header><h1>Cat-astrophe</h1><div class="stripe"></div><p class="tagline">Help Crunch dye the whole rug one colour</p></header>
+  <header><h1>Cat Mat</h1><div class="stripe"></div><p class="tagline">Help Crunch dye the whole mat one colour</p></header>
   <nav class="games" id="games" aria-label="Games"></nav>
 
   <div class="status"><span class="left"><span id="count"></span><span class="par" id="par"></span></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
@@ -91,13 +91,13 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-25.2"></script>
+<script src="../games.js?v=2026-10-25.3"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
-// Levels: [columns, rows, colours, spare pots on top of the fewest the solver finds].
+// Levels: [columns, rows, colours, spare pots on top of the ones a plain way of playing needs].
 function levelOf(n) {
-  return [null, [6, 6, 3, 3], [7, 7, 4, 3], [8, 8, 4, 3], [9, 9, 5, 3], [10, 10, 5, 2], [11, 11, 6, 2],
-    [12, 12, 6, 2], [13, 13, 6, 1], [14, 14, 6, 1], [16, 16, 6, 1]][n];
+  return [null, [6, 6, 3, 3], [7, 7, 4, 3], [8, 8, 4, 3], [9, 9, 5, 3], [10, 10, 5, 3], [11, 11, 6, 3],
+    [12, 12, 6, 2], [13, 13, 6, 2], [14, 14, 6, 2], [16, 16, 6, 2]][n];
 }
 // The rug as patches: each run of touching same-colour squares is one patch. Returns each square's
 // patch (of), each patch's colour and size, and its neighbours as bitsets (nbr) of `words` 32-bit words.
@@ -159,13 +159,41 @@ function bestPots(W, H, cells, K, width) {
   }
   return null;
 }
-// A rug: random squares in K colours. Par is the fewest pots the solver finds; the level allows a few more.
+// How many pots it takes knocking over, each time, the pot that soaks into the most squares. The beam
+// search's way is far shorter than people find on the bigger rugs, so the pots allowed count from this.
+function plainPots(W, H, cells, K) {
+  cells = cells.slice();
+  for (let n = 0; ; n++) {
+    const dyed = new Set([0]), stack = [0];
+    while (stack.length) {
+      const i = stack.pop(), x = i % W;
+      for (const j of [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, i - W, i + W < W * H ? i + W : -1])
+        if (j >= 0 && !dyed.has(j) && cells[j] === cells[0]) { dyed.add(j); stack.push(j); }
+    }
+    if (dyed.size === W * H) return n;
+    const {of, size} = patchesOf(W, H, cells), gain = new Array(K).fill(0), counted = new Set();
+    for (const i of dyed) {
+      const x = i % W;
+      for (const j of [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, i - W, i + W < W * H ? i + W : -1])
+        if (j >= 0 && !dyed.has(j) && !counted.has(of[j])) { counted.add(of[j]); gain[cells[j]] += size[of[j]]; }
+    }
+    const c = gain.indexOf(Math.max(...gain));
+    for (const i of dyed) cells[i] = c;
+  }
+}
+// Par (the fewest pots the solver finds) and the pots allowed: what plain playing needs, and a few spare.
+function potsFor(W, H, cells, K, spare) {
+  const best = bestPots(W, H, cells, K, 400);
+  if (!best || !best.length) return null;
+  return {par: best.length, pots: Math.max(best.length, plainPots(W, H, cells, K)) + spare};
+}
+// A rug: random squares in K colours.
 function makeRug(n) {
   const [W, H, K, spare] = levelOf(n), cells = [];
   for (let i = 0; i < W * H; i++) cells.push(Math.floor(Math.random() * K));
-  const best = bestPots(W, H, cells, K, 400);
-  if (!best || best.length < K + 1) return null;
-  return {W, H, K, cells, par: best.length, pots: best.length + spare};
+  const p = potsFor(W, H, cells, K, spare);
+  if (!p || p.par < K + 1) return null;
+  return {W, H, K, cells, par: p.par, pots: p.pots};
 }
 
 /* ---------- pictures ---------- */
@@ -199,7 +227,7 @@ const hints = G.hinter({game: () => game, key: () => game ? game.history.join() 
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !busy && !$("overlay").classList.contains("show");
 const levelName = n => { const [W, H, K] = levelOf(n); return `Level ${n} · ${W} × ${H}, ${K} colours`; };
-const build = G.builder([levelOf, patchesOf, bestPots, makeRug], "makeRug");
+const build = G.builder([levelOf, patchesOf, bestPots, plainPots, potsFor, makeRug], "makeRug");
 const used = () => game.history.length;
 const potsLeft = () => game.pots - used();
 const cellPx = () => 300 / game.W;
@@ -367,7 +395,7 @@ function win() {
   const next = game.hinted || used() > game.pots ? game.level : Math.min(MAX_LEVEL, game.level + 1);
   settings.level = next; $("levelSel").value = next; save();
   setTimeout(() => { if (game.won) draw(); }, 600);
-  G.track(`Cat-astrophe solved level ${game.level}`);
+  G.track(`Cat Mat solved level ${game.level}`);
   build.prefetch(next);
   const g = game;
   setTimeout(() => { if (game === g) finishCard(); }, 2200);
@@ -397,19 +425,19 @@ async function newPuzzle() {
   game = fresh(n, p);
   busy = false; G.closeCard(); G.note(""); draw(); save();
   build.prefetch(n);
-  G.track(`Cat-astrophe new puzzle level ${n}`);
+  G.track(`Cat Mat new puzzle level ${n}`);
 }
 
 /* ---------- sharing ---------- */
-$("linkBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Cat-astrophe", won: game.won,
+$("linkBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Cat Mat", won: game.won,
   puzzle: () => ({g: "catastrophe", N: game.level, c: game.start.join("")}),
   progress: () => ({h: game.history.join("")})}); };
 function openShared(d) {
   const lv = levelOf(d.N), ok = (s, len) => typeof s === "string" && (len < 0 || s.length === len) && [...s].every(ch => /[0-9]/.test(ch) && +ch < lv[2]);
   if (!lv || !ok(d.c, lv[0] * lv[1])) { G.note("That share link didn't work.", 5000); return; }
-  const cells = [...d.c].map(Number), best = bestPots(lv[0], lv[1], cells, lv[2], 400);
-  if (!best || !best.length) { G.note("That share link didn't work.", 5000); return; }
-  game = fresh(d.N, {W: lv[0], H: lv[1], K: lv[2], cells, par: best.length, pots: best.length + lv[3]});
+  const cells = [...d.c].map(Number), p = potsFor(lv[0], lv[1], cells, lv[2], lv[3]);
+  if (!p) { G.note("That share link didn't work.", 5000); return; }
+  game = fresh(d.N, {W: lv[0], H: lv[1], K: lv[2], cells, par: p.par, pots: p.pots});
   if (d.p && ok(d.p.h, -1) && d.p.h.length <= 4 * game.W * game.H) { game.history = [...d.p.h].map(Number); game.cells = replay(); game.timed = false; }
   settings.level = d.N; $("levelSel").value = d.N;
   draw(); save(); build.prefetch(d.N);
@@ -469,7 +497,7 @@ if (game && Array.isArray(game.start)) G.reopen(() => {
     build.prefetch(settings.level);
   }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
 else if (!shared) newPuzzle().then(helpOnFirstVisit);
-const shareOpts = () => ({name: "Cat-astrophe", inProgress: !!(game && !game.won && used()), open: openShared, after: helpOnFirstVisit});
+const shareOpts = () => ({name: "Cat Mat", inProgress: !!(game && !game.won && used()), open: openShared, after: helpOnFirstVisit});
 if (shared) G.offerShare(shared, shareOpts());
 window.addEventListener("hashchange", () => { const d = G.readShare("catastrophe"); if (d) G.offerShare(d, shareOpts()); });
 </script>
