@@ -900,6 +900,25 @@ const G = (() => {
     };
   }
 
+  /* ---------- what a word means ---------- */
+  // A word's meanings from Wiktionary (this needs the internet): up to three, each {pos (noun, verb…), text}, for
+  // Keyboard Cat's clues and Fish Bones' word list. Rejects when there are none or Wiktionary can't be reached.
+  // Asked again, a word comes from memory.
+  function plainText(html) { const d = document.createElement("div"); d.innerHTML = html; d.querySelectorAll("sup, .reference, style").forEach(x => x.remove()); return d.textContent.replace(/\s+/g, " ").trim(); }
+  const meanings = {};
+  function meaning(w) {
+    return meanings[w] || (meanings[w] = fetch(`https://en.wiktionary.org/api/rest_v1/page/definition/${encodeURIComponent(w)}`).then(async r => {
+      if (!r.ok) throw new Error(r.status);
+      const out = [];
+      for (const sense of (await r.json()).en || []) for (const d of sense.definitions || []) {
+        const text = plainText(d.definition || "");
+        if (text && out.length < 3) out.push({pos: sense.partOfSpeech, text});
+      }
+      if (!out.length) throw new Error("none");
+      return out;
+    }).catch(e => { delete meanings[w]; throw e; }));
+  }
+
   /* ---------- keyboard play ---------- */
   // Keyboard play on a board, the same in every game: the arrow keys move a cursor (it shows from the first arrow
   // press, and a tap or Escape hides it), Space or Enter acts on what's under it, and a game can list keys of its
@@ -1010,6 +1029,6 @@ const G = (() => {
     }
   }
 
-  return {GAMES, GROUPS, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen,
+  return {GAMES, GROUPS, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();
