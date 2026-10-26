@@ -43,13 +43,13 @@ const G = (() => {
     ["Cat Burglar", "catburglar", "Catch the cat that's sneaked into the painting", "#4E577D", "quick", "hidden object find spot seek paintings art museum met where's waldo wally", "2026-10-22"],
     ["Cat Pile", "catpile", "Pile napping cats on the blanket and clear the lines", "#E16A4A", "teasers", "blockudoku block blast woodoku 1010 blocks shapes tetris polyomino sudoku lines", "2026-10-23"],
     ["Fish Bones", "fishbones", "Swap the bones until Bowtie's fish spells words again", "#73A7AE", "words", "waffle swap letters crossword word puzzle fish skeleton", "2026-10-25"],
-    ["Toy Stash", "stash", "Work out which toys the cat stashed in the boxes", "#7885BA", "teasers", "mastermind guess code breaker codebreaker bulls and cows deduction colours colors hidden", "2026-10-26"],
+    ["Toy Stash", "stash", "Work out which toys the cat stashed in the boxes", "#7885BA", "logic", "mastermind guess code breaker codebreaker bulls and cows deduction colours colors hidden", "2026-10-26"],
     ["Knit Pick", "knitpick", "Help Laya find the words knitted into her blanket", "#8D78AD", "words", "word search wordsearch wonderword find a word hidden word puzzle", "2026-10-26"],
   ];
   // The shelves the front page and the games menu sort the games onto, in order: key (also a plain name for it,
   // for search), heading, one line.
   const GROUPS = [
-    ["logic", "Cat Logic", "Fill the grid by its rules; every puzzle has one answer"],
+    ["logic", "Cat Logic", "Work it out by the rules; every puzzle has one answer"],
     ["numbers", "Cat Math", "Sums and arithmetic"],
     ["lines", "Cat Trails", "Join, link and route things"],
     ["words", "Cat Spells", "Spell, find and climb words"],
@@ -57,6 +57,8 @@ const G = (() => {
     ["quick", "Kitten Play", "Match, pop, sort and chase"],
     ["travels", "Cat Travels", "Countries, maps and places"],
   ];
+  // Each shelf's colour: its games' tiles on the front page and in the games menu, and its label and shortcut.
+  const SHELF_COLOUR = {logic: "#BD5538", numbers: "#ECA818", lines: "#73A7AE", words: "#B94588", teasers: "#7885BA", quick: "#6AA673", travels: "#4E577D"};
   const $ = id => document.getElementById(id);
 
   /* ---------- the daily challenge ---------- */
@@ -175,7 +177,7 @@ const G = (() => {
     search.setAttribute("aria-label", "Search games");
     const tile = g => {
       const [name, slug, blurb, color] = g, a = document.createElement("a");
-      a.className = "gameTile"; a.style.setProperty("--tile", color);
+      a.className = "gameTile"; a.style.setProperty("--tile", SHELF_COLOUR[g[4]] || color);
       a.href = `${base}${slug}/`; a.dataset.slug = slug;
       if (slug === current) a.setAttribute("aria-current", "page");
       if (mastered(slug)) { a.classList.add("gold"); a.title = "Mastered: a gold paw at the top level"; }
@@ -186,9 +188,9 @@ const G = (() => {
       const w = document.createElement("div"); w.className = "favWrap"; w.dataset.slug = slug;
       w.append(a, favStar(slug, drawFavs)); return w;
     };
-    const section = (title, games) => {
+    const section = (title, games, key) => {
       const sec = document.createElement("section"); sec.className = "gamesGroup";
-      const h = document.createElement("h3"); h.textContent = title;
+      const h = document.createElement("h3"); h.textContent = title; if (key) h.style.setProperty("--dot", SHELF_COLOUR[key]);
       const grid = document.createElement("div"); grid.className = "gamesGrid";
       grid.append(...games.map(tile)); sec.append(h, grid); return sec;
     };
@@ -198,11 +200,11 @@ const G = (() => {
       favs.querySelector(".gamesGrid").replaceChildren(...list.map(tile));
       favs.hidden = !list.length || !!search.value.trim();
     }
-    const shelves = GROUPS.map(([key, title]) => section(title, GAMES.filter(g => g[4] === key)));
+    const shelves = GROUPS.map(([key, title]) => section(title, GAMES.filter(g => g[4] === key), key));
     const none = document.createElement("p"); none.className = "gamesNone"; none.hidden = true; none.textContent = "No games match that.";
     const dslug = daily(), dgame = GAMES.find(g => g[1] === dslug);
     const todays = section(dailyDoneToday() ? "Today's challenge: done" : "Today's challenge", [dgame]);
-    if (dailyDoneToday()) todays.querySelector(".gameTile").classList.add("gold");   // gold once it's solved, as on the front page
+    if (dailyDoneToday()) todays.querySelector(".gameTile").classList.add("gold", "done");   // gold once it's solved, as on the front page
     panel.append(home, todays, search, favs, ...shelves, none);
     drawFavs();
     search.oninput = () => {
@@ -1036,6 +1038,6 @@ const G = (() => {
     }
   }
 
-  return {GAMES, GROUPS, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, meaning, plainText,
+  return {GAMES, GROUPS, SHELF_COLOUR, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();
