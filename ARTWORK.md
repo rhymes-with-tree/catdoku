@@ -66,7 +66,8 @@ Cat Pile lays the napping cats from Sunbeams (the `SLEEPERS` list, the same in b
   it. The pictures of the two together are `bugsy-bowtie-window`, `bugsy-bowtie-rug` and
   `bugsy-bowtie-boxes`. Bugsy is the star of If It Fits too, with Bowtie as guest star: `bugsy-1` rolls on his back beside
   the title, Bugsy hops into each finished box curled up (`bugsy-6`) or stretched out (`bugsy-3`), about one box in
-  four Bowtie drops in instead, curled up (`bowtie-2`), and `bugsy-bowtie-boxes` is on the gold-paw card. Bowtie is the star of
+  four Bowtie drops in instead, curled up (`bowtie-2`), and `bugsy-bowtie-boxes` is on the gold-paw card. Bugsy and Bowtie are the stars of
+  Bird Watch: `bowtie-3` stands up on his back legs beside the title, and `bugsy-bowtie-window` is on the gold-paw card. Bowtie is the star of
   Fish Bones: `bowtie-5` peeks up beside the title, and `bowtie-1` lies on his back, full of fish, on the gold-paw card.
 - **Crunch** (`crunch-…`, grey tabby with green eyes) is the star of Pounce: `crunch-3` sits beside
   the title, `crunch-1` creeps up from the corner of the mat to cheer a chain of matches, and

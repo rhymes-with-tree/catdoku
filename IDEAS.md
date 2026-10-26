@@ -106,9 +106,9 @@ Rows are sorted by group, then status: Yes, Look closer, Option, Idea, Built, No
 | Toy Box (sort) | Match and clear | Sort toys into baskets along a ball track | — | — | — | Fluid Object Movement chat | Built | |
 | Pick of the Pile (Mahjong solitaire) | Match and clear | Take toy blocks off a heap on the rug in matching pairs; a block is free with nothing on it and its left or right side open | — | — | — | Idea list, Bubbles and Game Suite chats | Built | Starring Fred, who curls up on the rug when the pile is gone. Each toy is on four blocks; look-alike toys can share a pile. Shuffle when out of pairs |
 | Copycat (Memory) | Match and clear | Find the pairs of toys hidden in boxes | — | — | — | Fair Play chat | Built | |
-| Bird Watch | Action | Tap the right window as birds flit past, without waking the human; like whack-a-mole | None | Hard | — | Fair Play chat | Look closer | Split-second timing. Needs bird art |
 | Making Biscuits | Action | Knead the blanket in time with the purr | None | Hard | — | Fair Play chat | Idea | The site's first rhythm game; needs sound, which the site doesn't have yet |
 | Fruit Ninja-style, Angry Birds-style | Action | Swipe at flying things; fling things at a structure | None | Hard | Bubbles | Idea list | Idea | |
+| Bird Watch (whack-a-mole) | Action | Tap the pane where a bird lands, leaving falling leaves and squirrels alone; every tap makes a noise, so a level allows the flock plus three taps before the human wakes | — | — | — | Fair Play chat | Built | Starring Bugsy and Bowtie. Started as a 3 × 3 wall of windows with the human drawn asleep on a sofa; now three tall windows like a bay window, three panes high, and the human is only Zzz. Missed birds count (a quarter of the flock may get away), so there's no clock. Spotting a bird leaves a smudgy paw print, and the Wipe the windows helper cleans them |
 | Tail Chase (Snake) | Action | Catch toys while the yarn grows behind the cat | — | — | — | Fair Play chat | Built | |
 | Solitaire, FreeCell | Cards | Card patience games | None | Hard | — | Idea list | Idea | Needs card art |
 

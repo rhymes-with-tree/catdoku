@@ -774,10 +774,29 @@ def knitpick():
     return frame(PAPER, out)
 
 
+def birdwatch():
+    """A tall window of three panes on a periwinkle wall, a robin on the middle pane, and Zzz from the napping human."""
+    sky, white = tint(TEAL, .4), PAPER
+    out = f'<rect x="22" y="12" width="56" height="78" rx="3" fill="{white}" stroke="{INK}" stroke-width="2.5"/>'
+    for y in (17, 41, 65):
+        out += f'<rect x="27" y="{y}" width="46" height="21" fill="{sky}" stroke="{INK}" stroke-width="1.6"/>'
+    out += f'<rect x="27" y="56" width="46" height="5" fill="{tint(GREEN, .55)}"/><rect x="27" y="80" width="46" height="6" fill="{tint(GREEN, .55)}"/>'
+    # the robin, sitting on the bottom of the middle pane
+    shade = lambda c, f: "#" + "".join(f"{round(int(c[k:k + 2], 16) * (1 - f) + int(INK[k:k + 2], 16) * f):02X}" for k in (1, 3, 5))
+    brown, wing = shade(RED, .55), shade(RED, .7)   # as the robin in the game
+    out += (f'<g stroke="{INK}" stroke-width="1.6" stroke-linejoin="round"><path d="M41 53 L33 49 L34 56 Z" fill="{wing}"/>'
+            f'<ellipse cx="48" cy="54" rx="9" ry="6.5" fill="{brown}"/><path d="M52 50 C58 52 58 59 52 60 Z" fill="{ORANGE}" stroke="none"/>'
+            f'<circle cx="55" cy="46" r="5.5" fill="{brown}"/><path d="M60 45 L65 46.5 L60 48 Z" fill="{YELLOW}"/></g>'
+            f'<circle cx="56.5" cy="45" r="1.2" fill="{INK}"/>')
+    out += f'<rect x="16" y="88" width="68" height="6" rx="2" fill="{white}" stroke="{INK}" stroke-width="2.2"/>'
+    out += text(80, 76, "z", 10, PLUM) + text(86, 66, "Z", 13, PLUM)
+    return frame(tint(PERI, .5), out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")

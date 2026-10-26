@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bird Watch</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-26.10"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-26.10">
+<style>
+/* Three tall windows side by side, each with three panes. Birds land outside a pane for a moment: tap it to have
+   Bugsy or Bowtie spot one. Squirrels and falling leaves go past too; leave
+   them be. Every tap on the glass makes a little noise, and the human's napping nearby: a level allows the flock
+   plus three taps, and the next wakes them. */
+.wrap.room{height:auto;width:min(var(--board),calc((var(--tall) + 40px) * .86))}
+.wall{position:relative;border:4px solid #2A2530;border-radius:14px;overflow:hidden;background:color-mix(in srgb,var(--periwinkle) 50%,#fff);touch-action:none;user-select:none;-webkit-user-select:none}
+.wall svg{display:block;width:100%;height:auto}
+.win{cursor:pointer}
+.win .bump{opacity:0;transition:opacity .15s}
+.smudge > g{transition:opacity .4s}
+.smudge.wiped > g{opacity:0}
+.helpers button{display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:15px;padding:6px 12px;line-height:1.2}
+.helpers b{display:inline-block;min-width:22px;padding:0 6px;border-radius:999px;background:var(--ink);color:var(--paper);font-size:14px}
+.win.bumped .bump{opacity:1}
+.tapgo{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);pointer-events:none;white-space:nowrap;
+  font-weight:800;font-size:20px;color:var(--ink);background:var(--panel);border:3px solid var(--ink);border-radius:999px;padding:4px 18px}
+.tapgo[hidden],body:has(.spot) .tapgo{display:none}
+.left{display:flex;gap:12px;align-items:center}
+#taps.low{color:#C8392B}
+/* the human's Zzz, drifting up from the bottom of the room (fainter when they're stirring) */
+.z{font-family:var(--font);font-weight:800;fill:var(--ink-soft);stroke:#F7F8F3;stroke-width:3px;paint-order:stroke fill;transform-box:fill-box;animation:zz 2.4s ease-in-out infinite}
+.z2{animation-delay:.8s}.z3{animation-delay:1.6s}
+@keyframes zz{0%{opacity:0;transform:translateY(6px)}30%{opacity:1}100%{opacity:0;transform:translateY(-10px)}}
+#zz.low .z{opacity:.45;animation-duration:1.2s}
+#zz .wake{display:none;font-family:var(--font);font-weight:800;fill:#C8392B;stroke:#F7F8F3;stroke-width:3px;paint-order:stroke fill}
+#zz.woke .z{display:none}#zz.woke .wake{display:inline}
+/* Bowtie, reaching up to the window sill, beside the title */
+.title{display:flex;align-items:flex-end;gap:8px}
+.bowtie{display:block;height:58px;width:auto;margin-bottom:-4px}
+@media (max-height:760px){.bowtie{height:42px}}
+.card img.goldpic{display:block;width:80%;max-width:280px;height:auto;margin:0 auto 14px}
+</style>
+</head>
+<body>
+<main>
+  <header><div class="title"><h1>Bird Watch</h1><img class="bowtie" src="../cats/bowtie-3.webp" alt="Bowtie, a black and white cat, standing up on his back legs"></div><div class="stripe"></div><p class="tagline">Help Bugsy and Bowtie spot the birds without waking the human</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span class="left"><span id="taps"></span><span id="count"></span></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap room" id="room">
+    <div class="wall" id="board" role="application" aria-label="Three windows, each with three panes. Tap a pane when a bird lands outside it, or use the arrow keys and Space, or the keys 1 to 9.">
+      <svg id="wins" viewBox="0 0 300 300"></svg>
+      <div class="tapgo" id="tapgo">Tap to start</div>
+    </div>
+  </div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions helpers">
+    <button id="wipeBtn" title="Wipe the paw prints off the glass">🧽 Wipe the windows <b id="wipeN"></b></button>
+  </div>
+  <div class="actions">
+    <button id="restartBtn">Restart</button>
+    <button id="pauseBtn">Pause</button>
+    <button id="linkBtn">Share</button>
+    <button id="bestBtn">Best scores</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New flock</button>
+  </div>
+</main>
+
+<script src="../games.js?v=2026-10-26.10"></script>
+<script>
+/* ---------- levels ---------- */
+// Level n: [birds in the flock, how long a bird stays (ms), time between arrivals (ms), most things at the windows
+// at once, share of decoys, which decoys]. Twelve levels, each a little quicker than the last: falling leaves from
+// level 3, squirrels from level 5. Up to a quarter of the flock may get away; one more and the level is lost.
+function levelOf(n) {
+  const t = (n - 1) / 11;
+  return [12 + 2 * (n - 1), Math.round(1700 - 1050 * t), Math.round(1150 - 650 * t), n <= 2 ? 1 : n <= 6 ? 2 : 3,
+          n <= 2 ? 0 : Math.min(.4, .15 + .025 * (n - 3)), n <= 2 ? "" : n <= 4 ? "l" : "ls"];
+}
+const LEVELS = [null, ...Array.from({length: 12}, (_, i) => levelOf(i + 1))];
+const MAX_LEVEL = LEVELS.length - 1;
+const levelName = n => { const [F, , , , , D] = LEVELS[n]; return `Level ${n} · ${F} birds${D === "l" ? ", falling leaves" : D ? ", leaves and squirrels" : ""}`; };
+const AWAY = n => Math.floor(LEVELS[n][0] / 4);
+const SPARE = 3;   // taps a level allows beyond one for each bird
+
+/* ---------- the flock ---------- */
+// Everything that comes to the windows in a run, worked out in advance from a seed, so Restart and a share link
+// bring the same birds to the same windows at the same moments. Once the whole flock has come, nothing more does
+// (the next arrival is at t = Infinity). Each is {t (ms into the run), w (window 0–8),
+// k (a bird's kind, or "leaf" or "squirrel"), stay (ms), flip (facing left), c (a leaf's colour)}.
+function seeded(seed) { return () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function flockOf(n, seed) {
+  const [F, stay, gap, most, decoys, D] = LEVELS[n], rnd = seeded(seed), free = Array(9).fill(0);
+  let t = 900, last = -1, birds = 0;
+  return function next() {
+    if (birds >= F) return {t: Infinity};
+    t += gap * (.6 + .8 * rnd());
+    // no more than `most` at the windows at once: wait for one to go
+    const busy = () => free.filter(f => f > t).length;
+    while (busy() >= most) t = Math.min(...free.filter(f => f > t)) + 120;
+    const open = [...Array(9).keys()].filter(w => free[w] + 250 <= t && w !== last);
+    const w = open[Math.floor(rnd() * open.length)];
+    const decoy = D && rnd() < decoys, k = decoy ? (D.includes("s") && rnd() < .45 ? "squirrel" : "leaf") : BIRDS[Math.floor(rnd() * BIRDS.length)].k;
+    const s = Math.round(stay * (.85 + .3 * rnd()) * (k === "leaf" ? 1.25 : k === "squirrel" ? 1.4 : 1));
+    free[w] = t + s; last = w; if (!decoy) birds++;
+    return {t, w, k, stay: s, flip: rnd() < .5, c: LEAF[Math.floor(rnd() * LEAF.length)]};
+  };
+}
+
+/* ---------- pictures ---------- */
+const INK = "#2A2530";
+const mix = (a, b, p) => "#" + [1, 3, 5].map(i => Math.round(parseInt(a.substr(i, 2), 16) * (1 - p) + parseInt(b.substr(i, 2), 16) * p).toString(16).padStart(2, "0")).join("");
+const tint = (c, p) => mix(c, "#ffffff", p), shade = (c, p) => mix(c, INK, p);
+// Birds, drawn in a 100 × 100 square sitting on its bottom edge and facing right: body, breast, wing, head.
+const BIRDS = [
+  {k: "robin", name: "a robin", body: shade("#BD5538", .55), breast: "#E16A4A", wing: shade("#BD5538", .7), head: shade("#BD5538", .65)},
+  {k: "bluebird", name: "a bluebird", body: "#7885BA", breast: tint("#E16A4A", .25), wing: "#4E577D", head: "#7885BA"},
+  {k: "goldfinch", name: "a goldfinch", body: "#ECA818", breast: tint("#ECA818", .3), wing: INK, head: "#ECA818", cap: INK},
+  {k: "cardinal", name: "a cardinal", body: "#BD5538", breast: "#E16A4A", wing: shade("#BD5538", .3), head: "#BD5538", crest: true, mask: INK},
+  {k: "tit", name: "a blue tit", body: "#B3B94B", breast: tint("#ECA818", .15), wing: "#73A7AE", head: "#ffffff", cap: "#73A7AE", stripe: true},
+];
+const LEAF = ["#BD5538", "#E16A4A", "#ECA818", "#B3B94B"];
+const stroke = `stroke="${INK}" stroke-width="2.4" stroke-linejoin="round"`;
+function birdArt(b) {
+  return `<path d="M26 60 L4 50 L7 70 Z" fill="${b.wing}" ${stroke}/>
+    <ellipse cx="46" cy="62" rx="27" ry="21" fill="${b.body}" ${stroke}/>
+    <path d="M58 50 C74 56 74 78 56 82 C48 82 46 66 58 50 Z" fill="${b.breast}"/>
+    <path d="M28 56 Q48 46 60 62 Q44 76 26 66 Z" fill="${b.wing}" ${stroke}/>
+    ${b.crest ? `<path d="M58 30 L60 14 L72 28 Z" fill="${b.head}" ${stroke}/>` : ""}
+    <circle cx="66" cy="40" r="16" fill="${b.head}" ${stroke}/>
+    ${b.cap ? `<path d="M51 38 A16 16 0 0 1 81 36 Q66 34 51 38 Z" fill="${b.cap}"/>` : ""}
+    ${b.stripe ? `<path d="M56 43 L82 42" stroke="${INK}" stroke-width="2.5"/>` : ""}
+    ${b.mask ? `<path d="M70 34 L82 40 L72 48 Z" fill="${b.mask}"/>` : ""}
+    <circle cx="71" cy="38" r="3.4" fill="${INK}"/><circle cx="72.2" cy="36.8" r="1.1" fill="#fff"/>
+    <path d="M80 39 L94 43.5 L80 48 Z" fill="#ECA818" ${stroke}/>
+    <path d="M42 81 L40 93 M54 81 L56 93" stroke="${INK}" stroke-width="2.6" stroke-linecap="round"/>`;
+}
+// A squirrel sitting up with a nut, and a falling leaf
+const SQUIRREL = (() => {
+  const fur = shade("#E16A4A", .35), belly = tint("#ECA818", .55);
+  return `<path d="M30 90 C2 86 -2 52 14 34 C26 20 44 26 38 40 C32 52 18 50 24 64 C28 74 40 78 42 90 Z" fill="${shade(fur, .1)}" ${stroke}/>
+    <path d="M14 40 C20 30 30 32 30 38" fill="none" stroke="${tint(fur, .35)}" stroke-width="3" stroke-linecap="round"/>
+    <ellipse cx="54" cy="68" rx="20" ry="24" fill="${fur}" ${stroke}/>
+    <ellipse cx="60" cy="72" rx="10" ry="16" fill="${belly}"/>
+    <path d="M58 30 L60 18 L68 28 Z" fill="${fur}" ${stroke}/>
+    <circle cx="64" cy="40" r="14" fill="${fur}" ${stroke}/>
+    <circle cx="70" cy="37" r="3.2" fill="${INK}"/><circle cx="71" cy="36" r="1" fill="#fff"/><circle cx="77.5" cy="43" r="2.2" fill="${INK}"/>
+    <ellipse cx="68" cy="62" rx="7" ry="8" fill="${shade("#ECA818", .35)}" ${stroke}/><path d="M63 57 Q68 52 73 57" fill="${shade("#ECA818", .6)}"/>
+    <path d="M44 90 L60 90 M60 90 L72 90" stroke="${INK}" stroke-width="2.6" stroke-linecap="round"/>`;
+})();
+const leafArt = c => `<path d="M50 8 L58 30 L78 22 L70 44 L90 50 L70 58 L76 80 L56 70 L50 92 L44 70 L24 80 L30 58 L10 50 L30 44 L22 22 L42 30 Z" fill="${c}" ${stroke}/>
+  <path d="M50 26 L50 98 M50 52 L66 40 M50 62 L34 50" fill="none" stroke="${shade(c, .35)}" stroke-width="2.4" stroke-linecap="round"/>`;
+const artOf = th => th.k === "leaf" ? leafArt(th.c) : th.k === "squirrel" ? SQUIRREL : birdArt(BIRDS.find(b => b.k === th.k));
+const CAT_SRC = {};  // filled with embedded pictures when the page is bundled into one file
+const catSrc = f => CAT_SRC[f] || `../cats/${f}.webp`;
+
+/* ---------- the room ---------- */
+// Three tall double-hung windows of the same size, each a top sash of one pane over a bottom sash of two. Each pane
+// is a spot where something can turn up, nine in all, numbered across and then down. A tree outside, and a window
+// seat along the bottom.
+const COLS = [[14, 84], [108, 84], [202, 84]];   // each window: left edge and width
+const ROWS = [[32, 62], [106, 64], [176, 64]];   // each pane: top and height
+const TOP = 24, BOTTOM = 250;
+const spotBox = i => { const [x, w] = COLS[i % 3], [y, h] = ROWS[Math.floor(i / 3)]; return {x: x + 6, y, w: w - 12, h}; };
+const perchY = i => { const b = spotBox(i); return b.y + b.h - 2; };   // the bottom of the pane, where a bird sits
+const ns = "http://www.w3.org/2000/svg";
+const $ = G.$;
+let wins = [], rings = [];
+function buildRoom() {
+  const white = "#F7F8F3", wall = tint("#7885BA", .5), wood = shade("#ECA818", .55), leaves = ["#6AA673", tint("#6AA673", .25), shade("#6AA673", .2)];
+  const boxes = [...Array(9).keys()].map(spotBox), line = `stroke="${INK}" stroke-width="1.6"`;
+  let s = `<defs><filter id="soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.6"/></filter><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${tint("#73A7AE", .35)}"/><stop offset="1" stop-color="${tint("#73A7AE", .75)}"/></linearGradient>
+    <clipPath id="glass">${boxes.map(b => `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}"/>`).join("")}</clipPath>
+    ${boxes.map((b, i) => `<clipPath id="pane${i}"><rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}"/></clipPath>`).join("")}
+</defs>
+    <rect width="300" height="300" fill="${wall}"/><rect width="300" height="10" fill="${white}"/><path d="M0 10 H300" ${line}/>`;
+  // the trim round each window (the side ones a little shaded, being at an angle)
+  COLS.forEach(([x, w]) => { s += `<rect x="${x - 7}" y="${TOP - 7}" width="${w + 14}" height="${BOTTOM - TOP + 7}" fill="${white}" ${line}/>`; });
+  // outside: sky, far trees, a lawn and a pond, and a tree
+  s += `<g clip-path="url(#glass)"><rect width="300" height="${BOTTOM}" fill="url(#sky)"/>
+    ${[[10, 150, 26], [60, 140, 30], [250, 146, 30], [290, 160, 22], [200, 156, 22]].map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${tint("#6AA673", .5)}"/>`).join("")}
+    <rect x="0" y="196" width="300" height="60" fill="${tint("#6AA673", .55)}"/><ellipse cx="200" cy="232" rx="90" ry="10" fill="${tint("#73A7AE", .25)}"/>
+    <path d="M136 260 C140 200 120 140 132 90 C140 60 128 30 120 0 L142 0 C150 34 160 62 152 96 C144 140 162 200 160 260 Z" fill="${wood}"/>
+    ${[[30, 20], [90, 30], [190, 18], [260, 34], [60, 84], [230, 92], [120, 40]].map(([x, y], k) => `<circle cx="${x}" cy="${y}" r="${16 + (k % 3) * 4}" fill="${leaves[k % 3]}" opacity=".9"/>`).join("")}</g>`;
+  // the nine spots: something to tap (a little past the glass), what's turned up, a paw on the glass, a red flash for a bump
+  boxes.forEach((b, i) => {
+    s += `<g class="win" data-i="${i}"><rect x="${b.x - 2}" y="${b.y - 5}" width="${b.w + 4}" height="${b.h + 10}" fill="transparent"/>
+      <g clip-path="url(#pane${i})"><g class="thing"></g><g class="smudge"></g></g><g class="paw"></g>
+      <rect class="bump" x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="rgba(200,57,43,.3)"/></g>`;
+  });
+  // the sashes: a frame with three panes cut out, and a glint on the glass
+  s += `<g pointer-events="none">${COLS.map(([x, w], c) => {
+    const holes = [0, 1, 2].map(r => { const b = spotBox(r * 3 + c); return `M${b.x} ${b.y}h${b.w}v${b.h}h${-b.w}Z`; });
+    return `<path fill-rule="evenodd" d="M${x} ${TOP}h${w}V${BOTTOM}H${x}Z ${holes.join(" ")}" fill="${white}" ${line}/>
+      <path d="M${x} ${ROWS[0][0] + ROWS[0][1] + 6}h${w}" ${line}/><path d="M${x + 12} ${ROWS[1][0] + 30} l14 -20" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".5"/>`;
+  }).join("")}</g>`;
+  // the window seat, and the keyboard cursor
+  s += `<g pointer-events="none"><path d="M4 ${BOTTOM} H296 L300 ${BOTTOM + 8} H0 Z" fill="${white}" ${line}/><rect x="-2" y="${BOTTOM + 8}" width="304" height="12" fill="${white}" ${line}/>
+    <rect x="-2" y="288" width="304" height="14" fill="${white}" ${line}/></g>
+    <g id="zz" pointer-events="none"><text class="z z1" x="232" y="286" font-size="14">z</text><text class="z z2" x="248" y="276" font-size="18">z</text><text class="z z3" x="266" y="264" font-size="24">Z</text>
+      <text class="wake" x="252" y="280" font-size="22">!?</text></g>`;
+  s += boxes.map(b => `<rect class="ring" x="${b.x - 4}" y="${b.y - 4}" width="${b.w + 8}" height="${b.h + 8}" rx="4" fill="none" stroke="#73A7AE" stroke-width="4" visibility="hidden" pointer-events="none"/>`).join("");
+  $("wins").innerHTML = s;
+  wins = [...$("wins").querySelectorAll(".win")]; rings = [...$("wins").querySelectorAll(".ring")];
+}
+
+/* ---------- game ---------- */
+// game: {level, seed, flock (birds in it), away (how many may get away), spotted, escaped, taps (made so far), budget (taps allowed), t (ms into the run), next (the next arrival), up (what's at
+//        each window: {…arrival, start, gone, caught}), lastGone (when each window was last left), state
+//        ("ready" | "running" | "paused" | "woke" | "lost" | "won")}
+// There's no clock: a run lasts as long as its flock. settings.best[level] is {top (most birds spotted), wins}.
+const STORE = "catdoku.birdwatch.v1";
+let state = G.load(STORE);
+let settings = Object.assign({level: 1, tries: {}, best: {}}, state.settings);
+let game = null, flock = null, frame = 0, lastNow = 0;
+const save = () => G.save(STORE, {settings});
+
+function newRun(n, seed = Math.floor(Math.random() * 2 ** 31)) {
+  cancelAnimationFrame(frame);
+  game = {level: n, seed, flock: LEVELS[n][0], away: AWAY(n), spotted: 0, escaped: 0, taps: 0, budget: LEVELS[n][0] + SPARE, t: 0, up: Array(9).fill(null), lastGone: Array(9).fill(-1e9),
+          state: "ready", wipes: WIPES, helped: false, ...G.freshClock(), timed: false};
+  flock = flockOf(n, seed); game.next = flock();
+  for (const w of wins) { w.querySelector(".thing").innerHTML = ""; w.querySelector(".paw").innerHTML = ""; w.querySelector(".smudge").innerHTML = ""; w.classList.remove("bumped"); }
+  $("tapgo").hidden = false; $("tapgo").textContent = "Tap to start";
+  status();
+}
+function status() {
+  $("count").textContent = `${game.spotted}/${game.flock} spotted · ${game.escaped}/${game.away} got away`;
+  const left = game.budget - game.taps;
+  $("taps").textContent = `${left} ${left === 1 ? "tap" : "taps"} left`; $("taps").classList.toggle("low", left <= SPARE);
+  $("zz").setAttribute("class", game.state === "woke" ? "woke" : left <= SPARE ? "low" : "");
+  $("pauseBtn").textContent = game.state === "paused" ? "Go on" : "Pause";
+  $("pauseBtn").disabled = !["running", "paused"].includes(game.state);
+  $("wipeN").textContent = game.wipes;
+  $("wipeBtn").disabled = !game.wipes || !["running", "paused"].includes(game.state) || !document.querySelector(".smudge > g");
+}
+function start() {
+  game.state = "running"; game.started = true; $("tapgo").hidden = true; status();
+  G.track(`Bird Watch started level ${game.level}`);
+  lastNow = performance.now(); frame = requestAnimationFrame(loop);
+}
+function pause() { if (game && game.state === "running") { game.state = "paused"; cancelAnimationFrame(frame); $("tapgo").hidden = false; $("tapgo").textContent = "Paused · tap to go on"; status(); } }
+function resume() { if (game && game.state === "paused") { game.state = "running"; $("tapgo").hidden = true; status(); lastNow = performance.now(); frame = requestAnimationFrame(loop); } }
+$("pauseBtn").onclick = () => game && (game.state === "paused" ? resume() : pause());
+document.addEventListener("visibilitychange", () => { if (document.hidden) pause(); });
+
+// Each frame: move the run on, bring in what's due, send off what's had its time, and draw.
+function loop(now) {
+  if (game.state !== "running") return;
+  game.t += Math.min(100, now - lastNow); lastNow = now;
+  while (game.next.t <= game.t) { const a = game.next; game.up[a.w] = {...a, gone: a.t + a.stay}; game.next = flock(); wins[a.w].querySelector(".thing").innerHTML = `<g>${artOf(a)}</g>`; }
+  for (let w = 0; w < 9; w++) {
+    const th = game.up[w];
+    if (th && game.t >= (th.caught ? th.caught + 320 : th.gone)) {
+      game.up[w] = null; game.lastGone[w] = game.t; wins[w].querySelector(".thing").innerHTML = "";
+      if (!th.caught && isBird(th)) { escaped(); if (game.state !== "running") return; }
+    }
+  }
+  draw();
+  frame = requestAnimationFrame(loop);
+}
+// Where each thing is in its visit: birds hop up onto the bottom of the pane, sit (with a little bob), and fly off up and away;
+// a squirrel scampers in and back out; a leaf drifts down past the glass.
+function draw() {
+  for (let w = 0; w < 9; w++) {
+    const th = game.up[w], g = wins[w].querySelector(".thing > g");
+    if (!th || !g) continue;
+    const b = spotBox(w), t = game.t - th.t, left = th.gone - game.t, flip = th.flip;
+    const S = Math.min(b.w * .95, b.h) / 100 * (th.k === "leaf" ? .8 : 1), size = 100 * S;
+    let x = b.x + (b.w - size) / 2, y = perchY(w) - 92 * S, r = 0;
+    if (th.k === "leaf") {
+      const p = t / th.stay;
+      x += b.w * .2 * Math.sin(p * 9); y = b.y - size + (b.h + size) * p; r = 35 * Math.sin(p * 7);
+    } else {
+      const inn = Math.min(1, t / 160), out = th.caught ? Math.min(1, (game.t - th.caught) / 320) : Math.max(0, 1 - left / 160);
+      if (th.k === "squirrel") x += (flip ? 1 : -1) * b.w * (1 - inn + out);
+      else { y += 40 * (1 - inn) - 70 * out - (t % 900 < 120 ? 3 : 0); x += (flip ? -60 : 60) * out; }
+    }
+    g.setAttribute("transform", `translate(${x} ${y}) rotate(${r} ${size / 2} ${size / 2})${flip ? ` translate(${size} 0) scale(-1 1)` : ""} scale(${S})`);
+  }
+}
+
+/* ---------- tapping a window ---------- */
+const isBird = th => BIRDS.some(b => b.k === th.k);
+// A bird that flew off unspotted. One too many and the level's lost; the last of the flock ends the run.
+function escaped() {
+  game.escaped++; status();
+  if (game.escaped > game.away) lost();
+  else if (game.spotted + game.escaped >= game.flock) win();
+  else G.note(game.escaped === game.away ? "One got away! Don't let another." : "One got away!", 1800);
+}
+function tap(w) {
+  if (!game || $("overlay").classList.contains("show") || document.querySelector(".spot")) return;
+  if (game.state === "ready") { start(); return; }
+  if (game.state === "paused") { resume(); return; }
+  if (game.state !== "running") return;
+  // every tap makes a noise, bird or no bird
+  game.taps++;
+  const th = game.up[w];
+  if (th && isBird(th) && !th.caught) spot(w, th);
+  else if (th && !isBird(th)) bump(w, th);
+  else if (!th && game.t - game.lastGone[w] >= 250) bump(w, null);   // (just missing one, or a second tap, isn't a bump)
+  status();
+  if (game.state === "running" && game.taps >= game.budget) woke();
+}
+// A paw print on the glass where a bird was spotted, with pink toe beans
+const PAW = (cx, cy) => `<g transform="translate(${cx} ${cy}) scale(.9)" fill="${tint("#E16A4A", .45)}" stroke="${INK}" stroke-width="1.5" opacity=".9">
+  <path d="M0 -2 C8 -2 13 6 11 11 C9 15 4 13 0 13 C-4 13 -9 15 -11 11 C-13 6 -8 -2 0 -2 Z"/>
+  <ellipse cx="-11" cy="-7" rx="3.6" ry="4.6"/><ellipse cx="-4" cy="-13" rx="3.6" ry="4.6"/><ellipse cx="4" cy="-13" rx="3.6" ry="4.6"/><ellipse cx="11" cy="-7" rx="3.6" ry="4.6"/></g>`;
+// The smudgy print a paw leaves behind on the glass: it builds up, pane by pane, until the windows are wiped.
+const SMUDGE = (cx, cy, r) => `<g transform="translate(${cx} ${cy}) rotate(${r}) scale(1.25)" fill="${mix("#ffffff", INK, .12)}" opacity=".72" filter="url(#soft)">
+  <path d="M0 -2 C8 -2 13 6 11 11 C9 15 4 13 0 13 C-4 13 -9 15 -11 11 C-13 6 -8 -2 0 -2 Z"/><ellipse cx="0" cy="4" rx="17" ry="13" opacity=".5"/>
+  <ellipse cx="-11" cy="-7" rx="3.6" ry="4.6"/><ellipse cx="-4" cy="-13" rx="3.6" ry="4.6"/><ellipse cx="4" cy="-13" rx="3.6" ry="4.6"/><ellipse cx="11" cy="-7" rx="3.6" ry="4.6"/></g>`;
+function spot(w, th) {
+  th.caught = game.t; game.spotted++;
+  // a paw on the glass, which leaves a smudge behind
+  const b = spotBox(w), paw = wins[w].querySelector(".paw"), x = b.x + b.w / 2 + (Math.random() - .5) * b.w * .4, y = b.y + b.h / 2 + (Math.random() - .5) * b.h * .3;
+  paw.innerHTML = PAW(x, y);
+  clearTimeout(paw.timer); paw.timer = setTimeout(() => { paw.innerHTML = ""; }, 650);
+  const sm = wins[w].querySelector(".smudge"); sm.classList.remove("wiped");
+  sm.insertAdjacentHTML("beforeend", SMUDGE(x, y, Math.round((Math.random() - .5) * 50)));
+  status();
+  if (game.spotted + game.escaped >= game.flock) win();
+}
+function bump(w, th) {
+  const el = wins[w]; el.classList.remove("bumped"); void el.getBoundingClientRect(); el.classList.add("bumped");
+  clearTimeout(el.timer); el.timer = setTimeout(() => el.classList.remove("bumped"), 450);
+  G.note(th ? `That's ${th.k === "leaf" ? "a leaf" : "a squirrel"}!` : "No bird there!", 1800);
+}
+$("board").addEventListener("pointerdown", e => {
+  const w = e.target.closest && e.target.closest(".win");
+  e.preventDefault();
+  if (w) tap(+w.dataset.i);
+  else if (game && ["ready", "paused"].includes(game.state)) tap(-1);
+});
+
+/* ---------- keys ---------- */
+// The arrows move a cursor and Space taps the window under it; or the number keys tap a window straight away,
+// laid out like a keypad: 7 8 9 along the top, 1 2 3 along the bottom. P pauses.
+const keys = G.gridKeys({on: () => !!game, size: () => [3, 3], show: i => rings.forEach((r, k) => r.setAttribute("visibility", k === i ? "visible" : "hidden")),
+  act: i => tap(i)});
+const KEYPAD = {7: 0, 8: 1, 9: 2, 4: 3, 5: 4, 6: 5, 1: 6, 2: 7, 3: 8};
+addEventListener("keydown", e => {
+  if (e.ctrlKey || e.metaKey || e.altKey || !game || $("overlay").classList.contains("show") || document.querySelector(".spot") || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+  if (e.key in KEYPAD) { e.preventDefault(); if (game.state === "ready") game.started = true; tap(KEYPAD[e.key]); }
+  else if ((e.key === " " || e.key === "Enter") && keys.at() < 0 && ["ready", "paused"].includes(game.state) && e.target.tagName !== "BUTTON") { e.preventDefault(); game.started = true; tap(-1); }
+  else if (e.key === "p" || e.key === "P") { game.state === "paused" ? resume() : pause(); }
+});
+
+/* ---------- endings ---------- */
+// Out of taps: the human wakes up.
+function woke() {
+  game.state = "woke"; cancelAnimationFrame(frame); G.breakStreak(); status(); keepBest();
+  settings.tries[game.level] = (settings.tries[game.level] || 0) + 1; save();
+  G.track(`Bird Watch woke the human on level ${game.level}`);
+  const g = game;
+  setTimeout(() => {
+    if (game !== g) return;
+    G.openCard("The human woke up!", `That was tap ${game.budget}, after ${game.spotted} of the ${game.flock} birds. Too much tapping on the glass!`,
+      [["Restart", () => { G.closeCard(); newRun(game.level, game.seed); }, true], ["New flock", () => { G.closeCard(); newRun(game.level); }]],
+      null, G.otherSize($("levelSel"), game.level, startLevel, "Or play a different level:"));
+  }, 700);
+}
+// Too many birds got away: the level's lost.
+function lost() {
+  game.state = "lost"; cancelAnimationFrame(frame); G.breakStreak(); status(); keepBest();
+  settings.tries[game.level] = (settings.tries[game.level] || 0) + 1; save();
+  G.track(`Bird Watch lost level ${game.level}`);
+  const g = game;
+  setTimeout(() => {
+    if (game !== g) return;
+    G.openCard("Too many got away!", `${game.escaped} birds flew off before Bugsy and Bowtie spotted them. Only ${game.away} may get away on this level.`,
+      [["Restart", () => { G.closeCard(); newRun(game.level, game.seed); }, true], ["New flock", () => { G.closeCard(); newRun(game.level); }]],
+      null, G.otherSize($("levelSel"), game.level, startLevel, "Or play a different level:"));
+  }, 600);
+}
+// The most birds spotted on each level, kept on this device. Returns whether this run beat the last best.
+function keepBest(won) {
+  const b = settings.best[game.level] = Object.assign({top: 0, wins: 0}, settings.best[game.level]), beat = b.top > 0 && game.spotted > b.top;
+  b.top = Math.max(b.top, game.spotted); if (won) b.wins++; save();
+  return beat;
+}
+function showBests() {
+  const rows = Object.keys(settings.best).map(Number).filter(n => LEVELS[n]).sort((a, b) => a - b), media = document.createElement("div"), now = game ? game.level : settings.level;
+  if (!rows.length) { const p = document.createElement("p"); p.textContent = "Finish a level and your best scores will show up here. They're kept on this device only."; media.append(p); }
+  else {
+    const t = document.createElement("table"); t.className = "bests";
+    t.innerHTML = `<tr><th>Level</th><th class="num">Most spotted</th><th class="num">Won</th></tr>`;
+    for (const n of rows) {
+      const r = t.insertRow(), b = settings.best[n]; if (n === now) r.className = "now";
+      r.insertCell().textContent = n; const c = r.insertCell(); c.className = "num"; c.textContent = `${b.top} of ${LEVELS[n][0]}`;
+      const d = r.insertCell(); d.className = "num"; d.textContent = b.wins;
+    }
+    const p = document.createElement("p"); p.textContent = "Scores are kept on this device only.";
+    media.append(t, p);
+  }
+  G.openCard("Best scores", "", [["Close", G.closeCard, true]], media);
+}
+// The helper: wipe every paw print off the glass. Twice a level; using it costs the gold paw, and the level's
+// played again rather than moving up (as with Toy Box's helpers).
+const WIPES = 2;
+$("wipeBtn").onclick = () => {
+  if (!game || !game.wipes || !["running", "paused"].includes(game.state)) return;
+  game.wipes--; game.helped = true;
+  for (const w of wins) { const sm = w.querySelector(".smudge"); sm.classList.add("wiped"); clearTimeout(sm.timer); sm.timer = setTimeout(() => { sm.innerHTML = ""; sm.classList.remove("wiped"); status(); }, 420); }
+  G.note("Squeaky clean!", 1800); status();
+};
+function goldPic() { const im = new Image(); im.className = "goldpic"; im.src = catSrc("bugsy-bowtie-window"); im.alt = "Bugsy and Bowtie up at the window together"; return im; }
+function win() {
+  game.state = "won"; cancelAnimationFrame(frame); G.finishClock(game);
+  const gold = game.taps === game.flock && game.escaped === 0 && !game.helped, beat = keepBest(true), next = game.helped ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.tries[game.level] = 0; settings.level = next; $("levelSel").value = next; save(); status();
+  G.track(`Bird Watch won level ${game.level}`);
+  const g = game;
+  setTimeout(() => {
+    if (game !== g) return;
+    for (const w of wins) w.querySelector(".thing").innerHTML = "";
+    const text = (game.escaped ? `Bugsy and Bowtie spotted ${game.spotted} of the ${game.flock} birds.` : `Bugsy and Bowtie spotted all ${game.flock} birds.`) + (beat ? " That's a new best!" : "") + (game.helped ? ` You wiped the windows, so here's level ${next} again.` : game.level === MAX_LEVEL ? " That's the hardest level; here it is again." : ` Next up: level ${next}.`);
+    G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the view", game.result,
+      {title: game.escaped ? "Well spotted!" : "All spotted!", gold, goldWhy: "Every bird, not a tap wasted, no wiping!", goldPic: [goldPic()], next: `Next: level ${next}`, after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+  }, 600);
+}
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); G.closeCard(); newRun(n); }
+// Restart brings the same flock again; New flock brings a different one. Leaving a run partway counts as a try.
+const leaveRun = () => { if (["running", "paused"].includes(game.state)) { settings.tries[game.level] = (settings.tries[game.level] || 0) + 1; save(); } G.closeCard(); };
+$("restartBtn").onclick = () => { if (game) { leaveRun(); newRun(game.level, game.seed); } };
+$("newBtn").onclick = () => { if (game) { leaveRun(); newRun(game.level); } };
+// Share: a link to this flock (its level and seed), so a friend gets the same birds at the same windows.
+$("linkBtn").onclick = () => { if (game) { pause(); G.shareCard({name: "Bird Watch", what: "flock", won: game.state === "won", puzzle: () => ({g: "birdwatch", N: game.level, s: game.seed})}); } };
+function openShared(d) {
+  if (!(d.N >= 1 && d.N <= MAX_LEVEL && Number.isInteger(d.N)) || !Number.isInteger(d.s)) throw new Error("the shared flock doesn't fit the game");
+  settings.level = d.N; $("levelSel").value = d.N; save(); newRun(d.N, d.s);
+}
+
+/* ---------- how to play ---------- */
+// How to play works before a run and during one: a run in progress is paused first, and stays paused after.
+function showHelp() { pause(); settings.seenHelp = false; helpOnFirstVisit(); if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); } }
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || !["ready", "paused"].includes(game.state) || document.querySelector(".spot")) return;
+  const D = LEVELS[game.level][5], hit = i => wins[i].firstElementChild, all = [...Array(9).keys()].map(i => [i % 3, Math.floor(i / 3)]);
+  const steps = [
+    {say: "Tap the panes where a bird lands", lit: [], els: [hit(4)], tone: "ok"},
+    ...(D ? [{say: D === "l" ? "Leave the falling leaves alone" : "Leave the leaves and squirrels alone", lit: [], els: [hit(0), hit(8)]}] : []),
+    {say: "Be careful not to wake the sleeping human!", lit: [], els: [$("zz")]},
+    {say: `After ${game.budget} taps, you'll certainly wake them from their nap!`, lit: [], els: [$("taps")]},
+    {say: `Don't let more than ${game.away} of the ${game.flock} birds get away`, lit: [], els: [$("count")]},
+    {say: "Paws smudge the glass. Wipe the windows when you can't see", lit: [], els: [$("wipeBtn")]},
+    {say: "Or tap with the number keys", lit: all, tone: "ok", marks: all.map(([x, y]) => [x, y, String(7 - 3 * y + x)])},
+  ];
+  // the panes as a grid of squares, so the number keys' marks sit on them
+  const map = () => { const r = $("wins").getBoundingClientRect(), k = r.width / 300; return {ox: r.left + 9 * k, oy: r.top + 29 * k, cw: 94 * k, ch: 72 * k}; };
+  G.spotlight({grid: $("wins"), w: 3, h: 3, map, steps, done: () => { settings.seenHelp = true; save(); }});
+}
+$("helpBtn").onclick = showHelp;
+
+/* ---------- start ---------- */
+buildRoom();
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(`${n} · ${LEVELS[n][0]} birds${n === MAX_LEVEL ? " (hardest)" : ""}`, n));
+$("levelSel").onchange = e => { startLevel(+e.target.value); $("levelSel").blur(); };
+G.nav("birdwatch");
+// No clock (a run lasts as long as its flock), but the timer keeps the win streak and the daily challenge.
+G.setupTimer({name: "birdwatch", game: () => game, playing: g => g.state === "running", save, label: levelName, noun: "level"});
+$("bestBtn").onclick = () => { pause(); showBests(); };
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+if (typeof settings.best !== "object" || !settings.best) settings.best = {};
+$("levelSel").value = settings.level;
+const shared = G.readShare("birdwatch");
+let openedShare = false;
+if (shared) try { openShared(shared); openedShare = true; G.note("Here's the shared flock. Good luck!", 6000); G.track("Bird Watch shared puzzle opened"); } catch (e) { G.note("That share link didn't work.", 5000); }
+if (!openedShare) newRun(settings.level);
+window.addEventListener("hashchange", () => { const d = G.readShare("birdwatch"); if (d) G.offerShare(d, {name: "Bird Watch", inProgress: !!(game && game.started && game.state !== "won"), open: d => { try { openShared(d); } catch (e) { G.note("That share link didn't work.", 5000); } }}); });
+setTimeout(helpOnFirstVisit, 300);
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
