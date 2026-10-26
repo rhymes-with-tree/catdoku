@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-24.4";
+  var BUILD = "2026-10-26.1";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&family=Permanent+Marker&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-24.4">
+<link rel="stylesheet" href="../games.css?v=2026-10-26.1">
 <style>
 /* A wooden floor covered in cardboard boxes. Checked boxes get a number written on them in marker, like a
    labelled box; marked ones get a cat doodled on; a startled cat's box gets HISS scrawled across it. */
@@ -56,6 +56,29 @@
 .title{display:flex;align-items:flex-end;gap:8px}
 .jan{display:block;height:58px;width:auto;margin-bottom:-4px}
 @media (max-height:760px){.jan{height:42px;margin-bottom:-3px}}
+/* Full screen (G.fullScreen): the floor as big as the screen takes, laid sideways when that makes the boxes bigger
+   (Minesweeper's expert board is 30 across), with the lives above it and Hint and Mark below. A floor too big to
+   fit with boxes big enough to tap scrolls inside its frame. */
+body.full main{display:grid;grid-template-columns:minmax(0,1fr) auto auto minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;align-items:stretch;gap:6px 8px}
+body.full .status{grid-column:1 / -1;width:100%}
+body.full .wrap{grid-column:1 / -1;width:100%;height:auto;min-height:0;display:flex;overflow:auto}
+body.full .floor{margin:auto}
+body.full .actions{width:auto;grid-column:2;grid-row:3;align-self:center;flex-wrap:nowrap;gap:8px}
+body.full .actions > :not(#hintBtn,#markBtn),body.full .bar > :not(#fullBtn){display:none}
+body.full .bar{width:auto;grid-column:3;grid-row:3;align-self:center}
+.bar .fsBtn{padding:4px 10px}
+/* on a phone held sideways, the lives and buttons go in a narrow column beside the floor */
+@media (max-width:600px) and (orientation:landscape),(max-height:500px) and (orientation:landscape){
+  body.full main{grid-template-columns:minmax(0,1fr) 116px;grid-template-rows:auto minmax(0,1fr) auto auto;gap:4px 8px}
+  body.full .status{grid-column:2;grid-row:1;flex-direction:column;align-items:flex-start;gap:2px}
+  body.full .status .left{flex-direction:column;align-items:flex-start;gap:0;font-size:15px}
+  body.full .msg{flex:none;text-align:left;font-size:14px}
+  body.full .wrap{grid-column:1;grid-row:1 / 5}
+  body.full .actions{grid-column:2;grid-row:3;flex-direction:column;align-items:stretch;justify-self:stretch}
+  body.full .bar{grid-column:2;grid-row:4;justify-self:stretch}
+  body.full .bar .fsBtn{width:100%}
+  body.full .fsBtn svg{margin:0 auto}
+}
 .card img.janpic{display:block;width:56%;max-width:200px;height:auto;margin:0 auto 14px}
 </style>
 </head>
@@ -79,11 +102,12 @@
   <div class="bar">
     <label>Size <select id="size" aria-label="Floor size"></select></label>
     <button id="newBtn" class="primary">New floor</button>
+    <button id="fullBtn"></button>
   </div>
 
 </main>
 
-<script src="../games.js?v=2026-10-24.4"></script>
+<script src="../games.js?v=2026-10-26.1"></script>
 <script>
 /* ---------- sizes ---------- */
 // Width, height and cats, from Minesweeper's beginner board up to its expert one stood on end (16 across, 30 down),
@@ -326,11 +350,30 @@ function hint() {
 }
 
 /* ---------- drawing ---------- */
+// The boxes fill the page's width. In full screen they take the room the screen has, and the floor lies sideways
+// (turned a quarter clockwise, each box still upright) when that makes them bigger. A floor that won't fit with
+// boxes big enough to tap scrolls in its frame.
+let side = false;
+const full = () => document.body.classList.contains("full");
+const shown = () => side ? [H, W] : [W, H];   // boxes across and down, as shown
 function layout() {
-  const f = $("board"), cell = Math.max(20, Math.min(56, Math.floor((f.parentElement.clientWidth - 8) / W)));
-  f.style.gridTemplateColumns = `repeat(${W}, ${cell}px)`; f.style.width = `${W * cell + 8}px`; f.style.fontSize = Math.round(cell * .55) + "px";
+  const f = $("board"), room = f.parentElement;
+  let cell;
+  if (full()) {
+    const aw = room.clientWidth - 8, ah = room.clientHeight - 8;
+    side = Math.min(aw / H, ah / W) > Math.min(aw / W, ah / H) * 1.05;
+    const [dw, dh] = shown(), fit = Math.floor(Math.min(aw / dw, ah / dh));
+    // the whole floor if its boxes are big enough to tap; if not, boxes of 20 pixels (or the width) and it scrolls
+    cell = Math.max(16, Math.min(56, Math.max(fit, Math.min(20, Math.floor(aw / dw)))));
+  } else { side = false; cell = Math.max(20, Math.min(56, Math.floor((room.clientWidth - 8) / W))); }
+  const [dw] = shown();
+  f.style.gridTemplateColumns = `repeat(${dw}, ${cell}px)`; f.style.width = `${dw * cell + 8}px`; f.style.fontSize = Math.round(cell * .55) + "px";
   f.innerHTML = "";
-  for (let i = 0; i < W * H; i++) { const d = document.createElement("div"); d.className = "sq"; d.dataset.i = i; d.setAttribute("role", "gridcell"); f.append(d); }
+  for (let i = 0; i < W * H; i++) {
+    const d = document.createElement("div"); d.className = "sq"; d.dataset.i = i; d.setAttribute("role", "gridcell");
+    if (side) { d.style.gridColumn = H - ((i / W) | 0); d.style.gridRow = i % W + 1; }
+    f.append(d);
+  }
   $("size").value = game.N;
   draw();
 }
@@ -354,6 +397,12 @@ function draw() {
   $("hintBtn").disabled = !playing();
 }
 addEventListener("resize", () => { if (game) layout(); });
+const SMALL = matchMedia("(max-width:600px),(max-height:500px)");   // a phone
+G.fullScreen({btn: $("fullBtn"), name: "Hide & Seek", change: (on, toggled) => {
+  if (game) layout();
+  // a tall floor on a phone held upright fits much better sideways
+  if (on && toggled && game && SMALL.matches && innerHeight > innerWidth && H > W * 1.2) G.note("Turn your phone sideways to see the whole floor.", 5000);
+}});
 
 /* ---------- input: tap, press and hold, Mark mode ---------- */
 let hold = null;
@@ -375,7 +424,11 @@ board.addEventListener("pointerup", () => {
 });
 board.addEventListener("pointercancel", () => { if (hold) { clearTimeout(hold.t); hold = null; } });
 // Keys: the arrows move a cursor; Space or Enter checks the box under it (as a tap does), M doodles a cat on it.
-const keys = G.gridKeys({on: () => playing(), size: () => [W, H], keys: ["m"],
+const keys = G.gridKeys({on: () => playing(), keys: ["m"], start: () => side ? (H - 1) * W : 0,   // the top left box as shown
+  move: (i, dx, dy) => {   // the way the arrow points on the screen, which on a floor lying sideways is another way on the floor
+    const [mx, my] = side ? [dy, -dx] : [dx, dy];
+    return Math.max(0, Math.min(H - 1, ((i / W) | 0) + my)) * W + Math.max(0, Math.min(W - 1, i % W + mx));
+  },
   show: i => [...board.children].forEach((sq, k) => sq.classList.toggle("kbcursor", k === i)),
   act: (i, key) => { if (key === "m") { if (!open.has(i)) toggleMark(i); } else if (open.has(i)) chord(i); else if (markMode) toggleMark(i); else check(i); keys.set(i); }});
 $("markBtn").onclick = () => { markMode = !markMode; $("markBtn").setAttribute("aria-pressed", String(markMode)); G.note(markMode ? "Mark is on: tap a box to doodle a cat on it." : "", 3000); };
@@ -395,7 +448,7 @@ function showHelp() {
 // until then, so the label and cats in step 3 are only an example drawn over the boxes.
 function helpOnFirstVisit() {
   if (settings.seenHelp || !game || !playing() || document.querySelector(".spot")) return;
-  const {W, H} = game, all = [], mid = [W >> 1, H >> 1];
+  const [W, H] = shown(), all = [], mid = [W >> 1, H >> 1];   // squares as shown, which differ when the floor lies sideways
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) all.push([x, y]);
   const around = []; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) around.push([1 + dx, 1 + dy]);
   const steps = [

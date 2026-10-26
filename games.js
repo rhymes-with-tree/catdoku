@@ -30,7 +30,7 @@ const G = (() => {
     ["If It Fits", "iffits", "Build the box, and Bugsy comes to sit in it", "#C4925C", "teasers", "tangram shapes"],
     ["High Perch", "highperch", "Raise every cat tree to just the right height", "#8E5E3E", "logic", "skyscrapers towers futoshiki sudoku latin square"],
     ["Fuzzy Spelling", "fuzzyspelling", "Slide the letters until the bar spells a word", "#B94588", "words", "thruline"],
-    ["Cat-astrophe", "catastrophe", "Help Crunch dye the whole rug one colour", "#73A7AE", "teasers", "flood fill colour color"],
+    ["Cat Mat", "catastrophe", "Help Crunch dye the whole mat one colour", "#73A7AE", "teasers", "flood fill colour color rug catastrophe"],
     ["Laser Pointer", "laserpointer", "Bounce the dot past every cat", "#E16A4A", "lines", "mirrors laser light"],
     ["Treat Time", "treattime", "Help Higgins give every cat just enough treats", "#ECA818", "numbers", "sumplete sums"],
     ["Up a Tree", "upatree", "Help Dottie climb the cat tree, one letter at a time", "#6AA673", "words", "word ladder weaver doublets"],
@@ -42,6 +42,7 @@ const G = (() => {
     ["Catlas", "atlas", "Name the country where each cat is hiding", "#5FA0C8", "travels", "geography countries world map quiz seterra flags places territories wild cats", "2026-10-22"],
     ["Cat Burglar", "catburglar", "Catch the cat that's snuck into the painting", "#4E577D", "quick", "hidden object find spot seek paintings art museum met where's waldo wally", "2026-10-22"],
     ["Cat Pile", "catpile", "Pile napping cats on the blanket and clear the lines", "#E16A4A", "teasers", "blockudoku block blast woodoku 1010 blocks shapes tetris polyomino sudoku lines", "2026-10-23"],
+    ["Fish Bones", "fishbones", "Swap the bones until Bowtie's fish spells words again", "#73A7AE", "words", "waffle swap letters crossword word puzzle fish skeleton", "2026-10-25"],
   ];
   // The shelves the front page and the games menu sort the games onto, in order: key (also a plain name for it,
   // for search), heading, one line.
@@ -899,6 +900,25 @@ const G = (() => {
     };
   }
 
+  /* ---------- what a word means ---------- */
+  // A word's meanings from Wiktionary (this needs the internet): up to three, each {pos (noun, verb…), text}, for
+  // Keyboard Cat's clues and Fish Bones' word list. Rejects when there are none or Wiktionary can't be reached.
+  // Asked again, a word comes from memory.
+  function plainText(html) { const d = document.createElement("div"); d.innerHTML = html; d.querySelectorAll("sup, .reference, style").forEach(x => x.remove()); return d.textContent.replace(/\s+/g, " ").trim(); }
+  const meanings = {};
+  function meaning(w) {
+    return meanings[w] || (meanings[w] = fetch(`https://en.wiktionary.org/api/rest_v1/page/definition/${encodeURIComponent(w)}`).then(async r => {
+      if (!r.ok) throw new Error(r.status);
+      const out = [];
+      for (const sense of (await r.json()).en || []) for (const d of sense.definitions || []) {
+        const text = plainText(d.definition || "");
+        if (text && out.length < 3) out.push({pos: sense.partOfSpeech, text});
+      }
+      if (!out.length) throw new Error("none");
+      return out;
+    }).catch(e => { delete meanings[w]; throw e; }));
+  }
+
   /* ---------- keyboard play ---------- */
   // Keyboard play on a board, the same in every game: the arrow keys move a cursor (it shows from the first arrow
   // press, and a tap or Escape hides it), Space or Enter acts on what's under it, and a game can list keys of its
@@ -953,6 +973,44 @@ const G = (() => {
     return c ? +c.dataset.i : -1;
   }
 
+  /* ---------- full screen ---------- */
+  // A game's board filling the screen, for games whose board gains from the room (a big mat to look around, a
+  // painting). The browser's own full screen where it has one (not on an iPhone), and the page filling the window
+  // either way: body.full, with the title and menu put away (games.css); each game lays out the rest. The button
+  // gets its icon here; it, F, or Escape goes in and out. o: {btn, name (for the dashboard),
+  // change(on, toggled) (lay out again; toggled when it went in or out, not when the window only changed)}
+  function fullScreen(o) {
+    const isOn = () => document.body.classList.contains("full");
+    const screenFull = () => document.fullscreenElement || document.webkitFullscreenElement;
+    o.btn.classList.add("fsBtn");
+    o.btn.innerHTML = '<svg class="enter" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8V3h5M12 3h5v5M17 12v5h-5M8 17H3v-5"/></svg>' +
+      '<svg class="leave" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 3v5H3M17 8h-5V3M12 17v-5h5M3 12h5v5"/></svg>';
+    function set(on) {
+      document.body.classList.toggle("full", on);
+      o.btn.setAttribute("aria-label", on ? "Leave full screen" : "Full screen");
+      o.btn.title = on ? "Leave full screen (F)" : "Full screen (F)";
+      const el = document.documentElement;
+      try {
+        if (on && !screenFull()) { const go = el.requestFullscreen || el.webkitRequestFullscreen; if (go) Promise.resolve(go.call(el)).catch(() => {}); }
+        if (!on && screenFull()) { const leave = document.exitFullscreen || document.webkitExitFullscreen; Promise.resolve(leave.call(document)).catch(() => {}); }
+      } catch (e) {}
+      if (on) track(`${o.name} full screen`);
+      o.change(on, true);
+    }
+    set(false);
+    o.btn.addEventListener("click", () => set(!isOn()));
+    document.addEventListener("keydown", e => {
+      if (e.ctrlKey || e.metaKey || e.altKey || document.querySelector(".spot") || $("overlay").classList.contains("show") || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+      if (e.key === "f" || e.key === "F") set(!isOn());
+      else if (e.key === "Escape" && isOn() && !screenFull()) set(false);
+    });
+    // leaving the browser's full screen (Escape, or a swipe) leaves the game's too
+    const changed = () => { if (!screenFull() && isOn()) set(false); else o.change(isOn(), false); };
+    document.addEventListener("fullscreenchange", changed);
+    document.addEventListener("webkitfullscreenchange", changed);
+    return {on: isOn, set};
+  }
+
   // If something breaks, say what on the page and count it on the dashboard, so it can be fixed.
   function reportError(msg, where) {
     track(`Error: ${msg}${where ? ` (${where})` : ""}`);
@@ -971,6 +1029,6 @@ const G = (() => {
     }
   }
 
-  return {GAMES, GROUPS, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen,
+  return {GAMES, GROUPS, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();

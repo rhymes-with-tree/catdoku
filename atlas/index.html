@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-24.4"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-26.1"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-24.4">
+<link rel="stylesheet" href="../games.css?v=2026-10-26.1">
 <style>
 /* The map is the board: the country to name is lit in coral, and a gold ring goes round it when it's too small
    to see. Under it, the cat to find and the answer, given the way the player picks: four names (Pick), typing with
@@ -34,6 +34,8 @@
 .map canvas{display:block;width:100%;height:100%;cursor:grab}
 .map canvas:active{cursor:grabbing}
 .recentre{position:absolute;right:8px;bottom:8px;width:40px;height:40px;padding:0;border-radius:50%;display:grid;place-items:center;background:var(--panel)}
+.zoombtns{position:absolute;right:8px;bottom:56px;display:flex;flex-direction:column;gap:8px}
+.zoombtns button{width:40px;height:40px;padding:0;border-radius:50%;background:var(--panel);font-size:24px;line-height:1;font-weight:800}
 .recentre svg{width:22px;height:22px;fill:none;stroke:var(--ink);stroke-width:2.2;stroke-linecap:round}
 .key{position:absolute;left:8px;bottom:8px;display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--ink);background:color-mix(in srgb,var(--panel) 88%,transparent);border-radius:999px;padding:2px 10px 2px 4px;pointer-events:none}
 .key i{width:18px;height:14px;border-radius:4px;border:1.5px dashed var(--ink-soft);background:repeating-linear-gradient(135deg,var(--land) 0 3px,rgba(42,37,48,.42) 3px 4.6px)}
@@ -57,6 +59,8 @@
 .list li{padding:5px 10px;border-radius:7px;cursor:pointer;font-weight:600}
 .list li:hover{background:#fff}
 .list li[aria-selected="true"]{background:var(--ink);color:var(--paper)}
+/* on a phone, while typing: the map shrinks to fit above the answer box (see fitTyping) and the list is short */
+body.typing .list{max-height:var(--list-h,108px)}
 .list li.none{color:var(--ink-soft);cursor:default;font-weight:500}
 .tried{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
 .tried:empty{display:none}
@@ -88,6 +92,9 @@
 .card .wiki .more{font-weight:700;color:var(--ink)}
 .card .wiki .credit{text-decoration:none}
 .card .wiki .credit:empty{display:none}
+.card .wiki.places{margin-top:-10px}
+.card .say .also{display:block;font-size:16px;font-weight:600}
+.card .say .also small{font-size:14px;color:var(--ink-soft)}
 </style>
 </head>
 <body>
@@ -101,6 +108,7 @@
     <div class="grid" id="grid"><canvas id="canvas" tabindex="0" role="img" aria-label="World map with one country lit up. Drag to move, pinch or scroll to zoom."></canvas></div>
     <div class="key" aria-hidden="true"><i></i>Disputed</div>
     <div class="loading" id="loading">Unrolling the map…</div>
+    <div class="zoombtns"><button id="zoomInBtn" aria-label="Zoom in" title="Zoom in">+</button><button id="zoomOutBtn" aria-label="Zoom out" title="Zoom out">−</button></div>
     <button class="recentre" id="recentreBtn" aria-label="Back to the lit country" title="Back to the lit country"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
   </div>
   <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
@@ -111,7 +119,7 @@
     <p class="reveal" id="reveal" aria-live="polite"></p>
     <div class="choices" id="choices" hidden></div>
     <form class="typebox" id="typebox" hidden autocomplete="off">
-      <input id="guess" type="text" enterkeyhint="go" spellcheck="false" autocapitalize="words" aria-label="Country name" placeholder="Type a country">
+      <input id="guess" name="answer" type="text" enterkeyhint="go" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="words" aria-label="Your answer" placeholder="Type the name">
       <button type="submit" class="primary" id="goBtn">Go</button>
     </form>
     <ul class="list" id="list" role="listbox" aria-label="Countries" hidden></ul>
@@ -135,7 +143,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-24.4"></script>
+<script src="../games.js?v=2026-10-26.1"></script>
 <script>
 /* ---------- countries and their cats ---------- */
 // The 200 countries a trip can ask: the 193 UN members plus Vatican City, Palestine, Taiwan, Kosovo,
@@ -199,12 +207,17 @@ const WIKI = {
 const WIKI_HERE = {CAN: "Canada lynx", ESP: "Iberian lynx", PRT: "Iberian lynx", LSO: "African wildcat", TUN: "African wildcat",
   LBN: "African wildcat", BRN: "Sunda clouded leopard", PHL: "Sunda leopard cat"};
 // The disputed round's cats: a wild cat recorded there (GBIF sightings inside each place's outline), or a housecat.
-const DZ_CAT = {crimea: "house", donbas: "house", golan: "jungle", wsahara: "sand", kashmir: "snow", aksaichin: "manul", arunachal: "clouded",
+const DZ_CAT = {crimea: "house", donbas: "house", golan: "jungle", wsahara: "sand", kashmir: "snow", aksaichin: "manul", tibet: "snow", arunachal: "clouded",
   abkhazia: "wildcat", sossetia: "lynx", transnistria: "wildcat", ncyprus: "house", somaliland: "caracal", abyei: "leopard", ilemi: "cheetah",
   kurils: "house", karabakh: "lynx", kosovo: "lynx", taiwan: "leopardcat", palestine: "caracal", korea: "leopardcat", falklands: "house",
   chagos: "house", belize: "jaguar", essequibo: "ocelot"};
 const catOf = code => code.startsWith("dz:") ? DZ_CAT[code.slice(3)] : CLUE[code];
 const wikiTitle = code => WIKI_HERE[code] || WIKI[catOf(code)] || "Cat";
+// The place's own Wikipedia page, where its name isn't the page's title (and, in the disputed round, the dispute's page).
+const PLACE_WIKI = {GEO: "Georgia (country)", IRL: "Republic of Ireland", FSM: "Federated States of Micronesia", PSX: "State of Palestine",
+  IOA: "Australian Indian Ocean Territories", BES: "Caribbean Netherlands", MAF: "Collectivity of Saint Martin"};
+const wikiUrl = title => "https://en.wikipedia.org/wiki/" + encodeURIComponent(title.replace(/ /g, "_"));
+const placeLink = c => c.startsWith("dz:") ? [dzOf(c).name, dzOf(c).wiki || dzOf(c).name] : [nameOf(c), PLACE_WIKI[c] || nameOf(c)];
 // Where the cat is: "lives in", "migrated to", "is exploring".
 const livesIn = code => catOf(code) === "house" ? "migrated to" : catOf(code) === "empty" ? "is exploring" : "lives in";
 // "the <b>lynx</b>", "<b>Pallas's cat</b>", "the <b>housecat</b>"
@@ -241,11 +254,13 @@ function wikiPic(title) {
 }
 // The cat's photo beside the clue, with "Iberian lynx on Wikipedia" and the photo credit under it.
 let cardFor = null;
-function catCard(code, title, lines) {
+// `places` is the place and the countries that go with it, each [name, Wikipedia title], linked under the photo credit.
+function catCard(code, title, lines, places) {
   if (cardFor === code && $("overlay").classList.contains("show")) return;
   const t = wikiTitle(code), page = "https://en.wikipedia.org/wiki/" + encodeURIComponent(t.replace(/ /g, "_")), media = document.createElement("div");
   media.innerHTML = `<a class="photo" target="_blank" rel="noopener" href="${page}"><img alt="Photo: ${esc(t)}" hidden></a>${lines.map(l => `<p class="say">${l}</p>`).join("")}`
-    + `<p class="wiki"><a class="more" target="_blank" rel="noopener" href="${page}">${esc(t)} on Wikipedia</a> <a class="credit" target="_blank" rel="noopener"></a></p>`;
+    + `<p class="wiki"><a class="more" target="_blank" rel="noopener" href="${page}">${esc(t)} on Wikipedia</a> <a class="credit" target="_blank" rel="noopener"></a></p>`
+    + `<p class="wiki places">On Wikipedia: ${places.map(([n, w]) => `<a target="_blank" rel="noopener" href="${wikiUrl(w)}">${esc(n)}</a>`).join(" · ")}</p>`;
   const last = game.i >= TRIP - 1, dz = game.mode === "disputed";
   G.openCard(title, "", [[last ? (dz ? "Finish the round" : "Finish the trip") : "Next cat", nextCat, true]], media);
   cardFor = code;
@@ -278,33 +293,39 @@ function bothNames(text) {
   return null;
 }
 // The disputed-territory round: each place has a sentence with blanks, {0} for the place itself and {1}, {2}... for
-// the countries in its dispute (codes in `who`). Every name in `aka` also counts for the place; naming them earns bonuses.
+// the countries in its dispute (codes in `who`). A bonus is only a name some other side really uses (Malvinas, Artsakh),
+// not a short form, spelling or translation of the same one; `wiki` is its Wikipedia page when that isn't its name.
 // The sentences say who controls and who claims, never who's right.
 const DISPUTES = {
-  crimea: {name: "Crimea", aka: ["Crimean Peninsula", "Krym"], s: "{0} is controlled by {1} and claimed by {2}.", who: ["RUS", "UKR"]},
-  donbas: {name: "Donbas", aka: ["Donbass", "Donetsk and Luhansk", "Donetsk", "Luhansk"], s: "Most of the {0} is controlled by {1} and claimed by {2}.", who: ["RUS", "UKR"]},
-  golan: {name: "Golan Heights", aka: ["Golan", "Jawlan"], s: "The {0} are controlled by {1} and claimed by {2}.", who: ["ISR", "SYR"]},
-  wsahara: {name: "Western Sahara", aka: ["Sahrawi Arab Democratic Republic", "Sahrawi Republic", "SADR", "Southern Provinces"], s: "Most of {0} is controlled by {1}, and the Sahrawi Republic claims all of it.", who: ["MAR"]},
-  kashmir: {name: "Kashmir", aka: ["Jammu and Kashmir", "Azad Kashmir", "Gilgit-Baltistan", "Ladakh"], s: "{0} is divided between {1}, {2} and {3}, and none of the lines between them is an agreed border.", who: ["IND", "PAK", "CHN"]},
-  aksaichin: {name: "Aksai Chin", aka: [], s: "{0} is controlled by {1} and claimed by {2}.", who: ["CHN", "IND"]},
-  arunachal: {name: "Arunachal Pradesh", aka: ["Zangnan", "South Tibet"], s: "{0} is controlled by {1} and claimed by {2}.", who: ["IND", "CHN"]},
-  abkhazia: {name: "Abkhazia", aka: ["Apsny"], s: "{0} governs itself with {1}'s backing and is claimed by {2}.", who: ["RUS", "GEO"]},
-  sossetia: {name: "South Ossetia", aka: ["Tskhinvali Region", "Alania"], s: "{0} governs itself with {1}'s backing and is claimed by {2}.", who: ["RUS", "GEO"]},
-  transnistria: {name: "Transnistria", aka: ["Pridnestrovie", "Transdniestria"], s: "{0} governs itself and is claimed by {1}.", who: ["MDA"]},
-  ncyprus: {name: "Northern Cyprus", aka: ["North Cyprus", "TRNC", "Turkish Republic of Northern Cyprus"], s: "{0} governs itself, is recognised only by {1}, and is claimed by {2}.", who: ["TUR", "CYP"]},
-  somaliland: {name: "Somaliland", aka: ["Republic of Somaliland"], s: "{0} governs itself and is claimed by {1}.", who: ["SOM"]},
-  abyei: {name: "Abyei", aka: [], s: "{0} is claimed by both {1} and {2}.", who: ["SDN", "SDS"]},
-  ilemi: {name: "Ilemi Triangle", aka: ["Ilemi"], s: "The {0} is controlled by {1} and claimed by {2}.", who: ["KEN", "SDS"]},
-  kurils: {name: "Kuril Islands", aka: ["Kurils", "Southern Kurils", "Northern Territories", "Chishima"], s: "The southern {0} are controlled by {1} and claimed by {2}.", who: ["RUS", "JPN"]},
-  karabakh: {name: "Nagorno-Karabakh", aka: ["Artsakh", "Karabakh", "Mountainous Karabakh"], s: "{0} was fought over by {1} and {2}; Azerbaijan has controlled it since 2023.", who: ["ARM", "AZE"]},
-  kosovo: {name: "Kosovo", aka: ["Kosova", "Republic of Kosovo"], s: "{0} declared independence from {1}, which still claims it.", who: ["SRB"]},
-  taiwan: {name: "Taiwan", aka: ["Republic of China", "Formosa", "Chinese Taipei"], s: "{0} governs itself and is claimed by {1}.", who: ["CHN"]},
-  palestine: {name: "Palestine", aka: ["State of Palestine", "Palestinian territories", "West Bank and Gaza"], s: "{0} is recognised as a state by most UN members; its borders with {1} are not agreed.", who: ["ISR"]},
-  korea: {name: "Korean Peninsula", aka: ["Korea"], s: "The {0} is divided between {1} and {2}, and each claims all of it.", who: ["PRK", "KOR"]},
-  falklands: {name: "Falkland Islands", aka: ["Falklands", "Malvinas", "Islas Malvinas"], s: "The {0} are governed by the {1} and claimed by {2}.", who: ["GBR", "ARG"]},
-  chagos: {name: "Chagos Islands", aka: ["Chagos Archipelago", "British Indian Ocean Territory"], s: "The UN backs {1}'s claim to the {0}, which the {2} took in 1965.", who: ["MUS", "GBR"]},
-  belize: {name: "Belize", aka: [], s: "{1} claims about half of {0}.", who: ["GTM"]},
-  essequibo: {name: "Essequibo", aka: ["Guayana Esequiba"], s: "{1} claims the {0} region, about two-thirds of {2}.", who: ["VEN", "GUY"]}};
+  crimea: {name: "Crimea", same: ["Crimean Peninsula"], aka: [["Krym"]], s: "{0} is controlled by {1} and claimed by {2}.", who: ["RUS", "UKR"]},
+  donbas: {name: "Donbas", same: ["Donbass"], aka: [], s: "Most of the {0} is controlled by {1} and claimed by {2}.", who: ["RUS", "UKR"]},
+  golan: {name: "Golan Heights", same: ["Golan"], aka: [["Jawlan", "al-Jawlan"]], s: "The {0} are controlled by {1} and claimed by {2}.", who: ["ISR", "SYR"]},
+  wsahara: {name: "Western Sahara", same: [], aka: [["Sahrawi Republic", "Sahrawi Arab Democratic Republic", "SADR"], ["Southern Provinces"]], s: "Most of {0} is controlled by {1}, and a movement for its independence claims all of it.", who: ["MAR"]},
+  kashmir: {name: "Kashmir", same: ["Jammu and Kashmir"], aka: [], s: "{0} is divided between {1}, {2} and {3}, and none of the lines between them is an agreed border.", who: ["IND", "PAK", "CHN"]},
+  aksaichin: {name: "Aksai Chin", same: [], aka: [], s: "{0} is controlled by {1} and claimed by {2}.", who: ["CHN", "IND"]},
+  tibet: {name: "Tibet", same: ["Tibet Autonomous Region"], aka: [["Xizang", "Xizang Autonomous Region"], ["Bod", "Böd", "Bö"]], s: "{0} has been controlled by {1} since 1950, and its government in exile, based in {2}, disputes that rule.", who: ["CHN", "IND"], wiki: "Tibetan sovereignty debate"},
+  arunachal: {name: "Arunachal Pradesh", same: [], aka: [["Zangnan", "South Tibet"]], s: "{0} is controlled by {1} and claimed by {2}.", who: ["IND", "CHN"]},
+  abkhazia: {name: "Abkhazia", same: [], aka: [["Apsny"]], s: "{0} governs itself with {1}'s backing and is claimed by {2}.", who: ["RUS", "GEO"]},
+  sossetia: {name: "South Ossetia", same: [], aka: [["Tskhinvali Region", "Tskhinvali"], ["Alania"]], s: "{0} governs itself with {1}'s backing and is claimed by {2}.", who: ["RUS", "GEO"]},
+  transnistria: {name: "Transnistria", same: ["Transdniestria", "Trans-Dniester"], aka: [["Pridnestrovie"]], s: "{0} governs itself and is claimed by {1}.", who: ["MDA"]},
+  ncyprus: {name: "Northern Cyprus", same: ["North Cyprus", "TRNC", "Turkish Republic of Northern Cyprus"], aka: [], s: "{0} governs itself, is recognised only by {1}, and is claimed by {2}.", who: ["TUR", "CYP"]},
+  somaliland: {name: "Somaliland", same: ["Republic of Somaliland"], aka: [], s: "{0} governs itself and is claimed by {1}.", who: ["SOM"]},
+  abyei: {name: "Abyei", same: [], aka: [], s: "{0} is claimed by both {1} and {2}.", who: ["SDN", "SDS"]},
+  ilemi: {name: "Ilemi Triangle", same: ["Ilemi"], aka: [], s: "The {0} is controlled by {1} and claimed by {2}.", who: ["KEN", "SDS"]},
+  kurils: {name: "Kuril Islands", same: ["Kurils", "Southern Kurils"], aka: [["Northern Territories"], ["Chishima", "Chishima Islands"]], s: "The southern {0} are controlled by {1} and claimed by {2}.", who: ["RUS", "JPN"], wiki: "Kuril Islands dispute"},
+  karabakh: {name: "Nagorno-Karabakh", same: ["Karabakh", "Mountainous Karabakh"], aka: [["Artsakh"]], s: "{0} was fought over by {1} and {2}, and {2} has controlled it since 2023.", who: ["ARM", "AZE"]},
+  kosovo: {name: "Kosovo", same: ["Republic of Kosovo"], aka: [["Kosova", "Republic of Kosova"]], s: "{0} declared independence from {1}, which still claims it.", who: ["SRB"]},
+  taiwan: {name: "Taiwan", same: [], aka: [["Republic of China", "ROC"], ["Formosa"], ["Chinese Taipei"]], s: "{0} governs itself and is claimed by {1}.", who: ["CHN"], wiki: "Political status of Taiwan"},
+  palestine: {name: "Palestine", same: ["State of Palestine"], aka: [["Palestinian territories", "Occupied Palestinian territories", "West Bank and Gaza"]], s: "{0} is recognised as a state by most UN members; its borders with {1} are not agreed.", who: ["ISR"], wiki: "State of Palestine"},
+  korea: {name: "Korean Peninsula", same: ["Korea"], aka: [["Chosŏn", "Joseon", "Choson"], ["Hanguk", "Hankuk", "Hankook"]], s: "The {0} is split in two, between {1} and {2}, and each claims the whole of it.", who: ["PRK", "KOR"], wiki: "Division of Korea"},
+  falklands: {name: "Falkland Islands", same: ["Falklands"], aka: [["Malvinas", "Islas Malvinas"]], s: "The {0} are governed by the {1} and claimed by {2}.", who: ["GBR", "ARG"], wiki: "Falkland Islands sovereignty dispute"},
+  chagos: {name: "Chagos Islands", same: ["Chagos Archipelago", "Chagos"], aka: [["British Indian Ocean Territory", "BIOT"]], s: "The UN backs {1}'s claim to the {0}, which the {2} took in 1965.", who: ["MUS", "GBR"], wiki: "Chagos Archipelago sovereignty dispute"},
+  belize: {name: "Belize", same: [], aka: [], s: "{1} claims about half of {0}.", who: ["GTM"], wiki: "Belizean–Guatemalan territorial dispute"},
+  essequibo: {name: "Essequibo", same: [], aka: [["Guayana Esequiba"]], s: "{1} claims the {0} region, about two-thirds of {2}.", who: ["VEN", "GUY"], wiki: "Guayana Esequiba"}};
+// Every name that fills a place's blank: its name, its other spellings (`same`, no bonus) and its other names (`aka`,
+// groups of spellings of one name, the first shown; each group is one bonus).
+const dzAll = d => [d.name, ...d.same, ...d.aka.flat()];
+const dzGroup = (d, n) => d.aka.find(g => g.some(a => norm(a) === n));
 // Other names typed answers are matched against (Medium's list finds them too).
 const AKA = {
   CIV: ["Côte d'Ivoire"], CZE: ["Czech Republic"], MMR: ["Burma"], TLS: ["East Timor"], SWZ: ["Swaziland"], CPV: ["Cabo Verde"],
@@ -495,6 +516,9 @@ function flyTo(t, instant) {
     e.preventDefault(); clampView(); redraw();
   });
   new ResizeObserver(resize).observe(canvas);
+  const zoomBy = f => { if (tween) { cancelAnimationFrame(tween.raf); tween = null; } flyTo({x: view.x, y: view.y, s: view.s * f}); };
+  G.$("zoomInBtn").onclick = () => zoomBy(2);
+  G.$("zoomOutBtn").onclick = () => zoomBy(1 / 2);
 }
 G.$("recentreBtn").onclick = () => { if (game && world) flyTo(frameFor(current())); };
 
@@ -620,7 +644,9 @@ function show(fly) {
     : `Where's ${cat}?`;
   // the cat's photo only once the place is answered, on a card over the board until Next cat; it's fetched while the
   // question is up, so it's ready
-  if (seen) catCard(code, got ? "Found it!" : `Sorry! It's ${theName(nameOf(code))}.`, [`${upFirst(cat)} ${livesIn(code)} ${theBold(nameOf(code))}.`]);
+  if (seen) catCard(code, got ? "Found it!" : `Sorry! It's ${theName(nameOf(code))}.`, [`${upFirst(cat)} ${livesIn(code)} ${theBold(nameOf(code))}.`,
+    ...(DEPS[code] ? [`${upFirst(theBold(nameOf(code)))} belongs to ${theBold(nameOf(DEPS[code][1]))}.${game.res[game.i] && game.res[game.i].bonus ? " ✓" : ""}`] : [])],
+    [placeLink(code), ...(DEPS[code] ? [placeLink(DEPS[code][1])] : [])]);
   else if (code && !done) wikiPic(wikiTitle(code)).then(p => { if (p.src) new Image().src = p.src; });
   $("skipBtn").hidden = !bonus;
   $("reveal").textContent = !done && !bonus && !seen && style() !== "pick" && game.card.hints ? reveal(nameOf(code), game.card.hints) : "";
@@ -657,12 +683,12 @@ function fillList() {
   const list = $("list"), dz = game.mode === "disputed";
   const cs = dz ? (q => DZ_LIST().filter(c => !norm(q) || (" " + norm(nameOf(c))).includes(" " + norm(q))))($("guess").value) : matching($("guess").value, game.card.bonus === "ask");
   list.innerHTML = "";
-  if (!cs.length) { const li = document.createElement("li"); li.className = "none"; li.textContent = "No country starts like that"; list.append(li); }
+  if (!cs.length) { const li = document.createElement("li"); li.className = "none"; li.textContent = dz ? "Nothing on the list starts like that" : "No country or territory starts like that"; list.append(li); }
   cs.forEach((c, i) => {
     const li = document.createElement("li"); li.setAttribute("role", "option"); li.textContent = nameOf(c); li.dataset.c = c;
     li.setAttribute("aria-selected", i === active);
     li.onpointerdown = e => e.preventDefault();      // keep the keyboard up on phones
-    li.onclick = () => dz ? dzGuess(nameOf(c)) : submit(c);
+    li.onclick = () => { $("guess").value = nameOf(c); active = 0; fillList(); list.scrollTop = 0; };   // fills the box; Go sends it
     list.append(li);
   });
 }
@@ -680,7 +706,7 @@ $("typebox").addEventListener("submit", e => {
   if (game.mode === "disputed") {
     // a name typed in full counts as typed, even when the list's top line is another ("Sudan", not "South Sudan")
     const d = dzOf(current()), n = norm(text);
-    const typed = n && (DZ_LIST().some(c => norm(nameOf(c)) === n) || d.aka.some(a => norm(a) === n) || dzBlanks(d).some((x, j) => dzKnown(d, j).some(k => norm(k) === n)));
+    const typed = n && (DZ_LIST().some(c => norm(nameOf(c)) === n) || dzAll(d).some(a => norm(a) === n) || dzBlanks(d).some((x, j) => dzKnown(d, j).some(k => norm(k) === n)));
     const li = !typed && style() === "list" && active >= 0 && $("list").querySelectorAll("li[data-c]")[active];
     return dzGuess(li ? li.textContent : text);
   }
@@ -695,6 +721,26 @@ $("typebox").addEventListener("submit", e => {
 });
 function submit(c) { $("guess").value = ""; active = -1; if (game.card.bonus === "ask") answerBonus(c); else answer(c); }
 const focusTyping = () => { if (style() !== "pick" && matchMedia("(hover: hover)").matches) $("guess").focus(); };
+// On a phone the keyboard leaves little room, and the list used to fill it, hiding the map. While the answer box has
+// the focus there, the map shrinks to fit above the clue, the box and a short list, and the page scrolls to the map.
+function fitTyping() {
+  const vv = window.visualViewport, board = $("board"), on = document.activeElement === $("guess") && vv && !matchMedia("(hover: hover)").matches;
+  document.body.classList.toggle("typing", !!on);
+  if (!on) { board.style.height = ""; return; }
+  const below = $("typebox").getBoundingClientRect().bottom - board.getBoundingClientRect().bottom + 18;
+  const room = vv.height - below, list = $("list").hidden ? 0 : Math.max(36, Math.min(108, room - 180));
+  board.style.height = Math.round(Math.min(board.offsetWidth, Math.max(160, room - list - 8))) + "px";
+  document.body.style.setProperty("--list-h", list + "px");
+  const top = board.getBoundingClientRect().top - vv.offsetTop - 4;
+  if (Math.abs(top) > 2) scrollBy(0, top);
+}
+{
+  let raf = 0;
+  const fit = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(fitTyping); };
+  $("guess").addEventListener("focus", () => { fit(); setTimeout(fit, 350); });   // and again once the keyboard is up
+  $("guess").addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== $("guess")) fitTyping(); }, 0));
+  if (window.visualViewport) visualViewport.addEventListener("resize", fit);
+}
 
 // Each place gets TRIES guesses; after that it's shown and counts as missed.
 function answer(c, btn) {
@@ -740,6 +786,7 @@ function answerBonus(o, btn) {
 $("skipBtn").onclick = () => { if (game.card.bonus !== "ask" || busy) return; if (game.mode === "disputed") { game.card.bonus = "done"; save(); return seeCat(); } game.card.bonus = "done"; G.note(`It belongs to ${nameOf(DEPS[current()][1])}.`, 2200); save(); seeCat(); };
 // Once a place is answered, its cat's photo and Wikipedia link come up, until Next (the clock waits meanwhile).
 function seeCat() {
+  $("guess").blur();      // the keyboard goes, and the map is full size again under the card
   game.card.seen = true; game.card.bonus = undefined; save(); show();
 }
 function advance() {
@@ -804,7 +851,7 @@ function walkthrough() {
     {say: style() === "pick" ? "Tap the country's name." : style() === "list" ? "Type its name, or pick it from the list." : "Type its name, then Go.",
      lit: [], els: [style() === "pick" ? $("choices") : $("typebox")]},
     {say: "You get two tries for each.", lit: [], els: [style() === "pick" ? $("choices") : $("typebox")]},
-    {say: "Drag or pinch the map to look around.", lit: [[0, 0]], els: [$("recentreBtn")]},
+    {say: "Drag or pinch the map (or use + and −) to look around.", lit: [[0, 0]], els: [document.querySelector(".zoombtns"), $("recentreBtn")]},
     {say: "Choose how you answer here.", lit: [], els: [$("styleSel")]},
     {say: "Stuck? Hint helps, but costs the gold paw.", lit: [], els: [$("hintBtn")]}];
   G.spotlight({grid: $("grid"), w: 1, h: 1, steps, done: () => { settings.seenHelp = true; save(); }});
@@ -819,7 +866,7 @@ const DZ_TRIES = 3;
 const dzOf = c => DISPUTES[c.slice(3)];
 // The blanks still to fill: index 0 is the place, then its countries.
 const dzBlanks = d => [d.name, ...d.who.map(nameOf)];
-const dzKnown = (d, i) => i === 0 ? [d.name, ...d.aka] : [nameOf(d.who[i - 1]), ...(AKA[d.who[i - 1]] || [])];
+const dzKnown = (d, i) => i === 0 ? dzAll(d) : [nameOf(d.who[i - 1]), ...(AKA[d.who[i - 1]] || [])];
 function makeDzTrip() {
   const ids = Object.keys(DISPUTES).filter(k => world.by["dz:" + k]);
   const fresh = ids.filter(k => !recent.includes("dz:" + k));
@@ -830,8 +877,8 @@ function dzItem(k) {
   const d = DISPUTES[k], apartFrom = d.who.flatMap(w => NEVER_WITH[w] || []).filter(c => !d.who.includes(c));   // never Israel beside Palestine...
   const others = shuffle(Object.keys(DISPUTES).filter(o => o !== k && !apartFrom.some(c => nameOf(c) === DISPUTES[o].name))).slice(0, 2).map(o => DISPUTES[o].name);
   const near = PLACES.filter(c => NAMES[c] && !d.who.includes(c) && !apartFrom.includes(c) && world.main[c] && world.main[d.who[0]]).sort((a, b) => apart(d.who[0], a) - apart(d.who[0], b)).slice(0, 2).map(nameOf);
-  const altDecoys = shuffle(Object.keys(DISPUTES).filter(o => o !== k).flatMap(o => DISPUTES[o].aka)).slice(0, 3);
-  return {c: "dz:" + k, chips: shuffle([...dzBlanks(d), ...others, ...near]), altChips: shuffle([...d.aka, ...altDecoys])};
+  const altDecoys = shuffle(Object.keys(DISPUTES).filter(o => o !== k).flatMap(o => DISPUTES[o].aka.map(g => g[0]))).slice(0, 3);
+  return {c: "dz:" + k, chips: shuffle([...dzBlanks(d), ...others, ...near]), altChips: shuffle([...d.aka.map(g => g[0]), ...altDecoys])};
 }
 function newDzTrip(trip) {
   settings.round = LAST; $("levelSel").value = LAST;
@@ -861,9 +908,11 @@ function showDz(fly) {
   $("catLine").hidden = done;
   $("catLine").innerHTML = seen ? got ? `Found ${cat} in ${theBold(d.name)}!` : `That's where ${cat} is.`
     : catOf(t.c) === "house" ? "A <b>housecat</b> migrated to this disputed land." : `${upFirst(cat)} is hiding in this disputed land.`;
-  if (seen) catCard(t.c, got ? "Found it!" : "Sorry!", [dzSentence(d, card), `${upFirst(cat)} ${livesIn(t.c)} ${theBold(d.name)}.`]);
+  if (seen) catCard(t.c, got ? "Found it!" : "Sorry!", [dzSentence(d, card), `${upFirst(cat)} ${livesIn(t.c)} ${theBold(d.name)}.`,
+    ...(d.aka.length ? [`<span class="also">Also called ${d.aka.map(g => `<b>${esc(g[0])}</b>${card.alts.includes(g[0]) ? " ✓" : ""}${g.length > 1 ? ` <small>(or ${g.slice(1).map(esc).join(", ")})</small>` : ""}`).join(" · ")}</span>`] : [])],
+    [placeLink(t.c), ...d.who.map(placeLink)]);
   else if (!done) wikiPic(wikiTitle(t.c)).then(p => { if (p.src) new Image().src = p.src; });
-  const left = d.aka.filter(a => !card.alts.includes(a));
+  const left = d.aka.filter(g => !card.alts.includes(g[0]));
   $("reveal").classList.toggle("note", bonus);
   $("reveal").textContent = bonus ? `Bonus: name another name for ${d.name} (${left.length} more)` + (card.alts.length ? ` · ${card.alts.join(", ")}` : "") : "";
   $("skipBtn").hidden = !bonus; $("skipBtn").textContent = "Skip the bonus";
@@ -891,9 +940,10 @@ function dzGuess(text) {
   game.started = true;
   const t = game.trip[game.i], d = dzOf(t.c), card = game.card, n = norm(text);
   if (card.bonus === "ask") {
-    const alt = d.aka.find(a => norm(a) === n);
+    const g = dzGroup(d, n), alt = g && g[0];
     if (alt && !card.alts.includes(alt)) { card.alts.push(alt); G.note(`${alt}! Bonus!`, 1600); game.res[game.res.length - 1].bonus = card.alts.length; }
-    else if (alt) G.note("You've named that one.");
+    else if (alt) G.note(norm(alt) === n ? "You've named that one." : `That's another way of saying ${alt}.`);
+    else if (d.same.some(a => norm(a) === n) || norm(d.name) === n) G.note(`That's another way of saying ${d.name}.`);
     else { G.note(`${d.name} isn't also called “${text.trim()}”.`, 2000); if (style() === "pick" && !card.wrong.includes(text)) card.wrong.push(text); }
     $("guess").value = "";
     if (card.alts.length === d.aka.length) { save(); busy = true; return setTimeout(() => { busy = false; seeCat(); }, 900); }
@@ -915,14 +965,14 @@ function dzGuess(text) {
     save(); show(); focusTyping(); return;
   }
   card.filled.push(i);
-  if (i === 0 && norm(d.name) !== n) { const alt = d.aka.find(a => norm(a) === n); if (alt) card.alts.push(alt); }
+  if (i === 0) { const g = dzGroup(d, n); if (g) card.alts.push(g[0]); }
   if (card.filled.length < dzBlanks(d).length) { G.note("Yes!", 1200); save(); show(); focusTyping(); return; }
   game.res.push({c: t.c, first: !card.wrong.length && !card.hints, found: true, hinted: card.hints > 0, bonus: card.alts.length});
   G.note(card.wrong.length || card.hints ? "Filled in." : "All of it, first try!", 1600);
   flash = {code: t.c}; busy = true; save(); show();
   setTimeout(() => {
     flash = null; busy = false;
-    if (d.aka.some(a => !card.alts.includes(a))) { card.bonus = "ask"; save(); show(); focusTyping(); } else seeCat();
+    if (d.aka.some(g => !card.alts.includes(g[0]))) { card.bonus = "ask"; save(); show(); focusTyping(); } else seeCat();
   }, 1100);
 }
 function dzNext() {
@@ -946,7 +996,6 @@ function showMode() {
   const dz = settings.round === LAST;
   $("clue").classList.toggle("dz", dz);
   $("newBtn").textContent = dz ? "New round" : "New trip";
-  $("guess").placeholder = dz ? "Type a place or country" : "Type a country";
   if (!dz) $("reveal").classList.remove("note");
 }
 
@@ -985,7 +1034,7 @@ function openShared(d) {
 const shareOpts = () => ({name: "Catlas", inProgress: !!(game && !game.won && game.res.length), open: openShared});
 G.nav("atlas");
 const shared = G.readShare("atlas");
-Promise.all(["world.json", "disputed.json", "dz.json"].map(f => fetch(f).then(r => r.json()))).then(([raw, disputed, dz]) => {
+Promise.all(["world.json", "disputed.json", "dz.json"].map(f => fetch(f + "?v=" + window.SITE_BUILD).then(r => r.json()))).then(([raw, disputed, dz]) => {
   world = buildWorld(raw, disputed, dz); $("loading").remove(); resize(); start();
   if (shared) G.offerShare(shared, shareOpts());
   // A share link opened while this page is already showing only changes the address, so watch for it.

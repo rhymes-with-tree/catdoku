@@ -64,10 +64,11 @@ Cat Pile lays the napping cats from Sunbeams (the `SLEEPERS` list, the same in b
   it. The pictures of the two together are `bugsy-bowtie-window`, `bugsy-bowtie-rug` and
   `bugsy-bowtie-boxes`. Bugsy is the star of If It Fits too, with Bowtie as guest star: `bugsy-1` rolls on his back beside
   the title, Bugsy hops into each finished box curled up (`bugsy-6`) or stretched out (`bugsy-3`), about one box in
-  four Bowtie drops in instead, curled up (`bowtie-2`), and `bugsy-bowtie-boxes` is on the gold-paw card.
+  four Bowtie drops in instead, curled up (`bowtie-2`), and `bugsy-bowtie-boxes` is on the gold-paw card. Bowtie is the star of
+  Fish Bones: `bowtie-5` peeks up beside the title, and `bowtie-1` lies on his back, full of fish, on the gold-paw card.
 - **Crunch** (`crunch-…`, grey tabby with green eyes) is the star of Pounce: `crunch-3` sits beside
   the title, `crunch-1` creeps up from the corner of the mat to cheer a chain of matches, and
-  `crunch-6` rolls about on the gold-paw card. Crunch is the star of Cat-astrophe too: `crunch-7`
+  `crunch-6` rolls about on the gold-paw card. Crunch is the star of Cat Mat too: `crunch-7`
   (standing, one paw out, flipped to face the pot) bats the pots of dye over at the corner of the rug,
   `crunch-4` naps on the finished rug, and `crunch-2` lounges on the gold-paw card. Crunch is the star of Fridge Magnets too: `crunch-5` (head on one side) sits beside its title, `crunch-7` (flipped) bats
   at the alphabet magnets on the floor, `crunch-4` curls up on the empty floor once every letter is back on the fridge, and `crunch-6` rolls about on
