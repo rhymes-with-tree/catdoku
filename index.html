@@ -10,7 +10,7 @@ if (/^#share=/.test(location.hash)) location.replace("catdoku/" + location.hash)
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-26.7";
+  var BUILD = "2026-10-26.8";
   fetch("version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,11 +25,12 @@ if (/^#share=/.test(location.hash)) location.replace("catdoku/" + location.hash)
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="games.css?v=2026-10-26.7">
+<link rel="stylesheet" href="games.css?v=2026-10-26.8">
 <style>
-/* The front page: a search box, the games played lately, then every game on its shelf (Logic grids, Words…), each a
-   tile with an icon drawn from its board, a line about it and how many you've solved. */
-main{max-width:1240px}   /* on a wide screen the shelves spread out, five or six tiles across */
+/* The front page: today's challenge, a search box, shortcuts to the shelves, the games starred (once there are some), then
+   every game on its shelf (Cat Logic, Cat Spells…), each a tile with an icon drawn from its board, a line about it (on
+   wider screens) and how many you've solved once you've played. */
+main{max-width:1240px}   /* on a wide screen the shelves spread out, about nine tiles across */
 .find{width:100%;max-width:460px;font:inherit;font-size:17px;padding:9px 16px;border:2px solid var(--ink);border-radius:999px;background:var(--panel);color:var(--ink)}
 .group{width:100%;display:flex;flex-direction:column;gap:10px}
 .group[hidden],.tile[hidden],.daily[hidden],.group h2 small[hidden]{display:none}
@@ -37,17 +38,27 @@ main{max-width:1240px}   /* on a wide screen the shelves spread out, five or six
 .group h2{margin:10px 0 0;font-size:24px;font-weight:800;line-height:1.1}
 .group h2 small{display:block;font-size:15px;font-weight:500;color:var(--ink-soft);margin-top:2px}
 .none{color:var(--ink-soft)}
-.shelf{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;width:100%}
+.shelf{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:10px;width:100%}
+.group{scroll-margin-top:10px}
 .tile{display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px;padding:12px 10px 12px;border-radius:16px;background:var(--panel);
   border:2px solid var(--line);text-decoration:none;color:var(--ink);position:relative;overflow:hidden;line-height:1.2;transition:transform .15s,border-color .15s}
 .tile::before{content:"";position:absolute;left:0;right:0;top:0;height:6px;background:var(--tile)}
 .tile:hover,.tile:focus-visible{border-color:var(--tile);transform:translateY(-2px)}
-.tile .pic{position:relative;width:100%;height:120px;display:flex;align-items:center;justify-content:center;margin:4px 0 6px}
+.tile .pic{position:relative;width:100%;height:96px;display:flex;align-items:center;justify-content:center;margin:4px 0 6px}
 .tile img{max-width:100%;max-height:100%;object-fit:contain}
-.tile b{font-size:20px;font-weight:800}
+.tile b{font-size:18px;font-weight:800}
 .tile small{font-size:14px;color:var(--ink-soft)}
 .tile .done{margin-top:6px;font-size:13px;font-weight:600;color:var(--ink)}
-.tile .done.new{color:var(--ink-soft);font-weight:500}
+/* a game added in the last two weeks */
+.tile .newBadge{position:absolute;top:10px;left:8px;font-size:12px;font-weight:800;line-height:1.5;letter-spacing:.04em;text-transform:uppercase;
+  background:var(--ink);color:var(--paper);border-radius:999px;padding:0 7px}
+/* shortcuts to the shelves, and how to pin a game to the top */
+.jump{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;max-width:640px}
+.jump[hidden],.favTip[hidden]{display:none}
+.jump a{font-size:14px;font-weight:600;padding:1px 12px;border:2px solid var(--line);border-radius:999px;background:var(--panel);color:var(--ink);text-decoration:none}
+.jump a::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--dot);margin-right:6px;vertical-align:1px}
+.jump a:hover,.jump a:focus-visible{border-color:var(--ink)}
+.favTip{margin:-4px 0 0;font-size:14px;color:var(--ink-soft);text-align:center}
 /* Favorites: a row of small chips, a picture and the name, so the shelves start soon after */
 .shelf.compact{grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
 .tile.compact{flex-direction:row;text-align:left;gap:12px;padding:8px 32px 8px 14px;border-radius:12px}
@@ -81,7 +92,21 @@ main{max-width:1240px}   /* on a wide screen the shelves spread out, five or six
 .daily .goldpaw{position:absolute;right:12px;top:10px;width:38px;height:auto}
 @media (max-width:380px){ .daily .goldpaw{width:30px} }
 @media (max-width:380px){ .daily img{width:72px;height:72px} .daily b{font-size:22px} }
-@media (max-width:380px){ .shelf{grid-template-columns:1fr 1fr;gap:8px} .tile b{font-size:18px} .tile small{font-size:13px} }
+/* a phone: three small tiles across, just the picture and the name */
+@media (max-width:600px){
+  .shelf{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .tile{padding:10px 4px 8px;border-radius:14px}
+  .tile::before{height:5px}
+  .tile .pic{height:72px;margin:4px 0 4px}
+  .tile b{font-size:15px;line-height:1.15}
+  .tile small{display:none}
+  .tile .done{font-size:12px;margin-top:2px}
+  .tile .newBadge{top:8px;left:5px;font-size:10px;padding:0 5px}
+  .favWrap > .favStar{top:4px;right:0;font-size:19px}
+  .pawBadge{width:32px;bottom:-4px}
+  .group h2{font-size:21px}
+  .group h2 small{font-size:14px}
+}
 </style>
 </head>
 <body>
@@ -89,11 +114,13 @@ main{max-width:1240px}   /* on a wide screen the shelves spread out, five or six
   <header><h1>Catdoku</h1><div class="stripe"></div><p class="tagline">Cat puzzle games. Pick one to play!</p></header>
   <a class="daily" id="daily"></a>
   <input class="find" id="find" type="search" placeholder="Search games (try “word” or “minesweeper”)" aria-label="Search games">
+  <nav class="jump" id="jump" aria-label="Shelves"></nav>
+  <p class="favTip" id="favTip" hidden>Tap the ☆ on any game to pin it to the top.</p>
   <div id="shelves" style="display:contents"></div>
   <p class="none" id="none" hidden>No games match that. Try another word, or clear the search to see them all.</p>
 </main>
 
-<script src="games.js?v=2026-10-26.7"></script>
+<script src="games.js?v=2026-10-26.8"></script>
 <script>
 // Each tile shows a little picture of the game's board, drawn by tools/make-icons.py.
 // How many puzzles you've finished in each game, from the best-times records kept on this device.
@@ -107,6 +134,9 @@ function pawBadge(n) {
   t.setAttribute("x", 50); t.setAttribute("y", 77); t.setAttribute("text-anchor", "middle"); t.textContent = n > 999 ? "999+" : n; if (n > 99) t.style.fontSize = "30px";
   paw.append(t); badge.append(paw); return badge;
 }
+// New: added to the site (its date in G.GAMES) in the last week; at most the four newest, so it stays news.
+const NEWEST = G.GAMES.filter(g => g[6] && (Date.now() - new Date(g[6] + "T12:00:00")) / 864e5 < 7).sort((x, y) => x[6] < y[6] ? 1 : -1).slice(0, 4).map(g => g[1]);
+const isNew = g => NEWEST.includes(g[1]);
 // A compact tile (for Favorites) is just a small picture and the name.
 function tile(g, compact) {
   const [name, slug, blurb, color] = g, a = document.createElement("a");
@@ -116,10 +146,11 @@ function tile(g, compact) {
   pic.append(img);
   const b = document.createElement("b"); b.textContent = name;
   const sm = document.createElement("small"); sm.textContent = blurb;
-  const n = slug === "pawlette" ? -1 : solved(slug), done = document.createElement("span");
-  done.className = "done" + (n === 0 ? " new" : "");
-  done.textContent = n < 0 ? "Just play" : n ? `${n} solved` : "Not played yet";
-  if (compact) a.append(pic, b); else a.append(pic, b, sm, done);
+  // how many solved, once there are some (Pawlette has nothing to solve)
+  const n = slug === "pawlette" ? 0 : solved(slug), done = document.createElement("span");
+  done.className = "done"; done.textContent = `${n} solved`;
+  if (compact) a.append(pic, b); else a.append(pic, b, sm, ...(n ? [done] : []));
+  if (!compact && isNew(g)) { const nb = document.createElement("span"); nb.className = "newBadge"; nb.textContent = "New"; a.append(nb); }
   const gold = G.goldPaws(slug);
   if (gold) pic.append(pawBadge(gold));
   // mastered (a gold paw at the top level or size): the whole tile goes gold, like today's challenge once solved
@@ -128,8 +159,8 @@ function tile(g, compact) {
   const w = document.createElement("div"); w.className = "favWrap"; w.dataset.slug = slug;
   w.append(a, G.favStar(slug, drawFavs)); return w;
 }
-function shelf(title, line, games) {
-  const sec = document.createElement("section"); sec.className = "group";
+function shelf(title, line, games, key) {
+  const sec = document.createElement("section"); sec.className = "group"; if (key) sec.id = `shelf-${key}`;
   const h = document.createElement("h2"); h.textContent = title;
   if (line) { const sm = document.createElement("small"); sm.textContent = line; h.append(sm); }
   const grid = document.createElement("div"); grid.className = "shelf";
@@ -150,24 +181,30 @@ function shelf(title, line, games) {
   a.classList.toggle("done", done);
   if (done) a.append(G.goldPaw());
 }
-// Favorites: the games starred on this device, in the order they were starred (until there are some, a line says
-// how). Then every game on its shelf.
+// Favorites: the games starred on this device, in the order they were starred; the shelf only shows once there are some,
+// and until then a line under the search box says how. Then every game on its shelf.
 const favs = shelf("Favorites", "", []);
 favs.querySelector(".shelf").classList.add("compact");
 function drawFavs() {
   const list = G.favorites().map(s => G.GAMES.find(g => g[1] === s));
   favs.querySelector(".shelf").replaceChildren(...list.map(g => tile(g, true)));
-  favs.querySelector("h2 small") || favs.querySelector("h2").append(document.createElement("small"));
-  favs.querySelector("h2 small").textContent = list.length ? "" : "Tap the ☆ on any game to keep it here.";
-  favs.querySelector("h2 small").hidden = !!list.length;
+  favs.hidden = !list.length || !!$("find").value.trim();
+  $("favTip").hidden = !!list.length || !!$("find").value.trim();
 }
 drawFavs();
-const shelves = G.GROUPS.map(([key, title, line]) => shelf(title, line, G.GAMES.filter(g => g[4] === key)));
+const shelves = G.GROUPS.map(([key, title, line]) => shelf(title, line, G.GAMES.filter(g => g[4] === key), key));
+// Shortcuts to the shelves, each with its own short name and the colour of its first game.
+const SHORT = {logic: "Logic", numbers: "Math", lines: "Trails", words: "Spells", teasers: "Curious", quick: "Kitten Play", travels: "Travels"};
+for (const [key, title] of G.GROUPS) {
+  const first = G.GAMES.find(g => g[4] === key); if (!first) continue;
+  const a = document.createElement("a"); a.href = `#shelf-${key}`; a.textContent = SHORT[key] || title; a.title = title;
+  a.style.setProperty("--dot", first[3]); $("jump").append(a);
+}
 // Search: show only the games that match, on their shelves (Favorites hides while searching).
 $("find").oninput = () => {
   const q = $("find").value.trim();
-  favs.hidden = !!q;
-  $("daily").hidden = !!q;
+  $("daily").hidden = !!q; $("jump").hidden = !!q;
+  drawFavs();
   for (const sec of shelves) {
     let any = false;
     for (const w of sec.querySelectorAll(".favWrap")) { const hit = !q || G.matches(G.GAMES.find(g => g[1] === w.dataset.slug), q); w.hidden = !hit; any = any || hit; }

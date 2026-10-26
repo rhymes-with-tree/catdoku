@@ -43,13 +43,13 @@ const G = (() => {
     ["Cat Burglar", "catburglar", "Catch the cat that's sneaked into the painting", "#4E577D", "quick", "hidden object find spot seek paintings art museum met where's waldo wally", "2026-10-22"],
     ["Cat Pile", "catpile", "Pile napping cats on the blanket and clear the lines", "#E16A4A", "teasers", "blockudoku block blast woodoku 1010 blocks shapes tetris polyomino sudoku lines", "2026-10-23"],
     ["Fish Bones", "fishbones", "Swap the bones until Bowtie's fish spells words again", "#73A7AE", "words", "waffle swap letters crossword word puzzle fish skeleton", "2026-10-25"],
-    ["Toy Stash", "stash", "Work out which toys the cat stashed in the boxes", "#7885BA", "teasers", "mastermind guess code breaker codebreaker bulls and cows deduction colours colors hidden", "2026-10-26"],
+    ["Toy Stash", "stash", "Work out which toys the cat stashed in the boxes", "#7885BA", "logic", "mastermind guess code breaker codebreaker bulls and cows deduction colours colors hidden", "2026-10-26"],
     ["Knit Pick", "knitpick", "Help Laya find the words knitted into her blanket", "#8D78AD", "words", "word search wordsearch wonderword find a word hidden word puzzle", "2026-10-26"],
   ];
   // The shelves the front page and the games menu sort the games onto, in order: key (also a plain name for it,
   // for search), heading, one line.
   const GROUPS = [
-    ["logic", "Cat Logic", "Fill the grid by its rules; every puzzle has one answer"],
+    ["logic", "Cat Logic", "Work it out by the rules; every puzzle has one answer"],
     ["numbers", "Cat Math", "Sums and arithmetic"],
     ["lines", "Cat Trails", "Join, link and route things"],
     ["words", "Cat Spells", "Spell, find and climb words"],
