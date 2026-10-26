@@ -233,7 +233,8 @@ SE, 320 × 460, as well as a laptop at 1280 × 720. Load Playwright with
   and the page scrolls only as far as it must; take screenshots and look at them;
 - full screen, if the game has it (step 3, "Full screen"): measure the board at each size before and after,
   taps still land on the square under the finger (also when zoomed, and when the board is turned), F and Escape
-  leave it, and the cards and the walkthrough show on top. Test the iPhone way too, with
+  leave it, the cards and the walkthrough show on top, and the page still opens with a puzzle saved part-way
+  through (play a move, reload, and look for page errors). Test the iPhone way too, with
   `Element.prototype.requestFullscreen = undefined` in an init script (headless Chromium's own full screen also
   blocks resizing the viewport);
 - the walkthrough plays on a first visit and lines up with the board;
