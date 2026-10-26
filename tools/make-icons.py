@@ -755,10 +755,29 @@ def stash():
     return frame(tint(TEAL, .3), out)
 
 
+# Knit Pick: a knitted blanket of letters in plain yarn, one word (KNIT) dyed in a colourway, and Laya peeking over the top.
+def knitpick():
+    out = f'<rect x="12" y="24" width="76" height="66" rx="6" fill="{tint(PERI, .45)}" stroke="{INK}" stroke-width="2.5"/>'
+    out += "".join(f'<line x1="{x}" y1="25.5" x2="{x}" y2="88.5" stroke="{tint(PERI, .3)}" stroke-width="1.6"/>' for x in range(15, 88, 4))
+    rows, dyed = ["CATS", "KNIT", "PURR", "YARN"], ("#9874CA", "#B94588", "#E16A4A", "#ECA818")
+    for r, word in enumerate(rows):
+        for c, ch in enumerate(word):
+            x, y = 17 + c * 16.5, 29 + r * 14.5
+            fill = dyed[c] if r == 1 else PAPER
+            out += (f'<rect x="{x}" y="{y}" width="16.5" height="14.5" fill="{fill}"/>'
+                    f'<path d="M{x+8.25} {y+13.5}C{x+4} {y+11} {x+2.5} {y+6} {x+3} {y+1.5}C{x+6} {y+3.5} {x+8} {y+8} {x+8.25} {y+13.5}Z'
+                    f'M{x+8.25} {y+13.5}C{x+12.5} {y+11} {x+14} {y+6} {x+13.5} {y+1.5}C{x+10.5} {y+3.5} {x+8.5} {y+8} {x+8.25} {y+13.5}Z" '
+                    f'fill="{INK}" opacity="{.12 if r != 1 else .18}"/>')
+            out += text(x + 8.25, y + 7.8, ch, 10.5, "#fff" if r == 1 else INK)
+    out += f'<rect x="17" y="29" width="66" height="58" fill="none" stroke="{INK}" stroke-width="1.2" opacity=".35"/>'
+    out += layaface(74, 17, 10)
+    return frame(PAPER, out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")

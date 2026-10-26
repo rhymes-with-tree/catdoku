@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Knit Pick</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-26.7"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-26.7">
+<style>
+/* Laya's blanket: knitted in plain, undyed yarn, with the letters in it. Under the letters is a colourful pattern
+   that shows as they're dragged across; a word found stays dyed, and the whole pattern shows once every word is
+   found. Laya lies along the top edge. */
+.knitwrap{height:auto;--side:min(var(--board),calc(var(--tall) * .82))}
+.knitwrap .knitbox{position:relative;width:var(--side);margin:0 auto;padding-top:calc(var(--side) * .2)}
+.laya{position:absolute;top:0;right:4%;height:calc(var(--side) * .215);width:auto;pointer-events:none;z-index:2;
+  -webkit-mask-image:linear-gradient(to right,transparent,#000 18%);mask-image:linear-gradient(to right,transparent,#000 18%)}
+.knit{position:relative;z-index:1;width:var(--side);aspect-ratio:1;max-width:100%;border:3px solid var(--ink);border-radius:12px;padding:calc(var(--side) * .022);
+  background:var(--rib);touch-action:none;user-select:none;-webkit-user-select:none;cursor:pointer}
+.field{position:relative;width:100%;height:100%;border-radius:4px;background:#fff;overflow:hidden;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ink) 18%,transparent)}
+.cells{position:absolute;inset:0;display:grid}
+.cell{display:flex;align-items:center;justify-content:center;font-weight:800;line-height:1;color:var(--ink);font-size:var(--fs);position:relative;z-index:1}
+.cell .wool{position:absolute;inset:0;background-size:100% 100%;z-index:-2;opacity:0;transition:opacity .45s}
+.cell.lit .wool{opacity:1}
+.cell.lit{color:var(--fg)}
+.cell.lit.sel .wool{box-shadow:inset 0 0 0 2px rgba(255,255,255,.7)}
+.cell.miss .wool{opacity:.55;box-shadow:inset 0 0 0 100vmax rgba(200,57,43,.75)}
+.cell.pick{box-shadow:inset 0 0 0 3px var(--ink);border-radius:50%}
+/* the leftover letters, once every word is found: their yarn comes into colour one by one, in reading order */
+.cell{transition:color .45s}
+.cell.left,.cell.left .wool{transition-delay:var(--d,0s)}
+/* the theme and the words to find */
+.listbox{width:var(--board);display:flex;flex-direction:column;gap:6px}
+.theme{font-weight:800;font-size:18px;text-align:center;line-height:1.2}
+.words{display:flex;flex-wrap:wrap;justify-content:center;gap:5px 6px;margin:0;padding:0;list-style:none}
+.words li{font-weight:700;font-size:15px;letter-spacing:.04em;padding:1px 9px;border-radius:999px;border:2px solid var(--line);background:var(--panel)}
+.words li.found{text-decoration:line-through;text-decoration-thickness:2px;color:var(--ink-soft);border-color:var(--yarn);background:color-mix(in srgb,var(--yarn) 22%,var(--panel))}
+/* the hidden word */
+.hiddenrow{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px}
+.hiddenrow label{display:flex;align-items:center;gap:8px;font-weight:600}
+.hiddenrow input{font:inherit;font-weight:700;letter-spacing:.06em;text-transform:uppercase;width:min(11em,42vw);padding:4px 10px;border:2px solid var(--ink);border-radius:10px;background:var(--panel);color:var(--ink)}
+.hiddenrow.got{font-weight:800;font-size:18px;color:var(--fuchsia-plum);letter-spacing:.05em}
+.hiddenrow.miss input{animation:shake .35s}
+@keyframes shake{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+/* a phone held sideways: the words beside the blanket, so the blanket can have the screen's height */
+.play{display:contents}
+@media (orientation:landscape) and (max-height:500px){
+  .play{display:flex;align-items:flex-start;justify-content:center;gap:16px;width:100%}
+  .knitwrap{--side:min(calc(100vh - 20px),58vw);width:auto}
+  @supports (height:100svh){.knitwrap{--side:min(calc(100svh - 20px),58vw)}}
+  .knitwrap .knitbox{padding-top:0}
+  .laya{display:none}
+  .listbox{flex:1;min-width:0;width:auto}
+  .words li{font-size:13px;padding:0 7px}
+}
+.card img.layapic{display:block;width:80%;max-width:260px;height:auto;margin:0 auto 14px}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Knit Pick</h1><div class="stripe"></div><p class="tagline">Help Laya find the words knitted into her blanket</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="play">
+  <div class="wrap knitwrap"><div class="knitbox">
+    <img class="laya" id="laya" src="../cats/laya-7.webp" alt="Laya, a smooth grey cat, lying on the blanket">
+    <div class="knit" id="board" role="grid" aria-label="The blanket of letters"><div class="field"><div class="cells" id="cells"></div></div></div>
+  </div></div>
+  <div class="listbox">
+    <div class="theme" id="theme"></div>
+    <ul class="words" id="words" aria-label="Words to find"></ul>
+    <div class="hiddenrow" id="hiddenRow"></div>
+  </div>
+  </div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="restartBtn">Restart</button>
+    <button id="linkBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New blanket</button>
+  </div>
+  <div class="bar toggles">
+    <div class="opt"><label>Words <select id="modeSel" aria-label="Words"><option value="themes">Cat themes</option><option value="everyday">Everyday words</option></select></label>
+      <span class="hint">Cat themes give each blanket a theme; everyday words are any familiar words.</span></div>
+  </div>
+</main>
+
+<script src="../games.js?v=2026-10-26.7"></script>
+<script src="../colorways.js?v=2026-10-26.7"></script>
+<script>
+/* ---------- levels ---------- */
+// [blanket size, ways the words run, most letters left over for the hidden word]. Ways: E across, S down,
+// + and / the diagonals down and up, then W, N, - and \ the same four backwards. Bigger blankets leave more
+// letters over, so their hidden words are often sayings.
+const LEVELS = [null, [6, "ES", 8], [7, "ES+", 10], [8, "ES+/", 12], [9, "ES+/WN", 14], [10, "ES+/WN-\\", 16], [11, "ES+/WN-\\", 18]];
+const MAX_LEVEL = LEVELS.length - 1;
+const WAYS = ["", "Words run across and down", "Words run across, down and diagonally down", "Words run across, down and diagonally",
+  "Words run every way but diagonally backwards", "Words run every way, even backwards", "Words run every way, even backwards"];
+const levelName = n => { const [N] = LEVELS[n]; return `Level ${n} · ${N} × ${N}`; };
+
+/* ---------- words ---------- */
+// Cat themes: each blanket's words come from one, and its hidden word from the theme's own or the cat
+// phrases (spaces are shown once it's found, but the blanket only has the letters).
+const THEMES = [
+  {name: "Cat breeds", hidden: ["PEDIGREE", "BEST IN SHOW", "TOP CAT"], words: "SIAMESE PERSIAN BENGAL SPHYNX RAGDOLL BIRMAN BURMESE MANX SAVANNAH TONKINESE CHARTREUX SOMALI BOMBAY KORAT SIBERIAN LAPERM ORIENTAL HAVANA OCICAT SINGAPURA BALINESE CYMRIC TOYGER SOKOKE CHAUSIE PIXIEBOB SNOWSHOE NEBELUNG MUNCHKIN ABYSSINIAN HIMALAYAN RAGAMUFFIN"},
+  {name: "Cat toys", hidden: ["PLAYTIME", "FETCH", "GAME ON"], words: "MOUSE FEATHER YARN BALL LASER STRING WAND BELL RIBBON CATNIP TUNNEL SPRING TINSEL KICKER CRINKLE TEASER WIFFLE POMPOM BOX BAG CORK FISH BUTTERFLY TRACK CUBE PUZZLE BIRD ROPE SOCK KNOT TWINE"},
+  {name: "Knocked off the table", hidden: ["OOPS", "GRAVITY", "WHOOPS", "NOT SORRY"], words: "GLASS MUG PEN KEYS PHONE REMOTE PLANT VASE CUP SPOON PENCIL COIN EARRING CANDLE BOOK BOTTLE SOCK CORK RING FORK PLATE BOWL LAMP CLOCK NAPKIN SALT PEPPER TEACUP DICE CRAYON BUTTON MARBLE"},
+  {name: "From nose to tail", hidden: ["TOE BEANS", "FLUFF", "FLOOF"], words: "WHISKERS PAWS TAIL EARS NOSE CLAWS FUR BELLY CHIN CHEEKS FANGS TONGUE SCRUFF COAT PADS EYES TUMMY FOREHEAD MUZZLE HAUNCH SPINE TEETH BACK RUFF BEANS ELBOW NECK FLANK KNEE PAWPADS LASHES THUMBS"},
+  {name: "Napping spots", hidden: ["SNOOZE", "CATNAP", "DO NOT DISTURB"], words: "SUNBEAM LAPTOP BOX BASKET PILLOW SOFA BED RADIATOR WINDOW LAUNDRY BLANKET SHELF DRAWER SINK KEYBOARD HAMMOCK TOWER RUG CUSHION LAP SUITCASE BATHTUB CHAIR PORCH CLOSET ATTIC HAT BAG TOWEL NEST DUVET STAIRS"},
+  {name: "Cat sounds and moods", hidden: ["CHATTY", "PURRSONALITY", "SASS"], words: "PURR MEOW HISS CHIRP TRILL YOWL GROWL MEW CHATTER ZOOMIES BLINK SULK SNORE SQUEAK MURMUR GRUMBLE CHUFF SNIFF HUFF WAIL PEEP SIGH SNEEZE CROON YAWN CHIRRUP DOZY SMUG BOSSY GRUMPY PERKY SLEEPY"},
+  {name: "Coats and colours", hidden: ["FURRY", "FAB FUR", "COAT CHECK"], words: "TABBY CALICO TUXEDO GINGER TORTIE SMOKE TICKED POINTED CREAM SILVER SPOTTED MARBLED BLACK WHITE BICOLOR LILAC CINNAMON FAWN TORBIE CHOCOLATE BLUE STRIPED MACKEREL SOLID CAMEO SHADED GREY HARLEQUIN MINK SEPIA GOLDEN TIPPED"},
+  {name: "Things cats do", hidden: ["CATTITUDE", "MISCHIEF", "ON PURRPOSE"], words: "POUNCE STALK PURR KNEAD GROOM CLIMB LEAP SCRATCH NAP CHASE BAT HIDE PERCH STRETCH YAWN SNIFF NUZZLE PROWL WIGGLE SPRINT HUNT LICK BITE SWAT PEEK DOZE PLAY WATCH TUMBLE FLOP ROLL HOP"},
+  {name: "Dinner time", hidden: ["TREAT TIME", "YUM", "SNACK ATTACK"], words: "TUNA SALMON CHICKEN KIBBLE TREATS CREAM SARDINE SHRIMP TURKEY GRAVY PATE BROTH BEEF DUCK RABBIT COD TROUT LAMB LIVER PRAWN HADDOCK MACKEREL CRUNCHIES JELLY MOUSSE PUREE CHUNKS FLAKES MINCE HAM BOWL DISH"},
+  {name: "Big cats and wild cats", hidden: ["KING OF THE JUNGLE", "ROAR", "WILD SIDE"], words: "LION TIGER LEOPARD JAGUAR CHEETAH COUGAR LYNX BOBCAT OCELOT SERVAL CARACAL PUMA PANTHER MARGAY ONCILLA KODKOD MANUL LIONESS PROWL LIGER TIGON CATAMOUNT MANE PRIDE CUB SAVANNA STRIPES SPOTS TIGRESS PREY ROAR"},
+  {name: "Cat kit", hidden: ["SPOILED", "ALL MINE", "PAMPERED"], words: "BRUSH COMB COLLAR CARRIER LEASH BOWL LITTER FOUNTAIN SCOOP HARNESS TAG BED TREE POST MAT FLAP GATE SCRATCHER FEEDER TOWEL BELL SHAMPOO CLIPPERS BLANKET TOYS TREATS TUNNEL HAMMOCK PERCH CUBBY TRAY CRATE"},
+  {name: "Around the house", hidden: ["HOME SWEET HOME", "MY HOUSE", "INDOOR CAT"], words: "KITCHEN HALLWAY GARDEN WINDOW DOOR STAIRS ATTIC CELLAR PORCH SOFA TABLE SHELF CURTAIN RUG FRIDGE OVEN SINK BATH MIRROR PLANT CLOSET HEARTH CHIMNEY GARAGE BALCONY BEDROOM PANTRY LANDING HALL DESK LAMP"},
+];
+// Cat phrases, for a hidden word any theme can have.
+const CAT_PHRASES = ["CAT", "MEW", "NAP", "PAW", "PURR", "MEOW", "NAPS", "PAWS", "KITTY", "TABBY", "KNEAD", "CATNAP", "KITTEN", "FELINE", "MOUSER", "POUNCE",
+  "ZOOMIES", "NAP TIME", "SUNBEAM", "PURRING", "SNUGGLE", "CUDDLES", "COPYCAT", "CAT WALK", "FURBALL", "WHISKERS", "PURRFECT", "HAIRBALL", "KNEADING", "TOE BEANS",
+  "BELLY RUB", "HEADBUTT", "ALLEY CAT", "CAT'S MEOW", "CURIOSITY", "NINE LIVES", "SLOW BLINK", "PAWSITIVE", "PAW PRINTS", "TREAT TIME", "SUNNY SPOT", "TUXEDO CAT",
+  "LITTER BOX", "CATNAPPING", "SCAREDY CAT", "CAT'S CRADLE", "FURRY FRIEND", "KITTY LITTER", "PURRSONALITY", "KITTEN MITTENS", "MAKING BISCUITS",
+  "SCRATCHING POST", "HERE KITTY KITTY", "TOP CAT", "FAT CAT", "BIG CAT", "LAP CAT", "CAT TREE", "MISCHIEF", "CATTITUDE",
+  // sayings, for the bigger blankets
+  "PUSS IN BOOTS", "CHESHIRE CAT", "CAT'S WHISKERS", "THE CAT'S PAJAMAS", "WHEN THE CAT'S AWAY", "CAT GOT YOUR TONGUE", "LET SLEEPING CATS LIE",
+  "HERDING CATS", "CURIOSITY KILLED THE CAT", "RAINING CATS AND DOGS", "LET THE CAT OUT OF THE BAG", "LIKE A CAT ON A HOT TIN ROOF", "THE CAT CAME BACK",
+  "A CAT HAS NINE LIVES", "FAT CAT ON A MAT", "CAT AND MOUSE", "CAT BURGLAR", "CAT'S EYE", "KITTY CORNER", "COOL CAT", "SCAREDY CATS", "COPYCATS",
+  "SLEEPY KITTEN", "BELLY RUB TRAP", "WHO IS A GOOD KITTY", "CATS RULE", "NAP ALL DAY", "SECOND BREAKFAST", "MORE TREATS PLEASE",
+  "FEED ME NOW", "MY HUMAN", "IF I FITS I SITS", "I KNEAD YOU", "PURRFECTLY CONTENT", "SUNBEAM SNOOZE", "CATNIP PARTY", "MIDNIGHT ZOOMIES"];
+
+/* ---------- making a blanket ---------- */
+// The blanket: words placed at random in the level's directions, each crossing others where it can, until the
+// squares left over are few enough to hold a hidden word; then the hidden word fills them in reading order.
+// Every listed word must be in the blanket exactly once (forwards or backwards), and none inside another.
+// pool: the words to pick from; hiddenOf(len, placed): a hidden phrase with that many letters that isn't one of the
+// words placed, or null.
+// Returns {N, grid (a string, row by row), words (in the order to list them), hidden (with spaces), at (where each word is)}.
+function knit(n, pool, hiddenOf) {
+  const L = [null, [6, "ES", 8], [7, "ES+", 10], [8, "ES+/", 12], [9, "ES+/WN", 14], [10, "ES+/WN-\\", 16], [11, "ES+/WN-\\", 18]][n];
+  const [N, ways, most] = L;
+  const DIRS = {E: [1, 0], S: [0, 1], "+": [1, 1], "/": [1, -1], W: [-1, 0], N: [0, -1], "-": [-1, -1], "\\": [-1, 1]};
+  const dirs = [...ways].map(c => DIRS[c]);
+  const rnd = k => Math.floor(Math.random() * k);
+  const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const words = shuffle(pool.filter(w => w.length >= 3 && w.length <= N));
+  const g = Array(N * N).fill(""), placed = [], at = [];
+  let left = N * N, hidden = null;
+  for (const w of words) {
+    if (left <= most && left >= 3 && placed.length >= 4 && (hidden = hiddenOf(left, placed))) break;
+    if (placed.some(p => p.includes(w) || w.includes(p))) continue;
+    // every place it fits, preferring ones that cross letters already down (but never fill the blanket)
+    let best = [], bestCross = -1;
+    for (const [dx, dy] of dirs) for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const ex = x + dx * (w.length - 1), ey = y + dy * (w.length - 1);
+      if (ex < 0 || ey < 0 || ex >= N || ey >= N) continue;
+      let cross = 0, ok = true;
+      for (let k = 0; k < w.length; k++) { const c = g[(y + dy * k) * N + x + dx * k]; if (c) { if (c !== w[k]) { ok = false; break; } cross++; } }
+      if (!ok || cross === w.length) continue;
+      if (left - (w.length - cross) < 3) continue;
+      const score = cross + Math.random() * 1.5;
+      if (score > bestCross + 0.75) { best = [[x, y, dx, dy, cross]]; bestCross = score; }
+      else if (Math.abs(score - bestCross) <= 0.75) best.push([x, y, dx, dy, cross]);
+    }
+    if (!best.length) continue;
+    const [x, y, dx, dy] = best[rnd(best.length)];
+    for (let k = 0; k < w.length; k++) { const i = (y + dy * k) * N + x + dx * k; if (!g[i]) left--; g[i] = w[k]; }
+    placed.push(w); at.push([x, y, dx, dy]);
+  }
+  if (!hidden && left <= most && left >= 3) hidden = hiddenOf(left, placed);
+  if (!hidden) return null;
+  const letters = hidden.replace(/[^A-Z]/g, "");
+  let k = 0;
+  for (let i = 0; i < N * N; i++) if (!g[i]) g[i] = letters[k++];
+  // each word exactly once, either way, in any of the eight directions
+  const all = Object.values(DIRS);
+  const count = w => {
+    let c = 0;
+    for (const [dx, dy] of all) for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      let ok = true;
+      for (let j = 0; j < w.length && ok; j++) { const xx = x + dx * j, yy = y + dy * j; ok = xx >= 0 && yy >= 0 && xx < N && yy < N && g[yy * N + xx] === w[j]; }
+      if (ok) c++;
+    }
+    return c;
+  };
+  if (placed.some(w => count(w) !== 1)) return null;
+  const order = placed.map((w, i) => i).sort((a, b) => placed[a] < placed[b] ? -1 : 1);
+  return {N, grid: g.join(""), words: order.map(i => placed[i]), at: order.map(i => at[i]), hidden};
+}
+
+/* ---------- pictures and colours ---------- */
+const CAT_SRC = {};  // filled with embedded pictures when the page is bundled into one file
+const catSrc = f => CAT_SRC[f] || `../cats/${f}.webp`;
+// Each blanket's pattern is in one of Yarn's and Twirl's colourways (colorways.js): ripple chevrons, stripes or
+// granny-square rings.
+const PATTERNS = ["ripple", "stripes", "granny"];
+const UNDYED = "#F7F8F3";   // the plain yarn the blanket is knitted in before it's dyed: the page's panel colour
+function newLook() { return {k: pickOf(PATTERNS), c: pickOf(Object.keys(COLORWAYS))}; }
+function woolOf(N, look) {
+  // the colourway's shades, leaving out any too pale to stand out from the undyed yarn
+  const all = COLORWAYS[look.c] || Object.values(COLORWAYS)[0], deep = all.filter(c => lum(c) < 200);
+  const cs = deep.length >= 2 ? deep : all, n = cs.length, mid = (N - 1) / 2, out = [];
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const band = look.k === "ripple" ? y + Math.abs(x % 6 - 3) : look.k === "stripes" ? Math.floor(y / (N > 8 ? 2 : 1))
+      : Math.round(Math.max(Math.abs(x - mid), Math.abs(y - mid)));
+    out.push(cs[band % n]);
+  }
+  return out;
+}
+const mix = (c, to, f) => "#" + [1, 3, 5].map(k => Math.round(parseInt(c.slice(k, k + 2), 16) * (1 - f) + parseInt(to.slice(k, k + 2), 16) * f).toString(16).padStart(2, "0")).join("");
+const lum = c => { const [r, g, b] = [1, 3, 5].map(k => parseInt(c.slice(k, k + 2), 16)); return .299 * r + .587 * g + .114 * b; };
+const light = c => lum(c) > 150;
+// One knit stitch (a V of two loops) in a colour, a little darker than the square behind it.
+const STITCH = {};
+function stitch(c) {
+  return STITCH[c] || (STITCH[c] = `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" preserveAspectRatio="none"><rect width="20" height="20" fill="${c}"/>` +
+    `<path d="M10 19C4.5 15.5 2.5 8.5 3 1.5C7 4.5 9.5 10.5 10 19Z M10 19C15.5 15.5 17.5 8.5 17 1.5C13 4.5 10.5 10.5 10 19Z" fill="${light(c) ? mix(c, "#2A2530", .14) : mix(c, "#FFFFFF", .16)}"/></svg>`)}")`);
+}
+
+/* ---------- words for everyday blankets ---------- */
+let FAMILIAR = null;
+function loadWords() {
+  if (FAMILIAR) return Promise.resolve(FAMILIAR);
+  const got = window.WORDS_INLINE ? Promise.resolve(window.WORDS_INLINE) : fetch(`../words/words.json?v=${window.SITE_BUILD || ""}`).then(r => { if (!r.ok) throw new Error("couldn't load the word list"); return r.json(); });
+  return got.then(w => (FAMILIAR = w.familiar.split(" ").map(x => x.toUpperCase()).filter(x => /^[A-Z]{3,11}$/.test(x))));
+}
+
+/* ---------- game ---------- */
+// game: {level, mode, N, grid, words, at (each word's [x, y, dx, dy]), hidden, theme, look (the blanket's pattern),
+//        found (by word), order (words in the order found), guessed (the hidden word, before the end),
+//        pick (a square tapped as a word's start), hinted, restarted, won}
+const STORE = "catdoku.knitpick.v1";
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1, mode: "themes"}, state.settings);
+let game = state.game || null, making = 0;
+const hints = G.hinter({game: () => game, key: () => game ? game.found.join() : "", draw: () => draw()});   // marks {cells}
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !$("overlay").classList.contains("show");
+const pickOf = a => a[Math.floor(Math.random() * a.length)];
+const letters = s => s.replace(/[^A-Z]/g, "");
+
+// The hidden word: the theme's own hidden words, any of its words not in this blanket, or a cat saying (everyday
+// blankets can have any theme's word or a cat saying).
+const ALL_THEME_WORDS = [...new Set(THEMES.flatMap(t => t.words.split(" ")))];
+function make(n, mode) {
+  const len = (l, placed) => pickOf(themeHidden.filter(h => letters(h).length === l && !placed.includes(h))) || null;
+  let themeHidden, theme, p = null;
+  for (let k = 0; k < 400 && !p; k++) {
+    if (mode === "everyday") { theme = null; themeHidden = CAT_PHRASES.concat(ALL_THEME_WORDS); p = knit(n, Array.from({length: 150}, () => pickOf(FAMILIAR)), len); }
+    else { theme = pickOf(THEMES); themeHidden = theme.hidden.concat(theme.words.split(" "), CAT_PHRASES); p = knit(n, theme.words.split(" "), len); }
+  }
+  return p && Object.assign(p, {theme: theme ? theme.name : "Everyday words"});
+}
+function deal(n, p, mode) {
+  return {level: n, mode, N: p.N, grid: p.grid, words: p.words, at: p.at, hidden: p.hidden, theme: p.theme, look: newLook(),
+          found: p.words.map(() => false), order: [], guessed: false, pick: -1, hinted: false, restarted: false, won: false, ...G.freshClock()};
+}
+async function newPuzzle() {
+  G.closeCard(); hints.clear(false);
+  const ticket = ++making, n = settings.level, mode = settings.mode;
+  if (mode === "everyday") { try { await loadWords(); } catch (e) { G.note(`${e.message}, so here's a cat theme instead.`, 5000); settings.mode = "themes"; $("modeSel").value = "themes"; return newPuzzle(); } }
+  if (ticket !== making) return;
+  const p = make(n, settings.mode);
+  if (!p) { G.note("Couldn't knit that blanket. Try New blanket.", 5000); return; }
+  game = deal(n, p, settings.mode); draw(); save();
+  G.track(`Knit Pick new puzzle level ${game.level}`);
+}
+function startLevel(n) { settings.level = n; $("levelSel").value = n; newPuzzle(); }
+const foundCount = () => game.found.filter(Boolean).length;
+
+/* ---------- drawing ---------- */
+const cellsOf = i => { const [x, y, dx, dy] = game.at[i]; return [...Array(game.words[i].length).keys()].map(k => (y + dy * k) * game.N + x + dx * k); };
+let sel = null;   // a word being dragged out: {a, b} squares, and miss when it isn't one
+function draw() {
+  if (!game) return;
+  const {N, grid} = game, board = $("board"), cells = $("cells"), hm = hints.current(), wool = woolOf(N, game.look);
+  const cw = COLORWAYS[game.look.c] || Object.values(COLORWAYS)[0];
+  board.style.setProperty("--rib", `repeating-linear-gradient(90deg,${cw[0]} 0 5px,${cw[1]} 5px 9px)`);
+  board.querySelector(".field").style.background = `${stitch(UNDYED)} 0 0 / ${100 / N}% ${100 / N}%`;
+  if (cells.children.length !== N * N) {
+    cells.innerHTML = ""; cells.style.gridTemplateColumns = `repeat(${N}, 1fr)`;
+    for (let i = 0; i < N * N; i++) { const d = document.createElement("div"); d.className = "cell"; d.dataset.i = i; d.innerHTML = `<i class="wool"></i><span></span>`; cells.append(d); }
+  }
+  board.style.setProperty("--fs", `${Math.max(12, board.clientWidth / N * .5)}px`);
+  // lit: the words found, the line being dragged, and everything once it's won
+  const used = new Set(game.found.flatMap((f, i) => f ? cellsOf(i) : []));
+  const dragged = new Set(sel && sel.b !== undefined ? between(sel.a, sel.b) || [sel.a] : []);
+  let k = 0;
+  [...cells.children].forEach((d, i) => {
+    const w = d.firstChild;
+    if (w.dataset.c !== wool[i]) { w.dataset.c = wool[i]; w.style.backgroundImage = stitch(wool[i]); d.style.setProperty("--fg", light(wool[i]) ? "var(--ink)" : "#fff"); }
+    d.lastChild.textContent = grid[i];
+    const left = game.won && !used.has(i);
+    d.classList.toggle("lit", game.won || used.has(i) || (dragged.has(i) && !sel.miss));
+    d.classList.toggle("sel", dragged.has(i) && !sel.miss);
+    d.classList.toggle("miss", dragged.has(i) && !!(sel && sel.miss));
+    d.classList.toggle("left", left); if (left) d.style.setProperty("--d", `${(k++) * 0.11}s`);
+    d.classList.toggle("pick", i === game.pick && !game.won);
+    d.classList.toggle("hintcell", !!(hm && hm.cells.includes(i)));
+    d.setAttribute("aria-label", `${grid[i]}, row ${Math.floor(i / N) + 1}, column ${i % N + 1}`);
+  });
+  // the theme, the words (each crossed off in a colour from its stretch of blanket) and the hidden word
+  $("theme").textContent = game.theme;
+  const ul = $("words");
+  if (ul.dataset.words !== game.words.join()) { ul.dataset.words = game.words.join(); ul.innerHTML = game.words.map(w => `<li>${w}</li>`).join(""); }
+  [...ul.children].forEach((li, i) => {
+    li.classList.toggle("found", game.found[i]);
+    if (game.found[i]) { const cs = cellsOf(i); li.style.setProperty("--yarn", wool[cs[cs.length >> 1]]); }
+  });
+  drawHidden();
+  $("count").textContent = game.won ? "All found!" : `${foundCount()} of ${game.words.length} words`;
+  $("hintBtn").disabled = game.won;
+  $("restartBtn").disabled = game.won || (!foundCount() && !game.guessed);
+}
+function drawHidden() {
+  const row = $("hiddenRow"), n = letters(game.hidden).length, want = game.won || game.guessed ? "got" : "ask";
+  if (row.dataset.want === want + game.hidden) return;
+  row.dataset.want = want + game.hidden;
+  row.classList.toggle("got", want === "got");
+  if (want === "got") row.textContent = `Hidden: ${game.hidden}`;
+  else {
+    row.innerHTML = `<label>Hidden word <input id="guess" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="40" placeholder="${n} letters"></label><button id="guessBtn">Guess</button>`;
+    $("guessBtn").onclick = guess;
+    $("guess").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); guess(); } });
+  }
+}
+addEventListener("resize", () => { if (game) draw(); });
+
+/* ---------- finding words ---------- */
+// Drag from a word's first letter to its last (either way round), or tap the first and then the last. The line
+// snaps to the nearest of the eight ways.
+function cellAt(e) {
+  const r = $("board").querySelector(".cells").getBoundingClientRect(), N = game.N;
+  const x = Math.floor((e.clientX - r.left) / r.width * N), y = Math.floor((e.clientY - r.top) / r.height * N);
+  return {x: Math.max(0, Math.min(N - 1, x)), y: Math.max(0, Math.min(N - 1, y)), out: x < 0 || y < 0 || x >= N || y >= N};
+}
+function snap(a, x, y) {
+  const N = game.N, ax = a % N, ay = Math.floor(a / N), dx = x - ax, dy = y - ay;
+  if (!dx && !dy) return a;
+  const ang = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)), ux = Math.round(Math.cos(ang * Math.PI / 4)), uy = Math.round(Math.sin(ang * Math.PI / 4));
+  let len = Math.round(ux && uy ? (Math.abs(dx) + Math.abs(dy)) / 2 : Math.abs(ux ? dx : dy));
+  while (len > 0 && (ax + ux * len < 0 || ax + ux * len >= N || ay + uy * len < 0 || ay + uy * len >= N)) len--;
+  return (ay + uy * len) * N + ax + ux * len;
+}
+function between(a, b) {
+  const N = game.N, ax = a % N, ay = Math.floor(a / N), bx = b % N, by = Math.floor(b / N), dx = Math.sign(bx - ax), dy = Math.sign(by - ay);
+  const n = Math.max(Math.abs(bx - ax), Math.abs(by - ay));
+  if ((bx - ax) && (by - ay) && Math.abs(bx - ax) !== Math.abs(by - ay)) return null;
+  return [...Array(n + 1).keys()].map(k => (ay + dy * k) * N + ax + dx * k);
+}
+// Try the line from a to b as a word; true if it's one on the list, still to find.
+function tryWord(a, b) {
+  const cs = between(a, b); if (!cs || cs.length < 2) return false;
+  const s = cs.map(i => game.grid[i]).join(""), r = [...s].reverse().join("");
+  const i = game.words.findIndex((w, k) => !game.found[k] && (w === s || w === r));
+  if (i < 0) {
+    const was = game.words.findIndex((w, k) => game.found[k] && (w === s || w === r));
+    G.note(was >= 0 ? `You've found ${game.words[was]} already.` : `${s} isn't on the list.`, 2500);
+    sel = {a, b, miss: true}; draw(); setTimeout(() => { if (sel && sel.miss) { sel = null; draw(); } }, 450);
+    return false;
+  }
+  game.found[i] = true; game.order.push(i); game.pick = -1; game.started = true; sel = null;
+  draw(); save();
+  if (game.found.every(Boolean)) win();
+  return true;
+}
+let drag = null;
+$("board").addEventListener("pointerdown", e => {
+  if (!playing() || e.button > 0) return;
+  const {x, y} = cellAt(e), i = y * game.N + x;
+  drag = {a: i, moved: false}; sel = {a: i, b: i};
+  $("board").setPointerCapture(e.pointerId); draw();
+});
+$("board").addEventListener("pointermove", e => {
+  if (!drag) return;
+  const {x, y} = cellAt(e), b = snap(drag.a, x, y);
+  if (b !== drag.a) drag.moved = true;
+  if (sel.b !== b) { sel = {a: drag.a, b}; draw(); }
+});
+function endDrag() {
+  if (!drag) return;
+  const d = drag; drag = null;
+  if (d.moved && sel.b !== d.a) { tryWord(d.a, sel.b); if (!sel || !sel.miss) sel = null; game.pick = -1; draw(); save(); return; }
+  sel = null;
+  tapCell(d.a);
+}
+$("board").addEventListener("pointerup", endDrag);
+$("board").addEventListener("pointercancel", () => { drag = null; sel = null; draw(); });
+// A tap picks a word's first letter; a tap on its last letter (in a straight line) tries the word.
+function tapCell(i) {
+  if (!playing()) return;
+  if (game.pick < 0 || game.pick === i) { game.pick = game.pick === i ? -1 : i; draw(); save(); return; }
+  if (!between(game.pick, i)) { game.pick = i; draw(); save(); G.note("Those aren't in a line. That's your first letter now.", 2500); return; }
+  tryWord(game.pick, i); game.pick = -1; draw(); save();
+}
+// Keys: the arrows move a cursor, Space or Enter picks the first letter and then the last.
+const keys = G.gridKeys({on: () => playing(), size: () => [game.N, game.N],
+  show: i => [...$("cells").children].forEach((d, k) => d.classList.toggle("kbcursor", k === i)), act: i => tapCell(i),
+  escape: () => { if (game && game.pick >= 0) { game.pick = -1; draw(); save(); } }});
+
+/* ---------- the hidden word ---------- */
+// Guess it at any time; guessing it before the last word is found (with no hint) earns the gold paw.
+function guess() {
+  if (!playing()) return;
+  const g = letters(($("guess").value || "").toUpperCase());
+  if (!g) { G.note(`Type the hidden word: the ${letters(game.hidden).length} letters no word uses.`, 3500); return; }
+  game.started = true;
+  if (g === letters(game.hidden)) {
+    game.guessed = true; save(); draw();
+    G.note(`That's it! Now find the rest of the words.`, 4000);
+    return;
+  }
+  const row = $("hiddenRow"); row.classList.remove("miss"); void row.offsetWidth; row.classList.add("miss");
+  G.note("Not quite. The leftover letters read in order, row by row.", 3500);
+}
+
+/* ---------- hints ---------- */
+// A word still to find: first the square it starts in, then the whole word.
+function hint() {
+  if (!playing()) return;
+  const i = game.found.findIndex(f => !f); if (i < 0) return;
+  const cs = cellsOf(i), w = game.words[i];
+  game.hinted = true; save();
+  if (hints.level() === 0) hints.show({cells: [cs[0]]}, `${w} starts in the gold square.`);
+  else hints.show({cells: cs}, `There's ${w}: drag along it.`);
+}
+$("hintBtn").onclick = hint;
+// Restart: every word unfound again, on the same blanket. It costs the gold paw.
+$("restartBtn").onclick = () => {
+  if (!game || game.won) return;
+  Object.assign(game, {found: game.words.map(() => false), order: [], guessed: false, pick: -1, restarted: true});
+  hints.clear(false); draw(); save();
+  G.note("Every word is hidden again.", 3000);
+};
+
+/* ---------- winning ---------- */
+const goldOK = () => !game.hinted && !game.restarted && game.guessed;
+function win() {
+  game.won = true; game.pick = -1; G.finishClock(game);
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save(); draw();
+  G.track(`Knit Pick solved level ${game.level}`);
+  const g = game;
+  setTimeout(() => { if (game === g) finishCard(); }, 1600 + letters(game.hidden).length * 110);
+}
+function layaPic() { const im = new Image(); im.className = "layapic"; im.src = catSrc("laya-9"); im.alt = "Laya, a smooth grey cat, stretched out on the finished blanket"; return im; }
+function finishCard() {
+  const next = settings.level, n = game.words.length;
+  let text = `All ${n} words found, and the leftover letters spell ${game.hidden}${game.guessed ? ", which you guessed before the end" : ""}.`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the biggest blanket; here's another." : ` Next up: level ${next}.`;
+  if (!game.guessed && !game.hinted) text += " Guess the hidden word before the last word for a gold paw.";
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the blanket", game.result,
+    {title: "All found!", gold: goldOK(), goldWhy: "Hidden word guessed early, with no hints!", goldTitle: "Gold paw, Laya!", goldPic: [layaPic()], next: `Next: level ${next}`,
+     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- sharing ---------- */
+// The hidden word travels in the link a little scrambled, so it isn't there to read at a glance.
+const rot = (s, k) => s.replace(/[A-Z]/g, c => String.fromCharCode((c.charCodeAt(0) - 65 + k + 26) % 26 + 65));
+$("linkBtn").onclick = () => { if (game) G.shareCard({name: "Knit Pick", won: game.won,
+  puzzle: () => ({g: "knitpick", N: game.level, m: game.mode, t: game.theme, grid: game.grid, w: game.words, h: rot(game.hidden, 13), l: game.look}),
+  progress: () => ({f: game.order, q: game.guessed})}); };
+function openShared(d) {
+  const lv = LEVELS[d.N], N = lv && lv[0];
+  const ok = lv && typeof d.grid === "string" && d.grid.length === N * N && /^[A-Z]+$/.test(d.grid) && Array.isArray(d.w) && d.w.length >= 1 && d.w.length <= 40 &&
+    d.w.every(w => typeof w === "string" && /^[A-Z]{2,11}$/.test(w)) && typeof d.h === "string" && /^[A-Z' ]{3,40}$/.test(d.h) && typeof d.t === "string" && d.t.length < 40;
+  if (!ok) { G.note("That share link didn't work.", 5000); return; }
+  // find each word in the blanket again
+  const dirs = [[1, 0], [0, 1], [1, 1], [1, -1], [-1, 0], [0, -1], [-1, -1], [-1, 1]], at = [];
+  for (const w of d.w) {
+    let found = null;
+    for (const [dx, dy] of dirs) for (let y = 0; y < N && !found; y++) for (let x = 0; x < N && !found; x++)
+      if ([...w].every((c, k) => { const xx = x + dx * k, yy = y + dy * k; return xx >= 0 && yy >= 0 && xx < N && yy < N && d.grid[yy * N + xx] === c; })) found = [x, y, dx, dy];
+    if (!found) { G.note("That share link didn't work.", 5000); return; }
+    at.push(found);
+  }
+  const p = {N, grid: d.grid, words: d.w, at, hidden: rot(d.h, -13), theme: d.t || "Knit Pick"};
+  game = deal(d.N, p, d.m === "everyday" ? "everyday" : "themes");
+  if (d.l && PATTERNS.includes(d.l.k) && COLORWAYS[d.l.c]) game.look = {k: d.l.k, c: d.l.c};
+  if (d.p && Array.isArray(d.p.f)) {
+    for (const i of d.p.f) if (Number.isInteger(i) && i >= 0 && i < d.w.length && !game.found[i]) { game.found[i] = true; game.order.push(i); }
+    game.guessed = !!d.p.q; game.timed = false;
+    if (game.found.every(Boolean)) game.won = true;
+  }
+  settings.level = d.N; $("levelSel").value = d.N;
+  draw(); save();
+}
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  settings.seenHelp = false; helpOnFirstVisit();
+  if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
+}
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || !playing() || document.querySelector(".spot")) return;
+  const {N} = game, xy = i => [i % N, Math.floor(i / N)], all = [...Array(N * N).keys()].map(xy);
+  // once a word is found, show that one; before then, a row stands in for a word
+  const f = game.order[0], word = f !== undefined ? cellsOf(f).map(xy) : [...Array(N).keys()].map(x => [x, 0]);
+  const steps = [
+    {say: "Laya's blanket has words knitted into it", lit: all},
+    {say: "Find every word on the list", els: [$("words")]},
+    {say: "Drag from a word's first letter to its last", lit: word},
+    {say: "Or tap its first letter, then its last", lit: word},
+    {say: WAYS[game.level], lit: all},
+    {say: "Leftover letters spell a hidden word", els: [$("hiddenRow")]},
+    {say: "Guess it before the last word for a gold paw", els: [$("hiddenRow")]},
+    {say: "Stuck? Hint shows where a word starts", els: [$("hintBtn")]},
+  ];
+  G.spotlight({grid: $("cells"), w: N, h: N, steps, done: () => { settings.seenHelp = true; save(); }});
+}
+
+/* ---------- start ---------- */
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", "") + (n === MAX_LEVEL ? " (biggest)" : ""), n));
+$("levelSel").onchange = e => startLevel(+e.target.value);
+$("modeSel").onchange = e => {
+  settings.mode = e.target.value; save();
+  if (!game || game.won || (!foundCount() && !game.guessed)) newPuzzle();
+  else G.note(`Your next blanket will have ${settings.mode === "everyday" ? "everyday words" : "a cat theme"}.`, 3500);
+};
+$("newBtn").onclick = newPuzzle;
+$("helpBtn").onclick = showHelp;
+
+G.nav("knitpick");
+G.checkClock(game);
+G.setupTimer({name: "knitpick", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level",
+  emptyText: "Find every word in a blanket and your times will show up here. They're kept on this device only."});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+if (settings.mode !== "everyday") settings.mode = "themes";
+$("levelSel").value = settings.level; $("modeSel").value = settings.mode;
+const shared = G.readShare("knitpick");
+if (game && typeof game.grid === "string") G.reopen(() => {
+    const lv = LEVELS[game.level];
+    if (!lv || game.grid.length !== game.N * game.N || game.N !== lv[0] || game.found.length !== game.words.length) throw new Error("the saved blanket doesn't fit its level");
+    game.pick = -1;
+    if (!game.look || !PATTERNS.includes(game.look.k)) game.look = newLook();
+    draw();
+    if (game.won) finishCard(); else helpOnFirstVisit();
+  }, why => { game = null; newPuzzle(); G.note(why, 0); });
+else if (!shared) newPuzzle().then(helpOnFirstVisit);
+const shareOpts = () => ({name: "Knit Pick", inProgress: !!(game && !game.won && foundCount()), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, shareOpts());
+window.addEventListener("hashchange", () => { const d = G.readShare("knitpick"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
