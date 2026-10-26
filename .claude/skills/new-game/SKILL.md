@@ -43,6 +43,8 @@ Build a standalone page in the scratchpad and publish it as an artifact before c
 the `artifact-design` skill before the first publish. The user plays it and asks for changes; republish
 the same file path so the link stays the same.
 
+- Write the puzzle generator as plain functions and test it in Node: time per puzzle at every level,
+  and for logic puzzles, exactly one solution.
 - Write the page without `<!DOCTYPE>`, `<html>`, `<head>` or `<body>`; the artifact adds them. Start
   with `<title>`, the Baloo 2 font link, and one `<style>` holding `games.css` and the page's own CSS.
   Then the markup, `games.js` in a `<script>` (and `colorways.js` if the game uses it), and the page's
@@ -54,16 +56,18 @@ the same file path so the link stays the same.
 - Lay it out like the other games (see `tunnelrun/index.html`): title, gradient stripe and a tagline
   (the same words as the game's blurb in `G.GAMES`), games menu, status line, board (with any key or
   number pad just under it), action buttons, then level select and New puzzle.
-- Write the puzzle generator as plain functions and test it in Node: time per puzzle at every level,
-  and for logic puzzles, exactly one solution.
-- Before publishing, screenshot it with Playwright at the small phone sizes in step 5 (an iPhone SE upright
-  and sideways), not only at a roomy phone width, and script a playthrough to the win card (see step 5 for
-  Playwright).
+- Before publishing, screenshot it with Playwright at the small phone sizes, not only at a roomy phone width:
+  an iPhone SE upright (375 × 553) and sideways (667 × 323), and the first SE (320 × 460). Script a playthrough
+  to the win card too (step 5 says how to load Playwright).
 
 ## 3. Port
 
+Branch `claude/<slug>` from `main` before changing anything in the repo, unless the session names a branch to use.
+
 Copy the structure of `tunnelrun/` or `opendoor/`: the head (BUILD check script, icons, manifest, fonts,
-`games.css?v=<build>`), the action buttons and the settings row.
+`games.css?v=<build>`), the action buttons and the settings row. `games.js` itself looks up `games`, `msg`,
+`timer`, `board`, `overlay` and `card`, and names `newBtn`'s label (or `restartBtn`'s, if there's no `newBtn`)
+in its notes.
 
 - **Buttons, in this order on every page:** `hintBtn` (Hint), `undoBtn` (Undo), `restartBtn` (always
   labelled Restart, never Clear), then the game's own buttons (Flip, Notes, Mark…), then `linkBtn` (labelled Share; content
@@ -71,14 +75,11 @@ Copy the structure of `tunnelrun/` or `opendoor/`: the head (BUILD check script,
   `toysBtn` if it uses toys, `bestBtn` (Best times) and `helpBtn` (How to play). Leave out what the game
   doesn't have, but don't reorder. Undo also answers Ctrl+Z / ⌘Z (but not with Shift). Restart always puts
   back this same puzzle as it was dealt; `newBtn` deals a different one. Every game has Share, and New unless
-  levels are a fixed list. An Audit, if the game has one, never costs a life: like a hint, it keeps the player on
-  the same level and costs the gold paw.
+  levels are a fixed list.
 - **Settings row** (`.bar`, under the buttons): `levelSel` labelled "Level" (or `size` labelled "Size"),
   then `newBtn` (New puzzle, or a themed name: New box, New room…). Switches and extra pickers go in a
   second row, `<div class="bar toggles">`, each in a `<div class="opt">` with a
-  `<span class="hint">` line saying what it does (see `yarn/` or `patches/`). `games.js` itself looks up `games`, `msg`, `timer`,
-`board`, `overlay` and `card`, and names `newBtn`'s label (or `restartBtn`'s, if there's no `newBtn`) in
-its notes.
+  `<span class="hint">` line saying what it does (see `yarn/` or `patches/`).
 
 - **Menu:** `G.nav(slug)`.
 - **Puzzles:** `G.builder([fns…], "entry")` makes them in a Web Worker; `take(n)` returns a promise of
@@ -101,7 +102,8 @@ its notes.
   differ by game (README, "Across every game"). For a logic puzzle, follow Tunnel Run and Open the
   Door!: a hint, Undo or Restart costs the gold paw; a hint also keeps the player on the same level, and
   a win without one moves up. Say so on the win card: "You had a hint, so here's another at level N." Tunnel Run: `gold: !game.undid && !game.hinted`,
-  `goldWhy: "No hints or undos!"`.
+  `goldWhy: "No hints or undos!"`. An Audit, if the game has one, never costs a life: like a hint, it keeps the
+  player on the same level and costs the gold paw.
 - **Share links:** the Share button opens `G.shareCard({name, won, puzzle, progress})`. A game played against
   the clock (Pounce, Bubbles, Tail Chase) leaves out `progress` and passes `what` ("board", "rug"…), so the card
   shares only the level as dealt; keep a copy of it as dealt for that and for Restart (see `pounce/`). A shared
@@ -129,6 +131,38 @@ its notes.
   GoatCounter script tag at the end of the page.
 - **Toys:** a game that uses `toys/` lets players switch toys off with `G.toysOff`, `G.toyPicker` and
   `G.needToys` (see `pounce/`, `bubbles/` or `tango/`).
+
+### Hints
+
+A hint shows; it never makes the move (README, "Across every game"). Mark what to look at (gold for where
+to go, red for a mistake), say in the message line what to do there, and leave the player to do it.
+Every game's hint goes through `G.hinter` (see `toydoku/` or `sunbeams/`).
+
+- **Visible without animation.** `games.css` turns every animation off when the device asks for reduced
+  motion, so a mark that only pulses or glows disappears (Night Light's did). Use the shared steady
+  styles, which pulse on top only when motion is allowed: `.hintsq` (an SVG box or ring), `.hintline`
+  (an SVG line) and `.hintcell` (a tint on an HTML square), each with `.bad` for red. Draw the mark on
+  top of the board, but under anything it would hide, such as a number badge.
+- **How long.** `const hints = G.hinter({game: () => game, key: () => <the board as a string>, draw})`;
+  `hints.show(mark, say)` keeps the mark up for 5 s, or until the board or the puzzle changes, and `draw`
+  reads it with `hints.current()`. An Audit's marks go through it too, with `{uncounted: true}`.
+- **Say more when asked again.** `hints.level()` is how many hints have been shown on this same board. Where
+  there's more to say, the first shows where to look and why it's settled ("Only one toy fits in the gold
+  box"), and the next names the answer (see `toydoku/`, `toebeans/`, `catwalk/`).
+- **What to show.** Work from the game's own solver or stored answer: first a mistake if there is one
+  (in red, adding "(and 2 more)" when there are others), otherwise the next move, preferring the one with
+  the fewest options. If no hint can be found, say why in the message line rather than doing nothing.
+- **Bookkeeping.** Set `game.hinted = true` and save only when a mark is shown (a hint with nothing to show
+  is free); disable `hintBtn` once the puzzle is won.
+
+### Keys
+
+Every game can be played without a mouse. A board of squares, or of spots (perches, balls, baskets), uses
+`G.gridKeys({on, show, act, size | move, keys})`: the arrows move a cursor (drawn with `.kbcursor` on HTML
+squares, `.kbring` in SVG, or `G.CURSOR` on a canvas), Space or Enter does what a tap does, and `keys` adds
+the game's own (Notes, Mark…). For boards that aren't squares, `move` can use `G.nearestThatWay`. A game with
+typing (numbers, letters) keeps its own handler, as `highperch/` does, with Escape letting go of the square
+picked. The README's Keys line under "Across every game" says what Space does in each game.
 
 ### Full screen
 
@@ -165,38 +199,6 @@ three more, up to nine on one puzzle, and a revive shows a "Slightly alive!" car
 left. Restart only refills lives after they've run out, so it's never a way round them. Running out or a
 revive keeps the player on the same level and costs the gold paw.
 
-### Hints
-
-A hint shows; it never makes the move (README, "Across every game"). Mark what to look at (gold for where
-to go, red for a mistake), say in the message line what to do there, and leave the player to do it.
-Every game's hint goes through `G.hinter` (see `toydoku/` or `sunbeams/`).
-
-- **Visible without animation.** `games.css` turns every animation off when the device asks for reduced
-  motion, so a mark that only pulses or glows disappears (Night Light's did). Use the shared steady
-  styles, which pulse on top only when motion is allowed: `.hintsq` (an SVG box or ring), `.hintline`
-  (an SVG line) and `.hintcell` (a tint on an HTML square), each with `.bad` for red. Draw the mark on
-  top of the board, but under anything it would hide, such as a number badge.
-- **How long.** `const hints = G.hinter({game: () => game, key: () => <the board as a string>, draw})`;
-  `hints.show(mark, say)` keeps the mark up for 5 s, or until the board or the puzzle changes, and `draw`
-  reads it with `hints.current()`. An Audit's marks go through it too, with `{uncounted: true}`.
-- **Say more when asked again.** `hints.level()` is how many hints have been shown on this same board. Where
-  there's more to say, the first shows where to look and why it's settled ("Only one toy fits in the gold
-  box"), and the next names the answer (see `toydoku/`, `toebeans/`, `catwalk/`).
-- **What to show.** Work from the game's own solver or stored answer: first a mistake if there is one
-  (in red, adding "(and 2 more)" when there are others), otherwise the next move, preferring the one with
-  the fewest options. If no hint can be found, say why in the message line rather than doing nothing.
-- **Bookkeeping.** Set `game.hinted = true` and save only when a mark is shown (a hint with nothing to show
-  is free); disable `hintBtn` once the puzzle is won.
-
-### Keys
-
-Every game can be played without a mouse. A board of squares, or of spots (perches, balls, baskets), uses
-`G.gridKeys({on, show, act, size | move, keys})`: the arrows move a cursor (drawn with `.kbcursor` on HTML
-squares, `.kbring` in SVG, or `G.CURSOR` on a canvas), Space or Enter does what a tap does, and `keys` adds
-the game's own (Notes, Mark…). For boards that aren't squares, `move` can use `G.nearestThatWay`. A game with
-typing (numbers, letters) keeps its own handler, as `highperch/` does, with Escape letting go of the square
-picked. The README's Keys line under "Across every game" says what Space does in each game.
-
 ## 4. Housekeeping
 
 - **Game list:** add `[name, slug, blurb, colour, shelf, search words, added date]` to `G.GAMES` in `games.js`, with the added date as today's date (`"YYYY-MM-DD"`). The daily challenge leaves a new game out until the first cycle that starts at least 3 days later, so there's time to fix things first. The shelf is
@@ -216,6 +218,11 @@ picked. The README's Keys line under "Across every game" says what Space does in
   if the game wasn't listed. When two ideas become one game, merge their rows; when an idea becomes a mode
   or levels of an existing game, mark it Built and say where (Notes); drop rows the user rules out; and note
   new ideas, themes or changes of plan that come up while talking it through.
+- **Artwork:** add the game's cats to "Who's who in `cats/`" in `ARTWORK.md`: for a named cat, which pictures
+  the game uses and where (beside the title, on the board, on the gold-paw card); for general cats, the list
+  the page picks from and what each does.
+- **Shared files:** a drawing moved out of another game's page into a shared file (step 1) is loaded with
+  `?v=<build>` like `games.js`, gets the build bump below, and the game it came from is tested again (step 5).
 - **Build:** replace the current build string (`YYYY-MM-DD.N`) everywhere it appears (`version.txt`,
   every page's BUILD, every `?v=`) with a new one: today's date with `.1`, or the next number if the
   current string is already today's. Pages reload when `version.txt` doesn't match their BUILD.
@@ -250,6 +257,7 @@ SE, 320 × 460, as well as a laptop at 1280 × 720. Load Playwright with
 - a playthrough reaches the win card, and the level moves up (or stays, after a hint);
 - no page errors (failed loads of fonts, GoatCounter and cat photos are expected offline);
 - the front page shows the new tile and icon;
+- any game whose drawings moved to a shared file still draws and plays them;
 - every colour is from the site's palette (step 1, "Colours"): list each one the page and its icon use
   (`grep -o "#[0-9A-Fa-f]\{6\}\b\|#[0-9A-Fa-f]\{3\}\b\|rgba([^)]*)" <slug>/index.html icons/<slug>.svg | sort | uniq -c`)
   and check that each is a palette colour, the ink, or a tint or shade of one (`color-mix` with white or ink, or
@@ -263,9 +271,8 @@ carry between commands, so start the server, run the tests and stop it in one co
 (`python3 -m http.server 8766 & S=$!; …; kill $S`), or stop a leftover one with `fuser -k 8766/tcp`.
 Don't use `pkill -f`: the pattern matches the shell running the command and kills it.
 
-## 6. Branch and PR
+## 6. Commit and PR
 
-Branch `claude/<slug>` from `main`, unless the session names a branch to use. One commit, described
-like the earlier game commits (what the game is, how puzzles are made, levels, features, build bump).
+Make one commit on the branch from step 3, described like the earlier game commits (what the game is, how puzzles are made, levels, features, build bump).
 Push and open a PR, and give the user the link. That's the end: nobody else reviews or comments, and the
 user approves and merges it. Don't offer to watch it, subscribe to it or schedule check-ins.
