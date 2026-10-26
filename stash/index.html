@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Toy Stash</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-26.5"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-26.5">
+<style>
+/* A row of shut boxes, each with a toy the cat has stashed inside. Every guess is a row of toys on cushions,
+   with paw prints beside it: a dark paw for a toy in the right box, a light paw for a right toy in another box. */
+.wrap.stashwrap{height:auto}
+.stashboard{--s:52px;--gap:6px;display:flex;flex-direction:column;gap:var(--gap);padding:8px;border:3px solid var(--ink);border-radius:12px;
+  background:color-mix(in srgb,var(--pacific-blue) 16%,var(--panel));user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.line{display:flex;align-items:center;gap:8px}
+.line .num{flex:none;width:22px;text-align:right;font-weight:800;font-size:15px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+.slots{display:flex;gap:var(--gap)}
+.slot{position:relative;flex:none;width:var(--s);height:var(--s);border-radius:50%;background:color-mix(in srgb,var(--pacific-blue) 30%,var(--panel));
+  box-shadow:inset 0 3px 0 color-mix(in srgb,var(--ink) 12%,transparent)}
+.slot img{position:absolute;inset:6%;width:88%;height:88%;object-fit:contain;filter:drop-shadow(0 2px 2px rgba(42,37,48,.3))}
+.slot img.drop{animation:drop .18s ease-out}
+@keyframes drop{from{transform:translateY(-25%) scale(.7);opacity:0}}
+/* the row being guessed, and the box in it that the next toy goes into */
+.line.now .slot{cursor:pointer;background:var(--panel);box-shadow:inset 0 0 0 2px var(--line)}
+.line.now .slot.sel{box-shadow:inset 0 0 0 3px var(--ink)}
+.line.now .num{color:var(--ink)}
+/* rows still to come, up to the gold-paw line: just the spots, so the board is only as tall as it must be */
+.line.later .slot{height:10px;border-radius:5px;opacity:.55;box-shadow:none}
+.line.later .num{font-size:12px;line-height:10px;opacity:.6}
+.line.later .paws{visibility:hidden;height:10px}
+/* the last guess that can still earn a gold paw: a gold line under it */
+.line.par{padding-bottom:5px;border-bottom:2px dotted #ECA818}
+.line.par .num{color:#C98A0E}
+/* the paws for a guess, dark ones first */
+.paws{display:grid;grid-template-rows:repeat(2,calc(var(--s) * .42));grid-auto-flow:column;grid-auto-columns:calc(var(--s) * .42);gap:2px;margin-left:auto;padding-right:2px}
+.paws svg{width:100%;height:100%;display:block}
+.paws .right{fill:var(--ink);stroke:var(--ink)}
+.paws .near{fill:#fff;stroke:var(--ink)}
+.paws .none{fill:color-mix(in srgb,var(--ink) 16%,transparent);stroke:none}
+/* the boxes the toys are stashed in, along the top */
+.line.stash{padding-bottom:6px;border-bottom:2px dashed color-mix(in srgb,var(--ink) 30%,transparent);margin-bottom:2px}
+.line.stash .slot{border-radius:6px;background:none;box-shadow:none}
+.line.stash .slot svg{position:absolute;inset:0;width:100%;height:100%}
+.line.stash .slot img{inset:16%;width:68%;height:68%;animation:peek .3s ease-out both;animation-delay:var(--d,0s)}
+@keyframes peek{from{transform:translateY(30%) scale(.4);opacity:0}}
+/* the cat guarding the stash, sitting at the end of the boxes on the board's top edge; once the stash is found, it
+   plays with one of the toys instead */
+.line.stash{position:relative}
+.guard{position:absolute;right:-2px;bottom:4px;height:calc(var(--s) * 1.7);width:auto;max-width:var(--room,100px);object-fit:contain;object-position:bottom right;pointer-events:none;filter:drop-shadow(0 2px 2px rgba(42,37,48,.25))}
+.guard.play{height:calc(var(--s) * 1.35);animation:peek .4s ease-out both}
+.card img.stashpic{display:block;width:70%;max-width:240px;height:auto;margin:0 auto 14px}
+/* the toys to pick from, and Check */
+.tray{width:var(--board);display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px}
+.tray .toy{position:relative;width:50px;height:50px;padding:3px;border-radius:12px;background:#fff;border:2px solid var(--line);
+  -webkit-touch-callout:none;touch-action:manipulation}
+.tray .toy img{display:block;width:100%;height:100%;object-fit:contain;pointer-events:none}
+.tray .toy:hover{border-color:var(--ink)}
+.tray .toy:disabled{opacity:.3}
+/* a toy marked "nope": dimmed and crossed out on the tray, and dimmed in the rows */
+.tray .toy.nope{background:none;border-style:dashed}
+.tray .toy.nope img{opacity:.4;filter:grayscale(.5)}
+.tray .toy.nope::after{content:"";position:absolute;inset:4px;pointer-events:none;
+  background:linear-gradient(to top right,transparent calc(50% - 2px),#C8392B calc(50% - 2px),#C8392B calc(50% + 2px),transparent calc(50% + 2px))}
+.slot img.nope{opacity:.4}
+.tray #checkBtn{height:50px;padding:0 18px}
+@media (max-width:380px){.tray .toy{width:42px;height:42px}.tray #checkBtn{height:42px;padding:0 12px}}
+.line.miss .slots{animation:shake .35s}
+@keyframes shake{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Toy Stash</h1><div class="stripe"></div><p class="tagline">Work out which toys the cat stashed in the boxes</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap stashwrap"><div class="stashboard" id="board" aria-label="The stash and your guesses"></div></div>
+  <div class="tray" id="tray" aria-label="Toys"></div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="linkBtn">Share</button>
+    <button id="toysBtn">Toys</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New stash</button>
+  </div>
+</main>
+
+<script src="../games.js?v=2026-10-26.5"></script>
+<script src="../boxes.js?v=2026-10-26.5"></script>
+<script>
+/* ---------- levels ---------- */
+// [boxes, kinds of toy, whether a toy can be in more than one box, par]. There's no limit on guesses; par is the most
+// for a gold paw: one more than a player who only ever guesses stashes that fit every clue needs nine times in ten.
+const LEVELS = [null, [3, 4, false, 5], [4, 5, false, 6], [4, 6, false, 6], [4, 6, true, 7], [5, 7, true, 7], [5, 8, true, 8], [6, 8, true, 9]];
+const MAX_LEVEL = LEVELS.length - 1;
+const levelName = n => { const [P, K, rep] = LEVELS[n]; return `Level ${n} · ${P} boxes, ${K} toys${rep ? ", repeats" : ""}`; };
+
+/* ---------- the logic ---------- */
+// The paws for a guess: [right toy in the right box, right toy in another box]. K: kinds of toy.
+function paws(code, guess, K) {
+  let right = 0; const a = new Array(K).fill(0), b = new Array(K).fill(0);
+  for (let i = 0; i < code.length; i++) { if (code[i] === guess[i]) right++; else { a[code[i]]++; b[guess[i]]++; } }
+  let near = 0; for (let k = 0; k < K; k++) near += Math.min(a[k], b[k]);
+  return [right, near];
+}
+// Every stash that fits every row so far (rows: [{guess, paws}]).
+function fitting(P, K, rep, rows) {
+  const out = [], c = [];
+  (function go(i) {
+    if (i === P) { if (rows.every(r => { const [a, b] = paws(c, r.guess, K); return a === r.paws[0] && b === r.paws[1]; })) out.push(c.slice()); return; }
+    for (let k = 0; k < K; k++) { if (!rep && c.slice(0, i).includes(k)) continue; c[i] = k; go(i + 1); }
+  })(0);
+  return out;
+}
+function hide(P, K, rep) {
+  const c = [];
+  while (c.length < P) { const k = Math.floor(Math.random() * K); if (rep || !c.includes(k)) c.push(k); }
+  return c;
+}
+
+/* ---------- pictures ---------- */
+// The cardboard boxes (BOX, OPENBOX) are in ../boxes.js, shared with Copycat.
+// A paw print (the gold paw's shape): dark, light, or a plain dot for a toy that isn't in the stash.
+const PAD = "M100 6 C126 6 141 28 153 46 C172 50 197 70 195 101 C193 133 166 147 140 141 C125 138 112 131 100 131 C88 131 75 138 60 141 C34 147 7 133 5 101 C3 70 28 50 47 46 C59 28 74 6 100 6Z";
+const pawSVG = kind => kind === "none" ? `<svg viewBox="0 0 100 100" aria-hidden="true"><circle class="none" cx="50" cy="50" r="17"/></svg>` :
+  `<svg viewBox="-6 -6 112 100" aria-hidden="true"><g class="${kind}" stroke-width="7">
+  ${[[16.5, 30.5, -24], [38.5, 15, -8], [61.5, 15, 8], [83.5, 30.5, 24]].map(([x, y, r]) => `<ellipse cx="${x}" cy="${y}" rx="9.5" ry="10.75" transform="rotate(${r} ${x} ${y})"/>`).join("")}
+  <path d="${PAD}" transform="translate(19 35.3) scale(.31 .298)" stroke-width="22"/></g></svg>`;
+
+/* ---------- cats ---------- */
+// General cats (../cats/): one sits guarding each stash, and when it's found a cat plays with a toy; the cat pouncing on
+// a ball is on the gold-paw card.
+const GUARDS = ["c19-44", "c19-45", "c18-25", "c19-11", "c19-2", "c18-33"], PLAYERS = ["c17-17", "c19-43", "c17-18"];
+const CAT_SRC = {};  // filled with embedded pictures when the page is bundled into one file
+const catSrc = f => CAT_SRC[f] || `../cats/${f}.webp`;
+const pickOf = a => a[Math.floor(Math.random() * a.length)];
+
+/* ---------- toys ---------- */
+// The toy library, one kind per colour (as in Pounce and Copycat). A stash uses one look of each kind, so no two
+// toys on the tray share a colour.
+const KINDS = [
+  {c: "#BD5538", looks: [["wiffle-red", "red wiffle ball"], ["swirl-red", "red swirl ball"], ["crochet-stars", "star ball"], ["tinsel", "tinsel ball"]]},
+  {c: "#ECA818", looks: [["wiffle-yellow", "yellow wiffle ball"]]},
+  {c: "#73A7AE", looks: [["wiffle-teal", "teal wiffle ball"], ["fish", "fish"]]},
+  {c: "#6AA673", looks: [["lattice", "lattice ball"]]},
+  {c: "#B3B94B", looks: [["spiky-lime", "spiky pom-pom"]]},
+  {c: "#B94588", looks: [["swirl-purple", "plum swirl ball"], ["bell-purple", "bell ball"]]},
+  {c: "#7885BA", looks: [["spring", "spring"], ["rope-blue", "rope ball"]]},
+  {c: "#825840", looks: [["cork-paw", "cork paw ball"], ["burlap-paws", "burlap ball"], ["rattan", "rattan ball"]]},
+  {c: "#5E5866", looks: [["mouse", "mouse"]]},
+  {c: "#E16A4A", looks: [["felt-rainbow", "rainbow ball"], ["ribbon-tail", "ribbon ball"], ["spiky-rainbow", "spiky ball"]]},
+];
+const ALL_LOOKS = KINDS.flatMap(k => k.looks.map(([f]) => f));
+let offToys = G.toysOff();
+const TOY_SRC = {};  // filled with embedded pictures when the page is bundled into one file
+const toySrc = f => TOY_SRC[f] || `../toys/${f}.webp?v=${window.SITE_BUILD || ""}`;
+const nameOf = f => { for (const k of KINDS) for (const [g, n] of k.looks) if (g === f) return n; return "toy"; };
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+// K toys of different colours, from colours with a toy still in play first.
+function pickToys(K) {
+  const on = shuffle(KINDS.filter(k => k.looks.some(([f]) => !offToys.has(f)))), off = shuffle(KINDS.filter(k => !on.includes(k)));
+  return on.concat(off).slice(0, K).map(k => k.looks[G.pickLook(k, offToys)][0]);
+}
+
+/* ---------- game ---------- */
+// game: {level, P (boxes), K (toys), rep, toys (a picture per toy, in tray order), code (the toy in each box),
+//        rows ([{guess, paws}]), cur (the row being guessed: a toy or null per box), sel (the box the next toy goes in),
+//        undo (earlier versions of cur), nope (toys marked as not in the stash), hinted, restarted, won}
+const STORE = "catdoku.stash.v1";
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1}, state.settings);
+let game = state.game || null;
+const hints = G.hinter({game: () => game, key: () => game ? game.rows.length + "|" + game.cur.join() : "", draw: () => draw()});   // marks {slots, toys, bad}
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !$("overlay").classList.contains("show");
+
+function deal(n, toys, code) {
+  const [P, K, rep] = LEVELS[n];
+  return {level: n, P, K, rep, guard: pickOf(GUARDS), player: pickOf(PLAYERS.slice(0, 2)), toys: toys || pickToys(K), code: code || hide(P, K, rep), rows: [], cur: Array(P).fill(null), sel: 0, undo: [], nope: [],
+          hinted: false, restarted: false, won: false, ...G.freshClock()};
+}
+function newPuzzle() {
+  G.closeCard();
+  game = deal(settings.level); draw(); save();
+  G.track(`Toy Stash new puzzle level ${game.level}`);
+}
+function startLevel(n) { settings.level = n; $("levelSel").value = n; newPuzzle(); }
+const par = () => LEVELS[game.level][3];
+
+/* ---------- drawing ---------- */
+let fresh = new Set();   // boxes whose toy just went in, to drop it in
+function size() {
+  // the slot size that fits the board's width: number, boxes, then the paws (half as many columns as boxes)
+  const w = $("board").parentElement.clientWidth - 22, {P} = game, pc = Math.ceil(P / 2);
+  const s = Math.floor(Math.min(56, (w - 22 - 16 - (P - 1) * 6 - pc * 2 - 4) / (P + pc * 0.42)));
+  $("board").style.setProperty("--s", `${s}px`);
+}
+function pawsHTML(p, P) {
+  return [...Array(p[0]).fill("right"), ...Array(p[1]).fill("near"), ...Array(P - p[0] - p[1]).fill("none")].map(pawSVG).join("");
+}
+const toyImg = (t, cls = "") => { cls = (cls + (game.nope.includes(t) && !game.won ? " nope" : "")).trim(); return `<img src="${toySrc(game.toys[t])}" alt="${nameOf(game.toys[t])}"${cls ? ` class="${cls}"` : ""}>`; };
+function draw() {
+  const {P, rows, cur} = game, done = game.won, hm = hints.current(), T = Math.max(par(), rows.length + (done ? 0 : 1));
+  size();
+  let h = `<div class="line stash" id="stash"><span class="num"></span><div class="slots">`;
+  for (let i = 0; i < P; i++) h += `<div class="slot" aria-label="${done ? `Box ${i + 1}: ${nameOf(game.toys[game.code[i]])}` : `Box ${i + 1}, shut`}">${done ? OPENBOX + `<img src="${toySrc(game.toys[game.code[i]])}" alt="" style="--d:${i * 0.12}s">` : BOX}</div>`;
+  h += `</div>${done ? `<img class="guard play" src="${catSrc(game.player || PLAYERS[0])}" alt="A cat playing with a toy">` : `<img class="guard" src="${catSrc(game.guard || GUARDS[0])}" alt="A cat guarding the boxes">`}</div>`;
+  for (let r = 0; r < T; r++) {
+    const row = rows[r], now = !done && r === rows.length;
+    h += `<div class="line ${row ? "done" : now ? "now" : "later"}${r + 1 === par() ? " par" : ""}" data-r="${r}"><span class="num">${r + 1}</span><div class="slots">`;
+    for (let i = 0; i < P; i++) {
+      const t = row ? row.guess[i] : now ? cur[i] : null;
+      const mark = now && hm && hm.slots && hm.slots.includes(i) ? ` hintcell${hm.bad ? " bad" : ""}` : "";
+      h += `<div class="slot${now && i === game.sel ? " sel" : ""}${mark}" data-i="${i}"${now ? ` role="button" aria-label="Box ${i + 1}${t !== null ? `: ${nameOf(game.toys[t])}` : ", empty"}"` : ""}>${t !== null && t !== undefined ? toyImg(t, now && fresh.has(i) ? "drop" : "") : ""}</div>`;
+    }
+    h += `</div><div class="paws"${row ? ` aria-label="${row.paws[0]} right box, ${row.paws[1]} wrong box"` : ""}>${row ? pawsHTML(row.paws, P) : ""}</div></div>`;
+  }
+  $("board").innerHTML = h;
+  // the room beside the boxes, for the cat
+  const st = $("stash"), sl = st.querySelector(".slots");
+  st.style.setProperty("--room", `${Math.max(30, st.clientWidth - sl.offsetLeft - sl.offsetWidth - 2)}px`);
+  fresh.clear();
+  // the tray
+  const tray = $("tray");
+  if (tray.children.length !== game.K + 1 || tray.dataset.toys !== game.toys.join()) {
+    tray.dataset.toys = game.toys.join(); tray.innerHTML = "";
+    game.toys.forEach((f, t) => {
+      const b = document.createElement("button"); b.className = "toy"; b.dataset.t = t;
+      b.innerHTML = `<img src="${toySrc(f)}" alt="">`; b.setAttribute("aria-label", `${nameOf(f)} (${t + 1})`); b.title = nameOf(f)[0].toUpperCase() + nameOf(f).slice(1);
+      tray.append(b);
+    });
+    const c = document.createElement("button"); c.id = "checkBtn"; c.className = "primary"; c.textContent = "Check"; tray.append(c);
+  }
+  [...tray.querySelectorAll(".toy")].forEach((b, t) => {
+    b.disabled = done;
+    const no = game.nope.includes(t) && !done;
+    b.classList.toggle("nope", no); b.setAttribute("aria-label", `${nameOf(game.toys[t])} (${t + 1})${no ? ", marked not in the stash" : ""}`);
+    b.classList.toggle("hintcell", !!(hm && hm.toys && hm.toys.includes(t)));
+    b.classList.toggle("bad", !!(hm && hm.toys && hm.toys.includes(t) && hm.bad));
+  });
+  $("checkBtn").disabled = done || cur.includes(null);
+  const g = rows.length + (done ? 0 : 1);
+  $("count").textContent = game.won ? `Found in ${rows.length} guess${rows.length === 1 ? "" : "es"}!` : `Guess ${g}`;
+  $("hintBtn").disabled = done; $("undoBtn").disabled = done || !game.undo.length;
+  $("restartBtn").disabled = done || (!rows.length && !game.undo.length && !cur.some(t => t !== null));
+}
+addEventListener("resize", () => { if (game) size(); });
+
+/* ---------- playing ---------- */
+function change(fn) {
+  game.undo.push({cur: game.cur.slice(), sel: game.sel});
+  if (game.undo.length > 60) game.undo.shift();
+  fn(); game.started = true; draw(); save();
+}
+const nextEmpty = from => { for (let k = 0; k < game.P; k++) { const i = (from + k) % game.P; if (game.cur[i] === null) return i; } return from; };
+// A toy from the tray goes in the picked box, and the next empty box is picked.
+function put(t) {
+  if (!playing()) return;
+  const i = game.sel;
+  change(() => { game.cur[i] = t; fresh.add(i); game.sel = nextEmpty((i + 1) % game.P); if (game.cur[game.sel] !== null) game.sel = (i + 1) % game.P; });
+}
+// Tap a box in the row: pick it, or take out its toy if it's picked already.
+function tapSlot(i) {
+  if (!playing()) return;
+  if (i === game.sel && game.cur[i] !== null) change(() => { game.cur[i] = null; });
+  else { game.sel = i; draw(); save(); }
+}
+function takeOut() {
+  if (!playing()) return;
+  let i = game.cur[game.sel] !== null ? game.sel : game.cur.map((t, k) => t !== null ? k : -1).filter(k => k >= 0).pop();
+  if (i === undefined) return;
+  change(() => { game.cur[i] = null; game.sel = i; });
+}
+function check() {
+  if (!playing()) return;
+  if (game.cur.includes(null)) { G.note("Put a toy in every box first.", 2500); return; }
+  const guess = game.cur.slice(), p = paws(game.code, guess, game.K);
+  game.rows.push({guess, paws: p}); game.started = true;
+  game.cur = Array(game.P).fill(null); game.sel = 0; game.undo = [];
+  if (p[0] === game.P) { win(); return; }
+  draw(); save();
+  const now = $("board").querySelector(".line.now");
+  if (now) now.scrollIntoView({block: "nearest"});
+  $("tray").scrollIntoView({block: "nearest"});
+}
+$("board").addEventListener("click", e => { const s = e.target.closest(".line.now .slot"); if (s) tapSlot(+s.dataset.i); });
+// Tap a toy to put it in; hold it (or right-click it) to mark it "nope", dimmed as not in the stash, or to unmark it.
+let held = null, heldFired = false;
+function nope(t) {
+  if (!playing()) return;
+  const k = game.nope.indexOf(t);
+  if (k >= 0) game.nope.splice(k, 1); else game.nope.push(t);
+  draw(); save();
+}
+$("tray").addEventListener("pointerdown", e => {
+  const b = e.target.closest(".toy"); if (!b || b.disabled) return;
+  heldFired = false; clearTimeout(held);
+  held = setTimeout(() => { heldFired = true; nope(+b.dataset.t); if (navigator.vibrate) navigator.vibrate(15); }, 450);
+});
+for (const ev of ["pointerup", "pointerleave", "pointercancel"]) $("tray").addEventListener(ev, () => clearTimeout(held));
+$("tray").addEventListener("contextmenu", e => { const b = e.target.closest(".toy"); if (!b) return; e.preventDefault(); clearTimeout(held); if (!heldFired) nope(+b.dataset.t); heldFired = true; });
+$("tray").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.id === "checkBtn") check();
+  else if (heldFired) heldFired = false;
+  else put(+b.dataset.t);
+});
+function undo() {
+  if (!playing() || !game.undo.length) return;
+  const u = game.undo.pop(); game.cur = u.cur; game.sel = u.sel; draw(); save();
+}
+$("undoBtn").onclick = undo;
+// Keys: 1 to 9 put a toy in (with Shift, mark it "nope"), the arrows pick a box, Backspace takes a toy out, Enter checks.
+document.addEventListener("keydown", e => {
+  if (!playing() || document.querySelector(".spot") || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); return; }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const d = /^Digit[1-9]$/.test(e.code) ? +e.code[5] : /^[1-9]$/.test(e.key) ? +e.key : 0;
+  if (d && d <= game.K && e.shiftKey) { e.preventDefault(); nope(d - 1); }
+  else if (d && d <= game.K) { e.preventDefault(); game.started = true; put(d - 1); }
+  else if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); game.sel = (game.sel + (e.key === "ArrowLeft" ? game.P - 1 : 1)) % game.P; draw(); save(); }
+  else if (e.key === "Backspace" || e.key === "Delete") { e.preventDefault(); takeOut(); }
+  else if (e.key === "Enter" && e.target.tagName !== "BUTTON") { e.preventDefault(); check(); }
+});
+// Restart: the same stash, with every guess taken back. It costs the gold paw.
+$("restartBtn").onclick = () => {
+  if (!game || game.won) return;
+  const g = deal(game.level, game.toys, game.code);
+  game = Object.assign(g, {hinted: game.hinted, restarted: true, ms: game.ms, started: game.started, timed: game.timed});
+  draw(); save();
+  G.note("Back to the first guess, with the same stash.", 3000);
+};
+
+/* ---------- hints ---------- */
+// Worked out from every stash that still fits the paws: first a toy in the row that can't be in its box (red);
+// then a box whose toy is settled (the box, then the toy); then the box with fewest toys left (the box and its toys).
+function hint() {
+  if (!playing()) return;
+  const {P, K, rep, rows, cur} = game, nm = t => nameOf(game.toys[t]);
+  if (!rows.length) { hints.show({slots: [...Array(P).keys()]}, "Any first guess helps. Use different toys to learn the most.", {uncounted: true}); return; }
+  const fit = fitting(P, K, rep, rows);
+  const can = [...Array(P)].map((_, i) => new Set(fit.map(c => c[i])));
+  const anywhere = new Set(fit.flat());
+  const wrong = cur.map((t, i) => t !== null && !can[i].has(t) ? i : -1).filter(i => i >= 0);
+  game.hinted = true; save();
+  if (wrong.length) {
+    const i = wrong[0], t = cur[i];
+    hints.show({slots: [i], bad: true}, `${anywhere.has(t) ? `The ${nm(t)} can't be in box ${i + 1}` : `There's no ${nm(t)} in the stash`}: the paws so far rule it out.${wrong.length > 1 ? ` (And ${wrong.length - 1} more.)` : ""}`);
+    return;
+  }
+  const lvl = hints.level();
+  const settled = [...Array(P).keys()].filter(i => can[i].size === 1 && cur[i] !== [...can[i]][0]);
+  if (settled.length) {
+    const i = settled[0], t = [...can[i]][0];
+    if (lvl === 0) hints.show({slots: [i]}, `The paws so far settle box ${i + 1}. Which toy fits there?`);
+    else hints.show({slots: [i], toys: [t]}, `Box ${i + 1} has the ${nm(t)}.`);
+    return;
+  }
+  const open = [...Array(P).keys()].filter(i => cur[i] === null || can[i].size > 1);
+  if (fit.length === 1) { hints.show({slots: [...Array(P).keys()]}, "Your row is the only stash that fits the paws. Check it!"); return; }
+  const i = open.sort((a, b) => can[a].size - can[b].size)[0], ts = [...can[i]].sort((a, b) => a - b);
+  const out = [...Array(K).keys()].filter(t => !anywhere.has(t));
+  if (lvl === 0 || !out.length) hints.show({slots: [i], toys: ts}, `Box ${i + 1} holds one of the ${ts.length} gold toys.${fit.length <= 6 ? ` ${fit.length} stashes still fit.` : ""}`);
+  else hints.show({toys: out, bad: true}, `${out.length === 1 ? `The ${nm(out[0])} isn't` : "None of the red toys is"} in the stash.`);
+}
+$("hintBtn").onclick = hint;
+
+/* ---------- winning and losing ---------- */
+const goldOK = () => !game.hinted && !game.restarted && game.rows.length <= par();
+function win() {
+  game.won = true; G.finishClock(game);
+  // only a gold paw moves you up a level
+  const next = goldOK() ? Math.min(MAX_LEVEL, game.level + 1) : game.level;
+  settings.level = next; $("levelSel").value = next; save(); draw();
+  G.track(`Toy Stash solved level ${game.level}`);
+  const g = game;
+  setTimeout(() => { if (game === g) finishCard(); }, 1100);
+}
+function stashPic() { const im = new Image(); im.className = "stashpic"; im.src = catSrc("c17-18"); im.alt = "A black and white cat pouncing on a ball"; return im; }
+function finishCard() {
+  const next = settings.level, n = game.rows.length;
+  let text = `You found the stash in ${n} guess${n === 1 ? "" : "es"}.`;
+  text += goldOK() ? (game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`)
+    : ` A gold paw moves you up: ${par()} guesses or fewer, with no hint or Restart. ${game.hinted ? "You had a hint" : game.restarted ? "You restarted" : `This took ${n}`}, so here's another at level ${next}.`;
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the toys", game.result,
+    {title: "Found it!", gold: goldOK(), goldPic: [stashPic()], goldWhy: `Found in ${n} guess${n === 1 ? "" : "es"}, with no hints!`, next: `Next: level ${next}`,
+     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+/* ---------- sharing ---------- */
+// The stash travels in the link a little scrambled, so it isn't there to read at a glance.
+const scramble = (code, K) => code.map((t, i) => (t + 3 * i + 1) % K);
+const unscramble = (s, K) => s.map((t, i) => ((t - 3 * i - 1) % K + K * 4) % K);
+$("linkBtn").onclick = () => { if (game) G.shareCard({name: "Toy Stash", won: game.won,
+  puzzle: () => ({g: "stash", N: game.level, toys: game.toys, s: scramble(game.code, game.K)}),
+  progress: () => ({rows: game.rows.map(r => r.guess)})}); };
+function openShared(d) {
+  const lv = LEVELS[d.N], [P, K, rep] = lv || [];
+  const toy = (t, k = K) => Number.isInteger(t) && t >= 0 && t < k;
+  const ok = lv && Array.isArray(d.toys) && d.toys.length === K && d.toys.every(f => ALL_LOOKS.includes(f)) && new Set(d.toys).size === K &&
+    Array.isArray(d.s) && d.s.length === P && d.s.every(t => toy(t));
+  const code = ok && unscramble(d.s, K);
+  if (!ok || (!rep && new Set(code).size !== P)) { G.note("That share link didn't work.", 5000); return; }
+  game = deal(d.N, d.toys, code);
+  if (d.p && Array.isArray(d.p.rows) && d.p.rows.length <= 99 && d.p.rows.every(g => Array.isArray(g) && g.length === P && g.every(t => toy(t)))) {
+    game.rows = d.p.rows.map(guess => ({guess, paws: paws(code, guess, K)})); game.timed = false;
+    if (game.rows.some(r => r.paws[0] === P)) { game.rows = game.rows.slice(0, game.rows.findIndex(r => r.paws[0] === P) + 1); game.won = true; }
+  }
+  settings.level = d.N; $("levelSel").value = d.N;
+  draw(); save();
+}
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  settings.seenHelp = false; helpOnFirstVisit();
+  if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
+}
+// The squares the walkthrough lights are the boxes of the guess rows: x the box, y the row.
+function map() {
+  const lines = $("board").querySelectorAll(".line[data-r]"), s0 = lines[0].querySelectorAll(".slot"), a = s0[0].getBoundingClientRect();
+  const gap = s0.length > 1 ? s0[1].getBoundingClientRect().left - a.right : 6, row = lines[0].getBoundingClientRect();
+  return {ox: a.left - gap / 2, oy: row.top - gap / 2, cw: a.width + gap, ch: row.height + gap};
+}
+// First visit (or before the first Check): a made-up first guess shows what the paws mean, and afterwards the toys
+// are hidden again, so it gives nothing away. Once a guess has been checked, the steps point at the player's own rows.
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || !playing() || document.querySelector(".spot")) return;
+  const {P, rep} = game, T = Math.max(par(), game.rows.length + 1), example = !game.rows.length, row = [...Array(P).keys()].map(i => [i, 0]);
+  const keep = {cur: game.cur.slice(), sel: game.sel};
+  const show = () => !example ? {} : {
+    enter: () => { const guess = [...Array(P).keys()].map(i => i % game.K); game.rows = [{guess, paws: paws(game.code, guess, game.K)}]; draw(); },
+    leave: () => { game.rows = []; game.cur = keep.cur.slice(); game.sel = keep.sel; draw(); }};
+  // the toy dimmed to show "nope": one not dimmed already, if there is one
+  const demo = Math.max(0, [...Array(game.K).keys()].find(t => !game.nope.includes(t)) ?? 0), dimmed = game.nope.includes(demo);
+  const pawsEl = () => $("board").querySelector('.line[data-r="0"] .paws');
+  const steps = [
+    {say: "The cat has stashed a toy in each box", els: [() => $("board").querySelector("#stash .slots")]},
+    {say: "Guess which toys: tap them to fill a row", lit: [...Array(P).keys()].map(i => [i, game.rows.length]), els: [$("tray")]},
+    {say: "Then tap Check", els: [$("checkBtn")]},
+    {say: "A dark paw: a right toy in the right box", lit: row, els: [pawsEl], ...show()},
+    {say: "A light paw: a right toy in another box", lit: row, els: [pawsEl], ...show()},
+    {say: "The paws don't say which toys they mean", lit: row, els: [pawsEl], ...show()},
+    {say: rep ? "A toy can be in more than one box" : "Each toy is in one box at most", els: [$("tray")]},
+    {say: "Sure a toy isn't there? Hold it to dim it", els: [() => $("tray").children[demo]], enter: () => { if (!dimmed) { game.nope.push(demo); draw(); } },
+     leave: () => { if (!dimmed) { game.nope = game.nope.filter(t => t !== demo); draw(); } }},
+    {say: "Keep guessing until you find it", els: [$("count")]},
+    {say: `Find it by the gold line, with no hint or Restart, for a gold paw and the next level`, els: [() => $("board").querySelector(".line.par")]},
+    {say: "Stuck? Hint shows what the paws have settled", els: [$("hintBtn")]},
+  ];
+  G.spotlight({grid: $("board"), w: P, h: T, steps, map, done: () => {
+    settings.seenHelp = true;
+    if (example && !game.won && !game.rows.length) game.code = hide(game.P, game.K, game.rep);   // the example gave this stash away
+    draw(); save();
+  }});
+}
+
+/* ---------- choosing toys ---------- */
+// as many colours as the level being played has toys
+const toyChest = () => ({kinds: KINDS, off: offToys, min: LEVELS[game ? game.level : settings.level][1], src: toySrc, game: "Toy Stash", save: off => {
+  offToys = off; G.saveToys(off);
+  G.note("Saved. Your toys are used from the next stash.", 3500);
+}});
+$("toysBtn").onclick = () => G.toyPicker(toyChest());
+
+/* ---------- start ---------- */
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", "") + (n === MAX_LEVEL ? " (hardest)" : ""), n));
+$("levelSel").onchange = e => startLevel(+e.target.value);
+$("newBtn").onclick = newPuzzle;
+$("helpBtn").onclick = showHelp;
+
+G.nav("stash");
+G.checkClock(game);
+G.setupTimer({name: "stash", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level",
+  emptyText: "Find a stash and your times will show up here. They're kept on this device only."});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+const shared = G.readShare("stash");
+if (game && Array.isArray(game.rows)) G.reopen(() => {
+    const lv = LEVELS[game.level];
+    if (!lv || game.code.length !== lv[0] || game.toys.length !== lv[1] || game.cur.length !== lv[0]) throw new Error("the saved stash doesn't fit its level");
+    if (!Array.isArray(game.undo)) game.undo = [];
+    if (!Array.isArray(game.nope)) game.nope = [];
+    draw();
+    if (game.won) finishCard(); else helpOnFirstVisit();
+  }, why => { game = null; newPuzzle(); G.note(why, 0); });
+else if (!shared) { newPuzzle(); helpOnFirstVisit(); }
+const shareOpts = () => ({name: "Toy Stash", inProgress: !!(game && !game.won && game.rows.length), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, shareOpts());
+window.addEventListener("hashchange", () => { const d = G.readShare("stash"); if (d) G.offerShare(d, shareOpts()); });
+G.needToys({...toyChest(), off: () => offToys});
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>

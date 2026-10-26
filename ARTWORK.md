@@ -35,6 +35,8 @@ blended in: sitting, standing or crouching, with the face and ears showing (the 
 `catburglar/index.html`). Curled-up balls, backs and cats stretched flat are left out. `c19-21`, peeking round a corner,
 is beside its title.
 
+Toy Stash sits one of six general cats on its boxes for each stash (`c19-44`, `c19-45`, `c18-25`, `c19-11`, `c19-2`, `c18-33`, the list `GUARDS` in `stash/index.html`); once the stash is found, `c17-17` (batting a ball) or `c19-43` (pouncing on a feather) plays with the toys, and `c17-18` (pouncing on a ball) is on the gold-paw card.
+
 Cat Pile lays the napping cats from Sunbeams (the `SLEEPERS` list, the same in both pages) on its clumps' blankets, a straight one or a round one in each spot, and `c14-36` curls up beside its title.
 
 - **Jan Brady** (`jan-brady-…`, fluffy black and white, long dark tail; he's a he) is a one-of-a-kind
