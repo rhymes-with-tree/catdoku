@@ -362,7 +362,7 @@ const G = (() => {
   // The win cards' way out to every game.
   const homeBtn = () => ["Back to the front page", () => { location.href = HOME; }];
   function winCard(text, onNext, admire = "Admire my board", result, o = {}) {
-    const media = document.createElement("div");
+    const media = document.createElement("div"); media.className = "winmedia";
     // what earned the gold paw ("No undos!"), under the paw
     if (o.gold) { countGold(result, text, o.top); media.append(goldPaw()); if (o.goldWhy) { const g = document.createElement("p"); g.className = "goldwhy"; g.textContent = o.goldWhy; media.append(g); } }
     const p = document.createElement("p"); p.textContent = text;
@@ -376,7 +376,10 @@ const G = (() => {
     for (const line of o.lines || []) { const x = document.createElement("p"); x.textContent = line; media.append(x); }
     const dl = dailyLine();
     if (dl) { const d = document.createElement("p"); d.className = "dailyline"; d.textContent = dl; media.append(d); }
-    if (o.gold && o.goldPic) media.append(...o.goldPic); else media.append(catPhoto(), name);
+    // the picture on its own, so a phone held sideways can set it beside the rest (games.css)
+    const pic = document.createElement("div"); pic.className = "winpic";
+    if (o.gold && o.goldPic) pic.append(...o.goldPic); else pic.append(catPhoto(), name);
+    media.append(pic);
     const btns = [[o.next || "New puzzle", onNext, true]];
     if (admire !== null) btns.push([admire, () => { closeCard(); note(admireNote(), 0); }]);
     btns.push(["Share my result", e => shareResult(result, o.gold, e.currentTarget)], homeBtn());
