@@ -985,10 +985,10 @@ const G = (() => {
     o.btn.classList.add("fsBtn");
     o.btn.innerHTML = '<svg class="enter" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8V3h5M12 3h5v5M17 12v5h-5M8 17H3v-5"/></svg>' +
       '<svg class="leave" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 3v5H3M17 8h-5V3M12 17v-5h5M3 12h5v5"/></svg>';
+    const label = on => { o.btn.setAttribute("aria-label", on ? "Leave full screen" : "Full screen"); o.btn.title = on ? "Leave full screen (F)" : "Full screen (F)"; };
     function set(on) {
       document.body.classList.toggle("full", on);
-      o.btn.setAttribute("aria-label", on ? "Leave full screen" : "Full screen");
-      o.btn.title = on ? "Leave full screen (F)" : "Full screen (F)";
+      label(on);
       const el = document.documentElement;
       try {
         if (on && !screenFull()) { const go = el.requestFullscreen || el.webkitRequestFullscreen; if (go) Promise.resolve(go.call(el)).catch(() => {}); }
@@ -997,7 +997,9 @@ const G = (() => {
       if (on) track(`${o.name} full screen`);
       o.change(on, true);
     }
-    set(false);
+    // only the button's label to start with: the game may not have its puzzle out yet (a saved one is reopened
+    // later), so change() waits for full screen to be turned on or off
+    label(false);
     o.btn.addEventListener("click", () => set(!isOn()));
     document.addEventListener("keydown", e => {
       if (e.ctrlKey || e.metaKey || e.altKey || document.querySelector(".spot") || $("overlay").classList.contains("show") || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
