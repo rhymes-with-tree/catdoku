@@ -55,7 +55,9 @@ Cat Pile lays the napping cats from Sunbeams (the `SLEEPERS` list, the same in b
   card, and the cat on the table is Fred drawn from above (slender and white, with a tabby cap split by a white
   blaze, white ears, one tabby patch behind the left shoulder and a sky-blue collar, as in photos of him). `kitten-star.webp`, the kitten freed in Bubbles, is Fred too
   (sometimes called Fred Kitten). Fred is the star of Pick of the Pile too: `fred-7` sits beside its title, `fred-11` curls up asleep on
-  the rug once the pile of toy blocks is gone, and `fred-22` leaps on the gold-paw card.
+  the rug once the pile of toy blocks is gone, and `fred-22` leaps on the gold-paw card. Fred is the star of Shelf Life too: `fred-9` sits beside its title,
+  `fred-23` prowls on the floor below the shelf of yarn he knocked out of order, `fred-17` stretches out there once it's
+  sorted, and `fred-16` crouches to pounce on the gold-paw card.
 - **Bugsy** (`bugsy-…`, fluffy brown and white) and **Bowtie** (`bowtie-…`, tuxedo) are the
   mascots of Twirl and Tunnel Run, and will nap in Sunbeams. In Twirl, `bugsy-6` curls up beside the
   title, `bugsy-5` peeks over the top corner of the mat with its chin on the edge, and `bugsy-4`

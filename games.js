@@ -46,6 +46,7 @@ const G = (() => {
     ["Toy Stash", "stash", "Work out which toys the cat stashed in the boxes", "#7885BA", "logic", "mastermind guess code breaker codebreaker bulls and cows deduction colours colors hidden", "2026-10-26"],
     ["Knit Pick", "knitpick", "Help Laya find the words knitted into her blanket", "#8D78AD", "words", "word search wordsearch wonderword find a word hidden word puzzle", "2026-10-26"],
     ["Bird Watch", "birdwatch", "Help Bugsy and Bowtie spot the birds without waking the human", "#73A7AE", "quick", "whack-a-mole whack a mole birds window tapping action reflexes", "2026-10-26"],
+    ["Shelf Life", "shelflife", "Help Fred put the yarn back in order", "#B94588", "teasers", "i love hue gradient colour color sort shades swap yarn", "2026-10-26"],
   ];
   // The shelves the front page and the games menu sort the games onto, in order: key (also a plain name for it,
   // for search), heading, one line.

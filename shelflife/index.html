@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Shelf Life</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-26.11"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-26.11">
+<style>
+/* A pale painted shelf of cubbies in the yarn shop, each holding a ball of yarn. The balls shade smoothly from
+   corner to corner, until Fred knocks them about; the balls with a tag stay put. */
+.title{display:flex;align-items:flex-end;gap:8px}
+.fred{display:block;height:64px;width:auto;margin-bottom:-6px}
+@media (max-height:760px){.fred{height:46px;margin-bottom:-4px}}
+.wrap.shelfwrap{height:auto;display:flex;justify-content:center}
+.shelf{display:block;width:min(100%, calc(var(--tall) * var(--ar, .8)));height:auto;user-select:none;-webkit-user-select:none;touch-action:none;overflow:visible;outline:none}
+.cubby{cursor:pointer}
+.ball{transition:transform .18s ease-out}
+.ball.lift{transform:translateY(-7px)}
+.ball.drag{transition:none;pointer-events:none}
+.pick{fill:none;stroke:#fff;stroke-width:4px;stroke-dasharray:7 5;vector-effect:non-scaling-stroke;pointer-events:none}
+.pick.ink{stroke:var(--ink)}
+.empty.ink,.spinning .empty.ink{stroke:var(--ink-soft)}
+.empty{fill:none;stroke:rgba(255,255,255,.55);stroke-width:2.5px;stroke-dasharray:6 6;vector-effect:non-scaling-stroke}
+.spinning .empty{stroke:#fff;stroke-width:4px}
+.shelf .hintsq{fill:none}
+.fredtop{pointer-events:none}
+.fredtop{transition:opacity .6s}
+.left{display:flex;gap:12px;align-items:center}
+.par{color:var(--ink-soft)}
+.card img.fredpic{display:block;width:70%;max-width:240px;height:auto;margin:0 auto 14px}
+@media (prefers-reduced-motion:reduce){.ball{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <header><div class="title"><h1>Shelf Life</h1><img class="fred" id="fredTitle" src="../cats/fred-9.webp" alt="Fred, a white cat with tabby patches and a blue collar"></div><div class="stripe"></div><p class="tagline">Help Fred put the yarn back in order</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span class="left"><span id="count"></span><span class="par" id="par"></span></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap shelfwrap"><svg class="shelf" id="board" tabindex="0" role="application" aria-label="A shelf of yarn. Tap two balls to swap them; arrow keys and Space work too."></svg></div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="linkBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New shelf</button>
+  </div>
+  <div class="bar toggles">
+    <div class="opt"><label class="toggle"><input type="checkbox" id="shelfTgl"><span class="sw"></span>Shelf</label><span class="hint">Off shows just the yarn, bigger</span></div>
+  </div>
+</main>
+
+<script src="../games.js?v=2026-10-26.11"></script>
+<script src="../colorways.js?v=2026-10-26.11"></script>
+<script>
+/* ---------- shelves (plain functions, also run in a background worker) ---------- */
+// Levels: [columns, rows, which cubbies have a cat napping in them, how close the colours may get (the least
+// OKLab distance between any two balls), cubbies Fred has unwound the ball from].
+function levelOf(n) {
+  return [null, [4, 5, "frame", .06, 0], [5, 6, "frame", .042, 0], [5, 6, "sides", .045, 0], [6, 7, "sides", .034, 0],
+    [6, 7, "pins", .032, 0], [6, 8, "pins", .03, 0], [7, 9, "corners", .025, 0], [7, 10, "corners", .02, 0],
+    [8, 10, "corners", .016, 0], [6, 8, "pins", .03, 3], [7, 9, "corners", .025, 4], [8, 10, "corners", .018, 6]][n];
+}
+// Which cubbies have a cat napping in them (their balls never move).
+function catsAt(W, H, kind) {
+  const out = [];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const edgeX = x === 0 || x === W - 1, edgeY = y === 0 || y === H - 1;
+    const mid = (x === (W - 1) >> 1 || x === W >> 1) && (y === (H - 1) >> 1 || y === H >> 1);
+    if (kind === "frame" ? edgeX || edgeY : kind === "sides" ? edgeX : kind === "pins" ? (edgeX && edgeY) || (edgeX && y === H >> 1) || (edgeY && x === W >> 1) || mid : edgeX && edgeY) out.push(y * W + x);
+  }
+  return out;
+}
+// The four corners' colours: four palette colours from one side of the colour wheel (so the blends between them
+// stay colourful rather than going grey), each paled, darkened or left much as it is, with one corner pale and the
+// one across from it dark, so the shelf runs from light to dark.
+function pickCorners() {
+  const PAL = ["#BD5538", "#E16A4A", "#73A7AE", "#ECA818", "#B3B94B", "#6AA673", "#B94588", "#7885BA", "#4E577D", "#8D78AD"];
+  const mixHex = (a, b, t) => "#" + [1, 3, 5].map(i => Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - t) + parseInt(b.slice(i, i + 2), 16) * t).toString(16).padStart(2, "0")).join("");
+  const hue = c => { const [, a, b] = hexLab(c); return (Math.atan2(b, a) * 180 / Math.PI + 360) % 360; };
+  let pal;
+  for (;;) {
+    pal = PAL.slice().sort(() => Math.random() - .5).slice(0, 4);
+    const hs = pal.map(hue).sort((a, b) => a - b), gaps = hs.map((h, k) => (hs[(k + 1) % 4] - h + 360) % 360);
+    if (360 - Math.max(...gaps) <= 170) break;
+  }
+  const how = [["#FFFFFF", .5 + Math.random() * .25], ["#2A2530", .3 + Math.random() * .25], null, null].sort(() => Math.random() - .5);
+  // corners go top left, top right, bottom left, bottom right, so across from corner i is corner 3 - i
+  const li = how.findIndex(h => h && h[0] === "#FFFFFF"), di = how.findIndex(h => h && h[0] !== "#FFFFFF");
+  if (li + di !== 3) { const want = 3 - li, t = how[want]; how[want] = how[di]; how[di] = t; }
+  return pal.map((c, i) => how[i] ? mixHex(c, how[i][0], how[i][1]) : mixHex(c, "#FFFFFF", Math.random() * .15));
+}
+// Every cubby's colour, blended between the four corners.
+function shelfLab(W, H, corners) {
+  const [a, b, c, d] = corners.map(hexLab), out = [];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const u = x / (W - 1), v = y / (H - 1);
+    out.push([0, 1, 2].map(k => (a[k] * (1 - u) + b[k] * u) * (1 - v) + (c[k] * (1 - u) + d[k] * u) * v));
+  }
+  return out;
+}
+// The least distance between any two balls' colours.
+function nearest(labs) {
+  let m = Infinity;
+  for (let i = 0; i < labs.length; i++) for (let j = i + 1; j < labs.length; j++) m = Math.min(m, Math.hypot(labs[i][0] - labs[j][0], labs[i][1] - labs[j][1], labs[i][2] - labs[j][2]));
+  return m;
+}
+// The empty cubbies: off the edges, away from the cats and from each other. Each has balls either side of it in
+// its row and its column, and spinning two that are the same distance away gives exactly its colour.
+function emptiesFor(W, H, cats, k) {
+  const out = [];
+  for (const i of [...Array(W * H).keys()].sort(() => Math.random() - .5)) {
+    if (out.length >= k) break;
+    const x = i % W, y = Math.floor(i / W);
+    if (cats.includes(i) || x === 0 || y === 0 || x === W - 1 || y === H - 1) continue;
+    if (out.some(j => Math.abs(j % W - x) + Math.abs(Math.floor(j / W) - y) < 3)) continue;
+    out.push(i);
+  }
+  return out.length === k ? out : null;
+}
+// A shelf: its corners' colours, the empty cubbies, and the ball in each cubby (a ball is numbered by the cubby it
+// belongs in, -1 for none). Every loose ball starts out of its place.
+function makeShelf(n) {
+  const [W, H, kind, close, empty] = levelOf(n), corners = pickCorners(), labs = shelfLab(W, H, corners), d = nearest(labs);
+  if (d < close || d > close * 2) return null;
+  // and not grey in the middle
+  const [, a, b] = labs[(H >> 1) * W + (W >> 1)];
+  if (Math.hypot(a, b) < .045) return null;
+  const cats = catsAt(W, H, kind), holes = empty ? emptiesFor(W, H, cats, empty) : [];
+  if (!holes) return null;
+  const loose = [...Array(W * H).keys()].filter(i => !cats.includes(i) && !holes.includes(i));
+  let perm;
+  do { perm = loose.slice().sort(() => Math.random() - .5); } while (perm.some((b, k) => b === loose[k]));
+  const balls = [...Array(W * H).keys()].map(i => holes.includes(i) ? -1 : i);
+  loose.forEach((c, k) => { balls[c] = perm[k]; });
+  return {corners, balls};
+}
+
+/* ---------- colour ---------- */
+// hexLab and labHex are in colorways.js.
+const dist = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+const mid = (p, q) => p.map((v, k) => (v + q[k]) / 2);
+
+/* ---------- balls of yarn ---------- */
+// The balls are drawn by yarnBall in colorways.js, as in Yarn.
+const SVGNS = "http://www.w3.org/2000/svg";
+function svgEl(tag, attrs) { const el = document.createElementNS(SVGNS, tag); for (const a in attrs) el.setAttribute(a, attrs[a]); return el; }
+
+/* ---------- pictures ---------- */
+const CAT_SRC = {};   // filled with embedded pictures when the page is bundled into one file
+const catSrc = name => CAT_SRC[name] || `../cats/${name}.webp`;
+// The shelf is painted the page's pale panel colour, each cubby's back a little darker, with ink edges.
+const mixHex = (a, b, t) => labHex(hexLab(a).map((v, k) => v * (1 - t) + hexLab(b)[k] * t));
+const PAINT = {frame: "#F7F8F3", back: mixHex("#ECEEE7", "#2A2530", .07), edge: mixHex("#F7F8F3", "#2A2530", .35)};
+// Fred prowls on the floor below the shelf while the yarn's out of order, and stretches out there once it's sorted.
+const U = 100, FLOOR = 190, RIM = 14;
+
+/* ---------- game ---------- */
+// game: {level, W, H, corners, start (each cubby's ball as dealt, -1 empty), balls (now), spun (each empty cubby's
+//        spun ball, as OKLab, or null), history (["s", a, b] a swap, ["m", c, a, b] spinning c from a and b),
+//        hinted, undid, won}
+const STORE = "catdoku.shelflife.v1", MAX_LEVEL = 12;
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1, shelf: true}, state.settings);
+let game = state.game || null, busy = false, labs = [], cats = [], holes = [];
+let pick = -1, spin = null, drag = null;   // the ball picked to swap; the empty cubby being spun {c, from: []}
+const hints = G.hinter({game: () => game, key: () => game ? JSON.stringify(game.history) : "", draw: () => draw()});   // marks {cells, rings, bad}
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !busy && !$("overlay").classList.contains("show");
+const levelName = n => { const [W, H, , , e] = levelOf(n); return `Level ${n} · ${W} × ${H}${e ? `, ${e} to spin` : ""}`; };
+const build = G.builder([levelOf, hexLab, catsAt, pickCorners, shelfLab, nearest, emptiesFor, makeShelf], "makeShelf");
+const swaps = () => game.history.filter(h => h[0] === "s").length;
+
+// Work out the shelf's colours, cats and empty cubbies from the game.
+function setUp() {
+  const [W, H, kind] = levelOf(game.level);
+  labs = shelfLab(W, H, game.corners); cats = catsAt(W, H, kind); holes = game.start.flatMap((b, i) => b < 0 ? [i] : []);
+}
+const colourAt = (balls, spun, i) => balls[i] >= 0 ? labs[balls[i]] : spun[i];
+const right = i => { const c = colourAt(game.balls, game.spun, i); return !!c && dist(c, labs[i]) < .002; };
+const done = () => labs.every((_, i) => right(i));
+// The fewest swaps that sort the shelf as dealt: one fewer than the length of each loop of balls that swap round.
+function fewest() {
+  const seen = new Set(); let n = 0;
+  game.start.forEach((b, i) => {
+    if (b < 0 || seen.has(i)) return;
+    let len = 0; for (let j = i; !seen.has(j); j = game.start[j]) { seen.add(j); len++; }
+    n += len - 1;
+  });
+  return n;
+}
+function apply(balls, spun, h) {
+  if (h[0] === "s") { const [, a, b] = h; [balls[a], balls[b]] = [balls[b], balls[a]]; }
+  else { const [, c, a, b] = h; spun[c] = mid(colourAt(balls, spun, a), colourAt(balls, spun, b)); }
+}
+function replay() {
+  game.balls = game.start.slice(); game.spun = game.start.map(() => null);
+  for (const h of game.history) apply(game.balls, game.spun, h);
+}
+const movable = i => game.balls[i] >= 0 && !cats.includes(i);
+
+/* ---------- drawing ---------- */
+const at = i => [(i % game.W) * U, Math.floor(i / game.W) * U];
+// A shop tag on a ball that stays put: a little white tag in the cubby's top corner, tied to the ball by a short
+// string, clear of the ball itself.
+function tag() {
+  const g = svgEl("g", {"pointer-events": "none"});
+  g.append(svgEl("path", {d: settings.shelf ? "M17 20 Q22 28 26 31" : "M13 16 Q17 21 19 23", fill: "none", stroke: "#2A2530", "stroke-width": 1.6}));
+  const t = svgEl("g", {transform: settings.shelf ? "translate(17 18) rotate(-35)" : "translate(13 14) rotate(-35)"});
+  t.append(svgEl("path", {d: "M-3 0 L4 -7 H20 V7 H4 Z", fill: "#FFFFFF", stroke: "#2A2530", "stroke-width": 2, "stroke-linejoin": "round"}),
+    svgEl("circle", {cx: 2.5, cy: 0, r: 1.8, fill: "#2A2530"}));
+  g.append(t);
+  return g;
+}
+// The middle of a cubby's ball, and its radius.
+const ballSpot = () => settings.shelf ? [50, 53, 38] : [50, 50, 46];
+function ballIn(g, i) {
+  const c = colourAt(game.balls, game.spun, i); if (!c) return;
+  const [x, y, r] = ballSpot(i), b = svgEl("g", {class: "ball" + (i === pick ? " lift" : ""), "data-b": i});
+  const inner = svgEl("g", {transform: `translate(${x} ${y})`});
+  inner.append(yarnBall(labHex(c), r));
+  b.append(inner); g.append(b);
+  if (cats.includes(i)) g.append(tag());
+}
+function draw() {
+  const el = $("board"); if (!game) return;
+  const {W, H} = game, w = W * U, h = H * U, key = `${W}x${H}`, wood = settings.shelf;
+  if (el.dataset.key !== key) {
+    el.dataset.key = key;
+    el.setAttribute("viewBox", `${-RIM - 4} ${-RIM - 4} ${w + 2 * RIM + 8} ${h + 2 * RIM + FLOOR + 4}`);
+    el.style.setProperty("--ar", ((w + 2 * RIM + 8) / (h + 2 * RIM + FLOOR + 4)).toFixed(3));
+  }
+  el.innerHTML = "";
+  el.append(ballDefs());
+  // the frame, then each cubby's back wall with a little shadow under the shelf above
+  if (wood) {
+    el.append(svgEl("rect", {x: -RIM, y: -RIM, width: w + 2 * RIM, height: h + 2 * RIM, rx: 6, fill: PAINT.frame, stroke: "#2A2530", "stroke-width": 3}));
+  }
+  for (let i = 0; i < W * H; i++) {
+    const [x, y] = at(i), g = svgEl("g", {class: "cubby" + (spin && spin.c === i ? " spinning" : ""), "data-i": i, transform: `translate(${x} ${y})`});
+    // with the shelf off, a clear square still takes the taps
+    if (!wood) g.append(svgEl("rect", {x: 0, y: 0, width: U, height: U, fill: "transparent"}));
+    else {
+      g.append(svgEl("rect", {x: 5, y: 5, width: U - 10, height: U - 10, rx: 3, fill: PAINT.back, stroke: PAINT.edge, "stroke-width": 1.5}));
+      g.append(svgEl("rect", {x: 6, y: 6, width: U - 12, height: 7, fill: "#2A2530", "fill-opacity": .06}));
+    }
+    const [bx, by, br] = ballSpot(i);
+    if (holes.includes(i) && !game.spun[i]) g.append(svgEl("circle", {class: "empty ink", cx: bx, cy: by, r: br - 2}));
+    else ballIn(g, i);
+    if (i === pick || (spin && spin.from.includes(i))) g.append(svgEl("circle", {class: "pick ink", cx: bx, cy: i === pick ? by - 7 : by, r: Math.min(48, br + 6)}));
+    el.append(g);
+  }
+  // the dividers between cubbies
+  // Fred below
+  // (fred-23 is 241 × 237, fred-17 is 379 × 130)
+  const fw = game.won ? Math.min(w, 520) : 190, fh = game.won ? fw * 130 / 379 : 187;
+  const fred = svgEl("image", {class: "fredtop", x: game.won ? (w - fw) / 2 : w - fw + 6, y: h + RIM + FLOOR - fh - 2 - (wood ? 0 : 10), width: fw, height: fh});
+  fred.setAttribute("href", catSrc(game.won ? "fred-17" : "fred-23"));
+  el.append(fred);
+  // hint marks and the keyboard cursor
+  const m = hints.current();
+  if (m) {
+    for (const i of m.cells || []) { const [x, y] = at(i); el.append(svgEl("rect", {class: "hintsq" + (m.bad ? " bad" : ""), x: x + 3, y: y + 3, width: U - 6, height: U - 6, rx: 6})); }
+    for (const i of m.rings || []) { const [x, y] = at(i), [bx, by, br] = ballSpot(i); el.append(svgEl("circle", {class: "hintsq", cx: x + bx, cy: y + by, r: Math.min(48, br + 8)})); }
+  }
+  if (keys.at() >= 0) { const [x, y] = at(keys.at()); el.append(svgEl("rect", {class: "kbring", x: x + 2, y: y + 2, width: U - 4, height: U - 4, rx: 6})); }
+  // the count
+  const f = fewest(), s = swaps();
+  $("count").textContent = game.won ? "All in order!" : `${s} swap${s === 1 ? "" : "s"}`;
+  $("par").textContent = game.won ? `${s} swap${s === 1 ? "" : "s"} · fewest ${f}` : `fewest ${f}`;
+  $("undoBtn").disabled = !game.history.length || game.won; $("restartBtn").disabled = !game.history.length || game.won;
+  $("hintBtn").disabled = game.won;
+}
+
+/* ---------- playing ---------- */
+function doMove(h) {
+  game.started = true;
+  game.history.push(h); apply(game.balls, game.spun, h);
+  pick = -1; spin = null; G.note(""); save(); draw();
+  if (done()) win();
+}
+function tap(i) {
+  if (!playing() || i < 0) return;
+  if (spin) {
+    if (i === spin.c) { spin = null; G.note(""); return draw(); }
+    if (!colourAt(game.balls, game.spun, i)) return G.note("That cubby's empty. Pick two balls of yarn.");
+    if (spin.from.includes(i)) { spin.from = spin.from.filter(j => j !== i); return draw(); }
+    spin.from.push(i);
+    if (spin.from.length === 2) return doMove(["m", spin.c, ...spin.from]);
+    G.note("Now pick a second ball to spin in with it.", 0);
+    return draw();
+  }
+  if (holes.includes(i)) {
+    pick = -1; spin = {c: i, from: []};
+    G.note(game.spun[i] ? "Spin this one again: pick two balls to blend." : "Pick two balls to spin into a new one.", 0);
+    return draw();
+  }
+  if (cats.includes(i)) { G.note("That ball has a tag on it, so it stays put."); return; }
+  if (pick < 0) { pick = i; return draw(); }
+  if (pick === i) { pick = -1; return draw(); }
+  doMove(["s", pick, i]);
+}
+// Tap a ball, then another, to swap them; or drag one onto another.
+function cubbyAt(x, y) {
+  const el = document.elementFromPoint(x, y), g = el && el.closest && el.closest(".cubby");
+  return g ? +g.dataset.i : -1;
+}
+function svgPoint(e) {
+  const p = $("board").createSVGPoint(); p.x = e.clientX; p.y = e.clientY;
+  return p.matrixTransform($("board").getScreenCTM().inverse());
+}
+$("board").addEventListener("pointerdown", e => {
+  const i = cubbyAt(e.clientX, e.clientY);
+  if (!playing() || i < 0) return;
+  drag = {i, x: e.clientX, y: e.clientY, moved: false, p0: svgPoint(e)};
+  $("board").setPointerCapture(e.pointerId);
+});
+$("board").addEventListener("pointermove", e => {
+  if (!drag || spin || !movable(drag.i)) return;
+  if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 8) return;
+  if (!drag.moved) { drag.moved = true; pick = drag.i; draw(); }
+  const b = $("board").querySelector(`.ball[data-b="${drag.i}"]`), p = svgPoint(e);
+  if (b) { b.classList.add("drag"); b.setAttribute("transform", `translate(${p.x - drag.p0.x} ${p.y - drag.p0.y})`); $("board").append(b.closest(".cubby")); }
+});
+function endDrag(e) {
+  if (!drag) return;
+  const d = drag; drag = null;
+  if (!d.moved) return tap(d.i);
+  const j = cubbyAt(e.clientX, e.clientY);
+  if (j >= 0 && j !== d.i && movable(j)) doMove(["s", d.i, j]);
+  else { pick = -1; draw(); }
+}
+$("board").addEventListener("pointerup", endDrag);
+$("board").addEventListener("pointercancel", () => { drag = null; pick = -1; draw(); });
+const keys = G.gridKeys({on: () => playing(), size: () => [game.W, game.H], show: () => draw(), act: i => tap(i),
+  escape: () => { pick = -1; spin = null; G.note(""); draw(); }});
+document.addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && !$("undoBtn").disabled) { e.preventDefault(); $("undoBtn").click(); }
+});
+
+function undo() {
+  if (!game || game.won || !game.history.length) return;
+  G.closeCard();
+  game.history.pop(); game.undid = true; pick = -1; spin = null; replay(); draw(); save();
+}
+$("undoBtn").onclick = () => { if (playing() || $("overlay").classList.contains("show")) undo(); };
+function restart() {
+  if (!game || game.won || !game.history.length) return;
+  G.closeCard();
+  game.history = []; game.undid = true; pick = -1; spin = null; replay(); draw(); save();
+  G.note("Back to the start.", 3000);
+}
+$("restartBtn").onclick = restart;
+
+/* ---------- hints ---------- */
+// First a spun ball in the wrong shade (red). Then the cubby whose ball is easiest to find (the one with the most
+// settled neighbours), and asked again, the ball that goes there. Once every ball is sorted, an empty cubby, and
+// asked again, two balls either side of it to spin it from.
+function hint() {
+  if (!playing()) return;
+  const {W, H} = game, settled = i => cats.includes(i) || right(i);
+  const nb = i => { const x = i % W, y = Math.floor(i / W); return [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]].filter(([a, b]) => a >= 0 && b >= 0 && a < W && b < H).map(([a, b]) => b * W + a); };
+  const badSpun = holes.filter(i => game.spun[i] && !right(i));
+  if (badSpun.length) return hints.show({cells: [badSpun[0]], bad: true}, `That spun ball isn't quite the right shade. Tap it to spin it again.${badSpun.length > 1 ? ` (and ${badSpun.length - 1} more)` : ""}`);
+  const wrong = [...Array(W * H).keys()].filter(i => movable(i) && !right(i));
+  game.hinted = true; save();
+  if (wrong.length) {
+    const c = wrong.map(i => [nb(i).filter(settled).length, Math.random(), i]).sort((a, b) => b[0] - a[0] || a[1] - b[1])[0][2];
+    if (!hints.level()) return hints.show({cells: [c]}, "Find the ball that belongs in the gold cubby.");
+    return hints.show({cells: [c], rings: [game.balls.indexOf(c)]}, "The ringed ball goes in the gold cubby. Swap them.");
+  }
+  const h = holes.find(i => !right(i));
+  if (h === undefined) return;
+  if (!hints.level()) return hints.show({cells: [h]}, "Spin a ball for the gold cubby from two balls either side of it.");
+  hints.show({cells: [h], rings: [h - 1, h + 1].map(j => game.balls.indexOf(j))}, "Spin it from the two ringed balls: tap the cubby, then each ball.");
+}
+$("hintBtn").onclick = hint;
+
+/* ---------- endings ---------- */
+function win() {
+  game.won = true; pick = -1; spin = null;
+  G.finishClock(game);
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save();
+  draw();
+  G.track(`Shelf Life solved level ${game.level}`);
+  build.prefetch(next);
+  const g = game;
+  setTimeout(() => { if (game === g) finishCard(); }, 1600);
+}
+function fredPic() { const im = new Image(); im.className = "fredpic"; im.src = catSrc("fred-16"); im.alt = "Fred, crouched and wiggling, about to pounce"; return im; }
+function finishCard() {
+  const next = settings.level, s = swaps(), f = fewest();
+  let text = `Sorted in ${s} swap${s === 1 ? "" : "s"}${s === f ? ", the fewest it could take!" : ` (it could be done in ${f}).`}`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the shelf", game.result,
+    {title: "All in order!", gold: !game.hinted, goldWhy: "No hints used!", goldTitle: "Purrfectly sorted, Fred!", goldPic: [fredPic()], next: `Next: level ${next}`,
+     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- new shelves ---------- */
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
+function fresh(n, p) {
+  const [W, H] = levelOf(n);
+  return {level: n, W, H, corners: p.corners, start: p.balls.slice(), history: [], hinted: false, undid: false, won: false, ...G.freshClock()};
+}
+function begin(g) { game = g; pick = -1; spin = null; setUp(); replay(); }
+async function newPuzzle() {
+  if (busy) return;
+  busy = true;
+  const n = settings.level, p = await build.take(n);
+  begin(fresh(n, p));
+  busy = false; G.closeCard(); G.note(""); draw(); save();
+  build.prefetch(n);
+  G.track(`Shelf Life new puzzle level ${n}`);
+}
+
+/* ---------- sharing ---------- */
+$("linkBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Shelf Life", won: game.won,
+  puzzle: () => ({g: "shelflife", N: game.level, c: game.corners.join(""), b: game.start.join(".")}),
+  progress: () => ({h: game.history.map(h => h.join(".")).join("_")})}); };
+function openShared(d) {
+  const lv = levelOf(d.N), bad = () => G.note("That share link didn't work.", 5000);
+  if (!lv || typeof d.c !== "string" || !/^(#[0-9a-f]{6}){4}$/.test(d.c) || typeof d.b !== "string") return bad();
+  const balls = d.b.split(".").map(Number), N = lv[0] * lv[1];
+  if (balls.length !== N || balls.some(b => !Number.isInteger(b) || b < -1 || b >= N) || new Set(balls.filter(b => b >= 0)).size !== balls.filter(b => b >= 0).length) return bad();
+  const g = fresh(d.N, {corners: d.c.match(/#[0-9a-f]{6}/g), balls});
+  let hist = [];
+  if (d.p && typeof d.p.h === "string" && d.p.h) {
+    hist = d.p.h.split("_").map(s => s.split(".")).map(([t, ...r]) => [t, ...r.map(Number)]);
+    if (hist.some(h => !(h[0] === "s" && h.length === 3 || h[0] === "m" && h.length === 4) || h.slice(1).some(v => !Number.isInteger(v) || v < 0 || v >= N))) hist = [];
+  }
+  begin(g);
+  if (balls.some((b, i) => cats.includes(i) && b !== i)) { bad(); return newPuzzle(); }
+  if (hist.length) { game.history = hist; game.timed = false; replay(); }
+  settings.level = d.N; $("levelSel").value = d.N;
+  draw(); save(); build.prefetch(d.N);
+  if (done()) { game.won = true; draw(); save(); }
+}
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  settings.seenHelp = false; helpOnFirstVisit();
+  if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
+}
+function helpOnFirstVisit() {
+  if (!game || !playing() || settings.seenHelp || document.querySelector(".spot")) return;
+  const {W, H} = game, xy = i => [i % W, Math.floor(i / W)], all = [...Array(W * H).keys()];
+  const loose = all.filter(i => movable(i)), two = loose.slice(0, 2);
+  const steps = [
+    {say: "Fred knocked the yarn out of order", lit: all.map(xy)},
+    {say: "Balls with a tag stay put", lit: cats.map(xy)},
+    {say: "Tap two balls to swap them, or drag one", lit: two.map(xy)},
+    {say: "Shade the shelf smoothly, corner to corner", lit: all.map(xy), tone: "ok"},
+    ...(holes.length ? [{say: "Fred unwound these: tap one to spin a new ball", lit: holes.map(xy)},
+      {say: "Spin it from two balls either side, as far each way", lit: holes.slice(0, 1).flatMap(h => [h - 1, h, h + 1]).map(xy)}] : []),
+    {say: "Stuck? Hint marks a cubby to fix", els: [$("hintBtn")]},
+  ];
+  G.spotlight({grid: $("board"), w: W, h: H, steps, map, done: () => { settings.seenHelp = true; save(); }});
+}
+// Where the cubbies are on the page.
+function map() {
+  const r = $("board").getBoundingClientRect(), vb = $("board").viewBox.baseVal, k = r.width / vb.width;
+  return {ox: r.left - vb.x * k, oy: r.top - vb.y * k, cw: U * k, ch: U * k};
+}
+
+/* ---------- start ---------- */
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", "") + (n === MAX_LEVEL ? " (hardest)" : ""), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
+$("helpBtn").onclick = showHelp;
+$("shelfTgl").checked = settings.shelf;
+$("shelfTgl").onchange = e => { settings.shelf = e.target.checked; save(); draw(); };
+
+G.nav("shelflife");
+G.checkClock(game);
+G.setupTimer({name: "shelflife", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level",
+  emptyText: "Sort a shelf and your times will show up here. They're kept on this device only."});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+const shared = G.readShare("shelflife");
+if (game && Array.isArray(game.start)) G.reopen(() => {
+    const lv = levelOf(game.level);
+    if (!lv || game.start.length !== game.W * game.H || game.W !== lv[0] || game.corners.length !== 4) throw new Error("the saved shelf doesn't fit its level");
+    begin(game); draw();
+    if (game.won) finishCard(); else helpOnFirstVisit();
+    build.prefetch(settings.level);
+  }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
+else if (!shared) newPuzzle().then(helpOnFirstVisit);
+const shareOpts = () => ({name: "Shelf Life", inProgress: !!(game && !game.won && game.history.length), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, shareOpts());
+window.addEventListener("hashchange", () => { const d = G.readShare("shelflife"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
