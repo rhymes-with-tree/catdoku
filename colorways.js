@@ -1,5 +1,5 @@
-/* Colorways shared by the Catdoku family of games (Yarn's balls, Twirl's ribbons), and the color math
-   for blending along them. Each colorway runs light to dark or through a few hues, and every color is
+/* Colorways shared by the Catdoku family of games (Yarn's balls, Twirl's ribbons), the color math
+   for blending along them, and the balls of yarn themselves (Yarn, Unravel, Tangle and Shelf Life). Each colorway runs light to dark or through a few hues, and every color is
    drawn from the brand palette in index.html. */
 // Colorways change along any mix of hue, lightness and saturation; each puzzle may run one either way.
 // All of them are drawn from the brand palette (see index.html): its colors, their lighter and darker
@@ -60,4 +60,44 @@ function rampAt(anchors, t) {
   const x = Math.min(anchors.length - 1.0001, t * (anchors.length - 1)), i = Math.floor(x), f = x - i;
   const A = hexLab(anchors[i]), B = hexLab(anchors[i + 1]);
   return labHex(A.map((v, k) => v + (B[k] - v) * f));
+}
+
+/* ---------- balls of yarn ---------- */
+// Yarn, Unravel, Tangle and Shelf Life draw their balls of yarn alike: strands wound round three axes, shaded
+// light at the top left. The balls are drawn at radius 1 and scaled.
+// A ball's own SVG elements (each page has its own svgEl too).
+function ballEl(tag, attrs) { const el = document.createElementNS("http://www.w3.org/2000/svg", tag); for (const a in attrs) el.setAttribute(a, attrs[a]); return el; }
+// Shared clip and shading for every ball (drawn at radius 1, then scaled).
+function ballDefs() {
+  const defs = ballEl("defs", {}), clip = ballEl("clipPath", {id: "ballClip"});
+  clip.append(ballEl("circle", {r: .96}));
+  const lit = ballEl("radialGradient", {id: "ballLit", cx: .32, cy: .28, r: .75});
+  lit.append(ballEl("stop", {offset: 0, "stop-color": "#fff", "stop-opacity": .38}), ballEl("stop", {offset: .55, "stop-color": "#fff", "stop-opacity": 0}));
+  const dim = ballEl("radialGradient", {id: "ballDim", cx: .32, cy: .28, r: .95});
+  dim.append(ballEl("stop", {offset: .55, "stop-color": "#2A2530", "stop-opacity": 0}), ballEl("stop", {offset: 1, "stop-color": "#2A2530", "stop-opacity": .35}));
+  defs.append(clip, lit, dim);
+  return defs;
+}
+// Strands wound around three axes, like a real ball: each group is a set of ellipses through the same two poles.
+const WRAPS = [{rot: 18, ry: [.1, .3, .5, .7, .88]}, {rot: 108, ry: [.2, .45, .7]}, {rot: -40, ry: [.35, .62]}];
+// A darker strand shade: lower lightness (less for pale balls), same hue; yellows lean gold instead of going olive.
+function strandShade(color) {
+  const [L, a, b] = hexLab(color), C = Math.hypot(a, b) * 1.15;
+  let h = Math.atan2(b, a) * 180 / Math.PI;
+  if (h > 75 && h < 102) h -= 22;
+  return labHex([L - Math.min(.3, L * .4), C * Math.cos(h * Math.PI / 180), C * Math.sin(h * Math.PI / 180)]);
+}
+function yarnBall(color, r) {
+  const dark = strandShade(color), light = rampAt([color, "#FFFFFF"], .5);
+  const g = ballEl("g", {transform: `scale(${r})`});
+  g.append(ballEl("ellipse", {cx: .04, cy: .97, rx: .7, ry: .12, fill: "#2A2530", "fill-opacity": .13}));
+  g.append(ballEl("circle", {r: 1, fill: color}));
+  const w = ballEl("g", {"clip-path": "url(#ballClip)"});
+  for (const {rot, ry} of WRAPS) for (const k of ry) {
+    w.append(ballEl("ellipse", {rx: 1, ry: k, fill: "none", "stroke-width": .05, stroke: light, "stroke-opacity": .8, transform: `rotate(${rot}) translate(0 -.045)`}));
+    w.append(ballEl("ellipse", {rx: 1, ry: k, fill: "none", "stroke-width": .05, stroke: dark, transform: `rotate(${rot})`}));
+  }
+  g.append(w, ballEl("circle", {r: 1, fill: "url(#ballDim)"}), ballEl("circle", {r: 1, fill: "url(#ballLit)"}),
+    ballEl("circle", {r: 1, fill: "none", stroke: dark, "stroke-width": .07}));
+  return g;
 }

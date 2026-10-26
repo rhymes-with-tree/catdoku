@@ -793,10 +793,27 @@ def birdwatch():
     return frame(tint(PERI, .5), out)
 
 
+# Shelf Life: a pale shelf of nine balls of yarn shading from corner to corner, with a tag on the one in the corner.
+def shelflife():
+    def mix(a, b, t):
+        return "#" + "".join(f"{round(int(a[k:k + 2], 16) * (1 - t) + int(b[k:k + 2], 16) * t):02X}" for k in (1, 3, 5))
+    corners = (tint(YELLOW, .55), ORANGE, TEAL, PLUM)
+    out = f'<rect x="13" y="13" width="74" height="74" rx="4" fill="{PAPER}" stroke="{INK}" stroke-width="3"/>'
+    for r in range(3):
+        for c in range(3):
+            x, y = 16 + c * 23, 16 + r * 23
+            top, bottom = mix(corners[0], corners[1], c / 2), mix(corners[2], corners[3], c / 2)
+            out += f'<rect x="{x}" y="{y}" width="22" height="22" rx="2" fill="{tint(INK, .1)}"/>'
+            out += yarnball(x + 11, y + 12, 8.5, mix(top, bottom, r / 2))
+    out += (f'<path d="M19 21Q22 24 24 25" fill="none" stroke="{INK}" stroke-width="1.2"/>'
+            f'<g transform="translate(19 20) rotate(-35)"><path d="M-2 0L3 -4.5H12V4.5H3Z" fill="#fff" stroke="{INK}" stroke-width="1.5" stroke-linejoin="round"/></g>')
+    return frame(PAPER, out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")
