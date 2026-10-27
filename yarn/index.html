@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-27.6";
+  var BUILD = "2026-10-27.7";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-27.6">
+<link rel="stylesheet" href="../games.css?v=2026-10-27.7">
 <style>
 .board{background:var(--panel)}
 .cell{border-top:1px solid var(--line);border-left:1px solid var(--line);cursor:pointer}
@@ -114,8 +114,8 @@ main{--kw:min(calc(var(--board) * .34), 170px);--tw:min(calc(var(--board) * .52)
 
 </main>
 
-<script src="../games.js?v=2026-10-27.6"></script>
-<script src="../colorways.js?v=2026-10-27.6"></script>
+<script src="../games.js?v=2026-10-27.7"></script>
+<script src="../colorways.js?v=2026-10-27.7"></script>
 <script>
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 function nbrs(i,N){const r=Math.floor(i/N),c=i%N,o=[];if(r>0)o.push(i-N);if(r<N-1)o.push(i+N);if(c>0)o.push(i-1);if(c<N-1)o.push(i+1);return o;}
@@ -476,7 +476,21 @@ $("linkBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Yarn", won
   puzzle: () => ({g: "yarn", N: game.N, clue: game.clue, path: game.path, colorway: game.colorway, colors: game.colors}),
   progress: () => ({trail: game.trail})}); };
 // A puzzle from a share link, with its strand so far if one was sent (that isn't timed).
+// A shared board is checked before anything changes: a size on the list, a path through every square one step at
+// a time, balls numbered 1 to K (with a colour each, or none in links from before colourways), and progress (if
+// any) as squares on the board.
+function sharedOK(d) {
+  const N = d.N, sq = N * N;
+  const ints = (a, len, max, min = 0) => Array.isArray(a) && (len < 0 || a.length === len) && a.every(v => Number.isInteger(v) && v >= min && v < max);
+  if (![...$("size").options].some(o => +o.value === N) || !ints(d.clue, sq, sq + 1) || !ints(d.path, sq, sq) || new Set(d.path).size !== sq) return false;
+  if (d.path.some((k, i) => i && Math.abs(k % N - d.path[i - 1] % N) + Math.abs(Math.floor(k / N) - Math.floor(d.path[i - 1] / N)) !== 1)) return false;
+  const K = Math.max(...d.clue);
+  if (K < 1 || (d.colors != null && (typeof d.colorway !== "string" || !Array.isArray(d.colors) || d.colors.length !== K || !d.colors.every(c => typeof c === "string")))) return false;
+  return !d.p || ints(d.p.trail, -1, sq);
+}
 function openShared(d) {
+  if (!sharedOK(d)) { G.note("That share link didn't work.", 5000); return; }
+  if (d.colors == null) d = {...d, ...yarnColors(Math.max(...d.clue), settings.shades)};
   game = {N: d.N, clue: d.clue, path: d.path, trail: d.p ? d.p.trail : [], history: [], won: false,
           colorway: d.colorway, colors: d.colors, ...G.freshClock()};
   if (d.p) game.timed = false;
@@ -488,11 +502,13 @@ $("numTgl").checked = settings.numbers;
 $("shades").value = settings.shades;
 $("size").value = settings.size;
 if (game && game.clue && !game.colorway) Object.assign(game, yarnColors(Math.max(...game.clue), settings.shades));
-if (game && game.clue) G.reopen(() => { buildBoard(); render(); if (game.won) finishCard(); build.prefetch(game.N); helpOnFirstVisit(); },
+const hadSave = !!(game && game.clue);
+if (hadSave) G.reopen(() => { buildBoard(); render(); if (game.won) finishCard(); build.prefetch(game.N); helpOnFirstVisit(); },
   why => { game = null; busy = false; newPuzzle().then(() => G.note(why, 0)); });
 else if (!shared) newPuzzle().then(helpOnFirstVisit);
 const shareOpts = () => ({name: "Yarn", inProgress: !!(game && game.clue && !game.won && game.history.length), open: openShared, after: helpOnFirstVisit});
-if (shared) G.offerShare(shared, shareOpts());
+// a link that doesn't work, opened with no saved puzzle, would leave the board empty: start one
+if (shared) G.offerShare(shared, {...shareOpts(), fresh: hadSave ? null : why => Promise.resolve(newPuzzle()).then(() => { G.note(why, 6000); helpOnFirstVisit(); })});
 // A share link opened while this page is already showing only changes the address, so watch for it.
 window.addEventListener("hashchange", () => { const d = G.readShare("yarn"); if (d) G.offerShare(d, shareOpts()); });
 </script>
