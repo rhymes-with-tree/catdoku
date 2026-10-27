@@ -74,7 +74,10 @@ in its notes.
   labelled Restart, never Clear), then the game's own buttons (Flip, Notes, Mark…), then `linkBtn` (labelled Share; content
   blockers hide anything whose id or class has "share" in it, so never use the word there),
   `toysBtn` if it uses toys, `bestBtn` (Best times) and `helpBtn` (How to play). Leave out what the game
-  doesn't have, but don't reorder. Undo also answers Ctrl+Z / ⌘Z (but not with Shift). Restart always puts
+  doesn't have, but don't reorder. `games.js` turns them into icons with the word small underneath (its `ICON_OF`
+  table, by id): give a new kind of button an icon there (or `data-icon` where an id means something else in this
+  game), and change a button's word with `G.relabel(btn, words, icon)`, never `textContent`, or the icon goes.
+  The game's ☆ goes just after its name in the title by itself. Undo also answers Ctrl+Z / ⌘Z (but not with Shift). Restart always puts
   back this same puzzle as it was dealt; `newBtn` deals a different one. Every game has Share, and New unless
   levels are a fixed list.
 - **Settings row** (`.bar`, under the buttons): `levelSel` labelled "Level" (or `size` labelled "Size"),

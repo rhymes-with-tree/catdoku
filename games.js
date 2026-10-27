@@ -134,7 +134,7 @@ const G = (() => {
   }
   // A star button that adds a game to the favorites or takes it off; every star for that game on the page follows,
   // and `onChange` runs after (to redraw a Favorites row). `withLabel` adds a word, for a game's own page.
-  function favStar(slug, onChange, withLabel) {
+  function favStar(slug, onChange, withLabel, say = withLabel) {
     const b = document.createElement("button"), name = (GAMES.find(g => g[1] === slug) || [slug])[0];
     b.type = "button"; b.className = "favStar" + (withLabel ? " labelled" : ""); b.dataset.slug = slug;
     b.onclick = e => {
@@ -142,7 +142,7 @@ const G = (() => {
       const on = toggleFavorite(slug);
       document.querySelectorAll(".favStar").forEach(x => x.dataset.slug === slug && x.refresh());
       if (onChange) onChange();
-      if (withLabel) note(on ? `${name} is in your favorites, at the top of the front page.` : `${name} is out of your favorites.`, 3500);
+      if (say) note(on ? `${name} is in your favorites, at the top of the front page.` : `${name} is out of your favorites.`, 3500);
     };
     b.refresh = () => {
       const on = favorites().includes(slug);
@@ -225,9 +225,13 @@ const G = (() => {
     btn.onclick = e => { e.stopPropagation(); show(panel.hidden); };
     document.addEventListener("click", e => { if (!panel.hidden && !el.contains(e.target)) show(false); });
     document.addEventListener("keydown", e => { if (e.key === "Escape" && !panel.hidden) { show(false); btn.focus(); } });
-    // on a game's page, its own star beside the menu button
+    // on a game's page, its own star just after the game's name (in a row with it, and the cat beside it if any)
     const row = document.createElement("div"); row.className = "gamesRow"; row.append(btn);
-    if (current) row.append(favStar(current, drawFavs, true));
+    const h1 = current && document.querySelector("main header h1");
+    if (h1) {
+      if (!h1.parentElement.classList.contains("title")) { const t = document.createElement("div"); t.className = "title"; h1.before(t); t.append(h1); }
+      const st = favStar(current, drawFavs, false, true); st.classList.add("titleStar"); h1.after(st);
+    } else if (current) row.append(favStar(current, drawFavs, true));
     el.append(row, panel);
     // on today's challenge, a badge under the menu button says so
     if (current && current === dslug) {
@@ -983,6 +987,70 @@ const G = (() => {
     return c ? +c.dataset.i : -1;
   }
 
+  /* ---------- the action buttons: icons with small words under them ---------- */
+  // Every game's row of action buttons (Hint, Undo, Restart, the game's own, Share, Toys, Best times, How to play)
+  // and Twirl's zoom buttons show as icons with their word small underneath, as Toydoku's tools do. An icon is picked
+  // by the button's id, or by data-icon where one id means different things in different games (Mark). The helper
+  // rows (Bubbles, Toy Box, Bird Watch), New and the level pickers stay as buttons. Change a tool's word with
+  // relabel(), not textContent, or the icon goes.
+  const ICON = {
+    hint: '<path d="M11 20a8 8 0 1 1 10 0c-1 1-1.5 2-1.5 3h-7c0-1-.5-2-1.5-3z"/><path d="M13 27h6"/>',
+    undo: '<path d="M9 7v6h6"/><path d="M9.5 13A9 9 0 1 1 9 21"/>',
+    restart: '<path d="M25 16a9 9 0 1 1-2.6-6.4"/><path d="M23 4v6h-6"/>',
+    audit: '<circle cx="14" cy="14" r="9"/><path d="M21 21l6 6"/><path d="M10 14l3 3 5-6"/>',
+    pencil: '<path d="M21 5l6 6-14 14H7v-6z"/><path d="M18 8l6 6"/><path d="M7 27h18"/>',
+    pencils: '<path d="M23 5l5 5-12 12h-5v-5z"/><path d="M20 8l5 5"/><path d="M4 9h7M4 14h5M4 27h20"/>',
+    erase: '<path d="M18 6l8 8-11 11H9l-4-4z"/><path d="M12 12l8 8"/><path d="M15 25h11"/>',
+    pause: '<path d="M11 7v18M21 7v18"/>',
+    play: '<path d="M10 6l16 10-16 10z"/>',
+    guess: '<rect x="6" y="6" width="20" height="20" rx="4"/><circle cx="11.5" cy="11.5" r="1.3"/><circle cx="16" cy="16" r="1.3"/><circle cx="20.5" cy="20.5" r="1.3"/>',
+    giveup: '<path d="M8 28V5"/><path d="M8 6h15l-3 5 3 5H8"/>',
+    cat: '<path d="M7 13L8 4l6 5h4l6-5 1 9c2 4 1 9-3 11-3 2-11 2-14 0-4-2-5-7-2-11z"/><path d="M12.5 17v.5M19.5 17v.5M14.5 21.5h3"/>',
+    marks: '<path d="M5 10l8 8M13 10l-8 8"/><path d="M18 11h9M18 17h9"/>',
+    keep: '<path d="M9 5h14v22l-7-5-7 5z"/>',
+    shuffle: '<path d="M4 10h5c7 0 8 12 15 12h4"/><path d="M24 18l4 4-4 4"/><path d="M4 22h5c2 0 3.5-1.5 5-3.5M18 12.5c1.5-1.5 3-2.5 6-2.5h4"/><path d="M24 6l4 4-4 4"/>',
+    flip: '<path d="M16 4v24"/><path d="M12 8L4 22h8z"/><path d="M20 8l8 14h-8z"/>',
+    near: '<path d="M6 12.5c3-3 6 3 10 0s7 3 10 0M6 19.5c3-3 6 3 10 0s7 3 10 0"/>',
+    check: '<circle cx="16" cy="16" r="11"/><path d="M11 16.5l3.5 3.5 6.5-7.5"/>',
+    skip: '<path d="M7 7l12 9-12 9z"/><path d="M24 7v18"/>',
+    share: '<path d="M16 4v15"/><path d="M10 10l6-6 6 6"/><path d="M9 15H8v12h16V15h-1"/>',
+    toys: '<circle cx="16" cy="16" r="10"/><path d="M7 12c6 2.5 12 2.5 18 0M7.5 21c5-2.5 12-2.5 17 0M16 6c-3 6-3 14 0 20"/>',
+    best: '<path d="M10 5h12v6a6 6 0 0 1-12 0z"/><path d="M10 8H6v1.5a4 4 0 0 0 4 4M22 8h4v1.5a4 4 0 0 1-4 4"/><path d="M16 17v5"/><path d="M11 27h10M13 22h6v5h-6z"/>',
+    help: '<circle cx="16" cy="16" r="11"/><path d="M12.5 12.5a3.5 3.5 0 1 1 5 3.2c-1 .5-1.5 1.3-1.5 2.3V19"/><path d="M16 23v.2"/>',
+    zoomin: '<circle cx="14" cy="14" r="9"/><path d="M21 21l6 6"/><path d="M14 10v8M10 14h8"/>',
+    zoomout: '<circle cx="14" cy="14" r="9"/><path d="M21 21l6 6"/><path d="M10 14h8"/>',
+    fit: '<path d="M5 11h6V5M27 11h-6V5M5 21h6v6M27 21h-6v6"/>',
+    palette: '<path d="M16 5C9.5 5 5 9.5 5 15.5S9.5 27 15 27c2 0 2.5-1.2 2-2.6-.6-1.6.4-3.4 2.4-3.4H23c2.5 0 4-1.8 4-4.4C27 9.8 22.5 5 16 5z"/><circle cx="11" cy="14" r="1.3"/><circle cx="15" cy="10" r="1.3"/><circle cx="20.5" cy="11" r="1.3"/>',
+  };
+  const ICON_OF = {hintBtn: "hint", undoBtn: "undo", backBtn: "undo", restartBtn: "restart", auditBtn: "audit", notesBtn: "pencil",
+    allNotesBtn: "pencils", clearNotesBtn: "erase", eraseBtn: "erase", pauseBtn: "pause", guessBtn: "guess", giveUpBtn: "giveup",
+    keepBtn: "keep", shuffleBtn: "shuffle", flipBtn: "flip", finishBtn: "near", completeBtn: "check", skipBtn: "skip",
+    colBtn: "palette", linkBtn: "share", toysBtn: "toys", bestBtn: "best", helpBtn: "help", zoomIn: "zoomin", zoomOut: "zoomout", zoomFit: "fit"};
+  const iconSVG = name => `<svg class="ic" viewBox="0 0 32 32" aria-hidden="true">${ICON[name]}</svg>`;
+  function relabel(b, text, icon) {
+    const l = b.querySelector(".lbl");
+    if (!l) { b.textContent = text; return; }
+    l.textContent = text;
+    if (icon && ICON[icon]) b.querySelector(".ic").outerHTML = iconSVG(icon);
+  }
+  function toolify() {
+    for (const row of document.querySelectorAll("main .actions:not(.helpers), main .zoom")) {
+      if (row.closest(".wall")) continue;   // Cat Burglar's zoom sits on the painting
+      let any = false;
+      for (const b of row.querySelectorAll(":scope > button")) {
+        const name = b.dataset.icon || ICON_OF[b.id];
+        if (!name || !ICON[name]) continue;
+        // the button's own words, without an emoji the icon now stands for
+        const text = b.textContent.trim(), words = (text.length > 1 ? text : b.getAttribute("aria-label") || text)
+          .replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF\uFE0F]/gu, "").replace(/\s+/g, " ").trim();
+        b.innerHTML = iconSVG(name) + `<span class="lbl">${words}</span>`;
+        b.classList.add("tool"); any = true;
+      }
+      if (any) row.classList.add("tools");
+    }
+  }
+  toolify();
+
   /* ---------- sideways ---------- */
   // True while a phone held sideways has the board on the left and the rest beside it (games.css, main > .stage),
   // for a page that sizes its board in script.
@@ -1002,7 +1070,9 @@ const G = (() => {
     const screenFull = () => document.fullscreenElement || document.webkitFullscreenElement;
     o.btn.classList.add("fsBtn");
     o.btn.innerHTML = '<svg class="enter" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8V3h5M12 3h5v5M17 12v5h-5M8 17H3v-5"/></svg>' +
-      '<svg class="leave" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 3v5H3M17 8h-5V3M12 17v-5h5M3 12h5v5"/></svg>';
+      '<svg class="leave" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 3v5H3M17 8h-5V3M12 17v-5h5M3 12h5v5"/></svg>' +
+      (o.btn.closest(".tools, .bar") ? '<span class="lbl">Full screen</span>' : "");   // with the tools or settings, a word under it too
+    if (o.btn.closest(".tools, .bar")) o.btn.classList.add("tool");
     const label = on => { o.btn.setAttribute("aria-label", on ? "Leave full screen" : "Full screen"); o.btn.title = on ? "Leave full screen (F)" : "Full screen (F)"; };
     function set(on) {
       document.body.classList.toggle("full", on);
@@ -1049,6 +1119,6 @@ const G = (() => {
     }
   }
 
-  return {GAMES, GROUPS, SHELF_COLOUR, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, meaning, plainText,
+  return {GAMES, GROUPS, SHELF_COLOUR, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, relabel, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();
