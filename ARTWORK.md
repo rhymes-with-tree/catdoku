@@ -56,8 +56,8 @@ Cat Pile lays the napping cats from Sunbeams (the `SLEEPERS` list, the same in b
   blaze, white ears, one tabby patch behind the left shoulder and a sky-blue collar, as in photos of him). `kitten-star.webp`, the kitten freed in Bubbles, is Fred too
   (sometimes called Fred Kitten). Fred is the star of Pick of the Pile too: `fred-7` sits beside its title, `fred-11` curls up asleep on
   the rug once the pile of toy blocks is gone, and `fred-22` leaps on the gold-paw card. Fred is the star of Shelf Life too: `fred-9` sits beside its title,
-  `fred-23` prowls on the floor below the shelf of yarn he knocked out of order, `fred-17` stretches out there once it's
-  sorted, and `fred-16` crouches to pounce on the gold-paw card.
+  `fred-23` prowls on the floor below the shelf of yarn he knocked out of order, Dottie (`dottie-22`, with her teal crochet)
+  settles in there once it's sorted, and `fred-16` crouches to pounce on the gold-paw card.
 
 Shelf Life's skeins of yarn (`shelflife/skeins/skein-1` to `-9`) are the owner's drawing of nine shop-wound skeins, all near enough square, cut apart:
 each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the game fills with the ball's colour.
