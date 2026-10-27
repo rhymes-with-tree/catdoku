@@ -51,7 +51,7 @@ Every game moves you up as you win: the next puzzle is a size bigger (or, in Toy
 ## Patches
 
 A third puzzle in `patches/`: sew a quilt by giving every patch one of four fabrics so no two patches that share a seam match.
-Patches with a button come already sewn. Every quilt is generated in the browser and checked to have exactly one solution.
+Patches with a button come already sewn. Not sure of a patch? Pick Marker (after the four fabrics) and tap it to put your own button on it as a reminder; it doesn't sew the patch, and tapping again takes it off. Every quilt is generated in the browser and checked to have exactly one solution.
 Hint names the fabric for the open patch with the fewest choices left, or tints a patch in the wrong fabric red.
 
 ## Sunbeams
