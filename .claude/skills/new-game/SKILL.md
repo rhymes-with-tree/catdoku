@@ -206,7 +206,14 @@ and anything drawn on or around it (often `.wrap`). The rest of `main` becomes t
 - **Decorations.** A cat or picture over the board's top edge needs room inside the stage (padding-top, with
   `--tall` less that much: `pawlette/`, `twirl/`); one hanging below or beside the board, with no room for it,
   is put away there (`patches/`, `yarn/`). Padding kept for a decoration in the column goes too (`patches/`).
-- **Leave it out** when the board is much wider than tall (Fish Bones, Fridge Magnets): stacked, it already fits.
+- **A pad or tray that goes with the board** (numbers, letters) stands beside it inside the stage, in as many columns
+  as fit the height (`purrfect/`, `magnets/`), or, if it's outside the board's box, comes near the top of the column
+  (`stash/`). Never let it fall below the fold: you can't play without it.
+- **A board much wider than tall** adds `wide` (`.stage.wide`): it keeps the whole width under a slim row with the
+  title and menu, sized to the height left; `--below` keeps room for something under it. Set `--aspect` from the
+  board's real shape (`fishbones/`); a keyboard can go beside it (`upatree/`).
+- **A game you aim or shoot "up"** may read better turned on its side (`bubbles/`: the cat on the left shooting
+  right, with pictures and words kept upright, and taps, arrow keys and walkthrough turned with it).
 - **Full screen** keeps its own layout: the shared rule only applies without `body.full`.
 - A page whose board can't be one box of `main` lays it out itself in the same way (see `keyboardcat/`).
 
