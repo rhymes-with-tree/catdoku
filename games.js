@@ -1037,6 +1037,7 @@ const G = (() => {
     zoomout: '<circle cx="14" cy="14" r="9"/><path d="M21 21l6 6"/><path d="M10 14h8"/>',
     fit: '<path d="M5 11h6V5M27 11h-6V5M5 21h6v6M27 21h-6v6"/>',
     plus: '<path d="M16 7v18M7 16h18"/>',
+    level: '<path d="M5 26h6v-6h6v-6h6V8h4"/>',
     go: '<circle cx="16" cy="16" r="11"/><path d="M11 16h10M17 11.5l4.5 4.5-4.5 4.5"/>',
     sight: '<circle cx="16" cy="16" r="10"/><circle cx="16" cy="16" r="4.5"/><path d="M16 3v5M16 24v5M3 16h5M24 16h5"/>',
     catnip: '<path d="M7 25C7 13 14 6 26 6c0 12-7 19-19 19z"/><path d="M7 25l11-11"/>',
@@ -1074,6 +1075,14 @@ const G = (() => {
       b.innerHTML = iconSVG(name) + `<span class="lbl">${b.textContent.trim()}</span>`; b.classList.add("lead");
     }
     for (const b of document.querySelectorAll("main .bar > #chooseBtn")) makeTool(b);
+    // the Level (or Size, or Round) picker: a step icon in place of its word; the menu keeps the word as its name
+    for (const sel of document.querySelectorAll("main .bar label > select#levelSel, main .bar label > select#size")) {
+      const label = sel.parentElement;
+      for (const n of [...label.childNodes]) if (n.nodeType === 3) n.remove();
+      label.insertAdjacentHTML("afterbegin", iconSVG("level")); label.classList.add("picker");
+      if (!sel.getAttribute("aria-label")) sel.setAttribute("aria-label", "Level");
+      label.title = sel.getAttribute("aria-label");
+    }
     for (const row of document.querySelectorAll("main .actions, main .zoom")) {
       if (row.closest(".wall")) continue;   // Cat Burglar's zoom sits on the painting
       let any = false;
