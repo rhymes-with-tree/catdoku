@@ -810,10 +810,21 @@ def shelflife():
     return frame(PAPER, out)
 
 
+# Meowbile: a mobile hanging level from the ceiling, two toys on one end balancing one on the other, with a weight
+# badge on each.
+def meowbile():
+    out = (f'<rect x="38" y="13" width="24" height="5" rx="2" fill="{INK}"/><path d="M50 18V32M24 32V44M76 32V44M24 58V64" stroke="{INK}" stroke-width="1.8"/>'
+           f'<path d="M22 32H78" stroke="{INK}" stroke-width="4" stroke-linecap="round"/>' + circle(50, 32, 3.5, PAPER, 2))
+    for x, y, c in ((24, 51, TEAL), (24, 71, YELLOW), (76, 51, PLUM)):
+        out += yarnball(x, y, 7.5, c)
+    for x, y, v in ((31, 57, "2"), (31, 77, "?"), (83, 57, "5")):
+        out += circle(x, y, 5.5, PAPER, 1.8) + text(x, y + .5, v, 9)
+    return frame(tint(PERI, .2), out)
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")

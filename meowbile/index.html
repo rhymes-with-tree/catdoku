@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Meowbile</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-27.3"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-27.3">
+<style>
+/* A cat's mobile: rods hang from their middles, with a string of toys or another rod at each end. Every rod
+   balances. Tap a toy (or its button in the key) and then a number to say what that kind of toy weighs; a rod
+   whose toys are all weighed tips towards its heavier side. */
+.title{display:flex;align-items:flex-end;gap:8px}
+.looker{display:block;height:54px;width:auto;margin-bottom:-2px}
+@media (max-height:760px){.looker{height:40px}}
+.card img.leaper{display:block;width:80%;max-width:280px;height:auto;margin:0 auto 14px}
+.sky{--sky:color-mix(in srgb,var(--periwinkle) 13%,#fff);height:auto;background:var(--sky);border:3px solid var(--ink);border-radius:10px;
+  overflow:hidden;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.sky svg{display:block;width:100%;height:auto;max-height:calc(var(--tall) - 150px);min-height:160px;outline:none}
+.rod{stroke:var(--ink);stroke-width:7;stroke-linecap:round}
+.string{stroke:var(--ink-soft);stroke-width:2.5}
+.knot{fill:var(--ink)}
+.pivot{fill:var(--panel);stroke:var(--ink);stroke-width:4}
+.ceiling{fill:var(--ink)}
+.swing{transition:transform .45s cubic-bezier(.3,1.5,.5,1)}
+.toy{cursor:pointer}
+.toy .ring{fill:none;stroke:transparent;stroke-width:6}
+.toy.sel .ring{stroke:var(--spring-blue)}
+.badge circle{fill:var(--panel);stroke:var(--ink);stroke-width:3}
+.badge text{font:800 30px var(--font);fill:var(--ink);text-anchor:middle;dominant-baseline:central}
+.badge.unknown text{fill:var(--ink-soft)}
+.badge.given circle{fill:color-mix(in srgb,#ECA818 40%,#fff)}
+.tag rect{fill:color-mix(in srgb,#ECA818 40%,#fff);stroke:var(--ink);stroke-width:3}
+.tag text{font:800 30px var(--font);fill:var(--ink);text-anchor:middle;dominant-baseline:central}
+.tag.off rect{fill:color-mix(in srgb,#C8392B 22%,#fff)}
+/* the key: one button per kind of toy, with its weight */
+.key{width:var(--board);display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+.key button{display:flex;align-items:center;gap:4px;padding:3px 10px 3px 4px;border-radius:999px;font-size:22px;font-weight:800;line-height:1}
+.key button img{width:34px;height:34px;display:block}
+.key button .v{min-width:.7em;text-align:center}
+.key button.unknown .v{color:var(--ink-soft)}
+.key button[aria-pressed="true"]{background:var(--panel);color:var(--ink);border-color:var(--spring-blue);box-shadow:0 0 0 2px var(--spring-blue)}
+.key button.given{background:color-mix(in srgb,#ECA818 30%,var(--panel));cursor:default}
+.key button.hintkey{box-shadow:0 0 0 4px #ECA818}
+.key button.hintkey.bad{box-shadow:0 0 0 4px #C8392B}
+.pad{width:var(--board);display:flex;gap:5px;justify-content:center}
+.pad button{flex:1 1 0;max-width:54px;padding:5px 0;font-size:22px;font-weight:800;line-height:1.1}
+.pad button.erase{font-size:18px}
+@media (max-width:360px){.key button{font-size:19px;padding:2px 8px 2px 3px}.key button img{width:28px;height:28px}}
+</style>
+</head>
+<body>
+<main>
+  <header><div class="title"><h1>Meowbile</h1><img class="looker" src="../cats/c18-21.webp" alt="A calico cat sitting and looking up"></div><div class="stripe"></div><p class="tagline">Weigh the toys on the cat's mobile</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap sky" id="board"><svg id="svg" tabindex="0" role="application" aria-label="A mobile of toys. Tap a toy, then a number for its weight; arrow keys pick a toy and number keys weigh it."></svg></div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+  <div class="key" id="key" aria-label="Toys"></div>
+  <div class="pad" id="pad" aria-label="Weights"></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="linkBtn">Share</button>
+    <button id="toysBtn">Toys</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New mobile</button>
+  </div>
+
+</main>
+
+<script src="../games.js?v=2026-10-27.3"></script>
+<script>
+/* ---------- mobiles (plain functions, also run in a background worker) ---------- */
+// A mobile is a tree: a rod {l, r} hangs from its middle with a branch at each end (both ends the same distance
+// out), and a branch is another rod or a string of toys {toys: [kind…]}, top to bottom. Every rod balances, so
+// its two sides weigh the same. Each kind of toy weighs a whole number from 1 to 9. The clue is the whole
+// mobile's weight, on the tag at the hook, or one kind's weight.
+// Levels: K kinds of toy, R rods, the clue, and the reasoning: "one" needs only a rod (or the tag) with one kind
+// still unknown, "two" needs at least one step that takes two together.
+function levelSpec(n) {
+  return [null,
+    {K: 2, R: 1, clue: "total", step: "one"},
+    {K: 3, R: 2, clue: "total", step: "one"},
+    {K: 3, R: 2, clue: "toy", step: "one"},
+    {K: 4, R: 3, clue: "total", step: "one"},
+    {K: 4, R: 3, clue: "toy", step: "one"},
+    {K: 4, R: 3, clue: "any", step: "two"},
+    {K: 5, R: 4, clue: "any", step: "one"},
+    {K: 5, R: 4, clue: "any", step: "two"},
+    {K: 6, R: 5, clue: "any", step: "two"},
+    {K: 6, R: 6, clue: "toy", step: "two"}][n];
+}
+// The parts of a mobile, depth first, each {node, depth, parent}: part 0 is the top rod.
+function nodesOf(tree) {
+  const out = [];
+  (function walk(t, depth, parent) { const i = out.length; out.push({node: t, depth, parent}); if (!t.toys) { walk(t.l, depth + 1, i); walk(t.r, depth + 1, i); } })(tree, 0, -1);
+  return out;
+}
+// How many of each kind hang from a part.
+function countsOf(t, K) {
+  const c = new Array(K).fill(0);
+  (function walk(t) { if (t.toys) for (const k of t.toys) c[k]++; else { walk(t.l); walk(t.r); } })(t);
+  return c;
+}
+// What a mobile says, as equations over the kinds' weights, each {c (how many of each kind), v, at (the part it's
+// about, or -1 for a kind's given weight), half (true: a part weighing half of what's above it)}: the sum of
+// c[k] × weight[k] is v. Each rod's sides weigh the same (c is one side less the other); with the whole weight
+// on the tag, every part weighs its share of it.
+function equationsOf(p) {
+  const K = p.K, nodes = nodesOf(p.tree), eqs = [];
+  nodes.forEach((n, i) => {
+    if (n.node.toys) return;
+    const a = countsOf(n.node.l, K), b = countsOf(n.node.r, K);
+    eqs.push({c: a.map((x, k) => x - b[k]), v: 0, at: i});
+  });
+  if (p.clue.total != null) nodes.forEach((n, i) => eqs.push({c: countsOf(n.node, K), v: p.clue.total / 2 ** n.depth, at: i, half: i > 0}));
+  else { const c = new Array(K).fill(0); c[p.clue.kind] = 1; eqs.push({c, v: p.clue.w, at: -1}); }
+  return eqs;
+}
+// Work the weights out as a person might, from those already known (null where not). Each step finds one kind's
+// weight, from one equation with only that kind still unknown ("one"), or from two equations whose unknown kinds
+// are the same two ("two"). Returns {steps (each {k, w, how, eqs}), done, w}; with `first`, stops after one step.
+function reason(p, known, first) {
+  const K = p.K, w = known.slice(), eqs = equationsOf(p), steps = [];
+  const rest = e => { let v = e.v; const u = []; for (let k = 0; k < K; k++) if (e.c[k]) { if (w[k] == null) u.push(k); else v -= e.c[k] * w[k]; } return {u, v}; };
+  for (;;) {
+    let step = null;
+    for (const e of eqs) {
+      const {u, v} = rest(e);
+      if (u.length === 1) { step = {k: u[0], w: v / e.c[u[0]], how: "one", eqs: [e]}; break; }
+    }
+    if (!step) {
+      outer: for (let i = 0; i < eqs.length; i++) {
+        const A = rest(eqs[i]); if (A.u.length !== 2) continue;
+        for (let j = 0; j < eqs.length; j++) {
+          const B = rest(eqs[j]);
+          if (j === i || B.u.length !== 2 || B.u.some(k => !A.u.includes(k))) continue;
+          const [x, y] = A.u, a1 = eqs[i].c[x], b1 = eqs[i].c[y], a2 = eqs[j].c[x], b2 = eqs[j].c[y], det = a1 * b2 - a2 * b1;
+          if (!det) continue;
+          step = {k: x, w: (A.v * b2 - B.v * b1) / det, how: "two", eqs: [eqs[i], eqs[j]]}; break outer;
+        }
+      }
+    }
+    if (!step) break;
+    w[step.k] = step.w; steps.push(step);
+    if (first) break;
+  }
+  return {steps, done: w.every(x => x != null), w};
+}
+// A random shape with R rods: start with one rod, then keep turning a string into a rod, at most three rods deep
+// so the mobile isn't too tall.
+function shapeOf(R) {
+  const tree = {l: {toys: []}, r: {toys: []}};
+  for (let r = 1; r < R; r++) {
+    const leaves = nodesOf(tree).filter(n => n.node.toys && n.depth < 3);
+    const n = leaves[Math.floor(Math.random() * leaves.length)].node;
+    delete n.toys; n.l = {toys: []}; n.r = {toys: []};
+  }
+  return tree;
+}
+// Every string of 1 to `most` toys (as a set of kinds, any order) weighing v.
+function stringsFor(v, w, most) {
+  const out = [];
+  (function add(from, left, got) {
+    if (!left) { out.push(got.slice()); return; }
+    if (got.length === most) return;
+    for (let k = from; k < w.length; k++) if (w[k] <= left) { got.push(k); add(k, left - w[k], got); got.pop(); }
+  })(0, v, []);
+  return out;
+}
+// A mobile for level n: {K, w (each kind's weight), tree, clue ({total} or {kind, w})}, or null to try again.
+// Pick the weights and the whole weight, so each string must weigh its share, then pick toys for each string
+// that weigh that much. Keep it if it uses every kind, no rod has the same toys at both ends, and the weights
+// can be worked out (so only one way) with reasoning as hard as the level asks.
+function makeMobile(n) {
+  const spec = levelSpec(n), K = spec.K;
+  const w = [1, 2, 3, 4, 5, 6, 7, 8, 9].sort(() => Math.random() - 0.5).slice(0, K);
+  const tree = shapeOf(spec.R), nodes = nodesOf(tree), leaves = nodes.filter(x => x.node.toys);
+  const deep = Math.max(...leaves.map(x => x.depth)), shallow = Math.min(...leaves.map(x => x.depth));
+  // the deepest strings weigh `unit`, so the shallowest have 2^(deep - shallow) times as much
+  const total = (Math.round((3 + Math.random() * 12) / 2 ** (deep - shallow)) || 1) * 2 ** deep;
+  for (const x of leaves) {
+    const v = total / 2 ** x.depth, opts = stringsFor(v, w, v > 18 ? 4 : 3);
+    if (!opts.length) return null;
+    x.node.toys = opts[Math.floor(Math.random() * opts.length)].sort(() => Math.random() - 0.5);
+  }
+  if (countsOf(tree, K).some(c => !c)) return null;
+  for (const x of nodes) if (!x.node.toys) { const a = countsOf(x.node.l, K), b = countsOf(x.node.r, K); if (a.every((v, k) => v === b[k])) return null; }
+  const kind = Math.floor(Math.random() * K);
+  const clue = spec.clue === "total" || (spec.clue === "any" && Math.random() < 0.5) ? {total} : {kind, w: w[kind]};
+  const p = {K, w, tree, clue}, start = new Array(K).fill(null);
+  if (clue.kind != null) start[kind] = clue.w;
+  const r = reason(p, start);
+  if (!r.done) return null;
+  const twos = r.steps.filter(s => s.how === "two").length;
+  if (spec.step === "one" ? twos : !twos) return null;
+  return p;
+}
+
+/* ---------- game state ---------- */
+// game: {level, K, w (the answer), tree, clue, looks (the toy picture for each kind), got (the weights put in,
+//        null where not), history, won…}
+const STORE = "catdoku.meowbile.v1", MAX_LEVEL = 10;
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1}, state.settings);
+let game = state.game || null, busy = false, sel = -1;
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !busy && !$("overlay").classList.contains("show");
+const levelName = n => { const s = levelSpec(n); return `Level ${n} · ${s.K} toys`; };
+const build = G.builder([levelSpec, nodesOf, countsOf, equationsOf, reason, shapeOf, stringsFor, makeMobile], "makeMobile");
+const given = k => game.clue.kind === k;
+const weightOf = k => given(k) ? game.clue.w : game.got[k];
+
+// Ten kinds of toy, one per colour, as in Pounce. Each mobile picks some kinds and one picture for each.
+const KINDS = [
+  {c: "#BD5538", looks: [["wiffle-red", "red wiffle balls"], ["swirl-red", "red swirl balls"], ["crochet-stars", "star balls"], ["tinsel", "tinsel balls"]]},
+  {c: "#ECA818", looks: [["wiffle-yellow", "yellow wiffle balls"]]},
+  {c: "#73A7AE", looks: [["wiffle-teal", "teal wiffle balls"], ["fish", "fish"]]},
+  {c: "#6AA673", looks: [["lattice", "lattice balls"]]},
+  {c: "#B3B94B", looks: [["spiky-lime", "spiky pom-poms"]]},
+  {c: "#B94588", looks: [["swirl-purple", "plum swirl balls"], ["bell-purple", "bell balls"]]},
+  {c: "#7885BA", looks: [["spring", "springs"], ["rope-blue", "rope balls"]]},
+  {c: "#825840", looks: [["cork-paw", "cork paw balls"], ["burlap-paws", "burlap balls"], ["rattan", "rattan balls"]]},
+  {c: "#5E5866", looks: [["mouse", "mice"]]},
+  {c: "#E16A4A", looks: [["felt-rainbow", "rainbow balls"], ["ribbon-tail", "ribbon balls"], ["spiky-rainbow", "spiky balls"]]},
+];
+const MIN_COLOURS = 6;
+let offToys = G.toysOff();
+const toySrc = f => `../toys/${f}.webp`;
+// One picture from a different colour for each kind of toy in the mobile, as [colour, look].
+function pickLooks(K) {
+  const ok = KINDS.map((k, i) => i).filter(i => KINDS[i].looks.some(([f]) => !offToys.has(f)));
+  const from = (ok.length >= K ? ok : KINDS.map((k, i) => i)).sort(() => Math.random() - 0.5).slice(0, K);
+  return from.map(i => [i, G.pickLook(KINDS[i], offToys)]);
+}
+const lookOf = k => KINDS[game.looks[k][0]].looks[game.looks[k][1]];
+const nameOf = k => lookOf(k)[1];
+const picOf = k => toySrc(lookOf(k)[0]);
+
+/* ---------- drawing ---------- */
+// Sizes in the drawing: a toy is TOY across, hanging STR below its rod end (or the toy above it); a rod hangs
+// STR below its own string's top. Each rod is as wide as it must be for its two branches to clear each other.
+const NS = "http://www.w3.org/2000/svg", TOY = 100, STR = 38, GAP = 20, TOP = 96, PAD = 24;
+const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+// How much room a part takes either side of where it hangs, and below: {l, r, h, a (a rod's arm)}.
+function room(t) {
+  if (t.toys) return {l: TOY / 2, r: TOY / 2, h: STR + t.toys.length * TOY + (t.toys.length - 1) * GAP};
+  const L = room(t.l), R = room(t.r), a = Math.max(L.r, R.l, TOY / 2) + GAP / 2 + 6;
+  // a tipped rod drops one end by up to a × sin(MAX_TIP)
+  return {l: a + L.l, r: a + R.r, h: STR + Math.max(L.h, R.h) + a * 0.22, a, L, R};
+}
+let swings = [], toyEls = [];   // swings: per part, the rod's tipping group (null for strings); toyEls: [kind, element]
+function draw() {
+  const svg = $("svg"), size = room(game.tree);
+  svg.innerHTML = ""; swings = []; toyEls = [];
+  const W = size.l + size.r + 2 * PAD, H = TOP + size.h + PAD;
+  svg.setAttribute("viewBox", `${-size.l - PAD} 0 ${W} ${H}`);
+  // the hook in the ceiling, and the tag with the whole weight when that's the clue
+  el("rect", {x: -40, y: 0, width: 80, height: 12, rx: 4, class: "ceiling"}, svg);
+  el("line", {x1: 0, y1: 12, x2: 0, y2: TOP, class: "string"}, svg);
+  if (game.clue.total != null) {
+    const tag = el("g", {class: "tag", id: "tag", transform: `translate(0 ${TOP * 0.55})`}, svg);
+    el("rect", {x: -48, y: -22, width: 96, height: 44, rx: 12}, tag);
+    el("text", {x: 0, y: 1}, tag).textContent = game.clue.total;
+  }
+  const hint = el("g", {id: "hints"});
+  let n = 0;
+  (function part(t, g, size) {
+    const i = n++;
+    if (t.toys) {
+      swings[i] = null;
+      el("line", {x1: 0, y1: 0, x2: 0, y2: STR, class: "string"}, g);
+      t.toys.forEach((k, j) => {
+        const y = STR + j * (TOY + GAP);
+        if (j) el("line", {x1: 0, y1: y - GAP - 4, x2: 0, y2: y + 4, class: "string"}, g);
+        const toy = el("g", {class: "toy", "data-k": k, transform: `translate(0 ${y + TOY / 2})`}, g);
+        el("circle", {r: TOY / 2 + 6, class: "ring"}, toy);
+        el("image", {href: picOf(k), x: -TOY / 2 + 4, y: -TOY / 2 + 4, width: TOY - 8, height: TOY - 8}, toy);
+        const b = el("g", {class: "badge", transform: `translate(${TOY * 0.36} ${TOY * 0.3})`}, toy);
+        el("circle", {r: 22}, b); el("text", {}, b);
+        toyEls.push([k, toy]);
+      });
+      return;
+    }
+    el("line", {x1: 0, y1: 0, x2: 0, y2: STR, class: "string"}, g);
+    const sw = el("g", {class: "swing"}, g);
+    sw.style.transform = `translate(0px, ${STR}px)`;
+    const rod = el("g", {class: "rodtip"}, sw);
+    el("line", {x1: -size.a, y1: 0, x2: size.a, y2: 0, class: "rod"}, rod);
+    for (const s of [-1, 1]) el("circle", {cx: s * size.a, cy: 0, r: 7, class: "knot"}, rod);
+    el("circle", {cx: 0, cy: 0, r: 10, class: "pivot"}, sw);
+    const kids = [];
+    for (const [s, c, cs] of [[-1, t.l, size.L], [1, t.r, size.R]]) {
+      const k = el("g", {class: "swing"}, sw);
+      kids.push(k);
+      part(c, k, cs);
+    }
+    swings[i] = {rod, kids, a: size.a};
+  })(game.tree, el("g", {transform: `translate(0 ${TOP})`}, svg), size);
+  svg.append(hint);
+  update();
+}
+// The weight of a part from the weights put in, or null while any of its kinds isn't weighed.
+function weighed(t) {
+  if (t.toys) { let s = 0; for (const k of t.toys) { const v = weightOf(k); if (v == null) return null; s += v; } return s; }
+  const a = weighed(t.l), b = weighed(t.r);
+  return a == null || b == null ? null : a + b;
+}
+// Each rod whose toys are all weighed tips towards its heavier end, more for a bigger difference.
+const MAX_TIP = 12;
+function tip() {
+  const nodes = nodesOf(game.tree);
+  nodes.forEach((x, i) => {
+    const s = swings[i]; if (!s) return;
+    const a = weighed(x.node.l), b = weighed(x.node.r);
+    let deg = a == null || b == null ? 0 : Math.max(-MAX_TIP, Math.min(MAX_TIP, (b - a) / Math.max(a, b) * 30));
+    if (game.won) deg = 0;
+    const rad = deg * Math.PI / 180, cx = s.a * Math.cos(rad), cy = s.a * Math.sin(rad);
+    s.rod.style.transform = `rotate(${deg}deg)`;
+    s.kids[0].style.transform = `translate(${-cx}px, ${-cy}px)`;
+    s.kids[1].style.transform = `translate(${cx}px, ${cy}px)`;
+  });
+}
+function update() {
+  const K = game.K;
+  for (const [k, t] of toyEls) {
+    const v = weightOf(k), b = t.querySelector(".badge");
+    b.classList.toggle("unknown", v == null); b.classList.toggle("given", given(k));
+    b.querySelector("text").textContent = v == null ? "?" : v;
+    t.classList.toggle("sel", k === sel && !game.won);
+  }
+  tip();
+  // the key and the number pad
+  const key = $("key");
+  if (key.children.length !== K) {
+    key.innerHTML = "";
+    for (let k = 0; k < K; k++) {
+      const b = document.createElement("button"), im = new Image(), v = document.createElement("span");
+      im.src = picOf(k); im.alt = ""; v.className = "v"; b.append(im, v); b.dataset.k = k;
+      b.onclick = () => choose(k);
+      key.append(b);
+    }
+  }
+  [...key.children].forEach((b, k) => {
+    const v = weightOf(k);
+    b.querySelector(".v").textContent = v == null ? "?" : v;
+    b.classList.toggle("unknown", v == null); b.classList.toggle("given", given(k));
+    b.setAttribute("aria-pressed", String(k === sel && !game.won));
+    b.setAttribute("aria-label", `${nameOf(k)}: ${given(k) ? `weigh ${v} (given)` : v == null ? "not weighed yet" : `weigh ${v}`}`);
+    b.disabled = game.won;
+  });
+  for (const b of $("pad").children) b.disabled = game.won || sel < 0 || given(sel);
+  const left = game.got.filter((v, k) => v == null && !given(k)).length;
+  $("count").textContent = game.won ? "Every rod balances!" : left ? `${left} toy${left > 1 ? "s" : ""} to weigh` : "Every toy weighed";
+  $("hintBtn").disabled = game.won;
+  $("undoBtn").disabled = !game.history.length || game.won;
+  $("restartBtn").disabled = !game.history.length || game.won;
+  paintHint();
+}
+
+/* ---------- playing ---------- */
+function choose(k) {
+  if (!playing()) return;
+  if (given(k)) { G.note(`You're told the ${nameOf(k)} weigh ${game.clue.w} each.`, 3000); sel = -1; update(); return; }
+  sel = k; update();
+}
+// Put a weight (0 takes it away) on the kind picked.
+function put(v) {
+  if (!playing() || sel < 0 || given(sel)) return;
+  const was = game.got[sel], now = v || null;
+  if (was === now) return;
+  game.started = true;
+  game.history.push([sel, was]);
+  game.got[sel] = now;
+  update();
+  if (checkWin()) return;
+  save();
+}
+function checkWin() {
+  const ws = game.got.map((v, k) => weightOf(k));
+  if (ws.some(v => v == null)) return false;
+  if (ws.every((v, k) => v === game.w[k])) { win(); return true; }
+  const total = weighed(game.tree);
+  const level = nodesOf(game.tree).every(x => x.node.toys || weighed(x.node.l) === weighed(x.node.r));
+  G.note(level && game.clue.total != null ? `Every rod balances, but the mobile weighs ${total}, not ${game.clue.total}.` : "Not quite: a rod is tipping.", 4500);
+  return false;
+}
+$("svg").addEventListener("click", e => {
+  const t = e.target.closest(".toy");
+  if (t) choose(+t.dataset.k);
+});
+for (let v = 1; v <= 9; v++) { const b = document.createElement("button"); b.textContent = v; b.onclick = () => put(v); $("pad").append(b); }
+{ const b = document.createElement("button"); b.className = "erase"; b.textContent = "⌫"; b.setAttribute("aria-label", "Take the weight away"); b.onclick = () => put(0); $("pad").append(b); }
+// Keys: the arrows pick a kind of toy, 1 to 9 weigh it, Backspace (or 0) takes the weight away, Escape lets go.
+document.addEventListener("keydown", e => {
+  if (!playing() || e.ctrlKey || e.metaKey || e.altKey || document.querySelector(".spot")) return;
+  if (e.target.closest && e.target.closest("select, input, .games")) return;
+  const K = game.K, free = [...Array(K).keys()].filter(k => !given(k));
+  if (/^[0-9]$/.test(e.key)) { if (sel < 0) sel = free[0]; put(+e.key); }
+  else if (e.key === "Backspace" || e.key === "Delete") put(0);
+  else if (["ArrowLeft", "ArrowUp", "ArrowRight", "ArrowDown"].includes(e.key)) {
+    const d = e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 1, at = free.indexOf(sel);
+    sel = free[at < 0 ? (d > 0 ? 0 : free.length - 1) : (at + d + free.length) % free.length]; update();
+  }
+  else if (e.key === "Escape") { sel = -1; update(); }
+  else return;
+  e.preventDefault();
+});
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
+
+// Undo takes back a weight, or a Restart.
+function undo() {
+  if (!playing() || !game.history.length) return;
+  game.undid = true;
+  const h = game.history.pop();
+  if (h.got) game.got = h.got; else { game.got[h[0]] = h[1]; sel = h[0]; }
+  update(); save();
+}
+$("undoBtn").onclick = undo;
+$("restartBtn").onclick = () => {
+  if (!playing() || !game.history.length) return;
+  game.undid = true;
+  game.history.push({got: game.got.slice()});
+  game.got = game.got.map(() => null);
+  update(); save();
+  G.note("Back to how the mobile started. Undo brings your weights back.", 4000);
+};
+
+/* ---------- hints ---------- */
+// First a weight that's wrong, in red. Otherwise the next kind to work out from the weights that are right: the
+// first hint rings its toys and marks the rods (or part) that give it away; the next says its weight. The player
+// puts it in. A hint keeps you on the same level and costs the gold paw.
+const hints = G.hinter({game: () => game, key: () => game ? game.got.join() : "", draw: () => paintHint()});   // marks {kinds, parts, bad}
+function paintHint() {
+  const layer = $("hints"), m = game && hints.current();
+  for (const b of $("key").children) b.classList.remove("hintkey", "bad");
+  if (!layer) return;
+  layer.innerHTML = "";
+  if (!m) return;
+  // drawn in the svg's own units, from where each thing is on the page now (rods may be tipped)
+  const inv = $("svg").getScreenCTM().inverse(), pt = $("svg").createSVGPoint();
+  const to = (x, y) => { pt.x = x; pt.y = y; return pt.matrixTransform(inv); };
+  const at = e => { const r = e.getBoundingClientRect(), a = to(r.left, r.top), b = to(r.right, r.bottom); return {x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y}; };
+  for (const [kind, t] of toyEls) if (m.kinds.includes(kind)) { const r = at(t.querySelector("image")); el("rect", {x: r.x - 6, y: r.y - 6, width: r.w + 12, height: r.h + 12, rx: r.w / 2, class: "hintsq" + (m.bad ? " bad" : "")}, layer); }
+  for (const i of m.parts || []) {
+    const s = swings[i];
+    if (s) { const r = at(s.rod); el("rect", {x: r.x - 8, y: r.y - 8, width: r.w + 16, height: r.h + 16, rx: 12, class: "hintsq"}, layer); }
+  }
+  if (m.tag && $("tag")) { const r = at($("tag")); el("rect", {x: r.x - 6, y: r.y - 6, width: r.w + 12, height: r.h + 12, rx: 14, class: "hintsq"}, layer); }
+  for (const kind of m.kinds) $("key").children[kind].classList.add("hintkey", ...(m.bad ? ["bad"] : []));
+}
+$("hintBtn").onclick = () => {
+  if (!playing()) return;
+  const K = game.K, wrong = [...Array(K).keys()].filter(k => game.got[k] != null && game.got[k] !== game.w[k] && !given(k));
+  const mark = (m, say) => { game.hinted = true; game.started = true; save(); hints.show(m, say); };
+  if (wrong.length) return mark({kinds: [wrong[0]], bad: true}, `The ${nameOf(wrong[0])} don't weigh ${game.got[wrong[0]]}${wrong.length > 1 ? ` (and ${wrong.length - 1} more is wrong)` : ""}.`);
+  const known = [...Array(K).keys()].map(k => weightOf(k));
+  const r = reason(game, known, true), s = r.steps[0];
+  if (!s) return;
+  const name = nameOf(s.k);
+  if (hints.level()) return mark({kinds: [s.k]}, `The ${name} weigh ${s.w} each.`);
+  // the rods (or the part, with the tag) that tell you
+  const parts = [], nodes = nodesOf(game.tree);
+  let tag = false;
+  for (const e of s.eqs) {
+    if (e.at < 0) continue;
+    if (e.half || e.at === 0 && e.v && game.clue.total != null) { tag = true; parts.push(nodes[e.at].parent >= 0 ? nodes[e.at].parent : 0); }
+    else parts.push(e.at);
+  }
+  const say = s.how === "two" ? `Put the gold rods together to find what the ${name} weigh.`
+    : tag ? `The tag says what the whole mobile weighs, and every rod's two sides share it equally. What do the ${name} weigh?`
+    : `Both ends of the gold rod weigh the same. What do the ${name} weigh?`;
+  mark({kinds: [s.k], parts: [...new Set(parts)], tag}, say);
+};
+
+/* ---------- endings ---------- */
+// Every weight right: the mobile hangs level.
+function win() {
+  game.won = true; G.finishClock(game); sel = -1; hints.clear(false);
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save();
+  update();
+  G.track(`Meowbile solved level ${game.level}`);
+  build.prefetch(next);
+  const g = game;
+  setTimeout(() => { if (game === g) finishCard(); }, 900);
+}
+function leaper() { const im = new Image(); im.className = "leaper"; im.src = "../cats/c18-38.webp"; im.alt = "A ginger cat leaping up"; return im; }
+function finishCard() {
+  const next = settings.level, gold = !game.undid && !game.hinted;
+  let text = `Every rod on the mobile hangs level.`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my mobile", game.result,
+    {title: "Balanced!", gold, goldWhy: "No hints or undos!", goldTitle: "What a leap!", goldPic: [leaper()],
+     next: `Next: level ${next}`, after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- new mobiles ---------- */
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
+function begin(p, level, looks) {
+  game = {level, K: p.K, w: p.w, tree: p.tree, clue: p.clue, looks: looks || pickLooks(p.K), got: new Array(p.K).fill(null), history: [], won: false, ...G.freshClock()};
+  sel = -1; hints.clear(false);
+}
+async function newPuzzle() {
+  if (busy) return;
+  busy = true;
+  const n = settings.level;
+  G.openCard("Hanging the toys…", "", []);
+  const p = await build.take(n);
+  begin(p, n);
+  busy = false; G.closeCard(); G.note("");
+  $("key").innerHTML = "";
+  draw(); save();
+  build.prefetch(n);
+  G.track(`Meowbile new puzzle level ${n}`);
+  helpOnFirstVisit();
+}
+
+/* ---------- sharing ---------- */
+// The mobile as text: a rod is (left,right) and a string its kinds' digits, top to bottom; the weights as digits;
+// the clue as "t40" or "k2"; the toys as colour.look pairs. With progress, the weights put in ("-" for none).
+const treeOut = t => t.toys ? t.toys.join("") : `(${treeOut(t.l)},${treeOut(t.r)})`;
+function treeIn(s, K) {
+  let i = 0, rods = 0;
+  function part() {
+    if (s[i] === "(") { i++; rods++; const l = part(); if (!l || s[i++] !== ",") return null; const r = part(); if (!r || s[i++] !== ")") return null; return {l, r}; }
+    const toys = []; while (i < s.length && /[0-9]/.test(s[i])) { const k = +s[i++]; if (k >= K) return null; toys.push(k); }
+    return toys.length && toys.length <= 4 ? {toys} : null;
+  }
+  const t = typeof s === "string" && s.length < 200 ? part() : null;
+  return t && i === s.length && !t.toys && rods <= 8 ? t : null;
+}
+$("linkBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Meowbile", won: game.won,
+  puzzle: () => ({g: "meowbile", N: game.level, t: treeOut(game.tree), w: game.w.join(""), c: game.clue.total != null ? "t" + game.clue.total : "k" + game.clue.kind, l: game.looks.map(([c, l]) => `${c}.${l}`).join(",")}),
+  progress: () => game.got.map(v => v == null ? "-" : v).join("")}); };
+function openShared(d) {
+  const fail = () => G.note("That share link didn't work.", 5000);
+  const spec = levelSpec(d.N), w = typeof d.w === "string" && /^[1-9]{2,6}$/.test(d.w) ? [...d.w].map(Number) : null;
+  const K = w ? w.length : 0, tree = spec && w ? treeIn(d.t, K) : null;
+  if (!tree || countsOf(tree, K).some(c => !c)) { fail(); return; }
+  const m = /^(t)([0-9]{1,4})$|^(k)([0-9])$/.exec(typeof d.c === "string" ? d.c : "");
+  const clue = !m ? null : m[1] ? {total: +m[2]} : +m[4] < K ? {kind: +m[4], w: w[+m[4]]} : null;
+  const p = {K, w, tree, clue};
+  // it must balance, weigh what the tag says, and have only one answer
+  const balanced = nodesOf(tree).every(x => x.node.toys || countsOf(x.node.l, K).reduce((t, c, k) => t + (c - countsOf(x.node.r, K)[k]) * w[k], 0) === 0);
+  const sum = countsOf(tree, K).reduce((t, c, k) => t + c * w[k], 0);
+  const start = w.map((_, k) => clue && clue.kind === k ? clue.w : null);
+  if (!clue || !balanced || (clue.total != null && clue.total !== sum) || !reason(p, start).done) { fail(); return; }
+  const looks = typeof d.l === "string" ? d.l.split(",").map(x => x.split(".").map(Number)) : [];
+  const looksOK = looks.length === K && looks.every(([c, l]) => KINDS[c] && KINDS[c].looks[l]) && new Set(looks.map(x => x[0])).size === K;
+  begin(p, d.N, looksOK ? looks : null);
+  if (typeof d.p === "string" && d.p.length === K && /^[1-9-]+$/.test(d.p)) { game.got = [...d.p].map((c, k) => c === "-" || given(k) ? null : +c); game.timed = false; }
+  settings.level = d.N; $("levelSel").value = d.N;
+  $("key").innerHTML = ""; draw(); save(); build.prefetch(d.N);
+  if (game.got.some(v => v != null)) checkWin();
+}
+
+/* ---------- toys ---------- */
+const toyChest = () => ({kinds: KINDS, off: offToys, min: MIN_COLOURS, src: toySrc, save: off => {
+  offToys = off; G.saveToys(off);
+  if (game && !game.won && game.looks.some(([c, l]) => off.has(KINDS[c].looks[l][0]))) {
+    game.looks = pickLooks(game.K); $("key").innerHTML = ""; draw(); save(); G.note("Your toys are on the mobile now.", 4000);
+  } else G.note("Saved. Your toys are used from the next mobile.", 4000);
+}});
+$("toysBtn").onclick = () => G.toyPicker(toyChest());
+G.needToys({...toyChest(), off: () => offToys, game: "Meowbile"});
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  if (!game || game.won) { G.helpLater(); return; }
+  settings.seenHelp = false; helpOnFirstVisit();
+}
+function helpOnFirstVisit() {
+  if (!game || !playing() || settings.seenHelp || document.querySelector(".spot")) return;
+  const rods = () => [...$("svg").querySelectorAll(".rod")], free = [...Array(game.K).keys()].find(k => !given(k));
+  const clueStep = game.clue.total != null
+    ? {say: `The tag says the whole mobile weighs ${game.clue.total}`, els: [() => $("tag")]}
+    : {say: `You're told the ${nameOf(game.clue.kind)} weigh ${game.clue.w}`, els: [() => $("key").children[game.clue.kind]]};
+  const steps = [
+    {say: "The cat's mobile hangs perfectly level", els: [$("board")]},
+    {say: "So both ends of every rod weigh the same", els: [rods]},
+    {say: "Each kind of toy weighs 1 to 9", els: [$("key")]},
+    clueStep,
+    {say: "Tap a toy, then its weight", els: [() => $("key").children[free], $("pad")]},
+    {say: "A rod tips if its weights aren't right", els: [rods]},
+    {say: "Stuck? Hint shows which toy to work out next", els: [$("hintBtn")]},
+  ];
+  G.spotlight({grid: $("svg"), w: 1, h: 1, steps, done: () => { settings.seenHelp = true; save(); }});
+}
+
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", ""), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
+$("helpBtn").onclick = showHelp;
+
+G.nav("meowbile");
+G.checkClock(game);
+G.setupTimer({name: "meowbile", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+const shared = G.readShare("meowbile");
+if (game) G.reopen(() => {
+    if (!levelSpec(game.level) || !game.tree || game.got.length !== game.K || game.looks.some(([c, l]) => !KINDS[c] || !KINDS[c].looks[l])) throw new Error("the saved mobile doesn't fit this version of the game");
+    draw();
+    if (game.won) finishCard();
+    build.prefetch(settings.level); helpOnFirstVisit();
+  }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
+else if (!shared) newPuzzle();
+const shareOpts = () => ({name: "Meowbile", inProgress: !!(game && !game.won && game.history.length), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, shareOpts());
+window.addEventListener("hashchange", () => { const d = G.readShare("meowbile"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
