@@ -235,11 +235,12 @@ const G = (() => {
       const st = favStar(current, drawFavs, false, true); st.classList.add("tool", "headStar");
       const tools = document.createElement("div"); tools.className = "headTools"; tools.append(btn, st);
       head.classList.add("withTools"); head.append(tools);
-      // a long name gets a little smaller rather than going onto two lines beside the tools
+      // a long name gets a little smaller rather than going onto two lines beside the tools, unless even that won't do
       const h1 = head.querySelector("h1"), fit = () => {
         h1.style.fontSize = ""; let fs = parseFloat(getComputedStyle(h1).fontSize);
         const t = h1.closest(".title") || h1, one = () => h1.getBoundingClientRect().height < fs * 1.5 && t.getBoundingClientRect().right <= tools.getBoundingClientRect().left;
-        while (!one() && fs > 22) { fs -= 1; h1.style.fontSize = fs + "px"; }
+        while (!one() && fs > 20) { fs -= 1; h1.style.fontSize = fs + "px"; }
+        if (!one()) h1.style.fontSize = "24px";   // too long even then: two lines at a size that reads
       };
       if (h1) {
         fit(); addEventListener("resize", fit); document.fonts?.ready.then(fit);
