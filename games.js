@@ -983,6 +983,14 @@ const G = (() => {
     return c ? +c.dataset.i : -1;
   }
 
+  /* ---------- sideways ---------- */
+  // True while a phone held sideways has the board on the left and the rest beside it (games.css, main > .stage),
+  // for a page that sizes its board in script.
+  const SIDEWAYS = "(orientation:landscape) and (max-height:500px)";
+  function sideways() {
+    return matchMedia(SIDEWAYS).matches && !document.body.classList.contains("full") && !!document.querySelector("main > .stage");
+  }
+
   /* ---------- full screen ---------- */
   // A game's board filling the screen, for games whose board gains from the room (a big mat to look around, a
   // painting). The browser's own full screen where it has one (not on an iPhone), and the page filling the window
@@ -1041,6 +1049,6 @@ const G = (() => {
     }
   }
 
-  return {GAMES, GROUPS, SHELF_COLOUR, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, meaning, plainText,
+  return {GAMES, GROUPS, SHELF_COLOUR, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();
