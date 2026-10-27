@@ -59,7 +59,7 @@ Cat Pile lays the napping cats from Sunbeams (the `SLEEPERS` list, the same in b
   `fred-23` prowls on the floor below the shelf of yarn he knocked out of order, `fred-17` stretches out there once it's
   sorted, and `fred-16` crouches to pounce on the gold-paw card.
 
-Shelf Life's skeins of yarn (`shelflife/skeins/skein-1` to `-9`) are the owner's drawing of nine shop-wound skeins, cut apart:
+Shelf Life's skeins of yarn (`shelflife/skeins/skein-1` to `-9`) are the owner's drawing of nine shop-wound skeins, all near enough square, cut apart:
 each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the game fills with the ball's colour.
 - **Bugsy** (`bugsy-…`, fluffy brown and white) and **Bowtie** (`bowtie-…`, tuxedo) are the
   mascots of Twirl and Tunnel Run, and will nap in Sunbeams. In Twirl, `bugsy-6` curls up beside the
