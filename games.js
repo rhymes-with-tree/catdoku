@@ -225,13 +225,27 @@ const G = (() => {
     btn.onclick = e => { e.stopPropagation(); show(panel.hidden); };
     document.addEventListener("click", e => { if (!panel.hidden && !el.contains(e.target)) show(false); });
     document.addEventListener("keydown", e => { if (e.key === "Escape" && !panel.hidden) { show(false); btn.focus(); } });
-    // on a game's page, its own star just after the game's name (in a row with it, and the cat beside it if any)
-    const row = document.createElement("div"); row.className = "gamesRow"; row.append(btn);
-    const h1 = current && document.querySelector("main header h1");
-    if (h1) {
-      if (!h1.parentElement.classList.contains("title")) { const t = document.createElement("div"); t.className = "title"; h1.before(t); t.append(h1); }
-      const st = favStar(current, drawFavs, false, true); st.classList.add("titleStar"); h1.after(st);
-    } else if (current) row.append(favStar(current, drawFavs, true));
+    // On a game's page the menu button (Games) and the game's own star stand at the far right of the title, as tools,
+    // with the title, its cat and the stripe centred between them and an empty column of the same width on the left;
+    // the menu opens under the title as before.
+    const row = document.createElement("div"); row.className = "gamesRow";
+    const head = current && document.querySelector("main header");
+    if (head) {
+      btn.classList.add("tool"); btn.innerHTML = iconSVG("games") + '<span class="lbl">Games</span>';
+      const st = favStar(current, drawFavs, false, true); st.classList.add("tool", "headStar");
+      const tools = document.createElement("div"); tools.className = "headTools"; tools.append(btn, st);
+      head.classList.add("withTools"); head.append(tools);
+      // a long name gets a little smaller rather than going onto two lines beside the tools
+      const h1 = head.querySelector("h1"), fit = () => {
+        h1.style.fontSize = ""; let fs = parseFloat(getComputedStyle(h1).fontSize);
+        const t = h1.closest(".title") || h1, one = () => h1.getBoundingClientRect().height < fs * 1.5 && t.getBoundingClientRect().right <= tools.getBoundingClientRect().left;
+        while (!one() && fs > 22) { fs -= 1; h1.style.fontSize = fs + "px"; }
+      };
+      if (h1) {
+        fit(); addEventListener("resize", fit); document.fonts?.ready.then(fit);
+        for (const img of head.querySelectorAll("img")) img.addEventListener("load", fit);   // the cat beside the name takes room once it's in
+      }
+    } else { row.append(btn); if (current) row.append(favStar(current, drawFavs, true)); }
     el.append(row, panel);
     // on today's challenge, a badge under the menu button says so
     if (current && current === dslug) {
@@ -1004,10 +1018,10 @@ const G = (() => {
     pause: '<path d="M11 7v18M21 7v18"/>',
     play: '<path d="M10 6l16 10-16 10z"/>',
     guess: '<rect x="6" y="6" width="20" height="20" rx="4"/><circle cx="11.5" cy="11.5" r="1.3"/><circle cx="16" cy="16" r="1.3"/><circle cx="20.5" cy="20.5" r="1.3"/>',
-    giveup: '<path d="M8 28V5"/><path d="M8 6h15l-3 5 3 5H8"/>',
+    giveup: '<path d="M8 6h15l-3 5 3 5H8z" class="white"/><path d="M8 28V5"/>',
     cat: '<path d="M7 13L8 4l6 5h4l6-5 1 9c2 4 1 9-3 11-3 2-11 2-14 0-4-2-5-7-2-11z"/><path d="M12.5 17v.5M19.5 17v.5M14.5 21.5h3"/>',
     marks: '<path d="M5 10l8 8M13 10l-8 8"/><path d="M18 11h9M18 17h9"/>',
-    keep: '<path d="M9 5h14v22l-7-5-7 5z"/>',
+    keep: '<circle cx="16" cy="16" r="10" class="green"/>',
     shuffle: '<path d="M4 10h5c7 0 8 12 15 12h4"/><path d="M24 18l4 4-4 4"/><path d="M4 22h5c2 0 3.5-1.5 5-3.5M18 12.5c1.5-1.5 3-2.5 6-2.5h4"/><path d="M24 6l4 4-4 4"/>',
     flip: '<path d="M16 4v24"/><path d="M12 8L4 22h8z"/><path d="M20 8l8 14h-8z"/>',
     near: '<path d="M6 12.5c3-3 6 3 10 0s7 3 10 0M6 19.5c3-3 6 3 10 0s7 3 10 0"/>',
@@ -1020,12 +1034,31 @@ const G = (() => {
     zoomin: '<circle cx="14" cy="14" r="9"/><path d="M21 21l6 6"/><path d="M14 10v8M10 14h8"/>',
     zoomout: '<circle cx="14" cy="14" r="9"/><path d="M21 21l6 6"/><path d="M10 14h8"/>',
     fit: '<path d="M5 11h6V5M27 11h-6V5M5 21h6v6M27 21h-6v6"/>',
+    plus: '<path d="M16 7v18M7 16h18"/>',
+    go: '<circle cx="16" cy="16" r="11"/><path d="M11 16h10M17 11.5l4.5 4.5-4.5 4.5"/>',
+    sight: '<circle cx="16" cy="16" r="10"/><circle cx="16" cy="16" r="4.5"/><path d="M16 3v5M16 24v5M3 16h5M24 16h5"/>',
+    catnip: '<path d="M7 25C7 13 14 6 26 6c0 12-7 19-19 19z"/><path d="M7 25l11-11"/>',
+    bubbleshake: '<circle cx="13" cy="18" r="7"/><circle cx="23" cy="9" r="3.5"/><path d="M24 20l3 2M25 15.5h3.5"/>',
+    basketshake: '<path d="M6 14h20l-2.5 11h-15z"/><path d="M11 14l4-6M21 14l-4-6"/><path d="M3 10l2 2M29 10l-2 2M3 18l2-1M29 18l-2-1"/>',
+    losecolor: '<path d="M5 21a11 11 0 0 1 22 0"/><path d="M9.5 21a6.5 6.5 0 0 1 13 0"/><path d="M19 27h9"/>',
+    basketadd: '<path d="M4 14h17l-2.2 11H6.2z"/><path d="M8 14l3.5-6M17 14l-3.5-6"/><path d="M26 9v8M22 13h8"/>',
+    wipe: '<rect x="5" y="5" width="22" height="22" rx="2"/><path d="M16 5v22M5 16h22"/><path d="M8.5 24C12 17 18 12 24.5 9.5" class="swipe"/>',
+    keyboard: '<rect x="3" y="9" width="26" height="15" rx="3"/><path d="M8 14h.2M12 14h.2M16 14h.2M20 14h.2M24 14h.2M10 19h12"/>',
+    left: '<path d="M11 9h15M11 16h15M11 23h15"/><path d="M5.5 9h.2M5.5 16h.2M5.5 23h.2"/>',
+    pairs: '<path d="M4 25l5-15 5 15M6 20h6"/><path d="M19 10v15"/><circle cx="23" cy="20.5" r="4.5"/>',
+    marks: '<path d="M9 21l4-4 9-9 4 4-9 9-4 4h-4z"/><path d="M5 28h22"/>',
+    sliders: '<path d="M5 9h22M5 16h22M5 23h22"/><circle cx="11" cy="9" r="2.6"/><circle cx="21" cy="16" r="2.6"/><circle cx="14" cy="23" r="2.6"/>',
+    games: '<rect x="6" y="6" width="8" height="8" rx="2"/><rect x="18" y="6" width="8" height="8" rx="2"/><rect x="6" y="18" width="8" height="8" rx="2"/><rect x="18" y="18" width="8" height="8" rx="2"/>',
     palette: '<path d="M16 5C9.5 5 5 9.5 5 15.5S9.5 27 15 27c2 0 2.5-1.2 2-2.6-.6-1.6.4-3.4 2.4-3.4H23c2.5 0 4-1.8 4-4.4C27 9.8 22.5 5 16 5z"/><circle cx="11" cy="14" r="1.3"/><circle cx="15" cy="10" r="1.3"/><circle cx="20.5" cy="11" r="1.3"/>',
   };
   const ICON_OF = {hintBtn: "hint", undoBtn: "undo", backBtn: "undo", restartBtn: "restart", auditBtn: "audit", notesBtn: "pencil",
     allNotesBtn: "pencils", clearNotesBtn: "erase", eraseBtn: "erase", pauseBtn: "pause", guessBtn: "guess", giveUpBtn: "giveup",
     keepBtn: "keep", shuffleBtn: "shuffle", flipBtn: "flip", finishBtn: "near", completeBtn: "check", skipBtn: "skip",
-    colBtn: "palette", linkBtn: "share", toysBtn: "toys", bestBtn: "best", helpBtn: "help", zoomIn: "zoomin", zoomOut: "zoomout", zoomFit: "fit"};
+    colBtn: "palette", linkBtn: "share", toysBtn: "toys", bestBtn: "best", helpBtn: "help", zoomIn: "zoomin", zoomOut: "zoomout", zoomFit: "fit",
+    sightBtn: "sight", nipBtn: "catnip", shakeBtn: "bubbleshake", rainbowBtn: "losecolor", basketBtn: "basketadd", wipeBtn: "wipe",
+    chooseBtn: "keyboard", revealBtn: "giveup"};
+  // buttons that keep their own look with an icon in front of the word: every New (a +) and Catlas's Go (an arrow)
+  const LEAD = {newBtn: "plus", sNewBtn: "plus", goBtn: "go", settingsSum: "sliders"};
   const iconSVG = name => `<svg class="ic" viewBox="0 0 32 32" aria-hidden="true">${ICON[name]}</svg>`;
   function relabel(b, text, icon) {
     const l = b.querySelector(".lbl");
@@ -1034,20 +1067,29 @@ const G = (() => {
     if (icon && ICON[icon]) b.querySelector(".ic").outerHTML = iconSVG(icon);
   }
   function toolify() {
-    for (const row of document.querySelectorAll("main .actions:not(.helpers), main .zoom")) {
+    for (const [id, name] of Object.entries(LEAD)) {
+      const b = document.getElementById(id); if (!b || b.querySelector(".ic")) continue;
+      b.innerHTML = iconSVG(name) + `<span class="lbl">${b.textContent.trim()}</span>`; b.classList.add("lead");
+    }
+    for (const b of document.querySelectorAll("main .bar > #chooseBtn")) makeTool(b);
+    for (const row of document.querySelectorAll("main .actions, main .zoom")) {
       if (row.closest(".wall")) continue;   // Cat Burglar's zoom sits on the painting
       let any = false;
-      for (const b of row.querySelectorAll(":scope > button")) {
-        const name = b.dataset.icon || ICON_OF[b.id];
-        if (!name || !ICON[name]) continue;
-        // the button's own words, without an emoji the icon now stands for
-        const text = b.textContent.trim(), words = (text.length > 1 ? text : b.getAttribute("aria-label") || text)
-          .replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF\uFE0F]/gu, "").replace(/\s+/g, " ").trim();
-        b.innerHTML = iconSVG(name) + `<span class="lbl">${words}</span>`;
-        b.classList.add("tool"); any = true;
-      }
+      for (const b of row.querySelectorAll(":scope > button")) any = makeTool(b) || any;
       if (any) row.classList.add("tools");
     }
+  }
+  // One button as a tool: its icon, then its word (data-label, or its own words without an emoji the icon now stands
+  // for); a count it carries in a <b> (a helper's uses left) stays, as a badge on the icon's corner.
+  function makeTool(b) {
+    const name = b.dataset.icon || ICON_OF[b.id];
+    if (!name || !ICON[name]) return false;
+    const count = b.querySelector("b"), copy = b.cloneNode(true); copy.querySelector("b")?.remove();
+    const text = copy.textContent.trim(), words = (b.dataset.label || (text.length > 1 ? text : b.getAttribute("aria-label") || text))
+      .replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF\uFE0F]/gu, "").replace(/\s+/g, " ").trim();
+    b.innerHTML = iconSVG(name) + `<span class="lbl">${words}</span>`;
+    if (count) { count.classList.add("count"); b.append(count); }
+    b.classList.add("tool"); return true;
   }
   toolify();
 
@@ -1119,6 +1161,6 @@ const G = (() => {
     }
   }
 
-  return {GAMES, GROUPS, SHELF_COLOUR, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, relabel, meaning, plainText,
+  return {GAMES, GROUPS, SHELF_COLOUR, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, relabel, icon: iconSVG, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();
