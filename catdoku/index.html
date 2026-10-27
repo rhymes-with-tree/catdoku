@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-27.10";
+  var BUILD = "2026-10-27.11";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -24,7 +24,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-27.10">
+<link rel="stylesheet" href="../games.css?v=2026-10-27.11">
 <style>
 /* Catdoku's own looks; the rest is games.css. */
 html,body{height:100%}
@@ -87,6 +87,8 @@ main{padding-top:18px}
     <button id="hintBtn">Hint</button>
     <button id="undoBtn">Undo</button>
     <button id="restartBtn">Restart</button>
+    <button id="guessBtn" aria-pressed="false">Guess</button>
+    <button id="backBtn" hidden>Undo guess</button>
     <button id="auditBtn">Audit</button>
     <button id="eraseBtn" aria-pressed="false">Erase 🐾</button>
     <button id="completeBtn" class="primary">Complete</button>
@@ -111,7 +113,7 @@ main{padding-top:18px}
 
 </main>
 
-<script src="../games.js?v=2026-10-27.10"></script>
+<script src="../games.js?v=2026-10-27.11"></script>
 <script>G.nav("catdoku");</script>
 <script>
 const PALETTE = ["#BD5538","#73A7AE","#ECA818","#6AA673","#B94588","#B3B94B",
@@ -315,7 +317,7 @@ const livesLeft = h => `${h} ${h === 1 ? "life" : "lives"} left.`;
 
 function snapshot() {
   game.history.push(JSON.stringify(game.cells));
-  if (game.history.length > 500) game.history.shift();
+  if (game.history.length > 500) { game.history.shift(); for (const x of game.guesses || []) x.at--; }
 }
 
 /* ---------- actions ---------- */
@@ -339,6 +341,7 @@ function placeCat(i) {
     else note(game.hearts === 1 ? "Not there. 1 life left." : `Not there. ${game.hearts} lives left.`);
     return;
   }
+  guesses.before(i);
   snapshot();
   cell.cat = true; cell.manual = false;
   if (settings.autoExclude) for (const j of peers(i)) if (!game.cells[j].src.includes(i)) game.cells[j].src.push(i);
@@ -378,7 +381,7 @@ function undo() {
 function restart() {
   if (game.status === "lost") { breakStreak(); game.hearts = HEARTS; game.livesUsed = HEARTS; }
   setNextSize(game.N);
-  game.cells = blankCells(game.N); game.history = []; game.wrong = [];
+  game.cells = blankCells(game.N); game.history = []; game.wrong = []; guesses.clear();
   game.status = "playing";
   closeCard(); render(); save(); note("");
 }
@@ -401,6 +404,7 @@ function audit() {
 // so; asked again, the square itself. Failing that, the row, column or region with the fewest spots left, then a
 // square in it from the answer. You place the cat. Like Audit, a hint keeps you on this size and costs the gold paw.
 const hints = G.hinter({game: () => game, key: () => game ? game.cells.map(show).join("") : "", draw: () => render()});
+const guesses = G.guesser({game: () => game, undo, draw: () => { render(); save(); }, board: $("board"), what: "cat", over: () => game.status !== "playing"});
 function hint() {
   if (!game || game.status !== "playing" || busy) return;
   const N = game.N, isSol = k => game.sol[Math.floor(k / N)] === k % N;
@@ -628,12 +632,13 @@ const FACE = "../cats/higgins-face.webp", HIGGINS = `<img class="higginsface" sr
 new Image().src = FACE;
 function higginsPic(alt = "") { const im = new Image(); im.className = "inlineface"; im.src = FACE; im.alt = alt; return im; }
 function render() {
-  const kids = $("board").children, mark = hints.current();
+  const kids = $("board").children, mark = hints.current(), guessed = new Set(guesses.list());
   game.cells.forEach((c, i) => {
     const el = kids[i], s = show(c), N = game.N;
     const html = s === "cat" ? HIGGINS : s === "paw" ? '<span class="paw">🐾</span>' : "";
     if (el.innerHTML !== html) el.innerHTML = html;
     el.classList.toggle("wrong", game.wrong.includes(i));
+    el.classList.toggle("guessed", guessed.has(i) && s === "cat");
     el.classList.toggle("hint", !!(mark && mark.cells.includes(i))); el.classList.toggle("bad", !!(mark && mark.bad && mark.cells.includes(i)));
     el.setAttribute("aria-label", `Row ${Math.floor(i / N) + 1}, column ${i % N + 1}: ${s === "empty" ? "blank" : s}`);
   });
@@ -646,6 +651,7 @@ function render() {
   $("auditBtn").disabled = $("hintBtn").disabled = game.status !== "playing";
   $("eraseBtn").setAttribute("aria-pressed", erasing);
   $("undoBtn").disabled = !game.history.length || game.status !== "playing";
+  guesses.sync();
   $("gradeTgl").checked = settings.autoGrade;
   $("exclTgl").checked = settings.autoExclude;
 }
@@ -726,6 +732,7 @@ function spotlightSteps() {
     {say: "Tap once for 🐾, twice for 🐱", lit: [[c, r]], marks: [[c, r, ["🐾", FACE]]]},
     {say: "Drag to 🐾 several squares at once", lit: drag, marks: drag.map(([x, y]) => [x, y, "🐾"])},
     {say: "Turn on Erase 🐾 to tap or drag paws away", els: [$("eraseBtn")]},
+    {say: "Not sure? Guess, and Undo guess takes you back to just before it", els: [$("guessBtn")]},
     {say: "Stuck? Hint shows where to look; ask again for the square", els: [$("hintBtn")]},
     {say: "Auto exclude puts paws down for you after each cat", els: [$("exclTgl").closest(".opt")]},
     {say: "Auto grade checks each cat as you place it, and makes it harder", els: [$("gradeTgl").closest(".opt")]},

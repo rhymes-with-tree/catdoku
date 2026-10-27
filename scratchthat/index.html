@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-27.10"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-27.11"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-27.10">
+<link rel="stylesheet" href="../games.css?v=2026-10-27.11">
 <style>
 /* Dottie, the star, beside the title */
 .title{display:flex;align-items:flex-end;gap:8px}
@@ -87,6 +87,8 @@
     <button id="hintBtn">Hint</button>
     <button id="undoBtn">Undo</button>
     <button id="restartBtn">Restart</button>
+    <button id="guessBtn" aria-pressed="false">Guess</button>
+    <button id="backBtn" hidden>Undo guess</button>
     <button id="linkBtn">Share</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
@@ -100,8 +102,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-27.10"></script>
-<script src="../cattower.js?v=2026-10-27.10"></script>
+<script src="../games.js?v=2026-10-27.11"></script>
+<script src="../cattower.js?v=2026-10-27.11"></script>
 <script>
 /* ---------- rooms ---------- */
 // A room is N × N squares, each floor (-1), furniture (-2) or furniture with a number (0 to 4).
@@ -261,6 +263,7 @@ let state = G.load(STORE);
 let settings = Object.assign({level: 1}, state.settings);
 let game = state.game || null;
 const hints = G.hinter({game: () => game, key: () => game ? stateKey() : "", draw: () => draw()});   // marks {cells, bad}: a hint's squares
+const guesses = G.guesser({game: () => game, undo, draw: () => { draw(); save(); }, board: $("board"), what: "post", moves: gm => gm.moves});
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !$("overlay").classList.contains("show");
 
@@ -300,7 +303,7 @@ const dottieAt = () => { const {N, s} = game, c = (N - 1) / 2; let best = -1, d 
   s.forEach((v, i) => { const e = Math.hypot(i % N - c, Math.floor(i / N) - c); if (v === 1 && e < d) { d = e; best = i; } }); return best; };
 
 function draw() {
-  const el = $("board"), {N, g, s} = game, l = look(), sofas = furniture(), live = hints.current();
+  const el = $("board"), {N, g, s} = game, l = look(), sofas = furniture(), live = hints.current(), guessed = new Set(guesses.list());
   el.style.gridTemplateColumns = el.style.gridTemplateRows = `repeat(${N}, 1fr)`;
   if (el.children.length !== N * N) {
     el.innerHTML = "";
@@ -309,7 +312,7 @@ function draw() {
   [...el.children].forEach((d, i) => {
     const want = g[i] === -1 ? (s[i] === 1 ? "post" + (game.won ? i : "") : s[i] === 0 ? "dot" : "") : "wall" + g[i] + sofas[i].key;
     d.className = "sq" + (g[i] !== -1 ? " wall" : "") + (g[i] === -1 && l.lit[i] ? " lit" : "") + (l.bad[i] ? " bad" : "")
-      + (live && live.cells.includes(i) ? " hintcell" + (live.bad ? " bad" : "") : "");
+      + (live && live.cells.includes(i) ? " hintcell" + (live.bad ? " bad" : "") : "") + (guessed.has(i) && s[i] === 1 ? " guessed" : "");
     if (d.dataset.want !== want) {
       d.dataset.want = want;
       if (g[i] !== -1) d.innerHTML = sofaSVG(sofas[i]) + (g[i] >= 0 ? `<span class="num ${sofas[i].side ? "back-left" : "back-top"}">${g[i]}</span>` : "");
@@ -341,6 +344,7 @@ function draw() {
   const left = floorLeft(l);
   $("count").textContent = game.won ? "Furniture saved!" : left ? `${left} square${left === 1 ? "" : "s"} with no post in sight` : "A post in sight everywhere";
   $("hintBtn").disabled = game.won; $("undoBtn").disabled = game.won || !game.moves.length; $("restartBtn").disabled = game.won || !game.moves.length;
+  guesses.sync();
 }
 
 /* ---------- playing ---------- */
@@ -352,6 +356,7 @@ function tap(i, to) {
   const was = game.s[i];
   game.s[i] = to === undefined ? nextOf(was) : to;
   if (game.s[i] === was) return;
+  if (game.s[i] === 1) guesses.before(i);
   game.moves.push([[i, was]]);
   after();
 }
@@ -417,7 +422,7 @@ $("undoBtn").onclick = undo;
 addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); undo(); } });
 $("restartBtn").onclick = () => {
   if (!playing() || !game.moves.length) return;
-  game.s = game.g.map(() => -1); game.moves = []; game.restarted = true;
+  game.s = game.g.map(() => -1); game.moves = []; game.restarted = true; guesses.clear();
   draw(); save(); G.note("An empty room again.", 3000);
 };
 
@@ -527,6 +532,7 @@ function helpOnFirstVisit() {
     {say: settings.dotFirst ? "Tap for a dot (no post), again for a post, again to clear" : "Tap for a post, again for a dot (no post), again to clear", lit: floor.slice(0, 1).map(xy)},
     {say: "Drag across the floor to dot lots of squares at once", lit: floor.slice(0, 3).map(xy)},
     {say: "No hint, Undo or Restart earns a gold paw", els: [$("count")]},
+    {say: "Not sure? Guess, and Undo guess takes you back to just before it", els: [$("guessBtn")]},
     {say: "Stuck? Hint shows where a post goes, or can't", els: [$("hintBtn")]},
   );
   G.spotlight({grid: $("board"), w: N, h: N, steps, done: () => { settings.seenHelp = true; save(); }});

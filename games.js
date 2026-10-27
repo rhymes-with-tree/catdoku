@@ -1012,6 +1012,7 @@ const G = (() => {
     undo: '<path d="M9 7v6h6"/><path d="M9.5 13A9 9 0 1 1 9 21"/>',
     restart: '<path d="M25 16a9 9 0 1 1-2.6-6.4"/><path d="M23 4v6h-6"/>',
     audit: '<circle cx="14" cy="14" r="9"/><path d="M21 21l6 6"/><path d="M10 14l3 3 5-6"/>',
+    undoguess: '<path d="M9 7v6h6"/><path d="M9.5 13A9 9 0 1 1 9 21"/><circle cx="18" cy="17" r="2.5"/>',
     pencil: '<path d="M21 5l6 6-14 14H7v-6z"/><path d="M18 8l6 6"/><path d="M7 27h18"/>',
     pencils: '<path d="M23 5l5 5-12 12h-5v-5z"/><path d="M20 8l5 5"/><path d="M4 9h7M4 14h5M4 27h20"/>',
     erase: '<path d="M18 6l8 8-11 11H9l-4-4z"/><path d="M12 12l8 8"/><path d="M15 25h11"/>',
@@ -1051,7 +1052,7 @@ const G = (() => {
     games: '<rect x="6" y="6" width="8" height="8" rx="2"/><rect x="18" y="6" width="8" height="8" rx="2"/><rect x="6" y="18" width="8" height="8" rx="2"/><rect x="18" y="18" width="8" height="8" rx="2"/>',
     palette: '<path d="M16 5C9.5 5 5 9.5 5 15.5S9.5 27 15 27c2 0 2.5-1.2 2-2.6-.6-1.6.4-3.4 2.4-3.4H23c2.5 0 4-1.8 4-4.4C27 9.8 22.5 5 16 5z"/><circle cx="11" cy="14" r="1.3"/><circle cx="15" cy="10" r="1.3"/><circle cx="20.5" cy="11" r="1.3"/>',
   };
-  const ICON_OF = {hintBtn: "hint", undoBtn: "undo", backBtn: "undo", restartBtn: "restart", auditBtn: "audit", notesBtn: "pencil",
+  const ICON_OF = {hintBtn: "hint", undoBtn: "undo", backBtn: "undoguess", restartBtn: "restart", auditBtn: "audit", notesBtn: "pencil",
     allNotesBtn: "pencils", clearNotesBtn: "erase", eraseBtn: "erase", pauseBtn: "pause", guessBtn: "guess", giveUpBtn: "giveup",
     keepBtn: "keep", shuffleBtn: "shuffle", flipBtn: "flip", finishBtn: "near", completeBtn: "check", skipBtn: "skip",
     colBtn: "palette", linkBtn: "share", toysBtn: "toys", bestBtn: "best", helpBtn: "help", zoomIn: "zoomin", zoomOut: "zoomout", zoomFit: "fit",
@@ -1092,6 +1093,46 @@ const G = (() => {
     b.classList.add("tool"); return true;
   }
   toolify();
+
+  /* ---------- guesses ---------- */
+  // Guess, as in Toydoku and Fair Play, for a game whose moves go on an Undo list (game.history): Guess makes the next
+  // thing put on the board a guess, which glows violet; Undo guess takes everything back to just before the latest
+  // guess in one tap, through the game's own Undo (so it costs what Undo costs). A guess is kept as {i, at}: the square
+  // and how long the Undo list was before it, so plain Undo past it, or the square being emptied, ends it.
+  // o: {game: () => game, undo (one step), draw (after a change), board (the element that shows it's armed), what
+  // ("toy", "number"…: for the note line), over (() => true once the puzzle's finished; game.won if not given),
+  // moves (the Undo list, if it isn't game.history)}. Call before(i) just before the move that fills square i goes on the Undo
+  // list; draw the glow on each of list(); clear() on Restart; sync() wherever the buttons are brought up to date.
+  function guesser(o) {
+    let armed = false;
+    const g = () => o.game(), btn = $("guessBtn"), back = $("backBtn"), hist = gm => o.moves ? o.moves(gm) : gm.history;
+    const list = () => { const gm = g(); if (!gm) return []; gm.guesses = (gm.guesses || []).filter(x => x.at < hist(gm).length); return gm.guesses; };
+    const sync = () => {
+      const gm = g(), done = !gm || (o.over ? o.over() : gm.won);
+      if (done) armed = false;
+      btn.setAttribute("aria-pressed", String(armed)); btn.disabled = done;
+      back.hidden = done || !list().length;
+      if (o.board) o.board.classList.toggle("guessing", armed);
+    };
+    btn.onclick = () => {
+      const gm = g(); if (!gm || (o.over ? o.over() : gm.won)) return;
+      armed = !armed; sync(); if (armed) note(`Guess: the next ${o.what || "one"} you put in glows until you undo it`, 3500); else note("");
+    };
+    back.onclick = () => {
+      const gm = g(), gs = list(); if (!gm || (o.over ? o.over() : gm.won) || !gs.length) return;
+      const to = gs[gs.length - 1].at;
+      while (hist(gm).length > to) { const n = hist(gm).length; o.undo(); if (hist(gm).length >= n) break; }
+      armed = false; list(); o.draw(); note("Back to just before your guess.", 3000);
+    };
+    return {
+      before(i) { const gm = g(); if (!armed || !gm) return; armed = false; list().push({i, at: hist(gm).length}); },
+      list: () => list().map(x => x.i),
+      armed: () => armed,
+      disarm() { armed = false; },
+      clear() { const gm = g(); if (gm) gm.guesses = []; armed = false; },
+      sync,
+    };
+  }
 
   /* ---------- sideways ---------- */
   // True while a phone held sideways has the board on the left and the rest beside it (games.css, main > .stage),
@@ -1161,6 +1202,6 @@ const G = (() => {
     }
   }
 
-  return {GAMES, GROUPS, SHELF_COLOUR, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, relabel, icon: iconSVG, meaning, plainText,
+  return {GAMES, GROUPS, SHELF_COLOUR, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, relabel, icon: iconSVG, guesser, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();

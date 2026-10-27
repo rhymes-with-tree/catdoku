@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-27.10"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-27.11"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-27.10">
+<link rel="stylesheet" href="../games.css?v=2026-10-27.11">
 <style>
 /* A KenKen house: every row and column holds 1 to N once, and walls split the floor into rooms whose numbers
    must make the room's sign. Each room has a door that opens when the room is right; with every door open,
@@ -92,6 +92,8 @@
     <button id="hintBtn">Hint</button>
     <button id="undoBtn">Undo</button>
     <button id="restartBtn">Restart</button>
+    <button id="guessBtn" aria-pressed="false">Guess</button>
+    <button id="backBtn" hidden>Undo guess</button>
     <button id="notesBtn" aria-pressed="false">Notes</button>
     <button id="allNotesBtn">All notes</button>
     <button id="linkBtn">Share</button>
@@ -105,7 +107,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-27.10"></script>
+<script src="../games.js?v=2026-10-27.11"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N grid where every row and column holds 1 to N once, cut into rooms (cages). Each room has a sign:
@@ -344,12 +346,12 @@ function draw() {
   $("board").style.setProperty("--cell", ($("board").clientWidth / N) + "px");
   el.style.gridTemplateColumns = el.style.gridTemplateRows = `repeat(${N}, 1fr)`;
   const cols = Math.ceil(Math.sqrt(N)), sr = sel >= 0 ? Math.floor(sel / N) : -1, sc = sel % N;
-  const flash = hints.current();
+  const flash = hints.current(), guessed = new Set(guesses.list());
   let html = "";
   for (let i = 0; i < N * N; i++) {
     const k = plan.at[i], room = plan.rooms[k], [floor, lit] = FLOORS[plan.floor[k]];
     const r = Math.floor(i / N), c = i % N, peer = sel >= 0 && i !== sel && (r === sr || c === sc);
-    const cls = ["cell", right[k] || (forceOpen === k) ? "done" : "", i === sel ? "sel" : "", peer ? "peer" : "",
+    const cls = ["cell", right[k] || (forceOpen === k) ? "done" : "", i === sel ? "sel" : "", peer ? "peer" : "", guessed.has(i) && g[i] ? "guessed" : "",
       clash.has(i) ? "clash" : "", flash && flash.i === i ? flash.kind : "", sel >= 0 && g[sel] && g[i] === g[sel] && i !== sel ? "same" : ""].filter(Boolean).join(" ");
     const sign = plan.signAt[k] === i ? `<span class="sign${wrong[k] ? " wrong" : ""}">${room.t}${OPS[room.op]}</span>` : "";
     const notes = !g[i] && game.notes[i] ? `<span class="notes" style="grid-template-columns:repeat(${cols},1fr)">${[...Array(N)].map((_, v) => `<span>${game.notes[i] >> (v + 1) & 1 ? v + 1 : ""}</span>`).join("")}</span>` : "";
@@ -365,11 +367,13 @@ function draw() {
   $("key").textContent = noting ? "Notes: tap numbers to jot them down as maybes" : sel < 0 && !game.won ? "Tap a square, then a number" : "";
   $("hintBtn").disabled = game.won; $("allNotesBtn").disabled = game.won; $("allNotesBtn").setAttribute("aria-pressed", String(!game.won && allNotesOn()));
   $("undoBtn").disabled = !game.history.length || game.won; $("restartBtn").disabled = !game.history.length || game.won;
+  guesses.sync();
   return {clash, right, wrong};
 }
 // The walls between rooms (thin seams inside a room), with each room's door hung in one of them.
 let forceOpen = -1, rattle = new Set(), wasOpen = [];
 const hints = G.hinter({game: () => game, key: () => game ? game.grid.join() : "", draw: () => draw()});   // marks {i, kind}: a square to look at
+const guesses = G.guesser({game: () => game, undo, draw: () => { draw(); save(); }, board: $("board"), what: "number"});
 function drawWalls(right) {
   const N = game.N, svg = $("walls"), at = plan.at;
   svg.setAttribute("viewBox", `0 0 ${N} ${N}`);
@@ -416,6 +420,7 @@ function put(v) {
   if (!playing() || sel < 0) return;
   game.started = true;
   const before = check();
+  if (!(noting && v) && v && game.grid[sel] !== v) guesses.before(sel);
   snapshot();
   if (noting && v) {
     if (game.grid[sel]) game.grid[sel] = 0;
@@ -513,7 +518,7 @@ function whyNumber(i) {
   return [`The glowing square's room is the nearest to full. Its row and column leave ${free.length} numbers.`, ""];
 }
 $("hintBtn").onclick = hint;
-$("restartBtn").onclick = () => { if (playing() && game.history.length) { game.undid = true; snapshot(); game.grid = game.grid.map(() => 0); game.notes = game.notes.map(() => 0); draw(); save(); G.note("Every door's shut again. Undo brings your numbers back.", 3500); } };
+$("restartBtn").onclick = () => { if (playing() && game.history.length) { game.undid = true; snapshot(); guesses.clear(); game.grid = game.grid.map(() => 0); game.notes = game.notes.map(() => 0); draw(); save(); G.note("Every door's shut again. Undo brings your numbers back.", 3500); } };
 addEventListener("resize", () => { if (game && plan) draw(); });
 
 /* ---------- endings ---------- */
@@ -625,6 +630,7 @@ function helpOnFirstVisit() {
     {say: "Tap a square, then a number", els: [$("pad")]},
     {say: "Notes let you jot down maybes", els: [$("notesBtn")]},
     {say: "All notes puts every number in every empty square, to cross off", els: [$("allNotesBtn")]},
+    {say: "Not sure? Guess, and Undo guess takes you back to just before it", els: [$("guessBtn")]},
     {say: "Stuck? Hint finds a wrong number, or tells you one", els: [$("hintBtn")]},
   ];
   G.spotlight({grid: $("cells"), w: N, h: N, steps, done: () => { settings.seenHelp = true; save(); }});
