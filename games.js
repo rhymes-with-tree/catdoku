@@ -568,6 +568,8 @@ const G = (() => {
   const toB64 = str => btoa(unescape(encodeURIComponent(str))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   const fromB64 = str => decodeURIComponent(escape(atob(str.replace(/-/g, "+").replace(/_/g, "/"))));
   const shareUrl = data => location.origin + location.pathname + "#share=" + toB64(JSON.stringify(data));
+  // how every game's note starts when a link can't be used (offerShare looks for it)
+  const BAD_LINK = "That share link didn't work";
 
   // A share link this page was opened with, or null. The link is then tidied off the address.
   function readShare(slug) {
@@ -575,13 +577,20 @@ const G = (() => {
     if (!m) return null;
     history.replaceState(null, "", location.pathname + location.search);
     try { const d = JSON.parse(fromB64(m[1])); if (d && d.g === slug && d.N) return d; } catch (e) {}
-    setTimeout(() => note("That share link didn't work. It may have been cut off.", 6000), 0);
+    setTimeout(() => note(BAD_LINK + ". It may have been cut off.", 6000), 0);
     return null;
   }
   // Open a shared puzzle, checking first if it would replace a puzzle in progress.
+  // A game turns down a link it can't use by saying so in the note line (a note starting BAD_LINK) and leaving its
+  // puzzle as it was; o.open throwing counts the same. Then that note stays up in place of the welcome, and
+  // o.fresh(why), when given, starts a puzzle (for a page that opened with the link and had none of its own).
   function offerShare(d, o) {
     const go = () => {
-      closeCard(); o.open(d); track(`${o.name} shared puzzle opened`);
+      closeCard(); note("");
+      try { o.open(d); } catch (e) { note(BAD_LINK + ".", 5000); }
+      const why = $("msg").textContent;
+      if (why.startsWith(BAD_LINK)) { track(`${o.name} share link didn't work`); if (o.fresh) o.fresh(why); return; }
+      track(`${o.name} shared puzzle opened`);
       note(d.p ? "Here's the shared puzzle, with its progress so far. It isn't timed." : "Here's the shared puzzle. Good luck!", 6000);
       if (o.after) o.after();
     };

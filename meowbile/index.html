@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-27.14"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-27.15"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-27.14">
+<link rel="stylesheet" href="../games.css?v=2026-10-27.15">
 <style>
 /* A cat's mobile: rods hang from their middles, with a string of toys or another rod at each end. Every rod
    balances. Tap a toy (or its button in the key) and then a number to say what that kind of toy weighs; a rod
@@ -114,15 +114,16 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-27.14"></script>
+<script src="../games.js?v=2026-10-27.15"></script>
 <script>
 /* ---------- mobiles (plain functions, also run in a background worker) ---------- */
 // A mobile is a tree: a rod {l, r} hangs from its middle with a branch at each end (both ends the same distance
 // out), and a branch is another rod or a string of toys {toys: [kind…]}, top to bottom. Every rod balances, so
 // its two sides weigh the same. Each kind of toy weighs a whole number from 1 to 9. The clue is the whole
-// mobile's weight, on the tag at the hook, or one kind's weight.
+// mobile's weight, on the tag at the hook, or one kind's weight; or, on the last level, nothing: the answer is
+// the lightest whole weights that balance every rod.
 // Levels: K kinds of toy, R rods, the clue, and the reasoning: "one" needs only a rod (or the tag) with one kind
-// still unknown, "two" needs at least one step that takes two together.
+// still unknown, "two" needs at least one step that takes two together, "any" is either.
 function levelSpec(n) {
   return [null,
     {K: 2, R: 1, clue: "total", step: "one"},
@@ -134,7 +135,8 @@ function levelSpec(n) {
     {K: 5, R: 4, clue: "any", step: "one"},
     {K: 5, R: 4, clue: "any", step: "two"},
     {K: 6, R: 5, clue: "any", step: "two"},
-    {K: 6, R: 6, clue: "toy", step: "two"}][n];
+    {K: 6, R: 6, clue: "toy", step: "two"},
+    {K: 5, R: 4, clue: "light", step: "any"}][n];
 }
 // The parts of a mobile, depth first, each {node, depth, parent}: part 0 is the top rod.
 function nodesOf(tree) {
@@ -160,8 +162,15 @@ function equationsOf(p) {
     eqs.push({c: a.map((x, k) => x - b[k]), v: 0, at: i});
   });
   if (p.clue.total != null) nodes.forEach((n, i) => eqs.push({c: countsOf(n.node, K), v: p.clue.total / 2 ** n.depth, at: i, half: i > 0}));
-  else { const c = new Array(K).fill(0); c[p.clue.kind] = 1; eqs.push({c, v: p.clue.w, at: -1}); }
+  else if (p.clue.kind != null) { const c = new Array(K).fill(0); c[p.clue.kind] = 1; eqs.push({c, v: p.clue.w, at: -1}); }
   return eqs;
+}
+// With nothing given (clue {light: true}), the weights w are the answer only if the rods alone fix how the kinds
+// compare (worked out from the lightest kind's weight, every other one follows) and they have no common factor,
+// so they can't all be made smaller.
+function lightest(p) {
+  const gcd = (a, b) => b ? gcd(b, a % b) : a, k0 = p.w.indexOf(Math.min(...p.w));
+  return p.w.reduce(gcd) === 1 && reason({...p, clue: {light: true}}, p.w.map((v, k) => k === k0 ? v : null)).done;
 }
 // Work the weights out as a person might, from those already known (null where not). Each step finds one kind's
 // weight, from one equation with only that kind still unknown ("one"), or from two equations whose unknown kinds
@@ -214,7 +223,7 @@ function stringsFor(v, w, most) {
   })(0, v, []);
   return out;
 }
-// A mobile for level n: {K, w (each kind's weight), tree, clue ({total} or {kind, w})}, or null to try again.
+// A mobile for level n: {K, w (each kind's weight), tree, clue ({total}, {kind, w} or {light: true})}, or null to try again.
 // Pick the weights and the whole weight, so each string must weigh its share, then pick toys for each string
 // that weigh that much. Keep it if it uses every kind, no rod has the same toys at both ends, and the weights
 // can be worked out (so only one way) with reasoning as hard as the level asks.
@@ -232,6 +241,7 @@ function makeMobile(n) {
   }
   if (countsOf(tree, K).some(c => !c)) return null;
   for (const x of nodes) if (!x.node.toys) { const a = countsOf(x.node.l, K), b = countsOf(x.node.r, K); if (a.every((v, k) => v === b[k])) return null; }
+  if (spec.clue === "light") { const p = {K, w, tree, clue: {light: true}}; return lightest(p) ? p : null; }
   const kind = Math.floor(Math.random() * K);
   const clue = spec.clue === "total" || (spec.clue === "any" && Math.random() < 0.5) ? {total} : {kind, w: w[kind]};
   const p = {K, w, tree, clue}, start = new Array(K).fill(null);
@@ -246,15 +256,15 @@ function makeMobile(n) {
 /* ---------- game state ---------- */
 // game: {level, K, w (the answer), tree, clue, looks (the toy picture for each kind), got (the weights put in,
 //        null where not), history, won…}
-const STORE = "catdoku.meowbile.v1", MAX_LEVEL = 10;
+const STORE = "catdoku.meowbile.v1", MAX_LEVEL = 11;
 const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1}, state.settings);
 let game = state.game || null, busy = false, sel = -1;
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !busy && !$("overlay").classList.contains("show");
-const levelName = n => { const s = levelSpec(n); return `Level ${n} · ${s.K} toys`; };
-const build = G.builder([levelSpec, nodesOf, countsOf, equationsOf, reason, shapeOf, stringsFor, makeMobile], "makeMobile");
+const levelName = n => { const s = levelSpec(n); return `Level ${n} · ${s.K} toys${s.clue === "light" ? ", lightest" : ""}`; };
+const build = G.builder([levelSpec, nodesOf, countsOf, equationsOf, lightest, reason, shapeOf, stringsFor, makeMobile], "makeMobile");
 const given = k => game.clue.kind === k;
 const weightOf = k => given(k) ? game.clue.w : game.got[k];
 
@@ -302,13 +312,13 @@ function draw() {
   svg.innerHTML = ""; swings = []; toyEls = [];
   const W = size.l + size.r + 2 * PAD, H = TOP + size.h + PAD;
   svg.setAttribute("viewBox", `${-size.l - PAD} 0 ${W} ${H}`);
-  // the hook in the ceiling, and the tag with the whole weight when that's the clue
+  // the hook in the ceiling, and the tag with the whole weight when that's the clue (or "Lightest" when nothing's given)
   el("rect", {x: -40, y: 0, width: 80, height: 12, rx: 4, class: "ceiling"}, svg);
   el("line", {x1: 0, y1: 12, x2: 0, y2: TOP, class: "string"}, svg);
-  if (game.clue.total != null) {
-    const tag = el("g", {class: "tag", id: "tag", transform: `translate(0 ${TOP * 0.55})`}, svg);
-    el("rect", {x: -48, y: -22, width: 96, height: 44, rx: 12}, tag);
-    el("text", {x: 0, y: 1}, tag).textContent = game.clue.total;
+  if (game.clue.total != null || game.clue.light) {
+    const tag = el("g", {class: "tag", id: "tag", transform: `translate(0 ${TOP * 0.55})`}, svg), wide = game.clue.light ? 150 : 96;
+    el("rect", {x: -wide / 2, y: -22, width: wide, height: 44, rx: 12}, tag);
+    el("text", {x: 0, y: 1}, tag).textContent = game.clue.light ? "Lightest" : game.clue.total;
   }
   const hint = el("g", {id: "hints"});
   let n = 0;
@@ -432,7 +442,8 @@ function checkWin() {
   if (ws.every((v, k) => v === game.w[k])) { win(); return true; }
   const total = weighed(game.tree);
   const level = nodesOf(game.tree).every(x => x.node.toys || weighed(x.node.l) === weighed(x.node.r));
-  G.note(level && game.clue.total != null ? `Every rod balances, but the mobile weighs ${total}, not ${game.clue.total}.` : "Not quite: a rod is tipping.", 4500);
+  G.note(level && game.clue.total != null ? `Every rod balances, but the mobile weighs ${total}, not ${game.clue.total}.`
+    : level && game.clue.light ? "Every rod balances, but the mobile can be lighter." : "Not quite: a rod is tipping.", 4500);
   return false;
 }
 $("svg").addEventListener("click", e => {
@@ -506,6 +517,13 @@ $("hintBtn").onclick = () => {
   if (wrong.length) return mark({kinds: [wrong[0]], bad: true}, `The ${nameOf(wrong[0])} don't weigh ${game.got[wrong[0]]}${wrong.length > 1 ? ` (and ${wrong.length - 1} more is wrong)` : ""}.`);
   const known = [...Array(K).keys()].map(k => weightOf(k));
   const r = reason(game, known, true), s = r.steps[0];
+  // with nothing given, the rods only say how the toys compare: until a weight's in that sets the scale, start
+  // from the lightest kind
+  if (!s && game.clue.light) {
+    const k0 = game.w.indexOf(Math.min(...game.w));
+    if (hints.level()) return mark({kinds: [k0]}, `The ${nameOf(k0)} weigh ${game.w[k0]} each.`);
+    return mark({kinds: [k0], tag: true}, `The rods only say how the toys compare. Start with the ${nameOf(k0)}: what's the least they can weigh, with every toy a whole number?`);
+  }
   if (!s) return;
   const name = nameOf(s.k);
   if (hints.level()) return mark({kinds: [s.k]}, `The ${name} weigh ${s.w} each.`);
@@ -581,21 +599,21 @@ function treeIn(s, K) {
   return t && i === s.length && !t.toys && rods <= 8 ? t : null;
 }
 $("linkBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Meowbile", won: game.won,
-  puzzle: () => ({g: "meowbile", N: game.level, t: treeOut(game.tree), w: game.w.join(""), c: game.clue.total != null ? "t" + game.clue.total : "k" + game.clue.kind, l: game.looks.map(([c, l]) => `${c}.${l}`).join(",")}),
+  puzzle: () => ({g: "meowbile", N: game.level, t: treeOut(game.tree), w: game.w.join(""), c: game.clue.total != null ? "t" + game.clue.total : game.clue.light ? "l" : "k" + game.clue.kind, l: game.looks.map(([c, l]) => `${c}.${l}`).join(",")}),
   progress: () => game.got.map(v => v == null ? "-" : v).join("")}); };
 function openShared(d) {
   const fail = () => G.note("That share link didn't work.", 5000);
   const spec = levelSpec(d.N), w = typeof d.w === "string" && /^[1-9]{2,6}$/.test(d.w) ? [...d.w].map(Number) : null;
   const K = w ? w.length : 0, tree = spec && w ? treeIn(d.t, K) : null;
   if (!tree || countsOf(tree, K).some(c => !c)) { fail(); return; }
-  const m = /^(t)([0-9]{1,4})$|^(k)([0-9])$/.exec(typeof d.c === "string" ? d.c : "");
-  const clue = !m ? null : m[1] ? {total: +m[2]} : +m[4] < K ? {kind: +m[4], w: w[+m[4]]} : null;
+  const m = /^(t)([0-9]{1,4})$|^(k)([0-9])$|^(l)$/.exec(typeof d.c === "string" ? d.c : "");
+  const clue = !m ? null : m[1] ? {total: +m[2]} : m[5] ? {light: true} : +m[4] < K ? {kind: +m[4], w: w[+m[4]]} : null;
   const p = {K, w, tree, clue};
-  // it must balance, weigh what the tag says, and have only one answer
+  // it must balance, weigh what the tag says, and have only one answer (with nothing given, be the lightest)
   const balanced = nodesOf(tree).every(x => x.node.toys || countsOf(x.node.l, K).reduce((t, c, k) => t + (c - countsOf(x.node.r, K)[k]) * w[k], 0) === 0);
   const sum = countsOf(tree, K).reduce((t, c, k) => t + c * w[k], 0);
   const start = w.map((_, k) => clue && clue.kind === k ? clue.w : null);
-  if (!clue || !balanced || (clue.total != null && clue.total !== sum) || !reason(p, start).done) { fail(); return; }
+  if (!clue || !balanced || (clue.total != null && clue.total !== sum) || !(clue.light ? lightest(p) : reason(p, start).done)) { fail(); return; }
   const looks = typeof d.l === "string" ? d.l.split(",").map(x => x.split(".").map(Number)) : [];
   const looksOK = looks.length === K && looks.every(([c, l]) => KINDS[c] && KINDS[c].looks[l]) && new Set(looks.map(x => x[0])).size === K;
   begin(p, d.N, looksOK ? looks : null);
@@ -620,22 +638,32 @@ function showHelp() {
   if (!game || game.won) { G.helpLater(); return; }
   settings.seenHelp = false; helpOnFirstVisit();
 }
+// The first mobile with nothing given gets a few steps of its own, after the first visit's.
 function helpOnFirstVisit() {
-  if (!game || !playing() || settings.seenHelp || document.querySelector(".spot")) return;
+  if (!game || !playing() || document.querySelector(".spot")) return;
+  const lightSteps = [
+    {say: "Nothing's given away on this mobile", els: [() => $("tag")]},
+    {say: "Doubling every weight still balances, so find the lightest whole weights that do", els: [$("board")]},
+  ];
+  const seen = () => { settings.seenHelp = true; if (game.clue.light) settings.seenLight = true; save(); };
+  if (settings.seenHelp) {
+    if (game.clue.light && !settings.seenLight) G.spotlight({grid: $("svg"), w: 1, h: 1, steps: lightSteps, finish: false, done: seen});
+    return;
+  }
   const rods = () => [...$("svg").querySelectorAll(".rod")], free = [...Array(game.K).keys()].find(k => !given(k));
-  const clueStep = game.clue.total != null
-    ? {say: `The tag says the whole mobile weighs ${game.clue.total}`, els: [() => $("tag")]}
-    : {say: `You're told the ${nameOf(game.clue.kind)} weigh ${game.clue.w}`, els: [() => $("key").children[game.clue.kind]]};
+  const clueStep = game.clue.total != null ? [{say: `The tag says the whole mobile weighs ${game.clue.total}`, els: [() => $("tag")]}]
+    : game.clue.light ? lightSteps
+    : [{say: `You're told the ${nameOf(game.clue.kind)} weigh ${game.clue.w}`, els: [() => $("key").children[game.clue.kind]]}];
   const steps = [
     {say: "The cat's mobile hangs perfectly level", els: [$("board")]},
     {say: "So both ends of every rod weigh the same", els: [rods]},
     {say: "Each kind of toy weighs 1 to 9", els: [$("key")]},
-    clueStep,
+    ...clueStep,
     {say: "Tap a toy, then its weight", els: [() => $("key").children[free], $("pad")]},
     {say: "A rod tips if its weights aren't right", els: [rods]},
     {say: "Stuck? Hint shows which toy to work out next", els: [$("hintBtn")]},
   ];
-  G.spotlight({grid: $("svg"), w: 1, h: 1, steps, done: () => { settings.seenHelp = true; save(); }});
+  G.spotlight({grid: $("svg"), w: 1, h: 1, steps, done: seen});
 }
 
 for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", ""), n));
@@ -651,7 +679,8 @@ $("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : setti
 if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
 $("levelSel").value = settings.level;
 const shared = G.readShare("meowbile");
-if (game) G.reopen(() => {
+const hadSave = !!(game);
+if (hadSave) G.reopen(() => {
     if (!levelSpec(game.level) || !game.tree || game.got.length !== game.K || game.looks.some(([c, l]) => !KINDS[c] || !KINDS[c].looks[l])) throw new Error("the saved mobile doesn't fit this version of the game");
     draw();
     if (game.won) finishCard();
@@ -659,7 +688,8 @@ if (game) G.reopen(() => {
   }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
 else if (!shared) newPuzzle();
 const shareOpts = () => ({name: "Meowbile", inProgress: !!(game && !game.won && game.history.length), open: openShared, after: helpOnFirstVisit});
-if (shared) G.offerShare(shared, shareOpts());
+// a link that doesn't work, opened with no saved puzzle, would leave the board empty: start one
+if (shared) G.offerShare(shared, {...shareOpts(), fresh: hadSave ? null : why => Promise.resolve(newPuzzle()).then(() => { G.note(why, 6000); })});
 window.addEventListener("hashchange", () => { const d = G.readShare("meowbile"); if (d) G.offerShare(d, shareOpts()); });
 </script>
 <!-- Visit counts (GoatCounter: no cookies, nothing personal) -->

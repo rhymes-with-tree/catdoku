@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-27.14";
+  var BUILD = "2026-10-27.15";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-27.14">
+<link rel="stylesheet" href="../games.css?v=2026-10-27.15">
 <style>
 /* The board is a quilt: a stitched binding round the edge, dashed seams between patches. */
 .board{background:#F3EEDF;border:8px solid #853C68;border-radius:12px;outline:2px dashed rgba(255,244,230,.85);outline-offset:-5px}
@@ -116,7 +116,7 @@ main{--nw:min(calc(var(--board) * .4), 210px);--sw:min(calc(var(--board) * .5), 
 
 </main>
 
-<script src="../games.js?v=2026-10-27.14"></script>
+<script src="../games.js?v=2026-10-27.15"></script>
 <script>
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 function nbrs(i,N){const r=Math.floor(i/N),c=i%N,o=[];if(r>0)o.push(i-N);if(r<N-1)o.push(i+N);if(c>0)o.push(i-1);if(c<N-1)o.push(i+1);return o;}
@@ -527,7 +527,17 @@ $("linkBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Patches", 
   puzzle: () => ({g: "patches", N: game.N, R: game.R, reg: game.reg, given: game.given}),
   progress: () => ({col: game.col})}); };
 // A puzzle from a share link, with its fabrics so far if they were sent (that isn't timed).
+// A shared quilt is checked before anything changes: a size on the list, every patch used, buttons only in the
+// four fabrics, exactly one way to finish it, and progress (if any) keeping the buttons.
+function sharedOK(d) {
+  const N = d.N, R = d.R;
+  const ints = (a, len, max, min = 0) => Array.isArray(a) && (len < 0 || a.length === len) && a.every(v => Number.isInteger(v) && v >= min && v < max);
+  if (![...$("size").options].some(o => +o.value === N) || !(Number.isInteger(R) && R > 1) || !ints(d.reg, N * N, R) || new Set(d.reg).size !== R) return false;
+  if (!ints(d.given, R, FABRICS.length, -1) || solveColors(adjacency(N, R, d.reg), d.given, 2, false).length !== 1) return false;
+  return !d.p || (ints(d.p.col, R, FABRICS.length, -1) && d.given.every((c, g) => c < 0 || d.p.col[g] === c));
+}
 function openShared(d) {
+  if (!sharedOK(d)) { G.note("That share link didn't work.", 5000); return; }
   game = {N: d.N, R: d.R, reg: d.reg, adj: adjacency(d.N, d.R, d.reg), given: d.given,
           col: d.p ? d.p.col : d.given.slice(), history: [], won: false, ...G.freshClock()};
   if (d.p) game.timed = false;
@@ -536,11 +546,13 @@ function openShared(d) {
 }
 const shared = G.readShare("patches");
 $("size").value = settings.size;
-if (game && game.reg) G.reopen(() => { buildBoard(); render(); if (game.won) finishCard(); build.prefetch(game.N); helpOnFirstVisit(); },
+const hadSave = !!(game && game.reg);
+if (hadSave) G.reopen(() => { buildBoard(); render(); if (game.won) finishCard(); build.prefetch(game.N); helpOnFirstVisit(); },
   why => { game = null; busy = false; newPuzzle().then(() => G.note(why, 0)); });
 else if (!shared) newPuzzle().then(helpOnFirstVisit);
 const shareOpts = () => ({name: "Patches", inProgress: !!(game && game.reg && !game.won && game.history.length), open: openShared, after: helpOnFirstVisit});
-if (shared) G.offerShare(shared, shareOpts());
+// a link that doesn't work, opened with no saved puzzle, would leave the board empty: start one
+if (shared) G.offerShare(shared, {...shareOpts(), fresh: hadSave ? null : why => Promise.resolve(newPuzzle()).then(() => { G.note(why, 6000); helpOnFirstVisit(); })});
 // A share link opened while this page is already showing only changes the address, so watch for it.
 window.addEventListener("hashchange", () => { const d = G.readShare("patches"); if (d) G.offerShare(d, shareOpts()); });
 </script>

@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-27.14";
+  var BUILD = "2026-10-27.15";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -24,7 +24,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-27.14">
+<link rel="stylesheet" href="../games.css?v=2026-10-27.15">
 <style>
 /* Catdoku's own looks; the rest is games.css. */
 html,body{height:100%}
@@ -113,7 +113,7 @@ main{padding-top:18px}
 
 </main>
 
-<script src="../games.js?v=2026-10-27.14"></script>
+<script src="../games.js?v=2026-10-27.15"></script>
 <script>G.nav("catdoku");</script>
 <script>
 const PALETTE = ["#BD5538","#73A7AE","#ECA818","#6AA673","#B94588","#B3B94B",
@@ -760,9 +760,19 @@ $("linkBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Catdoku", 
   puzzle: () => ({g: "catdoku", N: game.N, reg: game.reg, sol: game.sol, colors: game.colors}),
   progress: () => ({cats: game.cells.flatMap((c, k) => c.cat ? [k] : []), paws: game.cells.flatMap((c, k) => c.manual ? [k] : [])})}); };
 // A puzzle from a share link, with its cats and paw marks so far if they were sent (that isn't timed).
+// A shared puzzle is checked before anything changes: N regions, all used, and an answer with one cat in every
+// row, column and region, no two touching; progress, if any, is squares on the board.
+function sharedOK(d) {
+  const N = d.N, sq = N * N;
+  const ints = (a, len, max, min = 0) => Array.isArray(a) && (len < 0 || a.length === len) && a.every(v => Number.isInteger(v) && v >= min && v < max);
+  if (!(N >= MIN_N && N <= MAX_N) || !ints(d.reg, sq, N) || new Set(d.reg).size !== N || !ints(d.sol, N, N) || new Set(d.sol).size !== N) return false;
+  if (new Set(d.sol.map((c, r) => d.reg[r * N + c])).size !== N || d.sol.some((c, r) => r && Math.abs(c - d.sol[r - 1]) < 2)) return false;
+  return !d.p || (ints(d.p.cats, -1, sq) && ints(d.p.paws, -1, sq));
+}
 function openShared(d) {
-  const N = d.N;
-  game = {N, reg: d.reg, sol: d.sol, colors: d.colors || assignColors(d.reg, N), cells: blankCells(N),
+  if (!sharedOK(d)) { G.note("That share link didn't work.", 5000); return; }
+  const N = d.N, colorsOK = Array.isArray(d.colors) && d.colors.length === N && d.colors.every(c => PALETTE.includes(c));
+  game = {N, reg: d.reg, sol: d.sol, colors: colorsOK ? d.colors : assignColors(d.reg, N), cells: blankCells(N),
           hearts: HEARTS, livesUsed: HEARTS, status: "playing", history: [], wrong: [], ...G.freshClock()};
   if (d.p) {
     game.timed = false;
@@ -780,7 +790,8 @@ function openShared(d) {
 const shared = G.readShare("catdoku");
 renderStreak();
 $("size").value = settings.size;
-if (game) G.reopen(() => {
+const hadSave = !!(game);
+if (hadSave) G.reopen(() => {
   buildBoard(); render(); note("");
   $("size").value = settings.size;
   if (game.status === "won") showWon();
@@ -790,7 +801,8 @@ if (game) G.reopen(() => {
 }, why => { game = null; busy = false; newPuzzle().then(() => note(why, 0)); });
 else if (!shared) newPuzzle().then(helpOnFirstVisit);
 const shareOpts = () => ({name: "Catdoku", inProgress: !!(game && game.status === "playing" && game.history.length), open: openShared, after: helpOnFirstVisit});
-if (shared) G.offerShare(shared, shareOpts());
+// a link that doesn't work, opened with no saved puzzle, would leave the board empty: start one
+if (shared) G.offerShare(shared, {...shareOpts(), fresh: hadSave ? null : why => Promise.resolve(newPuzzle()).then(() => { G.note(why, 6000); helpOnFirstVisit(); })});
 // A share link opened while this page is already showing only changes the address, so watch for it.
 window.addEventListener("hashchange", () => { const d = G.readShare("catdoku"); if (d) G.offerShare(d, shareOpts()); });
 </script>
