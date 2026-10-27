@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-26.12"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-27.1"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,9 +23,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-26.12">
+<link rel="stylesheet" href="../games.css?v=2026-10-27.1">
 <style>
-/* A pale painted shelf of cubbies in the yarn shop, each holding a ball of yarn. The balls shade smoothly from
+/* A pale painted shelf of cubbies in the yarn shop, each holding a skein of yarn. The balls shade smoothly from
    corner to corner, until Fred knocks them about; the balls with a tag stay put. */
 .title{display:flex;align-items:flex-end;gap:8px}
 .fred{display:block;height:64px;width:auto;margin-bottom:-6px}
@@ -36,8 +36,8 @@
 .ball{transition:transform .18s ease-out}
 .ball.lift{transform:translateY(-7px)}
 .ball.drag{transition:none;pointer-events:none}
-.pick{fill:none;stroke:#fff;stroke-width:4px;stroke-dasharray:7 5;vector-effect:non-scaling-stroke;pointer-events:none}
-.pick.ink{stroke:var(--ink)}
+.picked{fill:none;stroke:#fff;stroke-width:4px;stroke-dasharray:7 5;vector-effect:non-scaling-stroke;pointer-events:none}
+.picked.ink{stroke:var(--ink)}
 .empty.ink,.spinning .empty.ink{stroke:var(--ink-soft)}
 .empty{fill:none;stroke:rgba(255,255,255,.55);stroke-width:2.5px;stroke-dasharray:6 6;vector-effect:non-scaling-stroke}
 .spinning .empty{stroke:#fff;stroke-width:4px}
@@ -77,8 +77,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-26.12"></script>
-<script src="../colorways.js?v=2026-10-26.12"></script>
+<script src="../games.js?v=2026-10-27.1"></script>
+<script src="../colorways.js?v=2026-10-27.1"></script>
 <script>
 /* ---------- shelves (plain functions, also run in a background worker) ---------- */
 // Levels: [columns, rows, which cubbies have a cat napping in them, how close the colours may get (the least
@@ -168,8 +168,13 @@ function makeShelf(n) {
 const dist = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
 const mid = (p, q) => p.map((v, k) => (v + q[k]) / 2);
 
-/* ---------- balls of yarn ---------- */
-// The balls are drawn by yarnBall in colorways.js, as in Yarn.
+/* ---------- skeins of yarn ---------- */
+// Shop-wound skeins, nine drawings of them in skeins/ (all near enough square, so their shapes don't tell them apart): skein-N is the strands in ink (as see-through as the
+// drawing is light) and skein-N-shape its outline. The outline is filled with the ball's colour and the strands
+// laid over it, which shades the colour as the drawing does. Their sizes, in pixels:
+const SKEINS = [[161, 164], [161, 164], [164, 164], [165, 164], [161, 164], [162, 164], [158, 165], [165, 165], [164, 165]];
+const SKEIN_SRC = {};   // filled with embedded pictures when the page is bundled into one file
+const skeinSrc = name => SKEIN_SRC[name] || `skeins/${name}.webp`;
 const SVGNS = "http://www.w3.org/2000/svg";
 function svgEl(tag, attrs) { const el = document.createElementNS(SVGNS, tag); for (const a in attrs) el.setAttribute(a, attrs[a]); return el; }
 
@@ -229,26 +234,45 @@ const movable = i => game.balls[i] >= 0 && !cats.includes(i);
 
 /* ---------- drawing ---------- */
 const at = i => [(i % game.W) * U, Math.floor(i / game.W) * U];
-// A shop tag on a ball that stays put: a little white tag in the cubby's top corner, tied to the ball by a short
-// string, clear of the ball itself.
-function tag() {
-  const g = svgEl("g", {"pointer-events": "none"});
-  g.append(svgEl("path", {d: settings.shelf ? "M17 20 Q22 28 26 31" : "M13 16 Q17 21 19 23", fill: "none", stroke: "#2A2530", "stroke-width": 1.6}));
-  const t = svgEl("g", {transform: settings.shelf ? "translate(17 18) rotate(-35)" : "translate(13 14) rotate(-35)"});
-  t.append(svgEl("path", {d: "M-3 0 L4 -7 H20 V7 H4 Z", fill: "#FFFFFF", stroke: "#2A2530", "stroke-width": 2, "stroke-linejoin": "round"}),
-    svgEl("circle", {cx: 2.5, cy: 0, r: 1.8, fill: "#2A2530"}));
-  g.append(t);
-  return g;
+// A shop tag on a ball that stays put: a white tag in the middle of the skein, with a loop of string through its hole.
+function tag(i) {
+  const [x, y, w, h] = skeinBox(i), t = svgEl("g", {"pointer-events": "none", transform: `translate(${x + w / 2} ${y + h / 2}) rotate(-15) scale(2) translate(-8.5 0)`});
+  t.append(svgEl("path", {d: "M2.5 0 C-2 -1 -6 -6 -5 -9", fill: "none", stroke: "#2A2530", "stroke-width": .9, "stroke-linecap": "round"}),
+    svgEl("path", {d: "M-3 0 L4 -7 H20 V7 H4 Z", fill: "#FFFFFF", stroke: "#2A2530", "stroke-width": 1.1, "stroke-linejoin": "round"}),
+    svgEl("circle", {cx: 2.5, cy: 0, r: 1.6, fill: "#2A2530"}));
+  return t;
 }
-// The middle of a cubby's ball, and its radius.
-const ballSpot = () => settings.shelf ? [50, 53, 38] : [50, 50, 46];
+// Each ball keeps one of the skeins on a shelf, wherever it's swapped to; a spun ball gets one by its cubby.
+const skeinOf = i => ((game.balls[i] >= 0 ? game.balls[i] : i + 3) * 5 + parseInt(game.corners[0].slice(1, 3), 16)) % SKEINS.length;
+// The box a cubby's skein sits in, [left, top, width, height], scaled to fit and standing on the cubby's floor;
+// with the shelf off, the skeins all but touch.
+function skeinBox(i) {
+  const [cx, bottom, bw, bh] = settings.shelf ? [50, 92, 80, 80] : [50, 98.5, 97, 97], [sw, sh] = SKEINS[skeinOf(i)];
+  const k = Math.min(bw / sw, bh / sh);
+  return [cx - sw * k / 2, bottom - sh * k, sw * k, sh * k];
+}
+function skeinDefs() {
+  const defs = svgEl("defs", {});
+  SKEINS.forEach((_, k) => {
+    const m = svgEl("mask", {id: `skein${k}`, maskContentUnits: "objectBoundingBox"}), im = svgEl("image", {width: 1, height: 1, preserveAspectRatio: "none"});
+    im.setAttribute("href", skeinSrc(`skein-${k + 1}-shape`)); m.append(im); defs.append(m);
+  });
+  return defs;
+}
 function ballIn(g, i) {
   const c = colourAt(game.balls, game.spun, i); if (!c) return;
-  const [x, y, r] = ballSpot(i), b = svgEl("g", {class: "ball" + (i === pick ? " lift" : ""), "data-b": i});
-  const inner = svgEl("g", {transform: `translate(${x} ${y})`});
-  inner.append(yarnBall(labHex(c), r));
-  b.append(inner); g.append(b);
-  if (cats.includes(i)) g.append(tag());
+  const [x, y, w, h] = skeinBox(i), k = skeinOf(i), b = svgEl("g", {class: "ball" + (i === pick ? " lift" : ""), "data-b": i});
+  b.append(svgEl("ellipse", {cx: x + w / 2 + 2, cy: y + h - 1, rx: w * .42, ry: 3.5, fill: "#2A2530", "fill-opacity": .14}),
+    svgEl("rect", {x, y, width: w, height: h, fill: labHex(c), mask: `url(#skein${k})`}));
+  const ink = svgEl("image", {x, y, width: w, height: h, preserveAspectRatio: "none"});
+  ink.setAttribute("href", skeinSrc(`skein-${k + 1}`));
+  b.append(ink); g.append(b);
+  if (cats.includes(i)) g.append(tag(i));
+}
+// A rounded box round a cubby's skein, d bigger each way (for the picked ball, an empty cubby and hint marks).
+function around(i, d, cls, lift = 0) {
+  const [x, y, w, h] = skeinBox(i);
+  return svgEl("rect", {class: cls, x: x - d, y: y - d - lift, width: w + 2 * d, height: h + 2 * d, rx: 14 + d});
 }
 function draw() {
   const el = $("board"); if (!game) return;
@@ -259,7 +283,7 @@ function draw() {
     el.style.setProperty("--ar", ((w + 2 * RIM + 8) / (h + 2 * RIM + FLOOR + 4)).toFixed(3));
   }
   el.innerHTML = "";
-  el.append(ballDefs());
+  el.append(skeinDefs());
   // the frame, then each cubby's back wall with a little shadow under the shelf above
   if (wood) {
     el.append(svgEl("rect", {x: -RIM, y: -RIM, width: w + 2 * RIM, height: h + 2 * RIM, rx: 6, fill: PAINT.frame, stroke: "#2A2530", "stroke-width": 3}));
@@ -272,10 +296,9 @@ function draw() {
       g.append(svgEl("rect", {x: 5, y: 5, width: U - 10, height: U - 10, rx: 3, fill: PAINT.back, stroke: PAINT.edge, "stroke-width": 1.5}));
       g.append(svgEl("rect", {x: 6, y: 6, width: U - 12, height: 7, fill: "#2A2530", "fill-opacity": .06}));
     }
-    const [bx, by, br] = ballSpot(i);
-    if (holes.includes(i) && !game.spun[i]) g.append(svgEl("circle", {class: "empty ink", cx: bx, cy: by, r: br - 2}));
+    if (holes.includes(i) && !game.spun[i]) g.append(around(i, -3, "empty ink"));
     else ballIn(g, i);
-    if (i === pick || (spin && spin.from.includes(i))) g.append(svgEl("circle", {class: "pick ink", cx: bx, cy: i === pick ? by - 7 : by, r: Math.min(48, br + 6)}));
+    if (i === pick || (spin && spin.from.includes(i))) g.append(around(i, 3, "picked ink", i === pick ? 7 : 0));
     el.append(g);
   }
   // the dividers between cubbies
@@ -289,7 +312,7 @@ function draw() {
   const m = hints.current();
   if (m) {
     for (const i of m.cells || []) { const [x, y] = at(i); el.append(svgEl("rect", {class: "hintsq" + (m.bad ? " bad" : ""), x: x + 3, y: y + 3, width: U - 6, height: U - 6, rx: 6})); }
-    for (const i of m.rings || []) { const [x, y] = at(i), [bx, by, br] = ballSpot(i); el.append(svgEl("circle", {class: "hintsq", cx: x + bx, cy: y + by, r: Math.min(48, br + 8)})); }
+    for (const i of m.rings || []) { const [x, y] = at(i), r = around(i, 4, "hintsq"); r.setAttribute("transform", `translate(${x} ${y})`); el.append(r); }
   }
   if (keys.at() >= 0) { const [x, y] = at(keys.at()); el.append(svgEl("rect", {class: "kbring", x: x + 2, y: y + 2, width: U - 4, height: U - 4, rx: 6})); }
   // the count
