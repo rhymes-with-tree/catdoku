@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-27.7"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-27.15"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-27.7">
+<link rel="stylesheet" href="../games.css?v=2026-10-27.15">
 <style>
 /* A magic square of toe beans: every row, column and long diagonal adds up to the same total. Each bean holds a
    number, 1 to N² once each, and each line's total so far is on a main pad at its end (rows on the right, columns
@@ -55,6 +55,18 @@
 .pad{display:grid;grid-template-columns:repeat(10,1fr);gap:4px}
 .pad button{padding:0;min-width:0;aspect-ratio:1.15;font-weight:800;font-size:clamp(14px,4.4vw,19px);border-radius:999px;font-variant-numeric:tabular-nums}
 .pad button.used{opacity:.25;cursor:default}
+/* On a phone held sideways (games.css) the square takes the screen's height, with the numbers beside it reading left
+   to right, --across to a row (five, or three like a keypad for 1 to 9) in --rows rows (both set with the pad), each as tall as fits, and the pad no wider than the
+   square beside it */
+.square{--aspect:.6}
+@media (orientation:landscape) and (max-height:500px){
+  body:not(.full) main > .square.stage{flex-direction:row;align-items:center;gap:10px}
+  body:not(.full) main > .square.stage #grid{flex:1;min-width:0}
+  body:not(.full) main > .square.stage svg{max-height:var(--high)}
+  body:not(.full) main > .square.stage .pad{--k:min(48px,calc((var(--high) - (var(--rows) - 1) * 4px) / var(--rows)),calc((var(--board) * .5 - 26px) / var(--across) / 1.15));flex:none;
+    grid-template-columns:repeat(var(--across),calc(var(--k) * 1.15));grid-auto-rows:var(--k)}
+  body:not(.full) main > .square.stage .pad button{aspect-ratio:auto;font-size:clamp(14px,calc(var(--k) * .48),19px)}
+}
 .pad button.held{background:#FFF6DA;box-shadow:inset 0 0 0 3px #ECA818}
 .pad button.hinted{color:#B07A0A;background:#FFF6DA;box-shadow:inset 0 0 0 3px #ECA818}
 .shake{animation:shake .35s}
@@ -68,7 +80,7 @@
 
   <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
 
-  <div class="wrap square" id="board" tabindex="0">
+  <div class="wrap square stage" id="board" tabindex="0">
     <div id="grid"><svg id="svg" role="img" aria-label="A square of toe beans"></svg></div>
     <div class="pad" id="pad" aria-label="Numbers"></div>
   </div>
@@ -78,6 +90,8 @@
     <button id="hintBtn">Hint</button>
     <button id="undoBtn">Undo</button>
     <button id="restartBtn">Restart</button>
+    <button id="guessBtn" aria-pressed="false">Guess</button>
+    <button id="backBtn" hidden>Undo guess</button>
     <button id="auditBtn">Audit</button>
     <button id="linkBtn">Share</button>
     <button id="bestBtn">Best times</button>
@@ -90,7 +104,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-27.7"></script>
+<script src="../games.js?v=2026-10-27.15"></script>
 <script>
 /* ---------- squares ---------- */
 // A square is N × N (level 1 is 3 × 3, up to 6 × 6 at level 4) holding 1 to N² once each, every row, column and
@@ -213,6 +227,7 @@ const board = () => game.sol.map((_, k) => valueAt(k));
 const empties = () => game.sol.map((_, k) => k).filter(k => !valueAt(k));
 const usedNums = () => new Set(board().filter(Boolean));
 const hints = G.hinter({game: () => game, key: () => game ? JSON.stringify(game.put) : "", draw: () => draw()});   // marks {sq: [[square, bad]…], num}
+const guesses = G.guesser({game: () => game, undo, draw: () => { draw(); save(); }, board: $("board"), what: "number"});
 
 /* ---------- drawing ---------- */
 // The beans, with each line's total so far on a main pad at its end: rows on the right, columns below, the diagonal from the
@@ -253,6 +268,7 @@ function draw() {
   });
   svg.classList.toggle("solved", !!game.won);
   $("board").style.setProperty("--pc", game.pc[0]); $("board").style.setProperty("--pt", game.pc[1]);
+  for (const k of guesses.list()) if (game.put[k]) el("rect", {class: "guess", x: x0 + k % N * CS + 4, y: y0 + Math.floor(k / N) * CS + 4, width: CS - 8, height: CS - 8, rx: 11}, svg);
   const mark = hints.current();
   if (mark) for (const [k, bad] of mark.sq) {
     const r = Math.floor(k / N), c = k % N;
@@ -267,6 +283,8 @@ function drawPad() {
   if (pad.children.length !== NN) {
     pad.innerHTML = "";
     for (let v = 1; v <= NN; v++) { const b = document.createElement("button"); b.type = "button"; b.textContent = v; b.dataset.v = v; pad.append(b); }
+    const across = NN === 9 ? 3 : 5;   // beside the square on a phone held sideways: five to a row, or a keypad for 1 to 9
+    pad.style.setProperty("--across", across); pad.style.setProperty("--rows", Math.ceil(NN / across));
   }
   for (const b of pad.children) {
     const v = +b.dataset.v;
@@ -278,6 +296,7 @@ function update() {
   const left = empties().length;
   $("count").textContent = game.won ? `Every line adds up to ${total()}!` : `Every line adds up to ${total()} · ${left} to go`;
   $("undoBtn").disabled = !game.history.length || game.won;
+  guesses.sync();
   $("restartBtn").disabled = !Object.keys(game.put).length || game.won;
   $("hintBtn").disabled = $("auditBtn").disabled = game.won;
 }
@@ -289,6 +308,7 @@ function place(v, k) {
   if (!playing() || game.given[k]) return;
   if (game.put[k] === v) { sel = k; held = 0; draw(); return; }
   if (game.given.includes(v)) return shake(`The ${v} is already in the square.`);
+  guesses.before(k);
   game.history.push({...game.put});
   for (const q in game.put) if (game.put[q] === v) delete game.put[q];
   game.put[k] = v; game.started = true; held = 0;
@@ -371,7 +391,7 @@ function undo() {
 $("undoBtn").onclick = undo;
 $("restartBtn").onclick = () => {
   if (!playing() || !Object.keys(game.put).length) return;
-  game.undid = true; game.history.push({...game.put}); game.put = {}; sel = -1; held = 0;
+  game.undid = true; game.history.push({...game.put}); game.put = {}; sel = -1; held = 0; guesses.clear();
   draw(); save();
   G.note("All your numbers are out. Undo puts them back.", 4000);
 };
@@ -505,6 +525,7 @@ function helpOnFirstVisit() {
   steps.push(
     {say: "Tap your number twice to take it out", lit: [...Array(N * N).keys()].filter(k => !game.given[k]).map(k => [k % N, Math.floor(k / N)]), outline: []},
     {say: "Audit marks any number in the wrong square", els: [$("auditBtn")]},
+    {say: "Not sure? Guess, and Undo guess takes you back to just before it", els: [$("guessBtn")]},
     {say: "Stuck? Hint shows where a number goes", els: [$("hintBtn")]},
   );
   G.spotlight({grid: $("grid"), w: N, h: N, steps, map, done: () => { settings.seenHelp = true; save(); }});

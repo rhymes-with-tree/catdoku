@@ -57,7 +57,8 @@ the same file path so the link stays the same.
   (the same words as the game's blurb in `G.GAMES`), games menu, status line, board (with any key or
   number pad just under it), action buttons, then level select and New puzzle.
 - Before publishing, screenshot it with Playwright at the small phone sizes, not only at a roomy phone width:
-  an iPhone SE upright (375 × 553) and sideways (667 × 323), and the first SE (320 × 460). Script a playthrough
+  an iPhone SE upright (375 × 553) and sideways (667 × 323, with the board on the left: step 3, "Sideways"), and
+  the first SE (320 × 460). Script a playthrough
   to the win card too (step 5 says how to load Playwright).
 
 ## 3. Port
@@ -73,7 +74,10 @@ in its notes.
   labelled Restart, never Clear), then the game's own buttons (Flip, Notes, Mark…), then `linkBtn` (labelled Share; content
   blockers hide anything whose id or class has "share" in it, so never use the word there),
   `toysBtn` if it uses toys, `bestBtn` (Best times) and `helpBtn` (How to play). Leave out what the game
-  doesn't have, but don't reorder. Undo also answers Ctrl+Z / ⌘Z (but not with Shift). Restart always puts
+  doesn't have, but don't reorder. `games.js` turns them into icons with the word small underneath (its `ICON_OF`
+  table, by id): give a new kind of button an icon there (or `data-icon` where an id means something else in this
+  game), and change a button's word with `G.relabel(btn, words, icon)`, never `textContent`, or the icon goes.
+  The game's ☆ goes just after its name in the title by itself. Undo also answers Ctrl+Z / ⌘Z (but not with Shift). Restart always puts
   back this same puzzle as it was dealt; `newBtn` deals a different one. Every game has Share, and New unless
   levels are a fixed list.
 - **Settings row** (`.bar`, under the buttons): `levelSel` labelled "Level" (or `size` labelled "Size"),
@@ -190,6 +194,32 @@ into a narrow column beside the board so it gets the whole height (see `catburgl
 board is turned to lie sideways, taps, the arrow keys (which still go the way they point on the screen) and the
 walkthrough's squares and arrows must all be turned with it (see `shownXY` and `matXY` in `twirl/`).
 
+### Sideways
+
+On a phone held sideways (`(orientation:landscape) and (max-height:500px)`), every game puts its board on the left at
+the screen's full height, staying put, with everything else in a column beside it that scrolls. `games.css` does
+this for any page with a `.stage`: add the class to the board's box, the direct child of `main` that holds the board
+and anything drawn on or around it (often `.wrap`). The rest of `main` becomes the column, where `--board` is 100%.
+
+- **Size from `--board` (and `--tall`).** On the stage, `--board` is the box's width and `--tall` the screen's
+  height, so a board sized from them fits. A box taller than it is wide sets `--aspect`, its height for each pixel
+  across (`.floor{--aspect:1.29}` in `iffits/`); where that changes with the level, set it from script on the stage
+  (`fuzzyspelling/`, `unravel/`). A board sized in script asks `G.sideways()` and takes its room from the stage and
+  `innerHeight` (`twirl/`, `catburglar/`), and lays out again on `resize`.
+- **Decorations.** A cat or picture over the board's top edge needs room inside the stage (padding-top, with
+  `--tall` less that much: `pawlette/`, `twirl/`); one hanging below or beside the board, with no room for it,
+  is put away there (`patches/`, `yarn/`). Padding kept for a decoration in the column goes too (`patches/`).
+- **A pad or tray that goes with the board** (numbers, letters) stands beside it inside the stage, in as many columns
+  as fit the height (`purrfect/`, `magnets/`), or, if it's outside the board's box, comes near the top of the column
+  (`stash/`). Never let it fall below the fold: you can't play without it.
+- **A board much wider than tall** adds `wide` (`.stage.wide`): it keeps the whole width under a slim row with the
+  title and menu, sized to the height left; `--below` keeps room for something under it. Set `--aspect` from the
+  board's real shape (`fishbones/`); a keyboard can go beside it (`upatree/`).
+- **A game you aim or shoot "up"** may read better turned on its side (`bubbles/`: the cat on the left shooting
+  right, with pictures and words kept upright, and taps, arrow keys and walkthrough turned with it).
+- **Full screen** keeps its own layout: the shared rule only applies without `body.full`.
+- A page whose board can't be one box of `main` lays it out itself in the same way (see `keyboardcat/`).
+
 ### Lives
 
 Most games have none. A game that does follows Catdoku, Twirl and Toydoku: three hearts drawn as `♥` in
@@ -238,6 +268,11 @@ SE, 320 × 460, as well as a laptop at 1280 × 720. Load Playwright with
 - on the iPhone SE sizes, nothing runs off the side (no sideways scroll, no button cut off), button rows wrap
   tidily at 320 wide, the board at the biggest level is big enough to tap (note its square size in pixels),
   and the page scrolls only as far as it must; take screenshots and look at them;
+- sideways (step 3, "Sideways"), at 667 × 323, 844 × 390 and 932 × 430, at the game's smallest and biggest level: the
+  whole board is on screen (measure it), nothing runs off the side, it stays put while the column scrolls to the
+  settings, taps land on the board, a card (Best times, the win card) covers the column too, the walkthrough lines
+  up, and turning the phone part-way through a puzzle (upright, then sideways, then back) lays it out as a fresh
+  load would; held upright and on a laptop, the page is unchanged;
 - full screen, if the game has it (step 3, "Full screen"): measure the board at each size before and after,
   taps still land on the square under the finger (also when zoomed, and when the board is turned), F and Escape
   leave it, the cards and the walkthrough show on top, and the page still opens with a puzzle saved part-way

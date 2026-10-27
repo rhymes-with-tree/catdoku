@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-27.7"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-27.15"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-27.7">
+<link rel="stylesheet" href="../games.css?v=2026-10-27.15">
 <style>
 /* A fish skeleton: a spine word across and rib words down through it, with the letters on the bones muddled.
    Swap bones until every line spells a word. Green: in the right place. Gold: in that word, somewhere else.
@@ -36,6 +36,7 @@
   height:auto;touch-action:none;user-select:none;-webkit-user-select:none}
 .fish #svg{display:block;width:100%;height:auto;outline:none;overflow:visible}
 .body{fill:var(--ink)} .eye{fill:var(--paper)}
+.art{transition:opacity .6s} .art.faded{opacity:.15}
 .spine{stroke:var(--ink);stroke-width:16;stroke-linecap:round;fill:none}
 .bone{cursor:grab;transition:transform .22s ease-out}
 .bone rect{fill:var(--no);stroke:var(--ink);stroke-width:3;transition:fill .2s}
@@ -89,7 +90,7 @@ body.full .actions > :not(#hintBtn,#undoBtn),body.full .bar,body.full .wordlist{
 
   <div class="status"><span class="swaps" id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
 
-  <div class="wrap fish" id="board"><button id="fullBtn"></button><div id="grid"><svg id="svg" tabindex="0" role="application" aria-label="A fish skeleton with a letter on each bone. Drag a bone onto another to swap them, or tap one and then the other; arrow keys and Space work too."></svg></div></div>
+  <div class="wrap fish stage wide" id="board"><button id="fullBtn"></button><div id="grid"><svg id="svg" tabindex="0" role="application" aria-label="A fish skeleton with a letter on each bone. Drag a bone onto another to swap them, or tap one and then the other; arrow keys and Space work too."></svg></div></div>
   <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
 
   <div class="actions">
@@ -108,7 +109,7 @@ body.full .actions > :not(#hintBtn,#undoBtn),body.full .bar,body.full .wordlist{
 
 </main>
 
-<script src="../games.js?v=2026-10-27.7"></script>
+<script src="../games.js?v=2026-10-27.15"></script>
 <script>
 /* ---------- fish (plain functions, also run in a background worker) ---------- */
 // A fish is a spine word read across, with rib words read down through it. `ribs` gives each spine bone's rib
@@ -310,7 +311,7 @@ function draw() {
   const end = A.body[A.body.length - 1][0], q = (end - A.gill - 24) / L, k = 100 / q, x0 = A.gill + 12;
   const ys = cells.map(c => c[1]), top = Math.min(...ys) * 100, bot = (Math.max(...ys) + 1) * 100;
   svg.innerHTML = "";
-  const fish = el("g", {}, svg), g = el("g", {transform: `translate(${-x0 * k} 50) scale(${k})`}, fish);
+  const fish = el("g", {class: "art"}, svg), g = el("g", {transform: `translate(${-x0 * k} 50) scale(${k})`}, fish);
   el("path", {class: "spine", d: `M${A.gill - 6} 0H${end + 4}`, "stroke-width": 16 / k}, g);
   const tp = curve(A.body.map(([x, t]) => [x, t])), bp = curve(A.body.map(([x, , b]) => [x, b]));
   const body = "M" + tp.map(p => p.join(" ")).join("L") + "L" + bp.slice().reverse().map(p => p.join(" ")).join("L") + "Z";
@@ -335,7 +336,8 @@ function draw() {
   }
   // the frame: the fish and its bones, with a little room round them
   const fb = fish.getBBox(), X0 = Math.min(fb.x, 0) - 8, X1 = Math.max(fb.x + fb.width, L * 100) + 8, Y0 = Math.min(fb.y, top) - 8, Y1 = Math.max(fb.y + fb.height, bot) + 8;
-  svg.setAttribute("viewBox", `${X0} ${Y0} ${X1 - X0} ${Y1 - Y0}`);
+  frames = {whole: [X0, Y0, X1 - X0, Y1 - Y0], bones: [-8, top - 8, L * 100 + 16, bot - top + 16]};
+  showFrame(frames.whole);
   bones = []; at = [];
   const layer = el("g", {id: "bones"}, svg);
   for (let p = 0; p < cells.length; p++) {
@@ -349,7 +351,32 @@ function draw() {
   el("rect", {id: "kb", class: "kbring", x: -999, y: 0, width: 96, height: 96, rx: 18}, svg);
   el("g", {id: "hints"}, svg);
   place(); update();
+  if (game.sol + game.level !== drawnFor) { drawnFor = game.sol + game.level; zoomSoon(); } else frame(false);   // a new fish shows whole first
 }
+// On a phone held sideways (games.css) the bones are what matter: the fish shows whole for a moment, then its head,
+// tail and fins fade back and the view closes in on the bones. Solved, it opens out on the whole fish again.
+let frames = null, zoom = null, zoomTimer = null, drawnFor = "";
+function showFrame([x, y, w, h]) {
+  $("svg").setAttribute("viewBox", `${x} ${y} ${w} ${h}`);
+  $("board").style.setProperty("--aspect", (h / w).toFixed(3));   // its height for each pixel across (games.css)
+}
+function frame(animate) {
+  if (!frames) return;
+  const close = G.sideways() && game && !game.won, to = close ? frames.bones : frames.whole;
+  $("svg").querySelector(".art")?.classList.toggle("faded", close);
+  cancelAnimationFrame(zoom);
+  const vb = $("svg").viewBox.baseVal, from = [vb.x, vb.y, vb.width, vb.height];
+  if (!animate || matchMedia("(prefers-reduced-motion:reduce)").matches) return showFrame(to);
+  const t0 = performance.now(), step = t => {
+    const u = Math.min(1, (t - t0) / 700), e = 1 - Math.pow(1 - u, 3);
+    showFrame(from.map((a, i) => a + (to[i] - a) * e));
+    if (u < 1) zoom = requestAnimationFrame(step);
+  };
+  zoom = requestAnimationFrame(step);
+}
+// after drawing a fish: whole first, then (sideways) in to the bones
+function zoomSoon() { clearTimeout(zoomTimer); if (frames) showFrame(frames.whole); $("svg").querySelector(".art")?.classList.remove("faded"); zoomTimer = setTimeout(() => frame(true), 900); }
+addEventListener("resize", () => { clearTimeout(zoomTimer); frame(false); });
 const xy = i => { const [x, y] = shape().cells[i]; return [x * 100, y * 100]; };
 function place() { at.forEach((p, i) => { const [x, y] = xy(i); bones[p].style.transform = `translate(${x}px, ${y}px)`; }); }
 // Waffle's colours, word by word: green where the letter is right; gold where it's wrong but the word still
@@ -519,7 +546,7 @@ $("hintBtn").onclick = () => {
 
 /* ---------- endings ---------- */
 function win() {
-  game.won = true; G.finishClock(game); sel = -1; keys.hide(); hints.clear(); G.note("");
+  game.won = true; G.finishClock(game); sel = -1; keys.hide(); hints.clear(); G.note(""); frame(true);
   // a hint, or running over the swaps, keeps you on the same level
   const next = game.hinted || left() < 0 ? game.level : Math.min(MAX_LEVEL, game.level + 1);
   settings.level = next; $("levelSel").value = next; save();
