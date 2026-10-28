@@ -117,9 +117,6 @@
   .play > .side > .hintbtns .ic{width:22px;height:22px}
   .side .legend{font-size:13px;padding:2px 8px;margin-bottom:6px}
   .side .legend b{font-size:11px}
-  .side .chips{gap:4px;margin-bottom:6px}
-  .side .chips span{font-size:13px}
-  .side .chips i,.side .chips b{padding:0 4px}
   .tapclue{display:none}
 }
 .choose{display:flex;flex-direction:column;gap:10px;margin:0 0 16px;text-align:left}
@@ -140,14 +137,17 @@
 .side > .hintbtns{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:0;margin:auto 0 0;padding-top:6px;width:100%;
   position:sticky;bottom:0;background:linear-gradient(transparent,var(--panel) 10px)}
 .side > .hintbtns .lbl{font-size:12px}
-.chips{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin:0 0 12px}
-.chips span{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;font-size:15px;font-weight:600}
-.chips i{font-style:normal;padding:1px 6px;text-transform:uppercase}
-.chips b{padding:1px 6px;background:#FBF3DA;font-weight:800}
-.chips span.more i{background:#F6C78E}
 .words{list-style:none;margin:0;padding:0;columns:2;column-gap:24px;font-size:clamp(19px,2.2vw,26px);font-weight:700}
 .words li{break-inside:avoid;line-height:1.75;text-transform:capitalize;white-space:nowrap}
 .words li.blank{text-transform:uppercase;color:#5A5266}
+/* with Starts on: a heading for each pair of first letters, saying how many words left start with it */
+.words li.starthead{display:flex;align-items:baseline;gap:8px;break-after:avoid;break-inside:avoid;margin-top:.35em;line-height:1.3;
+  font-size:.62em;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--ink-soft);border-bottom:1px solid var(--line)}
+.words li.starthead:first-child{margin-top:0}
+.words li.starthead span{color:var(--ink);font-size:1.15em}
+.words li.starthead b{font-weight:700;letter-spacing:0;text-transform:none;color:#C9773F}
+.words li.starthead b.done{color:#6AA673}
+.words .plus,.legend .plus{font-size:.62em;font-weight:800;color:#2A2530;background:#F6C78E;border-radius:6px;padding:0 4px;vertical-align:.2em}
 .words li.blank button{all:unset;cursor:pointer;border-radius:6px;padding:0 4px;margin-left:-4px}
 .words li.blank button:hover,.words li.blank button:focus-visible{background:#EDE6F7;outline:none}
 .words li.blank small{font-size:.72em;font-weight:600;margin-left:2px}
@@ -210,7 +210,6 @@
       <div class="rank"><div class="rankrow"><b id="rankName">Kitten</b><span id="score"></span></div><div class="dots" id="dots"></div></div>
       <span class="smashes" id="smashes"></span></div>
     <ul class="legend" id="legend"></ul>
-    <div class="chips" id="chips"></div>
     <p class="tapclue" id="tapClue" hidden>Tap a blank for a clue.</p>
     <ul class="words" id="words"></ul>
     <div class="hintbtns tools" id="hintbar"></div>
@@ -449,7 +448,9 @@ function drawWords() {
     if (h.marks && rearranges(w)) cls.push("ana");
     if (w === lastWord) cls.push("new");
     const text = x && endsLeft.has(x) ? `${w.slice(0, -x.length)}<mark>${x}</mark>` : w;
-    return `<li><span class="${cls.join(" ").trim()}">${link(w, text)}</span></li>`;
+    // with Starts on, a found word that more words left start with says how many (ITEM +2)
+    const more = h.pairs && !game.revealed ? starts[w] : 0;
+    return `<li><span class="${cls.join(" ").trim()}">${link(w, text)}</span>${more ? ` <b class="plus" title="${more} more start with ${w}">+${more}</b>` : ""}</li>`;
   };
   // every word in the list links to its meaning, to learn the new ones
   const link = (w, text) => `<a href="https://en.wiktionary.org/wiki/${w}" target="_blank" rel="noopener" title="What does ${w} mean?">${text}</a>`;
@@ -457,7 +458,9 @@ function drawWords() {
   // a word left: its first letter and length, M(5); tap it for a clue
   blanks = [];
   $("tapClue").hidden = !(h.left && left.length && !game.revealed);
-  const blank = w => `<li class="blank"><button data-b="${blanks.push(w) - 1}" aria-label="${w[0]}, ${w.length} letters: tap for a clue">${w[0]}<small>(${w.length})</small></button></li>`;
+  // with Starts on, the blank shows the word's start (AC, or a word found that it starts with) instead
+  const blank = w => { const at = h.pairs ? startOf(w) : w[0];
+    return `<li class="blank"><button data-b="${blanks.push(w) - 1}" aria-label="${at}, ${w.length} letters: tap for a clue">${at}<small>(${w.length})</small></button></li>`; };
   // the two-letter starts (or found words) the words left begin with
   const startOf = w => game.found.filter(f => f.length < w.length && w.startsWith(f)).sort((a, b) => b.length - a.length)[0] || w.slice(0, 2);
   const starts = {};
@@ -469,25 +472,36 @@ function drawWords() {
     const sorted = game.found.slice().sort();
     const ends = [...new Set(sorted.map(suffixOf).filter(x => x && endsLeft.has(x)))];
     for (const x of ends) key.push(`<li>More end in <b><mark>-${x}</mark></b></li>`);
-    for (const f of sorted.filter(startsLonger)) key.push(`<li>More start with <b class="more">${f}-</b></li>`);
+    if (!h.pairs) for (const f of sorted.filter(startsLonger)) key.push(`<li>More start with <b class="more">${f}-</b></li>`);
     for (const f of sorted.filter(rearranges)) key.push(`<li>Rearrange <b class="ana">${f}</b> into another word</li>`);
     if (!key.length) key.push(`<li>Clues appear as you find words.</li>`);
   }
-  if (h.pairs && !h.marks && !game.revealed && Object.keys(starts).some(x => x.length > 2))
-    key.push(`<li><b class="more">Orange</b>: starts with a word you found</li>`);
+  if (h.pairs && !game.revealed && Object.keys(starts).some(x => x.length > 2))
+    key.push(`<li><b class="plus">+2</b> more words start with that one</li>`);
   if (game.revealed) key.push(`<li><b class="missed">Red</b>: missed</li>`);
   if (game.found.some(w => w.length === 7 && lettersOf(w).length === 7)) key.push(`<li><b class="star">★</b> Perfect Pounce</li>`);
   $("legend").innerHTML = key.join("");
-  $("chips").innerHTML = h.pairs ? Object.keys(starts).sort().map(s => `<span class="${s.length > 2 ? "more" : ""}"><i>${s}</i><b>${starts[s]}</b></span>`).join("") : "";
-  // One list, by first letter: the words found in alphabetical order, then, with Words Remaining on, a blank for
-  // each word left, shortest first. Once revealed, every word in alphabetical order, the missed ones marked.
-  const found = new Set(game.found);
-  const shown = game.revealed || h.left ? [...game.found, ...left] : game.found.slice();
-  const order = (a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1
+  // One list, by first letter (with Starts on, by first two letters, each pair a heading with how many words left
+  // start with it): the words found in alphabetical order, then, with Words left on, a blank for each word left,
+  // shortest first. Once revealed, every word in alphabetical order, the missed ones marked.
+  const found = new Set(game.found), by = h.pairs ? 2 : 1;
+  const shown = game.revealed || h.left || h.pairs ? [...game.found, ...left] : game.found.slice();
+  const order = (a, b) => a.slice(0, by) < b.slice(0, by) ? -1 : a.slice(0, by) > b.slice(0, by) ? 1
     : game.revealed ? (a < b ? -1 : 1)
     : (found.has(b) - found.has(a)) || (found.has(a) ? (a < b ? -1 : 1) : a.length - b.length);
-  $("words").innerHTML = shown.sort(order).map(w => found.has(w) ? word(w) : game.revealed ? missed(w) : blank(w)).join("");
-  if (!shown.length && !h.pairs) $("words").innerHTML = `<p class="none">Type a word and press Enter.</p>`;
+  const leftIn = {};
+  for (const w of left) leftIn[w.slice(0, 2)] = (leftIn[w.slice(0, 2)] || 0) + 1;
+  let html = "", at = "";
+  for (const w of shown.sort(order)) {
+    if (h.pairs && w.slice(0, 2) !== at) {
+      at = w.slice(0, 2); const n = game.revealed ? 0 : leftIn[at] || 0;
+      html += `<li class="starthead"><span>${at}</span>${n ? `<b>${n} left</b>` : `<b class="done">✓</b>`}</li>`;
+    }
+    if (found.has(w)) html += word(w); else if (game.revealed) html += missed(w); else if (h.left) html += blank(w);
+  }
+  $("words").innerHTML = html;
+  $("words").classList.toggle("grouped", !!h.pairs);
+  if (!shown.length) $("words").innerHTML = `<p class="none">Type a word and press Enter.</p>`;
 }
 let blanks = [];  // the words left, in the order their blanks are drawn
 $("words").addEventListener("click", e => { const b = e.target.closest("button[data-b]"); if (b && game && !game.revealed) wordClue(blanks[+b.dataset.b]); });
