@@ -21,6 +21,10 @@ under the SIL Open Font License.
 
 ## Who's who in `cats/`
 
+**Who gets along:** Fred and Jan Brady are friends, and Gus and Peanut are friends. Fred, Dottie, Jan Brady and
+Higgins can appear together, but of those four only Fred and Jan get along: put Dottie or Higgins in a picture
+with the others and they shouldn't look friendly (no cuddling or playing together).
+
 Most of the cats are just cats, and any game can use them. The `c14-…`, `c15-…` and
 `c17-…` to `c20-…` pictures (and any later numbered ones) are these general cats. A few cats
 have names, and most have their own files (`name-1.webp`, `name-2.webp`, …). Every named cat can also be used as an ordinary cat
@@ -46,7 +50,8 @@ Cat Pile lays the napping cats from Sunbeams (the `SLEEPERS` list, the same in b
   `jan-brady-34` leaping on the gold-paw card) and of Hide & Seek (he hides among the cats in the
   boxes as `c16-3`, `c16-5`, `jan-brady-15` and `jan-brady-33`, his tail is up beside the title in
   `jan-brady-22`, and `jan-brady-31` looks up from the gold-paw card).
-- **Higgins** (`higgins-…`, brown tabby; looks like Gus, but they aren't the same cat) is a one-of-a-kind character too, and the mascot of
+- **Higgins** (`higgins-…`, brown tabby, overweight, with a big thick neck from going through puberty; looks like Gus,
+  but they aren't the same cat) is a one-of-a-kind character too, and the mascot of
   Catdoku: `higgins-1` sits beside the title, `higgins-face` (cut from it) is every cat on the board, in the counter, the walkthrough and the cat facts, and `higgins-2` stretches out on the gold-paw card.
   The other tabbies on the Higgins sheet (`c20-…`) are general cats. Higgins hosts Treat Time too: `higgins-1` sits beside its title,
   the hungry cats at the ends of the rows and columns are the sitting tabbies from the sheet, and `c20-3` sleeps it off on the gold-paw card.
@@ -99,15 +104,15 @@ each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the 
   gold-paw card, and her face sits in the last empty square of its front-page icon. Laya is the star of Knit Pick too: `laya-7` lies along the top of her blanket, and `laya-9` stretches out on the gold-paw card. `laya-1` and
   `laya-8` have a hand in them, and `laya-1`, `laya-6` and `laya-7` are cut off partway.
 - **Gus** (`gus-…`, grey tabby: light, cool grey with taupe undertones, green eyes, a white and taupe muzzle and
-  chin, short-haired, medium build) looks like Higgins, but they're two different cats. Gus and Peanut are friends.
-  Gus doesn't star in a game yet. From the sheet: `gus-1` the face, large; `gus-2` sitting (from above); `gus-3`
-  sitting (side); `gus-4` curled up (from above); `gus-5` sleeping (side); `gus-6` the face, smaller; `gus-7` knocking
+  chin, short-haired, a moderately sized cat) looks like Higgins, but they're two different cats: Gus has none of
+  Higgins's weight or thick neck. Gus and Peanut are friends. He doesn't star in a game yet. From his sheet: `gus-1` his face, large; `gus-2` sitting (from above); `gus-3`
+  sitting (side); `gus-4` curled up (from above); `gus-5` sleeping (side); `gus-6` his face, smaller; `gus-7` knocking
   a cup over; `gus-8` pouncing; `gus-9` belly up; `gus-10` sitting (from behind); `gus-11` walking (from above);
-  `gus-12` sitting (front); `gus-13` stretched out; `gus-14` the tail.
+  `gus-12` sitting (front); `gus-13` stretched out; `gus-14` his tail.
 - **Peanut** (`peanut-…`, solid black shorthair with green eyes, very petite and thin, a delicate build) is little,
-  and often grumpy, though the sheet doesn't show it. Peanut isn't Dottie, who is stocky with two cricks in her tail.
-  Peanut and Gus are friends. Peanut doesn't star in a game yet. From the sheet: `peanut-1` the face, large; `peanut-2`
+  and often grumpy, though her sheet doesn't show it. Peanut isn't Dottie, who is stocky with two cricks in her tail.
+  Peanut and Gus are friends. She doesn't star in a game yet. From her sheet: `peanut-1` her face, large; `peanut-2`
   sitting (from above); `peanut-3` sitting (side); `peanut-4` curled up (from above); `peanut-5` sleeping (side);
-  `peanut-6` the face, smaller; `peanut-7` asleep in a round bed; `peanut-8` knocking a ball; `peanut-9` pouncing;
+  `peanut-6` her face, smaller; `peanut-7` asleep in a round bed; `peanut-8` knocking a ball; `peanut-9` pouncing;
   `peanut-10` sitting (from behind); `peanut-11` walking (from above); `peanut-12` sitting (front); `peanut-13`
-  stretched out; `peanut-14` a paw.
+  stretched out; `peanut-14` her paw.
