@@ -114,4 +114,4 @@ Rows are sorted by group, then status: Yes, Look closer, Option, Idea, Built, No
 | Tail Chase (Snake) | Action | Catch toys while the yarn grows behind the cat | — | — | — | Fair Play chat | Built | |
 | Solitaire, FreeCell | Cards | Card patience games | None | Hard | — | Idea list | Idea | Needs card art |
 
-**For games already on the site:** more medium-sized cats and bigger sunbeams in Sunbeams, zoom in Hide & Seek, a daily puzzle across the logic games, and sound to replace the buzzing and purring that were taken out.
+**For games already on the site:** more medium-sized cats and bigger sunbeams in Sunbeams, zoom in Hide & Seek (it has full screen for now), and sound to replace the buzzing and purring that were taken out.
