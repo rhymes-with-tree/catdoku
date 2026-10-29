@@ -21,7 +21,7 @@ under the SIL Open Font License.
 
 ## Who's who in `cats/`
 
-**Who gets along:** Fred and Jan Brady are friends, and Gus and Peanut are friends. Fred, Dottie, Jan Brady and
+**Who gets along:** Fred and Jan Brady are friends, and Gus, Peanut, Marmalade and Willow are all friends with each other. Fred, Dottie, Jan Brady and
 Higgins can appear together, but of those four only Fred and Jan get along: put Dottie or Higgins in a picture
 with the others and they shouldn't look friendly (no cuddling or playing together).
 
@@ -105,13 +105,13 @@ each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the 
   `laya-8` have a hand in them, and `laya-1`, `laya-6` and `laya-7` are cut off partway.
 - **Gus** (`gus-…`, grey tabby: light, cool grey with taupe undertones, green eyes, a white and taupe muzzle and
   chin, short-haired, a moderately sized cat) looks like Higgins, but they're two different cats: Gus has none of
-  Higgins's weight or thick neck. Gus and Peanut are friends. He doesn't star in a game yet. From his sheet: `gus-1` his face, large; `gus-2` sitting (from above); `gus-3`
+  Higgins's weight or thick neck. Gus is friends with Peanut, Marmalade and Willow. He doesn't star in a game yet. From his sheet: `gus-1` his face, large; `gus-2` sitting (from above); `gus-3`
   sitting (side); `gus-4` curled up (from above); `gus-5` sleeping (side); `gus-6` his face, smaller; `gus-7` knocking
   a cup over; `gus-8` pouncing; `gus-9` belly up; `gus-10` sitting (from behind); `gus-11` walking (from above);
   `gus-12` sitting (front); `gus-13` stretched out; `gus-14` his tail.
 - **Peanut** (`peanut-…`, solid black shorthair with green eyes, very petite and thin, a delicate build) is little,
   and often grumpy, though her sheet doesn't show it. Peanut isn't Dottie, who is stocky with two cricks in her tail.
-  Peanut and Gus are friends. She doesn't star in a game yet. From her sheet: `peanut-1` her face, large; `peanut-2`
+  Peanut is friends with Gus, Marmalade and Willow. She doesn't star in a game yet. From her sheet: `peanut-1` her face, large; `peanut-2`
   sitting (from above); `peanut-3` sitting (side); `peanut-4` curled up (from above); `peanut-5` sleeping (side);
   `peanut-6` her face, smaller; `peanut-7` asleep in a round bed; `peanut-8` knocking a ball; `peanut-9` pouncing;
   `peanut-10` sitting (from behind); `peanut-11` walking (from above); `peanut-12` sitting (front); `peanut-13`
@@ -123,15 +123,17 @@ each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the 
   tilted; `kitten-4` Gus curled up asleep; `kitten-5` Peanut batting a purple ball of yarn; `kitten-6` Gus in a cardboard
   box; `kitten-7` Gus asleep on top of Peanut; `kitten-8` Gus walking, tail up. (`kitten-star` is Fred as a kitten; see Fred.)
 - **Marmalade** (`marmalade-…`, a fluffy orange cat: a very long, fluffy coat with a full ruff and a plume of a tail,
-  green-gold eyes, large tufted ears, a medium to large build) doesn't star in a game yet. From the sheet, grown up:
+  green-gold eyes, large tufted ears, a medium to large build) is a he, and friends with Gus, Peanut and Willow.
+  He doesn't star in a game yet. From his sheet, grown up:
   `marmalade-1` sitting (front); `marmalade-2` standing (side); `marmalade-3` from behind; `marmalade-4` lying down,
-  looking at you; `marmalade-5` asleep, stretched out; `marmalade-6` belly up, playing; `marmalade-7` the face.
+  looking at you; `marmalade-5` asleep, stretched out; `marmalade-6` belly up, playing; `marmalade-7` his face.
   As a kitten: `marmalade-kitten-1` sitting (front); `-2` playing with a purple ball of yarn; `-3` curled up asleep;
   `-4` walking (front); `-5` reaching for a butterfly; `-6` in a cardboard box; `-7` curled up (from above); `-8`
   napping (side).
 - **Willow** (`willow-…`, a Siamese: slim and elegant, a short sleek cream coat with dark brown points, striking blue
-  eyes, large ears and a long, slender tail) doesn't star in a game yet. From the sheet, grown up: `willow-1` sitting
+  eyes, large ears and a long, slender tail) is a she, and friends with Gus, Peanut and Marmalade. She doesn't star
+  in a game yet. From her sheet, grown up: `willow-1` sitting
   (front); `willow-2` standing (side); `willow-3` from behind; `willow-4` lying down, looking at you; `willow-5` asleep,
-  curled up; `willow-6` stretching; `willow-7` the face. As a kitten: `willow-kitten-1` sitting (front); `-2` playing
+  curled up; `willow-6` stretching; `willow-7` her face. As a kitten: `willow-kitten-1` sitting (front); `-2` playing
   with a blue feather; `-3` curled up asleep; `-4` walking (front); `-5` looking up at a butterfly; `-6` in a round
   bed; `-7` belly up in the bed, playing; `-8` looking away (side).
