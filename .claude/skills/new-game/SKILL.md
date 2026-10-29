@@ -14,6 +14,14 @@ better option needs access the session doesn't have, don't work around it or rul
 (each host name, such as `collectionapi.metmuseum.org` and `images.metmuseum.org`, or the connector) and what it
 would make possible, then carry on with whatever doesn't depend on it.
 
+**Word data from Wiktionary:** a cloud session can't use Wiktionary's own API (`en.wiktionary.org` answers 429, too
+many requests, even when it's allowed: cloud sessions share addresses). This has come up more than once. Use
+kaikki.org instead, which is already allowed: it publishes Wiktionary as JSON, one word at a time
+(`https://kaikki.org/dictionary/English/meaning/c/ch/chrono-.jsonl`) or all English in one file
+(`kaikki.org-dictionary-English.jsonl`, about 3.4 GB; stream it through a filter rather than saving it). The
+site's pages can still look words up on Wiktionary while you play (`G.meaning`), since that runs on the player's
+device, not in the session.
+
 ## 1. Theme
 
 Check the README's game sections and `G.GAMES`; if an existing game already uses the same mechanic,
