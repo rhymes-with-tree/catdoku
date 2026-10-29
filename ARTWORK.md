@@ -41,6 +41,8 @@ is beside its title.
 
 Toy Stash sits one of six general cats on its boxes for each stash (`c19-44`, `c19-45`, `c18-25`, `c19-11`, `c19-2`, `c18-33`, the list `GUARDS` in `stash/index.html`); once the stash is found, `c17-17` (batting a ball) or `c19-43` (pouncing on a feather) plays with the toys, and `c17-18` (pouncing on a ball) is on the gold-paw card.
 
+Kitten Caboodle's mother cat, beside her root on the sign, is one of Purrfect Square's 24 sitting cats, picked at random for each litter (the list `MOTHERS` in `kittencaboodle/index.html`).
+
 Cat Pile lays the napping cats from Sunbeams (the `SLEEPERS` list, the same in both pages) on its clumps' blankets, a straight one or a round one in each spot, and `c14-36` curls up beside its title.
 
 - **Jan Brady** (`jan-brady-…`, fluffy black and white, long dark tail; he's a he) is a one-of-a-kind
@@ -118,7 +120,9 @@ each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the 
   stretched out; `peanut-14` her paw.
 - **The kittens** (`kitten-1` to `kitten-8`) are Gus and Peanut as kittens, from the owner's kitten sheet: the grey
   tabby kitten is Gus and the black kitten is Peanut. They're the kittens in Kitten Caboodle (each word built on a root
-  is one of the kittens); the mother and father cats there are general cats, not Gus's or Peanut's parents.
+  is one of the kittens), with kitten Marmalade and Willow; the mother cats there are general cats, not Gus's or Peanut's
+  parents. Kitten Caboodle gives each word one of `kitten-2`, `-3`, `-5`, `-6` and `-8` or Marmalade's and Willow's kittens
+  awake (the list `KITTENS`), grey until its word is spelled, and `kitten-7` is on the gold-paw card.
   `kitten-1` Gus and Peanut sitting side by side; `kitten-2` Gus on his back, paws up; `kitten-3` Peanut sitting, head
   tilted; `kitten-4` Gus curled up asleep; `kitten-5` Peanut batting a purple ball of yarn; `kitten-6` Gus in a cardboard
   box; `kitten-7` Gus asleep on top of Peanut; `kitten-8` Gus walking, tail up. (`kitten-star` is Fred as a kitten; see Fred.)
@@ -129,11 +133,12 @@ each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the 
   looking at you; `marmalade-5` asleep, stretched out; `marmalade-6` belly up, playing; `marmalade-7` his face.
   As a kitten: `marmalade-kitten-1` sitting (front); `-2` playing with a purple ball of yarn; `-3` curled up asleep;
   `-4` walking (front); `-5` reaching for a butterfly; `-6` in a cardboard box; `-7` curled up (from above); `-8`
-  napping (side).
+  napping (side). Kitten Caboodle uses `marmalade-kitten-1`, `-2`, `-4`, `-5` and `-6` as kittens.
 - **Willow** (`willow-…`, a Siamese: slim and elegant, a short sleek cream coat with dark brown points, striking blue
   eyes, large ears and a long, slender tail) is a she, and friends with Gus, Peanut and Marmalade. She doesn't star
   in a game yet. From her sheet, grown up: `willow-1` sitting
   (front); `willow-2` standing (side); `willow-3` from behind; `willow-4` lying down, looking at you; `willow-5` asleep,
   curled up; `willow-6` stretching; `willow-7` her face. As a kitten: `willow-kitten-1` sitting (front); `-2` playing
   with a blue feather; `-3` curled up asleep; `-4` walking (front); `-5` looking up at a butterfly; `-6` in a round
-  bed; `-7` belly up in the bed, playing; `-8` looking away (side).
+  bed; `-7` belly up in the bed, playing; `-8` looking away (side). Kitten Caboodle uses `willow-kitten-1`, `-2`, `-4`, `-5`, `-6` and `-8` as
+  kittens.
