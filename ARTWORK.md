@@ -116,9 +116,9 @@ each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the 
   `peanut-6` her face, smaller; `peanut-7` asleep in a round bed; `peanut-8` knocking a ball; `peanut-9` pouncing;
   `peanut-10` sitting (from behind); `peanut-11` walking (from above); `peanut-12` sitting (front); `peanut-13`
   stretched out; `peanut-14` her paw.
-- **The kittens** (`kitten-1` to `kitten-8`): the owner's kitten sheet, grey tabby kittens and black kittens with green
-  eyes, meant for Kitten Caboodle (the root is the mother cat, each word one of her kittens). Who they are isn't
-  settled yet, so for now they're kittens any game can use. `kitten-1` a tabby and a black kitten sitting side by side;
-  `kitten-2` a tabby on its back, paws up; `kitten-3` a black kitten sitting, head tilted; `kitten-4` a tabby curled up
-  asleep; `kitten-5` a black kitten batting a purple ball of yarn; `kitten-6` a tabby in a cardboard box; `kitten-7` a
-  tabby asleep on top of a black kitten; `kitten-8` a tabby walking, tail up. (`kitten-star` is Fred as a kitten; see Fred.)
+- **The kittens** (`kitten-1` to `kitten-8`) are Gus and Peanut as kittens, from the owner's kitten sheet: the grey
+  tabby kitten is Gus and the black kitten is Peanut. They're the kittens in Kitten Caboodle (each word built on a root
+  is one of the kittens); the mother and father cats there are general cats, not Gus's or Peanut's parents.
+  `kitten-1` Gus and Peanut sitting side by side; `kitten-2` Gus on his back, paws up; `kitten-3` Peanut sitting, head
+  tilted; `kitten-4` Gus curled up asleep; `kitten-5` Peanut batting a purple ball of yarn; `kitten-6` Gus in a cardboard
+  box; `kitten-7` Gus asleep on top of Peanut; `kitten-8` Gus walking, tail up. (`kitten-star` is Fred as a kitten; see Fred.)
