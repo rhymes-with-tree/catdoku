@@ -122,3 +122,16 @@ each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the 
   `kitten-1` Gus and Peanut sitting side by side; `kitten-2` Gus on his back, paws up; `kitten-3` Peanut sitting, head
   tilted; `kitten-4` Gus curled up asleep; `kitten-5` Peanut batting a purple ball of yarn; `kitten-6` Gus in a cardboard
   box; `kitten-7` Gus asleep on top of Peanut; `kitten-8` Gus walking, tail up. (`kitten-star` is Fred as a kitten; see Fred.)
+- **Marmalade** (`marmalade-…`, a fluffy orange cat: a very long, fluffy coat with a full ruff and a plume of a tail,
+  green-gold eyes, large tufted ears, a medium to large build) doesn't star in a game yet. From the sheet, grown up:
+  `marmalade-1` sitting (front); `marmalade-2` standing (side); `marmalade-3` from behind; `marmalade-4` lying down,
+  looking at you; `marmalade-5` asleep, stretched out; `marmalade-6` belly up, playing; `marmalade-7` the face.
+  As a kitten: `marmalade-kitten-1` sitting (front); `-2` playing with a purple ball of yarn; `-3` curled up asleep;
+  `-4` walking (front); `-5` reaching for a butterfly; `-6` in a cardboard box; `-7` curled up (from above); `-8`
+  napping (side).
+- **Willow** (`willow-…`, a Siamese: slim and elegant, a short sleek cream coat with dark brown points, striking blue
+  eyes, large ears and a long, slender tail) doesn't star in a game yet. From the sheet, grown up: `willow-1` sitting
+  (front); `willow-2` standing (side); `willow-3` from behind; `willow-4` lying down, looking at you; `willow-5` asleep,
+  curled up; `willow-6` stretching; `willow-7` the face. As a kitten: `willow-kitten-1` sitting (front); `-2` playing
+  with a blue feather; `-3` curled up asleep; `-4` walking (front); `-5` looking up at a butterfly; `-6` in a round
+  bed; `-7` belly up in the bed, playing; `-8` looking away (side).
