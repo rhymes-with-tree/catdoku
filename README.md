@@ -1,6 +1,6 @@
-# Catdoku
+# Purrplexed
 
-A family of cat-themed puzzle games, each a single HTML page. The first, Catdoku (in `catdoku/`), is a logic puzzle: place one 🐱 in every row, every column, and every color region — and no two cats may touch, not even diagonally.
+Purrplexed (once just Catdoku, the site's first game) is a family of cat-themed puzzle games, each a single HTML page. The first, Catdoku (in `catdoku/`), is a logic puzzle: place one 🐱 in every row, every column, and every color region — and no two cats may touch, not even diagonally.
 
 ## Play
 
