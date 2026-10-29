@@ -948,9 +948,14 @@ const G = (() => {
     return meanings[w] || (meanings[w] = fetch(`https://en.wiktionary.org/api/rest_v1/page/definition/${encodeURIComponent(w)}`).then(async r => {
       if (!r.ok) throw new Error(r.status);
       const out = [];
-      for (const sense of (await r.json()).en || []) for (const d of sense.definitions || []) {
-        const text = plainText(d.definition || "");
-        if (text && out.length < 3) out.push({pos: sense.partOfSpeech, text});
+      // English meanings only: Wiktionary lists a word's Translingual entries with them (GAP and ICE are language
+      // codes), and those come as symbols. A meaning that opens a list of examples ends in a colon there; drop it.
+      for (const sense of (await r.json()).en || []) {
+        if ((sense.language || "English") !== "English" || /^symbol$/i.test(sense.partOfSpeech || "")) continue;
+        for (const d of sense.definitions || []) {
+          const text = plainText(d.definition || "").replace(/\s*:$/, "");
+          if (text && !/^ISO \d/.test(text) && out.length < 3) out.push({pos: sense.partOfSpeech, text});
+        }
       }
       if (!out.length) throw new Error("none");
       return out;
