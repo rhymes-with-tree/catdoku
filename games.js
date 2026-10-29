@@ -407,7 +407,7 @@ const G = (() => {
     if (o.gold && o.goldPic) pic.append(...o.goldPic); else pic.append(catPhoto(), name);
     media.append(pic);
     const btns = [[o.next || "New puzzle", onNext, true]];
-    if (admire !== null) btns.push([admire, () => { closeCard(); note(admireNote(), 0); }]);
+    if (admire !== null) btns.push([admire, () => { closeCard(); if (o.onAdmire) o.onAdmire(); else note(admireNote(), 0); }]);
     btns.push(["Share my result", e => shareResult(result, o.gold, e.currentTarget)], homeBtn());
     openCard(o.gold ? o.goldTitle || "Gold paw!" : o.title || "Solved!", "", btns, media, o.after);
   }

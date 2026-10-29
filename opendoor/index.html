@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-29.1"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-29.2"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,11 +23,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-29.1">
+<link rel="stylesheet" href="../games.css?v=2026-10-29.2">
 <style>
 /* A KenKen house: every row and column holds 1 to N once, and walls split the floor into rooms whose numbers
    must make the room's sign. Each room has a door that opens when the room is right; with every door open,
-   a cat runs across the house. */
+   a cat curls up asleep in every doorway. */
 .house{position:relative;width:var(--board);height:var(--board);border:3px solid var(--ink);border-radius:6px;background:#F3EBDD;
   user-select:none;-webkit-user-select:none;touch-action:manipulation;--cell:40px}
 .cells{position:absolute;inset:0;display:grid}
@@ -57,20 +57,17 @@
 .door.open{transform:rotate(var(--swing))}
 .door.rattle{animation:rattle .45s}
 @keyframes rattle{20%{transform:rotate(calc(var(--swing) * .08))}45%{transform:rotate(calc(var(--swing) * -.06))}70%{transform:rotate(calc(var(--swing) * .04))}}
-/* the cat that runs across once every door is open */
-.runner{position:absolute;left:0;width:calc(var(--cell) * 1.5);pointer-events:none;z-index:4;animation:run 2.1s linear forwards}
-.runner svg{display:block;width:100%;animation:bound .3s ease-in-out infinite}
-.runner .legsA{animation:legs .3s steps(1) infinite}
-.runner .legsB{animation:legs .3s steps(1) infinite reverse}
-@keyframes run{from{transform:translateX(-110%)}to{transform:translateX(calc(var(--board) + 10%))}}
-@keyframes bound{50%{transform:translateY(-14%) rotate(-4deg)}}
-@keyframes legs{0%{opacity:1}50%{opacity:0}}
+/* the cats asleep in the doorways once every door is open */
+.sleeper{pointer-events:none;animation:settle .8s ease-out both;animation-delay:.7s}
+@keyframes settle{from{opacity:0}to{opacity:1}}
+.sleeper .zz{animation:zz 2.4s ease-in-out infinite}
+@keyframes zz{50%{transform:translateY(-3px);opacity:.4}}
 .pad{width:var(--board);display:flex;gap:6px;justify-content:center}
 .pad button{flex:1 1 0;max-width:58px;padding:6px 0;font-size:22px;font-weight:800;line-height:1.1}
 .pad button.erase{font-size:18px}
 .pad.noting button:not(.erase){border-style:dashed;color:#3C8681}
 .key{width:var(--board);text-align:center;font-weight:600;font-size:15px;color:var(--ink-soft);margin-top:-6px}
-@media (prefers-reduced-motion:reduce){.door{transition:none}.runner,.runner svg,.runner .legsA,.runner .legsB{animation:none}}
+@media (prefers-reduced-motion:reduce){.door{transition:none}.sleeper,.sleeper .zz{animation:none}}
 </style>
 </head>
 <body>
@@ -107,7 +104,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-29.1"></script>
+<script src="../games.js?v=2026-10-29.2"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N grid where every row and column holds 1 to N once, cut into rooms (cages). Each room has a sign:
@@ -410,7 +407,14 @@ function drawWalls(right) {
     wasOpen[k] = now;
     doors += `<g class="${cls}" data-k="${k}" style="transform-origin:${hx}px ${hy}px;--swing:${swing}deg"><rect ${box} rx=".03"/><circle cx="${kx}" cy="${ky}" r=".035"/></g>`;
   });
-  svg.innerHTML = `<path class="seam" d="${seams}"/><path class="wall" d="${walls}" fill="none"/>${doors}`;
+  // once every door is open, a cat is asleep in every doorway
+  let sleepers = "";
+  if (game.won) plan.doors.forEach((d, k) => {
+    if (!d) return;
+    const [x1, y1, x2, y2] = d.e, w = .5, h = .4;
+    sleepers += `<svg class="sleeper" x="${(x1 + x2) / 2 - w / 2}" y="${(y1 + y2) / 2 - h / 2}" width="${w}" height="${h}" viewBox="0 0 100 80" overflow="visible" aria-hidden="true">${sleeperSVG(k)}</svg>`;
+  });
+  svg.innerHTML = `<path class="seam" d="${seams}"/><path class="wall" d="${walls}" fill="none"/>${doors}${sleepers}`;
   if (swung.length) { svg.getBoundingClientRect(); for (const [k, now] of swung) svg.querySelector(`.door[data-k="${k}"]`).classList.toggle("open", now); }
 }
 
@@ -448,9 +452,9 @@ function makePad() {
   const er = document.createElement("button"); er.className = "erase"; er.textContent = "⌫"; er.setAttribute("aria-label", "Erase"); er.onclick = () => put(0); pad.append(er);
 }
 $("notesBtn").onclick = () => { if (!game || game.won) return; noting = !noting; draw(); };
-// All notes: every empty square gets every number from 1 to N as a note (not just the ones that could fit),
-// ready to cross off. Undo takes them away again.
-// All notes is a switch: on puts every number in every empty square, off takes every note away (Undo brings them
+// All notes: every empty square gets the numbers from 1 to N that aren't already in its row or column, ready to
+// cross off. Undo takes them away again.
+// All notes is a switch: on puts every number still open in every empty square, off takes every note away (Undo brings them
 // back). It shows on while every empty square has notes.
 function allNotesOn() { return game.grid.some(v => !v) && game.grid.every((v, i) => v || game.notes[i]); }
 $("allNotesBtn").onclick = () => {
@@ -459,11 +463,18 @@ $("allNotesBtn").onclick = () => {
     snapshot(); game.notes = game.notes.map(() => 0); draw(); save();
     G.note("Notes off: every note taken away. Undo brings them back.", 3000); return;
   }
-  const full = (1 << (game.N + 1)) - 2;
+  // every number, less the ones already put down in that square's row and column
+  const N = game.N, full = (1 << (N + 1)) - 2;
   snapshot();
-  game.notes = game.notes.map((m, i) => game.grid[i] ? m : full);
+  game.notes = game.notes.map((m, i) => {
+    if (game.grid[i]) return m;
+    const r = Math.floor(i / N), c = i % N;
+    let left = full;
+    for (let j = 0; j < N; j++) { left &= ~(1 << game.grid[r * N + j]); left &= ~(1 << game.grid[j * N + c]); }
+    return left;
+  });
   game.started = true; draw(); save();
-  G.note(`Notes 1 to ${game.N} in every empty square`, 3000);
+  G.note("Notes in every empty square, less the numbers already in its row and column", 3500);
 };
 document.addEventListener("keydown", e => {
   if (!playing() || document.querySelector(".spot") || e.target.tagName === "SELECT" || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -522,7 +533,7 @@ $("restartBtn").onclick = () => { if (playing() && game.history.length) { game.u
 addEventListener("resize", () => { if (game && plan) draw(); });
 
 /* ---------- endings ---------- */
-// Every door is open, so a cat runs right across the house, then the finishing card.
+// Every door is open, so a cat curls up asleep in every doorway, then the finishing card.
 function win() {
   game.won = true; G.finishClock(game); sel = -1; noting = false;
   const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
@@ -532,32 +543,24 @@ function win() {
   build.prefetch(next);
   const g = game, still = matchMedia("(prefers-reduced-motion: reduce)").matches;
   running = true;
-  setTimeout(() => { if (game === g) runCat(); }, 700);
-  setTimeout(() => { running = false; if (game === g) finishCard(); }, still ? 1200 : 3000);
+  setTimeout(() => { running = false; if (game === g) finishCard(); }, still ? 1200 : 2600);
 }
 const COATS = [["#E8A35A", "#B9692E"], ["#9A9AA4", "#62626C"], ["#3A3540", "#1E1B22"], ["#F2E6D2", "#C9A26B"], ["#C98B5B", "#5E3B22"]];
-function runCat() {
-  const old = document.querySelector(".runner"); if (old) old.remove();
-  const [fur, dark] = COATS[Math.floor(Math.random() * COATS.length)], N = game.N, row = Math.floor(N / 2);
-  const d = document.createElement("div"); d.className = "runner"; d.setAttribute("aria-hidden", "true");
-  d.style.top = `calc(var(--cell) * ${row + .5} - var(--cell) * .55)`;
-  const leg = (x1, y1, x2, y2) => `<path d="M${x1} ${y1}L${x2} ${y2}" stroke="#2A2530" stroke-width="9" stroke-linecap="round"/><path d="M${x1} ${y1}L${x2} ${y2}" stroke="${fur}" stroke-width="5" stroke-linecap="round"/>`;
-  d.innerHTML = `<svg viewBox="0 0 120 72">
-    <path d="M30 36Q12 30 8 10" fill="none" stroke="#2A2530" stroke-width="9" stroke-linecap="round"/><path d="M30 36Q12 30 8 10" fill="none" stroke="${fur}" stroke-width="5" stroke-linecap="round"/>
-    <g class="legsA">${leg(80, 44, 102, 58)}${leg(40, 44, 16, 56)}</g>
-    <g class="legsB">${leg(78, 46, 72, 66)}${leg(44, 46, 52, 66)}</g>
-    <ellipse cx="60" cy="38" rx="32" ry="15" fill="${fur}" stroke="#2A2530" stroke-width="3"/>
-    <path d="M52 25Q55 33 52 41M62 24Q65 33 62 42M72 25Q75 33 72 41" fill="none" stroke="${dark}" stroke-width="3" stroke-linecap="round"/>
-    <path d="M86 20L89 5L97 16L104 5L107 21" fill="${fur}" stroke="#2A2530" stroke-width="3" stroke-linejoin="round"/>
-    <circle cx="96" cy="27" r="13" fill="${fur}" stroke="#2A2530" stroke-width="3"/>
-    <circle cx="101" cy="25" r="2.4" fill="#2A2530"/><path d="M107 30l2.5 1.5-2.5 1.5z" fill="#DD9DAD"/>
-  </svg>`;
-  $("board").append(d);
-  setTimeout(() => d.remove(), 2400);
+// A cat curled up asleep, drawn in a 100 x 80 box.
+function sleeperSVG(k) {
+  const [fur, dark] = COATS[k % COATS.length], line = 'stroke="#2A2530" stroke-width="3"';
+  return `<path d="M22 62Q4 66 10 48Q14 40 24 46" fill="none" stroke="#2A2530" stroke-width="11" stroke-linecap="round"/><path d="M22 62Q4 66 10 48Q14 40 24 46" fill="none" stroke="${fur}" stroke-width="6" stroke-linecap="round"/>
+    <ellipse cx="46" cy="56" rx="36" ry="20" fill="${fur}" ${line}/>
+    <path d="M36 40Q40 52 36 70M50 38Q54 52 50 72M64 41Q67 52 64 68" fill="none" stroke="${dark}" stroke-width="3" stroke-linecap="round"/>
+    <path d="M60 36L63 18L73 28L82 18L86 38" fill="${fur}" ${line} stroke-linejoin="round"/>
+    <ellipse cx="73" cy="46" rx="19" ry="16" fill="${fur}" ${line}/>
+    <path d="M64 46Q68 50 72 46M76 46Q80 50 84 46" fill="none" stroke="#2A2530" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M73 52l3 2-3 2z" fill="#DD9DAD"/>
+    <g class="zz" fill="#5A5566" font-family="Baloo 2,sans-serif" font-weight="800"><text x="84" y="14" font-size="13">z</text><text x="92" y="6" font-size="9">z</text></g>`;
 }
 function finishCard() {
   const next = settings.level, N = game.N;
-  let text = `Every door in the ${N} × ${N} house is open, and the cat's off exploring.`;
+  let text = `Every door in the ${N} × ${N} house is open, and a cat's fast asleep in every doorway.`;
   text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my house", game.result,
     {title: "Door's open!", gold: !game.undid && !game.hinted, goldWhy: "No undos or hints!", next: `Next: level ${next}`, after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
@@ -626,7 +629,7 @@ function helpOnFirstVisit() {
     {say: `Walls make rooms. This room's numbers must ${what} ${room.t}`, lit, outline: [lit]},
     ...extra,
     {say: "Get a room right and its door opens 🚪", lit, outline: [lit], tone: "ok", enter: () => { forceOpen = k; draw(); }, leave: () => { forceOpen = -1; draw(); }},
-    {say: "Open every door and the cat runs through 🐈", lit: all, tone: "ok"},
+    {say: "Open every door and a cat curls up asleep in each doorway 😴", lit: all, tone: "ok"},
     {say: "Tap a square, then a number", els: [$("pad")]},
     {say: "Notes let you jot down maybes", els: [$("notesBtn")]},
     {say: "All notes puts every number in every empty square, to cross off", els: [$("allNotesBtn")]},

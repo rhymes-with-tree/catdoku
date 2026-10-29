@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-29.1";
+  var BUILD = "2026-10-29.2";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-29.1">
+<link rel="stylesheet" href="../games.css?v=2026-10-29.2">
 <style>
 /* Night at the museum: a painting in a gilt frame on a dark gallery wall, lit by a brass picture light.
    A cat has sneaked into the painting; pinch or use + and − to look closer, and tap it to catch it. */
@@ -102,6 +102,11 @@ body.full .msg{color:rgba(247,248,243,.8)}
 body.full .hearts .lost{color:rgba(247,248,243,.3)}
 .card img.caught{display:block;max-width:100%;max-height:220px;margin:0 auto 14px;border-radius:10px;border:2px solid var(--ink)}
 .card .museum{margin:12px 0 0;font-size:15px}
+.card:has(.gallery){max-width:min(760px,100%)}
+.gallery{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin:0 0 16px}
+.gallery figure{margin:0;flex:0 1 150px;min-width:0;padding:5px;background:#B8934A;border-radius:4px;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.gallery img{display:block;width:100%;height:auto;max-height:200px;object-fit:contain;border-radius:2px}
+.gallery figcaption{font-size:12px;font-weight:600;color:var(--ink);margin-top:4px;line-height:1.2}
 .card .museum a{color:var(--ink);font-weight:600}
 /* a phone held sideways: the cat where it was hiding on the left, the words and buttons beside it, so the whole
    card fits without scrolling */
@@ -153,8 +158,8 @@ body.full .hearts .lost{color:rgba(247,248,243,.3)}
 
 </main>
 
-<script src="../games.js?v=2026-10-29.1"></script>
-<script src="paintings.js?v=2026-10-29.1"></script>
+<script src="../games.js?v=2026-10-29.2"></script>
+<script src="paintings.js?v=2026-10-29.2"></script>
 <script>
 /* ---------- levels ---------- */
 // How big the cat is (the side of a square of the same area, as a share of the painting's), and how far it takes on
@@ -474,7 +479,7 @@ function onCat(px, py) {
 /* ---------- endings ---------- */
 // One painting done: caught, or missed (out of lives, or given up).
 function done(caughtIt) {
-  round.results.push({i: game.i, caught: caughtIt, lives: game.lives, hinted: game.hinted, revived: !!game.revived});
+  round.results.push({i: game.i, caught: caughtIt, lives: game.lives, hinted: game.hinted, revived: !!game.revived, pic: galleryPic(caughtIt)});
   if (game.hinted || game.revived) round.hinted = true;
   if (game.revived) round.revived = true;
   if (round.results.length >= ROUND) endRound();
@@ -521,6 +526,30 @@ function endRound() {
   settings.level = round.next; $("levelSel").value = settings.level;
   G.track(`Cat Burglar round over level ${round.level}: ${k} caught`);
 }
+// A small copy of the painting with its cat ringed (green if caught, red if it got away), kept for the round's gallery.
+function galleryPic(caughtIt) {
+  try {
+    const s = scene, k = Math.min(1, 360 / Math.max(s.PW, s.PH)), out = canvasOf(Math.round(s.PW * k), Math.round(s.PH * k)), x = out.getContext("2d");
+    x.drawImage($("art"), 0, 0, out.width, out.height);
+    const r = (Math.max(game.w, game.h) * 0.62 + 6) * k;
+    x.lineWidth = 3; x.strokeStyle = caughtIt ? "#6AA673" : "#C8392B";
+    x.beginPath(); x.ellipse(game.x * k, game.y * k, r, r, 0, 0, Math.PI * 2); x.stroke();
+    return out.toDataURL("image/jpeg", 0.7);
+  } catch (e) { return ""; }
+}
+// The whole round's paintings on one wall, each with its cat ringed.
+function gallery() {
+  const wall = document.createElement("div"); wall.className = "gallery";
+  for (const r of round.results) {
+    if (!r.pic) continue;
+    const p = paintingOf(r.i), f = document.createElement("figure"), im = new Image();
+    im.src = r.pic; im.alt = `${p ? p.title : "A painting"}${r.caught ? ", cat caught" : ", the cat got away"}`;
+    const c = document.createElement("figcaption"); c.textContent = p ? p.title : "";
+    f.append(im, c); wall.append(f);
+  }
+  if (!wall.children.length) { G.note("Tap Next round when you're ready for another.", 0); return; }
+  G.openCard("My gallery", "", [["Done", () => { G.closeCard(); G.note("Tap Next round when you're ready for another.", 0); }, true]], wall);
+}
 // The cat as it was found: the painting around it, cropped.
 function caughtPic() {
   const s = scene, k = 1.4, side = Math.max(game.w, game.h) * k * 2, c = $("art");
@@ -563,8 +592,8 @@ function roundCard() {
     : next > round.level ? ` Next up: level ${next}.`
     : k >= 4 ? " That's the top level; here's another round."
     : ` Catch 4 with no hints to move up. Here's another round at level ${next}.`;
-  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the painting", round.result,
-    {title: k === ROUND ? "All five caught!" : "Round over!", gold: round.gold, goldWhy: "Five cats, each on the first tap, no hints!",
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my gallery", round.result,
+    {onAdmire: gallery, title: k === ROUND ? "All five caught!" : "Round over!", gold: round.gold, goldWhy: "Five cats, each on the first tap, no hints!",
      goldTitle: "Caught red-pawed!", goldPic: [caughtPic()], next: next > round.level ? `Next round: level ${next}` : "Next round", after: museumBits(next)});
 }
 
