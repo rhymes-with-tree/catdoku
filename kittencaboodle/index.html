@@ -62,6 +62,17 @@
 /* the picked kitten's clue */
 .clue{width:var(--board);min-height:3.2em;padding:6px 10px;border-radius:10px;background:var(--panel);border:2px solid var(--line);font-size:16px;line-height:1.3}
 .clue .n{font-weight:800;color:var(--spring-blue);margin-right:4px}
+/* the language a word came into English from: old words often mean something new now (UPSET was "set up") */
+.clue .lang{font-size:14px;color:var(--ink-soft);white-space:nowrap}
+.means .src{display:block;font-size:13px;color:var(--ink-soft)}
+/* the words spelled so far, each with where it comes from (Wiktionary) */
+.wordlist{width:var(--board)}
+.wordlist h2{margin:0 0 4px;font-size:18px;font-weight:800}
+.wordlist ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.wordlist li{line-height:1.3}
+.wordlist a{font-weight:800;color:var(--ink);letter-spacing:.04em;text-transform:uppercase}
+.wordlist .blank{font-weight:800;letter-spacing:.18em;color:var(--ink-soft)}
+.wordlist .from{display:block;font-size:15px;color:var(--ink-soft)}
 /* what the game says (a hint's letter, a word that isn't right) goes in the clue box, under the clue, where you're looking */
 .clue .msg{text-align:left;color:var(--ink);font-weight:600;margin-top:2px}
 .clue .msg:empty{display:none}
@@ -119,6 +130,7 @@
     <label>Level <select id="levelSel" aria-label="Level"></select></label>
     <button id="newBtn" class="primary">New litter</button>
   </div>
+  <section class="wordlist" aria-label="The kittens' words"><h2>The words</h2><ol id="wordlist"></ol></section>
 
 </main>
 
@@ -161,7 +173,7 @@ function makeLitter(n, roots, rnd = Math.random) {
   const r = pool[Math.floor(rnd() * pool.length)], words = r.words.filter(ok).slice();
   for (let i = words.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [words[i], words[j]] = [words[j], words[i]]; }
   const pick = words.slice(0, s.n).sort((a, b) => a[0].length - b[0].length || (a[0] < b[0] ? -1 : 1));
-  return {root: r.root, meaning: r.meaning, words: pick.map(([w, clue]) => ({w, clue}))};
+  return {root: r.root, meaning: r.meaning, from: r.from || "", words: pick.map(([w, clue, , lang, from]) => ({w, clue, lang: lang || "", from: from || ""}))};
 }
 
 /* ---------- state ---------- */
@@ -193,7 +205,7 @@ function draw() {
   $("mom").src = catSrc(game.mom);
   $("root").textContent = rootShown() ? game.root.toUpperCase() : "?  ?  ?";
   $("root").classList.toggle("hidden", !rootShown());
-  $("means").innerHTML = `means <b>${esc(lower(game.meaning))}</b>`;
+  $("means").innerHTML = `means <b>${esc(lower(game.meaning))}</b>` + (game.from && rootShown() ? `<span class="src">from ${esc(game.from)}</span>` : "");
   const L = Math.max(...game.words.map(x => x.w.length)), grid = $("grid");
   grid.style.setProperty("--L", L); grid.style.setProperty("--n", game.words.length); grid.innerHTML = "";
   const hint = hints.current();
@@ -217,7 +229,8 @@ function draw() {
   });
   const c = game.words[sel];
   $("clue").innerHTML = game.won ? `Every kitten's awake. The words all come from <b>${esc(game.root.toUpperCase())}</b>, ${esc(lower(game.meaning))}.`
-    : `<span class="n">${sel + 1}.</span>${esc(c.clue)} <span class="n">(${c.w.length})</span>`;
+    : `<span class="n">${sel + 1}.</span>${esc(c.clue)} <span class="n">(${c.w.length})</span>` + (c.lang ? ` <span class="lang">from ${esc(c.lang)}</span>` : "");
+  wordList();
   const left = game.solved.filter(s => !s).length;
   $("count").textContent = game.won ? `${game.words.length} kittens awake` : `${game.words.length - left} of ${game.words.length} awake`;
   $("restartBtn").disabled = game.won || !game.started;
@@ -226,6 +239,19 @@ function draw() {
 // "Thousand" reads as "means thousand"; an abbreviation ("SI unit") keeps its capitals
 const lower = s => /^[A-Z](?![A-Z])/.test(s) ? s[0].toLowerCase() + s.slice(1) : s;
 const esc = s => s.replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+// The words spelled so far, each linked to Wiktionary with where it comes from; the rest as blanks.
+function wordList() {
+  const ol = $("wordlist"), out = [];
+  game.words.forEach((x, k) => {
+    const li = document.createElement("li");
+    if (game.solved[k] || game.won) {
+      li.innerHTML = `<a href="https://en.wiktionary.org/wiki/${encodeURIComponent(x.w)}#English" target="_blank" rel="noopener">${esc(x.w)}</a>` +
+        (x.from ? `<span class="from">${esc(x.from)}</span>` : "");
+    } else li.innerHTML = `<span class="blank">${"_".repeat(x.w.length)}</span>`;
+    out.push(li);
+  });
+  ol.replaceChildren(...out);
+}
 function pick(k) {
   if (k === sel) return;
   sel = k; hints.clear(false); G.note(""); draw();   // a message was about the kitten before
@@ -340,7 +366,7 @@ function finishCard() {
 function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
 function begin(p, level) {
   const pics = KITTENS.slice().sort(() => Math.random() - .5);
-  game = {level, root: p.root, meaning: p.meaning, give: levelSpec(level).give, words: p.words,
+  game = {level, root: p.root, meaning: p.meaning, from: p.from, give: levelSpec(level).give, words: p.words,
     typed: p.words.map(x => Array(x.w.length).fill("")), solved: p.words.map(() => false),
     pics: p.words.map((_, k) => pics[k % pics.length]), mom: MOTHERS[Math.floor(Math.random() * MOTHERS.length)],
     won: false, ...G.freshClock()};
@@ -372,7 +398,7 @@ function openShared(d) {
   if (!r || !spec || typeof d.w !== "string") return fail();
   const words = d.w.split(",").map(w => r.words.find(x => x[0] === w));
   if (!words.length || words.some(x => !x)) return fail();
-  begin({root: r.root, meaning: r.meaning, words: words.map(([w, clue]) => ({w, clue}))}, d.N);
+  begin({root: r.root, meaning: r.meaning, from: r.from || "", words: words.map(([w, clue, , lang, from]) => ({w, clue, lang: lang || "", from: from || ""}))}, d.N);
   if (typeof d.p === "string") {
     const parts = d.p.split(",");
     if (parts.length === words.length) parts.forEach((s, k) => {

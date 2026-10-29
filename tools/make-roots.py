@@ -31,6 +31,49 @@ USED_TO = re.compile(r"^(used|added|appended|attached)( \w+){0,6}? (meaning|deno
                      r"that means|expressing)( (being|a|an|the))? ", re.I)
 
 
+
+# Where a word comes from, for the game: Wiktionary's etymology, its first account in words (not the "Etymology
+# tree" drawn above it), cut short before cognates and the long chain back to Proto-Indo-European.
+PROSE = re.compile(r"^(From|Borrowed|Inherited|Learned|Derived|Coined|Clipping|Short|Back-formation|Blend|Univerbation|"
+                   r"Calque|Compound|Originally|Uncertain|Unknown|Of |Partly|Possibly|Probably|Equivalent|By |Named|The |A |An )")
+LANGS = re.compile(r"\b((?:(?:Late|Early|Medieval|Classical|Vulgar|New|Ancient|Old|Middle|Modern) )+(?:Anglo-)?[A-Z][a-z]+|Anglo-[A-Z][a-z]+|Latin|Greek|French|"
+                   r"Italian|Spanish|Dutch|German|Arabic|Persian|Hindi|Sanskrit|Portuguese|Japanese|Chinese|Norse|Yiddish|Hebrew|"
+                   r"Turkish|Malay|Nahuatl|Czech|Russian|Irish|Scots|Welsh)\b")
+# Words that only look built on a root: Wiktionary says so ("neither of these are etymologically related").
+NOT_REALLY = re.compile(r"not etymologically related|neither of these (are|is) etymologically|folk etymology|"
+                        r"unrelated to|coincidental resemblance", re.I)
+
+
+def origin(text):
+    """The etymology's first account in words, short: 'From Middle English upsetten, corresponding to up- + set.'"""
+    lines = [l.strip() for l in (text or "").split("\n")]
+    t = next((l for l in lines if PROSE.match(l) and len(l) > 12), "")
+    t = re.split(r"\s(?:Cognate with|Compare|Doublet of|More at|See also|Related to)\b", t)[0]
+    t = re.split(r",? from Proto-", t)[0]
+    t = re.sub(r"\s+", " ", t).strip()
+    if len(t) > 200:
+        cut = t.rfind(", from ", 0, 200)
+        t = t[:cut] if cut > 40 else t[:t.rfind(" ", 0, 197)] + "…"
+    return t.rstrip(",;: ") + ("" if t.endswith((".", "…", ")")) else ".") if t else ""
+
+
+def language(text):
+    """The language a word came into English from (Middle English, Old French…), or "" for one made in English."""
+    t = origin(text)
+    m = re.match(r"(?:From|Borrowed from|Inherited from|Learned borrowing from|Derived from)\s+(.*)", t)
+    if not m: return ""
+    l = LANGS.match(m.group(1))
+    return l.group(1) if l and l.group(1) != "English" else ""
+
+
+def root_source(text):
+    """Where a root comes from, short: 'Ancient Greek τῆλε (têle)', or its oldest English form."""
+    t = origin(text)
+    m = re.search(r"((?:Ancient |Late |Medieval |New )?(?:Greek|Latin)) (\S+)(?: \(([^,)“]+)[^)]*\))?", t) or \
+        re.search(r"((?:Middle |Old )?(?:English|French|Norse)) (\S+)(?: \(([^,)“]+)[^)]*\))?", t)
+    if not m: return ""
+    return f"{m.group(1)} {m.group(2).rstrip(',.;:')}" + (f" ({m.group(3).strip()})" if m.group(3) and m.group(3).strip() != m.group(2).rstrip(',') else "")
+
 def tidy(g):
     t = USED_TO.sub("", g)
     return t[0].upper() + t[1:] if t else g
@@ -79,7 +122,7 @@ GAME = {
 }
 # Where Wiktionary's meaning is about grammar rather than meaning, or off (it has -therm as a kind of animal), a
 # short plain one, and the spelling to show.
-MEANING = {"un-": "Not", "non-": "Not", "auto-": "Self", "-ness": "The state of being", "-ful": "Full of",
+MEANING = {"un-": "Not", "non-": "Not", "dis-": "Not; the opposite of", "auto-": "Self", "-ness": "The state of being", "-ful": "Full of",
            "-therm": "Heat", "by-": "Beside; on the side", "hyper-": "Over, beyond", "meta-": "Beyond; after; change",
            "after-": "After", "up-": "Up; higher", "down-": "Down; lower", "-teen": "Plus ten (thirteen to nineteen)",
            "co-": "Together", "-ward": "In the direction of", "-wise": "In the way or direction of",
@@ -177,6 +220,7 @@ def main(scowl, out_path):
     built = {}          # word -> English roots its etymology names
     word_src = {}       # word -> etymology text, for its Greek and Latin words
     clues = {}
+    origins = {}        # word -> its first etymology text
     for line in sys.stdin:
         try: e = json.loads(line)
         except ValueError: continue
@@ -184,13 +228,14 @@ def main(scowl, out_path):
         if pos in AFFIX_POS and (w.startswith("-") or w.endswith("-")):
             g = gloss(e)
             a = affixes.setdefault(w, {"meaning": None, "from": "", "sources": []})
-            if g and not a["meaning"]: a["meaning"] = tidy(g); a["from"] = (e.get("etymology_text") or "").split("\n")[0][:200]
+            if g and not a["meaning"]: a["meaning"] = tidy(g); a["from"] = e.get("etymology_text") or ""
             a["sources"] += sources(e)
             continue
         if w not in everyday: continue
         for t in e.get("etymology_templates", []):
             if t.get("name") in ENGLISH_PARTS: built.setdefault(w, set()).update(english_parts(t))
         word_src[w] = word_src.get(w, "") + " " + (e.get("etymology_text") or "")
+        if e.get("etymology_text") and not origins.get(w): origins[w] = e["etymology_text"]
         clues.setdefault(w, []).extend((t, len(clues[w]) + n, g) for t, n, g in glosses(e, giveaway=w[:max(4, len(w) - 3)]))
     clues = {w: min(c)[2] for w, c in clues.items() if c}
     # One root for every Greek or Latin word: chron- and chrono- are one mother cat.
@@ -218,7 +263,7 @@ def main(scowl, out_path):
         named = [re.compile(r"(?<![\w-])" + re.escape(r) + r"(?![\w-])") for r in spellings]
         for w, text in word_src.items():
             if not shows_in(w): continue
-            if len(lemma) >= 4 and lemma in text or any(n.search(text) for n in named): kits.add(w)
+            if len(lemma) >= 4 and lemma in text or any(r in text and n.search(text) for r, n in zip(spellings, named)): kits.add(w)
         kits = sorted((w for w in kits if w in clues), key=lambda w: (w not in familiar, len(w), w))
         if len(kits) < MIN_WORDS: continue
         main_spelling = max(spellings, key=lambda r: (sum(letters(r) in w for w in kits), -len(r)))
@@ -226,11 +271,12 @@ def main(scowl, out_path):
         if not a["meaning"]: a = next(affixes[r] for r in spellings if affixes[r]["meaning"])
         if main_spelling not in GAME: continue
         drop = set(GAME[main_spelling].split())
-        kits = [w for w in kits if w not in drop]
+        kits = [w for w in kits if w not in drop and not NOT_REALLY.search(origins.get(w, ""))]
         if len(kits) < MIN_WORDS: print("too few left:", main_spelling, file=sys.stderr); continue
         roots.append({"root": SHOW.get(main_spelling, main_spelling), "meaning": MEANING.get(main_spelling, a["meaning"]),
                       "familiar": sum(w in familiar for w in kits),
-                      "words": [[w, clues[w], int(w in familiar)] for w in kits[:MAX_WORDS]]})
+                      "from": root_source(a["from"]),
+                      "words": [[w, clues[w], int(w in familiar), language(origins.get(w)), origin(origins.get(w))] for w in kits[:MAX_WORDS]]})
     roots.sort(key=lambda r: (-r["familiar"], r["root"]))
     for r in set(GAME) - {x["root"] for x in roots} - {k for k, v in SHOW.items() if v in {x["root"] for x in roots}}:
         print("not found:", r, file=sys.stderr)
