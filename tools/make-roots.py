@@ -18,7 +18,7 @@ Only everyday words count (SCOWL sizes up to 50, American spelling, a-z, 4 lette
 old, rare or slang, and doesn't give the answer away."""
 import glob, json, os, re, sys, unicodedata
 
-MIN_WORDS, MAX_WORDS = 6, 16
+MIN_WORDS, MAX_WORDS = 6, 20
 AFFIX_POS = {"prefix", "suffix", "infix", "interfix", "affix", "combining_form"}
 SKIP_TAGS = {"obsolete", "archaic", "rare", "dated", "slang", "vulgar", "derogatory", "offensive", "nonstandard",
              "dialectal", "form-of", "alt-of", "abbreviation", "initialism", "misspelling", "humorous", "euphemistic",
@@ -42,6 +42,56 @@ NOT_FOR_US = re.compile(r"sex|porn|cunni|orgas|erect|foreskin|cide$|abort|racis|
                         r"diarrh|anorex|cocaine|heroin|narco|psycho|kill|murder|corpse|semen|penis|vagin|anal$|anus")
 # Roots with no meaning of their own to guess from (linking letters, grammar), or whose words are all left out.
 SKIP_ROOTS = set("-cide -a -o- -i- -u- -s -s- -os- -t -en -er -an -ie -ica".split())
+
+
+# The roots in the game, each with the words Wiktionary's links wrongly give it (UNTIL isn't UN- + TIL; MALE isn't
+# MAL- + E), picked by hand from everything the data gives.
+GAME = {
+    "un-": "until unless", "re-": "real rely rest relay", "mis-": "", "pre-": "precise present pregnant precisely premise",
+    "dis-": "disease discuss distant display dispute", "over-": "", "under-": "", "out-": "", "up-": "",
+    "down-": "", "after-": "after afterbirth", "fore-": "forward fore foreman foreplay", "sub-": "suborn",
+    "super-": "super superego", "inter-": "", "trans-": "", "anti-": "anti", "non-": "nonwhite",
+    "co-": "copy cover coherent companion connection correspond copula coring cosine",
+    "-less": "", "-ful": "", "-ness": "witness business", "-able": "", "-ish": "vanish gibberish lavish modish",
+    "-hood": "", "-ward": "awkward", "-wise": "wise", "-some": "fulsome",
+    "-ling": "sterling sling cowling titling buckling castling fondling needling gangling", "-proof": "",
+    "-like": "deathlike", "-worthy": "", "-fold": "", "-teen": "teenager umpteen", "mid-": "", "grand-": "",
+    "cross-": "", "bi-": "billion bike biker bigamy biopsy",
+    "tri-": "trial tripos trivia trinket trillion triptych trifecta", "uni-": "", "mono-": "monarch mono monogamy monogamous",
+    "multi-": "multiply multiplex", "poly-": "polyp polygamy polyamory", "semi-": "semi", "mini-": "minor mini",
+    "mega-": "", "micro-": "", "auto-": "auto autopsy", "tele-": "", "bio-": "", "geo-": "", "photo-": "",
+    "phono-": "", "-graph": "", "-graphy": "", "-logy": "apology trilogy anthology", "-meter": "meter", "-scope": "",
+    "chrono-": "", "hydro-": "", "aqua-": "aqua", "aero-": "", "-therm": "", "extra-": "extra extramarital",
+    "circum-": "circumcision", "counter-": "counter", "contra-": "control contraceptive", "retro-": "", "omni-": "",
+    "magni-": "magnum magnate magnolia", "mal-": "male maleness malaria mallard", "-cracy": "", "-crat": "",
+    "-naut": "", "cosmo-": "cosmetic", "techno-": "", "socio-": "sociopath", "electro-": "electrocute electrocution",
+    "magnet-": "", "radio-": "radius", "milli-": "mill miller millet", "ambi-": "ambassador ambulance ambition",
+    "hyper-": "hyper", "meta-": "method metastasis metastasize", "-dom": "", "-ess": "fortress marquess mistress temptress",
+    "-kin": "bodkin", "-let": "hamlet islet", "-ette": "cigarette", "-ster": "dumpster lobster mobster upholster barrister",
+    "-cast": "cast", "-craft": "", "-ware": "", "-side": "", "-most": "", "-wear": "", "-work": "", "-bound": "",
+    "-vert": "advert convertible", "-gram": "grammar gram", "-logue": "", "-pathy": "",
+    "-oid": "opioid steroid schizoid paranoid",
+    "peri-": "period periodic periodically peroxide permafrost perambulate", "dia-": "diaper diabolic diabolical",
+    "para-": "parliament parole parable parochial", "syn-": "synod", "epi-": "epic epilepsy", "ana-": "anathema",
+    "an-": "announce annex annihilate anion anode", "equ-": "", "centro-": "", "arch-": "arch archness archipelago",
+    "phil-": "", "nom-": "", "agri-": "", "linguo-": "", "numero-": "", "vari-": "", "dynamo-": "", "audio-": "",
+    "by-": "", "on-": "", "homo-": "homily homophobia", "-archy": "",
+}
+# Where Wiktionary's meaning is about grammar rather than meaning, or off (it has -therm as a kind of animal), a
+# short plain one, and the spelling to show.
+MEANING = {"un-": "Not", "non-": "Not", "auto-": "Self", "-ness": "The state of being", "-ful": "Full of",
+           "-therm": "Heat", "by-": "Beside; on the side", "hyper-": "Over, beyond", "meta-": "Beyond; after; change",
+           "after-": "After", "up-": "Up; higher", "down-": "Down; lower", "-teen": "Plus ten (thirteen to nineteen)",
+           "co-": "Together", "-ward": "In the direction of", "-wise": "In the way or direction of",
+           "-hood": "The state or time of being", "-dom": "The state or realm of", "-ess": "A female",
+           "-ster": "Someone who does or is", "-proof": "Safe against", "-like": "Like", "-most": "Most; furthest",
+           "-meter": "A device for measuring", "electro-": "Electricity", "bio-": "Life",
+           "-cast": "Sent out to an audience", "-ware": "Things made of, or for", "-vert": "Turn",
+           "-ish": "Like; somewhat", "-some": "Tending to; full of", "-ling": "Small, young",
+           "-kin": "Small", "-let": "Small", "-ette": "Small", "-able": "Able to be", "-less": "Without",
+           "-wear": "Clothing", "-work": "Work made of or with", "-side": "Beside", "-bound": "Going towards; held by",
+           "an-": "Without", "co-": "Together"}
+SHOW = {"-therm": "thermo-"}
 
 
 def plain(w): return unicodedata.normalize("NFKD", w).encode("ascii", "ignore").decode()
@@ -93,19 +143,32 @@ def letters(root):
     return r
 
 
-def gloss(e, giveaway=None):
-    """The entry's first everyday meaning; for a word, one that doesn't give the word away. (A root's meaning may
-    be put as a form of another word: bio- is "combining form of life".)"""
-    for s in e.get("senses", []):
-        if set(s.get("tags", [])) - {"form-of"} & SKIP_TAGS or s.get("alt_of"): continue
-        if giveaway and (s.get("form_of") or "form-of" in s.get("tags", [])): continue
+def glosses(e, giveaway=None):
+    """The entry's everyday meanings, best first, as (rank, text): a meaning filed under a subject (computing,
+    physics) ranks after the rest. For a word, a meaning that gives the word away keeps only its parts that don't
+    ("worthy of dependence, reliance or trust; dependable, trustworthy" is "dependable, trustworthy" for RELIABLE).
+    (A root's meaning may be put as a form of another word: bio- is "combining form of life".)"""
+    out = []
+    for n, s in enumerate(e.get("senses", [])):
+        tags = set(s.get("tags", []))
+        if tags - {"form-of"} & SKIP_TAGS or s.get("alt_of"): continue
+        if giveaway and (s.get("form_of") or "form-of" in tags): continue
         for g in s.get("glosses", [])[:1]:
-            g = re.sub(r"\s+", " ", g).strip()
+            g = re.sub(r"\s+", " ", g).strip().rstrip(":")
             low = g.lower()
-            if not g or len(g) > 140 or low.startswith(("plural of", "alternative", "obsolete", "synonym of")): continue
-            if giveaway and giveaway in low: continue
-            return g
-    return None
+            if not g or low.startswith(("plural of", "alternative", "obsolete", "synonym of", "see ")): continue
+            if giveaway and giveaway in low:
+                g = "; ".join(p for p in g.split("; ") if giveaway not in p.lower())
+                if not g: continue
+                g = g[0].upper() + g[1:]
+            if len(g) > 180: continue
+            out.append((bool(s.get("topics")), n, g))
+    return out
+
+
+def gloss(e, giveaway=None):
+    g = sorted(glosses(e, giveaway))
+    return g[0][2] if g else None
 
 
 def main(scowl, out_path):
@@ -128,9 +191,8 @@ def main(scowl, out_path):
         for t in e.get("etymology_templates", []):
             if t.get("name") in ENGLISH_PARTS: built.setdefault(w, set()).update(english_parts(t))
         word_src[w] = word_src.get(w, "") + " " + (e.get("etymology_text") or "")
-        if w not in clues:
-            g = gloss(e, giveaway=w[:max(4, len(w) - 3)])
-            if g: clues[w] = g
+        clues.setdefault(w, []).extend((t, len(clues[w]) + n, g) for t, n, g in glosses(e, giveaway=w[:max(4, len(w) - 3)]))
+    clues = {w: min(c)[2] for w, c in clues.items() if c}
     # One root for every Greek or Latin word: chron- and chrono- are one mother cat.
     groups = {}
     for r, a in affixes.items():
@@ -162,10 +224,16 @@ def main(scowl, out_path):
         main_spelling = max(spellings, key=lambda r: (sum(letters(r) in w for w in kits), -len(r)))
         a = affixes[main_spelling]
         if not a["meaning"]: a = next(affixes[r] for r in spellings if affixes[r]["meaning"])
-        roots.append({"root": main_spelling, "also": sorted(set(spellings) - {main_spelling}), "meaning": a["meaning"],
-                      "from": a["from"], "familiar": sum(w in familiar for w in kits),
+        if main_spelling not in GAME: continue
+        drop = set(GAME[main_spelling].split())
+        kits = [w for w in kits if w not in drop]
+        if len(kits) < MIN_WORDS: print("too few left:", main_spelling, file=sys.stderr); continue
+        roots.append({"root": SHOW.get(main_spelling, main_spelling), "meaning": MEANING.get(main_spelling, a["meaning"]),
+                      "familiar": sum(w in familiar for w in kits),
                       "words": [[w, clues[w], int(w in familiar)] for w in kits[:MAX_WORDS]]})
     roots.sort(key=lambda r: (-r["familiar"], r["root"]))
+    for r in set(GAME) - {x["root"] for x in roots} - {k for k, v in SHOW.items() if v in {x["root"] for x in roots}}:
+        print("not found:", r, file=sys.stderr)
     json.dump(roots, open(out_path, "w"), ensure_ascii=False, indent=0)
     print(len(roots), "roots", file=sys.stderr)
 
