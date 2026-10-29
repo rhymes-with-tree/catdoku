@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kitten Caboodle</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-29.2"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-29.2">
+<style>
+/* A word root is the mother cat; the everyday words built on it are her kittens, asleep until you spell them.
+   The mother sits at the top with her root and what it means; under her, a row for each kitten: its picture and
+   the squares for its word, the root's letters already in on the early levels. The clue for the picked kitten
+   is under the board, with the keys under that. */
+.den{position:relative;width:var(--board);height:auto;background:color-mix(in srgb,var(--lavender) 10%,var(--panel));border:3px solid var(--ink);
+  border-radius:14px;padding:10px 10px 12px;display:flex;flex-direction:column;gap:8px;touch-action:manipulation}
+/* the mother cat and her root */
+.mother{display:flex;align-items:flex-end;gap:10px;padding-bottom:8px;border-bottom:2px dashed var(--line)}
+.mother img{height:92px;width:auto;flex:none;margin-bottom:-4px}
+.sign{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.root{font-weight:800;font-size:clamp(26px,8vw,40px);line-height:1;letter-spacing:1px;text-transform:uppercase;color:var(--ink)}
+.root.hidden{color:var(--ink-soft);letter-spacing:4px}
+.means{font-size:15px;line-height:1.25;color:var(--ink-soft)}
+.means b{color:var(--ink);font-weight:600}
+/* the kittens */
+/* the kittens as big as the screen's height allows with the clue and keys still on screen: fewer kittens, bigger ones */
+.litter{--kit:clamp(40px,calc((var(--tall) - 440px) / var(--n,5) / .88),64px);display:flex;flex-direction:column;gap:5px}
+.kit{display:grid;grid-template-columns:var(--kit) minmax(0,1fr);align-items:center;gap:8px;padding:3px 6px 3px 2px;border-radius:10px;
+  border:2px solid transparent;cursor:pointer}
+.kit.sel{border-color:var(--pacific-blue);background:color-mix(in srgb,var(--pacific-blue) 12%,transparent)}
+.kit img{width:var(--kit);height:calc(var(--kit) * .88);object-fit:contain;filter:grayscale(1) brightness(1.08);opacity:.45;transition:opacity .3s,filter .3s,transform .3s}
+.kit.done img{filter:none;opacity:1}
+.kit.woke img{animation:wake .6s cubic-bezier(.3,1.6,.6,1)}
+@keyframes wake{40%{transform:translateY(-8px) scale(1.12)}}
+.word{display:flex;gap:3px;min-width:0}
+.sq{flex:0 1 auto;width:min(30px,calc((100% - (var(--L) - 1) * 3px) / var(--L)));aspect-ratio:1/1.12;display:grid;place-items:center;border-radius:6px;
+  background:#fff;border:2px solid var(--ink);font-weight:800;font-size:clamp(11px,calc(var(--board) / var(--L) * .5),19px);text-transform:uppercase;line-height:1}
+.sq.given{background:color-mix(in srgb,var(--lavender) 22%,#fff);color:var(--spring-blue)}
+.sq.ghost{color:var(--ink-soft)}
+.sq.next{border-color:var(--pacific-blue);box-shadow:0 0 0 2px var(--pacific-blue)}
+.kit.done .sq{background:color-mix(in srgb,var(--sage-green) 30%,#fff);border-color:color-mix(in srgb,var(--sage-green) 60%,var(--ink))}
+.kit.done .sq.given{color:var(--ink)}
+.rowshake{animation:shake .35s}
+@keyframes shake{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+/* the picked kitten's clue */
+.clue{width:var(--board);min-height:3.2em;padding:6px 10px;border-radius:10px;background:var(--panel);border:2px solid var(--line);font-size:16px;line-height:1.3}
+.clue .n{font-weight:800;color:var(--spring-blue);margin-right:4px}
+/* the language a word came into English from: old words often mean something new now (UPSET was "set up") */
+.clue .lang{font-size:14px;color:var(--ink-soft);white-space:nowrap}
+.means .src{display:block;font-size:13px;color:var(--ink-soft)}
+/* the words spelled so far, each with where it comes from (Wiktionary) */
+.wordlist{width:var(--board)}
+.wordlist h2{margin:0 0 4px;font-size:18px;font-weight:800}
+.wordlist ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.wordlist li{line-height:1.3}
+.wordlist a{font-weight:800;color:var(--ink);letter-spacing:.04em;text-transform:uppercase}
+.wordlist .blank{font-weight:800;letter-spacing:.18em;color:var(--ink-soft)}
+.wordlist .from{display:block;font-size:15px;color:var(--ink-soft)}
+/* what the game says (a hint's letter, a word that isn't right) goes in the clue box, under the clue, where you're looking */
+.clue .msg{text-align:left;color:var(--ink);font-weight:600;margin-top:2px}
+.clue .msg:empty{display:none}
+/* the keyboard */
+.keys{width:var(--board);display:flex;flex-direction:column;gap:6px;user-select:none;-webkit-user-select:none}
+.keys .row{display:flex;gap:5px;justify-content:center}
+.keys button{flex:1 1 0;min-width:0;padding:10px 0;border-radius:8px;font-weight:800;font-size:18px;text-transform:uppercase;touch-action:manipulation}
+.keys button.wide{flex:1.6 1 0;font-size:15px;text-transform:none}
+/* the win: every kitten up and bouncing */
+.won .kit img{animation:hop .5s ease-in-out 3 alternate}
+.won .kit:nth-child(2n) img{animation-delay:.12s}
+@keyframes hop{to{transform:translateY(-6px)}}
+.card img.mompic{display:block;width:46%;max-width:180px;height:auto;margin:0 auto 6px}
+@media (max-height:760px){.mother img{height:70px}}
+/* On a phone held sideways (games.css puts the den on the left at the screen's height): the clue and keys come
+   first in the column beside it */
+@media (orientation:landscape) and (max-height:500px){
+  body:not(.full) main > .den.stage{overflow:auto;padding:6px 8px;gap:4px}
+  body:not(.full) main:has(> .den.stage) > .clue{order:-1}
+  .mother{padding-bottom:4px}
+  .mother img{height:44px}
+  .root{font-size:26px}
+  .litter{gap:2px}
+  .kit{padding:1px 4px 1px 1px;gap:6px}
+  body:not(.full) main > .den.stage{height:var(--board)}
+  .litter{--kit:clamp(26px,calc((var(--tall) - 100px) / var(--n,5) - 10px),48px)}
+  .sq{width:min(24px,calc((100% - (var(--L) - 1) * 3px) / var(--L)));font-size:14px}
+}
+@media (prefers-reduced-motion:reduce){.kit img{transition:none}.kit.woke img,.won .kit img{animation:none}}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Kitten Caboodle</h1><div class="stripe"></div><p class="tagline">Wake the kittens. Spell the words made from the mother's root word.</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button></div>
+
+  <div class="wrap den stage" id="board" tabindex="0">
+    <div class="mother"><img id="mom" alt="The mother cat"><div class="sign"><div class="root" id="root"></div><div class="means" id="means"></div></div></div>
+    <div class="litter grid" id="grid"></div>
+  </div>
+  <div class="clue"><div id="clue" aria-live="polite"></div><div class="msg" id="msg" aria-live="polite"></div></div>
+  <div class="keys" id="keys" aria-label="Keyboard"></div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="restartBtn">Restart</button>
+    <button id="linkBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New litter</button>
+  </div>
+  <section class="wordlist" aria-label="The kittens' words"><h2>The words</h2><ol id="wordlist"></ol></section>
+
+</main>
+
+<script src="../games.js?v=2026-10-29.2"></script>
+<script>
+const $ = G.$;
+
+/* ---------- litters ---------- */
+// words/roots.json (made by tools/make-roots.py from Wiktionary): every root with its meaning and up to 20 everyday
+// words built on it, each [word, clue, familiar (1 for the most everyday words)], the roots with the most
+// familiar words first.
+// Levels: how many kittens, how everyday the words, and how much of the root you're given: its letters in the
+// squares (levels 1 to 4), only on the mother's sign (5 and 6), or not at all until a word's spelled (7 and 8).
+function levelSpec(n) {
+  return [null,
+    {n: 4, fam: true, max: 9, top: 40, give: "letters"}, {n: 5, fam: true, max: 10, top: 60, give: "letters"},
+    {n: 5, fam: false, max: 11, top: 90, give: "letters"}, {n: 6, fam: false, max: 12, top: 999, give: "letters"},
+    {n: 5, fam: true, max: 10, top: 60, give: "sign"}, {n: 6, fam: false, max: 12, top: 999, give: "sign"},
+    {n: 5, fam: false, max: 11, top: 90, give: "none"}, {n: 7, fam: false, max: 13, top: 999, give: "none"}][n];
+}
+// Where a root shows in a word, as [from, to): CHRONO- in CHRONOMETER, or CHRON- (its last vowel dropped) in
+// SYNCHRONIZE. null if it doesn't show.
+function rootSpan(root, w) {
+  const bare = root.replace(/-/g, ""), forms = [bare];
+  if (root.endsWith("-") && bare.length > 3 && /[aeiou]$/.test(bare)) forms.push(bare.slice(0, -1));
+  if (root.startsWith("-") && bare.length > 3 && /^[aeiou]/.test(bare)) forms.push(bare.slice(1));
+  if (root.startsWith("-") && bare.length > 3 && /[aeiouy]$/.test(bare)) forms.push(bare.slice(0, -1));   // -SCOPE in TELESCOPIC
+  for (const f of forms) {
+    const i = root.startsWith("-") && w.endsWith(f) ? w.length - f.length : root.endsWith("-") && w.startsWith(f) ? 0 : w.indexOf(f);
+    if (i >= 0) return [i, i + f.length];
+  }
+  return null;
+}
+// A litter for level n: a root the level allows with enough words that fit, and that many of its words, picked at
+// random and shortest first.
+function makeLitter(n, roots, rnd = Math.random) {
+  const s = levelSpec(n), ok = ([w, , f]) => w.length <= s.max && (f || !s.fam);
+  const pool = roots.slice(0, s.top).filter(r => r.words.filter(ok).length >= s.n);
+  if (!pool.length) return null;
+  const r = pool[Math.floor(rnd() * pool.length)], words = r.words.filter(ok).slice();
+  for (let i = words.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [words[i], words[j]] = [words[j], words[i]]; }
+  const pick = words.slice(0, s.n).sort((a, b) => a[0].length - b[0].length || (a[0] < b[0] ? -1 : 1));
+  return {root: r.root, meaning: r.meaning, from: r.from || "", words: pick.map(([w, clue, , lang, from]) => ({w, clue, lang: lang || "", from: from || ""}))};
+}
+
+/* ---------- state ---------- */
+const STORE = "catdoku.kittencaboodle.v1", MAX_LEVEL = 8;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1}, state.settings);
+let game = state.game || null, ROOTS = null, running = false;
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !running && !$("overlay").classList.contains("show");
+const levelName = n => { const s = levelSpec(n); return `Level ${n} · ${s.n} kittens${s.give === "letters" ? ", root filled in" : s.give === "sign" ? ", root on the sign" : ", root hidden"}`; };
+const catSrc = f => (window.CAT_SRC || {})[f] || `../cats/${f}.webp`;
+// The kittens: kitten Gus, Peanut, Marmalade and Willow, awake (asleep, they're grey until their word is spelled).
+const KITTENS = ["kitten-2", "kitten-3", "kitten-5", "kitten-6", "kitten-8", "marmalade-kitten-1", "marmalade-kitten-2",
+  "marmalade-kitten-4", "marmalade-kitten-5", "marmalade-kitten-6", "willow-kitten-1", "willow-kitten-2", "willow-kitten-4",
+  "willow-kitten-5", "willow-kitten-6", "willow-kitten-8"];
+// The mother cats: general cats sitting up and facing out (Purrfect Square's sitters).
+const MOTHERS = "c14-63 c18-6 c18-7 c18-17 c18-19 c18-21 c18-26 c18-27 c18-32 c18-40 c19-1 c19-5 c19-6 c19-14 c19-16 c19-17 c19-28 c19-32 c19-37 c19-40 c20-1 c20-17 c20-18 c20-30".split(" ");
+let sel = 0;   // the picked kitten
+
+// What's in a kitten's squares: the letters typed, with the root's given letters in place.
+const given = (g, k) => { const sp = g.give === "letters" ? rootSpan(g.root, g.words[k].w) : null; return sp || [0, 0]; };
+const isGiven = (g, k, i) => { const [a, b] = given(g, k); return i >= a && i < b; };
+const nextSquare = k => game.typed[k].findIndex((c, i) => !c && !isGiven(game, k, i));
+const rootShown = () => game.give !== "none" || game.solved.some(Boolean);
+
+/* ---------- drawing ---------- */
+function draw() {
+  if (!game) return;
+  $("mom").src = catSrc(game.mom);
+  $("root").textContent = rootShown() ? game.root.toUpperCase() : "?  ?  ?";
+  $("root").classList.toggle("hidden", !rootShown());
+  $("means").innerHTML = `means <b>${esc(lower(game.meaning))}</b>` + (game.from && rootShown() ? `<span class="src">from ${esc(game.from)}</span>` : "");
+  const L = Math.max(...game.words.map(x => x.w.length)), grid = $("grid");
+  grid.style.setProperty("--L", L); grid.style.setProperty("--n", game.words.length); grid.innerHTML = "";
+  const hint = hints.current();
+  game.words.forEach((x, k) => {
+    const row = document.createElement("div"), done = game.solved[k];
+    row.className = "kit" + (done ? " done" : "") + (k === sel && !game.won ? " sel" : ""); row.dataset.k = k;
+    row.setAttribute("aria-label", `Kitten ${k + 1}, ${x.w.length} letters${done ? ": " + x.w : ""}`);
+    const img = new Image(); img.src = catSrc(game.pics[k]); img.alt = ""; row.append(img);
+    const word = document.createElement("div"); word.className = "word";
+    const nx = k === sel && !done ? nextSquare(k) : -1;
+    for (let i = 0; i < x.w.length; i++) {
+      const sq = document.createElement("div"), g = isGiven(game, k, i);
+      sq.className = "sq" + (g ? " given" : "") + (i === nx ? " next" : "");
+      const shown = hint && hint.k === k && hint.i === i;
+      if (shown) sq.classList.add("hintcell", "ghost", ...(hint.bad ? ["bad"] : []));
+      sq.dataset.i = i;
+      sq.textContent = done || g ? x.w[i] : shown ? x.w[i] : game.typed[k][i] || "";
+      word.append(sq);
+    }
+    row.append(word); grid.append(row);
+  });
+  const c = game.words[sel];
+  $("clue").innerHTML = game.won ? `Every kitten's awake. The words all come from <b>${esc(game.root.toUpperCase())}</b>, ${esc(lower(game.meaning))}.`
+    : `<span class="n">${sel + 1}.</span>${esc(c.clue)} <span class="n">(${c.w.length})</span>` + (c.lang ? ` <span class="lang">from ${esc(c.lang)}</span>` : "");
+  wordList();
+  const left = game.solved.filter(s => !s).length;
+  $("count").textContent = game.won ? `${game.words.length} kittens awake` : `${game.words.length - left} of ${game.words.length} awake`;
+  $("restartBtn").disabled = game.won || !game.started;
+  $("hintBtn").disabled = game.won;
+}
+// "Thousand" reads as "means thousand"; an abbreviation ("SI unit") keeps its capitals
+const lower = s => /^[A-Z](?![A-Z])/.test(s) ? s[0].toLowerCase() + s.slice(1) : s;
+const esc = s => s.replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+// The words spelled so far, each linked to Wiktionary with where it comes from; the rest as blanks.
+function wordList() {
+  const ol = $("wordlist"), out = [];
+  game.words.forEach((x, k) => {
+    const li = document.createElement("li");
+    if (game.solved[k] || game.won) {
+      li.innerHTML = `<a href="https://en.wiktionary.org/wiki/${encodeURIComponent(x.w)}#English" target="_blank" rel="noopener">${esc(x.w)}</a>` +
+        (x.from ? `<span class="from">${esc(x.from)}</span>` : "");
+    } else li.innerHTML = `<span class="blank">${"_".repeat(x.w.length)}</span>`;
+    out.push(li);
+  });
+  ol.replaceChildren(...out);
+}
+function pick(k) {
+  if (k === sel) return;
+  sel = k; hints.clear(false); G.note(""); draw();   // a message was about the kitten before
+}
+
+/* ---------- the keyboard ---------- */
+const ROWS = ["qwertyuiop", "asdfghjkl", "⏎zxcvbnm⌫"];
+for (const r of ROWS) {
+  const row = document.createElement("div"); row.className = "row";
+  for (const ch of r) {
+    const b = document.createElement("button"); b.type = "button";
+    if (ch === "⏎") { b.textContent = "Next"; b.className = "wide"; b.setAttribute("aria-label", "Next kitten"); b.onclick = () => nextKitten(1); }
+    else if (ch === "⌫") { b.textContent = "⌫"; b.className = "wide"; b.setAttribute("aria-label", "Delete"); b.onclick = () => back(); }
+    else { b.textContent = ch; b.onclick = () => type(ch); }
+    row.append(b);
+  }
+  $("keys").append(row);
+}
+document.addEventListener("keydown", e => {
+  if (e.ctrlKey || e.metaKey || e.altKey || !playing() || document.querySelector(".spot") || /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
+  if (/^[a-z]$/i.test(e.key)) { type(e.key.toLowerCase()); e.preventDefault(); }
+  else if (e.key === "Backspace") { back(); e.preventDefault(); }
+  else if (e.key === "ArrowDown" || e.key === "Enter" || e.key === "Tab" && !e.shiftKey) { nextKitten(1); e.preventDefault(); }
+  else if (e.key === "ArrowUp" || e.key === "Tab" && e.shiftKey) { nextKitten(-1); e.preventDefault(); }
+});
+// the next kitten still asleep, down (or up) the litter
+function nextKitten(d) {
+  if (!playing()) return;
+  const n = game.words.length;
+  for (let s = 1; s <= n; s++) { const k = (sel + d * s + n * s) % n; if (!game.solved[k]) return pick(k); }
+}
+function type(ch) {
+  if (!playing() || game.solved[sel]) return;
+  const i = nextSquare(sel);
+  if (i < 0) return;
+  game.started = true; game.typed[sel][i] = ch;
+  if (nextSquare(sel) < 0) return check();
+  draw(); save();
+}
+function back() {
+  if (!playing() || game.solved[sel]) return;
+  const t = game.typed[sel];
+  for (let i = t.length - 1; i >= 0; i--) if (t[i] && !isGiven(game, sel, i)) { t[i] = ""; break; }
+  draw(); save();
+}
+// a full word: right wakes the kitten and moves on; wrong shakes
+function check() {
+  const k = sel, x = game.words[k], got = game.typed[k].map((c, i) => isGiven(game, k, i) ? x.w[i] : c).join("");
+  if (got !== x.w) {
+    draw(); save();
+    const row = document.querySelector(`.kit[data-k="${k}"]`);
+    if (row) { row.classList.remove("rowshake"); row.getBoundingClientRect(); row.classList.add("rowshake"); }
+    return G.note(`${got.toUpperCase()} isn't this kitten's word. ⌫ to change it.`, 3500);
+  }
+  game.solved[k] = true;
+  if (game.solved.every(Boolean)) return win();
+  nextKitten(1); draw(); save();
+  const row = document.querySelector(`.kit[data-k="${k}"]`);
+  if (row) row.classList.add("woke");
+  G.note("");   // the kitten waking says it; the clue box moves on to the next word
+}
+// tap a kitten to pick it; tap a square of its word to take that letter (and the ones after) back out
+$("grid").addEventListener("click", e => {
+  const row = e.target.closest(".kit");
+  if (!row || !playing()) return;
+  const k = +row.dataset.k, sq = e.target.closest(".sq");
+  if (k !== sel) { pick(k); return; }
+  if (!sq || game.solved[k]) return;
+  const t = game.typed[k];
+  for (let i = +sq.dataset.i; i < t.length; i++) if (!isGiven(game, k, i)) t[i] = "";
+  draw(); save();
+});
+
+/* ---------- hints ---------- */
+// A hint shows one letter of the picked kitten's word (or the first asleep), in its square: in red where a letter
+// typed is wrong (the first one), otherwise in gold in the next empty square. You type it in.
+const hints = G.hinter({game: () => game, key: () => game ? sel + ":" + game.typed.map(t => t.join("")).join(",") + game.solved.join("") : "", draw: () => draw()});
+const aLetter = c => `${/[aefhilmnorsx]/.test(c) ? "an" : "a"} ${c.toUpperCase()}`;
+$("hintBtn").onclick = () => {
+  if (!playing()) return;
+  if (game.solved[sel]) nextKitten(1);
+  const k = sel, w = game.words[k].w, t = game.typed[k];
+  const bad = t.findIndex((c, i) => c && !isGiven(game, k, i) && c !== w[i]);
+  game.hinted = true; game.started = true; save();
+  if (bad >= 0) return hints.show({k, i: bad, bad: true}, `The red square should be ${aLetter(w[bad])}.`);
+  const i = nextSquare(k);
+  hints.show({k, i}, `The gold square is ${aLetter(w[i])}.`);
+};
+
+/* ---------- endings ---------- */
+function win() {
+  game.won = true; G.finishClock(game); hints.clear(false);
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save();
+  draw(); $("board").classList.add("won");
+  G.track(`Kitten Caboodle solved level ${game.level}`);
+  running = true;
+  const g = game;
+  setTimeout(() => { running = false; $("board").classList.remove("won"); if (game === g) finishCard(); }, matchMedia("(prefers-reduced-motion: reduce)").matches ? 400 : 1600);
+}
+function finishCard() {
+  const next = settings.level, gold = !game.hinted && !game.undid;
+  let text = `All ${game.words.length} kittens are awake, every one built on ${game.root.toUpperCase()} (${lower(game.meaning)}).`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  const pic = new Image(); pic.className = "mompic"; pic.src = catSrc("kitten-7"); pic.alt = "Kitten Gus asleep on kitten Peanut";
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my litter", game.result,
+    {title: "The whole caboodle!", gold, goldWhy: "No hints or restarts!", goldPic: [pic], next: `Next: level ${next}`,
+     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- new litters ---------- */
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
+function begin(p, level) {
+  const pics = KITTENS.slice().sort(() => Math.random() - .5);
+  game = {level, root: p.root, meaning: p.meaning, from: p.from, give: levelSpec(level).give, words: p.words,
+    typed: p.words.map(x => Array(x.w.length).fill("")), solved: p.words.map(() => false),
+    pics: p.words.map((_, k) => pics[k % pics.length]), mom: MOTHERS[Math.floor(Math.random() * MOTHERS.length)],
+    won: false, ...G.freshClock()};
+  sel = 0; hints.clear(false);
+}
+function newPuzzle() {
+  const n = settings.level, p = makeLitter(n, ROOTS);
+  if (!p) return G.note("Couldn't find a litter; try again.", 4000);
+  begin(p, n);
+  G.closeCard(); G.note("");
+  draw(); save();
+  G.track(`Kitten Caboodle new puzzle level ${n}`);
+  helpOnFirstVisit();
+}
+$("restartBtn").onclick = () => {
+  if (!playing() || !game.started) return;
+  game.typed = game.words.map(x => Array(x.w.length).fill("")); game.solved = game.solved.map(() => false); game.undid = true;
+  sel = 0; hints.clear(false); draw(); save();
+  G.note("Every kitten's back asleep.", 3000);
+};
+
+/* ---------- sharing ---------- */
+$("linkBtn").onclick = () => { if (game) G.shareCard({name: "Kitten Caboodle", won: game.won,
+  puzzle: () => ({g: "kittencaboodle", N: game.level, r: game.root, w: game.words.map(x => x.w).join(",")}),
+  progress: () => game.typed.map((t, k) => game.solved[k] ? "+" : t.map(c => c || ".").join("")).join(",")}); };
+function openShared(d) {
+  const fail = () => G.note("That share link didn't work.", 5000);
+  const r = ROOTS.find(x => x.root === d.r), spec = levelSpec(d.N);
+  if (!r || !spec || typeof d.w !== "string") return fail();
+  const words = d.w.split(",").map(w => r.words.find(x => x[0] === w));
+  if (!words.length || words.some(x => !x)) return fail();
+  begin({root: r.root, meaning: r.meaning, from: r.from || "", words: words.map(([w, clue, , lang, from]) => ({w, clue, lang: lang || "", from: from || ""}))}, d.N);
+  if (typeof d.p === "string") {
+    const parts = d.p.split(",");
+    if (parts.length === words.length) parts.forEach((s, k) => {
+      if (s === "+") game.solved[k] = true;
+      else if (s.length === game.words[k].w.length && /^[a-z.]+$/.test(s)) game.typed[k] = [...s].map(c => c === "." ? "" : c);
+    });
+    game.timed = false;
+  }
+  settings.level = d.N; $("levelSel").value = d.N;
+  draw(); save();
+}
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  settings.seenHelp = false; helpOnFirstVisit();
+  if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
+}
+function helpOnFirstVisit() {
+  if (!game || !playing() || document.querySelector(".spot") || settings.seenHelp) return;
+  const n = game.words.length, rows = [...Array(n).keys()].map(k => [0, k]);
+  const steps = [
+    {say: "The mother cat is a word root", els: [document.querySelector(".mother")]},
+    {say: rootShown() ? `${game.root.toUpperCase()} means "${lower(game.meaning)}"` : "Her root is hidden; this is what it means", els: [$("means")]},
+    {say: "Each kitten is a word built on it", lit: rows},
+    {say: "The picked kitten's clue is here", els: [document.querySelector(".clue")]},
+    {say: "Type its word; Next moves on", els: [$("keys")]},
+    {say: "Spell every word to wake them all", lit: rows, tone: "ok"},
+    {say: "Stuck? Hint shows you a letter", els: [$("hintBtn")]},
+  ];
+  G.spotlight({grid: $("grid"), w: 1, h: n, steps, done: () => { settings.seenHelp = true; save(); }});
+}
+
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", ""), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
+$("helpBtn").onclick = showHelp;
+
+G.nav("kittencaboodle");
+G.checkClock(game);
+G.setupTimer({name: "kittencaboodle", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+
+G.note("Fetching the words…", 0);
+(window.ROOTS_DATA ? Promise.resolve(window.ROOTS_DATA) : fetch(`../words/roots.json?v=${window.SITE_BUILD}`).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }))
+  .catch(e => { G.note(`The words didn't load (${e.message}). Check your connection and reload.`, 0); throw e; }).then(data => {
+  ROOTS = data; G.note("");
+  const shared = G.readShare("kittencaboodle");
+  const hadSave = !!game;
+  if (hadSave) G.reopen(() => {
+      if (!levelSpec(game.level) || !Array.isArray(game.words) || !game.words.length || game.typed.length !== game.words.length) throw new Error("the saved litter doesn't fit");
+      sel = Math.max(0, game.solved.indexOf(false));
+      draw();
+      if (game.won) finishCard();
+      helpOnFirstVisit();
+    }, why => { game = null; newPuzzle(); G.note(why, 0); });
+  else if (!shared) newPuzzle();
+  const shareOpts = () => ({name: "Kitten Caboodle", inProgress: !!(game && !game.won && game.started), open: openShared, after: helpOnFirstVisit});
+  if (shared) G.offerShare(shared, {...shareOpts(), fresh: hadSave ? null : why => Promise.resolve(newPuzzle()).then(() => { G.note(why, 6000); })});
+  window.addEventListener("hashchange", () => { const d = G.readShare("kittencaboodle"); if (d) G.offerShare(d, shareOpts()); });
+});
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
