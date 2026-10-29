@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-29.2";
+  var BUILD = "2026-10-29.3";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-29.2">
+<link rel="stylesheet" href="../games.css?v=2026-10-29.3">
 <style>
 /* Night at the museum: a painting in a gilt frame on a dark gallery wall, lit by a brass picture light.
    A cat has sneaked into the painting; pinch or use + and − to look closer, and tap it to catch it. */
@@ -45,6 +45,8 @@
 .layer svg{pointer-events:none}
 .miss path{fill:none;stroke:#C8392B;stroke-linecap:round;vector-effect:non-scaling-stroke}
 .miss circle{fill:rgba(255,255,255,.55);stroke:#C8392B;vector-effect:non-scaling-stroke}
+.cut1{fill:#808080;mix-blend-mode:saturation}
+.cut2{fill:#101014;fill-opacity:.5}
 .found{fill:none;stroke:#6AA673;stroke-width:5px;vector-effect:non-scaling-stroke}
 .found.away{stroke:#C8392B}
 .view.zoomed{cursor:grab}
@@ -105,7 +107,11 @@ body.full .hearts .lost{color:rgba(247,248,243,.3)}
 .card:has(.gallery){max-width:min(760px,100%)}
 .gallery{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin:0 0 16px}
 .gallery figure{margin:0;flex:0 1 150px;min-width:0;padding:5px;background:#B8934A;border-radius:4px;box-shadow:0 2px 6px rgba(0,0,0,.35)}
-.gallery img{display:block;width:100%;height:auto;max-height:200px;object-fit:contain;border-radius:2px}
+.gallery .pic{position:relative}
+.gallery img{display:block;width:100%;height:auto;border-radius:2px}
+.gallery .ring{position:absolute;border:3px solid #6AA673;border-radius:50%;box-sizing:border-box;pointer-events:none}
+.gallery .ring.away{border-color:#C8392B}
+.gallery.bare .ring{display:none}
 .gallery figcaption{font-size:12px;font-weight:600;color:var(--ink);margin-top:4px;line-height:1.2}
 .card .museum a{color:var(--ink);font-weight:600}
 /* a phone held sideways: the cat where it was hiding on the left, the words and buttons beside it, so the whole
@@ -158,8 +164,8 @@ body.full .hearts .lost{color:rgba(247,248,243,.3)}
 
 </main>
 
-<script src="../games.js?v=2026-10-29.2"></script>
-<script src="paintings.js?v=2026-10-29.2"></script>
+<script src="../games.js?v=2026-10-29.3"></script>
+<script src="paintings.js?v=2026-10-29.3"></script>
 <script>
 /* ---------- levels ---------- */
 // How big the cat is (the side of a square of the same area, as a share of the painting's), and how far it takes on
@@ -479,7 +485,7 @@ function onCat(px, py) {
 /* ---------- endings ---------- */
 // One painting done: caught, or missed (out of lives, or given up).
 function done(caughtIt) {
-  round.results.push({i: game.i, caught: caughtIt, lives: game.lives, hinted: game.hinted, revived: !!game.revived, pic: galleryPic(caughtIt)});
+  round.results.push({i: game.i, caught: caughtIt, lives: game.lives, hinted: game.hinted, revived: !!game.revived, pic: galleryPic(), ring: ringOf()});
   if (game.hinted || game.revived) round.hinted = true;
   if (game.revived) round.revived = true;
   if (round.results.length >= ROUND) endRound();
@@ -526,29 +532,35 @@ function endRound() {
   settings.level = round.next; $("levelSel").value = settings.level;
   G.track(`Cat Burglar round over level ${round.level}: ${k} caught`);
 }
-// A small copy of the painting with its cat ringed (green if caught, red if it got away), kept for the round's gallery.
-function galleryPic(caughtIt) {
+// A small copy of the painting for the round's gallery (the ring round the cat is drawn over it there, so it can come off).
+function galleryPic() {
   try {
-    const s = scene, k = Math.min(1, 360 / Math.max(s.PW, s.PH)), out = canvasOf(Math.round(s.PW * k), Math.round(s.PH * k)), x = out.getContext("2d");
-    x.drawImage($("art"), 0, 0, out.width, out.height);
-    const r = (Math.max(game.w, game.h) * 0.62 + 6) * k;
-    x.lineWidth = 3; x.strokeStyle = caughtIt ? "#6AA673" : "#C8392B";
-    x.beginPath(); x.ellipse(game.x * k, game.y * k, r, r, 0, 0, Math.PI * 2); x.stroke();
+    const s = scene, k = Math.min(1, 360 / Math.max(s.PW, s.PH)), out = canvasOf(Math.round(s.PW * k), Math.round(s.PH * k));
+    out.getContext("2d").drawImage($("art"), 0, 0, out.width, out.height);
     return out.toDataURL("image/jpeg", 0.7);
   } catch (e) { return ""; }
 }
-// The whole round's paintings on one wall, each with its cat ringed.
+// The cat's ring as shares of the painting: left, top, width, height.
+const ringOf = () => { const r = Math.max(game.w, game.h) * 0.62 + 6; return [(game.x - r) / scene.PW, (game.y - r) / scene.PH, 2 * r / scene.PW, 2 * r / scene.PH]; };
+let ringsOn = true;
+// The whole round's paintings on one wall, with each cat ringed (green if caught, red if it got away) unless the rings are off.
 function gallery() {
-  const wall = document.createElement("div"); wall.className = "gallery";
+  const wall = document.createElement("div"); wall.className = "gallery" + (ringsOn ? "" : " bare");
   for (const r of round.results) {
     if (!r.pic) continue;
-    const p = paintingOf(r.i), f = document.createElement("figure"), im = new Image();
+    const p = paintingOf(r.i), f = document.createElement("figure"), box = document.createElement("div"), im = new Image();
     im.src = r.pic; im.alt = `${p ? p.title : "A painting"}${r.caught ? ", cat caught" : ", the cat got away"}`;
+    box.className = "pic"; box.append(im);
+    if (r.ring) { const o = document.createElement("i"); o.className = "ring" + (r.caught ? "" : " away"); o.style.cssText = `left:${r.ring[0] * 100}%;top:${r.ring[1] * 100}%;width:${r.ring[2] * 100}%;height:${r.ring[3] * 100}%`; box.append(o); }
     const c = document.createElement("figcaption"); c.textContent = p ? p.title : "";
-    f.append(im, c); wall.append(f);
+    f.append(box, c); wall.append(f);
   }
-  if (!wall.children.length) { G.note("Tap Next round when you're ready for another.", 0); return; }
-  G.openCard("My gallery", "", [["Done", () => { G.closeCard(); G.note("Tap Next round when you're ready for another.", 0); }, true]], wall);
+  const away = () => G.note("Tap Next round when you're ready for another.", 0);
+  if (!wall.children.length) { away(); return; }
+  let btn;
+  const toggle = () => { ringsOn = !ringsOn; wall.classList.toggle("bare", !ringsOn); btn.textContent = ringsOn ? "Hide the rings" : "Show the rings"; };
+  G.openCard("My gallery", "", [["Done", () => { G.closeCard(); away(); }, true], [ringsOn ? "Hide the rings" : "Show the rings", toggle]], wall);
+  btn = $("card").querySelectorAll(".btns button")[1];
 }
 // The cat as it was found: the painting around it, cropped.
 function caughtPic() {
@@ -598,14 +610,29 @@ function roundCard() {
 }
 
 /* ---------- hints ---------- */
-// A gold ring round the part of the painting the cat is in; each hint after the first rings a smaller part.
-const hints = G.hinter({game: () => game, key: () => game ? String(game.misses.length) : "", draw: () => draw()});   // marks {x, y, r}: a ring
+// Each hint greys out a third of the painting (a band across it) that the cat isn't in, and the grey stays for the
+// rest of that painting. Bands alternate between up-and-down and side-to-side; after four hints they get narrower.
 function hint() {
   if (!playing() || !ready()) return;
-  const s = scene, catR = Math.max(game.w, game.h) * 0.6, r = Math.max(catR * 1.6, Math.min(s.PW, s.PH) * (game.hints ? 0.13 : 0.26));
-  const off = Math.random() * Math.max(0, r - catR), a = Math.random() * Math.PI * 2;
-  game.hints++; if (!game.hinted) game.hinted = true;
-  save(); hints.show({x: game.x + Math.cos(a) * off, y: game.y + Math.sin(a) * off, r}, "The cat is somewhere in the gold ring.");
+  const s = scene, R = Math.max(game.w, game.h) * 0.62, cuts = game.cuts || (game.cuts = []);
+  for (let k = 0; k < 12; k++) {
+    const n = game.hints + k, across = n % 2, parts = n < 4 ? 3 : n < 8 ? 5 : 9;
+    const span = across ? s.PH : s.PW, at = across ? game.y : game.x, bands = [];
+    for (let j = 0; j < parts; j++) {
+      const lo = span * j / parts, hi = span * (j + 1) / parts;
+      if (at + R < lo || at - R > hi) bands.push(across ? [0, lo, s.PW, hi - lo] : [lo, 0, hi - lo, s.PH]);
+    }
+    const fresh = bands.filter(b => !cuts.some(c => c.every((v, i) => Math.abs(v - b[i]) < 1)));
+    if (!fresh.length) continue;
+    // the band farthest from the cat goes first, so the hint helps the most when it's the first
+    const pick = fresh[Math.floor(Math.random() * fresh.length)];
+    cuts.push(pick.map(Math.round));
+    game.hints++; if (!game.hinted) game.hinted = true;
+    save(); draw();
+    G.note(game.hints === 1 ? "The cat isn't in the greyed-out part." : "Another part ruled out.", 3500);
+    return;
+  }
+  G.note("There's nothing more to rule out. Try zooming in.", 3000);
 }
 
 /* ---------- looking closer: pinch, drag, the mouse wheel, + and − ---------- */
@@ -724,7 +751,7 @@ const keys = G.gridKeys({on: () => playing() && ready(),
 /* ---------- drawing ---------- */
 const ns = "http://www.w3.org/2000/svg";
 const svgEl = (t, a) => { const e = document.createElementNS(ns, t); for (const k in a) e.setAttribute(k, a[k]); return e; };
-// Misses (a red cross on a pale dot), the hint ring, and the ring round the cat once it's caught or got away;
+// Misses (a red cross on a pale dot), the parts a hint ruled out, and the ring round the cat once it's caught or got away;
 // the marks keep the same size on the screen however far in you zoom.
 function drawMarks() {
   const svg = $("marks"); svg.innerHTML = "";
@@ -741,8 +768,10 @@ function drawMarks() {
       svgEl("path", {d: `M${kb.x - r - q} ${kb.y}H${kb.x - r + q}M${kb.x + r - q} ${kb.y}H${kb.x + r + q}M${kb.x} ${kb.y - r - q}V${kb.y - r + q}M${kb.x} ${kb.y + r - q}V${kb.y + r + q}`, stroke: G.CURSOR, "stroke-width": 3 * u}));
     svg.append(g);
   }
-  const shown = playing() && hints.current();
-  if (shown) svg.append(svgEl("circle", {class: "hintsq", cx: shown.x, cy: shown.y, r: shown.r}));
+  // the parts a hint ruled out: drained of colour and dimmed
+  if (playing()) for (const [x, y, w, h] of game.cuts || []) {
+    svg.append(svgEl("rect", {class: "cut1", x, y, width: w, height: h}), svgEl("rect", {class: "cut2", x, y, width: w, height: h}));
+  }
   // the ring round a caught cat shows until the win card comes up, so the painting can be admired without it
   if ((game.won && !game.admired) || game.lost) svg.append(svgEl("ellipse", {class: "found" + (game.lost ? " away" : ""), cx: game.x, cy: game.y,
     rx: Math.max(game.w, game.h) * 0.62 + 6 * u, ry: Math.max(game.w, game.h) * 0.62 + 6 * u}));
@@ -793,7 +822,7 @@ function helpOnFirstVisit(tries = 0) {
     {say: "Pinch or tap + to look closer", els: [$("zoom")]},
     {say: "A wrong tap costs a life", els: [$("hearts")]},
     {say: "Give up shows where it was and moves on", els: [$("giveUpBtn")]},
-    {say: "Stuck? Hint rings where to look", els: [$("hintBtn")]},
+    {say: "Stuck? Hint greys out a part of the painting to rule out", els: [$("hintBtn")]},
   ];
   G.spotlight({grid: $("board"), w: 1, h: 1, steps, done: () => { settings.seenHelp = true; save(); }});
 }
