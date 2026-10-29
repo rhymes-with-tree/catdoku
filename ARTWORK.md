@@ -116,3 +116,9 @@ each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the 
   `peanut-6` her face, smaller; `peanut-7` asleep in a round bed; `peanut-8` knocking a ball; `peanut-9` pouncing;
   `peanut-10` sitting (from behind); `peanut-11` walking (from above); `peanut-12` sitting (front); `peanut-13`
   stretched out; `peanut-14` her paw.
+- **The kittens** (`kitten-1` to `kitten-8`): the owner's kitten sheet, grey tabby kittens and black kittens with green
+  eyes, meant for Kitten Caboodle (the root is the mother cat, each word one of her kittens). Who they are isn't
+  settled yet, so for now they're kittens any game can use. `kitten-1` a tabby and a black kitten sitting side by side;
+  `kitten-2` a tabby on its back, paws up; `kitten-3` a black kitten sitting, head tilted; `kitten-4` a tabby curled up
+  asleep; `kitten-5` a black kitten batting a purple ball of yarn; `kitten-6` a tabby in a cardboard box; `kitten-7` a
+  tabby asleep on top of a black kitten; `kitten-8` a tabby walking, tail up. (`kitten-star` is Fred as a kitten; see Fred.)
