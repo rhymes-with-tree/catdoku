@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-29.2"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-30.1"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-29.2">
+<link rel="stylesheet" href="../games.css?v=2026-10-30.1">
 <style>
 /* A word root is the mother cat; the everyday words built on it are her kittens, asleep until you spell them.
    The mother sits at the top with her root and what it means; under her, a row for each kitten: its picture and
@@ -134,7 +134,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-29.2"></script>
+<script src="../games.js?v=2026-10-30.1"></script>
 <script>
 const $ = G.$;
 
@@ -389,15 +389,30 @@ $("restartBtn").onclick = () => {
 };
 
 /* ---------- sharing ---------- */
+// The link names the litter by numbers, so it gives none of the words (or the root) away: which root in
+// words/roots.json (i) and which of its words (k), with a check (c) that the list hasn't changed since, which
+// would make the numbers point at other words.
+const linkCheck = (root, words) => { let h = 7; for (const ch of root + ":" + words.join(",")) h = (h * 31 + ch.charCodeAt(0)) % 1679616; return h.toString(36); };
 $("linkBtn").onclick = () => { if (game) G.shareCard({name: "Kitten Caboodle", won: game.won,
-  puzzle: () => ({g: "kittencaboodle", N: game.level, r: game.root, w: game.words.map(x => x.w).join(",")}),
+  puzzle: () => {
+    const i = ROOTS.findIndex(x => x.root === game.root), r = ROOTS[i];
+    const k = game.words.map(x => r ? r.words.findIndex(y => y[0] === x.w) : -1);
+    return {g: "kittencaboodle", N: game.level, i, k: k.join("."), c: linkCheck(game.root, game.words.map(x => x.w))};
+  },
   progress: () => game.typed.map((t, k) => game.solved[k] ? "+" : t.map(c => c || ".").join("")).join(",")}); };
 function openShared(d) {
   const fail = () => G.note("That share link didn't work.", 5000);
-  const r = ROOTS.find(x => x.root === d.r), spec = levelSpec(d.N);
-  if (!r || !spec || typeof d.w !== "string") return fail();
-  const words = d.w.split(",").map(w => r.words.find(x => x[0] === w));
-  if (!words.length || words.some(x => !x)) return fail();
+  const spec = levelSpec(d.N);
+  let r, words;
+  if (Number.isInteger(d.i) && typeof d.k === "string") {
+    r = ROOTS[d.i];
+    words = r ? d.k.split(".").map(n => /^\d+$/.test(n) ? r.words[+n] : null) : [];
+    if (!r || words.some(x => !x) || linkCheck(r.root, words.map(x => x[0])) !== d.c) return fail();
+  } else {   // a link from before the numbers: the root and words by name
+    r = ROOTS.find(x => x.root === d.r);
+    words = r && typeof d.w === "string" ? d.w.split(",").map(w => r.words.find(x => x[0] === w)) : [];
+  }
+  if (!r || !spec || !words.length || words.some(x => !x)) return fail();
   begin({root: r.root, meaning: r.meaning, from: r.from || "", words: words.map(([w, clue, , lang, from]) => ({w, clue, lang: lang || "", from: from || ""}))}, d.N);
   if (typeof d.p === "string") {
     const parts = d.p.split(",");
