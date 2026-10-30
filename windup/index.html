@@ -145,7 +145,7 @@ const SHAPE = {
   }),
 };
 const POM_TOP = 6;   // puffballs wind up to this size; two of the biggest puff away
-const SHAKE_FOR = .5;   // seconds the bowl wobbles after a shake
+const SHAKE_FOR = .9;   // seconds the bowl wobbles after a shake
 const SUB = 6, STEP = 1 / 60, ITER = 4, GRACE = 1.1, LOSE_AFTER = 2.4, COOL = 0.4;
 
 const mulberry = s => () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -236,7 +236,7 @@ function nearOnShape(b, sh, k) {
 }
 function step(g, h) {
   const B = g.balls, merges = [], cs = [];
-  for (const b of B) { b.vy += TUNE.GRAV * h; const sp = Math.hypot(b.vx, b.vy); if (sp > 1100) { b.vx *= 1100 / sp; b.vy *= 1100 / sp; } }
+  for (const b of B) { b.vy += TUNE.GRAV * h; const sp = Math.hypot(b.vx, b.vy); if (sp > 1400) { b.vx *= 1400 / sp; b.vy *= 1400 / sp; } }
   // contacts: pairs touching (or within a hair), and the walls. n points from A to C (from a wall, into the ball).
   for (const b of B) b.floor = false;
   const contact = (A, C, nx, ny) => { if (!A && ny < -.5) C.floor = true; const wa = A ? 1 / (A.r * A.r) : 0, wc = 1 / (C.r * C.r); const vn0 = (C.vx - (A ? A.vx : 0)) * nx + (C.vy - (A ? A.vy : 0)) * ny;
@@ -324,6 +324,7 @@ function tick(g, dt) {
     for (const b of g.balls) { b.age += STEP; if (b.pop < 1) b.pop = Math.min(1, b.pop + STEP * 3); if (b.born < 1) b.born += STEP; }
     g.cool = Math.max(0, g.cool - STEP); g.shakeT = Math.max(0, (g.shakeT || 0) - STEP); g.shakeCool = Math.max(0, (g.shakeCool || 0) - STEP);
     for (const f of g.fx) f.t += STEP; g.fx = g.fx.filter(f => f.t < f.T);
+    if (g.state !== "running") continue;   // after a win the balls keep moving, with nothing more to check
     const over = g.balls.some(b => b.age > GRACE && b.y - b.r < g.line);
     g.overT = over ? g.overT + STEP : Math.max(0, g.overT - STEP * 2);
     if (g.best >= GOALS[g.level]) return win();
@@ -335,7 +336,7 @@ function tick(g, dt) {
 let last = performance.now();
 function frame(now) {
   const dt = (now - last) / 1000; last = now;
-  if (game && game.state === "running" && !$("overlay").classList.contains("show") && !document.querySelector(".spot")) tick(game, dt);
+  if (game && (game.state === "running" || game.state === "won") && !$("overlay").classList.contains("show") && !document.querySelector(".spot")) tick(game, dt);
   paint();
   requestAnimationFrame(frame);
 }
@@ -357,8 +358,9 @@ function drawNumber(c, l, x, y, r, p) {
 function paint() {
   if (!game) return;
   const k = size(), g = game;
-  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); const sx = g.shakeT > 0 && !matchMedia("(prefers-reduced-motion: reduce)").matches ? Math.sin(g.shakeT * 70) * 5 * (g.shakeT / SHAKE_FOR) : 0;   // the bowl wobbles while it's shaken
-  ctx.setTransform(k, 0, 0, k, sx * k, CAT * k);
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); // the bowl jolts and tilts while it's shaken, less as it settles
+  const sk = g.shakeT > 0 && !matchMedia("(prefers-reduced-motion: reduce)").matches ? g.shakeT / SHAKE_FOR : 0;
+  ctx.setTransform(k, 0, 0, k, 0, 0); ctx.translate(W / 2 + Math.sin(g.shakeT * 75) * 14 * sk, CAT + H / 2 + Math.cos(g.shakeT * 61) * 9 * sk); ctx.rotate(Math.sin(g.shakeT * 47) * .035 * sk); ctx.translate(-W / 2, -H / 2);
   // the bowl
   // gold at 15% strength on white
   ctx.fillStyle = "#FCF2DC"; ctx.beginPath(); ctx.roundRect(0, 0, W, H, [0, 0, 22, 22]); ctx.fill();
@@ -384,7 +386,7 @@ function paint() {
     const u = f.t / f.T, e = u * u * (3 - 2 * u), th = e * Math.PI * 2 * TUNE.WIND_TURNS, cs = Math.cos(th), sn = Math.sin(th), al = 1 - Math.max(0, (u - .5) / .5), r = RAD[f.l] * (1 - .25 * e);
     for (const [ox, oy, a0] of [[f.ox, f.oy, f.a0], [f.pxo, f.pyo, f.a1]]) drawBall(ctx, f.l, f.x + (ox * cs - oy * sn) * (1 - e), f.y + (ox * sn + oy * cs) * (1 - e), r, a0 + th * TUNE.WIND_SPIN, al, f.p);
   }
-  for (const f of g.fx) if (!f.wind) { ctx.save(); ctx.globalAlpha = 1 - f.t / .4; ctx.strokeStyle = f.c; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(f.x, f.y, f.r * (1 + f.t * 1.1), 0, 7); ctx.stroke(); ctx.restore(); }
+  for (const f of g.fx) if (!f.wind && f.t >= 0) { ctx.save(); ctx.globalAlpha = 1 - f.t / f.T; ctx.strokeStyle = f.c; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(f.x, f.y, f.r * (1 + (f.t / f.T) * (f.grow || .44)), 0, 7); ctx.stroke(); ctx.restore(); }
   if (["ready", "running"].includes(g.state)) { drawBall(ctx, nl, ax, RAD[nl] + 2, RAD[nl], 0, g.cool > 0 ? .25 : .85, nb.p); if (g.cool <= 0) drawNumber(ctx, nl, ax, RAD[nl] + 2, RAD[nl], nb.p); }
   // the rim, and the bowl's outline
   ctx.strokeStyle = "#2A2530"; ctx.lineWidth = 5; ctx.lineJoin = "round";
@@ -431,14 +433,14 @@ addEventListener("keydown", e => {
   else if (k === "p" || k === "P") game.state === "paused" ? resume() : pause();
   else if (k === "s" || k === "S") shake();
 });
-// Shake: every ball is thrown up and sideways, so a stuck pile loosens. It costs the gold paw, and the balls get a moment
-// before they count as over the line again.
+// Shake: the bowl jolts and every ball is thrown up and sideways, so a stuck pile loosens. It costs the gold paw, and the balls
+// get a few seconds before they count as over the line again.
 function shake() {
   const g = game;
   if (!g || g.state !== "running" || $("overlay").classList.contains("show") || document.querySelector(".spot")) return;
   if (g.shakeCool > 0) { G.note("Give the yarn a moment to settle.", 1800); return; }
-  for (const b of g.balls) { const lift = 380 / Math.sqrt(b.r / 11) * (.55 + Math.random() * .6); b.vy -= lift; b.vx += (Math.random() - .5) * 360; b.w = (Math.random() - .5) * 2 * TUNE.SPIN; b.age = 0; }
-  g.overT = 0; g.shakeT = SHAKE_FOR; g.shakeCool = 2.5;
+  for (const b of g.balls) { const lift = 1050 / Math.sqrt(b.r / 11) * (.55 + Math.random() * .6); b.vy -= lift; b.vx += (Math.random() - .5) * 700; b.w = (Math.random() - .5) * 2 * TUNE.SPIN * 2; b.age = -2.5; }
+  g.overT = 0; g.shakeT = SHAKE_FOR; g.shakeCool = 3;
   if (!g.shook) G.note("Shaken! That costs the gold paw this time.", 3500);
   g.shook = true; save();
 }
@@ -465,6 +467,9 @@ function lose() {
 }
 function win() {
   game.state = "won"; G.finishClock(game);
+  // a finale: the finished ball pops up and rings of colour spread out from it, before the card
+  const top = game.balls.find(b => b.l === GOALS[game.level] && !b.p);
+  if (top) { top.pop = .7; top.born = 1; ["#ECA818", "#E16A4A", "#B94588"].forEach((c, k) => game.fx.push({x: top.x, y: top.y, r: top.r, t: -k * .22, T: .9, c, grow: 1.4})); }
   const first = !settings.tries[game.level], next = Math.min(MAX_LEVEL, game.level + 1);
   settings.tries[game.level] = 0; settings.level = next; $("levelSel").value = next; save(); status();
   G.track(`Wind Up won level ${game.level}`);
@@ -476,7 +481,7 @@ function win() {
     G.winCard(text, () => { closeCard(); startLevel(next); }, "Admire the yarn", g.result,
       {title: "All wound up!", gold: first && !g.shook, goldWhy: "First try, no shakes!", goldTitle: "Even Peanut is impressed!", goldPic: [im], next: next > g.level ? `Next: level ${next}` : "Next bowl",
        after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
-  }, 800);
+  }, 1700);
 }
 function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); closeCard(); newGame(n); }
 const leave = () => { if (["running", "paused"].includes(game.state)) { settings.tries[game.level] = (settings.tries[game.level] || 0) + 1; save(); } closeCard(); };
