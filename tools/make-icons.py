@@ -837,16 +837,18 @@ def kittencaboodle():
     return frame(tint(LIME, .2), out)
 
 
-# Wind Up: Gus on a bowl of yarn, a big teal ball and a plum one in it, and a small yellow ball dropping in.
+# Wind Up: Gus above a wicker basket of yarn, a big teal ball and a plum one in it, and a small yellow ball dropping in.
 def windup():
-    gus = (catface(50, 24, 11, "#A8A7AE").split("<circle")[0]
-           + f'<path d="M{50-11*.42} {24-11*.2}L{50-11*.3} {24-11*.5}L50 {24-11*.3}L{50+11*.3} {24-11*.5}L{50+11*.42} {24-11*.2}" stroke="#5E5866" stroke-width="1.6" fill="none" stroke-linecap="round"/>'
-           f'<circle cx="{50-11*.38}" cy="{24+11*.1}" r="{11*.16}" fill="{LIME}"/><circle cx="{50+11*.38}" cy="{24+11*.1}" r="{11*.16}" fill="{LIME}"/>')
-    out = f'<path d="M12 52H88Q88 90 50 90Q12 90 12 52Z" fill="{tint(YELLOW, .5)}" stroke="{INK}" stroke-width="3" stroke-linejoin="round"/>'
-    out += yarnball(35, 68, 16, TEAL) + yarnball(66, 72, 12.5, PLUM) + yarnball(52, 53, 7.5, YELLOW)
-    out += f'<path d="M12 52H88" stroke="{INK}" stroke-width="3" stroke-linecap="round"/>'
+    gus = (catface(50, 22, 11, "#A8A7AE").split("<circle")[0]
+           + f'<path d="M{50-11*.42} {22-11*.2}L{50-11*.3} {22-11*.5}L50 {22-11*.3}L{50+11*.3} {22-11*.5}L{50+11*.42} {22-11*.2}" stroke="#5E5866" stroke-width="1.6" fill="none" stroke-linecap="round"/>'
+           f'<circle cx="{50-11*.38}" cy="{22+11*.1}" r="{11*.16}" fill="{LIME}"/><circle cx="{50+11*.38}" cy="{22+11*.1}" r="{11*.16}" fill="{LIME}"/>')
+    wicker = "#BB871E"   # gold, a quarter ink, as the basket in the game
+    out = yarnball(35, 56, 15, TEAL) + yarnball(65, 59, 12, PLUM) + yarnball(52, 40, 7.5, YELLOW)
+    out += f'<path d="M14 62H86L80 90H20Z" fill="{tint(YELLOW, .75)}" stroke="{INK}" stroke-width="3" stroke-linejoin="round"/>'
+    out += "".join(f'<path d="M{x} 64V88" stroke="{wicker}" stroke-width="2"/>' for x in range(24, 80, 8))
+    out += "".join(f'<path d="M{17 + (y - 62) * 6 / 28} {y}H{83 - (y - 62) * 6 / 28}" stroke="{wicker}" stroke-width="2.4" stroke-dasharray="4 4" stroke-dashoffset="{(y // 7) % 2 * 4}"/>' for y in (70, 77, 84))
+    out += f'<rect x="10" y="58" width="80" height="8" rx="4" fill="{wicker}" stroke="{INK}" stroke-width="2.5"/>'
     return frame(PAPER, out + gus)
-
 
 
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
