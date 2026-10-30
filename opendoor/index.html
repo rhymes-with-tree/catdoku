@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-30.3"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-30.4"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-30.3">
+<link rel="stylesheet" href="../games.css?v=2026-10-30.4">
 <style>
 /* A KenKen house: every row and column holds 1 to N once, and walls split the floor into rooms whose numbers
    must make the room's sign. Each room has a door that opens when the room is right; with every door open,
@@ -102,14 +102,14 @@
 
 </main>
 
-<script src="../games.js?v=2026-10-30.3"></script>
+<script src="../games.js?v=2026-10-30.4"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N grid where every row and column holds 1 to N once, cut into rooms (cages). Each room has a sign:
 // a number and a sum (+), difference (−), product (×) or quotient (÷) its numbers make. A room of one
-// square just shows its number. Levels: [size, the signs it uses, how big rooms get].
+// square just shows its number. Levels: [size, the signs it uses, whether it can be solved without a guess].
 function levelOf(n) {
-  return [null, [4, "+-"], [5, "+-"], [5, "+-x/"], [6, "+-x/"], [7, "+-x/"], [8, "+-x/"], [9, "+-x/"]][n];
+  return [null, [4, "+-", 1], [5, "+-", 1], [5, "+-x/", 1], [6, "+-x/", 1], [7, "+-x/", 1], [8, "+-x/", 1], [9, "+-x/", 0]][n];
 }
 // A random full grid: fill square by square with numbers in a random order, backing up when stuck
 // (and starting over if it takes too long).
@@ -185,6 +185,7 @@ function pickSign(cells, sol, ops) {
 }
 // Every answer to a puzzle, counted up to `limit` (and the first one found). Each room keeps the list of
 // ways its numbers could go; numbers are ruled out square by square until one is left or it has to guess.
+// `stuck` lists the squares still open when it first had to guess (none if it never did).
 function solveRooms(N, cages, limit = 2) {
   const full = (1 << (N + 1)) - 2, at = new Array(N * N), tuples = [];
   cages.forEach((cg, k) => {
@@ -240,23 +241,25 @@ function solveRooms(N, cages, limit = 2) {
     if (!settle(dom, alive)) return;
     let best = -1, bn = 99;
     for (let i = 0; i < N * N; i++) { const n = ones(dom[i]); if (n > 1 && n < bn) { bn = n; best = i; } }
+    if (best >= 0 && !go.stuck) go.stuck = dom.map((m, i) => ones(m) > 1 ? i : -1).filter(i => i >= 0);
     if (best < 0) { found++; if (!first) first = dom.map(m => Math.log2(m)); else go.second = dom.map(m => Math.log2(m)); return; }
     for (let v = 1; v <= N; v++) if (dom[best] & bit(v)) { const d = dom.slice(); d[best] = bit(v); go(d, alive.slice()); }
   }
   go(new Array(N * N).fill(full), tuples.slice());
-  return {count: steps > 20000 ? -1 : found, first, second: go.second || null};
+  return {count: steps > 20000 ? -1 : found, first, second: go.second || null, stuck: go.stuck || []};
 }
 // Make a puzzle: a full grid, rooms, and a sign on each. While two answers fit, a room where they differ
-// gets a new sign, or is split in two, and it's checked again.
+// gets a new sign, or is split in two, and it's checked again. On a level that needs no guess, a room where
+// the solver got stuck is changed the same way until it never has to guess.
 function makePuzzle(n) {
-  const [N, ops] = levelOf(n);
+  const [N, ops, logic] = levelOf(n);
   for (;;) {
     const sol = randomLatin(N), cages = makeRooms(N).map(cells => ({cells, ...pickSign(cells, sol, ops)}));
     for (let tries = 0; tries < 40; tries++) {
       const r = solveRooms(N, cages);
-      if (r.count === 1) return {N, cages: cages.map(c => [c.cells, c.t, c.op])};
-      if (r.count < 0 || !r.second) break;
-      const diff = r.first.map((v, i) => v !== r.second[i] ? i : -1).filter(i => i >= 0);
+      if (r.count === 1 && !(logic && r.stuck.length)) return {N, cages: cages.map(c => [c.cells, c.t, c.op])};
+      if (r.count < 0 || (r.count !== 1 && !r.second)) break;
+      const diff = r.count === 1 ? r.stuck : r.first.map((v, i) => v !== r.second[i] ? i : -1).filter(i => i >= 0);
       const d = diff[Math.floor(Math.random() * diff.length)], k = cages.findIndex(c => c.cells.includes(d)), cg = cages[k];
       if (cg.cells.length > 2 && Math.random() < 0.5) {
         // split the room: the square on its own goes with a neighbour from the room, if it has one
@@ -280,7 +283,7 @@ let game = state.game || null, busy = false, sel = -1, noting = false, running =
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
 const OPS = {"+": "+", "-": "−", "x": "×", "/": "÷", "": ""};
-const levelName = n => { const [N, ops] = levelOf(n); return `Level ${n} · ${N} × ${N}${ops === "+-" ? ", + and − only" : ""}`; };
+const levelName = n => { const [N, ops, logic] = levelOf(n); return `Level ${n} · ${N} × ${N}${ops === "+-" ? ", + and − only" : ""}${logic ? "" : ", may need a guess"}`; };
 const build = G.builder([levelOf, randomLatin, cageValue, makeRooms, pickSign, solveRooms, makePuzzle], "makePuzzle");
 // floor colours for the rooms (no two rooms side by side match), and each one lit up once its room is right
 const FLOORS = [["#EFE2CC", "#FFF4D6"], ["#DDE7D6", "#F1FBE6"], ["#E2DDEC", "#F6F1FF"], ["#EDD9D3", "#FFEFE8"], ["#D8E4E6", "#EEFAFB"]];
