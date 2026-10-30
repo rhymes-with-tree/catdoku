@@ -1057,6 +1057,7 @@ const G = (() => {
     go: '<circle cx="16" cy="16" r="11"/><path d="M11 16h10M17 11.5l4.5 4.5-4.5 4.5"/>',
     sight: '<circle cx="16" cy="16" r="10"/><circle cx="16" cy="16" r="4.5"/><path d="M16 3v5M16 24v5M3 16h5M24 16h5"/>',
     catnip: '<path d="M7 25C7 13 14 6 26 6c0 12-7 19-19 19z"/><path d="M7 25l11-11"/>',
+    roller: '<rect x="5" y="5" width="17" height="9" rx="3"/><path d="M22 9.5h4.5V19H15v4"/><rect x="12.5" y="23" width="5" height="6" rx="1.2"/>',
     bubbleshake: '<circle cx="13" cy="18" r="7"/><circle cx="23" cy="9" r="3.5"/><path d="M24 20l3 2M25 15.5h3.5"/>',
     basketshake: '<path d="M6 14h20l-2.5 11h-15z"/><path d="M11 14l4-6M21 14l-4-6"/><path d="M3 10l2 2M29 10l-2 2M3 18l2-1M29 18l-2-1"/>',
     losecolor: '<path d="M5 21a11 11 0 0 1 22 0"/><path d="M9.5 21a6.5 6.5 0 0 1 13 0"/><path d="M19 27h9"/>',
@@ -1074,7 +1075,7 @@ const G = (() => {
     allNotesBtn: "pencils", clearNotesBtn: "erase", eraseBtn: "erase", pauseBtn: "pause", guessBtn: "guess", giveUpBtn: "giveup",
     keepBtn: "keep", shuffleBtn: "shuffle", flipBtn: "flip", finishBtn: "near", completeBtn: "check", skipBtn: "skip",
     colBtn: "palette", linkBtn: "share", toysBtn: "toys", bestBtn: "best", helpBtn: "help", zoomIn: "zoomin", zoomOut: "zoomout", zoomFit: "fit",
-    sightBtn: "sight", nipBtn: "catnip", shakeBtn: "bubbleshake", rainbowBtn: "losecolor", basketBtn: "basketadd", wipeBtn: "wipe",
+    sightBtn: "sight", nipBtn: "catnip", shakeBtn: "bubbleshake", fluffBtn: "roller", rainbowBtn: "losecolor", basketBtn: "basketadd", wipeBtn: "wipe",
     chooseBtn: "keyboard", revealBtn: "giveup"};
   // buttons that keep their own look with an icon in front of the word: every New (a +) and Catlas's Go (an arrow)
   const LEAD = {newBtn: "plus", sNewBtn: "plus", goBtn: "go", settingsSum: "sliders"};

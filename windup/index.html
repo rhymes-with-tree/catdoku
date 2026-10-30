@@ -87,6 +87,7 @@ body.full .bar{width:auto;grid-column:3;grid-row:4;align-self:center}
     <button id="pauseBtn">Pause</button>
     <button id="restartBtn">Restart</button>
     <button id="shakeBtn">Shake</button>
+    <button id="fluffBtn">De-fluff</button>
     <button id="linkBtn">Share</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
@@ -200,7 +201,7 @@ let game = null;
 const cv = $("cv"), ctx = cv.getContext("2d");
 const nextOf = g => dropFor(g.seed, g.i, LV[g.level]);
 const save = () => G.save(STORE, {settings, game: game && ["running", "paused"].includes(game.state) ? {
-  level: game.level, seed: game.seed, i: game.i, score: game.score, best: game.best, ms: game.ms, started: game.started, timed: game.timed, shook: !!game.shook,
+  level: game.level, seed: game.seed, i: game.i, score: game.score, best: game.best, ms: game.ms, started: game.started, timed: game.timed, shook: !!game.shook, fluffed: !!game.fluffed,
   balls: game.balls.map(b => [Math.round(b.x * 10) / 10, Math.round(b.y * 10) / 10, b.l, Math.round(b.a * 100) / 100, b.p ? 1 : 0])} : null});
 
 function newGame(n, seed) {
@@ -218,6 +219,8 @@ function status() {
   $("bestTxt").textContent = game.best ? `Biggest so far: ${game.best}` : "";
   G.relabel($("pauseBtn"), game.state === "paused" ? "Go on" : "Pause", game.state === "paused" ? "play" : "pause");
   $("shakeBtn").disabled = game.state !== "running";
+  $("fluffBtn").hidden = !LV[game.level].pom[0];   // only on levels that have fluffballs
+  $("fluffBtn").disabled = game.state !== "running" || !!game.fluffed;
   $("pauseBtn").disabled = !["running", "paused"].includes(game.state);
 }
 
@@ -386,7 +389,8 @@ function paint() {
     const u = f.t / f.T, e = u * u * (3 - 2 * u), th = e * Math.PI * 2 * TUNE.WIND_TURNS, cs = Math.cos(th), sn = Math.sin(th), al = 1 - Math.max(0, (u - .5) / .5), r = RAD[f.l] * (1 - .25 * e);
     for (const [ox, oy, a0] of [[f.ox, f.oy, f.a0], [f.pxo, f.pyo, f.a1]]) drawBall(ctx, f.l, f.x + (ox * cs - oy * sn) * (1 - e), f.y + (ox * sn + oy * cs) * (1 - e), r, a0 + th * TUNE.WIND_SPIN, al, f.p);
   }
-  for (const f of g.fx) if (!f.wind && f.t >= 0) { ctx.save(); ctx.globalAlpha = 1 - f.t / f.T; ctx.strokeStyle = f.c; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(f.x, f.y, f.r * (1 + (f.t / f.T) * (f.grow || .44)), 0, 7); ctx.stroke(); ctx.restore(); }
+  for (const f of g.fx) if (f.puff) { const u = f.t / f.T; drawBall(ctx, f.l, f.x, f.y, f.r * (1 + .5 * u), f.a, 1 - u, true); }
+  for (const f of g.fx) if (!f.wind && !f.puff && f.t >= 0) { ctx.save(); ctx.globalAlpha = 1 - f.t / f.T; ctx.strokeStyle = f.c; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(f.x, f.y, f.r * (1 + (f.t / f.T) * (f.grow || .44)), 0, 7); ctx.stroke(); ctx.restore(); }
   if (["ready", "running"].includes(g.state)) { drawBall(ctx, nl, ax, RAD[nl] + 2, RAD[nl], 0, g.cool > 0 ? .25 : .85, nb.p); if (g.cool <= 0) drawNumber(ctx, nl, ax, RAD[nl] + 2, RAD[nl], nb.p); }
   // the rim, and the bowl's outline
   ctx.strokeStyle = "#2A2530"; ctx.lineWidth = 5; ctx.lineJoin = "round";
@@ -432,6 +436,7 @@ addEventListener("keydown", e => {
   else if (k === "ArrowDown" || k === " " || k === "Enter") { if (e.target.closest("button")) return; e.preventDefault(); if (game.state === "paused") resume(); else drop(); }
   else if (k === "p" || k === "P") game.state === "paused" ? resume() : pause();
   else if (k === "s" || k === "S") shake();
+  else if (k === "l" || k === "L") defluff();
 });
 // Shake: the bowl jolts and every ball is thrown up and sideways, so a stuck pile loosens. It costs the gold paw, and the balls
 // get a few seconds before they count as over the line again.
@@ -444,6 +449,18 @@ function shake() {
   if (!g.shook) G.note("Shaken! That costs the gold paw this time.", 3500);
   g.shook = true; save();
 }
+// De-fluff: a lint roller that takes every fluffball off the board, once a board. It costs the gold paw.
+function defluff() {
+  const g = game;
+  if (!g || g.state !== "running" || g.fluffed || $("overlay").classList.contains("show") || document.querySelector(".spot")) return;
+  const fluff = g.balls.filter(b => b.p);
+  if (!fluff.length) { G.note("No fluffballs on the board right now. You only get one go, so save it.", 3500); return; }
+  for (const b of fluff) g.fx.push({puff: true, l: b.l, x: b.x, y: b.y, r: b.r, a: b.a, t: 0, T: .45});
+  g.balls = g.balls.filter(b => !b.p); g.fluffed = true;
+  G.note("All the fluff is gone. That costs the gold paw this time.", 3500);
+  status(); save();
+}
+$("fluffBtn").onclick = () => defluff();
 $("shakeBtn").onclick = () => shake();
 function pause() { if (game && game.state === "running") { game.state = "paused"; $("tapgo").hidden = false; $("tapgo").textContent = "Paused · tap to go on"; status(); save(); } }
 function resume() { if (game && game.state === "paused") { game.state = "running"; $("tapgo").hidden = true; status(); } }
@@ -479,7 +496,7 @@ function win() {
     const im = new Image(); im.className = "pic"; im.src = catSrc("kitten-1"); im.alt = "Gus and Peanut as kittens, sitting side by side";
     const text = `A size ${GOALS[g.level]} ball, with ${g.score} points.` + (g.level === MAX_LEVEL ? " That's the biggest ball there is; here it is again." : ` Next up: level ${next}.`);
     G.winCard(text, () => { closeCard(); startLevel(next); }, "Admire the yarn", g.result,
-      {title: "All wound up!", gold: first && !g.shook, goldWhy: "First try, no shakes!", goldTitle: "Even Peanut is impressed!", goldPic: [im], next: next > g.level ? `Next: level ${next}` : "Next bowl",
+      {title: "All wound up!", gold: first && !g.shook && !g.fluffed, goldWhy: "First try, no helpers!", goldTitle: "Even Peanut is impressed!", goldPic: [im], next: next > g.level ? `Next: level ${next}` : "Next bowl",
        after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
   }, 1700);
 }
@@ -510,6 +527,7 @@ function helpOnFirstVisit() {
     ...(LV[game.level].pom[0] ? [{say: "Fluffballs wind only with fluffballs", els: [$("nextCv")]}] : []),
     {say: "Don't pile yarn above the line", lit: line, tone: "ok"},
     {say: "Stuck? Shake the bowl", els: [$("shakeBtn")]},
+    ...(LV[game.level].pom[0] ? [{say: "Once a board, De-fluff clears the fluffballs", els: [$("fluffBtn")]}] : []),
   ];
   G.spotlight({grid: cv, w: cols, h: rows, steps, done: () => { settings.seenHelp = true; save(); }});
 }
@@ -534,7 +552,7 @@ if (!openedShare) {
   const s = state.game;
   if (s && s.level === settings.level && Array.isArray(s.balls) && s.balls.every(b => Array.isArray(b) && b[2] >= 1 && b[2] <= MAXL)) {
     newGame(s.level, s.seed);
-    Object.assign(game, {i: s.i, score: s.score, best: s.best, ms: s.ms || 0, started: s.started, timed: s.timed !== false, shook: !!s.shook,
+    Object.assign(game, {i: s.i, score: s.score, best: s.best, ms: s.ms || 0, started: s.started, timed: s.timed !== false, shook: !!s.shook, fluffed: !!s.fluffed,
       balls: s.balls.map(([x, y, l, a, p]) => mk(x, y, l, {a, age: 5, p: !!p})), state: "paused"});
     G.checkClock && G.checkClock(game);
     $("tapgo").hidden = false; $("tapgo").textContent = "Paused · tap to go on"; status(); paintHud();
