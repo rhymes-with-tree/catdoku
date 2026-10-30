@@ -107,7 +107,7 @@ each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the 
   `laya-8` have a hand in them, and `laya-1`, `laya-6` and `laya-7` are cut off partway.
 - **Gus** (`gus-…`, grey tabby: light, cool grey with taupe undertones, green eyes, a white and taupe muzzle and
   chin, short-haired, a moderately sized cat) looks like Higgins, but they're two different cats: Gus has none of
-  Higgins's weight or thick neck. Gus is friends with Peanut, Marmalade and Willow. He stars in Wind Up with Peanut: `gus-12` (sitting, front) is on the bowl's rim, following where the yarn will drop, and beside the title. From his sheet: `gus-1` his face, large; `gus-2` sitting (from above); `gus-3`
+  Higgins's weight or thick neck. Gus is friends with Peanut, Marmalade and Willow. He stars in Wind Up with Peanut: `gus-12` (sitting, front) is on the basket's rim, following where the yarn will drop, and beside the title. From his sheet: `gus-1` his face, large; `gus-2` sitting (from above); `gus-3`
   sitting (side); `gus-4` curled up (from above); `gus-5` sleeping (side); `gus-6` his face, smaller; `gus-7` knocking
   a cup over; `gus-8` pouncing; `gus-9` belly up; `gus-10` sitting (from behind); `gus-11` walking (from above);
   `gus-12` sitting (front); `gus-13` stretched out; `gus-14` his tail.
