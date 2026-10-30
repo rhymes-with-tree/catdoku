@@ -333,7 +333,7 @@ Ten levels, each a little harder: a goal ball from size 6 up to 10, bigger balls
 
 ## Toy library
 
-`toys/` holds 32 cat toy pictures for any game to use: 256 × 256 WebP with a clear background, named by what they are (`wiffle-red`, `fish`, `cork-paw`…). The ones in `toys/` are recoloured to the games' palette; `toys/original/` has the same toys in their first colours, and `toys/earlier/` an earlier set.
+`toys/` holds 32 cat toy pictures for any game to use: 256 × 256 WebP with a clear background, named by what they are (`wiffle-red`, `fish`, `cork-paw`…). The ones in `toys/` are recoloured to the games' palette; `toys/original/` has the same toys in their first colours, and `toys/earlier/` an earlier set. `toys/sheets/` keeps uncut sheets for later: `springs.webp` (1312 × 1199) is the owner's sheet of coil springs, ten rows in Wind Up's yarn colours in the same order (gold, slate, coral, teal, plum, lime, periwinkle, brick, lavender, green) and nine poses across (standing, tilted both ways, end-on, lying flat, bent into an arc). It isn't cut into toys yet: its background is only partly clear, with coloured fringes round each spring to clean off first.
 
 ## Ideas
 
