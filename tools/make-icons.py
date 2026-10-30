@@ -837,10 +837,22 @@ def kittencaboodle():
     return frame(tint(LIME, .2), out)
 
 
+# Wind Up: Gus on a bowl of yarn, a big teal ball and a plum one in it, and a small yellow ball dropping in.
+def windup():
+    gus = (catface(50, 24, 11, "#A8A7AE").split("<circle")[0]
+           + f'<path d="M{50-11*.42} {24-11*.2}L{50-11*.3} {24-11*.5}L50 {24-11*.3}L{50+11*.3} {24-11*.5}L{50+11*.42} {24-11*.2}" stroke="#5E5866" stroke-width="1.6" fill="none" stroke-linecap="round"/>'
+           f'<circle cx="{50-11*.38}" cy="{24+11*.1}" r="{11*.16}" fill="{LIME}"/><circle cx="{50+11*.38}" cy="{24+11*.1}" r="{11*.16}" fill="{LIME}"/>')
+    out = f'<path d="M12 52H88Q88 90 50 90Q12 90 12 52Z" fill="{tint(YELLOW, .5)}" stroke="{INK}" stroke-width="3" stroke-linejoin="round"/>'
+    out += yarnball(35, 68, 16, TEAL) + yarnball(66, 72, 12.5, PLUM) + yarnball(52, 53, 7.5, YELLOW)
+    out += f'<path d="M12 52H88" stroke="{INK}" stroke-width="3" stroke-linecap="round"/>'
+    return frame(PAPER, out + gus)
+
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")
