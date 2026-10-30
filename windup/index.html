@@ -473,19 +473,30 @@ $("pauseBtn").onclick = () => game && (game.state === "paused" ? resume() : paus
 document.addEventListener("visibilitychange", () => { if (document.hidden) pause(); });
 
 /* ---------- endings ---------- */
+// Going over the line: a card offers Shake or De-fluff to keep going (either costs the gold paw), or starting again.
+// The try only counts, and a win streak only ends, once the player gives up on this basket.
 function lose() {
-  G.breakStreak();
   game.state = "lost"; status();
-  settings.tries[game.level] = (settings.tries[game.level] || 0) + 1; save();
   G.track(`Wind Up overflowed on level ${game.level}`);
   const g = game;
   setTimeout(() => {
     if (game !== g) return;
-    G.openCard("Over the line!", `The yarn piled up too high, with ${g.score} points and a size ${g.best || 1} ball.`,
-      [["Try again", () => { closeCard(); newGame(g.level, g.seed); }, true], ["New basket", () => { closeCard(); newGame(g.level); }],
-       ["Admire the mess", () => { closeCard(); G.note("Tap Restart to try again.", 0); }]],
-      null, G.otherSize($("levelSel"), g.level, startLevel, "Or play a different level:"));
+    const fluff = !!LV[g.level].pom[0] && !g.fluffed && g.balls.some(b => b.p);
+    const keepOn = [["Shake and keep going", () => { closeCard(); revive(g, "shake"); }, true]];
+    if (fluff) keepOn.push(["De-fluff and keep going", () => { closeCard(); revive(g, "fluff"); }]);
+    G.openCard("Over the line!", `The yarn piled up too high, with ${g.score} points and a size ${g.best || 1} ball. Shake${fluff ? " or De-fluff" : ""} to keep going, or start again.`,
+      [...keepOn, ["Try again", () => { closeCard(); giveUp(g); newGame(g.level, g.seed); }], ["New basket", () => { closeCard(); giveUp(g); newGame(g.level); }],
+       ["Admire the mess", () => { closeCard(); giveUp(g); G.breakStreak(); G.note("Tap Restart to try again.", 0); }]],
+      null, G.otherSize($("levelSel"), g.level, n => { giveUp(g); startLevel(n); }, "Or play a different level:"));
   }, 700);
+}
+function giveUp(g) { if (!g.counted) { g.counted = true; settings.tries[g.level] = (settings.tries[g.level] || 0) + 1; save(); } }
+function revive(g, how) {
+  if (game !== g || g.state !== "lost") return;
+  g.state = "running"; g.overT = 0; $("tapgo").hidden = true;
+  if (how === "shake") { g.shakeCool = 0; shake(); }
+  else { defluff(); for (const b of g.balls) b.age = Math.min(b.age, 0); }   // a moment before anything counts as over the line
+  status(); save();
 }
 function win() {
   game.state = "won"; G.finishClock(game);
@@ -506,7 +517,7 @@ function win() {
   }, 1700);
 }
 function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); closeCard(); newGame(n); }
-const leave = () => { if (["running", "paused"].includes(game.state)) { settings.tries[game.level] = (settings.tries[game.level] || 0) + 1; save(); } closeCard(); };
+const leave = () => { if (["running", "paused"].includes(game.state)) { settings.tries[game.level] = (settings.tries[game.level] || 0) + 1; save(); } else if (game.state === "lost") giveUp(game); closeCard(); };
 $("restartBtn").onclick = () => { if (game) { leave(); newGame(game.level, game.seed); } };
 $("newBtn").onclick = () => { if (game) { leave(); newGame(game.level); } };
 // Share: the level and the order the yarn comes in, as dealt.
