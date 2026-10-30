@@ -107,13 +107,13 @@ each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the 
   `laya-8` have a hand in them, and `laya-1`, `laya-6` and `laya-7` are cut off partway.
 - **Gus** (`gus-…`, grey tabby: light, cool grey with taupe undertones, green eyes, a white and taupe muzzle and
   chin, short-haired, a moderately sized cat) looks like Higgins, but they're two different cats: Gus has none of
-  Higgins's weight or thick neck. Gus is friends with Peanut, Marmalade and Willow. He doesn't star in a game yet. From his sheet: `gus-1` his face, large; `gus-2` sitting (from above); `gus-3`
+  Higgins's weight or thick neck. Gus is friends with Peanut, Marmalade and Willow. He stars in Wind Up with Peanut: `gus-12` (sitting, front) is on the bowl's rim, following where the yarn will drop, and beside the title. From his sheet: `gus-1` his face, large; `gus-2` sitting (from above); `gus-3`
   sitting (side); `gus-4` curled up (from above); `gus-5` sleeping (side); `gus-6` his face, smaller; `gus-7` knocking
   a cup over; `gus-8` pouncing; `gus-9` belly up; `gus-10` sitting (from behind); `gus-11` walking (from above);
   `gus-12` sitting (front); `gus-13` stretched out; `gus-14` his tail.
 - **Peanut** (`peanut-…`, solid black shorthair with green eyes, very petite and thin, a delicate build) is little,
   and often grumpy, though her sheet doesn't show it. Peanut isn't Dottie, who is stocky with two cricks in her tail.
-  Peanut is friends with Gus, Marmalade and Willow. She doesn't star in a game yet. From her sheet: `peanut-1` her face, large; `peanut-2`
+  Peanut is friends with Gus, Marmalade and Willow. She stars in Wind Up with Gus: `peanut-12` (sitting, front) watches beside the next ball. From her sheet: `peanut-1` her face, large; `peanut-2`
   sitting (from above); `peanut-3` sitting (side); `peanut-4` curled up (from above); `peanut-5` sleeping (side);
   `peanut-6` her face, smaller; `peanut-7` asleep in a round bed; `peanut-8` knocking a ball; `peanut-9` pouncing;
   `peanut-10` sitting (from behind); `peanut-11` walking (from above); `peanut-12` sitting (front); `peanut-13`
@@ -123,7 +123,7 @@ each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the 
   is one of the kittens), with kitten Marmalade and Willow; the mother cats there are general cats, not Gus's or Peanut's
   parents. Kitten Caboodle gives each word one of `kitten-2`, `-3`, `-5`, `-6` and `-8` or Marmalade's and Willow's kittens
   awake (the list `KITTENS`), grey until its word is spelled, and `kitten-7` is on the gold-paw card.
-  `kitten-1` Gus and Peanut sitting side by side; `kitten-2` Gus on his back, paws up; `kitten-3` Peanut sitting, head
+  `kitten-1` Gus and Peanut sitting side by side (on Wind Up's gold-paw card); `kitten-2` Gus on his back, paws up; `kitten-3` Peanut sitting, head
   tilted; `kitten-4` Gus curled up asleep; `kitten-5` Peanut batting a purple ball of yarn; `kitten-6` Gus in a cardboard
   box; `kitten-7` Gus asleep on top of Peanut; `kitten-8` Gus walking, tail up. (`kitten-star` is Fred as a kitten; see Fred.)
 - **Marmalade** (`marmalade-…`, a fluffy orange cat: a very long, fluffy coat with a full ruff and a plume of a tail,
