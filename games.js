@@ -63,6 +63,10 @@ const G = (() => {
     ["quick", "Kitten Play", "Match, pop, sort and chase"],
     ["travels", "Cat Travels", "Countries, maps and places"],
   ];
+  // A shelf's games, A to Z by name (ignoring punctuation, so L-M-N-O-Pom sits among the Ls). GAMES itself keeps its own
+  // order, which today's challenge takes its turns from.
+  const onShelf = key => GAMES.filter(g => g[4] === key)
+    .sort((a, b) => a[0].replace(/[^A-Za-z0-9 ]/g, "").localeCompare(b[0].replace(/[^A-Za-z0-9 ]/g, ""), "en", {sensitivity: "base"}));
   // Each shelf's colour: its games' tiles on the front page and in the games menu, and its label and shortcut.
   const SHELF_COLOUR = {logic: "#BD5538", numbers: "#ECA818", lines: "#73A7AE", words: "#B94588", teasers: "#7885BA", quick: "#6AA673", travels: "#4E577D"};
   const $ = id => document.getElementById(id);
@@ -205,7 +209,7 @@ const G = (() => {
       favs.querySelector(".gamesGrid").replaceChildren(...list.map(tile));
       favs.hidden = !list.length || !!search.value.trim();
     }
-    const shelves = GROUPS.map(([key, title]) => section(title, GAMES.filter(g => g[4] === key), key));
+    const shelves = GROUPS.map(([key, title]) => section(title, onShelf(key), key));
     const none = document.createElement("p"); none.className = "gamesNone"; none.hidden = true; none.textContent = "No games match that.";
     const dslug = daily(), dgame = GAMES.find(g => g[1] === dslug);
     const todays = section(dailyDoneToday() ? "Today's challenge: done" : "Today's challenge", [dgame]);
@@ -1238,6 +1242,6 @@ const G = (() => {
     }
   }
 
-  return {GAMES, GROUPS, SHELF_COLOUR, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, relabel, icon: iconSVG, guesser, meaning, plainText,
+  return {GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, relabel, icon: iconSVG, guesser, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();
