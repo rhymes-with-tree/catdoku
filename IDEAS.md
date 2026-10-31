@@ -121,6 +121,6 @@ Rows are sorted by group, then status: Yes, Look closer, Option, Idea, Built, No
 
 **For games already on the site:** more medium-sized cats and bigger sunbeams in Sunbeams, zoom in Hide & Seek (it has full screen for now), and sound to replace the buzzing and purring that were taken out.
 
-**Art saved for later:** the owner's sheet of coil springs, `toys/sheets/springs.webp`: ten rows in the yarn colours (gold, slate, coral, teal, plum, lime, periwinkle, brick, lavender, green, the same order as Wind Up's balls) and nine poses each (standing, tilted, end-on, lying flat, bent into an arc). For any game that wants bouncy springs; it needs its coloured fringes cleaned off and cutting into toys first.
+**Art saved for later:** the owner's sheet of coil springs, `toys/sheets/springs.webp`: ten rows in the yarn colours (gold, slate, coral, teal, plum, lime, periwinkle, brick, lavender, green, the same order as Wind Up's balls) and nine poses each (standing, tilted, end-on, lying flat, bent into an arc). For any game that wants bouncy springs; it needs its coloured fringes cleaned off and cutting into toys first. Better for a game: `toys/sheets/springs-grey.webp`, the same nine poses in neutral grey, clean, and big enough (170 to 470 pixels a spring), to tint to any colour (see the README's Toy library).
 
 **Names saved for later:** kindle (a group of kittens) and clowder (a group of cats), the owner's favourites, kept for a game or a mode that suits them. Kaleidocat is saved too (see its row).
