@@ -63,6 +63,10 @@ const G = (() => {
     ["quick", "Kitten Play", "Match, pop, sort and chase"],
     ["travels", "Cat Travels", "Countries, maps and places"],
   ];
+  // A shelf's games, A to Z by name (ignoring punctuation, so L-M-N-O-Pom sits among the Ls). GAMES itself keeps its own
+  // order, which today's challenge takes its turns from.
+  const onShelf = key => GAMES.filter(g => g[4] === key)
+    .sort((a, b) => a[0].replace(/[^A-Za-z0-9 ]/g, "").localeCompare(b[0].replace(/[^A-Za-z0-9 ]/g, ""), "en", {sensitivity: "base"}));
   // Each shelf's colour: its games' tiles on the front page and in the games menu, and its label and shortcut.
   const SHELF_COLOUR = {logic: "#BD5538", numbers: "#ECA818", lines: "#73A7AE", words: "#B94588", teasers: "#7885BA", quick: "#6AA673", travels: "#4E577D"};
   const $ = id => document.getElementById(id);
@@ -186,10 +190,9 @@ const G = (() => {
       a.className = "gameTile"; a.style.setProperty("--tile", SHELF_COLOUR[g[4]] || color);
       a.href = `${base}${slug}/`; a.dataset.slug = slug;
       if (slug === current) a.setAttribute("aria-current", "page");
-      if (mastered(slug)) { a.classList.add("gold"); a.title = "Mastered: a gold paw at the top level"; }
       const b = document.createElement("b"); b.textContent = name;
       const sm = document.createElement("small"); sm.textContent = slug === current ? "You're here" : blurb;
-      a.append(b, sm);
+      a.append(b, sm, ...(mastered(slug) ? [masterPill()] : []));
       // the star sits beside the link, not in it, so tapping it doesn't open the game
       const w = document.createElement("div"); w.className = "favWrap"; w.dataset.slug = slug;
       w.append(a, favStar(slug, drawFavs)); return w;
@@ -206,7 +209,7 @@ const G = (() => {
       favs.querySelector(".gamesGrid").replaceChildren(...list.map(tile));
       favs.hidden = !list.length || !!search.value.trim();
     }
-    const shelves = GROUPS.map(([key, title]) => section(title, GAMES.filter(g => g[4] === key), key));
+    const shelves = GROUPS.map(([key, title]) => section(title, onShelf(key), key));
     const none = document.createElement("p"); none.className = "gamesNone"; none.hidden = true; none.textContent = "No games match that.";
     const dslug = daily(), dgame = GAMES.find(g => g[1] === dslug);
     const todays = section(dailyDoneToday() ? "Today's challenge: done" : "Today's challenge", [dgame]);
@@ -372,11 +375,19 @@ const G = (() => {
   }
   // Gold paws earned on this device, counted per game by the win card. A win card shown again (a finished puzzle reopened) isn't
   // counted twice: the last few wins counted are remembered by game, result and text. A gold paw on a game's top level or
-  // size masters it, and its tile turns gold (`top`; a game whose levels aren't its picker's values, like Catlas, says
+  // size masters it, and its tile gets a gold Mastered label (`top`; a game whose levels aren't its picker's values, like Catlas, says
   // whether a win was on its top one).
   const GOLD = "catdoku.goldpaws.v1";
   const goldPaws = slug => (load(GOLD).counts || {})[slug] || 0;
   const mastered = slug => !!(load(GOLD).top || {})[slug];
+  // A mastered game's tile keeps its shelf's colour and gets a small gold Mastered label; extra (the front page's "12 solved")
+  // joins it as "Mastered · 12 solved", and a phone, short of room, shows just the extra in the gold label.
+  const masterPill = (extra = "") => {
+    const m = document.createElement("span"); m.className = "masterPill"; m.title = "Mastered: a gold paw at the top level";
+    if (!extra) m.textContent = "Mastered";
+    else { const w = document.createElement("span"); w.className = "masterWord"; w.textContent = "Mastered · "; m.append(w, extra); }
+    return m;
+  };
   // the highest level or size in the page's picker
   const topLevel = () => { const sel = $("levelSel") || $("size"); return sel ? Math.max(...[...sel.options].map(o => +o.value).filter(v => !isNaN(v))) : null; };
   function countGold(result, text, top) {
@@ -1231,6 +1242,6 @@ const G = (() => {
     }
   }
 
-  return {GAMES, GROUPS, SHELF_COLOUR, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, relabel, icon: iconSVG, guesser, meaning, plainText,
-          setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
+  return {GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, relabel, icon: iconSVG, guesser, meaning, plainText,
+          setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();
