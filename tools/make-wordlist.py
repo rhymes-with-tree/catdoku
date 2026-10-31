@@ -1,4 +1,4 @@
-"""Builds words/words.json, the word list Up a Tree and Fuzzy Spelling share, from SCOWL.
+"""Builds words/words.json, the word list Up a Tree and Spelling String share, from SCOWL.
 Usage: download SCOWL (https://wordlist.aspell.net/, e.g. scowl-2020.12.07.tar.gz), then
        python3 tools/make-wordlist.py scowl-2020.12.07/final words/words.json words/long.json
 SCOWL is (c) Kevin Atkinson; its notice is in words/WORDS-LICENSE.txt and must stay with the list.

@@ -29,7 +29,7 @@ const G = (() => {
     ["Keyboard Cat", "keyboardcat", "Make words from the keys that still work", "#8D78AD", "words", "spelling bee"],
     ["If It Fits", "iffits", "Build the box, and Bugsy comes to sit in it", "#C4925C", "teasers", "tangram shapes"],
     ["High Perch", "highperch", "Raise every cat tree to just the right height", "#8E5E3E", "logic", "skyscrapers towers futoshiki sudoku latin square"],
-    ["Fuzzy Spelling", "fuzzyspelling", "Slide the letters until the bar spells a word", "#B94588", "words", "thruline"],
+    ["Spelling String", "fuzzyspelling", "Slide the letters until the bar spells a word", "#B94588", "words", "thruline fuzzy spelling pompoms"],
     ["Cat Mat", "catastrophe", "Help Crunch dye the whole mat one colour", "#73A7AE", "teasers", "flood fill colour color rug catastrophe"],
     ["Laser Pointer", "laserpointer", "Bounce the dot past every cat", "#E16A4A", "lines", "mirrors laser light"],
     ["Treat Time", "treattime", "Help Higgins give every cat just enough treats", "#ECA818", "numbers", "sumplete sums"],
@@ -50,6 +50,7 @@ const G = (() => {
     ["Meowbile", "meowbile", "Weigh the toys on the cat's mobile", "#7885BA", "numbers", "solveme mobiles mobile balance scales weights weigh algebra equations maths math", "2026-10-27"],
     ["Kitten Caboodle", "kittencaboodle", "Wake the kittens. Spell the words made from the mother's root word.", "#B3B94B", "words", "rootonym word roots prefixes suffixes etymology greek latin vocabulary definitions clues kittens", "2026-10-29"],
     ["Wind Up", "windup", "Drop yarn for Gus and wind two of a kind into a bigger ball", "#B94588", "quick", "suika watermelon game merge drop physics 2048 yarn balls fluffballs pompoms", "2026-10-30"],
+    ["L-M-N-O-Pom", "lmnopom", "Spell words in the falling pompoms for Marmalade to pounce on", "#B94588", "words", "tetris letris falling letters words scrabble blocks drop pompoms pom poms alphabet lmnop", "2026-10-31"],
   ];
   // The shelves the front page and the games menu sort the games onto, in order: key (also a plain name for it,
   // for search), heading, one line.
@@ -1057,6 +1058,7 @@ const G = (() => {
     go: '<circle cx="16" cy="16" r="11"/><path d="M11 16h10M17 11.5l4.5 4.5-4.5 4.5"/>',
     sight: '<circle cx="16" cy="16" r="10"/><circle cx="16" cy="16" r="4.5"/><path d="M16 3v5M16 24v5M3 16h5M24 16h5"/>',
     catnip: '<path d="M7 25C7 13 14 6 26 6c0 12-7 19-19 19z"/><path d="M7 25l11-11"/>',
+    swat: '<path d="M9 21c0-4 3-6 7-6s7 2 7 6-3 5-7 5-7-1-7-5z"/><circle cx="8" cy="12" r="2.6"/><circle cx="13" cy="7.5" r="2.6"/><circle cx="19" cy="7.5" r="2.6"/><circle cx="24" cy="12" r="2.6"/>',
     roller: '<rect x="5" y="5" width="17" height="9" rx="3"/><path d="M22 9.5h4.5V19H15v4"/><rect x="12.5" y="23" width="5" height="6" rx="1.2"/>',
     bubbleshake: '<circle cx="13" cy="18" r="7"/><circle cx="23" cy="9" r="3.5"/><path d="M24 20l3 2M25 15.5h3.5"/>',
     basketshake: '<path d="M6 14h20l-2.5 11h-15z"/><path d="M11 14l4-6M21 14l-4-6"/><path d="M3 10l2 2M29 10l-2 2M3 18l2-1M29 18l-2-1"/>',
@@ -1075,7 +1077,7 @@ const G = (() => {
     allNotesBtn: "pencils", clearNotesBtn: "erase", eraseBtn: "erase", pauseBtn: "pause", guessBtn: "guess", giveUpBtn: "giveup",
     keepBtn: "keep", shuffleBtn: "shuffle", flipBtn: "flip", finishBtn: "near", completeBtn: "check", skipBtn: "skip",
     colBtn: "palette", linkBtn: "share", toysBtn: "toys", bestBtn: "best", helpBtn: "help", zoomIn: "zoomin", zoomOut: "zoomout", zoomFit: "fit",
-    sightBtn: "sight", nipBtn: "catnip", shakeBtn: "bubbleshake", fluffBtn: "roller", rainbowBtn: "losecolor", basketBtn: "basketadd", wipeBtn: "wipe",
+    sightBtn: "sight", nipBtn: "catnip", shakeBtn: "bubbleshake", fluffBtn: "roller", swatBtn: "swat", rainbowBtn: "losecolor", basketBtn: "basketadd", wipeBtn: "wipe",
     chooseBtn: "keyboard", revealBtn: "giveup"};
   // buttons that keep their own look with an icon in front of the word: every New (a +) and Catlas's Go (an arrow)
   const LEAD = {newBtn: "plus", sNewBtn: "plus", goBtn: "go", settingsSum: "sliders"};

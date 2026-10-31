@@ -1,4 +1,4 @@
-/* The orange tabby that trots across Keyboard Cat's keyboard and along the bottom of Fuzzy Spelling's board,
+/* The orange tabby that trots across Keyboard Cat's keyboard and along the bottom of Spelling String's board,
    seen from above, facing right, in a 300 × 120 box: the tail, four paws (drawn separately so they can step),
    the body and the head. */
 const WALKCAT = (() => {
