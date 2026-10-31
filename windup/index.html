@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-31.9"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-31.10"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -22,7 +22,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-31.9">
+<link rel="stylesheet" href="../games.css?v=2026-10-31.10">
 <style>
 /* Gus sits on the rim of a basket and drops balls of yarn into it; two of a kind that touch wind into one bigger
    ball. Peanut watches from the corner with the next ball. Don't let the yarn pile up over the line. */
@@ -52,7 +52,7 @@ body.full .status,body.full .hud{grid-column:1 / -1;width:100%}
 body.full .wrap{grid-column:1 / -1;width:100%;height:auto;min-height:0;display:flex;justify-content:center}
 body.full .basket{height:100%;width:auto;min-width:0;max-width:100%}
 body.full .actions{width:auto;grid-column:2;grid-row:4;align-self:center;flex-wrap:nowrap;gap:8px}
-body.full .actions > :not(#pauseBtn,#shakeBtn,#fluffBtn),body.full .bar > :not(#fullBtn){display:none}
+body.full .actions > :not(#pauseBtn,#shakeBtn,#fluffBtn,#netBtn),body.full .bar > :not(#fullBtn){display:none}
 body.full .bar{width:auto;grid-column:3;grid-row:4;align-self:center}
 .bar .fsBtn{padding:4px 10px}
 @media (max-width:600px) and (orientation:landscape),(max-height:500px) and (orientation:landscape){
@@ -93,6 +93,7 @@ body.full .bar{width:auto;grid-column:3;grid-row:4;align-self:center}
     <button id="restartBtn">Restart</button>
     <button id="shakeBtn">Shake</button>
     <button id="fluffBtn">De-fluff</button>
+    <button id="netBtn">Drop floor</button>
     <button id="linkBtn">Share</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
@@ -107,8 +108,8 @@ body.full .bar{width:auto;grid-column:3;grid-row:4;align-self:center}
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-31.9"></script>
-<script src="../colorways.js?v=2026-10-31.9"></script>
+<script src="../games.js?v=2026-10-31.10"></script>
+<script src="../colorways.js?v=2026-10-31.10"></script>
 <script>
 /* ---------- the basket ---------- */
 // World units: the basket is W wide and H deep; Gus sits CAT above its rim. Ten sizes of yarn ball, each winding up
@@ -135,8 +136,14 @@ const LV = [null,
   {goal: 10, pool: 5, line: 140, pom: [.08, 3], shape: "round+ledges"},
   {goal: 10, pool: 5, line: 150, pom: [.09, 3], shape: "ledges+slope"}];
 const GOALS = LV.map(v => v && v.goal), MAX_LEVEL = LV.length - 1;
+// Zen: no goal ball and no line, so it never ends. Once the yarn in the basket weighs enough, the floor can be dropped:
+// for a few seconds it's a net, the basket is shaken, and the small balls (sizes 1 to 3) fall through it. Two size 10s
+// wind away for a bonus, and yarn piled out over the rim spills off the side.
+LV.push({goal: 0, pool: 5, line: -1e9, pom: [.06, 3], shape: "", zen: true});
+const ZEN = LV.length - 1, isZen = g => !!LV[g.level].zen;
+const NET_AT = .36, NET_FOR = 3, NET_HOLE = RAD[3], ZEN_TENS = 110;   // the floor can drop once the basket is this full, is a net this many seconds, and lets balls up to size 3 through; two 10s score this
 const SHAPE_WORDS = {slope: "sloped floor", slopeR: "sloped floor", hump: "hump", ledge: "ledge", ledgeR: "ledge", ledges: "ledges", round: "round corners"};
-const levelName = n => { const v = LV[n], bits = [...new Set(v.shape.split("+").filter(Boolean).map(k => SHAPE_WORDS[k]))]; if (v.pom[0]) bits.push("fluffballs");
+const levelName = n => { if (LV[n].zen) return "Zen · no goal, drop the floor"; const v = LV[n], bits = [...new Set(v.shape.split("+").filter(Boolean).map(k => SHAPE_WORDS[k]))]; if (v.pom[0]) bits.push("fluffballs");
   return `Level ${n} · size ${v.goal} ball` + (bits.length ? ", " + bits.join(", ") : ""); };
 // The shapes in the basket: a line of points with a half-thickness (a single point is a round peg), and for the corners
 // a polygon to fill. Balls roll off them like the walls.
@@ -214,7 +221,8 @@ const save = () => G.save(STORE, {settings, game: game && ["running", "paused"].
 
 function newGame(n, seed) {
   closeCard();
-  game = {level: n, line: LV[n].line, shapes: LV[n].shape.split("+").filter(Boolean).flatMap(k => SHAPE[k]()), seed: seed || (Math.random() * 2 ** 31) | 0, i: 0, balls: [], score: 0, best: 0, cool: 0, shakeT: 0, shakeCool: 0, overT: 0, aim: W / 2, fx: [], state: "ready", ...G.freshClock()};
+  game = {level: n, line: LV[n].line, shapes: LV[n].shape.split("+").filter(Boolean).flatMap(k => SHAPE[k]()), seed: seed || (Math.random() * 2 ** 31) | 0, i: 0, balls: [], score: 0, best: 0, cool: 0, net: 0, netReady: false, fell: 0, shakeT: 0, shakeCool: 0, overT: 0, aim: W / 2, fx: [], state: "ready", ...G.freshClock()};
+  if (LV[n].zen) game.timed = false;   // Zen has no end, so no time
   $("tapgo").hidden = true; status(); paintHud(); save();
 }
 function closeCard() { G.closeCard(); }
@@ -223,10 +231,18 @@ const clampAim = x => { const [a, b] = aimRange(nextOf(game).l); return Math.max
 
 function status() {
   $("score").textContent = `${game.score} points`;
-  $("goalTxt").textContent = `Wind a size ${GOALS[game.level]} ball`;
-  $("bestTxt").textContent = game.best ? `Biggest so far: ${game.best}` : "";
+  if (isZen(game)) {
+    if (game.score > (settings.zenBest || 0)) settings.zenBest = game.score;
+    $("goalTxt").textContent = game.best ? `Zen · biggest so far: ${game.best}` : "Zen · no goal";
+    $("bestTxt").textContent = settings.zenBest ? `Best: ${settings.zenBest} points` : "";
+  } else {
+    $("goalTxt").textContent = `Wind a size ${GOALS[game.level]} ball`;
+    $("bestTxt").textContent = game.best ? `Biggest so far: ${game.best}` : "";
+  }
   G.relabel($("pauseBtn"), game.state === "paused" ? "Go on" : "Pause", game.state === "paused" ? "play" : "pause");
   $("shakeBtn").disabled = game.state !== "running";
+  $("netBtn").hidden = !isZen(game);
+  $("netBtn").disabled = game.state !== "running" || !game.netReady || game.net > 0;
   $("fluffBtn").hidden = !LV[game.level].pom[0];   // only on levels that have fluffballs
   $("fluffBtn").disabled = game.state !== "running" || !!game.fluffed;
   $("pauseBtn").disabled = !["running", "paused"].includes(game.state);
@@ -245,9 +261,40 @@ function nearOnShape(b, sh, k) {
   const dx = b.x - px, dy = b.y - py, d = Math.hypot(dx, dy);
   return d < 160 ? {d, nx: d ? dx / d : 0, ny: d ? dy / d : -1} : null;
 }
+// Zen's net: while the floor is dropped, a ball small enough to fit through the net has no floor under it; once it's
+// gone through it keeps falling even when the floor comes back.
+function throughNet(g, b) { return b.falling || (g.net > 0 && b.r <= NET_HOLE + .5); }
+function zenTick(g) {
+  g.load = g.balls.reduce((t, b) => t + Math.PI * b.r * b.r, 0) / (W * H);
+  const ready = g.load > NET_AT;
+  if (ready !== g.netReady) { g.netReady = ready; if (ready && !g.netNote) { g.netNote = true; G.note("The basket's heavy: you can drop the floor.", 3500); } status(); }
+  if (g.net > 0 && (g.net = Math.max(0, g.net - STEP)) === 0) status();
+  for (const b of g.balls) if (!b.falling && throughNet(g, b) && b.y > H - b.r + 1) b.falling = true;
+  const out = g.balls.filter(b => b.falling && b.y - b.r > H + M + 4);
+  // yarn piled right out over the rim spills over the side and is gone
+  const spill = g.balls.filter(b => !b.falling && b.age > 1.5 && b.y + b.r < -8);
+  for (const b of spill) g.fx.push({puff: true, l: b.l, x: b.x, y: b.y, r: b.r, a: b.a, t: 0, T: .45, yarn: !b.p});
+  if (out.length || spill.length) { g.balls = g.balls.filter(b => !out.includes(b) && !spill.includes(b)); g.fell += out.length; status(); }
+}
+// Drop the floor (Zen): the floor turns into a net for a few seconds and the basket is shaken so the small balls sift
+// down, sinking faster than the rest, and fall through.
+function dropFloor() {
+  const g = game;
+  if (!g || !isZen(g) || g.state !== "running" || g.net > 0 || $("overlay").classList.contains("show") || document.querySelector(".spot")) return;
+  if (!g.netReady) { G.note("Not heavy enough yet: wind and drop more yarn first.", 2500); return; }
+  g.net = NET_FOR; g.shakeT = SHAKE_FOR;
+  // a sifting shake: the big balls are bounced up and the small ones pushed down, so the small ones slip under them
+  for (const b of g.balls) {
+    if (b.r <= NET_HOLE + .5) { b.vy += 250; b.vx += (Math.random() - .5) * 200; }
+    else { b.vy -= 650 * (.7 + Math.random() * .5); b.vx += (Math.random() - .5) * 300; }
+    b.age = Math.min(b.age, 0);
+  }
+  G.note("The floor drops: it's a net!", 2500); status(); save();
+}
 function step(g, h) {
   const B = g.balls, merges = [], cs = [];
-  for (const b of B) { b.vy += TUNE.GRAV * h; const sp = Math.hypot(b.vx, b.vy); if (sp > 1400) { b.vx *= 1400 / sp; b.vy *= 1400 / sp; } }
+  for (const b of B) { b.vy += TUNE.GRAV * h * (g.net > 0 && b.r <= NET_HOLE + .5 ? 2.5 : 1);   // small balls sink through a dropped floor
+    const sp = Math.hypot(b.vx, b.vy); if (sp > 1400) { b.vx *= 1400 / sp; b.vy *= 1400 / sp; } }
   // contacts: pairs touching (or within a hair), and the walls. n points from A to C (from a wall, into the ball).
   for (const b of B) b.floor = false;
   const contact = (A, C, nx, ny) => { if (!A && ny < -.5) C.floor = true; const wa = A ? 1 / (A.r * A.r) : 0, wc = 1 / (C.r * C.r); const vn0 = (C.vx - (A ? A.vx : 0)) * nx + (C.vy - (A ? A.vy : 0)) * ny;
@@ -263,9 +310,9 @@ function step(g, h) {
       // balls that rub as they meet set each other spinning, a bit
       const vt = (c.vx - a.vx) * (-dy / d) + (c.vy - a.vy) * (dx / d);
       if (Math.abs(vt) > TUNE.KICK_MIN && Math.hypot(c.vx - a.vx, c.vy - a.vy) > TUNE.KICK_SPEED) { const m = Math.max(-TUNE.SPIN, Math.min(TUNE.SPIN, vt * TUNE.KICK)); a.w = Math.max(-TUNE.SPIN, Math.min(TUNE.SPIN, a.w + m / a.r)); c.w = Math.max(-TUNE.SPIN, Math.min(TUNE.SPIN, c.w + m / c.r)); }
-      if (a.l === c.l && a.p === c.p && a.l < (a.p ? POM_TOP + 1 : MAXL)) merges.push([a, c]);
+      if (a.l === c.l && a.p === c.p && a.l < (a.p ? POM_TOP + 1 : isZen(g) ? MAXL + 1 : MAXL)) merges.push([a, c]);
     }
-    if (a.y >= H - a.r - .4) contact(null, a, 0, -1);
+    if (a.y >= H - a.r - .4 && !throughNet(g, a)) contact(null, a, 0, -1);
     if (a.x <= a.r + .4) contact(null, a, 1, 0);
     if (a.x >= W - a.r - .4) contact(null, a, -1, 0);
     for (const sh of g.shapes) for (let k = 0; k < Math.max(1, sh.pts.length - 1); k++) {
@@ -297,7 +344,7 @@ function step(g, h) {
         const hit = nearOnShape(b, sh, k), need = hit && b.r + sh.hr - SLOP;
         if (hit && hit.d < need) { const pen = Math.min(need - hit.d, 3) * .6; b.x += hit.nx * pen; b.y += hit.ny * pen; }
       }
-      b.x = Math.max(b.r, Math.min(W - b.r, b.x)); if (b.y > H - b.r) b.y = H - b.r;
+      b.x = Math.max(b.r, Math.min(W - b.r, b.x)); if (b.y > H - b.r && !throughNet(g, b)) b.y = H - b.r;
     }
   }
   // how they turn, and settling to rest
@@ -319,6 +366,7 @@ function mergeAll(g, pairs) {
     const wind = {wind: true, l: a.l, p, x, y, ox: a.x - x, oy: a.y - y, pxo: c.x - x, pyo: c.y - y, a0: a.a, a1: c.a, t: 0, T: TUNE.WIND};
     g.fx.push(wind);
     if (p && l > POM_TOP) { g.fx.push({x, y, r: RAD[a.l], t: 0, T: .4, c: "#9F9DA2"}); continue; }   // two of the biggest puffballs puff away
+    if (!p && l > MAXL) { g.score += ZEN_TENS; ["#ECA818", "#E16A4A", "#B94588"].forEach((c, k) => g.fx.push({x, y, r: RAD[MAXL], t: -k * .22, T: .9, c, grow: 1.4})); continue; }   // two 10s (Zen) wind away
     const nb = mk(x, y, l, {p, vx: (a.vx + c.vx) / 2 + (Math.random() - .5) * TUNE.MERGE_NUDGE, vy: (a.vy + c.vy) / 2, age: GRACE, pop: .65, born: 0});
     made.push(nb); wind.to = nb;   // the swirl follows the new ball as it settles
     if (!p) { g.score += PTS[l]; g.best = Math.max(g.best, l); }
@@ -338,6 +386,7 @@ function tick(g, dt) {
     g.cool = Math.max(0, g.cool - STEP); g.shakeT = Math.max(0, (g.shakeT || 0) - STEP); g.shakeCool = Math.max(0, (g.shakeCool || 0) - STEP);
     for (const f of g.fx) f.t += STEP; g.fx = g.fx.filter(f => f.t < f.T);
     if (g.state !== "running") continue;   // after a win the balls keep moving, with nothing more to check
+    if (isZen(g)) { zenTick(g); continue; }   // no line and no goal
     const over = g.balls.some(b => b.age > GRACE && b.y - b.r < g.line);
     g.overT = over ? g.overT + STEP : Math.max(0, g.overT - STEP * 2);
     if (g.best >= GOALS[g.level]) return win();
@@ -384,10 +433,12 @@ function paint() {
     ctx.lineWidth = sh.hr * 2; ctx.beginPath(); sh.pts.forEach(([x, y], k) => k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); if (sh.pts.length === 1) { ctx.arc(sh.pts[0][0], sh.pts[0][1], sh.hr, 0, 7); ctx.fill(); } else ctx.stroke();
   }
   ctx.restore();
-  // the line yarn mustn't pile above
+  // the line yarn mustn't pile above (none in Zen)
+  if (!isZen(g)) {
   const warn = g.overT > .35, pulse = warn && Math.floor(g.overT * 6) % 2 === 0;
   ctx.save(); ctx.strokeStyle = pulse ? "#BD5538" : warn ? "#E16A4A" : "rgba(189,85,56,.55)"; ctx.lineWidth = warn ? 3.5 : 2.5; ctx.setLineDash([10, 8]);
   ctx.beginPath(); ctx.moveTo(0, g.line); ctx.lineTo(W, g.line); ctx.stroke(); ctx.restore();
+  }
   // where the next ball will land
   const nb = nextOf(g), nl = nb.l, ax = clampAim(g.aim);
   if (["ready", "running"].includes(g.state)) {
@@ -401,7 +452,7 @@ function paint() {
     const fx = f.to ? f.to.x : f.x, fy = f.to ? f.to.y : f.y;
     for (const [ox, oy, a0] of [[f.ox, f.oy, f.a0], [f.pxo, f.pyo, f.a1]]) drawBall(ctx, f.l, fx + (ox * cs - oy * sn) * (1 - e), fy + (ox * sn + oy * cs) * (1 - e), r, a0 + th * TUNE.WIND_SPIN, al, f.p);
   }
-  for (const f of g.fx) if (f.puff) { const u = f.t / f.T; drawBall(ctx, f.l, f.x, f.y, f.r * (1 + .5 * u), f.a, 1 - u, true); }
+  for (const f of g.fx) if (f.puff) { const u = f.t / f.T; drawBall(ctx, f.l, f.x, f.y, f.r * (1 + .5 * u), f.a, 1 - u, !f.yarn); }
   for (const f of g.fx) if (!f.wind && !f.puff && f.t >= 0) { ctx.save(); ctx.globalAlpha = 1 - f.t / f.T; ctx.strokeStyle = f.c; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(f.to ? f.to.x : f.x, f.to ? f.to.y : f.y, f.r * (1 + (f.t / f.T) * (f.grow || .44)), 0, 7); ctx.stroke(); ctx.restore(); }
   if (["ready", "running"].includes(g.state)) { drawBall(ctx, nl, ax, RAD[nl] + 2, RAD[nl], 0, g.cool > 0 ? .25 : .85, nb.p); if (g.cool <= 0) drawNumber(ctx, nl, ax, RAD[nl] + 2, RAD[nl], nb.p); }
   // the basket: woven wicker walls round the sides and floor (gold, a quarter ink), outlined in ink, the tops of the
@@ -412,12 +463,19 @@ function paint() {
   wall(); ctx.strokeStyle = "#2A2530"; ctx.lineWidth = M + 3; ctx.stroke();
   wall(); ctx.strokeStyle = "#BB871E"; ctx.lineWidth = M - 3; ctx.stroke();
   wall(); ctx.strokeStyle = "rgba(42,37,48,.3)"; ctx.setLineDash([3, 5]); ctx.stroke(); ctx.setLineDash([]);
+  // Zen's dropped floor: the bottom of the basket shown as a net, its holes open
+  if (isZen(g) && g.net > 0) {
+    ctx.save(); ctx.beginPath(); ctx.rect(20, H - 1, W - 40, M + 2); ctx.clip(); ctx.fillStyle = "#FCF2DC"; ctx.fillRect(0, H - 1, W, M + 2);
+    ctx.strokeStyle = "#BB871E"; ctx.lineWidth = 2;
+    for (let x = -M; x < W + M; x += 14) { ctx.beginPath(); ctx.moveTo(x, H - 1); ctx.lineTo(x + M + 2, H + M + 1); ctx.moveTo(x + M + 2, H - 1); ctx.lineTo(x, H + M + 1); ctx.stroke(); }
+    ctx.restore();
+  }
   // Gus on the rim, over where the ball will fall
   const gus = pic(catSrc("gus-12"));
   if (gus.complete && gus.naturalWidth) { const h = CAT + 4, w = h * gus.naturalWidth / gus.naturalHeight, gx = Math.max(w / 2, Math.min(W - w / 2, ax)); ctx.drawImage(gus, gx - w / 2, -CAT + 2, w, h); }
 }
 function paintHud() {
-  for (const [id, l, p] of [["nextCv", game ? afterOf(game).l : 1, game ? afterOf(game).p : false], ["goalCv", game ? GOALS[game.level] : 6, false]]) {
+  for (const [id, l, p] of [["nextCv", game ? afterOf(game).l : 1, game ? afterOf(game).p : false], ["goalCv", game ? (isZen(game) ? Math.max(1, game.best) : GOALS[game.level]) : 6, false]]) {
     const c = $(id).getContext("2d"), im = sprite(l, p), s = id === "goalCv" ? 92 : 92 * (RAD[l] / RAD[5]) ** .85;
     c.clearRect(0, 0, 92, 92);
     if (im.ok) { const d = Math.min(92, id === "goalCv" ? 92 * (RAD[l] / RAD[MAXL]) ** .5 : s); c.drawImage(im, 46 - d / 2, 46 - d / 2, d, d); drawNumber(c, l, 46, 46, d / 2, p); }
@@ -454,6 +512,7 @@ addEventListener("keydown", e => {
   else if (k === "p" || k === "P") game.state === "paused" ? resume() : pause();
   else if (k === "s" || k === "S") shake();
   else if (k === "l" || k === "L") defluff();
+  else if (k === "n" || k === "N") dropFloor();
 });
 // Shake: the basket jolts and every ball is thrown up and sideways, so a stuck pile loosens. It costs the gold paw, and the balls
 // get a few seconds before they count as over the line again.
@@ -463,7 +522,7 @@ function shake() {
   if (g.shakeCool > 0) { G.note("Give the yarn a moment to settle.", 1800); return; }
   for (const b of g.balls) { const lift = 1050 / Math.sqrt(b.r / 11) * (.55 + Math.random() * .6); b.vy -= lift; b.vx += (Math.random() - .5) * 700; b.w = (Math.random() - .5) * 2 * TUNE.SPIN * 2; b.age = -2.5; }
   g.overT = 0; g.shakeT = SHAKE_FOR; g.shakeCool = 3;
-  if (!g.shook) G.note("Shaken! That costs the gold paw this time.", 3500);
+  if (!g.shook && !isZen(g)) G.note("Shaken! That costs the gold paw this time.", 3500);
   g.shook = true; save();
 }
 // De-fluff: a lint roller that takes every fluffball off the board, once a board. It costs the gold paw.
@@ -478,6 +537,7 @@ function defluff() {
   status(); save();
 }
 $("fluffBtn").onclick = () => defluff();
+$("netBtn").onclick = () => dropFloor();
 $("shakeBtn").onclick = () => shake();
 function pause() { if (game && game.state === "running") { game.state = "paused"; $("tapgo").hidden = false; $("tapgo").textContent = "Paused · tap to go on"; status(); save(); } }
 function resume() { if (game && game.state === "paused") { game.state = "running"; $("tapgo").hidden = true; status(); } }
@@ -525,7 +585,7 @@ function win() {
     const text = `A size ${GOALS[g.level]} ball, with ${g.score} points.` + (g.level === MAX_LEVEL ? " That's the biggest ball there is; here it is again." : ` Next up: level ${next}.`);
     G.winCard(text, () => { closeCard(); startLevel(next); }, "Admire the yarn", g.result,
       {title: "All wound up!", gold: first && !g.shook && !g.fluffed, goldWhy: "First try, no helpers!", goldTitle: "Even Peanut is impressed!", goldPic: [im], next: next > g.level ? `Next: level ${next}` : "Next basket",
-       after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+       top: g.level === MAX_LEVEL, after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
   }, 1700);
 }
 function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); closeCard(); newGame(n); }
@@ -535,7 +595,7 @@ $("newBtn").onclick = () => { if (game) { leave(); newGame(game.level); } };
 // Share: the level and the order the yarn comes in, as dealt.
 $("linkBtn").onclick = () => { if (game) { pause(); G.shareCard({name: "Wind Up", what: "basket", won: game.state === "won", puzzle: () => ({g: "windup", N: game.level, s: game.seed})}); } };
 function openShared(d) {
-  if (!(d.N >= 1 && d.N <= MAX_LEVEL) || !Number.isInteger(d.s)) throw new Error("the shared basket doesn't fit the game");
+  if (!(d.N >= 1 && d.N <= ZEN) || !Number.isInteger(d.s)) throw new Error("the shared basket doesn't fit the game");
   settings.level = d.N; $("levelSel").value = d.N; save(); newGame(d.N, d.s);
 }
 
@@ -551,9 +611,9 @@ function helpOnFirstVisit() {
   const steps = [
     {say: "Point where Gus drops, then let go", lit: top},
     {say: "Two of a kind wind into a bigger ball", lit: floor},
-    {say: "Wind the goal ball to win", els: [$("goalCv")]},
+    ...(isZen(game) ? [{say: "Zen: no goal, no line, no end", els: [$("goalCv")]}] : [{say: "Wind the goal ball to win", els: [$("goalCv")]}]),
     ...(LV[game.level].pom[0] ? [{say: "Fluffballs wind only with fluffballs", els: [$("nextCv")]}] : []),
-    {say: "Don't pile yarn above the line", lit: line, tone: "ok"},
+    ...(isZen(game) ? [{say: "Heavy? Drop the floor: small balls fall through", els: [$("netBtn")]}] : [{say: "Don't pile yarn above the line", lit: line, tone: "ok"}]),
     {say: "Stuck? Shake the basket", els: [$("shakeBtn")]},
     ...(LV[game.level].pom[0] ? [{say: "Once a board, De-fluff clears the fluffballs", els: [$("fluffBtn")]}] : []),
   ];
@@ -565,13 +625,14 @@ $("numTgl").onchange = e => { settings.numbers = e.target.checked; save(); paint
 
 /* ---------- start ---------- */
 for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", "") + (n === MAX_LEVEL ? " (hardest)" : ""), n));
+$("levelSel").append(new Option(levelName(ZEN), ZEN));
 $("levelSel").onchange = e => { startLevel(+e.target.value); $("levelSel").blur(); };
 G.nav("windup");
 G.fullScreen({btn: $("fullBtn"), name: "Wind Up", change: () => paint()});
 G.setupTimer({name: "windup", game: () => game, playing: g => g.state === "running", save, label: levelName, noun: "level",
   emptyText: "Wind the goal ball on a level and your times will show up here. They're kept on this device only."});
 $("bestBtn").onclick = () => { pause(); G.showBests("Best times", game ? game.level : settings.level); };
-if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+if (!(settings.level >= 1 && settings.level <= ZEN)) settings.level = 1;
 $("levelSel").value = settings.level;
 const shared = G.readShare("windup");
 let openedShare = false;
