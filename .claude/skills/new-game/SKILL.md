@@ -113,7 +113,7 @@ in its notes.
 - **Winning:** `G.winCard(text, onNext, admire, result, {title, gold, goldWhy, next, after})`, with
   `after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")`. When `gold` is
   true the card's title is "Gold paw!", so `title` only shows on other wins. A gold paw on the top level or size masters the
-  game (its tile turns gold); the win card works that out from `result.n` and the page's level or size picker,
+  game (its tile gets a gold Mastered label); the win card works that out from `result.n` and the page's level or size picker,
   so pass `top: true` or `false` if the game's levels aren't the picker's values (see `atlas/`). Gold paw rules
   differ by game (README, "Across every game"). For a logic puzzle, follow Tunnel Run and Open the
   Door!: a hint, Undo or Restart costs the gold paw; a hint also keeps the player on the same level, and
@@ -140,6 +140,9 @@ in its notes.
   squares fill `grid`'s client box unless a `map` function says where they are (see the comment above
   `spotlight` in `games.js`); Tunnel Run passes the div around its SVG. "Let's Play!" is placed in
   `grid`'s parent, which needs `position: relative` (`.wrap` has it).
+- **Losing:** every card that ends a game without a win (out of lives, out of moves, no room, piled up, and
+  so on) ends its buttons with `G.homeBtn()` ("Back to the front page"), as the win card does, so there's
+  always a way home: `btns.push(G.homeBtn())` before `G.openCard(...)`, or `G.homeBtn()` last in the list.
 - **Win streaks:** `G.finishClock` adds a win and the win card shows the streak, and a new puzzle made with
   `G.freshClock()` while one is started ends it. Call `G.breakStreak()` wherever the player loses (out of lives,
   moves or time, giving up).
@@ -236,8 +239,8 @@ and anything drawn on or around it (often `.wrap`). The rest of `main` becomes t
 
 Most games have none. A game that does follows Catdoku, Twirl and Toydoku: three hearts drawn as `♥` in
 `.hearts` (lost ones in `<span class="lost">`), the line saying how many are left. Running out opens an "Out
-of lives" card with Restart, New and "Wait, I'm only mostly dead! Mostly dead is slightly alive, folks!" for
-three more, up to nine on one puzzle, and a revive shows a "Slightly alive!" card saying how many revives are
+of lives" card with Restart, New, "Wait, I'm only mostly dead! Mostly dead is slightly alive, folks!" for
+three more (up to nine on one puzzle) and, last, `G.homeBtn()`, and a revive shows a "Slightly alive!" card saying how many revives are
 left. Restart only refills lives after they've run out, so it's never a way round them. Running out or a
 revive keeps the player on the same level and costs the gold paw.
 
@@ -302,6 +305,7 @@ SE, 320 × 460, as well as a laptop at 1280 × 720. Load Playwright with
 - progress survives a reload;
 - a share link opens the same puzzle;
 - a playthrough reaches the win card, and the level moves up (or stays, after a hint);
+- every losing card has Back to the front page;
 - a game with a Next preview: over a run of drops, Next never shows the piece in play, and each piece that comes
   in is the one Next showed just before;
 - no page errors (failed loads of fonts, GoatCounter and cat photos are expected offline);
