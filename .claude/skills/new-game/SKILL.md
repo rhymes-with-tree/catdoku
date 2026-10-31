@@ -53,6 +53,10 @@ the same file path so the link stays the same.
 
 - Write the puzzle generator as plain functions and test it in Node: time per puzzle at every level,
   and for logic puzzles, exactly one solution.
+- **A Next preview shows the piece after the one in play**, never the one the player is already holding or
+  dropping (Wind Up and L-M-N-O-Pom both first showed the same piece twice). Count from the piece in play: if
+  `game.i` is the piece in play (or the one about to come in), Next is `game.i + 1`, whatever the step in between,
+  and it's redrawn every time a new piece comes in.
 - Write the page without `<!DOCTYPE>`, `<html>`, `<head>` or `<body>`; the artifact adds them. Start
   with `<title>`, the Baloo 2 font link, and one `<style>` holding `games.css` and the page's own CSS.
   Then the markup, `games.js` in a `<script>` (and `colorways.js` if the game uses it), and the page's
@@ -298,6 +302,8 @@ SE, 320 × 460, as well as a laptop at 1280 × 720. Load Playwright with
 - progress survives a reload;
 - a share link opens the same puzzle;
 - a playthrough reaches the win card, and the level moves up (or stays, after a hint);
+- a game with a Next preview: over a run of drops, Next never shows the piece in play, and each piece that comes
+  in is the one Next showed just before;
 - no page errors (failed loads of fonts, GoatCounter and cat photos are expected offline);
 - the front page shows the new tile and icon;
 - any game whose drawings moved to a shared file still draws and plays them;
