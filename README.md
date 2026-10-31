@@ -345,7 +345,7 @@ Letters come from shuffled bags like Scrabble's tiles (a few more S's, as plural
 
 ## Ideas
 
-[IDEAS.md](IDEAS.md) lists every puzzle considered for the site, built or not, with how it plays, how easy it would be to add, and whether it's wanted.
+[IDEAS.md](IDEAS.md) lists every puzzle considered for the site, built or not, with how it plays, how easy it would be to add, and whether it's built (Built, Idea or No).
 
 ## License
 
