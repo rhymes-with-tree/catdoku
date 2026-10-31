@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-31.12"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-31.13"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-31.12">
+<link rel="stylesheet" href="../games.css?v=2026-10-31.13">
 <style>
 /* Dottie, the star, beside the title */
 .title{display:flex;align-items:flex-end;gap:8px}
@@ -99,11 +99,12 @@
   </div>
   <div class="bar toggles">
     <div class="opt"><label class="toggle"><input type="checkbox" id="dotSw"><span class="sw"></span>Dot first</label><span class="hint">A tap puts a dot (no post) first, then a post</span></div>
+    <div class="opt"><label class="toggle"><input type="checkbox" id="checkTgl"><span class="sw"></span>Auto check</label><span class="hint">Posts in line show in red, and so does a number with too many</span></div>
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-31.12"></script>
-<script src="../cattower.js?v=2026-10-31.12"></script>
+<script src="../games.js?v=2026-10-31.13"></script>
+<script src="../cattower.js?v=2026-10-31.13"></script>
 <script>
 /* ---------- rooms ---------- */
 // A room is N × N squares, each floor (-1), furniture (-2) or furniture with a number (0 to 4).
@@ -260,7 +261,7 @@ const catSrc = f => CAT_SRC[f] || `../cats/${f}.webp`;
 const STORE = "catdoku.scratchthat.v1";
 const $ = G.$;
 let state = G.load(STORE);
-let settings = Object.assign({level: 1}, state.settings);
+let settings = Object.assign({level: 1, autoCheck: true}, state.settings);
 let game = state.game || null;
 const hints = G.hinter({game: () => game, key: () => game ? stateKey() : "", draw: () => draw()});   // marks {cells, bad}: a hint's squares
 const guesses = G.guesser({game: () => game, undo, draw: () => { draw(); save(); }, board: $("board"), what: "post", moves: gm => gm.moves});
@@ -303,7 +304,7 @@ const dottieAt = () => { const {N, s} = game, c = (N - 1) / 2; let best = -1, d 
   s.forEach((v, i) => { const e = Math.hypot(i % N - c, Math.floor(i / N) - c); if (v === 1 && e < d) { d = e; best = i; } }); return best; };
 
 function draw() {
-  const el = $("board"), {N, g, s} = game, l = look(), sofas = furniture(), live = hints.current(), guessed = new Set(guesses.list());
+  const el = $("board"), {N, g, s} = game, l = look(), chk = settings.autoCheck || game.won, sofas = furniture(), live = hints.current(), guessed = new Set(guesses.list());
   el.style.gridTemplateColumns = el.style.gridTemplateRows = `repeat(${N}, 1fr)`;
   if (el.children.length !== N * N) {
     el.innerHTML = "";
@@ -311,7 +312,7 @@ function draw() {
   }
   [...el.children].forEach((d, i) => {
     const want = g[i] === -1 ? (s[i] === 1 ? "post" + (game.won ? i : "") : s[i] === 0 ? "dot" : "") : "wall" + g[i] + sofas[i].key;
-    d.className = "sq" + (g[i] !== -1 ? " wall" : "") + (g[i] === -1 && l.lit[i] ? " lit" : "") + (l.bad[i] ? " bad" : "")
+    d.className = "sq" + (g[i] !== -1 ? " wall" : "") + (g[i] === -1 && l.lit[i] ? " lit" : "") + (chk && l.bad[i] ? " bad" : "")
       + (live && live.cells.includes(i) ? " hintcell" + (live.bad ? " bad" : "") : "") + (guessed.has(i) && s[i] === 1 ? " guessed" : "");
     if (d.dataset.want !== want) {
       d.dataset.want = want;
@@ -321,7 +322,7 @@ function draw() {
       else d.innerHTML = s[i] === 0 ? `<span class="dot"></span>` : "";
     }
     d.classList.toggle("dottiehere", game.won && i === dottieAt());
-    if (g[i] >= 0) { const nm = d.querySelector(".num"); nm.classList.toggle("done", l.num[i] === g[i]); nm.classList.toggle("over", l.num[i] > g[i]); }
+    if (g[i] >= 0) { const nm = d.querySelector(".num"); nm.classList.toggle("done", chk && l.num[i] === g[i]); nm.classList.toggle("over", chk && l.num[i] > g[i]); }
     d.setAttribute("role", "gridcell");
     d.setAttribute("aria-label", g[i] === -2 ? "Furniture" : g[i] >= 0 ? `Furniture wanting ${g[i]} post${g[i] === 1 ? "" : "s"} beside it`
       : s[i] === 1 ? "Scratching post" : s[i] === 0 ? "No post here" : l.lit[i] ? "Floor with a post in sight" : "Floor with no post in sight");
@@ -329,7 +330,7 @@ function draw() {
   // a red line between each pair of posts that can see each other
   const clash = $("clash"); clash.setAttribute("viewBox", `0 0 ${N} ${N}`);
   let lines = "";
-  for (let i = 0; i < N * N; i++) if (g[i] === -1 && s[i] === 1) for (const k of stSight(N, g, i)) if (k > i && s[k] === 1)
+  if (chk) for (let i = 0; i < N * N; i++) if (g[i] === -1 && s[i] === 1) for (const k of stSight(N, g, i)) if (k > i && s[k] === 1)
     lines += `<line x1="${i % N + .5}" y1="${Math.floor(i / N) + .5}" x2="${k % N + .5}" y2="${Math.floor(k / N) + .5}"/>`;
   clash.innerHTML = lines;
   // Dottie peeks over a sofa that has floor beside it with no post in sight (one without a number, if she can)
@@ -545,6 +546,8 @@ $("newBtn").onclick = newPuzzle;
 $("helpBtn").onclick = showHelp;
 $("dotSw").checked = !!settings.dotFirst;
 $("dotSw").onchange = e => { settings.dotFirst = e.target.checked; save(); };
+$("checkTgl").checked = settings.autoCheck;
+$("checkTgl").onchange = e => { settings.autoCheck = e.target.checked; save(); if (game) draw(); };
 
 G.nav("scratchthat");
 G.checkClock(game);
