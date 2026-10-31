@@ -7,7 +7,7 @@ This covers:
 
 - the cat pictures in `cats/`
 - the cats beside the boards in `patches/` and `yarn/`
-- the cat toy pictures in `toys/`
+- the cat toy pictures in `toys/` (including the uncut sheets in `toys/sheets/`)
 - the pompom, googly eye and jingle bell pictures in `fuzzyspelling/`
 - Bowtie's tunnel pictures in `tunnelrun/`
 - the app icons: `favicon.png`, `apple-touch-icon.png`, `icon-192.png` and `icon-512.png`
