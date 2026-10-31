@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-31.12";
+  var BUILD = "2026-10-31.13";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-31.12">
+<link rel="stylesheet" href="../games.css?v=2026-10-31.13">
 <style>
 /* A wooden floor in the shade; sunbeams are patches of window light, each with a cat stretched out in it. */
 .board{border-color:#5C3A22;border-radius:12px;position:relative;z-index:2}
@@ -62,10 +62,13 @@
     </label>
     <button id="newBtn" class="primary">New puzzle</button>
   </div>
+  <div class="bar toggles">
+    <div class="opt"><label class="toggle"><input type="checkbox" id="checkTgl"><span class="sw"></span>Auto check</label><span class="hint">A cat settles into its sunbeam once it fits</span></div>
+  </div>
 
 </main>
 
-<script src="../games.js?v=2026-10-31.12"></script>
+<script src="../games.js?v=2026-10-31.13"></script>
 <script>
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 // Split the grid into random rectangles, scanning for the first uncovered cell each time.
@@ -209,12 +212,15 @@ function sunbeam(g, x, y, w, h) {
   el(g, "path", {d:`M${x + w / 2} ${y + 14} V${y + h - 14} M${x + 14} ${y + h / 2} H${x + w - 14}`, stroke:"#8A5A34", "stroke-width":6, "stroke-opacity":.14, "stroke-linecap":"round"});
 }
 // Everything on the floor: sunbeams with their cats, numbers still waiting, and the one being dragged.
-function drawScene(g, N, clue, rects, isValid, draft, seed) {
+// Unchecked (Auto check off), every sunbeam looks the same and the numbers wait in them, so nothing says
+// which ones fit.
+function drawScene(g, N, clue, rects, isValid, draft, seed, unchecked) {
   g.innerHTML = "";
   const housed = new Set(), used = new Map();
   for (const R of rects) {
     const x = R.c * U, y = R.r * U, w = R.w * U, h = R.h * U;
-    if (isValid(R)) {
+    if (unchecked) sunbeam(g, x, y, w, h);
+    else if (isValid(R)) {
       const k = cellsIn(N, R).find(i => clue[i]); housed.add(k);
       sunbeam(g, x, y, w, h);
       sleepingCat(g, x, y, w, h, k, seed, used);
@@ -227,7 +233,7 @@ function drawScene(g, N, clue, rects, isValid, draft, seed) {
     const cx = (k % N) * U + 50, cy = Math.floor(k / N) * U + 50;
     sizeTag(g, cx, cy, clue[k]);   // just the number until its cat has a sunbeam
   }
-  for (const R of rects) if (!isValid(R)) sizeChip(g, R, `${R.w * R.h}?`);
+  if (!unchecked) for (const R of rects) if (!isValid(R)) sizeChip(g, R, `${R.w * R.h}?`);
   if (draft) {
     el(g, "rect", {x:draft.c * U + 9, y:draft.r * U + 9, width:draft.w * U - 18, height:draft.h * U - 18, rx:8, fill:"#FFE9A6", "fill-opacity":.25, stroke:"#FFF4C8", "stroke-width":5, "stroke-dasharray":"14 10"});
     sizeChip(g, draft, `${draft.w} × ${draft.h} = ${draft.w * draft.h}`);
@@ -244,7 +250,7 @@ function cellsIn(N, R) { const out = []; for (let y = R.r; y < R.r + R.h; y++) f
 const STORE = "catdoku.sunbeams.v1";
 const $ = G.$;
 let state = G.load(STORE);
-let settings = Object.assign({size: 7}, state.settings);
+let settings = Object.assign({size: 7, autoCheck: true}, state.settings);
 let game = state.game || null, busy = false;
 const build = G.builder([shuffle, randomRects, candidates, solveShikaku, makeShikaku], "makeShikaku");
 const save = () => G.save(STORE, {settings, game});
@@ -314,7 +320,7 @@ function checkWin() {
     settings.size = game.hinted ? game.N : G.sizeUp(game.N, $("size")); $("size").value = settings.size; save(); build.prefetch(settings.size);
     const done = game;   // let the finished floor show for a moment first
     setTimeout(() => { if (game === done) finishCard(); }, 1400);
-  }
+  } else if (!settings.autoCheck && covered === game.N * game.N) G.note("The whole floor is sunny, but a sunbeam doesn't fit its cat. Hint can show one.", 6000);
 }
 
 async function newPuzzle() {
@@ -346,15 +352,16 @@ function buildBoard() {
 
 function render() {
   const N = game.N;
-  drawScene($("beams"), N, game.clue, game.rects, valid, press && press.draft, game.seed || 0);
-  const kids = $("board").children, lit = new Set(game.rects.filter(valid).flatMap(R => cellsIn(N, R)));
+  const unchecked = !settings.autoCheck && !game.won;
+  drawScene($("beams"), N, game.clue, game.rects, valid, press && press.draft, game.seed || 0, unchecked);
+  const kids = $("board").children, lit = new Set(game.rects.filter(R => unchecked || valid(R)).flatMap(R => cellsIn(N, R)));
   const hintMark = hints.current(), hinted = new Set(hintMark ? hintMark.cells : []);
   for (let i = 0; i < N * N; i++) { kids[i].classList.toggle("hintcell", hinted.has(i)); kids[i].classList.toggle("bad", hinted.has(i) && !!hintMark.bad); }
   for (let i = 0; i < N * N; i++) kids[i].setAttribute("aria-label",
     `Row ${Math.floor(i / N) + 1}, column ${i % N + 1}${game.clue[i] ? ", cat " + game.clue[i] : ""}${lit.has(i) ? ", sunny" : ""}`);
   const covered = game.rects.reduce((s, R) => s + R.w * R.h, 0);
   $("count").textContent = `☀️ ${covered} / ${N * N} squares sunny`;
-  const bad = game.rects.filter(R => !valid(R)).length;
+  const bad = unchecked ? 0 : game.rects.filter(R => !valid(R)).length;
   if (bad) G.note(bad === 1 ? "One sunbeam doesn't fit its cat." : `${bad} sunbeams don't fit their cats.`, 0);
   else if ($("msg").textContent.includes("fit")) G.note("");
   $("undoBtn").disabled = !game.history.length || game.won; $("hintBtn").disabled = game.won;
@@ -405,6 +412,8 @@ const keys = G.gridKeys({on: () => game && !game.won && !busy, size: () => [game
 
 $("newBtn").onclick = newPuzzle;
 $("size").onchange = e => { settings.size = +e.target.value; save(); newPuzzle(); };
+$("checkTgl").checked = settings.autoCheck;
+$("checkTgl").onchange = e => { settings.autoCheck = e.target.checked; save(); if (game) render(); };
 $("undoBtn").onclick = undo;
 $("restartBtn").onclick = clearAll;
 $("helpBtn").onclick = showHelp;

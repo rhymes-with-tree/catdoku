@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-31.12"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-31.13"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-31.12">
+<link rel="stylesheet" href="../games.css?v=2026-10-31.13">
 <style>
 /* Sudoku with toys: every row, column and box holds one of each toy. The Numbers switch shows 1 to N instead. */
 .gridwrap{background:var(--panel);border:3px solid var(--ink);border-radius:10px;overflow:hidden;
@@ -75,6 +75,8 @@
 @keyframes hop{50%{transform:translateY(-14px)}}
 .won .toy,.won .num{transform-box:fill-box;transform-origin:50% 100%;animation:hop .45s ease-in-out both}
 @media (prefers-reduced-motion:reduce){.won .toy,.won .num{animation:none}}
+/* three switches: two to a row on a phone */
+@media (max-width:520px){.bar.toggles{flex-wrap:wrap;row-gap:10px} .bar.toggles .opt{flex:1 1 140px}}
 /* lives, as in Catdoku, while Auto grade is on */
 .hearts{font-size:20px;letter-spacing:1px;color:var(--fuchsia-plum);margin-right:8px}
 .hearts .lost{color:var(--line)}
@@ -120,11 +122,12 @@
   </div>
   <div class="bar toggles">
     <div class="opt" id="gradeOpt"><label class="toggle"><input type="checkbox" id="gradeTgl"><span class="sw"></span>Auto grade</label><span class="hint">A wrong toy isn't put out, and costs a life</span></div>
+    <div class="opt" id="checkOpt"><label class="toggle"><input type="checkbox" id="checkTgl"><span class="sw"></span>Auto check</label><span class="hint">A toy twice in a line or box gets a red ring</span></div>
     <div class="opt" id="numOpt"><label class="toggle"><input type="checkbox" id="numTgl"><span class="sw"></span>Numbers</label><span class="hint">Shows numbers in place of the toys</span></div>
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-31.12"></script>
+<script src="../games.js?v=2026-10-31.13"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N grid in boxes of bw × bh squares: every row, column and box holds each of the N toys once. Toys are
@@ -354,7 +357,7 @@ function pickToys(N) {
 const STORE = "catdoku.toydoku.v1", MAX_LEVEL = 11;
 const $ = G.$;
 let state = G.load(STORE);
-let settings = Object.assign({level: 1, numbers: false, autoGrade: false}, state.settings);
+let settings = Object.assign({level: 1, numbers: false, autoGrade: false, autoCheck: true}, state.settings);
 // Lives, as in Catdoku: 3 a time, and running out can bring 3 more, up to 9 on one puzzle.
 const HEARTS = 3, MAX_LIVES = 9;
 let game = state.game || null, busy = false, running = false, sel = -1, noting = false;
@@ -386,7 +389,7 @@ function clashes() {
 let missMark = -1, missTimer = null;   // missMark: a square Auto grade just turned a toy away from
 const hints = G.hinter({game: () => game, key: () => game ? game.grid.join() : "", draw: () => draw()});   // marks {i, bad}: a square to look at
 function draw() {
-  const {N, bw, bh} = game, S = N * 100, svg = $("svg"), g = game.grid, clash = clashes(), nums = settings.numbers;
+  const {N, bw, bh} = game, S = N * 100, svg = $("svg"), g = game.grid, clash = settings.autoCheck ? clashes() : new Set(), nums = settings.numbers;
   svg.setAttribute("viewBox", `0 0 ${S} ${S}`);
   const rc = i => [Math.floor(i / N), i % N], boxOf = i => Math.floor(Math.floor(i / N) / bh) * (N / bw) + Math.floor(i % N / bw);
   const [sr, sc] = sel >= 0 ? rc(sel) : [-1, -1], sv = armed ? armed.v : sel >= 0 ? g[sel] : 0;
@@ -433,7 +436,7 @@ function draw() {
   $("hearts").hidden = !settings.autoGrade;
   $("hearts").innerHTML = Array.from({length: Math.max(HEARTS, game.livesUsed)}, (_, k) => k < game.hearts ? "♥" : '<span class="lost">♥</span>').join("");
   $("hearts").setAttribute("aria-label", `${game.hearts} ${game.hearts === 1 ? "life" : "lives"} left`);
-  $("gradeTgl").checked = settings.autoGrade;
+  $("gradeTgl").checked = settings.autoGrade; $("checkTgl").checked = settings.autoCheck;
   $("board").classList.toggle("guessing", guessing);
   $("guessBtn").setAttribute("aria-pressed", String(guessing));
   $("guessBtn").disabled = game.won; $("backBtn").hidden = !(game.guesses || []).length || game.won;
@@ -443,7 +446,7 @@ function draw() {
   [...$("pad").children, $("eraseBtn")].forEach(b => { const v = +b.dataset.v, on = armed && armed.v === v; b.classList.toggle("armed", !!on && !armed.sticky); b.classList.toggle("sticky", !!on && armed.sticky); });
   $("notesBtn").setAttribute("aria-pressed", String(noting));
   const filled = g.filter(Boolean).length;
-  $("count").textContent = game.won ? "Every toy's in place!" : `${filled} of ${N * N} ${nums ? "squares" : "toys"}`;
+  $("count").textContent = game.won ? "Every toy's in place!" : filled === N * N ? "Something's not right" : `${filled} of ${N * N} ${nums ? "squares" : "toys"}`;
   const what = nums ? "number" : "toy", it = armed ? (armed.v ? (nums ? String(armed.v) : "the " + toyName(armed.v)) : "the eraser") : "";
   $("key").textContent = game.won ? "" : guessing ? `Guess: the next ${what} you put out glows until you undo it` : armed ? (armed.sticky ? `${it[0].toUpperCase() + it.slice(1)} sticks: tap squares${noting && armed.v ? " (or drag) to pencil it in" : ""} (tap it for ${noting ? "pen" : "pencil"}, hold to let go)` : `Tap a square for ${it}${noting && armed.v ? " (in pencil)" : ""}`)
     : sel >= 0 && isGiven(sel) ? "That one was already out" : "";
@@ -684,6 +687,7 @@ function loseLives(n) {
   if (game.hearts <= 0) { save(); setTimeout(showLost, 600); }
   return game.hearts;
 }
+$("checkTgl").onchange = e => { settings.autoCheck = e.target.checked; save(); if (game) draw(); };
 // Switching Auto grade on mid-puzzle grades the board as it stands: each wrong toy gets a red ring and costs a life.
 $("gradeTgl").onchange = e => {
   settings.autoGrade = e.target.checked; save();

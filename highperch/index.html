@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-31.12"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-31.13"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-31.12">
+<link rel="stylesheet" href="../games.css?v=2026-10-31.13">
 <style>
 /* A cattery floor of cat trees, 1 to N perches tall: one of each height in every row and column. Arrows between
    trees point down to the shorter one, and lookout cats round the walls count the trees they can see. When
@@ -89,10 +89,13 @@
     <label>Level <select id="levelSel" aria-label="Level"></select></label>
     <button id="newBtn" class="primary">New floor</button>
   </div>
+  <div class="bar toggles">
+    <div class="opt"><label class="toggle"><input type="checkbox" id="checkTgl"><span class="sw"></span>Auto check</label><span class="hint">A tree or arrow that breaks a rule shows in red, and lookouts go green or red</span></div>
+  </div>
 </main>
 
-<script src="../games.js?v=2026-10-31.12"></script>
-<script src="../cattower.js?v=2026-10-31.12"></script>
+<script src="../games.js?v=2026-10-31.13"></script>
+<script src="../cattower.js?v=2026-10-31.13"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N floor of cat trees, 1 to N perches tall: every row and column has one tree of each height.
@@ -225,7 +228,7 @@ function makeFloor(n) {
 const STORE = "catdoku.highperch.v1", MAX_LEVEL = 10;
 const $ = G.$;
 let state = G.load(STORE);
-let settings = Object.assign({level: 1}, state.settings);
+let settings = Object.assign({level: 1, autoCheck: true}, state.settings);
 let game = state.game || null, busy = false, running = false, sel = -1, noting = false;
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
@@ -263,6 +266,7 @@ function check() {
   }
   const badSign = game.signs.map(([t, s]) => g[t] && g[s] && g[t] <= g[s]);
   const lookState = game.looks.map(([side, l, c]) => { const hs = viewCells(N, side, l).map(i => g[i]); return hs.every(Boolean) ? (seen(hs) === c ? "ok" : "bad") : ""; });
+  if (!settings.autoCheck) return {clash: new Set(), badSign: badSign.map(() => false), lookState: lookState.map(() => "")};   // Auto check off: nothing shows
   return {clash, badSign, lookState};
 }
 const hints = G.hinter({game: () => game, key: () => game ? game.grid.join() : "", draw: () => draw()});   // marks {i, bad}: a square to look at
@@ -316,7 +320,7 @@ function draw() {
   $("pad").classList.toggle("noting", noting);
   $("notesBtn").setAttribute("aria-pressed", String(noting));
   const filled = g.filter(Boolean).length;
-  $("count").textContent = game.won ? "Every tree is up!" : `${filled} of ${N * N} trees`;
+  $("count").textContent = game.won ? "Every tree is up!" : filled === N * N ? "Something's not right" : `${filled} of ${N * N} trees`;
   $("key").textContent = game.won ? "" : noting ? "Notes: tap heights to jot them down as maybes" : sel < 0 ? "Tap a square, then a height" : isGiven(sel) ? "That tree was already standing" : "";
   $("hintBtn").disabled = game.won; $("allNotesBtn").disabled = game.won; $("allNotesBtn").setAttribute("aria-pressed", String(!game.won && allNotesOn()));
   $("undoBtn").disabled = !game.history.length || game.won; $("restartBtn").disabled = !game.history.length || game.won;
@@ -540,6 +544,8 @@ $("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : setti
 
 if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
 $("levelSel").value = settings.level;
+$("checkTgl").checked = settings.autoCheck;
+$("checkTgl").onchange = e => { settings.autoCheck = e.target.checked; save(); if (game) draw(); };
 const shared = G.readShare("highperch");
 const hadSave = !!(game && Array.isArray(game.grid));
 if (hadSave) G.reopen(() => {
