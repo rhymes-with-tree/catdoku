@@ -174,6 +174,14 @@ Every game's hint goes through `G.hinter` (see `toydoku/` or `sunbeams/`).
 - **Bookkeeping.** Set `game.hinted = true` and save only when a mark is shown (a hint with nothing to show
   is free); disable `hintBtn` once the puzzle is won.
 
+### One-use helpers
+
+A helper that can only be used so many times a level (Bubbles' Long sight, Toy Box's Shake, Bird Watch's Wipe)
+goes away once it's used up: set `button.hidden = true`, never `disabled`, so there's no strip of greyed-out
+buttons. Keep them in an `.actions.helpers` row; `games.css` lets the buttons that are left share the row and
+hides the whole row when none are left. Bring them all back when the level starts again. (A helper that works
+any time, or as often as it's needed, like Wind Up's Shake, stays and is only greyed while it can't be used.)
+
 ### Keys
 
 Every game can be played without a mouse. A board of squares, or of spots (perches, balls, baskets), uses
