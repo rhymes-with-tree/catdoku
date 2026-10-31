@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-31.11"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-31.12"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -22,7 +22,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-31.11">
+<link rel="stylesheet" href="../games.css?v=2026-10-31.12">
 <style>
 /* Gus sits on the rim of a basket and drops balls of yarn into it; two of a kind that touch wind into one bigger
    ball. Peanut watches from the corner with the next ball. Don't let the yarn pile up over the line. */
@@ -113,8 +113,8 @@ body.full .bar{width:auto;grid-column:3;grid-row:5;align-self:center}
   </div>
 </main>
 
-<script src="../games.js?v=2026-10-31.11"></script>
-<script src="../colorways.js?v=2026-10-31.11"></script>
+<script src="../games.js?v=2026-10-31.12"></script>
+<script src="../colorways.js?v=2026-10-31.12"></script>
 <script>
 /* ---------- the basket ---------- */
 // World units: the basket is W wide and H deep; Gus sits CAT above its rim. Ten sizes of yarn ball, each winding up
@@ -149,17 +149,18 @@ const SHAPE_WORDS = {slope: "sloped floor", slopeR: "sloped floor", hump: "hump"
 const levelName = n => { const v = LV[n], bits = [...new Set(v.shape.split("+").filter(Boolean).map(k => SHAPE_WORDS[k]))]; if (v.pom[0]) bits.push("fluffballs"); if (v.net) bits.push("drop the floor");
   return `Level ${n} · size ${v.goal} ball` + (bits.length ? ", " + bits.join(", ") : ""); };
 // The shapes in the basket: a line of points with a half-thickness (a single point is a round peg), and for the corners
+// (net: part of the floor, which turns to net with it when the floor is dropped)
 // a polygon to fill. Balls roll off them like the walls.
 const SHAPE = {
-  slope: () => [{pts: [[0, H - 80], [W, H]], hr: 3, fill: [[0, H - 80], [W, H], [0, H]]}],   // the floor higher on the left, so balls roll right
-  slopeR: () => [{pts: [[W, H - 80], [0, H]], hr: 3, fill: [[W, H - 80], [0, H], [W, H]]}],
+  slope: () => [{pts: [[0, H - 80], [W, H]], hr: 3, fill: [[0, H - 80], [W, H], [0, H]], net: true}],   // the floor higher on the left, so balls roll right
+  slopeR: () => [{pts: [[W, H - 80], [0, H]], hr: 3, fill: [[W, H - 80], [0, H], [W, H]], net: true}],
   hump: () => [{pts: [[W / 2, H + 14]], hr: 44}],
   ledge: () => [{pts: [[0, 236], [84, 262]], hr: 5}],
   ledgeR: () => [{pts: [[W, 250], [W - 84, 276]], hr: 5}],
   ledges: () => [{pts: [[0, 200], [80, 226]], hr: 5}, {pts: [[W, 290], [W - 80, 316]], hr: 5}],
   round: () => [-1, 1].map(side => {   // a curved corner each side of the floor: an arc of 60 units, filled in behind
     const pts = Array.from({length: 9}, (_, k) => { const f = Math.PI / 2 * (k / 8), phi = side < 0 ? Math.PI - f : f; return [(side < 0 ? 60 : W - 60) + 60 * Math.cos(phi), H - 60 + 60 * Math.sin(phi)]; });
-    return {pts, hr: 3, fill: [...pts, [side < 0 ? 0 : W, H]]};
+    return {pts, hr: 3, fill: [...pts, [side < 0 ? 0 : W, H]], net: true};
   }),
 };
 const POM_TOP = 6;   // puffballs wind up to this size; two of the biggest puff away
@@ -240,7 +241,7 @@ function status() {
   $("netBtn").hidden = !hasNet(game);
   $("netBtn").disabled = game.state !== "running" || !game.netReady || game.net > 0;
   $("fluffBtn").hidden = !LV[game.level].pom[0];   // only on levels that have fluffballs
-  $("fluffBtn").disabled = game.state !== "running" || !!game.fluffed;
+  $("fluffBtn").disabled = game.state !== "running";
   $("pauseBtn").disabled = !["running", "paused"].includes(game.state);
 }
 
@@ -265,7 +266,8 @@ function netTick(g) {
   const ready = g.load > NET_AT;
   if (ready !== g.netReady) { g.netReady = ready; if (ready && !g.netNote) { g.netNote = true; G.note("The basket's heavy: you can drop the floor.", 3500); } status(); }
   if (g.net > 0 && (g.net = Math.max(0, g.net - STEP)) === 0) status();
-  for (const b of g.balls) if (!b.falling && throughNet(g, b) && b.y > H - b.r + 1) b.falling = true;
+  for (const b of g.balls) if (!b.falling && throughNet(g, b) && (b.y > H - b.r + 1 ||
+    g.shapes.some(sh => sh.net && sh.pts.some((_, k) => { const hit = k < Math.max(1, sh.pts.length - 1) && nearOnShape(b, sh, k); return hit && hit.d < b.r + sh.hr + 1; })))) b.falling = true;
   const out = g.balls.filter(b => b.falling && b.y - b.r > H + M + 4);
   if (out.length) { g.balls = g.balls.filter(b => !out.includes(b)); g.fell += out.length; status(); }
 }
@@ -309,6 +311,7 @@ function step(g, h) {
     if (a.x <= a.r + .4) contact(null, a, 1, 0);
     if (a.x >= W - a.r - .4) contact(null, a, -1, 0);
     for (const sh of g.shapes) for (let k = 0; k < Math.max(1, sh.pts.length - 1); k++) {
+      if (sh.net && throughNet(g, a)) continue;
       const hit = nearOnShape(a, sh, k); if (hit && hit.d < a.r + sh.hr + .4) contact(null, a, hit.nx, hit.ny);
     }
   }
@@ -334,6 +337,7 @@ function step(g, h) {
     }
     for (const b of B) {
       for (const sh of g.shapes) for (let k = 0; k < Math.max(1, sh.pts.length - 1); k++) {
+        if (sh.net && throughNet(g, b)) continue;
         const hit = nearOnShape(b, sh, k), need = hit && b.r + sh.hr - SLOP;
         if (hit && hit.d < need) { const pen = Math.min(need - hit.d, 3) * .6; b.x += hit.nx * pen; b.y += hit.ny * pen; }
       }
@@ -421,6 +425,13 @@ function paint() {
   // shapes in the basket (a hump, ledges, round corners), in ink a little lightened
   ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip(); ctx.fillStyle = ctx.strokeStyle = "#59555E"; ctx.lineCap = ctx.lineJoin = "round";
   for (const sh of g.shapes) {
+    if (sh.fill && sh.net && g.net > 0) {   // a sloped floor or a round corner dropped to net with the floor
+      ctx.save(); ctx.beginPath(); sh.fill.forEach(([x, y], k) => k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.clip();
+      ctx.strokeStyle = "#BB871E"; ctx.lineWidth = 2;
+      for (let x = -H; x < W + H; x += 14) { ctx.beginPath(); ctx.moveTo(x, H - 90); ctx.lineTo(x + 100, H + 10); ctx.moveTo(x + 100, H - 90); ctx.lineTo(x, H + 10); ctx.stroke(); }
+      ctx.restore(); ctx.strokeStyle = "#BB871E"; ctx.lineWidth = sh.hr * 2; ctx.beginPath(); sh.pts.forEach(([x, y], k) => k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke(); ctx.strokeStyle = "#59555E";
+      continue;
+    }
     if (sh.fill) { ctx.beginPath(); sh.fill.forEach(([x, y], k) => k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.fill(); }
     ctx.lineWidth = sh.hr * 2; ctx.beginPath(); sh.pts.forEach(([x, y], k) => k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); if (sh.pts.length === 1) { ctx.arc(sh.pts[0][0], sh.pts[0][1], sh.hr, 0, 7); ctx.fill(); } else ctx.stroke();
   }
@@ -517,15 +528,15 @@ function shake() {
   if (!g.shook) G.note("Shaken! That costs the gold paw this time.", 3500);
   g.shook = true; save();
 }
-// De-fluff: a lint roller that takes every fluffball off the board, once a board. It costs the gold paw.
+// De-fluff: a lint roller that takes every fluffball off the board, as often as there's fluff to take. It costs the gold paw.
 function defluff() {
   const g = game;
-  if (!g || g.state !== "running" || g.fluffed || $("overlay").classList.contains("show") || document.querySelector(".spot")) return;
+  if (!g || g.state !== "running" || $("overlay").classList.contains("show") || document.querySelector(".spot")) return;
   const fluff = g.balls.filter(b => b.p);
-  if (!fluff.length) { G.note("No fluffballs on the board right now. You only get one go, so save it.", 3500); return; }
+  if (!fluff.length) { G.note("No fluffballs on the board right now.", 2500); return; }
   for (const b of fluff) g.fx.push({puff: true, l: b.l, x: b.x, y: b.y, r: b.r, a: b.a, t: 0, T: .45});
+  G.note(g.fluffed ? "All the fluff is gone." : "All the fluff is gone. That costs the gold paw this time.", 3000);
   g.balls = g.balls.filter(b => !b.p); g.fluffed = true;
-  G.note("All the fluff is gone. That costs the gold paw this time.", 3500);
   status(); save();
 }
 $("fluffBtn").onclick = () => defluff();
@@ -545,7 +556,7 @@ function lose() {
   const g = game;
   setTimeout(() => {
     if (game !== g) return;
-    const fluff = !!LV[g.level].pom[0] && !g.fluffed && g.balls.some(b => b.p);
+    const fluff = !!LV[g.level].pom[0] && g.balls.some(b => b.p);
     const keepOn = [["Shake and keep going", () => { closeCard(); revive(g, "shake"); }, true]];
     if (fluff) keepOn.push(["De-fluff and keep going", () => { closeCard(); revive(g, "fluff"); }]);
     if (hasNet(g)) keepOn.push(["Drop the floor and keep going", () => { closeCard(); revive(g, "net"); }]);
@@ -609,7 +620,7 @@ function helpOnFirstVisit() {
     ...(LV[game.level].pom[0] ? [{say: "Fluffballs wind only with fluffballs", els: [$("nextCv")]}] : []),
     {say: "Don't pile yarn above the line", lit: line, tone: "ok"},
     {say: "Stuck? Shake the basket", els: [$("shakeBtn")]},
-    ...(LV[game.level].pom[0] ? [{say: "Once a board, De-fluff clears the fluffballs", els: [$("fluffBtn")]}] : []),
+    ...(LV[game.level].pom[0] ? [{say: "De-fluff clears the fluffballs", els: [$("fluffBtn")]}] : []),
     ...(hasNet(game) ? [{say: "Heavy? Drop the floor: small balls fall through", els: [$("netBtn")]}] : []),
   ];
   G.spotlight({grid: cv, w: cols, h: rows, steps, done: () => { settings.seenHelp = true; save(); }});
