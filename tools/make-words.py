@@ -22,7 +22,7 @@ CRUDE = set("""arse bitch bitched bitchier bitchy bollock bugger buggered butt b
 dick dickhead dildo fart farted fuck fucked fucker jerkoff jizz piss pissed shit shitty tit tits titty turd twat wank
 wanker boner boob booby porn porno perv fatso slut whore""".split())
 # Newer words neither list has yet.
-ALSO = set("empath empathic vlog vlogger glamping matcha knick".split())
+ALSO = set("empath empathic vlog vlogger glamping matcha knick tata".split())
 # Decided by hand: words that should be answers though SCOWL doesn't count them common, and common words that
 # shouldn't be answers (they still count when typed).
 MAKE_COMMON = set("dino dada dadda droid".split())
