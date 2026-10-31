@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-10-31.19"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-10-31.20"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-10-31.19">
+<link rel="stylesheet" href="../games.css?v=2026-10-31.20">
 <style>
 /* A cat has walked across the keyboard and broken it. Only seven keys still work. Make words with them, always
    using the gold one. */
@@ -63,6 +63,7 @@
 .krow.ctl{gap:var(--gap)}
 .ctlkey{flex:1 1 0;height:42px;border-radius:10px;border:none;background:#8D78AD;color:#fff;font-size:16px;font-weight:800;box-shadow:inset 0 -3px 0 rgba(0,0,0,.25);cursor:pointer}
 .ctlkey.enter{background:#6AA673}
+.ctlkey.mix{background:#5E8FB5}
 /* What matters is the keys, the word being typed and the word list (with the hints, which work on the list), so
    everything else is kept small. On a phone: the rank, the word, the keys, then the list and the few buttons. */
 .play{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%}
@@ -238,8 +239,8 @@
   <p class="help">Words from <a href="https://wordlist.aspell.net/">SCOWL</a>, © Kevin Atkinson, and ENABLE.</p>
 </main>
 
-<script src="../games.js?v=2026-10-31.19"></script>
-<script src="../walkcat.js?v=2026-10-31.19"></script>
+<script src="../games.js?v=2026-10-31.20"></script>
+<script src="../walkcat.js?v=2026-10-31.20"></script>
 <script>
 const WORDS_INLINE = null;  // the word list, filled in when the page is bundled into one file
 
@@ -291,9 +292,17 @@ function rankAt(s) { let r = 0; RANKS.forEach(([, f], i) => { if (s >= Math.ceil
 
 // The whole keyboard (while the cat crosses it), or, once it's knocked the rest off, just the seven keys left, in
 // keyboard order, closed up into two rows (four and three) and bigger, with no gaps left where the others were.
+// The seven keys once the cat has knocked the rest off: the gold one always bottom middle, the six others in
+// game.order (keyboard order to begin with; Mix shuffles it).
+function compactOrder() {
+  if (!game.order) game.order = ROWS.join("").split("").filter(ch => game.keys.includes(ch) && ch !== game.centre);
+  const o = game.order.slice(), at = Math.min(5, o.length);
+  o.splice(at, 0, game.centre);
+  return o.join("");
+}
 function drawKeys(compact) {
   const kb = $("board"); kb.innerHTML = ""; kb.classList.toggle("compact", !!compact);
-  const left = ROWS.join("").split("").filter(ch => game.keys.includes(ch)).join(""), half = Math.ceil(left.length / 2);
+  const left = compact ? compactOrder() : ROWS.join("").split("").filter(ch => game.keys.includes(ch)).join(""), half = Math.ceil(left.length / 2);
   const rows = compact ? [left.slice(0, half), left.slice(half)].filter(Boolean) : ROWS;
   kb.style.setProperty("--per", compact ? half : 10);
   rows.forEach(row => {
@@ -311,7 +320,7 @@ function drawKeys(compact) {
     kb.append(r);
   });
   const c = document.createElement("div"); c.className = "krow ctl";
-  c.innerHTML = `<button class="ctlkey" data-k="del">⌫ Delete</button><button class="ctlkey enter" data-k="enter">Enter ⏎</button>`;
+  c.innerHTML = `<button class="ctlkey" data-k="del">⌫ Delete</button>${compact ? `<button class="ctlkey mix" data-k="mix" aria-label="Mix up the keys">🔀 Mix</button>` : ""}<button class="ctlkey enter" data-k="enter">Enter ⏎</button>`;
   kb.append(c);
 }
 function draw() {
@@ -364,9 +373,10 @@ function placeCat(walk) {
 }
 // The whole keyboard gives way to the seven keys left: each slides from where it was to its new place, growing, and
 // the keyboard shrinks to fit them.
-function closeUp() {
+function closeUp(mixing) {
   const kb = $("board"), was = {}, h0 = kb.offsetHeight;
   for (const k of kb.querySelectorAll("[data-k]")) was[k.dataset.k] = k.getBoundingClientRect();
+  if (mixing) { const before = game.order.join(""); do game.order.sort(() => Math.random() - .5); while (game.order.join("") === before && game.order.length > 1); }
   drawKeys(true);
   const opts = {duration: 350, easing: "ease-in-out"};
   kb.animate([{height: h0 + "px"}, {height: kb.offsetHeight + "px"}], opts);
@@ -380,6 +390,7 @@ function closeUp() {
 let lastWord = null, flyFrom = null;
 function press(k) {
   if (!game || $("overlay").classList.contains("show") || document.querySelector(".spot")) return;
+  if (k === "mix") { if ($("board").classList.contains("compact")) closeUp(true); return; }
   if (stale !== null) { stale = null; typed = ""; if (k === "del" || k === "enter") { draw(); return; } }
   if (k === "del") typed = typed.slice(0, -1);
   else if (k === "enter") return submit();
@@ -395,9 +406,10 @@ $("board").addEventListener("pointerdown", e => {
 });
 addEventListener("keydown", e => {
   if (e.metaKey || e.ctrlKey || e.altKey || e.target.closest("select,input,textarea")) return;
-  const k = e.key === "Backspace" ? "del" : e.key === "Enter" ? "enter" : e.key.length === 1 ? e.key.toLowerCase() : null;
+  const k = e.key === " " ? "mix" : e.key === "Backspace" ? "del" : e.key === "Enter" ? "enter" : e.key.length === 1 ? e.key.toLowerCase() : null;
   if (!k) return;
-  if (k === "enter" || k === "del" || /^[a-z]$/.test(k)) { e.preventDefault(); press(k); }
+  if (k === "mix" && (e.target.closest("button,a") || $("overlay").classList.contains("show"))) return;   // Space still presses a focused button
+  if (k === "enter" || k === "del" || /^[a-z]$/.test(k) || k === "mix") { e.preventDefault(); press(k); }
 });
 function toast(text) { const t = document.createElement("div"); t.className = "toast"; t.textContent = text; document.body.append(t); setTimeout(() => t.remove(), 1500); }
 // A word that doesn't count shakes and stays up a moment, then clears (at once, if the next key comes sooner).
