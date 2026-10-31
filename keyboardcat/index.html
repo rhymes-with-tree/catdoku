@@ -143,6 +143,13 @@
 /* with Starts on: a heading for each pair of first letters, saying how many words left start with it */
 .words li.starthead{display:flex;align-items:baseline;gap:8px;break-after:avoid;break-inside:avoid;margin-top:.35em;line-height:1.3;
   font-size:.62em;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--ink-soft);border-bottom:1px solid var(--line)}
+.starts{list-style:none;margin:0 0 10px;padding:0 0 8px;display:flex;flex-wrap:wrap;gap:4px 12px;border-bottom:1px solid var(--line);
+  font-size:.8em;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--ink-soft)}
+.starts[hidden]{display:none}
+.starts li{display:flex;gap:5px;align-items:baseline}
+.starts span{color:var(--ink)}
+.starts b{font-weight:700;letter-spacing:0;text-transform:none;color:#C9773F}
+.starts b.done{color:#6AA673}
 .words li.starthead:first-child{margin-top:0}
 .words li.starthead span{color:var(--ink);font-size:1.15em}
 .words li.starthead b{font-weight:700;letter-spacing:0;text-transform:none;color:#C9773F}
@@ -151,7 +158,6 @@
 .words li.blank button{all:unset;cursor:pointer;border-radius:6px;padding:0 4px;margin-left:-4px}
 .words li.blank button:hover,.words li.blank button:focus-visible{background:#EDE6F7;outline:none}
 .words li.blank small{font-size:.72em;font-weight:600;margin-left:2px}
-.words li.blank.bare small{font-size:1em;margin-left:0}
 .wordclue{margin:0 0 16px;text-align:left}
 .wordclue .pos{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--ink-soft);margin:0 0 4px}
 .wordclue p{margin:0 0 8px;color:var(--ink)}
@@ -212,6 +218,7 @@
       <span class="smashes" id="smashes"></span></div>
     <ul class="legend" id="legend"></ul>
     <p class="tapclue" id="tapClue" hidden>Tap a blank for a clue.</p>
+    <ul class="starts" id="startsList" hidden></ul>
     <ul class="words" id="words"></ul>
     <div class="hintbtns tools" id="hintbar"></div>
   </section>
@@ -459,11 +466,8 @@ function drawWords() {
   // a word left: its first letter and length, M(5); tap it for a clue
   blanks = [];
   $("tapClue").hidden = !(h.left && left.length && !game.revealed);
-  // with Starts on, the blank shows the word's start (AC, or a word found that it starts with) instead
-  // With Starts on, the heading above already gives the first two letters, so a blank repeats them only when a found
-  // word it grows from makes it longer (ANT for ANTLER); otherwise it's just the length.
-  const blank = w => { const at = h.pairs ? startOf(w) : w[0], bare = h.pairs && at === w.slice(0, 2);
-    return `<li class="blank${bare ? " bare" : ""}"><button data-b="${blanks.push(w) - 1}" aria-label="${at}, ${w.length} letters: tap for a clue">${bare ? "" : at}<small>(${w.length})</small></button></li>`; };
+  const blank = w => { const at = w[0];
+    return `<li class="blank"><button data-b="${blanks.push(w) - 1}" aria-label="${at}, ${w.length} letters: tap for a clue">${at}<small>(${w.length})</small></button></li>`; };
   // the two-letter starts (or found words) the words left begin with
   const startOf = w => game.found.filter(f => f.length < w.length && w.startsWith(f)).sort((a, b) => b.length - a.length)[0] || w.slice(0, 2);
   const starts = {};
@@ -487,23 +491,23 @@ function drawWords() {
   // One list, by first letter (with Starts on, by first two letters, each pair a heading with how many words left
   // start with it): the words found in alphabetical order, then, with Words left on, a blank for each word left,
   // shortest first. Once revealed, every word in alphabetical order, the missed ones marked.
-  const found = new Set(game.found), by = h.pairs ? 2 : 1;
+  const found = new Set(game.found), by = 1;
   const shown = game.revealed || h.left || h.pairs ? [...game.found, ...left] : game.found.slice();
   const order = (a, b) => a.slice(0, by) < b.slice(0, by) ? -1 : a.slice(0, by) > b.slice(0, by) ? 1
     : game.revealed ? (a < b ? -1 : 1)
     : (found.has(b) - found.has(a)) || (found.has(a) ? (a < b ? -1 : 1) : a.length - b.length);
-  const leftIn = {};
-  for (const w of left) leftIn[w.slice(0, 2)] = (leftIn[w.slice(0, 2)] || 0) + 1;
-  let html = "", at = "";
+  let html = "";
   for (const w of shown.sort(order)) {
-    if (h.pairs && w.slice(0, 2) !== at) {
-      at = w.slice(0, 2); const n = game.revealed ? 0 : leftIn[at] || 0;
-      html += `<li class="starthead"><span>${at}</span>${n ? `<b>${n} left</b>` : `<b class="done">✓</b>`}</li>`;
-    }
     if (found.has(w)) html += word(w); else if (game.revealed) html += missed(w); else if (h.left) html += blank(w);
   }
   $("words").innerHTML = html;
-  $("words").classList.toggle("grouped", !!h.pairs);
+  // Starts: its own strip above the list, a chip for each pair of first letters (or found word) and how many words are left
+  const pairs = {};
+  for (const w of shown) pairs[startOf(w)] = pairs[startOf(w)] || 0;
+  for (const x in starts) pairs[x] = starts[x];
+  $("startsList").innerHTML = h.pairs && !game.revealed ? Object.keys(pairs).sort().map(x =>
+    `<li><span>${x}</span>${pairs[x] ? `<b>${pairs[x]} left</b>` : `<b class="done">✓</b>`}</li>`).join("") : "";
+  $("startsList").hidden = !(h.pairs && !game.revealed);
   if (!shown.length) $("words").innerHTML = `<p class="none">Type a word and press Enter.</p>`;
 }
 let blanks = [];  // the words left, in the order their blanks are drawn
