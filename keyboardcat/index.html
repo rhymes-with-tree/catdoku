@@ -194,6 +194,8 @@
 .words .ana{box-shadow:inset 0 -.45em 0 #D5C6F2;border-radius:2px}
 .words .more.ana{background:linear-gradient(#F6C78E 55%,#D5C6F2 55%);box-shadow:none}
 .words .new{animation:pop .4s ease-out}
+.words li.ghost{position:fixed;z-index:20;margin:0;padding:0 8px;border-radius:8px;background:#F7D56A;box-shadow:0 3px 8px rgba(0,0,0,.3);
+  transform-origin:0 50%;pointer-events:none;list-style:none;width:auto;white-space:nowrap}
 @keyframes pop{from{transform:scale(1.4)}}
 .toast{position:fixed;left:50%;top:22%;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:6px 16px;border-radius:999px;font-weight:700;z-index:5;pointer-events:none;animation:toast 1.4s ease-out forwards}
 @keyframes toast{0%{opacity:0;transform:translate(-50%,6px)}12%,75%{opacity:1;transform:translate(-50%,0)}100%{opacity:0}}
@@ -372,7 +374,7 @@ function closeUp() {
 }
 
 /* ---------- typing ---------- */
-let lastWord = null;
+let lastWord = null, flyFrom = null;
 function press(k) {
   if (!game || $("overlay").classList.contains("show") || document.querySelector(".spot")) return;
   if (stale !== null) { stale = null; typed = ""; if (k === "del" || k === "enter") { draw(); return; } }
@@ -410,6 +412,9 @@ function submit() {
   if (game.found.includes(w)) return nope("Already found");
   if (!COMMON.has(w) && !EXTRA.has(w)) return nope("Not in the word list");
   const before = rankAt(score());
+  // with Words left on, note where the word's blank is, so the word can appear there before it moves into place
+  const bb = blanks.indexOf(w), bEl = bb < 0 ? null : $("words").querySelector(`button[data-b="${bb}"]`);
+  flyFrom = bEl ? bEl.getBoundingClientRect() : null;
   game.found.push(w); lastWord = w; typed = "";
   const smash = lettersOf(w).length === 7, p = points(w);
   toast(smash ? `${w.length === 7 ? "Perfect Pounce" : "Full Pounce"}! +${p}` : EXTRA.has(w) ? `A rare one! +${p}` : `${["", "Nice!", "", "", "", "Good!", "Great!", "Purrfect!"][Math.min(7, w.length - 3)] || "Purrfect!"} +${p}`);
@@ -501,6 +506,7 @@ function drawWords() {
     if (found.has(w)) html += word(w); else if (game.revealed) html += missed(w); else if (h.left) html += blank(w);
   }
   $("words").innerHTML = html;
+  if (flyFrom) { fly(flyFrom); flyFrom = null; }
   // Starts: its own strip above the list, a chip for each pair of first letters (or found word) and how many words are left
   const pairs = {};
   for (const w of shown) pairs[startOf(w)] = pairs[startOf(w)] || 0;
@@ -509,6 +515,24 @@ function drawWords() {
     `<li><span>${x}</span>${pairs[x] ? `<b>${pairs[x]}</b>` : `<b class="done">✓</b>`}</li>`).join("") : "";
   $("startsList").hidden = !(h.pairs && !game.revealed);
   if (!shown.length) $("words").innerHTML = `<p class="none">Type a word and press Enter.</p>`;
+}
+// A word just found shows up big and gold where its blank was, so you see which clue it answered, then glides
+// to its place in the list.
+function fly(from) {
+  const li = $("words").querySelector(".new")?.closest("li");
+  if (!li || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const to = li.getBoundingClientRect(), g = li.cloneNode(true), dx = to.left - from.left, dy = to.top - from.top;
+  g.className = "ghost"; g.style.cssText = `left:${from.left}px;top:${from.top}px`;
+  li.style.visibility = "hidden"; $("words").appendChild(g);
+  const a = g.animate([
+    {transform: "scale(1)", offset: 0},
+    {transform: "scale(1.7)", offset: .18},
+    {transform: "scale(1.35)", offset: .3},
+    {transform: "scale(1.6)", offset: .42},
+    {transform: "scale(1.5)", offset: .62},
+    {transform: `translate(${dx}px,${dy}px) scale(1)`, offset: 1}], {duration: 1300, easing: "ease-in-out", fill: "forwards"});
+  const end = () => { g.remove(); li.style.visibility = ""; };
+  a.onfinish = end; a.oncancel = end;
 }
 let blanks = [];  // the words left, in the order their blanks are drawn
 $("words").addEventListener("click", e => { const b = e.target.closest("button[data-b]"); if (b && game && !game.revealed) wordClue(blanks[+b.dataset.b]); });
