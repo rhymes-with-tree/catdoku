@@ -51,6 +51,7 @@ const G = (() => {
     ["Kitten Caboodle", "kittencaboodle", "Wake the kittens. Spell the words made from the mother's root word.", "#B3B94B", "words", "rootonym word roots prefixes suffixes etymology greek latin vocabulary definitions clues kittens", "2026-10-29"],
     ["Wind Up", "windup", "Drop yarn for Gus and wind two of a kind into a bigger ball", "#B94588", "quick", "suika watermelon game merge drop physics 2048 yarn balls fluffballs pompoms", "2026-10-30"],
     ["L-M-N-O-Pom", "lmnopom", "Spell words in the falling pompoms for Marmalade to pounce on", "#B94588", "words", "tetris letris falling letters words scrabble blocks drop pompoms pom poms alphabet lmnop", "2026-10-31"],
+    ["Window Ledges", "windowledges", "Add up the windows to match every total", "#B3B94B", "numbers", "kakuro cross sums sums arithmetic maths math", "2026-10-31"],
   ];
   // The shelves the front page and the games menu sort the games onto, in order: key (also a plain name for it,
   // for search), heading, one line.
