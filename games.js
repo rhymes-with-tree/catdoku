@@ -376,10 +376,13 @@ const G = (() => {
   const GOLD = "catdoku.goldpaws.v1";
   const goldPaws = slug => (load(GOLD).counts || {})[slug] || 0;
   const mastered = slug => !!(load(GOLD).top || {})[slug];
-  // A mastered game's tile keeps its shelf's colour and gets a small gold Mastered label (extra, if given, joins its tooltip).
+  // A mastered game's tile keeps its shelf's colour and gets a small gold Mastered label; extra (the front page's "12 solved")
+  // joins it as "Mastered · 12 solved", and a phone, short of room, shows just the extra in the gold label.
   const masterPill = (extra = "") => {
-    const m = document.createElement("span"); m.className = "masterPill"; m.textContent = "Mastered";
-    m.title = "A gold paw at the top level" + (extra ? ` · ${extra}` : ""); return m;
+    const m = document.createElement("span"); m.className = "masterPill"; m.title = "Mastered: a gold paw at the top level";
+    if (!extra) m.textContent = "Mastered";
+    else { const w = document.createElement("span"); w.className = "masterWord"; w.textContent = "Mastered · "; m.append(w, extra); }
+    return m;
   };
   // the highest level or size in the page's picker
   const topLevel = () => { const sel = $("levelSel") || $("size"); return sel ? Math.max(...[...sel.options].map(o => +o.value).filter(v => !isNaN(v))) : null; };
