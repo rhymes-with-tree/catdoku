@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Window Ledges</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-31.23"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-31.23">
+<style>
+/* Kakuro on a block of flats, at night. The brick is wall; the stone squares in it hold the totals (across at the top
+   right, down at the bottom left of the slash); the windows take the numbers 1 to 9, none twice in a run of windows.
+   A window lights up when every run through it adds up, and with every window lit, cats sit in the windows. */
+:root{--brick:#BD5538;--night:color-mix(in srgb,#2A2530 72%,#4E577D);--frame:#F7F8F3;--glow1:color-mix(in srgb,#ECA818 34%,white);--glow2:color-mix(in srgb,#ECA818 62%,white);
+  --shutter:#F7F8F3}
+.title{display:flex;align-items:flex-end;gap:6px}
+.sitter{display:block;height:64px;width:auto;margin-bottom:-4px}
+@media (max-height:760px){.sitter{height:46px;margin-bottom:-3px}}
+/* the building: a roof, the facade (the board) and a doorway, with a drainpipe down one side */
+.facade{position:relative;width:var(--board);display:flex;flex-direction:column;align-items:stretch;--sky:.1;padding-top:calc(var(--board) * var(--sky))}
+.facade::before{content:"";position:absolute;left:0;right:0;top:0;height:calc(var(--board) * (var(--sky) + .13));border-radius:12px 12px 0 0;
+  background:
+    radial-gradient(circle at 90% 30%,color-mix(in srgb,#ECA818 70%,white) 0 7px,transparent 7.6px),
+    radial-gradient(circle at 44% 30%,#fff 0 4.5px,transparent 5px),radial-gradient(circle at 47% 22%,#fff 0 5.5px,transparent 6px),radial-gradient(circle at 50.5% 30%,#fff 0 4.5px,transparent 5px),
+    radial-gradient(circle at 12% 40%,#fff 0 3.5px,transparent 4px),radial-gradient(circle at 14.5% 34%,#fff 0 4.5px,transparent 5px),radial-gradient(circle at 17.5% 40%,#fff 0 3.5px,transparent 4px),
+    linear-gradient(color-mix(in srgb,#73A7AE 50%,white),color-mix(in srgb,#73A7AE 22%,white))}
+.roof{display:block;width:100%;height:auto;overflow:visible}
+.roof{aspect-ratio:100/13;margin-bottom:-1px;position:relative;z-index:1}
+.roofcat{z-index:2;position:absolute;left:61%;top:calc(var(--board) * (var(--sky) - .078));width:18%;height:auto;pointer-events:none}
+.pipe{position:absolute;right:-8px;top:calc(var(--board) * (var(--sky) + .12));bottom:0;width:6px;border-radius:3px;
+  background:linear-gradient(90deg,color-mix(in srgb,#73A7AE 55%,#2A2530),color-mix(in srgb,#73A7AE 45%,white) 45%,color-mix(in srgb,#73A7AE 55%,#2A2530));
+  box-shadow:0 0 0 1px rgba(42,37,48,.5)}
+.pipe::before{content:"";position:absolute;inset:0 -2px;background:repeating-linear-gradient(transparent 0 calc(var(--board) * .17),color-mix(in srgb,#73A7AE 50%,#2A2530) 0 calc(var(--board) * .17 + 3px));border-radius:2px}
+@media (max-height:760px){.facade{--sky:.08}}
+/* a phone held sideways: just the facade, on the left at the screen's full height */
+@media (orientation:landscape) and (max-height:500px){body:not(.full) .roof,body:not(.full) .pipe,body:not(.full) .roofcat{display:none}body:not(.full) .facade{padding-top:0}body:not(.full) .facade::before{display:none}}
+.block{position:relative;width:100%;height:auto;aspect-ratio:1;border:3px solid var(--ink);border-radius:0;background-color:var(--brick);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 40 40%27%3E%3Crect width=%2740%27 height=%2740%27 fill=%27%23D4D3D6%27/%3E%3Crect x=%270.9%27 y=%270.9%27 width=%2718.2%27 height=%278.2%27 rx=%27.9%27 fill=%27%23BD5538%27/%3E%3Crect x=%270.9%27 y=%270.9%27 width=%2718.2%27 height=%278.2%27 rx=%27.9%27 fill=%27%23000%27 fill-opacity=%270.22%27/%3E%3Crect x=%2720.9%27 y=%270.9%27 width=%2718.2%27 height=%278.2%27 rx=%27.9%27 fill=%27%23BD5538%27/%3E%3Crect x=%2720.9%27 y=%270.9%27 width=%2718.2%27 height=%278.2%27 rx=%27.9%27 fill=%27%23000%27 fill-opacity=%270.1%27/%3E%3Crect x=%27-9.1%27 y=%2710.9%27 width=%2718.2%27 height=%278.2%27 rx=%27.9%27 fill=%27%23BD5538%27/%3E%3Crect x=%27-9.1%27 y=%2710.9%27 width=%2718.2%27 height=%278.2%27 rx=%27.9%27 fill=%27%23fff%27 fill-opacity=%270.1%27/%3E%3Crect x=%2710.9%27 y=%2710.9%27 width=%2718.2%27 height=%278.2%27 rx=%27.9%27 fill=%27%23BD5538%27/%3E%3Crect x=%2710.9%27 y=%2710.9%27 width=%2718.2%27 height=%278.2%27 rx=%27.9%27 fill=%27%237A4035%27 fill-opacity=%270.25%27/%3E%3Crect x=%2730.9%27 y=%2710.9%27 width=%2718.2%27 height=%278.2%27 rx=%27.9%27 fill=%27%23BD5538%27/%3E%3Crect x=%2730.9%27 y=%2710.9%27 width=%2718.2%27 height=%278.2%27 rx=%27.9%27 fill=%27%23000%27 fill-opacity=%270.0%27/%3E%3Crect x=%270.9%27 y=%2720.9%27 width=%2718.2%27 height=%278.2%27 rx=%27.9%27 fill=%27%23BD5538%27/%3E%3Crect x=%270.9%27 y=%2720.9%27 width=%2718.2%27 height=%278.2%27 rx=%27.9%27 fill=%27%23000%27 fill-opacity=%270.0%27/%3E%3Crect x=%2720.9%27 y=%2720.9%27 width=%2718.2%27 height=%278.2%27 rx=%27.9%27 fill=%27%23BD5538%27/%3E%3Crect x=%2720.9%27 y=%2720.9%27 width=%2718.2%27 height=%278.2%27 rx=%27.9%27 fill=%27%23fff%27 fill-opacity=%270.18%27/%3E%3Crect x=%27-9.1%27 y=%2730.9%27 width=%2718.2%27 height=%278.2%27 rx=%27.9%27 fill=%27%23BD5538%27/%3E%3Crect x=%27-9.1%27 y=%2730.9%27 width=%2718.2%27 height=%278.2%27 rx=%27.9%27 fill=%27%23000%27 fill-opacity=%270.0%27/%3E%3Crect x=%2710.9%27 y=%2730.9%27 width=%2718.2%27 height=%278.2%27 rx=%27.9%27 fill=%27%23BD5538%27/%3E%3Crect x=%2710.9%27 y=%2730.9%27 width=%2718.2%27 height=%278.2%27 rx=%27.9%27 fill=%27%23000%27 fill-opacity=%270.22%27/%3E%3Crect x=%2730.9%27 y=%2730.9%27 width=%2718.2%27 height=%278.2%27 rx=%27.9%27 fill=%27%23BD5538%27/%3E%3Crect x=%2730.9%27 y=%2730.9%27 width=%2718.2%27 height=%278.2%27 rx=%27.9%27 fill=%27%23fff%27 fill-opacity=%270.18%27/%3E%3C/svg%3E");
+  background-size:calc(var(--cell) * .64) calc(var(--cell) * .64);
+  user-select:none;-webkit-user-select:none;touch-action:manipulation;--cell:40px;overflow:hidden}
+.cells{position:absolute;inset:0;display:grid}
+.cell{position:relative;display:flex;align-items:center;justify-content:center}
+/* a window: dark glass in a white recess with a dark inner frame, an arched head and a sill below */
+.cell.win{cursor:pointer;margin:calc(var(--cell) * .07);border-radius:calc(var(--cell) * .3) calc(var(--cell) * .3) 0 0;
+  background:var(--night);
+  box-shadow:inset 0 0 0 max(1px,calc(var(--cell) * .03)) #2A2530,0 0 0 max(2px,calc(var(--cell) * .07)) var(--frame),0 calc(var(--cell) * .1) 0 calc(var(--cell) * .03) color-mix(in srgb,#4E577D 45%,white);
+  transition:background-color .35s,box-shadow .35s}
+.cell.win.lit{background:radial-gradient(circle at 50% 60%,var(--glow1),var(--glow2));
+  box-shadow:inset 0 0 0 max(1px,calc(var(--cell) * .03)) #2A2530,0 0 0 max(2px,calc(var(--cell) * .07)) var(--frame),0 calc(var(--cell) * .1) 0 calc(var(--cell) * .03) color-mix(in srgb,#4E577D 45%,white),0 0 calc(var(--cell) * .3) 0 rgba(236,168,24,.5)}
+.cell.win.peer{background-color:color-mix(in srgb,#73A7AE 38%,var(--night))}
+.cell.win.sel{box-shadow:inset 0 0 0 max(1px,calc(var(--cell) * .03)) #2A2530,0 0 0 max(2px,calc(var(--cell) * .07)) var(--frame),0 0 0 max(4px,calc(var(--cell) * .13)) #3C8681;z-index:1}
+.cell .v{font-size:calc(var(--cell) * .52);font-weight:800;line-height:1;margin-top:calc(var(--cell) * .1);color:#fff;transition:color .35s}
+.cell.win.lit .v{color:var(--ink)}
+.cell.same .v{color:color-mix(in srgb,#73A7AE 65%,white)}
+.cell.win.lit.same .v{color:color-mix(in srgb,#3C8681 75%,#2A2530)}
+.cell.clash .v{color:color-mix(in srgb,#E16A4A 60%,white)}
+.cell.win.lit.clash .v{color:#C8392B}
+.cell .notes{position:absolute;inset:calc(var(--cell) * .27) calc(var(--cell) * .05) calc(var(--cell) * .1);display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);
+  align-items:center;justify-items:center;font-size:max(7px,calc(var(--cell) * .19));font-weight:600;line-height:1;color:rgba(255,255,255,.75);pointer-events:none}
+.cell.win.lit .notes{color:var(--ink-soft)}
+.cell.win.guessed .v{color:color-mix(in srgb,#8D78AD 55%,white)}
+.cell.win.lit.guessed .v{color:color-mix(in srgb,#8D78AD 70%,#2A2530)}
+/* a clue square is a white painted shutter: boards with a brace along the slash; the across total top right, the down total bottom left */
+.cell.clue{margin:calc(var(--cell) * .03);border-radius:calc(var(--cell) * .05);
+  background:
+    linear-gradient(to top right,transparent calc(50% - var(--cell) * .055),rgba(0,0,0,.2) calc(50% - var(--cell) * .055),color-mix(in srgb,#2A2530 12%,#F7F8F3) calc(50% - var(--cell) * .045),color-mix(in srgb,#2A2530 12%,#F7F8F3) calc(50% + var(--cell) * .045),rgba(0,0,0,.2) calc(50% + var(--cell) * .055),transparent calc(50% + var(--cell) * .055)),
+    repeating-linear-gradient(90deg,transparent 0 calc(var(--cell) * .2 - 1px),rgba(0,0,0,.13) calc(var(--cell) * .2 - 1px) calc(var(--cell) * .2)),
+    var(--shutter);
+  box-shadow:inset 0 0 0 max(1px,calc(var(--cell) * .03)) rgba(0,0,0,.28),0 max(1px,calc(var(--cell) * .03)) 0 rgba(0,0,0,.25)}
+.cell .sum{position:absolute;font-weight:800;line-height:1;color:var(--ink);font-size:max(9px,calc(var(--cell) * .3));font-variant-numeric:tabular-nums;pointer-events:none;padding:0 1px;border-radius:3px}
+.cell .sum.a{top:calc(var(--cell) * .07);right:calc(var(--cell) * .07)}
+.cell .sum.d{bottom:calc(var(--cell) * .07);left:calc(var(--cell) * .07)}
+.cell .sum.on{background:#3C8681;color:#fff}
+.cell .sum.done{color:#3C8681;opacity:.75}
+.cell .sum.wrong{background:#C8392B;color:#fff}
+/* a cat sitting in a window once every window is lit */
+.cell .sitter2{position:absolute;left:4%;bottom:calc(var(--cell) * -.045);width:92%;height:94%;object-fit:contain;object-position:center bottom;filter:drop-shadow(0 1px 1px rgba(42,37,48,.4));z-index:2;pointer-events:none;animation:settle .8s ease-out both}
+@keyframes settle{from{opacity:0}to{opacity:1}}
+.cell.win.cat .v{visibility:hidden}
+.pad{width:var(--board);display:flex;gap:4px;justify-content:center}
+.pad button{flex:1 1 0;max-width:46px;min-width:0;padding:6px 0;font-size:20px;font-weight:800;line-height:1.1}
+.pad button.erase{font-size:17px}
+.pad.noting button:not(.erase){border-style:dashed;color:#3C8681}
+.key{width:var(--board);text-align:center;font-weight:600;font-size:15px;color:var(--ink-soft);margin-top:-6px}
+/* the sets panel: which digits can make each total */
+.sets{width:var(--board);min-height:86px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 10px;display:flex;flex-direction:column;gap:6px;font-size:15px}
+.sets[hidden]{display:none}
+.sets .run{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px}
+.sets .run b{font-weight:800}
+.sets .chip{font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:.06em;padding:0 6px;border-radius:999px;background:white;border:1px solid var(--line)}
+.sets .chip.out{opacity:.35;text-decoration:line-through}
+.sets .can{color:var(--ink-soft)} .sets .can b{color:var(--ink);letter-spacing:.12em}
+.sets .none{color:var(--ink-soft)}
+@media (prefers-reduced-motion:reduce){.cell .sitter2{animation:none}.cell.win{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <header><div class="title"><h1>Window Ledges</h1><img class="sitter" id="sitter" alt="Willow sitting beside the title"></div><div class="stripe"></div><p class="tagline">Add up the windows to match every total</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+
+  <div class="facade stage" id="facade">
+    <svg class="roof" viewBox="0 0 100 13" aria-hidden="true">
+      <path d="M-2 13L8 3H92L102 13Z" fill="color-mix(in srgb,#4E577D 78%,#2A2530)"/>
+      <path d="M-2 13L8 3H92L102 13" fill="none" stroke="#2A2530" stroke-width=".6"/>
+      <path d="M12 3L6 13M24 3L20 13M36 3L34 13M48 3V13M60 3L62 13M72 3L76 13M84 3L90 13" stroke="rgba(255,255,255,.2)" stroke-width=".5"/>
+      <rect x="14" y="-1.5" width="6" height="5.5" fill="color-mix(in srgb,#BD5538 86%,#2A2530)" stroke="#2A2530" stroke-width=".5"/>
+      <rect x="13.2" y="-2.6" width="7.6" height="1.5" fill="color-mix(in srgb,#4E577D 60%,#2A2530)" stroke="#2A2530" stroke-width=".4"/>
+      <circle cx="17" cy="-4.6" r="1.5" fill="color-mix(in srgb,#4E577D 45%,white)" opacity=".7"/><circle cx="18.4" cy="-7" r="1.9" fill="color-mix(in srgb,#4E577D 45%,white)" opacity=".5"/>
+    </svg>
+    <img class="roofcat" id="roofcat" alt="Willow lying along the roof">
+    <div class="wrap block" id="board" aria-label="The block of flats: windows to fill with numbers">
+      <div class="cells" id="cells"></div>
+    </div>
+    <div class="pipe" aria-hidden="true"></div>
+  </div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="pad" id="pad" aria-label="Numbers"></div>
+  <div class="key" id="key"></div>
+  <div class="sets" id="sets" aria-live="polite"></div>
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="guessBtn" aria-pressed="false">Guess</button>
+    <button id="backBtn" hidden>Undo guess</button>
+    <button id="notesBtn" aria-pressed="false">Notes</button>
+    <button id="allNotesBtn">All notes</button>
+    <button id="linkBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New puzzle</button>
+  </div>
+  <div class="bar toggles">
+    <div class="opt"><label class="toggle"><input type="checkbox" id="setsTgl"><span class="sw"></span>Show sets</label><span class="hint">Which digits can make the totals of the selected window</span></div>
+  </div>
+
+</main>
+
+<script src="../games.js?v=2026-10-31.23"></script>
+<script>
+/* ---------- puzzles (plain functions, also run in a background worker) ---------- */
+// A block of flats on an R × C plan: walls (the top row and left column are always walls, holding the totals) and
+// windows. Every window is in an across run and a down run of 2 or more windows; a run's total is on the wall square
+// before it. Digits 1 to 9, none twice in a run. Levels: [rows, columns, longest run, whether it can be solved without a guess].
+// A puzzle: {R, C, w: array of 0/1 (1 = white), runs: [{cells:[...], sum, dir:"a"|"d"}], sol:[digits]}
+function levelOf(n) {
+  // [rows, cols, longest run, needs no guess]
+  return [null, [6, 6, 4, 1], [7, 7, 5, 1], [8, 8, 5, 1], [9, 9, 6, 1], [10, 10, 6, 0]][n];
+}
+// every set of n different digits from 1 to 9, by the sum they make: comboTable()[n][sum] is a list of digit masks
+function comboTable() {
+  if (self.__kc) return self.__kc;
+  const t = [];
+  for (let n = 0; n <= 9; n++) t.push({});
+  for (let m = 2; m < 1024; m += 2) {
+    let n = 0, sum = 0;
+    for (let v = 1; v <= 9; v++) if (m >> v & 1) { n++; sum += v; }
+    (t[n][sum] = t[n][sum] || []).push(m);
+  }
+  return (self.__kc = t);
+}
+function kRand(n) { return Math.floor(Math.random() * n); }
+// a pattern of white squares (1) and wall squares (0): the top row and left column are walls (they hold the
+// clues); every white square sits in an across run and a down run of 2 to `maxRun` squares; whites all join up
+function kPattern(R, C, maxRun) {
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const w = new Array(R * C).fill(1);
+    for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) if (!r || !c) w[r * C + c] = 0;
+    const dens = 0.18 + Math.random() * 0.12;
+    for (let r = 1; r < R; r++) for (let c = 1; c < C; c++) if (Math.random() < dens) { w[r * C + c] = 0; w[(R - r) * C + (C - c)] = 0; }
+    for (let pass = 0; pass < 60; pass++) {
+      let changed = false;
+      // runs that are too long get a wall in the middle
+      for (const dir of [0, 1]) {
+        for (let a = 1; a < (dir ? C : R); a++) {
+          let b = 1;
+          while (b < (dir ? R : C)) {
+            const idx = k => dir ? k * C + a : a * C + k;
+            if (!w[idx(b)]) { b++; continue; }
+            let e = b; while (e < (dir ? R : C) && w[idx(e)]) e++;
+            if (e - b > maxRun) { const m = b + Math.floor((e - b) / 2) + (kRand(3) - 1); w[idx(Math.max(b + 1, Math.min(e - 2, m)))] = 0; changed = true; }
+            b = e;
+          }
+        }
+      }
+      // a white with no neighbour to one side along a line (run of 1) becomes a wall
+      for (let r = 1; r < R; r++) for (let c = 1; c < C; c++) {
+        if (!w[r * C + c]) continue;
+        const across = (c + 1 < C && w[r * C + c + 1]) || w[r * C + c - 1];
+        const down = (r + 1 < R && w[(r + 1) * C + c]) || w[(r - 1) * C + c];
+        if (!across || !down) { w[r * C + c] = 0; changed = true; }
+      }
+      if (!changed) break;
+    }
+    // keep the biggest joined group of whites
+    const seen = new Array(R * C).fill(0), groups = [];
+    for (let i = 0; i < R * C; i++) {
+      if (!w[i] || seen[i]) continue;
+      const g = [i]; seen[i] = 1;
+      for (let q = 0; q < g.length; q++) for (const j of [g[q] - 1, g[q] + 1, g[q] - C, g[q] + C]) if (j >= 0 && j < R * C && w[j] && !seen[j] && Math.abs((j % C) - (g[q] % C)) <= 1) { seen[j] = 1; g.push(j); }
+      groups.push(g);
+    }
+    if (!groups.length) continue;
+    groups.sort((x, y) => y.length - x.length);
+    if (groups[0].length < (R - 1) * (C - 1) * 0.55) continue;
+    for (const g of groups.slice(1)) for (const i of g) w[i] = 0;
+    // after dropping stragglers, make sure every run is still 2+ long
+    let ok = true;
+    for (let r = 1; r < R && ok; r++) for (let c = 1; c < C; c++) {
+      if (!w[r * C + c]) continue;
+      const across = (c + 1 < C && w[r * C + c + 1]) || w[r * C + c - 1];
+      const down = (r + 1 < R && w[(r + 1) * C + c]) || w[(r - 1) * C + c];
+      if (!across || !down) { ok = false; break; }
+    }
+    if (ok) return w;
+  }
+  return null;
+}
+// the runs of a pattern, as lists of squares
+function kRuns(R, C, w) {
+  const runs = [];
+  for (let r = 1; r < R; r++) for (let c = 1; c < C; c++) {
+    if (!w[r * C + c]) continue;
+    if (!w[r * C + c - 1]) { const cells = []; for (let k = c; k < C && w[r * C + k]; k++) cells.push(r * C + k); runs.push({cells, dir: "a", clue: r * C + c - 1}); }
+    if (!w[(r - 1) * C + c]) { const cells = []; for (let k = r; k < R && w[k * C + c]; k++) cells.push(k * C + c); runs.push({cells, dir: "d", clue: (r - 1) * C + c}); }
+  }
+  return runs;
+}
+// a full set of digits: no repeat in any run
+function kFill(R, C, w, runs) {
+  const at = new Array(R * C).fill(null).map(() => []);
+  runs.forEach((r, k) => r.cells.forEach(i => at[i].push(k)));
+  const cells = [], seen = new Set();
+  // fill square by square, row by row
+  for (let i = 0; i < R * C; i++) if (w[i]) cells.push(i);
+  const sol = new Array(R * C).fill(0), used = runs.map(() => 0);
+  let steps = 0;
+  const go = p => {
+    if (p === cells.length) return true;
+    if (++steps > 600) return false;
+    const i = cells[p], vs = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+    for (let k = 8; k > 0; k--) { const j = kRand(k + 1); [vs[k], vs[j]] = [vs[j], vs[k]]; }
+    for (const v of vs) {
+      if (at[i].some(k => used[k] >> v & 1)) continue;
+      sol[i] = v; at[i].forEach(k => used[k] |= 1 << v);
+      if (go(p + 1)) return true;
+      at[i].forEach(k => used[k] &= ~(1 << v));
+    }
+    sol[i] = 0; return false;
+  };
+  return go(0) ? sol : null;
+}
+// Count answers (up to `limit`), with the first and second found. Digits are ruled out square by square from
+// what each run's sum allows; `stuck` is true if it had to guess.
+function kSolve(R, C, runs, w, limit, given) {
+  const COMBOS = comboTable(), N = R * C, at = new Array(N).fill(null).map(() => []);
+  runs.forEach((r, k) => r.cells.forEach(i => at[i].push(k)));
+  const FULL = 0x3FE, bit = v => 1 << v;
+  const ones = m => { let c = 0; while (m) { m &= m - 1; c++; } return c; };
+  // which digits each square of a run can take: for every set of digits that makes the run's sum, see whether the
+  // squares' open digits let that set be dealt out one to a square, and keep the digits that appear in some way of doing it
+  const memo = self.__kmemo || (self.__kmemo = new Map());
+  function narrow(run, dom) {
+    const cells = run.cells, n = cells.length;
+    const key = n + "|" + run.sum + "|" + cells.map(i => dom[i]).join();
+    let hit = memo.get(key);
+    if (hit === undefined) { hit = narrowRaw(run, dom); if (memo.size > 50000) memo.clear(); memo.set(key, hit); }
+    if (hit === false) return false;
+    let changed = false;
+    for (let t = 0; t < n; t++) if (dom[cells[t]] !== hit[t]) { dom[cells[t]] = hit[t]; changed = true; }
+    return changed ? 1 : 2;
+  }
+  function narrowRaw(run, dom) {
+    const cells = run.cells, n = cells.length, list = (COMBOS[n] || {})[run.sum] || [], seen = new Array(n).fill(0);
+    let any = false;
+    for (const m of list) {
+      let all = true;
+      for (let t = 0; t < n; t++) { const a = dom[cells[t]] & m; if (!a) { all = null; break; } if (a !== m) all = false; }
+      if (all === null) continue;
+      if (all) { any = true; for (let t = 0; t < n; t++) seen[t] |= m; continue; }
+      // forward: F[t] is the sets of digits the first t squares can use up; backward: B[t] the sets squares t.. can finish
+      const F = [new Set([0])], B = new Array(n + 1);
+      for (let t = 0; t < n; t++) {
+        const nx = new Set(), d = dom[cells[t]] & m;
+        for (const S of F[t]) { let r = d & ~S; while (r) { const lo = r & -r; nx.add(S | lo); r ^= lo; } }
+        F.push(nx);
+      }
+      if (!F[n].has(m)) continue;
+      B[n] = new Set([m]);
+      for (let t = n - 1; t >= 0; t--) {
+        const pv = new Set(), d = dom[cells[t]];
+        for (const S of B[t + 1]) { let r = d & S; while (r) { const lo = r & -r; pv.add(S ^ lo); r ^= lo; } }
+        B[t] = pv;
+      }
+      any = true;
+      for (let t = 0; t < n; t++) {
+        const d = dom[cells[t]] & m;
+        for (const S of F[t]) { let r = d & ~S; while (r) { const lo = r & -r; if (B[t + 1].has(S | lo)) seen[t] |= lo; r ^= lo; } }
+      }
+    }
+    return any ? seen : false;
+  }
+  function settle(dom) {
+    const queue = runs.map((_, k) => k), queued = new Array(runs.length).fill(true);
+    while (queue.length) {
+      const k = queue.pop(); queued[k] = false;
+      const before = runs[k].cells.map(i => dom[i]), r = narrow(runs[k], dom);
+      if (r === false) return false;
+      if (r === 1) runs[k].cells.forEach((i, t) => { if (dom[i] !== before[t]) for (const q of at[i]) if (q !== k && !queued[q]) { queued[q] = true; queue.push(q); } });
+    }
+    return true;
+  }
+  let found = 0, first = null, second = null, stuck = false, steps = 0;
+  const go = (dom, guessed) => {
+    if (found >= limit || ++steps > 600) return;
+    if (!settle(dom)) return;
+    let best = -1, bn = 99;
+    for (let i = 0; i < N; i++) if (w[i]) { const n = ones(dom[i]); if (n > 1 && n < bn) { bn = n; best = i; } }
+    if (best < 0) { found++; const s = dom.map(m => m ? 31 - Math.clz32(m) : 0); if (!first) first = s; else second = s; return; }
+    if (!guessed) stuck = true;
+    for (let v = 1; v <= 9; v++) if (dom[best] & bit(v)) { const d = dom.slice(); d[best] = bit(v); go(d, true); }
+  };
+  const dom = new Array(N).fill(0); for (let i = 0; i < N; i++) if (w[i]) dom[i] = FULL;
+  if (given) for (let i = 0; i < N; i++) if (w[i] && given[i]) dom[i] = bit(given[i]);
+  if (limit === 0) { const ok = settle(dom); return {ok, dom}; }
+  go(dom, false);
+  return {count: steps > 600 ? -1 : found, first, second, stuck};
+}
+// is this pattern one a puzzle can be made on: every white in an across run and a down run of 2 to maxRun, all joined?
+function kValid(R, C, w, maxRun) {
+  let first = -1, count = 0;
+  for (let r = 1; r < R; r++) for (let c = 1; c < C; c++) {
+    if (!w[r * C + c]) continue;
+    count++; if (first < 0) first = r * C + c;
+    if (!((c + 1 < C && w[r * C + c + 1]) || w[r * C + c - 1]) || !((r + 1 < R && w[(r + 1) * C + c]) || w[(r - 1) * C + c])) return false;
+  }
+  for (const run of kRuns(R, C, w)) if (run.cells.length > maxRun) return false;
+  const seen = new Set([first]), todo = [first];
+  while (todo.length) { const i = todo.pop(); for (const j of [i - 1, i + 1, i - C, i + C]) if (w[j] && !seen.has(j) && j >= 0 && j < R * C) { seen.add(j); todo.push(j); } }
+  return seen.size === count;
+}
+function kMake(n) {
+  const [R, C, maxRun, logic] = levelOf(n);
+  for (;;) {
+    let w = kPattern(R, C, maxRun); if (!w) continue;
+    let runs = kRuns(R, C, w), sol = kFill(R, C, w, runs); if (!sol) continue;
+    for (let tries = 0; tries < 80; tries++) {
+      for (const r of runs) r.sum = r.cells.reduce((a, i) => a + sol[i], 0);
+      const res = kSolve(R, C, runs, w, 2);
+      if (res.count === 1 && !(logic && res.stuck)) return {R, C, w, runs: runs.map(r => ({cells: r.cells, sum: r.sum, dir: r.dir, clue: r.clue})), sol};
+      if (res.count < 0) break;
+      let d;
+      if (res.count === 1) {   // unique but it needs a guess: change a square so it doesn't have to
+        const open = []; for (let i = 0; i < R * C; i++) if (w[i]) open.push(i);
+        d = open[kRand(open.length)];
+      } else {
+        const diff = res.first.map((v, i) => v !== res.second[i] ? i : -1).filter(i => i >= 0);
+        d = diff[kRand(diff.length)];
+      }
+      // sometimes turn that square into a wall instead (the answer stays, less that square)
+      if (Math.random() < 0.5) {
+        const w2 = w.slice(); w2[d] = 0;
+        if (kValid(R, C, w2, maxRun)) { w = w2; sol[d] = 0; runs = kRuns(R, C, w); continue; }
+      }
+      // give that square another digit that repeats nothing in its runs
+      const mine = runs.filter(r => r.cells.includes(d)), used = new Set(mine.flatMap(r => r.cells.filter(i => i !== d).map(i => sol[i])));
+      const opts = [1, 2, 3, 4, 5, 6, 7, 8, 9].filter(v => v !== sol[d] && !used.has(v));
+      if (!opts.length) break;
+      sol[d] = opts[kRand(opts.length)];
+    }
+  }
+}
+
+
+/* ---------- the block ---------- */
+const STORE = "catdoku.windowledges.v1", MAX_LEVEL = 5;
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1, sets: true}, state.settings);
+let game = state.game || null, busy = false, sel = -1, noting = false, running = false;
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
+const levelName = n => { const [R, C, , logic] = levelOf(n); return `Level ${n} · ${R - 1} × ${C - 1}${logic ? "" : ", may need a guess"}`; };
+const build = G.builder([levelOf, kRand, kPattern, kRuns, kFill, comboTable, kSolve, kValid, kMake], "kMake");
+const SITTERS = "c14-63 c18-6 c18-7 c18-17 c18-19 c18-21 c18-26 c18-27 c18-32 c18-40 c19-1 c19-5 c19-6 c19-14 c19-16 c19-17 c19-28 c19-32 c19-37 c19-40 c20-1 c20-17 c20-18 c20-30".split(" ");
+const catSrc = f => (window.CAT_SRC || {})[f] || `../cats/${f}.webp`;
+
+// Everything about the plan that doesn't change while playing: the runs (with their totals), which runs each window is
+// in, and the totals on each wall square.
+let plan = null, wasLit = [];
+function makePlan() {
+  const {R, C} = game, w = game.w, runs = kRuns(R, C, w);
+  runs.forEach((r, k) => { r.sum = game.sums[k]; });
+  const at = new Array(R * C).fill(null).map(() => []), clue = {};
+  runs.forEach((r, k) => { r.cells.forEach(i => at[i].push(k)); (clue[r.clue] = clue[r.clue] || {})[r.dir] = k; });
+  plan = {runs, at, clue};
+}
+const popcount = m => { let c = 0; while (m) { m &= m - 1; c++; } return c; };
+
+// Windows whose digit is already in their run, and runs that are full: right or wrong.
+function check() {
+  const g = game.grid, clash = new Set();
+  const right = [], wrong = [];
+  plan.runs.forEach((run, k) => {
+    const seen = {}; let sum = 0, full = true;
+    for (const i of run.cells) { if (g[i]) { (seen[g[i]] = seen[g[i]] || []).push(i); sum += g[i]; } else full = false; }
+    let dupe = false;
+    for (const v in seen) if (seen[v].length > 1) { dupe = true; seen[v].forEach(i => clash.add(i)); }
+    right[k] = full && !dupe && sum === run.sum;
+    wrong[k] = full && (dupe || sum !== run.sum);
+  });
+  return {clash, right, wrong};
+}
+
+function draw() {
+  const {R, C} = game, el = $("cells"), {clash, right, wrong} = check(), g = game.grid, w = game.w;
+  $("board").style.setProperty("--cell", ($("board").clientWidth / C) + "px");
+  el.style.gridTemplateColumns = `repeat(${C}, 1fr)`; el.style.gridTemplateRows = `repeat(${R}, 1fr)`;
+  const selRuns = sel >= 0 ? plan.at[sel] : [], peers = new Set(selRuns.flatMap(k => plan.runs[k].cells));
+  const flash = hints.current(), guessed = new Set(guesses.list());
+  let html = "";
+  for (let i = 0; i < R * C; i++) {
+    if (!w[i]) {
+      const cl = plan.clue[i];
+      if (!cl) { html += `<div class="cell wall" aria-hidden="true"></div>`; continue; }
+      const part = (dir, k) => k === undefined ? "" : `<span class="${["sum", dir, selRuns.includes(k) ? "on" : "", right[k] ? "done" : "", wrong[k] ? "wrong" : ""].filter(Boolean).join(" ")}">${plan.runs[k].sum}</span>`;
+      const say = [cl.a !== undefined && `across ${plan.runs[cl.a].sum}`, cl.d !== undefined && `down ${plan.runs[cl.d].sum}`].filter(Boolean).join(", ");
+      html += `<div class="cell clue${cl.a === undefined ? " onlyD" : cl.d === undefined ? " onlyA" : ""}" role="img" aria-label="Totals: ${say}">${part("a", cl.a)}${part("d", cl.d)}</div>`;
+      continue;
+    }
+    const lit = game.won || forceLit.has(i) || plan.at[i].every(k => right[k]);
+    const cls = ["cell", "win", lit ? "lit" : "", i === sel ? "sel" : "", peers.has(i) && i !== sel ? "peer" : "", guessed.has(i) && g[i] ? "guessed" : "", clash.has(i) ? "clash" : "",
+      flash && flash.i === i ? "hintcell" + (flash.bad ? " bad" : "") : "", game.won && game.cats[i] ? "cat" : "",
+      sel >= 0 && g[sel] && g[i] === g[sel] && i !== sel ? "same" : ""].filter(Boolean).join(" ");
+    const notes = !g[i] && game.notes[i] ? `<span class="notes">${[...Array(9)].map((_, v) => `<span>${game.notes[i] >> (v + 1) & 1 ? v + 1 : ""}</span>`).join("")}</span>` : "";
+    const cat = game.won && game.cats[i] ? `<img class="sitter2" src="${catSrc(game.cats[i])}" alt="" aria-hidden="true">` : "";
+    const say = `Row ${Math.floor(i / C)}, column ${i % C}: ${g[i] || "empty"}`;
+    html += `<div class="${cls}" data-i="${i}" role="button" aria-label="${say}">${g[i] ? `<span class="v">${g[i]}</span>` : notes}${cat}</div>`;
+  }
+  el.innerHTML = html;
+  $("pad").classList.toggle("noting", noting);
+  $("notesBtn").setAttribute("aria-pressed", String(noting));
+  const lights = [...Array(R * C).keys()].filter(i => w[i] && plan.at[i].every(k => right[k])).length, windows = w.reduce((a, b) => a + b, 0);
+  $("count").textContent = game.won ? "Every window is lit!" : `${lights} of ${windows} windows lit`;
+  $("key").textContent = noting ? "Notes: tap numbers to jot them down as maybes" : sel < 0 && !game.won ? "Tap a window, then a number" : "";
+  $("hintBtn").disabled = game.won; $("allNotesBtn").disabled = game.won; $("allNotesBtn").setAttribute("aria-pressed", String(!game.won && allNotesOn()));
+  $("undoBtn").disabled = !game.history.length || game.won; $("restartBtn").disabled = !game.history.length || game.won;
+  drawSets(right);
+  guesses.sync();
+  return {clash, right, wrong};
+}
+let forceLit = new Set();
+const hints = G.hinter({game: () => game, key: () => game ? game.grid.join() : "", draw: () => draw()});   // marks {i, bad}: a window to look at
+const guesses = G.guesser({game: () => game, undo, draw: () => { draw(); save(); }, board: $("board"), what: "number"});
+
+// The sets panel: for each run through the selected window, the sets of digits that make its total (struck out when
+// a digit already in the run rules a set out), and the digits this window can still be.
+function drawSets(right) {
+  const box = $("sets");
+  box.hidden = !settings.sets || game.won;
+  if (box.hidden) return;
+  if (sel < 0 || game.won) { box.innerHTML = `<span class="none">${game.won ? "" : "Pick a window to see which digits can make its totals."}</span>`; return; }
+  const table = comboTable(), g = game.grid;
+  let can = 0x3FE, html = "";
+  for (const k of plan.at[sel]) {
+    const run = plan.runs[k], len = run.cells.length;
+    let fixed = 0; for (const i of run.cells) if (i !== sel && g[i]) fixed |= 1 << g[i];
+    const all = table[len][run.sum] || [];
+    let union = 0;
+    const chips = all.map(m => {
+      const ok = (m & fixed) === fixed; if (ok) union |= m & ~fixed;
+      const digits = []; for (let v = 1; v <= 9; v++) if (m >> v & 1) digits.push(v);
+      return `<span class="chip${ok ? "" : " out"}">${digits.join("")}</span>`;
+    }).join("");
+    can &= union;
+    html += `<div class="run"><span>${run.dir === "a" ? "Across" : "Down"} <b>${run.sum}</b> in ${len}:</span>${chips}</div>`;
+  }
+  const ds = []; for (let v = 1; v <= 9; v++) if (can >> v & 1) ds.push(v);
+  html += `<div class="can">This window can be <b>${ds.length ? ds.join(" ") : "—"}</b></div>`;
+  box.innerHTML = html;
+}
+
+/* ---------- playing ---------- */
+const snapshot = () => game.history.push({grid: game.grid.slice(), notes: game.notes.slice()});
+function put(v) {
+  if (!playing() || sel < 0 || !game.w[sel]) return;
+  game.started = true;
+  if (!(noting && v) && v && game.grid[sel] !== v) guesses.before(sel);
+  snapshot();
+  if (noting && v) {
+    if (game.grid[sel]) game.grid[sel] = 0;
+    game.notes[sel] ^= 1 << v;
+  } else {
+    game.grid[sel] = v && game.grid[sel] !== v ? v : 0;
+    // a digit put down comes off the notes in its runs
+    if (game.grid[sel]) for (const k of plan.at[sel]) for (const j of plan.runs[k].cells) game.notes[j] &= ~(1 << v);
+    else if (!v) game.notes[sel] = 0;
+  }
+  const after = check();
+  if (after.right.every(Boolean)) { win(); return; }
+  draw(); save();
+}
+$("cells").addEventListener("click", e => {
+  if (!playing()) return;
+  const c = e.target.closest(".cell.win"); if (!c) return;
+  const i = +c.dataset.i, m = hints.current();
+  sel = i === sel && !(m && m.i === i) ? -1 : i; draw();
+});
+function makePad() {
+  const pad = $("pad"); pad.innerHTML = "";
+  for (let v = 1; v <= 9; v++) { const b = document.createElement("button"); b.textContent = v; b.onclick = () => put(v); pad.append(b); }
+  const er = document.createElement("button"); er.className = "erase"; er.textContent = "⌫"; er.setAttribute("aria-label", "Erase"); er.onclick = () => put(0); pad.append(er);
+}
+$("notesBtn").onclick = () => { if (!game || game.won) return; noting = !noting; draw(); };
+// What a window can still be: the digits its runs' sets allow, less the ones already in those runs.
+function candidates(i) {
+  const table = comboTable(), g = game.grid;
+  let can = 0x3FE;
+  for (const k of plan.at[i]) {
+    const run = plan.runs[k]; let fixed = 0, union = 0;
+    for (const j of run.cells) if (j !== i && g[j]) fixed |= 1 << g[j];
+    for (const m of table[run.cells.length][run.sum] || []) if ((m & fixed) === fixed) union |= m & ~fixed;
+    can &= union;
+  }
+  return can;
+}
+// All notes is a switch: on puts every digit still possible in every empty window, off takes every note away (Undo
+// brings them back). It shows on while every empty window has notes.
+function allNotesOn() { return game.grid.some((v, i) => game.w[i] && !v) && game.grid.every((v, i) => !game.w[i] || v || game.notes[i]); }
+$("allNotesBtn").onclick = () => {
+  if (!playing()) return;
+  if (allNotesOn()) {
+    snapshot(); game.notes = game.notes.map(() => 0); draw(); save();
+    G.note("Notes off: every note taken away. Undo brings them back.", 3000); return;
+  }
+  snapshot();
+  game.notes = game.notes.map((m, i) => game.w[i] && !game.grid[i] ? candidates(i) : m);
+  game.started = true; draw(); save();
+  G.note("Notes in every empty window: the digits its totals' sets still allow", 3500);
+};
+document.addEventListener("keydown", e => {
+  if (!playing() || document.querySelector(".spot") || e.target.tagName === "SELECT" || e.ctrlKey || e.metaKey || e.altKey) return;
+  const {R, C} = game, k = e.key;
+  if (k === "Escape") { sel = -1; draw(); return; }
+  const dm = /^(Digit|Numpad)([1-9])$/.exec(e.code);
+  if (dm) {
+    if (sel < 0) sel = firstWindow();
+    // Shift + a digit jots a note, whatever mode it's in
+    if (e.shiftKey) { const was = noting; noting = true; put(+dm[2]); noting = was; draw(); } else put(+dm[2]);
+    e.preventDefault(); return;
+  }
+  if (k === "Backspace" || k === "Delete" || k === "0") { put(0); e.preventDefault(); return; }
+  if (k === "n" || k === "N" || k === "p" || k === "P") { noting = !noting; draw(); return; }
+  const d = {ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0]}[k];
+  if (d) {
+    e.preventDefault();
+    if (sel < 0) { sel = firstWindow(); draw(); return; }
+    // the next window that way, jumping over walls
+    let x = sel % C, y = Math.floor(sel / C);
+    for (let s = 0; s < Math.max(R, C); s++) {
+      x += d[0]; y += d[1];
+      if (x < 0 || y < 0 || x >= C || y >= R) break;
+      if (game.w[y * C + x]) { sel = y * C + x; break; }
+    }
+    draw();
+  }
+});
+const firstWindow = () => game.w.findIndex(Boolean);
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
+function undo() { if (playing() && game.history.length) { game.undid = true; const h = game.history.pop(); game.grid = h.grid; game.notes = h.notes; draw(); save(); } }
+$("undoBtn").onclick = undo;
+
+// Hint: first points out a digit that's wrong, if there is one. Otherwise it works out, from the digits down and the sets
+// each total allows, a window that has only one digit left, and glows it: the first time the message says why;
+// asked again, its digit. When nothing can be settled that way, it picks the window with the fewest digits left and says so.
+// It never fills one in for you. Any hint keeps you on the same level and costs the gold paw.
+let answer = null;
+const solution = () => answer && answer.g === game ? answer.sol : (answer = {g: game, sol: kSolve(game.R, game.C, plan.runs, game.w, 1).first}).sol;
+function hint() {
+  if (!playing()) return;
+  const sol = solution(), g = game.grid;
+  if (!sol) { G.note("Couldn't work out a hint for this puzzle. Try Undo, or check for a wrong digit.", 4000); return; }
+  game.hinted = true; game.started = true; save();
+  const wrong = g.map((v, i) => v && v !== sol[i] ? i : -1).filter(i => i >= 0);
+  if (wrong.length) {
+    const i = wrong.includes(sel) ? sel : wrong[0];
+    sel = i; hints.show({i, bad: true}, wrong.length > 1 ? `That one's wrong (and ${wrong.length - 1} more)` : "That one's wrong");
+    return;
+  }
+  const empty = i => game.w[i] && !g[i], left = i => Math.min(...plan.at[i].map(k => plan.runs[k].cells.filter(j => !g[j]).length));
+  const r = kSolve(game.R, game.C, plan.runs, game.w, 0, g), cands = [];
+  for (let i = 0; i < game.R * game.C; i++) if (empty(i) && r.ok && popcount(r.dom[i]) === 1) cands.push(i);
+  if (cands.length) {
+    cands.sort((a, b) => left(a) - left(b) || a - b);
+    const i = cands.includes(sel) ? sel : cands[0];
+    sel = i; hints.show({i}, hints.level() ? `The glowing window is a ${sol[i]}.` : whyDigit(i));
+    return;
+  }
+  // nothing settled by the sets alone: the window with the fewest possibilities
+  const open = [...Array(game.R * game.C).keys()].filter(empty).sort((a, b) => popcount(r.ok ? r.dom[a] : candidates(a)) - popcount(r.ok ? r.dom[b] : candidates(b)) || a - b);
+  const i = open.includes(sel) ? sel : open[0], dom = r.ok ? r.dom[i] : candidates(i), ds = [];
+  for (let v = 1; v <= 9; v++) if (dom >> v & 1) ds.push(v);
+  sel = i; hints.show({i}, hints.level() ? `The glowing window is a ${sol[i]}.` : `No window is settled by the sets alone. The glowing one can be ${ds.join(", ")}: a guess may help.`);
+}
+// Why a hinted window takes its digit: a run where only one set of digits makes the total, or the digits its runs already have.
+function whyDigit(i) {
+  const table = comboTable();
+  for (const k of plan.at[i]) {
+    const run = plan.runs[k], all = table[run.cells.length][run.sum] || [];
+    if (all.length === 1) return `Only one set makes ${run.sum} in ${run.cells.length} windows ${run.dir === "a" ? "across" : "down"}, so the glowing window has just one place for its digit.`;
+  }
+  return "Only one digit fits in the glowing window, from the sets of its two totals and the digits already in its runs.";
+}
+$("hintBtn").onclick = hint;
+$("restartBtn").onclick = () => { if (playing() && game.history.length) { game.undid = true; snapshot(); guesses.clear(); game.grid = game.grid.map(() => 0); game.notes = game.notes.map(() => 0); draw(); save(); G.note("Every window's dark again. Undo brings your numbers back.", 3500); } };
+addEventListener("resize", () => { if (game && plan) draw(); });
+
+/* ---------- endings ---------- */
+// Every window is lit, so a few cats sit in the windows, then the finishing card.
+function win() {
+  game.won = true; G.finishClock(game); sel = -1; noting = false;
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save();
+  pickCats(); $("facade").classList.add("won"); draw();
+  G.track(`Window Ledges solved level ${game.level}`);
+  build.prefetch(next);
+  const g = game, still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  running = true;
+  setTimeout(() => { running = false; if (game === g) finishCard(); }, still ? 1200 : 2600);
+}
+// a cat in about one window in six, different cats, never two side by side
+function pickCats() {
+  const wins = game.w.map((v, i) => v ? i : -1).filter(i => i >= 0), want = Math.max(2, Math.round(wins.length / 6)), seed = game.sums.reduce((a, b) => a * 31 + b, game.level);
+  game.cats = {};
+  let s = seed;
+  const rnd = () => (s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  const order = wins.slice(); for (let k = order.length - 1; k > 0; k--) { const j = Math.floor(rnd() * (k + 1)); [order[k], order[j]] = [order[j], order[k]]; }
+  let n = 0;
+  for (const i of order) {
+    if (n >= want) break;
+    if (game.cats[i - 1] || game.cats[i + 1] || game.cats[i - game.C] || game.cats[i + game.C]) continue;
+    game.cats[i] = SITTERS[(seed + n * 7) % SITTERS.length]; n++;
+  }
+}
+function goldPic() { const im = new Image(); im.className = "goldpic"; im.src = catSrc("willow-6"); im.alt = "Willow stretching in the lit window"; return im; }
+function finishCard() {
+  const next = settings.level, cats = Object.keys(game.cats || {}).length;
+  let text = `Every window in the ${game.R - 1} × ${game.C - 1} block is lit, and ${cats} cats are sitting in them.`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my block", game.result,
+    {title: "All lit up!", gold: !game.undid && !game.hinted, goldWhy: "No undos or hints!", goldTitle: "Willow approves!", goldPic: [goldPic()],
+     next: next > game.level ? `Next: level ${next}` : "Next block", after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- new puzzles ---------- */
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
+function begin(p, level) {
+  const n = p.R * p.C;
+  game = {level, R: p.R, C: p.C, w: Array.from(p.w, Number), sums: p.sums || p.runs.map(r => r.sum), grid: new Array(n).fill(0), notes: new Array(n).fill(0), history: [], won: false, cats: {}, ...G.freshClock()};
+  sel = -1; noting = false; forceLit = new Set(); $("facade").classList.remove("won"); makePlan(); makePad();
+}
+async function newPuzzle() {
+  if (busy) return;
+  busy = true;
+  const n = settings.level;
+  G.openCard("Building the block…", n >= 4 ? "Big blocks can take a few seconds." : "", []);
+  const p = await build.take(n);
+  begin(p, n);
+  busy = false; G.closeCard(); G.note("");
+  draw(); save();
+  build.prefetch(n);
+  G.track(`Window Ledges new puzzle level ${n}`);
+}
+
+/* ---------- sharing ---------- */
+$("linkBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Window Ledges", won: game.won,
+  puzzle: () => ({g: "windowledges", N: game.level, r: game.R, c: game.C, w: game.w.join(""), s: game.sums}),
+  progress: () => ({grid: game.grid, notes: game.notes})}); };
+// A puzzle from a share link, with its digits so far if they were sent (that isn't timed). The plan is checked: the
+// right size, every run 2 or more windows, a sensible total for each run, and exactly one answer.
+function openShared(d) {
+  const lv = levelOf(d.N), ok = lv && d.r === lv[0] && d.c === lv[1] && typeof d.w === "string" && d.w.length === d.r * d.c && /^[01]+$/.test(d.w) && Array.isArray(d.s);
+  let good = false;
+  if (ok) {
+    const w = Array.from(d.w, Number), runs = kRuns(d.r, d.c, w), table = comboTable();
+    good = runs.length === d.s.length && runs.every((r, k) => r.cells.length >= 2 && r.cells.length <= 9 && Number.isInteger(d.s[k]) && (table[r.cells.length][d.s[k]] || []).length > 0)
+      && w.every((v, i) => !v || (i % d.c && Math.floor(i / d.c) && ((w[i - 1] || w[i + 1]) && (w[i - d.c] || w[i + d.c]))));
+    if (good) { runs.forEach((r, k) => { r.sum = d.s[k]; }); good = kSolve(d.r, d.c, runs, w, 2).count === 1; }
+  }
+  if (!good) { G.note("That share link didn't work.", 5000); return; }
+  begin({R: d.r, C: d.c, w: d.w, sums: d.s}, d.N);
+  const n = d.r * d.c;
+  if (d.p && Array.isArray(d.p.grid) && d.p.grid.length === n) { game.grid = d.p.grid.map(v => (+v >= 1 && +v <= 9) ? +v : 0); if (Array.isArray(d.p.notes) && d.p.notes.length === n) game.notes = d.p.notes.map(v => (+v | 0) & 0x3FE); game.timed = false; }
+  settings.level = d.N; $("levelSel").value = d.N;
+  draw(); save(); build.prefetch(d.N);
+  if (d.p && check().right.every(Boolean)) win();
+}
+
+/* ---------- how to play ---------- */
+// How to play plays the walkthrough on the board (there's no rules card).
+function showHelp() {
+  settings.seenHelp = false; helpOnFirstVisit();
+  if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
+}
+// First visit only: walk through the block that's out, lighting one run's windows just while its step is up.
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || !playing() || document.querySelector(".spot")) return;
+  const {R, C} = game, xy = i => [i % C, Math.floor(i / C)], wins = game.w.map((v, i) => v ? i : -1).filter(i => i >= 0).map(xy);
+  const across = plan.runs.find(r => r.dir === "a" && r.cells.length >= 2 && r.cells.length <= 4) || plan.runs.find(r => r.dir === "a");
+  const down = plan.runs.find(r => r.dir === "d" && r.cells.length >= 2 && r.cells.length <= 4) || plan.runs.find(r => r.dir === "d");
+  const ac = [across.clue, ...across.cells].map(xy), dc = [down.clue, ...down.cells].map(xy);
+  const steps = [
+    {say: "Put a number from 1 to 9 in every window", lit: wins},
+    {say: `This run's windows add up to ${across.sum}: the total at the top right of its wall square`, lit: ac, outline: [ac]},
+    {say: `This one adds up to ${down.sum}: the total at the bottom left`, lit: dc, outline: [dc]},
+    {say: "No number twice in a run", lit: across.cells.map(xy), outline: [across.cells.map(xy)]},
+    {say: "A window lights up when all its runs add up 💡", lit: across.cells.map(xy), outline: [across.cells.map(xy)], tone: "ok", enter: () => { forceLit = new Set(across.cells); draw(); }, leave: () => { forceLit = new Set(); draw(); }},
+    {say: "Light every window and cats sit in them 😸", lit: wins, tone: "ok"},
+    {say: "Tap a window, then a number", els: [$("pad")]},
+    {say: "Show sets lists the digits that can make each total", els: [() => $("setsTgl").closest(".opt")]},
+    {say: "Notes let you jot down maybes", els: [$("notesBtn")]},
+    {say: "Not sure? Guess, and Undo guess takes you back to just before it", els: [$("guessBtn")]},
+    {say: "Stuck? Hint finds a wrong number, or tells you one", els: [$("hintBtn")]},
+  ];
+  G.spotlight({grid: $("cells"), w: C, h: R, steps, done: () => { settings.seenHelp = true; save(); }});
+}
+
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", "") + (n === MAX_LEVEL ? " (hardest)" : ""), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
+$("helpBtn").onclick = showHelp;
+$("setsTgl").checked = settings.sets !== false;
+$("setsTgl").onchange = e => { settings.sets = e.target.checked; save(); if (game) draw(); };
+$("sitter").src = catSrc("willow-1");
+$("roofcat").src = catSrc("willow-4");
+
+G.nav("windowledges");
+G.checkClock(game);
+G.setupTimer({name: "windowledges", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+const shared = G.readShare("windowledges");
+const hadSave = !!(game && Array.isArray(game.grid) && Array.isArray(game.w) && Array.isArray(game.sums));
+if (hadSave) G.reopen(() => {
+    const lv = levelOf(game.level);
+    if (!lv || game.grid.length !== game.R * game.C || game.w.length !== game.grid.length) throw new Error("the saved puzzle doesn't fit its level");
+    if (!Array.isArray(game.notes)) game.notes = new Array(game.R * game.C).fill(0);
+    if (!game.cats) game.cats = {};
+    makePlan(); makePad(); draw();
+    if (game.won) { $("facade").classList.add("won"); finishCard(); }
+    build.prefetch(settings.level); helpOnFirstVisit();
+  }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
+else if (!shared) newPuzzle().then(helpOnFirstVisit);
+const shareOpts = () => ({name: "Window Ledges", inProgress: !!(game && !game.won && game.history.length), open: openShared, after: helpOnFirstVisit});
+// a link that doesn't work, opened with no saved puzzle, would leave the board empty: start one
+if (shared) G.offerShare(shared, {...shareOpts(), fresh: hadSave ? null : why => Promise.resolve(newPuzzle()).then(() => { G.note(why, 6000); helpOnFirstVisit(); })});
+// A share link opened while this page is already showing only changes the address, so watch for it.
+window.addEventListener("hashchange", () => { const d = G.readShare("windowledges"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>

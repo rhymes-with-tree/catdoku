@@ -39,6 +39,8 @@ blended in: sitting, standing or crouching, with the face and ears showing (the 
 `catburglar/index.html`). Curled-up balls, backs and cats stretched flat are left out. `c19-21`, peeking round a corner,
 is beside its title.
 
+Window Ledges sits a few of Purrfect Square's 24 sitting cats (the list `SITTERS`, the same in both pages) on the sills of its windows once every window is lit, picked for each puzzle from its totals, about one window in six and never two side by side.
+
 Toy Stash sits one of six general cats on its boxes for each stash (`c19-44`, `c19-45`, `c18-25`, `c19-11`, `c19-2`, `c18-33`, the list `GUARDS` in `stash/index.html`); once the stash is found, `c17-17` (batting a ball) or `c19-43` (pouncing on a feather) plays with the toys, and `c17-18` (pouncing on a ball) is on the gold-paw card.
 
 Kitten Caboodle's mother cat, beside her root on the sign, is one of Purrfect Square's 24 sitting cats, picked at random for each litter (the list `MOTHERS` in `kittencaboodle/index.html`).
@@ -138,8 +140,7 @@ each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the 
   `-4` walking (front); `-5` reaching for a butterfly; `-6` in a cardboard box; `-7` curled up (from above); `-8`
   napping (side). Kitten Caboodle uses `marmalade-kitten-1`, `-2`, `-4`, `-5` and `-6` as kittens.
 - **Willow** (`willow-…`, a Siamese: slim and elegant, a short sleek cream coat with dark brown points, striking blue
-  eyes, large ears and a long, slender tail) is a she, and friends with Gus, Peanut and Marmalade. She doesn't star
-  in a game yet. From her sheet, grown up: `willow-1` sitting
+  eyes, large ears and a long, slender tail) is a she, and friends with Gus, Peanut and Marmalade. She stars in Window Ledges: `willow-1` (sitting, front) is beside the title, `willow-4` (lying down) lies along the roof ridge, and `willow-6` (stretching) is on the gold-paw card. From her sheet, grown up: `willow-1` sitting
   (front); `willow-2` standing (side); `willow-3` from behind; `willow-4` lying down, looking at you; `willow-5` asleep,
   curled up; `willow-6` stretching; `willow-7` her face. As a kitten: `willow-kitten-1` sitting (front); `-2` playing
   with a blue feather; `-3` curled up asleep; `-4` walking (front); `-5` looking up at a butterfly; `-6` in a round

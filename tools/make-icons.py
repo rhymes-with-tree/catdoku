@@ -867,10 +867,26 @@ def lmnopom():
     return frame(tint("#8D78AD", .15), marm + out)
 
 
+# Window Ledges: a brick wall with arched windows, three of them lit gold with a digit, the rest dark, and two white
+# shutters (the clue squares) with their totals, in the game's colours.
+def windowledges():
+    out = "".join(f'<path d="M10 {y}H90" stroke="#000" stroke-opacity=".22" stroke-width="1.4"/>' for y in range(18, 90, 10))
+    def win(x, y, lit, d):
+        fill = YELLOW if lit else INK
+        return (f'<path d="M{x} {y + 20}V{y + 9}a9.5 9.5 0 0 1 19 0V{y + 20}Z" fill="{fill}" stroke="{PAPER}" stroke-width="3" stroke-linejoin="round"/>'
+                + text(x + 9.5, y + 14.5, d, 13, INK if lit else PAPER))
+    def shutter(x, y, n):
+        return (f'<rect x="{x}" y="{y}" width="21" height="21" rx="2" fill="{PAPER}" stroke="{INK}" stroke-width="2"/>'
+                f'<path d="M{x + 1} {y + 1}L{x + 20} {y + 20}" stroke="{tint(INK, .2)}" stroke-width="3.5"/>' + text(x + 15.5, y + 6.5, n, 8.5))
+    out += shutter(14, 14, "7") + win(40, 14, True, "3") + win(66, 14, False, "")
+    out += win(14, 40, False, "") + win(40, 40, True, "4") + shutter(66, 40, "9")
+    out += shutter(14, 66, "5") + win(40, 66, False, "") + win(66, 66, True, "2")
+    return frame(RED, out)
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")
