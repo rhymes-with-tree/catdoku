@@ -315,11 +315,16 @@ const G = (() => {
   // list offers. The finishing cards also offer every other size, so players can always choose.
   const sizeUp = (N, sel) => Math.min(Math.max(...[...sel.options].map(o => +o.value)), N + 1);
   function otherSize(sel, current, choose, text = "Or play a different size:") {
+    // A select's own text can't wrap (not on an iPhone, anyway), so the chosen level is shown as plain text that can
+    // run onto two lines, and the select is laid over it, see-through, so a tap still opens the usual menu.
     const wrap = document.createElement("label"); wrap.className = "pick";
+    const box = document.createElement("span"); box.className = "pickbox";
+    const shown = document.createElement("span"); shown.className = "pickshown";
     const pick = document.createElement("select"); pick.setAttribute("aria-label", text);
     for (const o of sel.options) { const c = new Option(o.textContent, o.value); c.selected = +o.value === current; pick.append(c); }
-    pick.onchange = () => { closeCard(); choose(+pick.value); };
-    wrap.append(text, pick);
+    const show = () => { shown.textContent = pick.selectedIndex >= 0 ? pick.options[pick.selectedIndex].textContent : ""; };
+    pick.onchange = () => { show(); closeCard(); choose(+pick.value); };
+    show(); box.append(shown, pick); wrap.append(text, box);
     return wrap;
   }
 
