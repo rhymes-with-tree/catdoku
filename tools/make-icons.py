@@ -468,7 +468,7 @@ def highperch():
     return frame("#F1E7D6", out)
 
 
-# Fuzzy Spelling: three pompom toys hanging on strings, each a googly-eyed head above its letter (the last with one
+# Spelling String: three pompom toys hanging on strings, each a googly-eyed head above its letter (the last with one
 # more pompom below), lined up across the gold bar so it spells CAT, with yarn tails underneath. All palette colours:
 # the toys in the game's first three toy colours (gold, periwinkle, brick), the bar a tint of gold outlined in ink,
 # on a tint of pacific blue.
@@ -851,10 +851,26 @@ def windup():
     return frame(PAPER, out + gus)
 
 
+
+# L-M-N-O-Pom: a pile of letter pompoms, L M N O along the bottom and an M on top at the right, with a pair, P and O,
+# falling on its gold string, and Marmalade's orange face peeking in at the top left. Pompoms in the game's colours
+# (pacific blue, plum, sage, lime, periwinkle; gold for a 2L), ink letters with a white halo, on a tint of lavender.
+def lmnopom():
+    def pom(x, y, col, ch):
+        return (f'<circle cx="{x}" cy="{y}" r="10.5" fill="{col}" stroke="{INK}" stroke-width="1.6"/>'
+                f'<text x="{x}" y="{y + 1}" font-size="13" fill="{INK}" stroke="#fff" stroke-width="2.6" paint-order="stroke" stroke-linejoin="round" {FONT}>{ch}</text>')
+    marm = (catface(25, 30, 11, ORANGE).split("<circle")[0]
+            + f'<circle cx="{25-11*.38}" cy="{30+11*.1}" r="{11*.16}" fill="{GREEN}"/><circle cx="{25+11*.38}" cy="{30+11*.1}" r="{11*.16}" fill="{GREEN}"/>')
+    out = f'<path d="M50 40H72" stroke="{YELLOW}" stroke-width="2.6"/>' + pom(50, 40, PLUM, "P") + pom(72, 40, YELLOW, "O")
+    out += "".join(pom(x, 80, c, ch) for x, c, ch in [(20, TEAL, "L"), (40, PLUM, "M"), (60, GREEN, "N"), (80, LIME, "O")])
+    out += pom(80, 59, PERI, "M")
+    return frame(tint("#8D78AD", .15), marm + out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")

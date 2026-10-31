@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>L-M-N-O-Pom</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-10-31.3"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-10-31.3">
+<style>
+/* Marmalade has knocked the pompoms out of the craft basket, and they tumble down into a pile, each with a letter.
+   Any word spelled across or down, he pounces on and bats away, and the pompoms above fall into the gap. Reach the
+   level's points before the pile reaches the top. */
+.title{display:flex;align-items:flex-end;gap:8px}
+.marm{display:block;height:58px;width:auto;margin-bottom:-4px}
+@media (max-height:760px){.marm{height:44px}}
+.hud{width:var(--board);display:flex;align-items:center;justify-content:space-between;gap:10px}
+.hud small{display:block;font-size:13px;font-weight:600;line-height:1.1;opacity:.75}
+.next{display:flex;align-items:center;gap:8px}
+.next canvas{display:block;width:96px;height:48px}
+.goal{text-align:right}
+.score{display:inline-flex;align-items:center;height:26px;padding:0 10px;border:2px solid var(--ink);border-radius:999px;
+  background:var(--panel);font-variant-numeric:tabular-nums;white-space:nowrap}
+/* the pile: 7 pompoms across, 10 down; as wide as fits the screen's height, with the pad under it */
+.wrap.stage{height:auto;display:flex;flex-direction:column;align-items:center;gap:8px;--aspect:1.6}
+.pile{position:relative;width:min(var(--board),calc((var(--tall) - 150px) * .7));min-width:230px;aspect-ratio:7/10;
+  touch-action:none;user-select:none;-webkit-user-select:none}
+.pile canvas{display:block;width:100%;height:100%;outline:none;border-radius:14px}
+.tapgo{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;
+  font-weight:800;font-size:22px;color:var(--ink);text-shadow:0 2px 0 #fff8;text-align:center;padding:0 16px}
+.tapgo[hidden]{display:none}
+.pad{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:min(var(--board),calc((var(--tall) - 150px) * .7));min-width:230px}
+.pad button{padding:0;height:44px;min-width:0;display:flex;align-items:center;justify-content:center;border-radius:14px}
+.pad svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.found{width:var(--board);margin-top:6px}
+.found h2{font-size:16px;margin:0 0 4px;text-align:center}
+.found p{margin:0;text-align:center;line-height:1.7}
+.found a{display:inline-block;margin:0 4px;color:var(--ink);text-decoration:none;border-bottom:2px solid color-mix(in srgb,#E16A4A 45%,white);font-weight:600;white-space:nowrap}
+.found a small{opacity:.7;font-weight:600;margin-left:2px}
+.found[hidden]{display:none}
+.card img.pic{display:block;width:70%;max-width:240px;height:auto;margin:0 auto 14px}
+/* A phone held sideways: the bed at the full height on the left, the pad standing beside it. */
+@media (orientation:landscape) and (max-height:500px){
+  body:not(.full) main > .wrap.stage{flex-direction:row;align-items:stretch;gap:8px;--board:auto}
+  body:not(.full) .pile{height:var(--tall);width:auto;min-width:0}
+  body:not(.full) .pad{grid-template-columns:52px;grid-auto-rows:1fr;width:52px;min-width:0;height:min(var(--tall),240px);align-self:center}
+  body:not(.full) .pad button{height:auto}
+}
+</style>
+</head>
+<body>
+<main>
+  <header><div class="title"><h1>L-M-N-O-Pom</h1><img class="marm" src="../cats/marmalade-1.webp" alt="Marmalade, a fluffy orange cat, sitting"></div><div class="stripe"></div><p class="tagline">Spell words in the falling pompoms for Marmalade to pounce on</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span class="left"><span class="score" id="score"></span></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+  <div class="hud">
+    <div class="next"><span><small>Next</small></span><canvas id="nextCv" width="192" height="96"></canvas></div>
+    <div class="goal"><small id="goalTxt"></small><small id="bestTxt"></small></div>
+  </div>
+
+  <div class="wrap stage">
+    <div class="pile" id="board"><canvas id="cv" tabindex="0" role="application" aria-label="A pile of pompoms with letters. Move the falling pompoms with the left and right arrows, turn a pair with the up arrow, and drop with space."></canvas><div class="tapgo" id="tapgo" hidden></div></div>
+    <div class="pad" id="pad">
+      <button id="leftBtn" aria-label="Left"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <button id="turnBtn" aria-label="Turn"><svg viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2.1-5"/><path d="M18 3v4.5h-4.5"/></svg></button>
+      <button id="rightBtn" aria-label="Right"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+      <button id="dropBtn" aria-label="Drop"><svg viewBox="0 0 24 24"><path d="M12 4v13M6 11l6 6 6-6M5 21h14"/></svg></button>
+    </div>
+  </div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="pauseBtn">Pause</button>
+    <button id="restartBtn">Restart</button>
+    <button id="swatBtn">Swat</button>
+    <button id="linkBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New pile</button>
+  </div>
+  <section class="found" id="found" hidden><h2>Marmalade pounced on</h2><p id="foundList"></p></section>
+</main>
+
+<script src="../games.js?v=2026-10-31.3"></script>
+<script>
+/* ---------- the pile ---------- */
+// The pile is COLS pompoms across and ROWS down. Pieces are one pompom or a pair on a string, dealt from shuffled bags
+// of letters like Scrabble tiles (Q comes as QU), with fluffballs as blanks, gold 2L pompoms that count their letter
+// twice and brick 2W pompoms that count the whole word twice.
+const COLS = 7, ROWS = 10, MAXW = 7;
+const VAL = {a: 1, b: 3, c: 3, d: 2, e: 1, f: 4, g: 2, h: 4, i: 1, j: 8, k: 5, l: 1, m: 3, n: 1, o: 1, p: 3, qu: 10, r: 1, s: 1, t: 1, u: 1, v: 4, w: 4, x: 8, y: 4, z: 10, "?": 0};
+const BAG = {e: 12, a: 9, i: 8, o: 8, n: 6, r: 6, t: 6, l: 4, s: 6, u: 3, d: 4, g: 3, b: 2, c: 2, m: 2, p: 2, f: 2, h: 2, v: 2, w: 2, y: 2, k: 1, j: 1, x: 1, qu: 1, z: 1, "?": 2};
+// Ten levels: the points to reach, how long a pompom takes to fall one row (ms), how often one is 2L (gold) or 2W
+// (maple, as it's brick), how often a piece is a pair, whether fluffballs come, and how many rows are already down.
+const LV = [null,
+  {goal: 40, ms: 900, gold: .08, maple: .03, pairs: .45, fluff: false, pile: 0},
+  {goal: 60, ms: 800, gold: .08, maple: .03, pairs: .5, fluff: false, pile: 0},
+  {goal: 80, ms: 720, gold: .07, maple: .03, pairs: .5, fluff: true, pile: 0},
+  {goal: 100, ms: 650, gold: .07, maple: .03, pairs: .5, fluff: true, pile: 2},
+  {goal: 125, ms: 580, gold: .07, maple: .03, pairs: .55, fluff: true, pile: 2},
+  {goal: 150, ms: 520, gold: .06, maple: .03, pairs: .55, fluff: true, pile: 3},
+  {goal: 175, ms: 460, gold: .06, maple: .03, pairs: .6, fluff: true, pile: 3},
+  {goal: 200, ms: 410, gold: .06, maple: .03, pairs: .6, fluff: true, pile: 4},
+  {goal: 230, ms: 360, gold: .05, maple: .03, pairs: .6, fluff: true, pile: 4},
+  {goal: 260, ms: 320, gold: .05, maple: .03, pairs: .65, fluff: true, pile: 5}];
+const MAX_LEVEL = LV.length - 1;
+const levelName = n => `Level ${n} · ${LV[n].goal} points` + (LV[n].pile ? `, ${LV[n].pile} rows down` : "");
+const mulberry = s => () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+
+// The pompoms for a seed, in order: {l (letter, "?" a fluffball), k (0 plain, 1 2L, 2 2W)}.
+function dealPoms(seed, n, lv) {
+  const rnd = mulberry(seed), out = [];
+  while (out.length < n) {
+    const bag = [];
+    for (const [l, c] of Object.entries(BAG)) if (l !== "?" || lv.fluff) for (let i = 0; i < c; i++) bag.push(l);
+    for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [bag[i], bag[j]] = [bag[j], bag[i]]; }
+    for (const l of bag) { const r = rnd(); out.push({l, k: l === "?" ? 0 : r < lv.gold ? 1 : r < lv.gold + lv.maple ? 2 : 0}); }
+  }
+  return out.slice(0, n);
+}
+// Piece i for a seed: one pompom or a pair, the same every time, so Restart and a share link deal the same pile.
+const dealt = {};
+function pieceOf(seed, level, i) {
+  const key = seed + ":" + level;
+  let d = dealt[key];
+  if (!d) {
+    const lv = LV[level], rnd = mulberry(seed ^ 0x51ED), poms = dealPoms(seed, 4000, lv), pieces = [];
+    for (let k = 0; pieces.length < 1800;) { const two = rnd() < lv.pairs; pieces.push(two ? [poms[k], poms[k + 1]] : [poms[k]]); k += two ? 2 : 1; }
+    d = dealt[key] = pieces;
+  }
+  return d[i % d.length].map(t => ({...t}));
+}
+// A piece's cells for its spot and turn: r 0 across (a, b), 1 down (a over b), 2 across (b, a), 3 down (b over a).
+function cellsOf(p, x, y, r) {
+  if (p.length === 1) return [[x, y, p[0]]];
+  const [a, b] = r >= 2 ? [p[1], p[0]] : p;
+  return r % 2 ? [[x, y, a], [x, y + 1, b]] : [[x, y, a], [x + 1, y, b]];
+}
+const fits = (board, cells) => cells.every(([x, y]) => x >= 0 && x < COLS && y < ROWS && (y < 0 || !board[y * COLS + x]));
+// Let every pompom fall straight down its column; returns the moves [x, from, to].
+function settle(board) {
+  const moved = [];
+  for (let x = 0; x < COLS; x++) {
+    let to = ROWS - 1;
+    for (let y = ROWS - 1; y >= 0; y--) { const t = board[y * COLS + x]; if (!t) continue; if (to !== y) { board[to * COLS + x] = t; board[y * COLS + x] = null; moved.push([x, y, to]); } to--; }
+  }
+  return moved;
+}
+// Every run of three or more pompoms across (left to right) and down (top to bottom), as lists of cells.
+function runs(board) {
+  const out = [];
+  for (let y = 0; y < ROWS; y++) { let cur = []; for (let x = 0; x <= COLS; x++) { if (x < COLS && board[y * COLS + x]) cur.push(y * COLS + x); else { if (cur.length >= 3) out.push(cur); cur = []; } } }
+  for (let x = 0; x < COLS; x++) { let cur = []; for (let y = 0; y <= ROWS; y++) { if (y < ROWS && board[y * COLS + x]) cur.push(y * COLS + x); else { if (cur.length >= 3) out.push(cur); cur = []; } } }
+  return out;
+}
+// Whether the pompoms spell a word, a fluffball standing for any letter; returns the word or null.
+function spells(tiles, dict) {
+  if (!tiles.some(t => t.l === "?")) { const w = tiles.map(t => t.l).join(""); return dict.has(w) ? w : null; }
+  if (tiles.filter(t => t.l === "?").length > 2) return null;
+  const go = (i, acc) => {
+    if (i === tiles.length) return dict.has(acc) ? acc : null;
+    if (tiles[i].l !== "?") return go(i + 1, acc + tiles[i].l);
+    for (const c of "eariotnslcudpmhgbfywkvxzjq") { const r = go(i + 1, acc + c); if (r) return r; }
+    return null;
+  };
+  return go(0, "");
+}
+// A word's points, Scrabble style: its letters (a 2L pompom's twice), doubled for each 2W pompom, times
+// (length - 2), so a longer word is worth much more.
+function wordScore(tiles) {
+  let s = 0, m = 1;
+  for (const t of tiles) { s += VAL[t.l] * (t.k === 1 ? 2 : 1); if (t.k === 2) m *= 2; }
+  return s * m * Math.max(1, tiles.length - 2);
+}
+// The words on the board: in each run, the set of words that don't overlap worth the most points.
+// A pompom can be in a word across and a word down at once, and counts in both.
+function findWords(board, dict) {
+  const found = [];
+  for (const run of runs(board)) {
+    const n = run.length, best = Array(n + 1).fill(null); best[n] = {pts: 0, words: []};
+    for (let i = n - 1; i >= 0; i--) {
+      let b = best[i + 1];
+      for (let j = i + 3; j <= Math.min(n, i + MAXW); j++) {
+        const tiles = run.slice(i, j).map(c => board[c]), w = spells(tiles, dict);
+        if (!w) continue;
+        const pts = wordScore(tiles), cand = {pts: pts + best[j].pts, words: [{cells: run.slice(i, j), word: w, pts}, ...best[j].words]};
+        if (cand.pts > b.pts) b = cand;
+      }
+      best[i] = b;
+    }
+    found.push(...best[0].words);
+  }
+  return found;
+}
+// The pompoms already down at the start of a level: rows of them, a few gaps, and no words among them.
+function startPile(seed, level, dict) {
+  const lv = LV[level], board = Array(COLS * ROWS).fill(null);
+  if (!lv.pile) return board;
+  const rnd = mulberry(seed ^ 0xBEEF);
+  for (let tries = 0; tries < 400; tries++) {
+    board.fill(null);
+    const poms = dealPoms((seed ^ 0xC0FFEE) + tries, COLS * lv.pile, {...lv, fluff: false});
+    let k = 0;
+    for (let y = ROWS - lv.pile; y < ROWS; y++) for (let x = 0; x < COLS; x++) { const t = poms[k++]; if (rnd() > .18) board[y * COLS + x] = {...t, k: 0}; }
+    settle(board);
+    if (!findWords(board, dict).length) return board;
+  }
+  return Array(COLS * ROWS).fill(null);
+}
+</script>
+<script>
+/* ---------- words ---------- */
+// The shared word list's familiar and common words, three to seven letters, less a few nobody wants to see
+// spelled out by chance.
+const NOT = new Set("cock fags hos hoes prick rapes rapist semen boobs penis vagina scrotum slag pimp retards spastic gyp gypsy redskin squaw bimbo hooker horny nude nudes orgasm sperm erotic bitchy pussy bastard incest molest".split(" "));
+let DICT = null;
+const wordsReady = (async () => {
+  const w = window.WORDS_INLINE || await fetch(`../words/words.json?v=${window.SITE_BUILD || ""}`).then(r => { if (!r.ok) throw new Error("couldn't load the word list"); return r.json(); });
+  DICT = new Set([w.familiar, w.common].join(" ").split(" ").filter(x => /^[a-z]{3,7}$/.test(x) && !NOT.has(x)));
+})();
+
+/* ---------- pictures ---------- */
+const catSrc = f => (window.CAT_SRC && window.CAT_SRC[f]) || `../cats/${f}.webp`;
+const picCache = {};
+const pic = src => picCache[src] || (picCache[src] = Object.assign(new Image(), {src}));
+const GOLD = "#ECA818", MAPLE = "#BD5538", INK = "#2A2530";
+const W = COLS * 50, H = ROWS * 50, CELL = 50;
+// Pompoms, as in Spelling String: its pompom photo tinted to one of the site's colours (the photo's light times the
+// colour), plain letters in pacific blue, plum, sage, lime, lavender and periwinkle, a 2L pompom gold and a 2W pompom
+// brick; the blank is Wind Up's grey fluffball with googly eyes.
+const POM_SRC = window.POM_SRC || "../fuzzyspelling/pompom.webp", EYE_SRC = window.EYE_SRC || "../fuzzyspelling/eye.webp";
+const POM_PLAIN = ["#73A7AE", "#B94588", "#6AA673", "#B3B94B", "#8D78AD", "#7885BA"];
+const tints = {};
+function tinted(hex) {
+  if (tints[hex]) return tints[hex];
+  const im = pic(POM_SRC); if (!(im.complete && im.naturalWidth)) return null;
+  const c = document.createElement("canvas"); c.width = c.height = 160; const x = c.getContext("2d"); x.drawImage(im, 0, 0, 160, 160);
+  if (hex) {
+    const d = x.getImageData(0, 0, 160, 160), m = [1, 3, 5].map(i => Math.min(1, parseInt(hex.slice(i, i + 2), 16) / 255 * 1.22));
+    for (let i = 0; i < d.data.length; i += 4) for (let k = 0; k < 3; k++) d.data[i + k] *= m[k];
+    x.putImageData(d, 0, 0);
+  }
+  return tints[hex] = c;
+}
+// One pompom at x, y (its middle), s across, turned its own way.
+function drawPom(c, t, x, y, s, alpha = 1, glow = false) {
+  c.save(); c.globalAlpha = alpha; c.translate(x, y);
+  if (glow) { c.beginPath(); c.roundRect(-s * .5, -s * .5, s, s, s * .2); c.fillStyle = "rgba(236,168,24,.45)"; c.fill(); }
+  const blank = t.l === "?", im = tinted(blank ? "" : t.k === 1 ? GOLD : t.k === 2 ? MAPLE : POM_PLAIN[(t.id || 0) % POM_PLAIN.length]);
+  if (im) { c.save(); c.rotate(((t.id || 0) * 47 % 360) * Math.PI / 180 + (t.spin || 0)); c.drawImage(im, -s * .56, -s * .56, s * 1.12, s * 1.12); c.restore(); }
+  if (blank) {
+    const eye = pic(EYE_SRC);
+    if (eye.complete && eye.naturalWidth) for (const dx of [-1, 1]) { c.save(); c.translate(dx * s * .18, -s * .04); c.rotate(((t.id || 0) * 97 + dx * 13) % 360 * Math.PI / 180); c.drawImage(eye, -s * .15, -s * .15, s * .3, s * .3); c.restore(); }
+  } else {
+    const L = t.l === "qu" ? "Qu" : t.l.toUpperCase();
+    c.font = `800 ${s * (t.l === "qu" ? .46 : .54)}px "Baloo 2", sans-serif`; c.textAlign = "center"; c.textBaseline = "middle";
+    c.lineJoin = "round"; c.lineWidth = s * .08; c.strokeStyle = "rgba(255,255,255,.55)"; c.strokeText(L, 0, s * .04);
+    c.fillStyle = INK; c.fillText(L, 0, s * .04);
+    c.font = `800 ${s * .22}px "Baloo 2", sans-serif`; c.lineWidth = s * .06; c.strokeText(VAL[t.l], s * .3, s * .32); c.fillText(VAL[t.l], s * .3, s * .32);
+    if (t.k) {
+      c.font = `800 ${s * .2}px "Baloo 2", sans-serif`; c.lineWidth = s * .04; c.strokeStyle = INK;
+      c.beginPath(); c.roundRect(-s * .5, -s * .5, s * .36, s * .24, s * .08); c.fillStyle = "#fff"; c.fill(); c.stroke();
+      c.fillStyle = INK; c.fillText(t.k === 1 ? "2L" : "2W", -s * .32, -s * .37);
+    }
+  }
+  c.restore();
+}
+/* ---------- game ---------- */
+// game: {level, seed, i (pieces dealt), board [COLS*ROWS of {l, k, id, oy} or null], piece {p, x, y, r} or null,
+//        score, words [[word, pts]], chain, phase ("fall" | "settle" | "pounce"), state ("ready" | "running" | "paused" | "lost" | "won")}
+const STORE = "catdoku.lmnopom.v1";
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1, tries: {}}, state.settings);
+let game = null, nextId = 1;
+const cv = $("cv"), ctx = cv.getContext("2d");
+const tile = t => ({l: t.l, k: t.k, id: nextId++, oy: 0});
+const save = () => G.save(STORE, {settings, game: game && ["ready", "running", "paused"].includes(game.state) ? {
+  level: game.level, seed: game.seed, i: game.i, score: game.score, words: game.words, ms: game.ms, started: game.started, timed: game.timed, swatted: !!game.swatted,
+  board: game.board.map(t => t ? t.l + t.k : ""), piece: game.piece && {x: game.piece.x, y: game.piece.y, r: game.piece.r}} : null});
+
+function newGame(n, seed) {
+  closeCard();
+  seed = seed || (Math.random() * 2 ** 31) | 0;
+  game = {level: n, seed, i: 0, board: startPile(seed, n, DICT).map(t => t && tile(t)), piece: null, score: 0, words: [], chain: 0,
+    phase: "fall", fallT: 0, lockT: 0, t: 0, fx: [], state: "ready", ...G.freshClock()};
+  spawn();
+  $("tapgo").hidden = false; $("tapgo").textContent = "Tap to start";
+  status(); paintNext(); listWords(); save();
+}
+const closeCard = () => G.closeCard();
+function spawn() {
+  const g = game, p = pieceOf(g.seed, g.level, g.i).map(tile);
+  g.piece = {p, x: 3, y: 0, r: 0};
+  if (!fits(g.board, cellsOf(p, 3, 0, 0))) { g.piece = null; return false; }
+  g.fallT = 0; g.lockT = 0;
+  return true;
+}
+function status() {
+  const g = game;
+  $("score").textContent = `${g.score} / ${LV[g.level].goal} points`;
+  $("goalTxt").textContent = `Goal: ${LV[g.level].goal} points`;
+  const best = g.words.reduce((b, w) => w[1] > b[1] ? w : b, ["", 0]);
+  $("bestTxt").textContent = best[1] ? `Best word: ${best[0].toUpperCase()} (${best[1]})` : "";
+  G.relabel($("pauseBtn"), g.state === "paused" ? "Go on" : "Pause", g.state === "paused" ? "play" : "pause");
+  $("pauseBtn").disabled = !["running", "paused"].includes(g.state);
+  $("swatBtn").disabled = !["running", "ready"].includes(g.state) || !!g.swatted || !g.board.some(Boolean);
+}
+function listWords() {
+  const ws = game.words;
+  $("found").hidden = !ws.length;
+  $("foundList").replaceChildren(...ws.slice().reverse().map(([w, p]) => {
+    const a = document.createElement("a"); a.href = `https://en.wiktionary.org/wiki/${w}#English`; a.target = "_blank"; a.rel = "noopener";
+    a.append(w.toUpperCase()); const s = document.createElement("small"); s.textContent = p; a.append(s); return a;
+  }));
+}
+
+/* ---------- moving the poms ---------- */
+const busy = () => $("overlay").classList.contains("show") || !!document.querySelector(".spot");
+function begin() {
+  if (game.state === "ready") { game.state = "running"; game.started = true; $("tapgo").hidden = true; status(); }
+  else if (game.state === "paused") resume();
+  return game.state === "running";
+}
+function canAct() { return game && !busy() && ["ready", "running", "paused"].includes(game.state) && begin() && game.phase === "fall" && game.piece; }
+function move(dx) {
+  if (!canAct()) return;
+  const pc = game.piece;
+  if (fits(game.board, cellsOf(pc.p, pc.x + dx, pc.y, pc.r))) { pc.x += dx; game.lockT = 0; }
+}
+function turn() {
+  if (!canAct()) return;
+  const pc = game.piece; if (pc.p.length < 2) return;
+  const r = (pc.r + 1) % 4;
+  // a pair against a wall or the pile slides over to turn
+  for (const [dx, dy] of [[0, 0], [-1, 0], [1, 0], [0, -1]]) if (fits(game.board, cellsOf(pc.p, pc.x + dx, pc.y + dy, r))) { pc.x += dx; pc.y += dy; pc.r = r; game.lockT = 0; return; }
+}
+function landY() { const pc = game.piece; let y = pc.y; while (fits(game.board, cellsOf(pc.p, pc.x, y + 1, pc.r))) y++; return y; }
+function hardDrop() {
+  if (!canAct()) return;
+  game.piece.y = landY(); lock();
+}
+function lock() {
+  const g = game, pc = g.piece;
+  for (const [x, y, t] of cellsOf(pc.p, pc.x, pc.y, pc.r)) g.board[y * COLS + x] = t;
+  g.piece = null; g.i++; g.chain = 0;
+  startSettle(); paintNext();
+}
+// After anything lands or is taken away: pompoms fall down their columns, then any words are pounced on.
+function startSettle() {
+  const g = game;
+  for (const [x, from, to] of settle(g.board)) g.board[to * COLS + x].oy += from - to;
+  g.phase = "settle";
+}
+function afterSettle() {
+  const g = game, words = findWords(g.board, DICT);
+  if (words.length) {
+    g.chain++;
+    const hit = new Set(); let pts = 0;
+    for (const w of words) { w.pts *= g.chain; pts += w.pts; g.words.push([w.word, w.pts]); for (const c of w.cells) hit.add(c); }
+    for (const c of hit) g.board[c].hit = true;
+    g.score += pts; g.phase = "pounce"; g.t = 0; g.hit = hit;
+    // Marmalade's face pops up on the first word, and the points float up from each
+    const w0 = words[0], [x0, y0] = mid(w0.cells);
+    g.fx.push({face: true, x: x0, y: y0, t: 0, T: .75});
+    for (const w of words) { const [x, y] = mid(w.cells); g.fx.push({text: `+${w.pts}`, x, y, t: 0, T: 1.1}); }
+    const top = words.slice().sort((a, b) => b.pts - a.pts)[0];
+    G.note(`${words.map(w => w.word.toUpperCase()).join(", ")}: ${pts} points` + (g.chain > 1 ? ` (chain × ${g.chain}!)` : top.word.length >= 6 ? " Pounce!" : ""), 2600);
+    status(); listWords(); save();
+    return;
+  }
+  g.chain = 0;
+  if (g.score >= LV[g.level].goal) return win();
+  if (!g.piece && !spawn()) return lose();
+  g.phase = "fall"; status(); save();
+}
+const mid = cells => { const xs = cells.map(c => c % COLS), ys = cells.map(c => Math.floor(c / COLS)); return [(Math.min(...xs) + Math.max(...xs) + 1) / 2 * CELL, (Math.min(...ys) + Math.max(...ys) + 1) / 2 * CELL]; };
+function scatter() {
+  const g = game;
+  for (const c of g.hit) {
+    const t = g.board[c], x = (c % COLS + .5) * CELL, y = (Math.floor(c / COLS) + .5) * CELL;
+    g.fx.push({pom: {...t, hit: false}, x, y, vx: (Math.random() - .5) * 260, vy: -160 - Math.random() * 200, w: (Math.random() - .5) * 9, t: 0, T: .9});
+    g.board[c] = null;
+  }
+  g.hit = null; startSettle();
+}
+
+/* ---------- the loop ---------- */
+const FALL = 16, LOCK = .4, SOFT = .045;   // rows a second pompoms settle at; seconds a resting piece waits; seconds a row while Down is held
+let softDown = false, last = performance.now();
+function tick(dt) {
+  const g = game;
+  for (const f of g.fx) { f.t += dt; if (f.pom) { f.x += f.vx * dt; f.y += f.vy * dt; f.vy += 900 * dt; f.pom.spin = (f.pom.spin || 0) + f.w * dt; } }
+  g.fx = g.fx.filter(f => f.t < f.T);
+  if (g.state !== "running") return;
+  if (g.phase === "settle") {
+    let moving = false;
+    for (const t of g.board) if (t && t.oy < 0) { t.oy = Math.min(0, t.oy + FALL * dt); moving = moving || t.oy < 0; }
+    if (!moving) afterSettle();
+  } else if (g.phase === "pounce") {
+    g.t += dt; if (g.t > .5) scatter();
+  } else if (g.piece) {
+    const pc = g.piece, step = softDown ? SOFT : LV[g.level].ms / 1000;
+    if (fits(g.board, cellsOf(pc.p, pc.x, pc.y + 1, pc.r))) { g.lockT = 0; g.fallT += dt; if (g.fallT >= step) { g.fallT = 0; pc.y++; } }
+    else { g.lockT += dt; if (g.lockT >= (softDown ? .12 : LOCK)) lock(); }
+  }
+}
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (game && !busy()) tick(dt);
+  paint();
+  requestAnimationFrame(frame);
+}
+function size() {
+  const r = cv.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1), w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  return cv.width / W;
+}
+function paint() {
+  if (!game) return;
+  const k = size(), g = game;
+  ctx.setTransform(k, 0, 0, k, 0, 0); ctx.clearRect(0, 0, W, H);
+  // the backdrop: lavender at 12% on white, with faint lines between the columns
+  ctx.fillStyle = "#F1EFF5"; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = "rgba(42,37,48,.06)"; ctx.lineWidth = 1;
+  for (let x = 1; x < COLS; x++) { ctx.beginPath(); ctx.moveTo(x * CELL, 0); ctx.lineTo(x * CELL, H); ctx.stroke(); }
+  // the top row: the pile mustn't reach it
+  ctx.fillStyle = "rgba(189,85,56,.07)"; ctx.fillRect(0, 0, W, CELL);
+  // where the piece will land
+  if (g.piece && g.phase === "fall" && ["ready", "running"].includes(g.state)) {
+    const pc = g.piece, ly = landY();
+    for (const [x, y, t] of cellsOf(pc.p, pc.x, ly, pc.r)) if (ly !== pc.y) drawPom(ctx, t, (x + .5) * CELL, (y + .5) * CELL, CELL * .9, .22);
+  }
+  for (let c = 0; c < g.board.length; c++) {
+    const t = g.board[c]; if (!t) continue;
+    const x = (c % COLS + .5) * CELL, y = (Math.floor(c / COLS) + .5 + (t.oy || 0)) * CELL;
+    drawPom(ctx, t, x, y, CELL * .96, 1, t.hit);
+  }
+  if (g.piece && ["ready", "running", "paused"].includes(g.state)) {
+    const pc = g.piece, sm = g.phase === "fall" && g.state === "running" && !softDown ? Math.min(1, g.fallT / (LV[g.level].ms / 1000)) * .25 : 0;
+    for (const [x, y, t] of cellsOf(pc.p, pc.x, pc.y, pc.r)) {
+      const can = fits(g.board, cellsOf(pc.p, pc.x, pc.y + 1, pc.r));
+      if (pc.p.length > 1 && pc.r % 2 === 0) { // the string joining a pair
+        ctx.save(); ctx.strokeStyle = GOLD; ctx.lineWidth = 4; ctx.lineCap = "round"; ctx.beginPath(); const yy = (pc.y + .5 + (can ? sm : 0)) * CELL; ctx.moveTo((pc.x + .5) * CELL, yy); ctx.lineTo((pc.x + 1.5) * CELL, yy); ctx.stroke(); ctx.restore();
+      }
+      drawPom(ctx, t, (x + .5) * CELL, (y + .5 + (can ? sm : 0)) * CELL, CELL * .94);
+    }
+  }
+  for (const f of g.fx) {
+    const u = f.t / f.T;
+    if (f.pom) drawPom(ctx, f.pom, f.x, f.y, CELL * .94, 1 - u);
+    else if (f.face) { const im = pic(catSrc("marmalade-7")); if (im.complete && im.naturalWidth) { const s = CELL * 1.7 * (u < .2 ? u / .2 : 1), a = u > .7 ? (1 - u) / .3 : 1; ctx.save(); ctx.globalAlpha = a; ctx.drawImage(im, f.x - s / 2, f.y - s * .55, s, s * im.naturalHeight / im.naturalWidth); ctx.restore(); } }
+    else if (f.text) { ctx.save(); ctx.globalAlpha = 1 - Math.max(0, u - .5) * 2; ctx.font = `800 26px "Baloo 2", sans-serif`; ctx.textAlign = "center"; ctx.lineWidth = 5; ctx.lineJoin = "round"; ctx.strokeStyle = "#fff"; ctx.fillStyle = INK; const y = f.y - 30 - u * 40; ctx.strokeText(f.text, f.x, y); ctx.fillText(f.text, f.x, y); ctx.restore(); }
+  }
+}
+// Next: the piece after the one in play. game.i is the piece falling now (or, between a landing and the next
+// spawn, the one about to fall), so Next is always game.i + 1.
+function paintNext() {
+  const c = $("nextCv").getContext("2d"); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, 192, 96);
+  if (!game) return;
+  const p = pieceOf(game.seed, game.level, game.i + 1);   // the piece after the one falling (or about to fall), never the same one
+  p.forEach((t, k) => drawPom(c, {...t, id: k + 1}, (p.length === 1 ? 96 : 48 + k * 96), 48, 86));
+}
+addEventListener("resize", paint);
+
+/* ---------- controls ---------- */
+// On the pile: drag sideways to move, tap to turn a pair, flick down to drop. The pad does the same, and the keys:
+// the arrows move, Up turns, Down falls faster, Space drops.
+let drag = null;
+cv.addEventListener("pointerdown", e => {
+  if (!game || busy()) return;
+  if (game.state === "paused") { resume(); return; }
+  if (game.state === "ready") begin();
+  const r = cv.getBoundingClientRect();
+  drag = {id: e.pointerId, x0: e.clientX, y0: e.clientY, t0: performance.now(), cw: r.width / COLS, moved: 0, px: game.piece ? game.piece.x : 0};
+  cv.setPointerCapture(e.pointerId);
+});
+cv.addEventListener("pointermove", e => {
+  if (!drag || e.pointerId !== drag.id || !game.piece) return;
+  const want = drag.px + Math.round((e.clientX - drag.x0) / drag.cw);
+  while (game.piece && game.piece.x < want && fits(game.board, cellsOf(game.piece.p, game.piece.x + 1, game.piece.y, game.piece.r))) { move(1); drag.moved = 1; }
+  while (game.piece && game.piece.x > want && fits(game.board, cellsOf(game.piece.p, game.piece.x - 1, game.piece.y, game.piece.r))) { move(-1); drag.moved = 1; }
+  if (Math.abs(e.clientX - drag.x0) > drag.cw * .4) drag.moved = 1;
+});
+cv.addEventListener("pointerup", e => {
+  if (!drag || e.pointerId !== drag.id) return;
+  const dy = e.clientY - drag.y0, dx = e.clientX - drag.x0, dt = performance.now() - drag.t0;
+  if (dy > drag.cw * 1.2 && dy > Math.abs(dx) * 1.5) hardDrop();
+  else if (!drag.moved && Math.abs(dy) < drag.cw * .5 && dt < 400) turn();
+  drag = null;
+});
+cv.addEventListener("pointercancel", () => { drag = null; });
+// pad buttons: left and right repeat while held
+for (const [id, fn] of [["leftBtn", () => move(-1)], ["rightBtn", () => move(1)], ["turnBtn", turn], ["dropBtn", hardDrop]]) {
+  const b = $(id); let rep = null;
+  b.addEventListener("pointerdown", e => { e.preventDefault(); fn(); if (id === "leftBtn" || id === "rightBtn") { clearInterval(rep); rep = setTimeout(() => { rep = setInterval(fn, 90); }, 260); } });
+  const stop = () => { clearTimeout(rep); clearInterval(rep); rep = null; };
+  b.addEventListener("pointerup", stop); b.addEventListener("pointerleave", stop); b.addEventListener("pointercancel", stop);
+  b.addEventListener("click", e => { if (e.detail === 0) fn(); });   // Enter or Space on the focused button
+}
+addEventListener("keydown", e => {
+  if (!game || e.target.closest("select,input,textarea") || e.ctrlKey || e.metaKey || e.altKey || busy()) return;
+  const k = e.key;
+  if (k === "ArrowLeft") { e.preventDefault(); move(-1); }
+  else if (k === "ArrowRight") { e.preventDefault(); move(1); }
+  else if (k === "ArrowUp" || k === "x" || k === "X") { e.preventDefault(); turn(); }
+  else if (k === "ArrowDown") { e.preventDefault(); if (canAct()) softDown = true; }
+  else if (k === " " || k === "Enter") { if (e.target.closest("button")) return; e.preventDefault(); hardDrop(); }
+  else if (k === "p" || k === "P") game.state === "paused" ? resume() : pause();
+  else if (k === "s" || k === "S") swat();
+});
+addEventListener("keyup", e => { if (e.key === "ArrowDown") softDown = false; });
+// Swat: once a level, Marmalade bats away the bottom two rows. It costs the gold paw.
+function swat() {
+  const g = game;
+  if (!g || g.swatted || busy() || !["ready", "running"].includes(g.state) || g.phase !== "fall") return;
+  if (!g.board.some(Boolean)) { G.note("Nothing to swat yet. You only get one go, so save it.", 3000); return; }
+  begin();
+  for (let c = (ROWS - 2) * COLS; c < ROWS * COLS; c++) { const t = g.board[c]; if (!t) continue;
+    g.fx.push({pom: {...t}, x: (c % COLS + .5) * CELL, y: (Math.floor(c / COLS) + .5) * CELL, vx: (Math.random() - .5) * 300, vy: -120 - Math.random() * 160, w: (Math.random() - .5) * 9, t: 0, T: .9}); g.board[c] = null; }
+  g.fx.push({face: true, x: W / 2, y: H - CELL, t: 0, T: .75});
+  g.swatted = true; startSettle();
+  G.note("Swat! That costs the gold paw this time.", 3500);
+  status(); save();
+}
+$("swatBtn").onclick = () => swat();
+function pause() { if (game && game.state === "running") { game.state = "paused"; softDown = false; $("tapgo").hidden = false; $("tapgo").textContent = "Paused · tap to go on"; status(); save(); } }
+function resume() { if (game && game.state === "paused") { game.state = "running"; $("tapgo").hidden = true; status(); } }
+$("pauseBtn").onclick = () => game && (game.state === "paused" ? resume() : pause());
+document.addEventListener("visibilitychange", () => { if (document.hidden) pause(); });
+
+/* ---------- endings ---------- */
+// The pile reaching the top: a card offers Swat to keep going (once, and it costs the gold paw), or starting again.
+// The try only counts, and a win streak only ends, once the player gives up on this pile.
+function lose() {
+  const g = game; g.state = "lost"; status(); save();
+  G.track(`L-M-N-O-Pom piled up on level ${g.level}`);
+  setTimeout(() => {
+    if (game !== g) return;
+    const keepOn = g.swatted ? [] : [["Swat and keep going", () => { closeCard(); revive(g); }, true]];
+    G.openCard("Piled to the top!", `The pompoms reached the top, with ${g.score} of ${LV[g.level].goal} points.` + (g.swatted ? " Start again?" : " Swat the bottom two rows to keep going, or start again."),
+      [...keepOn, ["Try again", () => { closeCard(); giveUp(g); newGame(g.level, g.seed); }, !keepOn.length], ["New pile", () => { closeCard(); giveUp(g); newGame(g.level); }],
+       ["Admire the pile", () => { closeCard(); giveUp(g); G.breakStreak(); G.note("Tap Restart to try again.", 0); }]],
+      null, G.otherSize($("levelSel"), g.level, n => { giveUp(g); startLevel(n); }, "Or play a different level:"));
+  }, 700);
+}
+function giveUp(g) { if (!g.counted) { g.counted = true; settings.tries[g.level] = (settings.tries[g.level] || 0) + 1; save(); } }
+function revive(g) {
+  if (game !== g || g.state !== "lost") return;
+  g.state = "running"; g.phase = "fall"; swat();
+}
+function win() {
+  const g = game; g.state = "won"; g.phase = "fall"; G.finishClock(g);
+  const first = !settings.tries[g.level], next = Math.min(MAX_LEVEL, g.level + 1);
+  settings.tries[g.level] = 0; settings.level = next; $("levelSel").value = next; save(); status();
+  G.track(`L-M-N-O-Pom won level ${g.level}`);
+  setTimeout(() => {
+    if (game !== g) return;
+    const im = new Image(); im.className = "pic"; im.src = catSrc("marmalade-6"); im.alt = "Marmalade rolling on his back, batting at a pompom";
+    const best = g.words.reduce((b, w) => w[1] > b[1] ? w : b, ["", 0]);
+    const text = `${g.score} points from ${g.words.length} word${g.words.length === 1 ? "" : "s"}` + (best[1] ? `, best of all ${best[0].toUpperCase()} for ${best[1]}.` : ".") +
+      (g.level === MAX_LEVEL ? " That's the top level; here it is again." : ` Next up: level ${next}.`);
+    G.winCard(text, () => { closeCard(); startLevel(next); }, "Admire the pile", g.result,
+      {title: "Pounced!", gold: first && !g.swatted, goldWhy: "First try, no swat!", goldTitle: "Marmalade rolls in the pompoms!", goldPic: [im], next: next > g.level ? `Next: level ${next}` : "Next pile",
+       after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+  }, 900);
+}
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); closeCard(); newGame(n); }
+const leave = () => { if (["running", "paused"].includes(game.state) && game.started) { settings.tries[game.level] = (settings.tries[game.level] || 0) + 1; save(); } else if (game.state === "lost") giveUp(game); closeCard(); };
+$("restartBtn").onclick = () => { if (game) { leave(); newGame(game.level, game.seed); } };
+$("newBtn").onclick = () => { if (game) { leave(); newGame(game.level); } };
+// Share: the level and the order the poms come in, as dealt.
+$("linkBtn").onclick = () => { if (game) { pause(); G.shareCard({name: "L-M-N-O-Pom", what: "pile", won: game.state === "won", puzzle: () => ({g: "lmnopom", N: game.level, s: game.seed})}); } };
+function openShared(d) {
+  if (!(d.N >= 1 && d.N <= MAX_LEVEL) || !Number.isInteger(d.s)) throw new Error("the shared pile doesn't fit the game");
+  settings.level = d.N; $("levelSel").value = d.N; save(); newGame(d.N, d.s);
+}
+
+/* ---------- how to play ---------- */
+function showHelp() { pause(); settings.seenHelp = false; helpOnFirstVisit(); if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); } }
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || !["ready", "paused", "running"].includes(game.state) || document.querySelector(".spot")) return;
+  if (game.state === "running") pause();
+  const row = y => Array.from({length: COLS}, (_, x) => [x, y]);
+  const top = row(0), bottom = [...row(ROWS - 2), ...row(ROWS - 1)];
+  const steps = [
+    {say: "Letters fall. Drag them, or use the arrows", lit: top, els: [$("leftBtn"), $("rightBtn")]},
+    {say: "Tap to turn a pair", lit: top, els: [$("turnBtn")]},
+    {say: "Flick down to drop", els: [$("dropBtn")]},
+    {say: "Spell words across or down for Marmalade", lit: bottom, tone: "ok"},
+    {say: "Long words and rare letters score more", els: [$("nextCv")]},
+    {say: "2L counts its letter twice; 2W, the whole word", els: [$("nextCv")]},
+    ...(LV[game.level].fluff ? [{say: "A fluffball can be any letter", els: [$("nextCv")]}] : []),
+    {say: `Get ${LV[game.level].goal} points before the pile reaches the top`, lit: top, els: [$("score")]},
+    {say: "Stuck? Swat the bottom two rows, once", els: [$("swatBtn")]},
+  ];
+  G.spotlight({grid: cv, w: COLS, h: ROWS, steps, done: () => { settings.seenHelp = true; save(); }});
+}
+$("helpBtn").onclick = showHelp;
+pic(POM_SRC).addEventListener("load", () => paintNext());
+
+/* ---------- start ---------- */
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", "") + (n === MAX_LEVEL ? " (hardest)" : ""), n));
+$("levelSel").onchange = e => { startLevel(+e.target.value); $("levelSel").blur(); };
+G.nav("lmnopom");
+G.setupTimer({name: "lmnopom", game: () => game, playing: g => g.state === "running", save, label: levelName, noun: "level",
+  emptyText: "Reach a level's points and your times will show up here. They're kept on this device only."});
+$("bestBtn").onclick = () => { pause(); G.showBests("Best times", game ? game.level : settings.level); };
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+wordsReady.then(() => {
+  const shared = G.readShare("lmnopom");
+  let openedShare = false;
+  if (shared) try { openShared(shared); openedShare = true; G.note("Here's the shared pile. Good luck!", 6000); G.track("L-M-N-O-Pom shared puzzle opened"); } catch (e) { G.note("That share link didn't work.", 5000); }
+  if (!openedShare) G.reopen(() => {
+    const s = state.game;
+    if (!(s && s.level === settings.level && Array.isArray(s.board) && s.board.length === COLS * ROWS)) return newGame(settings.level);
+    newGame(s.level, s.seed);
+    const board = s.board.map(v => { if (!v) return null; const m = /^([a-z?]|qu)([012])$/.exec(v); if (!m) throw new Error("bad pompom"); return tile({l: m[1], k: +m[2]}); });
+    Object.assign(game, {i: s.i | 0, score: s.score | 0, words: Array.isArray(s.words) ? s.words : [], ms: s.ms || 0, started: s.started, timed: s.timed !== false, swatted: !!s.swatted, board, state: s.started ? "paused" : "ready"});
+    spawn();
+    if (s.piece && game.piece && fits(board, cellsOf(game.piece.p, s.piece.x, s.piece.y, s.piece.r))) Object.assign(game.piece, s.piece);
+    if (!game.piece) game.state = "ready";
+    G.checkClock && G.checkClock(game);
+    $("tapgo").hidden = false; $("tapgo").textContent = s.started ? "Paused · tap to go on" : "Tap to start"; status(); paintNext(); listWords();
+  }, msg => { newGame(settings.level); G.note(msg, 5000); });
+  window.addEventListener("hashchange", () => { const d = G.readShare("lmnopom"); if (d) G.offerShare(d, {name: "L-M-N-O-Pom", inProgress: !!(game && game.started && !["won", "lost"].includes(game.state)), open: d => { try { openShared(d); } catch (e) { G.note("That share link didn't work.", 5000); } }}); });
+  requestAnimationFrame(frame);
+  setTimeout(helpOnFirstVisit, 300);
+}).catch(() => G.note("The word list wouldn't load. Check the connection and reload.", 0));
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>

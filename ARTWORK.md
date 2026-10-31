@@ -128,7 +128,10 @@ each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the 
   box; `kitten-7` Gus asleep on top of Peanut; `kitten-8` Gus walking, tail up. (`kitten-star` is Fred as a kitten; see Fred.)
 - **Marmalade** (`marmalade-…`, a fluffy orange cat: a very long, fluffy coat with a full ruff and a plume of a tail,
   green-gold eyes, large tufted ears, a medium to large build) is a he, and friends with Gus, Peanut and Willow.
-  He doesn't star in a game yet. From his sheet, grown up:
+  He stars in L-M-N-O-Pom: `marmalade-1` (sitting, front) is beside its title, his face (`marmalade-7`) pops up on every word he
+  pounces on (and when he swats the bottom two rows away), and `marmalade-6` (belly up, playing) rolls in the pompoms on the gold-paw card.
+  L-M-N-O-Pom's pompoms are Spelling String's pompom photo (`fuzzyspelling/pompom.webp`), tinted, and its blank is the grey
+  fluffball with googly eyes (`fuzzyspelling/eye.webp`). From his sheet, grown up:
   `marmalade-1` sitting (front); `marmalade-2` standing (side); `marmalade-3` from behind; `marmalade-4` lying down,
   looking at you; `marmalade-5` asleep, stretched out; `marmalade-6` belly up, playing; `marmalade-7` his face.
   As a kitten: `marmalade-kitten-1` sitting (front); `-2` playing with a purple ball of yarn; `-3` curled up asleep;
