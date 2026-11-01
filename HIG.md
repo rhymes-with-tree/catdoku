@@ -39,7 +39,7 @@ the reason they don't apply.
 
 ### Accessibility
 - 🔧 **Support larger text sizes / Dynamic Type:** text follows the iPhone's text size setting, now up to 1.6 times
-  (about AX1, the first larger accessibility size). ❌ The four largest accessibility sizes (AX2–AX5) stop at 1.6.
+  (about AX1, the first larger accessibility size). 🔧 Now up to 2.4 times (about AX3); titles grow less, and from 1.6 times the layouts change (two tiles across, switches stacked). AX4 and AX5 stop at 2.4.
 - ✅ **Color contrast (4.5:1 up to 17 pt, 3:1 for 18 pt or bold):** checked on every page in light and dark.
 - 🔧 **Increase Contrast:** with the system setting on, soft grey text goes to full ink and lines get stronger.
 - ✅ **Convey information with more than color alone** (see Designing for games).
@@ -59,7 +59,7 @@ the reason they don't apply.
 - 🔧 **Minimize time-boxed elements:** hints no longer vanish after five seconds; they stay until the board changes.
   ⚠️ Short notes in the message line still clear after a few seconds (they repeat what the board already shows).
 - ✅ **Difficulty accommodations:** every game has levels; hints, Undo and revives.
-  ⚠️ The action games (Tail Chase, Bird Watch, Wind Up, L-M-N-O-Pom) have no slower speed setting.
+  🔧 Tail Chase, Bird Watch and L-M-N-O-Pom have a Slower switch (two-thirds speed). Wind Up has no clock to beat.
 - ✅ **Be cautious with fast-moving and blinking animations / Reduce Motion:** animations turn off, hint marks stay.
 - ⚠️ **Assistive Access, Switch Control, Voice Control:** not tested.
 
@@ -209,5 +209,5 @@ snippets, status bars, text views, web views, right-to-left, SF Symbols, materia
 2. ✅ ~~Shorter first visits~~: 3 to 9 steps now.
 3. ✅ **VoiceOver on the boards** (see Accessibility); not possible in a useful way for the colour, shape, picture and
    action games. Still to try on a real iPhone with VoiceOver on.
-4. **A slower speed for the action games** (difficulty accommodation).
-5. **The largest accessibility text sizes (AX2–AX5)** for the words around the board.
+4. ✅ ~~A slower speed for the action games~~: a Slower switch.
+5. ✅ Larger text up to 2.4 times (about AX3), with layouts that change at large sizes; AX4 and AX5 stop there.

@@ -284,8 +284,9 @@ carry over if the site ever became an app:
 - **Text size.** Text sizes in shared CSS are `calc(<n>px*var(--ts))`, so they follow the iPhone's text size setting
   (`textSize` in `games.js` sets `--ts`). In a game's own CSS, scale words outside the board the same way (status
   lines, a word list, a clue); leave the board's own lettering as it is. Never stop pinch to zoom (no
-  `maximum-scale` or `user-scalable=no`). Nothing smaller than 11 pixels. `--ts` goes up to 1.6, so check the page at
-  that size.
+  `maximum-scale` or `user-scalable=no`). Nothing smaller than 11 pixels. `--ts` goes up to 2.4 (titles use `--ts-big`, and `.bigText`
+  is on the page from 1.6), so check the page at 2.4. A game played against the clock adds the Slower switch
+  (`#slowTgl`, `G.slower(slug)`; see `tailchase/`).
 - **Contrast:** at least 4.5 to 1 for words and 3 to 1 for icons and the lines that matter, in light and dark.
 - **VoiceOver:** every button has words or an `aria-label` (an icon alone needs a label), and the message line is
   `aria-live="polite"`. A board of HTML squares labels each one (`role="grid"`, as in `catdoku/`); a board drawn as one
@@ -379,8 +380,7 @@ SE, 320 × 460, as well as a laptop at 1280 × 720. Load Playwright with
   side of its centre with `document.elementFromPoint` on a viewport tall enough to show the whole page); with
   `colorScheme: "dark"` on the context, take screenshots and look at them, and check every word against what's behind
   it (at least 4.5 to 1, worked out from the computed colours), the cards included; light mode is unchanged; with
-  `--ts` set to 1.6 on the page (`document.documentElement.style.setProperty("--ts", "1.6")`, as the largest text
-  setting it follows would), nothing runs off the side at 320 × 460 or sideways at 667 × 323; and each button, the board and its
+  `--ts` set to 2.4 and the `bigText` class on `<html>` (as the largest text setting it follows would), nothing runs off the side at 320 × 460 or sideways at 667 × 323; and each button, the board and its
   squares read out sensibly (their `aria-label`s or words);
 - no page errors (failed loads of fonts, GoatCounter and cat photos are expected offline);
 - the front page shows the new tile and icon;
