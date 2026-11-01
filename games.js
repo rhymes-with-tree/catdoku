@@ -789,6 +789,16 @@ const G = (() => {
   function findEl(f) { const e = document.getElementById(f.id); return e && f.up ? e.closest(f.up) : e; }
   const isToolStep = st => !st.try && !st.enter && !(st.lit && st.lit.length) && !st.marks && !st.shapes && !st.lines && !st.arrows &&
     resolveEls(st.els).length && resolveEls(st.els).every(e => e.closest && e.closest(".actions,.bar,.toggles") && findable(e));
+  // A step about an on/off switch (Auto grade, Auto check…) isn't in the walkthrough at all: it's shown once, by
+  // itself, the first time the player turns that switch on, which is when it means something (tips, below).
+  const isSwitchStep = st => isToolStep(st) && resolveEls(st.els).every(e => e.closest(".toggles") && e.querySelector && e.querySelector("input[type=checkbox]"));
+  function keepSwitchTips(steps) {
+    if (!steps.length) return;
+    const d = load(TIPS), shown = d[SLUG + ":shown"] || [];   // each is shown once ever, even if How to play runs again
+    const left = steps.map(st => ({say: st.say, els: resolveEls(st.els).map(findable)})).filter(t => !shown.includes(t.say));
+    if (left.length) d[SLUG + ":on"] = left; else delete d[SLUG + ":on"];
+    save(TIPS, d);
+  }
   function keepTips(steps) {
     const d = load(TIPS);
     d[SLUG] = steps.map(st => ({say: st.say, els: resolveEls(st.els).map(findable)}));
@@ -798,6 +808,10 @@ const G = (() => {
 
   function spotlight(o) {
     const tip = o.finish === false;
+    if (!tip) {   // switches are taught when they're turned on, never in the walkthrough
+      const sw = o.steps.filter(isSwitchStep);
+      if (sw.length && sw.length < o.steps.length) { o = {...o, steps: o.steps.filter(st => !isSwitchStep(st))}; keepSwitchTips(sw); }
+    }
     if (!tip && Date.now() - helpTappedAt > 2000) {   // a first visit: tools and settings wait for later
       const later = o.steps.filter(isToolStep);
       if (later.length && later.length < o.steps.length) { o = {...o, steps: o.steps.filter(st => !isToolStep(st))}; keepTips(later); }
@@ -913,6 +927,8 @@ const G = (() => {
       const skip = document.createElement("button"); skip.type = "button"; skip.textContent = steps().length > 1 ? "Skip" : "Got it";
       skip.addEventListener("pointerdown", e => e.stopPropagation()); skip.addEventListener("click", e => { e.stopPropagation(); end(); });
       bar.append(skip); bar.addEventListener("pointerdown", e => e.stopPropagation()); layer.append(bar);
+      // the bar goes to the top when what the step lights is down by the bottom, so it never covers it
+      if (els.some(r => r.y + r.h > H - 90) || lit.some(([, y]) => Y(y + 1) > H - 90)) { bar.style.bottom = "auto"; bar.style.top = "max(14px, env(safe-area-inset-top))"; }
       const say = document.createElement("div"); say.className = "say";
       say.style.left = `${b.left + b.width * 0.04}px`; say.style.width = `${b.width * 0.92}px`;
       const bw = document.createElement("b"); sayWith(bw, st.say);
@@ -1052,6 +1068,15 @@ const G = (() => {
       const el = e.target.closest && e.target.closest("[id]"); if (!el || el.closest(".spot")) return;
       for (const t of list()) if (t.els.some(f => f && f.id === el.id)) drop(t);
     }, true);
+    // the first time a switch is turned on, its tip, pointing at the switch
+    document.addEventListener("change", e => {
+      const box = e.target; if (!box.matches || !box.matches("input[type=checkbox]") || !box.checked || !box.id) return;
+      const key = SLUG + ":on", d = load(TIPS), t = (d[key] || []).find(x => x.els.some(f => f && f.id === box.id));
+      if (!t) return;
+      d[key] = d[key].filter(x => x !== t); if (!d[key].length) delete d[key];
+      d[SLUG + ":shown"] = [...(d[SLUG + ":shown"] || []), t.say]; save(TIPS, d);
+      setTimeout(() => { if (free() && $("board")) spotlight({grid: $("board"), w: 1, h: 1, steps: [{say: t.say, els: t.els.map(f => f && findEl(f)).filter(Boolean)}], finish: false}); }, 250);
+    });
     let idle = 0;
     const playing = () => { const g = T && T.game(); return !!(g && g.started && T.playing(g)); };
     const poke = () => {
@@ -1205,13 +1230,13 @@ const G = (() => {
     undo: '<path d="M9 7v6h6"/><path d="M9.5 13A9 9 0 1 1 9 21"/>',
     restart: '<path d="M25 16a9 9 0 1 1-2.6-6.4"/><path d="M23 4v6h-6"/>',
     audit: '<circle cx="14" cy="14" r="9"/><path d="M21 21l6 6"/><path d="M10 14l3 3 5-6"/>',
-    undoguess: '<path d="M9 7v6h6"/><path d="M9.5 13A9 9 0 1 1 9 21"/><circle cx="18" cy="17" r="2.5"/>',
+    undoguess: '<path d="M9 7v6h6"/><path d="M9.5 13A9 9 0 1 1 9 21"/><path d="M16 12h6v10l-3-2.2-3 2.2z"/>',   // back to bookmark
     pencil: '<path d="M21 5l6 6-14 14H7v-6z"/><path d="M18 8l6 6"/><path d="M7 27h18"/>',
     pencils: '<path d="M23 5l5 5-12 12h-5v-5z"/><path d="M20 8l5 5"/><path d="M4 9h7M4 14h5M4 27h20"/>',
     erase: '<path d="M18 6l8 8-11 11H9l-4-4z"/><path d="M12 12l8 8"/><path d="M15 25h11"/>',
     pause: '<path d="M11 7v18M21 7v18"/>',
     play: '<path d="M10 6l16 10-16 10z"/>',
-    guess: '<rect x="6" y="6" width="20" height="20" rx="4"/><circle cx="11.5" cy="11.5" r="1.3"/><circle cx="16" cy="16" r="1.3"/><circle cx="20.5" cy="20.5" r="1.3"/>',
+    guess: '<path d="M9 5h14v22l-7-5-7 5z"/>',   // a bookmark (the Bookmark button, once called Guess)
     giveup: '<path d="M8 6h15l-3 5 3 5H8z" class="white"/><path d="M8 28V5"/>',
     cat: '<path d="M7 13L8 4l6 5h4l6-5 1 9c2 4 1 9-3 11-3 2-11 2-14 0-4-2-5-7-2-11z"/><path d="M12.5 17v.5M19.5 17v.5M14.5 21.5h3"/>',
     marks: '<path d="M5 10l8 8M13 10l-8 8"/><path d="M18 11h9M18 17h9"/>',
@@ -1299,10 +1324,10 @@ const G = (() => {
   }
   toolify();
 
-  /* ---------- guesses ---------- */
-  // Guess, as in Toydoku and Fair Play, for a game whose moves go on an Undo list (game.history): Guess makes the next
-  // thing put on the board a guess, which glows violet; Undo guess takes everything back to just before the latest
-  // guess in one tap, through the game's own Undo (so it costs what Undo costs). A guess is kept as {i, at}: the square
+  /* ---------- bookmarks (guesses) ---------- */
+  // Bookmark (called Guess until 2026-11; the code keeps the old names), as in Toydoku and Fair Play, for a game whose
+  // moves go on an Undo list (game.history): Bookmark marks the board as it is, and the next thing put on it glows
+  // violet; Back to bookmark takes everything back to the latest bookmark in one tap, through the game's own Undo (so it costs what Undo costs). A guess is kept as {i, at}: the square
   // and how long the Undo list was before it, so plain Undo past it, or the square being emptied, ends it.
   // o: {game: () => game, undo (one step), draw (after a change), board (the element that shows it's armed), what
   // ("toy", "number"…: for the note line), over (() => true once the puzzle's finished; game.won if not given),
@@ -1321,13 +1346,13 @@ const G = (() => {
     };
     btn.onclick = () => {
       const gm = g(); if (!gm || (o.over ? o.over() : gm.won)) return;
-      armed = !armed; sync(); if (armed) note(`Guess: the next ${o.what || "one"} you put in glows until you undo it`, 3500); else note("");
+      armed = !armed; sync(); if (armed) note(`Bookmarked: the next ${o.what || "one"} you put in glows, and Back to bookmark returns here`, 3500); else note("");
     };
     back.onclick = () => {
       const gm = g(), gs = list(); if (!gm || (o.over ? o.over() : gm.won) || !gs.length) return;
       const to = gs[gs.length - 1].at;
       while (hist(gm).length > to) { const n = hist(gm).length; o.undo(); if (hist(gm).length >= n) break; }
-      armed = false; list(); o.draw(); note("Back to just before your guess.", 3000);
+      armed = false; list(); o.draw(); note("Back at your bookmark.", 3000);
     };
     return {
       before(i) { const gm = g(); if (!armed || !gm) return; armed = false; list().push({i, at: hist(gm).length}); },
