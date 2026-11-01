@@ -268,8 +268,15 @@ const G = (() => {
       const h1 = head.querySelector("h1"), fit = () => {
         h1.style.fontSize = ""; let fs = parseFloat(getComputedStyle(h1).fontSize);
         const t = h1.closest(".title") || h1, one = () => h1.getBoundingClientRect().height < fs * 1.5 && t.getBoundingClientRect().right <= tools.getBoundingClientRect().left;
-        while (!one() && fs > 20) { fs -= 1; h1.style.fontSize = fs + "px"; }
-        if (!one()) h1.style.fontSize = "24px";   // too long even then: two lines at a size that reads
+        // never smaller than a little over the body text (at the larger text sizes that's big): past that, two lines
+        const floor = Math.max(20, parseFloat(getComputedStyle(document.body).fontSize) * 1.15);
+        while (!one() && fs > floor) { fs -= 1; h1.style.fontSize = fs + "px"; }
+        if (!one()) {   // too long even then: two lines at a size that reads...
+          fs = Math.max(24, floor); h1.style.fontSize = fs + "px";
+          // ...unless one word on its own is too wide for the room (Caboodle on a small phone): then smaller, till it fits
+          const clear = () => t.getBoundingClientRect().right <= tools.getBoundingClientRect().left + 1 && h1.scrollWidth <= h1.clientWidth + 1;
+          while (!clear() && fs > 20) { fs -= 1; h1.style.fontSize = fs + "px"; }
+        }
       };
       if (h1) {
         fit(); addEventListener("resize", fit); document.fonts?.ready.then(fit);
