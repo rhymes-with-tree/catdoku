@@ -920,7 +920,8 @@ const G = (() => {
       // (a button to press first, say) take taps; a tap anywhere else does nothing (see guard, below).
       holes = st.try && !st.tried ? [
         ...(lit.length ? [[Math.min(...lit.map(([x]) => X(x))), Math.min(...lit.map(([, y]) => Y(y))), Math.max(...lit.map(([x]) => X(x + 1))), Math.max(...lit.map(([, y]) => Y(y + 1)))]] : []),
-        ...els.map(r => [r.x, r.y, r.x + r.w, r.y + r.h])] : [];
+        ...els.map(r => [r.x, r.y, r.x + r.w, r.y + r.h]),
+        ...shapes.filter(sh => sh.poly).map(sh => { const xs = sh.poly.map(p => p[0]), ys = sh.poly.map(p => p[1]); return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; })] : [];
       layer.dataset.holes = JSON.stringify(holes.map(h => h.map(Math.round)));   // where taps go through (handy for tests)
       // the bar: a dot for each step, and Skip (or, for a single tip, Got it)
       const bar = document.createElement("div"); bar.className = "spotBar";
