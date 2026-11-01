@@ -1059,6 +1059,24 @@ const G = (() => {
     next(); layer.focus({preventScroll: true});
   }
 
+  /* ---------- boards in words ---------- */
+  // A board drawn as one picture (SVG or canvas) can't be explored square by square with VoiceOver, so it's described
+  // in words instead: el (the board's box) becomes an image whose label says what's where, set again after every
+  // move (and only when it changes); the drawing inside is hidden from VoiceOver. Moves themselves go by keyboard
+  // (G.gridKeys) and are announced in the message line. at(i, W) says where square i is, as "row 2, column 3".
+  function describe(el, text) {
+    if (!el) return;
+    // a board played with keys keeps its role (application, grid…); one that has none becomes an image
+    if (!el.dataset.described) { el.dataset.described = "1"; if (!el.getAttribute("role")) el.setAttribute("role", "img");
+      for (const k of el.querySelectorAll(":scope > svg, :scope > canvas, :scope > .grid > svg")) k.setAttribute("aria-hidden", "true"); }
+    if (el.getAttribute("aria-label") !== text) el.setAttribute("aria-label", text);
+    // an SVG board that is itself the thing played with keys: its drawing (letters, numbers) is hidden, the words say it
+    if (el instanceof SVGElement) for (const k of el.children) if (!k.hasAttribute("aria-hidden")) k.setAttribute("aria-hidden", "true");
+  }
+  const at = (i, W) => `row ${Math.floor(i / W) + 1}, column ${i % W + 1}`;
+  // a list in words: "a, b and c"
+  const listed = (xs, sep = ", ") => xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(sep)}${sep === ", " ? " and " : sep}${xs[xs.length - 1]}`;   // ("; " between longer items)
+
   /* ---------- your turn ---------- */
   // Your turn steps in a walkthrough (st.try) are played on the real board; this keeps the game as it was before the
   // first of a run of them and puts it back after the last, or whenever the walkthrough ends (Skip included), so
@@ -1458,6 +1476,6 @@ const G = (() => {
     }
   }
 
-  return {GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, relabel, icon: iconSVG, guesser, yourTurn, meaning, plainText,
+  return {GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();
