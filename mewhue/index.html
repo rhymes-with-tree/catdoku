@@ -142,17 +142,20 @@ function clearLines(g) {
   kill.forEach(i => { g[i] = -1; }); crumble.forEach(i => { g[i] = -1; });
   return {lines, crumble};
 }
-// Levels: what falls in (colour: weight), how many lines to clear, and which lines count (stone only on level 4).
+// Levels: what falls in (colour: weight), how many lines to clear, which lines count (stone only on level 5), and
+// on level 6 one primary much rarer than the others (which one, from the cloth's seed).
 function levelSpec(n) {
   return [null,
-    {drops: {0: 1, 2: 1}, goal: 4},
-    {drops: {0: 1, 2: 1, 1: .3}, goal: 8},
-    {drops: {1: 1, 3: 1}, goal: 4},
-    {drops: {0: 3, 3: 1}, goal: 3, stone: true},
-    {drops: {0: 1, 2: 1, 4: 1}, goal: 3},
-    {drops: {0: 1, 2: 1, 4: 1, 1: .2, 3: .2, 5: .2}, goal: 4}][n];
+    {drops: {0: 1, 2: 1}, goal: 1},
+    {drops: {4: 1, 0: 1}, goal: 1},
+    {drops: {4: 1, 2: 1, 3: .5}, goal: 1},
+    {drops: {1: 1, 3: 1}, goal: 2},
+    {drops: {2: 3, 5: 1}, goal: 2, stone: true},
+    {drops: {0: 1, 2: 1, 4: 1}, goal: 3, rare: .12}][n];
 }
-function pickDrop(spec, r) { const e = Object.entries(spec.drops), tot = e.reduce((t, [, w]) => t + w, 0); let x = r * tot; for (const [c, w] of e) { if ((x -= w) < 0) return +c; } return +e[0][0]; }
+function pickDrop(spec, r, seed) {
+  const d = Object.assign({}, spec.drops); if (spec.rare) d[[0, 2, 4][seed % 3]] = spec.rare;
+  const e = Object.entries(d), tot = e.reduce((t, [, w]) => t + w, 0); let x = r * tot; for (const [c, w] of e) { if ((x -= w) < 0) return +c; } return +e[0][0]; }
 
 function seeded(seed) { return () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 
@@ -172,15 +175,16 @@ const mark = c => { const ink = inkFor(COLOURS[c].hex); return `<svg viewBox="0 
 const chip = c => `<span class="chip" style="background:${COLOURS[c].hex}" title="${COLOURS[c].name}">${mark(c)}</span>`;
 const Cap = w => w[0].toUpperCase() + w.slice(1);
 // Each level's rules strip, in marks: [the rule, whether it's new on this level]
-function rulesOf(n) {
-  const mixR = (a, b, m) => `${chip(a)}+${chip(b)}=${chip(m)}`;
+function rulesOf(n, seed) {
+  const mixR = (a, b, m) => `${chip(a)}+${chip(b)}=${chip(m)}`, same = c => `${chip(c)}+${chip(c)}=${chip(c)}`, line = isNew => [`a line of one kind clears`, isNew];
+  const rare = [0, 2, 4][seed % 3];
   return [null,
-    [[mixR(0, 2, 1), 1], [`${chip(0)}+${chip(0)}=${chip(0)}`, 1], [`a line of one kind clears`, 1]],
-    [[mixR(0, 2, 1), 0], [`${chip(1)} is full: it stays put`, 1], [`a line of one kind clears`, 0]],
-    [[`${chip(1)} ${chip(3)} never mix`, 1], [`line them up to clear them`, 1]],
-    [[`${chip(0)}+${chip(3)}=${chip(6)}`, 1], [`stone never moves`, 1], [`goal: lines of ${chip(6)}`, 1]],
-    [[mixR(0, 2, 1), 0], [mixR(2, 4, 3), 1], [mixR(0, 4, 5), 1], [`a mark + the mix without it = ${chip(6)}`, 1], [`${chip(6)} crumbles beside a cleared line`, 1]],
-    [[mixR(0, 2, 1), 0], [mixR(2, 4, 3), 0], [mixR(0, 4, 5), 0], [`a mark + the mix without it = ${chip(6)}`, 0], [`mixes fall in too`, 1]]][n];
+    [[mixR(0, 2, 1), 1], [same(0), 1], line(1)],
+    [[mixR(0, 4, 5), 1], [same(4), 1], line(0)],
+    [[mixR(2, 4, 3), 1], [`${chip(3)} is full: it stays put`, 1], line(0)],
+    [[`${chip(1)} ${chip(3)} never mix`, 1], line(0)],
+    [[`${chip(2)}+${chip(5)}=${chip(6)}`, 1], [`${chip(6)} never moves`, 1], [`goal: lines of ${chip(6)}`, 1]],
+    [[mixR(0, 2, 1), 0], [mixR(2, 4, 3), 0], [mixR(0, 4, 5), 0], [`a mark + the mix without it = ${chip(6)}`, 1], [`${chip(rare)} is rare`, 1], [`${chip(6)} crumbles beside a cleared line`, 1]]][n];
 }
 
 /* ---------- game state ---------- */
@@ -191,11 +195,11 @@ let saved = G.load(STORE), settings = Object.assign({level: 1, seen: {}}, saved.
 let game = saved.game || null, busy = false;
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !game.lost && !busy && !$("overlay").classList.contains("show");
-const levelName = n => [null, "Red and yellow", "Ready-mixed orange", "Two mixes", "Stone", "Red, yellow, blue", "Everything"][n];
+const levelName = n => [null, "Red and yellow", "Blue and red", "Blue, yellow, green", "Orange and green", "Stone", "All three"][n];
 function drop(g) {
   const r = seeded(g.seed * 7919 + g.drops++), empty = g.grid.map((c, i) => c < 0 ? i : -1).filter(i => i >= 0);
   if (!empty.length) return -1;
-  const i = empty[Math.floor(r() * empty.length)]; g.grid[i] = pickDrop(levelSpec(g.level), r()); return i;
+  const i = empty[Math.floor(r() * empty.length)]; g.grid[i] = pickDrop(levelSpec(g.level), r(), g.seed); return i;
 }
 function deal(level, seed) {
   const g = {level, seed, grid: new Array(N * N).fill(-1), drops: 0, lines: 0, moves: 0, mixes: MIXES, history: [], won: false, lost: false, ...G.freshClock()};
@@ -222,12 +226,12 @@ function draw() {
   if (!grid.querySelector(".slot")) for (let i = 0; i < N * N; i++) { const s = document.createElement("div"); s.className = "slot"; s.dataset.i = i; const [x, y] = xyOf(i); s.style.left = x * 20 + "%"; s.style.top = y * 20 + "%"; grid.append(s); }
   grid.querySelectorAll(".blk,.ghost").forEach(e => e.remove());
   blocks = game.grid.map((c, i) => c >= 0 ? blk(c, i) : null);
-  $("rules").innerHTML = rulesOf(game.level).map(([t, isNew]) => `<span class="r${isNew ? " new" : ""}">${t}</span>`).join("");
+  $("rules").innerHTML = rulesOf(game.level, game.seed).map(([t, isNew]) => `<span class="r${isNew ? " new" : ""}">${t}</span>`).join("");
   update();
 }
 function update() {
   const spec = levelSpec(game.level);
-  $("count").innerHTML = `Level ${game.level} · ${Math.min(game.lines, spec.goal)} of ${spec.goal} ${spec.stone ? "stone " : ""}lines <span class="goalbar"><i style="width:${Math.min(100, game.lines / spec.goal * 100)}%"></i></span>`;
+  $("count").innerHTML = `Level ${game.level} · ${Math.min(game.lines, spec.goal)} of ${spec.goal} ${spec.stone ? "stone " : ""}line${spec.goal === 1 ? "" : "s"} <span class="goalbar"><i style="width:${Math.min(100, game.lines / spec.goal * 100)}%"></i></span>`;
   $("hintBtn").disabled = !playing();
   $("undoBtn").disabled = !game.history.length || game.won;
   $("restartBtn").disabled = !game.history.length || game.won;
@@ -362,7 +366,7 @@ function win() {
   settings.level = next; $("levelSel").value = next; save();
   G.track(`Mew Hue won level ${game.level}`);
   const gold = !game.undid && !game.hinted && !game.mixed, spec = levelSpec(game.level);
-  let text = `You cleared ${game.lines} ${spec.stone ? "lines of stone" : "lines"} in ${game.moves} moves.`;
+  let text = `You cleared ${game.lines} ${spec.stone ? "line" : "line"}${game.lines === 1 ? "" : "s"}${spec.stone ? " of stone" : ""} in ${game.moves} moves.`;
   text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the last level; here's another cloth." : ` Next up: level ${next}, ${levelName(next).toLowerCase()}.`;
   setTimeout(() => G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the cloth", game.result,
     {title: "Lined up!", gold, goldWhy: "No hints, undos or mix-ups!", next: next > game.level ? `Next: level ${next}` : "Next cloth",
@@ -399,7 +403,7 @@ function helpOnFirstVisit(all) {
   const row = cells.filter(([, y]) => y === can[1]), way = can[2] ? "left" : "right";
   const turn = G.yourTurn(() => game, g => { game = g; }, draw);
   let was = 0;
-  const newSay = {1: "Two marks mix into one block", 2: "Some mixes fall in ready-made", 3: "These two never mix", 4: "A mark meets the mix without it: stone", 5: "Here comes blue's ring", 6: "Everything at once"}[n];
+    const newSay = {1: "Two marks mix into one block", 2: "A new mark: the ring", 3: "Ready-mixed green is full", 4: "These two never mix", 5: "A mark meets the mix without it: stone", 6: "All three marks, one rare"}[n];
   const steps = first ? [
     {say: "Each colour has a mark 🐈", els: [$("rules")]},
     {say: `Drag this row ${way}`, lit: row, ...turn.upTo, try: {done: () => game.moves !== was}, enter() { turn.from.enter(); was = game.moves; }},
