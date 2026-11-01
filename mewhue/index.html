@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-01.14"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-01.15"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-01.14">
+<link rel="stylesheet" href="../games.css?v=2026-11-01.15">
 <style>
 /* Blocks of paint, each with a mark: red a bar down, yellow a bar across, blue a ring. Drag a row
    or column and its blocks slide to that end. Two different marks mix, and the mix carries both (orange is a
@@ -98,7 +98,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-01.14"></script>
+<script src="../games.js?v=2026-11-01.15"></script>
 <script>
 /* ---------- marks, colours and rules (plain functions) ---------- */
 // Colours by number: 0 red (a bar down), 1 orange (bar down and across), 2 yellow (a bar across), 3 green (across
@@ -107,8 +107,12 @@
 const N = 5;
 // What two bumping blocks make: the same primary joins into one; two different primaries mix; a primary and the
 // one mix that doesn't hold its mark (its complement) set into stone; anything else just bumps (-1).
+// Level 7 adds black (7) and white (8). Black wipes out whatever it bumps, and itself (VANISH), except white: black
+// and white set into stone. White never combines; when it slides up to a colour it takes that colour (slideLine).
+const VANISH = -2;
 function combine(a, b) {
-  if (a === 6 || b === 6) return -1;
+  if (a === 7 || b === 7) return a === 8 || b === 8 ? 6 : VANISH;
+  if (a === 6 || b === 6 || a === 8 || b === 8) return -1;
   const prim = c => c % 2 === 0;
   if (prim(a) && prim(b)) return a === b ? a : {"0,2": 1, "2,4": 3, "0,4": 5}[[a, b].sort().join()];
   const p = prim(a) ? a : prim(b) ? b : -1, s = prim(a) ? b : a;
@@ -120,22 +124,30 @@ function lineOf(axis, l, back) { const L = [...Array(N)].map((_, k) => axis ? k 
 // Slide one line's blocks to its first end, each combining once at most; stone stays where it is and blocks stop
 // against it. Returns the moves ({from, to}) and the squares where blocks combined.
 function slideLine(g, L) {
-  const moves = [], merged = [];
+  const moves = [], merged = [], vanish = [];
   let seg = [];
   const flush = () => {
     const out = [];   // {c, at, done}
     for (const i of seg) {
       const c = g[i]; if (c < 0) continue;
       const last = out[out.length - 1];
-      if (last && !last.done) { const r = combine(last.c, c); if (r >= 0) { last.c = r; last.done = true; moves.push({from: i, to: last.at}); merged.push(last.at); continue; } }
-      const at = seg[out.length]; out.push({c, at, done: false}); if (at !== i) moves.push({from: i, to: at});
+      if (last && !last.done) {
+        const r = combine(last.c, c);
+        if (r === VANISH) { moves.push({from: i, to: last.at}); vanish.push(last.at); out.pop(); continue; }
+        if (r >= 0) { last.c = r; last.done = true; moves.push({from: i, to: last.at}); merged.push(last.at); continue; }
+      }
+      const at = seg[out.length];
+      // white that slides up against a colour takes that colour (it doesn't merge)
+      let cc = c;
+      if (c === 8 && at !== i && last && last.c >= 0 && last.c <= 5) { cc = last.c; merged.push(at); }
+      out.push({c: cc, at, done: cc !== c}); if (at !== i) moves.push({from: i, to: at});
     }
     seg.forEach((i, k) => { g[i] = k < out.length ? out[k].c : -1; });
     seg = [];
   };
   for (const i of L) { if (g[i] === 6) flush(); else seg.push(i); }
   flush();
-  return {moves, merged};
+  return {moves, merged, vanish};
 }
 // Whole rows and columns of one colour (stone too) clear, and stone next to a cleared square crumbles.
 function clearLines(g) {
@@ -147,18 +159,21 @@ function clearLines(g) {
   return {lines, crumble};
 }
 // Levels: how many lines to clear, and which count (only stone on level 5). The colours come from boardColours.
-function levelSpec(n) { return [null, {goal: 1}, {goal: 1}, {goal: 1}, {goal: 2}, {goal: 1, stone: true}, {goal: 3}][n]; }
+function levelSpec(n) { return [null, {goal: 1}, {goal: 1}, {goal: 1}, {goal: 2}, {goal: 1, stone: true}, {goal: 3}, {goal: 4}][n]; }
 // Each board's colours: what falls in (colour: weight) and the key's bars. Levels 1 to 3 take the three pairs of
 // primaries in the player's own order (order, kept on the device), so level 2 brings in the third mark and by level
 // 3 they've made all three mixes; level 3 also drops that pair's mix ready-made. The rest pick from the board's
 // seed: level 4 any two mixes, level 5 any primary with the mix that hasn't its mark (they set into stone), and
 // level 6 all three primaries with any one of them rarer.
+// Level 7 drops black and white this often, each, against 1 for each common primary.
+const BLACK_WHITE = .2;
 function boardColours(level, seed, order) {
   const PAIRS = [[0, 2, 1], [0, 4, 5], [2, 4, 3]], COMP = {0: 3, 2: 5, 4: 1}, PRIM = [0, 2, 4], k = seed % 3, d = {};
   if (level <= 3) { const [a, b, m] = PAIRS[order[level - 1]]; d[a] = 1; d[b] = 1; if (level === 3) d[m] = .5; return {drops: d, key: [[a, m, b]]}; }
   if (level === 4) { const two = [1, 3, 5].filter((_, i) => i !== k); d[two[0]] = 1; d[two[1]] = 1; return {drops: d, key: [[two[0]], [two[1]]]}; }
   if (level === 5) { const p = PRIM[k]; d[p] = 3; d[COMP[p]] = 1; return {drops: d, key: [[p, 6, COMP[p]]]}; }
   const rare = PRIM[k], other = PRIM[(k + 1) % 3]; PRIM.forEach(c => { d[c] = c === rare ? .35 : 1; });
+  if (level === 7) { d[7] = BLACK_WHITE; d[8] = BLACK_WHITE; return {drops: d, key: [[0, 1, 2, 3, 4, 5, 0], [other, 6, COMP[other]], [8, 6, 7]]}; }
   return {drops: d, key: [[0, 1, 2, 3, 4, 5, 0], [other, 6, COMP[other]]]};
 }
 function pickDrop(drops, r) { const e = Object.entries(drops), tot = e.reduce((t, [, w]) => t + w, 0); let x = r * tot; for (const [c, w] of e) { if ((x -= w) < 0) return +c; } return +e[0][0]; }
@@ -173,7 +188,10 @@ const COLOURS = [
   {name: "yellow", hex: "#ECA818", marks: [ACROSS]}, {name: "green", hex: "#6AA673", marks: [ACROSS, RING]},
   {name: "blue", hex: "#30A6B3", marks: [RING]}, {name: "purple", hex: "#9874CA", marks: [DOWN, RING]},
   // stone has all three marks, scratched in thin
-  {name: "stone", hex: "#5E5866", marks: [`<g fill="none" stroke-width="1.8" stroke-linecap="round"><path d="M12 2.5V21.5M2.5 12H21.5"/><circle cx="12" cy="12" r="6.2"/></g>`]}];
+  {name: "stone", hex: "#5E5866", marks: [`<g fill="none" stroke-width="1.8" stroke-linecap="round"><path d="M12 2.5V21.5M2.5 12H21.5"/><circle cx="12" cy="12" r="6.2"/></g>`]},
+  // black: a solid dot, everything blotted out; white: an empty dashed outline, a block still waiting for a mark
+  {name: "black", hex: "#2A2530", marks: [`<circle cx="12" cy="12" r="6.5"/>`]},
+  {name: "white", hex: "#F7F8F3", marks: [`<rect x="4" y="4" width="16" height="16" rx="3.5" fill="none" stroke-width="2.2" stroke-dasharray="3.6 2.6"/>`]}];
 function inkFor(hex) {
   const n = parseInt(hex.slice(1), 16), lin = v => (v /= 255) <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4;
   return .2126 * lin(n >> 16) + .7152 * lin(n >> 8 & 255) + .0722 * lin(n & 255) > .45 ? "#2A2530" : "#fff";
@@ -184,7 +202,7 @@ const Cap = w => w[0].toUpperCase() + w.slice(1);
 // The key: bars that blend from one colour to the next, each with its mark, so a mix sits between the two colours
 // it's made of. Colours that don't mix get bars of their own, and stone sits between the two that make it.
 const PAPER = "#F7F8F3";
-const keyMark = c => `<svg viewBox="0 0 24 24" fill="${PAPER}" stroke="${PAPER}" aria-hidden="true">${COLOURS[c].marks.join("")}</svg>`;
+const keyMark = c => { const k = c === 8 ? "#2A2530" : PAPER; return `<svg viewBox="0 0 24 24" fill="${k}" stroke="${k}" aria-hidden="true">${COLOURS[c].marks.join("")}</svg>`; };
 function drawKey(g) {
   $("rules").innerHTML = boardColours(g.level, g.seed, g.order).key.map(bar => {
     const bg = bar.length > 1 ? `linear-gradient(90deg,${bar.map((c, k) => `${COLOURS[c].hex} ${(k / (bar.length - 1) * 100).toFixed(0)}%`).join(",")})` : COLOURS[bar[0]].hex;
@@ -195,7 +213,7 @@ function drawKey(g) {
 /* ---------- game state ---------- */
 // game: {level, seed, grid (a colour number or -1 in each square), drops, lines, moves, mixes (Mix it ups left),
 //        start (the board as dealt), history, won, lost, hinted, undid, clock…}
-const STORE = "catdoku.mewhue.v3", MAX_LEVEL = 6, MIXES = 2, $ = G.$;
+const STORE = "catdoku.mewhue.v3", MAX_LEVEL = 7, MIXES = 2, $ = G.$;
 let saved = G.load(STORE), settings = Object.assign({level: 1, seen: {}}, saved.settings);
 // the order levels 1 to 3 take the pairs of primaries in, picked once for this device
 const isOrder = o => Array.isArray(o) && o.length === 3 && [0, 1, 2].every(k => o.includes(k));
@@ -203,7 +221,7 @@ if (!isOrder(settings.order)) settings.order = [0, 1, 2].sort(() => Math.random(
 let game = saved.game || null, busy = false;
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !game.lost && !busy && !$("overlay").classList.contains("show");
-const levelName = n => [null, "Two colours", "A new colour", "All three mixes", "Two mixes", "Stone", "All three"][n];
+const levelName = n => [null, "Two colours", "A new colour", "All three mixes", "Two mixes", "Stone", "All three", "Black and white"][n];
 function drop(g) {
   const r = seeded(g.seed * 7919 + g.drops++), empty = g.grid.map((c, i) => c < 0 ? i : -1).filter(i => i >= 0);
   if (!empty.length) return -1;
@@ -268,7 +286,8 @@ function slideMove(ax, l, back) {
     game.grid = after; draw(); busy = true;
     r.merged.forEach(i => blocks[i] && blocks[i].classList.add("pop"));
     const made = r.merged.map(i => after[i]);
-    if (made.includes(6)) G.note("All three marks: it's set into stone!", 2200);
+    if (r.vanish.length) G.note("Black wipes them both out!", 2000);
+    else if (made.includes(6)) G.note("All three marks: it's set into stone!", 2200);
     else { const mix = made.find(c => c % 2); if (mix != null) G.note(`${Cap(COLOURS[mix].name)}: two marks, so it's full now.`, 2000); }
     const cleared = after.slice(), c = clearLines(cleared);
     const finish = () => {
@@ -313,7 +332,7 @@ function showGhost(ax, l, back) {
   const L = lineOf(ax, l, back), h = game.grid.slice(), r = slideLine(h, L), c = clearLines(h.slice());
   L.forEach(i => $("grid").querySelector(`.slot[data-i="${i}"]`).classList.add("lit"));
   const put = (i, t) => { const g = document.createElement("div"); g.className = "ghost"; const [x, y] = xyOf(i); g.style.left = x * 20 + "%"; g.style.top = y * 20 + "%"; g.innerHTML = `<span>${t}</span>`; $("grid").append(g); };
-  r.merged.forEach(i => put(i, h[i] === 6 ? "●" : "+"));
+  r.merged.forEach(i => put(i, h[i] === 6 ? "●" : "+")); r.vanish.forEach(i => put(i, "✕"));
   new Set(c.lines.flatMap(x => x.cells)).forEach(i => put(i, "★"));
 }
 function clearGhost() { $("grid").querySelectorAll(".ghost").forEach(g => g.remove()); $("grid").querySelectorAll(".slot.lit").forEach(s => s.classList.remove("lit")); }
@@ -422,7 +441,7 @@ function helpOnFirstVisit(all) {
   const row = cells.filter(([, y]) => y === can[1]), way = can[2] ? "left" : "right";
   const turn = G.yourTurn(() => game, g => { game = g; }, draw);
   let was = 0;
-    const newSay = {1: "Two marks mix into one block", 2: "A new mark joins in", 3: "Ready-made mixes are full", 4: "These two never mix", 5: "A mark meets the mix without it: stone", 6: "All three marks at once"}[n];
+    const newSay = {1: "Two marks mix into one block", 2: "A new mark joins in", 3: "Ready-made mixes are full", 4: "These two never mix", 5: "A mark meets the mix without it: stone", 6: "All three marks at once", 7: "Black wipes out what it hits"}[n];
   const steps = first ? [
     {say: "Each colour has a mark 🐈", els: [$("rules")]},
     {say: `Drag this row ${way}`, lit: row, ...turn.upTo, try: {done: () => game.moves !== was}, enter() { turn.from.enter(); was = game.moves; }},
@@ -431,7 +450,7 @@ function helpOnFirstVisit(all) {
     {say: "Line up one kind to clear it", lit: cells.filter(([x]) => x === 0), tone: "ok"},
     {say: "Mix it up shuffles the board", els: [$("shuffleBtn")]},
     {say: "Stuck? Hint shows a good slide", els: [$("hintBtn")]},
-  ] : [{say: `New: ${newSay.toLowerCase()}`, els: [$("rules")]}];
+  ] : [{say: `New: ${newSay.toLowerCase()}`, els: [$("rules")]}, ...(n === 7 ? [{say: "White takes the colour it slides to", els: [$("rules")]}, {say: "Black and white make stone", els: [$("rules")]}] : [])];
   G.spotlight({grid: $("grid"), w: N, h: N, steps, finish: first ? undefined : false, done: () => { settings.seen[n] = true; if (first) for (let k = 1; k <= n; k++) settings.seen[k] = true; save(); }});
 }
 
