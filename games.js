@@ -514,8 +514,8 @@ const G = (() => {
     .spot .dots i.on{background:#FFF4D2}
     .spot .spotBar button{min-height:44px;min-width:64px;padding:0 16px;border:none;border-radius:999px;background:none;color:#FFF4D2;font:inherit;font-weight:800;font-size:calc(16px*var(--ts));cursor:pointer}
     .spot .spotBar button:hover,.spot .spotBar button:focus-visible{background:rgba(255,244,210,.16)}
-    .spot.trying{pointer-events:none}   /* an interactive step: taps on the lit squares reach the board... */
-    .spot .block{position:fixed;pointer-events:auto}   /* ...and nowhere else */
+    .spot.trying{pointer-events:none}   /* an interactive step: taps go through to what it lights (and nowhere else) */
+    .spot.trying .spotBar{pointer-events:auto}
     .spotGo{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;pointer-events:none;animation:spotGo 1.3s ease-out forwards}
     .spotGo b{font-size:clamp(34px,10vw,52px);font-weight:800;color:#FFF4D2;-webkit-text-stroke:7px var(--ink);paint-order:stroke fill}
     @keyframes spotGo{0%{opacity:0;transform:scale(.7)}18%{opacity:1;transform:scale(1.06)}30%{transform:scale(1)}70%{opacity:1}100%{opacity:0;transform:scale(1.08)}}
@@ -806,7 +806,14 @@ const G = (() => {
     const wrap = o.grid.parentElement, layer = document.createElement("div"), ns = "http://www.w3.org/2000/svg";
     layer.className = "spot"; layer.tabIndex = 0; layer.setAttribute("role", "dialog"); layer.setAttribute("aria-live", "polite");
     document.body.append(layer);
-    let k = -1, frame = 0, ticker = null;
+    let k = -1, frame = 0, ticker = null, holes = [];
+    // while an interactive step is up, a tap outside what it lights (and the bar) goes nowhere
+    const guard = e => {
+      if (!holes.length || e.target.closest && e.target.closest(".spotBar")) return;
+      const x = e.clientX, y = e.clientY;
+      if (!holes.some(([x1, y1, x2, y2]) => x >= x1 && x <= x2 && y >= y1 && y <= y2)) { e.preventDefault(); e.stopPropagation(); }
+    };
+    for (const ev of ["pointerdown", "click"]) window.addEventListener(ev, guard, true);
     const steps = () => o.steps;
     const svgEl = (t, a) => { const e = document.createElementNS(ns, t); for (const n in a) e.setAttribute(n, a[n]); return e; };
     // Bring the board (and anything else the steps light) into view first.
@@ -890,16 +897,11 @@ const G = (() => {
         if (sh.arrow) arrow(sh.arrow[0], sh.arrow[1], sh.from[0], sh.from[1], sh.size || 40);
       }
       layer.append(svg);
-      // An interactive step (st.try): the player does it on the real board. Only the lit squares take taps; blocks
-      // cover the rest of the screen.
-      if (st.try && !st.tried && lit.length) {
-        const x1 = Math.min(...lit.map(([x]) => X(x))), y1 = Math.min(...lit.map(([, y]) => Y(y))), x2 = Math.max(...lit.map(([x]) => X(x + 1))), y2 = Math.max(...lit.map(([, y]) => Y(y + 1)));
-        for (const [l, t, w, h] of [[0, 0, W, y1], [0, y2, W, H - y2], [0, y1, x1, y2 - y1], [x2, y1, W - x2, y2 - y1]]) {
-          const bl = document.createElement("div"); bl.className = "block"; Object.assign(bl.style, {left: l + "px", top: t + "px", width: w + "px", height: Math.max(0, h) + "px"});
-          bl.addEventListener("pointerdown", e => { e.preventDefault(); e.stopPropagation(); });   // a tap elsewhere does nothing
-          layer.append(bl);
-        }
-      }
+      // An interactive step (st.try): the player does it on the real board. Only its lit squares and lit page elements
+      // (a button to press first, say) take taps; a tap anywhere else does nothing (see guard, below).
+      holes = st.try && !st.tried ? [
+        ...(lit.length ? [[Math.min(...lit.map(([x]) => X(x))), Math.min(...lit.map(([, y]) => Y(y))), Math.max(...lit.map(([x]) => X(x + 1))), Math.max(...lit.map(([, y]) => Y(y + 1)))]] : []),
+        ...els.map(r => [r.x, r.y, r.x + r.w, r.y + r.h])] : [];
       // the bar: a dot for each step, and Skip (or, for a single tip, Got it)
       const bar = document.createElement("div"); bar.className = "spotBar";
       if (steps().length > 1) {
@@ -975,7 +977,8 @@ const G = (() => {
     const redraw = () => k >= 0 && k < o.steps.length && show();
     function close() {
       clearInterval(ticker); removeEventListener("resize", redraw); removeEventListener("scroll", redraw); document.removeEventListener("pointerup", tried, true);
-      layer.remove(); if (o.done) o.done();
+      for (const ev of ["pointerdown", "click"]) window.removeEventListener(ev, guard, true);
+      holes = []; layer.remove(); if (o.done) o.done();
     }
     // Skip (or Escape): the walkthrough ends here, and counts as seen; How to play has it all again.
     function end() { const was = o.steps[k]; if (was && was.leave) was.leave(); k = o.steps.length; close(); }
@@ -985,7 +988,7 @@ const G = (() => {
         const st = o.steps[k];
         if (!st || !st.try || st.tried || !st.try.done()) return;
         st.tried = true; st.tone = "ok"; if (st.try.yes) st.say = st.try.yes;
-        show(); setTimeout(() => { if (o.steps[k] === st) next(); }, 1400);
+        show(); setTimeout(() => { if (o.steps[k] === st) next(); }, st.try.yes ? 1400 : 350);   // a quick step needs no pause
       }, 60);
     }
     document.addEventListener("pointerup", tried, true);

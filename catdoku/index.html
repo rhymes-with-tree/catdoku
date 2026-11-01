@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-01.3";
+  var BUILD = "2026-11-01.4";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -26,7 +26,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-01.3">
+<link rel="stylesheet" href="../games.css?v=2026-11-01.4">
 <style>
 /* Catdoku's own looks; the rest is games.css. */
 html,body{height:100%}
@@ -115,7 +115,7 @@ main{padding-top:18px}
 
 </main>
 
-<script src="../games.js?v=2026-11-01.3"></script>
+<script src="../games.js?v=2026-11-01.4"></script>
 <script>G.nav("catdoku");</script>
 <script>
 const PALETTE = ["#BD5538","#73A7AE","#ECA818","#6AA673","#B94588","#B3B94B",
@@ -721,7 +721,12 @@ document.addEventListener("keydown", e => {
 // First visit only: once the first puzzle is on the board, walk through the rules on it. Nothing is
 // placed on the puzzle; the marks are only drawn over it. The cat in the middle of the "can't touch"
 // step and the paws are just examples, not where the answer's cats are.
-let tryWas = null;   // the game as it was before the walkthrough's interactive step
+let tryWas = null;   // the game as it was before the walkthrough's Your turn steps
+// put the board back as it was before them (and Erase off), with nothing given away or lost
+function putBack() {
+  if (tryWas && JSON.stringify(game) !== tryWas) { game = JSON.parse(tryWas); note(""); save(); }
+  tryWas = null; erasing = false; if (game) render();
+}
 function spotlightSteps() {
   const N = game.N, r = Math.floor(N / 2), c = Math.floor(N / 2), g = game.reg[r * N + c];
   const row = [...Array(N).keys()].map(x => [x, r]), col = [...Array(N).keys()].map(y => [c, y]);
@@ -730,25 +735,29 @@ function spotlightSteps() {
   const drag = [0, 1, 2].map(x => [x, N - 1]);
   // Your turn steps (Apple: teach through play) are done on the real board; the game is put back just as it was
   // afterwards (lives, undos and clock too), so nothing is given away or lost. Space or Skip goes past one.
-  const keep = {enter() { tryWas = JSON.stringify(game); },
-    leave() { if (tryWas && JSON.stringify(game) !== tryWas) { game = JSON.parse(tryWas); note(""); render(); save(); } tryWas = null; }};
+  // A run of them shares one starting point: the first saves the game, the last (or the walkthrough ending, see
+  // putBack) puts it back.
+  const from = {enter() { if (!tryWas) tryWas = JSON.stringify(game); }}, upTo = {...from, leave: putBack};
   return [
     {say: "One 🐱 in every row", lit: row},
     {say: "every column", lit: col},
     {say: "and every color", lit: region},
     {say: "No touching, not even corners", lit: around, marks: around.map(([x, y]) => [x, y, x === c && y === r ? FACE : "❌"])},
-    {say: "Tap twice for a 🐱", lit: [[c, r]], try: {done: () => !!(game.cells[r * N + c] || {}).cat, yes: "Once is a 🐾"}, ...keep},
-    {say: "Drag for lots of 🐾", lit: drag, try: {done: () => drag.every(([x, y]) => show(game.cells[y * N + x]) === "paw"), yes: "Nice!"}, ...keep},
-    {say: "Erase 🐾: tap or drag paws away", els: [$("eraseBtn")]},
-    {say: "Guess, then Undo guess to go back", els: [$("guessBtn")]},
+    {say: "Tap twice for a 🐱", lit: [[c, r]], try: {done: () => !!(game.cells[r * N + c] || {}).cat,
+      yes: settings.autoExclude ? "🐾 means no cat here" : "Once is a 🐾: no cat here"}, ...upTo},
+    {say: "Drag for lots of 🐾", lit: drag, try: {done: () => drag.every(([x, y]) => show(game.cells[y * N + x]) === "paw"), yes: "Nice!"}, ...from},
+    {say: "Tap Erase", els: [$("eraseBtn")], try: {done: () => erasing}, ...from},
+    {say: "Drag the 🐾 away", lit: drag, try: {done: () => drag.every(([x, y]) => show(game.cells[y * N + x]) !== "paw"), yes: "Erased!"}, ...upTo},
+    // kept back as tips on a first visit (G.spotlight)
+    {say: "Not sure? Tap Guess before trying a 🐱. Undo guess takes it all back", els: [$("guessBtn")]},
     {say: "Stuck? Hint shows where to look", els: [$("hintBtn")]},
-    {say: "Auto exclude puts 🐾 round each 🐱", els: [$("exclTgl").closest(".opt")]},
-    {say: "Auto grade checks each 🐱 (harder)", els: [$("gradeTgl").closest(".opt")]},
+    {say: "Auto exclude: 🐾 go round each 🐱 for you", els: [$("exclTgl").closest(".opt")]},
+    {say: "Auto grade: a wrong 🐱 costs a life", els: [$("gradeTgl").closest(".opt")]},
   ];
 }
 function helpOnFirstVisit() {
   if (settings.seenHelp || !game || game.status !== "playing" || document.querySelector(".spot")) return;
-  G.spotlight({grid: $("board"), w: game.N, h: game.N, steps: spotlightSteps(), pics: {"🐱": FACE}, done: () => { settings.seenHelp = true; save(); }});
+  G.spotlight({grid: $("board"), w: game.N, h: game.N, steps: spotlightSteps(), pics: {"🐱": FACE}, done: () => { putBack(); settings.seenHelp = true; save(); }});
 }
 // How to play plays the walkthrough on the board (there's no rules card).
 function showHelp() {
