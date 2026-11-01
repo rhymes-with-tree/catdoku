@@ -277,7 +277,7 @@ const G = (() => {
           fs = Math.max(24, floor); h1.style.fontSize = fs + "px";
           // ...unless one word on its own is too wide for the room (Caboodle on a small phone): then smaller, till it fits
           const clear = () => apart() && h1.scrollWidth <= h1.clientWidth + 1;
-          while (!clear() && fs > 20) { fs -= 1; h1.style.fontSize = fs + "px"; }
+          while (!clear() && fs > 16) { fs -= 1; h1.style.fontSize = fs + "px"; }
         }
       };
       if (h1) {
