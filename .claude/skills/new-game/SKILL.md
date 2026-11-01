@@ -26,7 +26,8 @@ device, not in the session.
 
 Check the README's game sections and `G.GAMES`; if an existing game already uses the same mechanic,
 say which. Look the idea up in `IDEAS.md`, the list of every puzzle considered, and use its row (rules,
-what it's close to, theme notes). Offer a few cat themes for the user's idea and recommend one.
+what it's close to, theme notes). Offer a few cat themes for the user's idea and recommend one. If the row starts with "Shortlist" and says "Cat theme picked", that theme is decided: use it
+(name, setting, pieces) without offering others, unless the user asks for changes.
 
 Ask whether there's a particular cat the user wants as the game's mascot or star. The named cats and the
 games they're meant for are in `ARTWORK.md` ("Who's who in `cats/`"); Bowtie in Tunnel Run is the example
