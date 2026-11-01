@@ -43,9 +43,14 @@ the reason they don't apply.
 - ✅ **Color contrast (4.5:1 up to 17 pt, 3:1 for 18 pt or bold):** checked on every page in light and dark.
 - 🔧 **Increase Contrast:** with the system setting on, soft grey text goes to full ink and lines get stronger.
 - ✅ **Convey information with more than color alone** (see Designing for games).
-- ⚠️ **Describe the interface for VoiceOver:** buttons, menus and settings are labelled, cards are dialogs (🔧) and
-  the message line is announced. Board squares are labelled in Catdoku, Pawlette and some others; ❌ not every game's
-  board reads out sensibly yet (a per-game job: each needs `aria-label`s on its squares or pieces).
+- 🔧 **Describe the interface for VoiceOver:** buttons, menus and settings are labelled, cards are dialogs and the
+  message line is announced. Boards made of squares label each one (Catdoku, Hide & Seek, Sunbeams, Treat Time…);
+  boards drawn as one picture are described in words that update after every move (`G.describe`): Knock It Off,
+  Tangle, High Perch, Toydoku, Spelling String, Up a Tree, Fish Bones, Laser Pointer, Tunnel Run, Unravel, Fridge
+  Magnets, Meowbile, Cat Pile, Pounce, Toy Box and Twirl, played with the keys. ⚠️ Not described: the colour games
+  (Pawlette, Shelf Life), If It Fits (shapes), Cat Burglar (finding a cat in a painting), Catlas's map (its List and
+  Type modes work without it) and the action games (Bubbles, Tail Chase, Bird Watch, Wind Up, L-M-N-O-Pom), which
+  ask for sight and quick reactions.
 - 🔧 **Sufficiently sized controls (44 × 44 default, 28 × 28 minimum):** 44 for all controls outside the board;
   nothing under 28 (the launch calendar's chips were 21 tall and are 28 now).
 - ✅ **Consider spacing between controls.**
@@ -122,7 +127,7 @@ the reason they don't apply.
 - 🔧 **Tips: short, actionable, only for people who'd benefit, at a reasonable cadence:** one line each; dropped
   unseen if you've already used that button; one a day.
 - 🔧 **Brief:** first visits are now 3 to 11 steps (Catdoku 11 → 6, Open the Door! 13 → 8).
-  ⚠️ Bubbles (11), Stash (10), Catwalk, Fish Bones, Patches, Pawlette and Toydoku (9) are still long.
+  🔧 First visits are now 3 to 9 steps, most 4 to 7; rarer rules wait for How to play (`later`).
 - 🔧 **Optional:** Skip on every step (and Escape); skipping counts as seen; How to play plays it all again.
 - 🔧 **Page control for multi-page flows (dots, centred at the bottom, not coloured).**
 - ✅ **Focused on the game, not the device;** ✅ no splash screen, licences or setup.
@@ -201,8 +206,8 @@ snippets, status bars, text views, web views, right-to-left, SF Symbols, materia
 ## Still to do
 
 1. ✅ ~~An interactive step for every game~~: done, except the action games, Cat Burglar and Catlas.
-2. **Shorter first visits** for Bubbles, Stash, Catwalk, Fish Bones, Patches, Pawlette and Toydoku: fold steps
-   together, or move rules that only matter later into tips.
-3. **VoiceOver on every board:** squares and pieces labelled, the way Catdoku's are.
+2. ✅ ~~Shorter first visits~~: 3 to 9 steps now.
+3. ✅ **VoiceOver on the boards** (see Accessibility); not possible in a useful way for the colour, shape, picture and
+   action games. Still to try on a real iPhone with VoiceOver on.
 4. **A slower speed for the action games** (difficulty accommodation).
 5. **The largest accessibility text sizes (AX2–AX5)** for the words around the board.
