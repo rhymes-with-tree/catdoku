@@ -29,7 +29,7 @@ Rows are sorted by group, then status: Idea, Built, No. When a game ships, set i
 | Yarn Golf | Yarn Golf | A course of holes around the house, each hole a cat basket |
 | Kitty Plinko | Kitty Plinko | Drop yarn down a cat tree, off posts and perches into cat beds |
 | Paw-ball | Paw-ball | A playroom table: paws for flippers, springs, box ramps, toy mice |
-| Pounce Up | Top Shelf | Jump shelf to shelf up an endless bookcase, springs for boosts |
+| Pounce Up | Pounce Up | Jump shelf to shelf up an endless bookcase, springs for boosts |
 
 ## Every idea
 
@@ -140,7 +140,7 @@ Rows are sorted by group, then status: Idea, Built, No. When a game ships, set i
 | Fruit Ninja-style, Angry Birds-style | Action | Swipe at flying things; fling things at a structure | None | Idea list | Idea | |
 | Kitty Plinko (pachinko) | Action | Drop balls of yarn through a field of pegs and springs into cat beds at the bottom, each worth different points | None | Owner, Wind Up chat | Idea | Shortlist. Wind Up's drop-and-aim and physics with pegs; little new code. Would sit on Kitten Play beside Wind Up and Bubbles. Springs from the owner's sheet. Cat theme picked: Kitty Plinko (the name stays), drop yarn down a cat tree, bouncing off sisal posts and perches into the cat beds at the bottom |
 | Paw-ball (pinball) | Action | Pinball with cat paws for flippers and springs for bumpers (the end-on springs make round ones) | None | Owner, Wind Up chat | Idea | Shortlist. Real-time, and flippers need moving pieces, which Wind Up's physics doesn't have yet. Cat theme picked: Paw-ball (the name stays), a playroom table with paws for flippers, springs for bumpers, cardboard-box ramps and toy mice to hit |
-| Pounce Up (Doodle Jump-style) | Action | A cat bounces up from spring to spring; tilt or tap to steer, as high as it can go | None | Owner, Wind Up chat | Idea | Shortlist. Real-time and endless; the springs' colours could say how strong each is. Cat theme picked: Top Shelf, a cat jumps from shelf to shelf up an endless bookcase, with springs for big boosts (renamed so it isn't mixed up with Pounce) |
+| Pounce Up (Doodle Jump-style) | Action | A cat bounces up from spring to spring; tilt or tap to steer, as high as it can go | None | Owner, Wind Up chat | Idea | Shortlist. Real-time and endless; the springs' colours could say how strong each is. Cat theme picked: Pounce Up (the name stays), a cat jumps from shelf to shelf up an endless bookcase, with springs for big boosts |
 | Bird Watch (whack-a-mole) | Action | Tap the pane where a bird lands, leaving falling leaves and squirrels alone; every tap makes a noise, so a level allows the flock plus three taps before the human wakes | — | Fair Play chat | Built | Starring Bugsy and Bowtie. Started as a 3 × 3 wall of windows with the human drawn asleep on a sofa; now three tall windows like a bay window, three panes high, and the human is only Zzz. Missed birds count (a quarter of the flock may get away), so there's no clock. Spotting a bird leaves a smudgy paw print, and the Wipe the windows helper cleans them |
 | Tail Chase (Snake) | Action | Catch toys while the yarn grows behind the cat | — | Fair Play chat | Built | |
 | Solitaire, FreeCell | Cards | Card patience games | None | Idea list | Idea | Needs card art |
