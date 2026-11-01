@@ -52,6 +52,7 @@ const G = (() => {
     ["Wind Up", "windup", "Drop yarn for Gus and wind two of a kind into a bigger ball", "#B94588", "quick", "suika watermelon game merge drop physics 2048 yarn balls fluffballs pompoms", "2026-10-30"],
     ["L-M-N-O-Pom", "lmnopom", "Spell words in the falling pompoms for Marmalade to pounce on", "#B94588", "words", "tetris letris falling letters words scrabble blocks drop pompoms pom poms alphabet lmnop", "2026-10-31"],
     ["Window Ledges", "windowledges", "Add up the windows to match every total", "#B3B94B", "numbers", "kakuro cross sums sums arithmetic maths math", "2026-10-31"],
+    ["Cat Shuffle", "catshuffle", "Put the cat's picture back together", "#9874CA", "teasers", "fifteen 15 puzzle sixteen twiddle sliding tiles slide puzzle picture shuffle scramble rotate turn", "2026-11-01"],
   ];
   // The shelves the front page and the games menu sort the games onto, in order: key (also a plain name for it,
   // for search), heading, one line.
@@ -1325,6 +1326,7 @@ const G = (() => {
     plus: '<path d="M16 7v18M7 16h18"/>',
     level: '<path d="M5 26h6v-6h6v-6h6V8h4"/>',
     go: '<circle cx="16" cy="16" r="11"/><path d="M11 16h10M17 11.5l4.5 4.5-4.5 4.5"/>',
+    peek: '<path d="M3 16s5-8 13-8 13 8 13 8-5 8-13 8S3 16 3 16z"/><circle cx="16" cy="16" r="4"/>',
     sight: '<circle cx="16" cy="16" r="10"/><circle cx="16" cy="16" r="4.5"/><path d="M16 3v5M16 24v5M3 16h5M24 16h5"/>',
     catnip: '<path d="M7 25C7 13 14 6 26 6c0 12-7 19-19 19z"/><path d="M7 25l11-11"/>',
     swat: '<path d="M9 21c0-4 3-6 7-6s7 2 7 6-3 5-7 5-7-1-7-5z"/><circle cx="8" cy="12" r="2.6"/><circle cx="13" cy="7.5" r="2.6"/><circle cx="19" cy="7.5" r="2.6"/><circle cx="24" cy="12" r="2.6"/>',
@@ -1348,7 +1350,7 @@ const G = (() => {
     keepBtn: "keep", shuffleBtn: "shuffle", flipBtn: "flip", finishBtn: "near", completeBtn: "check", skipBtn: "skip",
     colBtn: "palette", linkBtn: "share", toysBtn: "toys", bestBtn: "best", helpBtn: "help", zoomIn: "zoomin", zoomOut: "zoomout", zoomFit: "fit",
     sightBtn: "sight", nipBtn: "catnip", shakeBtn: "bubbleshake", fluffBtn: "roller", swatBtn: "swat", netBtn: "net", rainbowBtn: "losecolor", basketBtn: "basketadd", wipeBtn: "wipe",
-    chooseBtn: "keyboard", revealBtn: "giveup"};
+    chooseBtn: "keyboard", revealBtn: "giveup", peekBtn: "peek"};
   // buttons that keep their own look with an icon in front of the word: every New (a +) and Catlas's Go (an arrow)
   const LEAD = {newBtn: "plus", sNewBtn: "plus", goBtn: "go", settingsSum: "sliders"};
   const iconSVG = name => `<svg class="ic" viewBox="0 0 32 32" aria-hidden="true">${ICON[name]}</svg>`;
