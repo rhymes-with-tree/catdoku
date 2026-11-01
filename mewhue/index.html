@@ -27,298 +27,407 @@
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../games.css?v=2026-11-01.13">
 <style>
-/* Blocks of paint on a drop cloth. Swipe and they all slide. Red, yellow and blue each have a mark (a bar
-   down, a bar across, a ring); when two different ones bump they mix, and the mix carries both marks. Orange,
-   green and purple are full, with two marks each, so they stay put: line up a whole row or column of one colour
-   to clear it. Three licks a game take one block away. */
+/* Blocks of paint on a drop cloth, each with a mark: red a bar down, yellow a bar across, blue a ring. Drag a row
+   or column and its blocks slide to that end. Two different marks mix, and the mix carries both (orange is a
+   cross); a mix is full and stays put. A mark meeting the one mix it isn't part of sets into stone. A whole row or
+   column of one kind clears. */
 .cloth{background:color-mix(in srgb,#2A2530 8%,#F7F8F3);border:3px solid var(--ink);border-radius:12px;overflow:hidden;
   touch-action:none;user-select:none;-webkit-user-select:none}
 .cloth .grid{position:absolute;inset:2%;outline:none}
 .slot{position:absolute;width:20%;height:20%;display:grid;place-items:center}
-.slot::before{content:"";width:84%;height:84%;border-radius:18%;background:color-mix(in srgb,#2A2530 6%,transparent)}
+.slot::before{content:"";width:86%;height:86%;border-radius:18%;background:color-mix(in srgb,#2A2530 6%,transparent)}
+.slot.lit::before{background:color-mix(in srgb,#73A7AE 30%,transparent)}
+.slot.hintcell::before{background:rgba(236,168,24,.6)}
+.slot.kbcursor{outline-offset:-4px;border-radius:14px}
 .blk{position:absolute;left:0;top:0;width:20%;height:20%;transition:transform .12s ease-out;pointer-events:none}
-.blk .b{position:absolute;inset:8%;border-radius:18%;display:grid;place-items:center;
+.blk .b{position:absolute;inset:7%;border-radius:18%;display:grid;place-items:center;
   box-shadow:inset 0 -4px 0 rgba(42,37,48,.2),0 2px 3px rgba(42,37,48,.25)}
-.blk .b svg{width:52%;height:52%}
-/* the mixes are finished: a glossy edge says they're done */
-.blk.full .b{box-shadow:inset 0 0 0 3px rgba(247,248,243,.75),inset 0 -4px 0 rgba(42,37,48,.2),0 2px 3px rgba(42,37,48,.25)}
+.blk .b svg{width:66%;height:66%}
+.blk.full .b{box-shadow:inset 0 0 0 3px rgba(247,248,243,.8),inset 0 -4px 0 rgba(42,37,48,.2),0 2px 3px rgba(42,37,48,.25)}
+.blk.stone .b{border-radius:12%;box-shadow:inset 0 -5px 0 rgba(0,0,0,.3),0 2px 3px rgba(42,37,48,.35)}
 .blk.pop .b{animation:pop .3s ease-out}
 @keyframes pop{50%{transform:scale(1.15)}}
-.blk.gone .b{animation:gone .5s ease-in forwards}
+.blk.gone .b{animation:gone .45s ease-in forwards}
 @keyframes gone{to{transform:scale(0) rotate(20deg);opacity:0}}
 .blk.fresh .b{animation:fresh .25s ease-out}
 @keyframes fresh{from{transform:scale(.2)}}
-/* what a swipe will do, shown while you drag */
 .ghost{position:absolute;width:20%;height:20%;display:grid;place-items:center;pointer-events:none;z-index:3}
 .ghost span{min-width:1.6em;height:1.6em;border-radius:999px;background:#2A2530;color:#F7F8F3;font:800 clamp(12px,4vw,18px)/1.6em "Baloo 2",system-ui,sans-serif;text-align:center}
-.slot.hintcell::before{background:rgba(236,168,24,.6)}
-.cloth.licking .grid{cursor:pointer}
-.cloth.licking{box-shadow:0 0 0 4px #ECA818}
-/* the rules, in the blocks' own marks */
-.rules{display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center;font-size:calc(14px*var(--ts));color:var(--ink-soft);width:var(--board)}
+/* the rules, written in the blocks' own marks; only what this level uses */
+.rules{display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:center;font-size:calc(14px*var(--ts));color:var(--ink-soft);width:var(--board)}
 .rules .r{display:flex;align-items:center;gap:4px}
-.chip{width:22px;height:22px;border-radius:5px;display:grid;place-items:center}
-.chip svg{width:62%;height:62%}
-.tally{display:flex;align-items:center;gap:6px}
-.coming{display:flex;align-items:center;gap:5px;font-size:calc(14px*var(--ts));color:var(--ink-soft)}
+.rules .new{color:var(--ink);font-weight:600}
+.chip{width:24px;height:24px;border-radius:5px;display:grid;place-items:center;flex:none}
+.chip svg{width:70%;height:70%}
+.goalbar{height:8px;border-radius:999px;background:var(--line);overflow:hidden;width:min(140px,30vw)}
+.goalbar i{display:block;height:100%;background:#ECA818;border-radius:999px;transition:width .3s}
+#count{display:flex;align-items:center;gap:8px}
 @media (prefers-reduced-motion:reduce){.blk{transition:none}}
 </style>
 </head>
 <body>
 <main>
-  <header><h1>Mew Hue</h1><div class="stripe"></div><p class="tagline">Swipe paint together and line up the colours</p></header>
+  <header><h1>Mew Hue</h1><div class="stripe"></div><p class="tagline">Slide paint together and line up the colours</p></header>
   <nav class="games" id="games" aria-label="Games"></nav>
 
-  <div class="status"><span class="tally" id="count"></span><span class="coming" id="coming"></span><span class="msg" id="msg" aria-live="polite"></span></div>
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
 
   <div class="wrap cloth stage" id="board">
-    <div class="grid" id="grid" tabindex="0" role="application" aria-label="Blocks of paint. Swipe, or press an arrow key, to slide them all."></div>
+    <div class="grid" id="grid" tabindex="0" role="application" aria-label="Blocks of paint. Drag a row or column to slide it."></div>
   </div>
-  <div class="rules" id="rules" aria-label="How colours mix"></div>
+  <div class="rules" id="rules" aria-label="How the marks mix"></div>
   <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
 
+  <div class="actions helpers"><button id="shuffleBtn">Mix it up</button></div>
   <div class="actions">
     <button id="hintBtn">Hint</button>
     <button id="undoBtn">Undo</button>
-    <button id="lickBtn" data-icon="swat">Lick</button>
+    <button id="restartBtn">Restart</button>
     <button id="linkBtn">Share</button>
+    <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
   </div>
   <div class="bar">
-    <button id="newBtn" class="primary">New game</button>
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New cloth</button>
   </div>
 
 </main>
 
 <script src="../games.js?v=2026-11-01.13"></script>
 <script>
-/* ---------- colours, marks and rules ---------- */
-// Pawlette's colours and marks: red a bar down, yellow a bar across, blue a ring. A mix carries both of its
-// colours' marks, so orange is a cross, green a bar across and a ring, purple a bar down and a ring.
-const DOWN = `<rect x="9.75" y="2" width="4.5" height="20" rx="2"/>`, ACROSS = `<rect x="2" y="9.75" width="20" height="4.5" rx="2"/>`, RING = `<circle cx="12" cy="12" r="6"/>`;
+/* ---------- marks, colours and rules (plain functions) ---------- */
+// Colours by number: 0 red (a bar down), 1 orange (bar down and across), 2 yellow (a bar across), 3 green (across
+// and a ring), 4 blue (a ring), 5 purple (down and a ring), 6 stone (all three marks: what you get when a colour
+// meets its complement).
+const N = 5;
+// What two bumping blocks make: the same primary joins into one; two different primaries mix; a primary and the
+// one mix that doesn't hold its mark (its complement) set into stone; anything else just bumps (-1).
+function combine(a, b) {
+  if (a === 6 || b === 6) return -1;
+  const prim = c => c % 2 === 0;
+  if (prim(a) && prim(b)) return a === b ? a : {"0,2": 1, "2,4": 3, "0,4": 5}[[a, b].sort().join()];
+  const p = prim(a) ? a : prim(b) ? b : -1, s = prim(a) ? b : a;
+  if (p < 0) return -1;
+  return {0: 3, 2: 5, 4: 1}[p] === s ? 6 : -1;
+}
+// The squares of row or column l (axis 0 a row, 1 a column), starting at the end its blocks slide towards.
+function lineOf(axis, l, back) { const L = [...Array(N)].map((_, k) => axis ? k * N + l : l * N + k); return back ? L : L.reverse(); }
+// Slide one line's blocks to its first end, each combining once at most; stone stays where it is and blocks stop
+// against it. Returns the moves ({from, to}) and the squares where blocks combined.
+function slideLine(g, L) {
+  const moves = [], merged = [];
+  let seg = [];
+  const flush = () => {
+    const out = [];   // {c, at, done}
+    for (const i of seg) {
+      const c = g[i]; if (c < 0) continue;
+      const last = out[out.length - 1];
+      if (last && !last.done) { const r = combine(last.c, c); if (r >= 0) { last.c = r; last.done = true; moves.push({from: i, to: last.at}); merged.push(last.at); continue; } }
+      const at = seg[out.length]; out.push({c, at, done: false}); if (at !== i) moves.push({from: i, to: at});
+    }
+    seg.forEach((i, k) => { g[i] = k < out.length ? out[k].c : -1; });
+    seg = [];
+  };
+  for (const i of L) { if (g[i] === 6) flush(); else seg.push(i); }
+  flush();
+  return {moves, merged};
+}
+// Whole rows and columns of one colour (stone too) clear, and stone next to a cleared square crumbles.
+function clearLines(g) {
+  const lines = [], kill = new Set();
+  for (let l = 0; l < N; l++) for (const ax of [0, 1]) { const L = lineOf(ax, l, true); if (g[L[0]] >= 0 && L.every(i => g[i] === g[L[0]])) { lines.push({cells: L, c: g[L[0]]}); L.forEach(i => kill.add(i)); } }
+  const crumble = [];
+  for (const i of kill) for (const j of [i - N, i + N, i % N ? i - 1 : -1, i % N < N - 1 ? i + 1 : -1]) if (j >= 0 && j < N * N && !kill.has(j) && g[j] === 6 && !crumble.includes(j)) crumble.push(j);
+  kill.forEach(i => { g[i] = -1; }); crumble.forEach(i => { g[i] = -1; });
+  return {lines, crumble};
+}
+// Levels: what falls in (colour: weight), how many lines to clear, and which lines count (stone only on level 4).
+function levelSpec(n) {
+  return [null,
+    {drops: {0: 1, 2: 1}, goal: 4},
+    {drops: {0: 1, 2: 1, 1: .3}, goal: 8},
+    {drops: {1: 1, 3: 1}, goal: 4},
+    {drops: {0: 3, 3: 1}, goal: 3, stone: true},
+    {drops: {0: 1, 2: 1, 4: 1}, goal: 3},
+    {drops: {0: 1, 2: 1, 4: 1, 1: .2, 3: .2, 5: .2}, goal: 4}][n];
+}
+function pickDrop(spec, r) { const e = Object.entries(spec.drops), tot = e.reduce((t, [, w]) => t + w, 0); let x = r * tot; for (const [c, w] of e) { if ((x -= w) < 0) return +c; } return +e[0][0]; }
+
+function seeded(seed) { return () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+
+/* ---------- looks ---------- */
+const DOWN = `<rect x="9.5" y="1.5" width="5" height="21" rx="2.2"/>`, ACROSS = `<rect x="1.5" y="9.5" width="21" height="5" rx="2.2"/>`, RING = `<circle cx="12" cy="12" r="6.2" fill="none" stroke-width="3.4"/>`;
 const COLOURS = [
-  {name: "red", hex: "#E16251", shape: DOWN}, {name: "orange", hex: "#EC814D", shape: DOWN + ACROSS},
-  {name: "yellow", hex: "#ECA818", shape: ACROSS}, {name: "green", hex: "#6AA673", shape: ACROSS + RING},
-  {name: "blue", hex: "#30A6B3", shape: RING}, {name: "purple", hex: "#9874CA", shape: DOWN + RING}];
-const N = 5, PRIMARIES = [0, 2, 4], THIRD_AT = 2, LICKS = 3;
+  {name: "red", hex: "#E16251", marks: [DOWN]}, {name: "orange", hex: "#EC814D", marks: [DOWN, ACROSS]},
+  {name: "yellow", hex: "#ECA818", marks: [ACROSS]}, {name: "green", hex: "#6AA673", marks: [ACROSS, RING]},
+  {name: "blue", hex: "#30A6B3", marks: [RING]}, {name: "purple", hex: "#9874CA", marks: [DOWN, RING]},
+  // stone has all three marks, scratched in thin
+  {name: "stone", hex: "#5E5866", marks: [`<g fill="none" stroke-width="1.8" stroke-linecap="round"><path d="M12 2.5V21.5M2.5 12H21.5"/><circle cx="12" cy="12" r="6.2"/></g>`]}];
 function inkFor(hex) {
   const n = parseInt(hex.slice(1), 16), lin = v => (v /= 255) <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4;
   return .2126 * lin(n >> 16) + .7152 * lin(n >> 8 & 255) + .0722 * lin(n & 255) > .45 ? "#2A2530" : "#fff";
 }
-// Two blocks bumping: the same primary join into one, two different primaries make the mix between them, and
-// anything with a mix in it stays put (-1).
-function combine(a, b) {
-  if (a % 2 || b % 2) return -1;
-  if (a === b) return a;
-  return {"0,2": 1, "2,4": 3, "0,4": 5}[[a, b].sort().join()];
+const mark = c => { const ink = inkFor(COLOURS[c].hex); return `<svg viewBox="0 0 24 24" fill="${ink}" stroke="${ink}" aria-hidden="true">${COLOURS[c].marks.join("")}</svg>`; };
+const chip = c => `<span class="chip" style="background:${COLOURS[c].hex}" title="${COLOURS[c].name}">${mark(c)}</span>`;
+const Cap = w => w[0].toUpperCase() + w.slice(1);
+// Each level's rules strip, in marks: [the rule, whether it's new on this level]
+function rulesOf(n) {
+  const mixR = (a, b, m) => `${chip(a)}+${chip(b)}=${chip(m)}`;
+  return [null,
+    [[mixR(0, 2, 1), 1], [`${chip(0)}+${chip(0)}=${chip(0)}`, 1], [`a line of one kind clears`, 1]],
+    [[mixR(0, 2, 1), 0], [`${chip(1)} is full: it stays put`, 1], [`a line of one kind clears`, 0]],
+    [[`${chip(1)} ${chip(3)} never mix`, 1], [`line them up to clear them`, 1]],
+    [[`${chip(0)}+${chip(3)}=${chip(6)}`, 1], [`stone never moves`, 1], [`goal: lines of ${chip(6)}`, 1]],
+    [[mixR(0, 2, 1), 0], [mixR(2, 4, 3), 1], [mixR(0, 4, 5), 1], [`a mark + the mix without it = ${chip(6)}`, 1], [`${chip(6)} crumbles beside a cleared line`, 1]],
+    [[mixR(0, 2, 1), 0], [mixR(2, 4, 3), 0], [mixR(0, 4, 5), 0], [`a mark + the mix without it = ${chip(6)}`, 0], [`mixes fall in too`, 1]]][n];
 }
-// Slide every block one way. Each block combines at most once a swipe. Then whole rows and columns of one
-// colour clear. Returns the new grid (a block {id, c} or null in each square), where each block went, which
-// squares combined and which lines cleared.
-function slide(grid, dx, dy) {
-  const g = new Array(N * N).fill(null), moves = [], merged = [], lines = [];
-  for (let a = 0; a < N; a++) {
-    const L = []; for (let k = 0; k < N; k++) { const t = (dx || dy) > 0 ? N - 1 - k : k; L.push(dx ? a * N + t : t * N + a); }
-    const out = [];
-    for (const i of L) {
-      const b = grid[i]; if (!b) continue;
-      const last = out[out.length - 1];
-      if (last && !last.done) { const r = combine(last.b.c, b.c); if (r >= 0) { moves.push({id: b.id, to: L[out.length - 1], into: last.b.id}); last.b = {id: last.b.id, c: r}; last.done = true; merged.push(L[out.length - 1]); continue; } }
-      out.push({b, done: false}); moves.push({id: b.id, to: L[out.length - 1]});
-    }
-    out.forEach((o, k) => { g[L[k]] = o.b; });
-  }
-  for (let a = 0; a < N; a++) for (const L of [[...Array(N)].map((_, k) => a * N + k), [...Array(N)].map((_, k) => k * N + a)]) {
-    const c = g[L[0]] && g[L[0]].c; if (c != null && L.every(i => g[i] && g[i].c === c)) lines.push(L);
-  }
-  const clear = new Set(lines.flat());
-  return {grid: g.map((b, i) => clear.has(i) ? null : b), keep: g, moves, merged, lines};
-}
-const same = (a, b) => a.every((x, i) => (x && x.c) === (b[i] && b[i].c) && (x && x.id) === (b[i] && b[i].id));
-function canMove(grid) { for (const d of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!same(grid, slide(grid, ...d).grid)) return true; return false; }
 
 /* ---------- game state ---------- */
-// game: {grid, pair (the two primaries before the third comes), lines, swipes, licks, nextId, history, over, best}
-const STORE = "catdoku.mewhue.v2", $ = G.$;
-let saved = G.load(STORE), settings = Object.assign({seen: false}, saved.settings);
-let game = saved.game || null, busy = false, licking = false;
+// game: {level, seed, grid (a colour number or -1 in each square), drops, lines, moves, mixes (Mix it ups left),
+//        start (the cloth as dealt), history, won, lost, hinted, undid, clock…}
+const STORE = "catdoku.mewhue.v3", MAX_LEVEL = 6, MIXES = 2, $ = G.$;
+let saved = G.load(STORE), settings = Object.assign({level: 1, seen: {}}, saved.settings);
+let game = saved.game || null, busy = false;
 const save = () => G.save(STORE, {settings, game});
-const playing = () => game && !game.over && !busy && !$("overlay").classList.contains("show");
-function add(g) {
-  const empty = g.grid.map((b, i) => b ? -1 : i).filter(i => i >= 0); if (!empty.length) return -1;
-  const i = empty[Math.floor(Math.random() * empty.length)], from = g.lines < THIRD_AT ? g.pair : PRIMARIES;
-  g.grid[i] = {id: g.nextId++, c: from[Math.floor(Math.random() * from.length)]}; return i;
+const playing = () => game && !game.won && !game.lost && !busy && !$("overlay").classList.contains("show");
+const levelName = n => [null, "Red and yellow", "Ready-mixed orange", "Two mixes", "Stone", "Red, yellow, blue", "Everything"][n];
+function drop(g) {
+  const r = seeded(g.seed * 7919 + g.drops++), empty = g.grid.map((c, i) => c < 0 ? i : -1).filter(i => i >= 0);
+  if (!empty.length) return -1;
+  const i = empty[Math.floor(r() * empty.length)]; g.grid[i] = pickDrop(levelSpec(g.level), r()); return i;
 }
-function newGame() {
-  const out = PRIMARIES[Math.floor(Math.random() * 3)], best = (game && game.best) || 0;
-  game = {grid: new Array(N * N).fill(null), pair: PRIMARIES.filter(c => c !== out), lines: 0, swipes: 0, licks: LICKS, nextId: 1, history: [], over: false, best};
-  for (let k = 0; k < 3; k++) add(game);
-  licking = false; hints.clear(false); draw(); save(); G.note("");
-  G.track("Mew Hue new game");
-  helpOnFirstVisit();
+function deal(level, seed) {
+  const g = {level, seed, grid: new Array(N * N).fill(-1), drops: 0, lines: 0, moves: 0, mixes: MIXES, history: [], won: false, lost: false, ...G.freshClock()};
+  for (let k = 0; k < 4; k++) drop(g);
+  g.start = JSON.stringify({grid: g.grid, drops: g.drops});
+  return g;
+}
+const snap = () => JSON.stringify({grid: game.grid, drops: game.drops, lines: game.lines, moves: game.moves, mixes: game.mixes});
+// Every slide that would change something: [axis, line, back]
+function slides(g) {
+  const out = [];
+  for (let l = 0; l < N; l++) for (const ax of [0, 1]) for (const back of [false, true]) { const h = g.slice(); if (slideLine(h, lineOf(ax, l, back)).moves.length) out.push([ax, l, back]); }
+  return out;
 }
 
 /* ---------- drawing ---------- */
-let els = new Map();
 const xyOf = i => [i % N, Math.floor(i / N)];
 const place = (el, i) => { const [x, y] = xyOf(i); el.style.transform = `translate(${x * 100}%, ${y * 100}%)`; };
-const mark = c => `<svg viewBox="0 0 24 24" fill="${inkFor(COLOURS[c].hex)}" aria-hidden="true">${COLOURS[c].shape}</svg>`;
-function blkEl(b) { const el = document.createElement("div"); paint(el, b); return el; }
-function paint(el, b) { el.className = "blk" + (b.c % 2 ? " full" : ""); el.innerHTML = `<div class="b" style="background:${COLOURS[b.c].hex}">${mark(b.c)}</div>`; }
+let blocks = [];   // the element on each square
+function blk(c, i) { const el = document.createElement("div"); el.className = "blk" + (c === 6 ? " stone" : c % 2 ? " full" : ""); el.innerHTML = `<div class="b" style="background:${COLOURS[c].hex}">${mark(c)}</div>`; place(el, i); $("grid").append(el); return el; }
 function draw() {
   queueMicrotask(say);
   const grid = $("grid");
   if (!grid.querySelector(".slot")) for (let i = 0; i < N * N; i++) { const s = document.createElement("div"); s.className = "slot"; s.dataset.i = i; const [x, y] = xyOf(i); s.style.left = x * 20 + "%"; s.style.top = y * 20 + "%"; grid.append(s); }
-  grid.querySelectorAll(".blk,.ghost").forEach(e => e.remove()); els = new Map();
-  game.grid.forEach((b, i) => { if (!b) return; const el = blkEl(b); place(el, i); grid.append(el); els.set(b.id, el); });
+  grid.querySelectorAll(".blk,.ghost").forEach(e => e.remove());
+  blocks = game.grid.map((c, i) => c >= 0 ? blk(c, i) : null);
+  $("rules").innerHTML = rulesOf(game.level).map(([t, isNew]) => `<span class="r${isNew ? " new" : ""}">${t}</span>`).join("");
   update();
 }
-const chip = c => `<span class="chip" style="background:${COLOURS[c].hex}">${mark(c)}</span>`;
-function drawRules() {
-  const r = (a, b, m) => `<span class="r">${chip(a)}+${chip(b)}=${chip(m)}</span>`;
-  $("rules").innerHTML = r(0, 2, 1) + r(2, 4, 3) + r(0, 4, 5) +
-    `<span class="r">${chip(1)}${chip(3)}${chip(5)} stay put: line them up</span>`;
-}
 function update() {
-  $("count").textContent = `${game.lines} line${game.lines === 1 ? "" : "s"}${game.best ? ` · best ${game.best}` : ""}`;
-  const third = PRIMARIES.find(c => !game.pair.includes(c)), left = THIRD_AT - game.lines;
-  $("coming").innerHTML = left > 0 ? `${chip(third)} after ${left} line${left === 1 ? "" : "s"}` : "";
+  const spec = levelSpec(game.level);
+  $("count").innerHTML = `Level ${game.level} · ${Math.min(game.lines, spec.goal)} of ${spec.goal} ${spec.stone ? "stone " : ""}lines <span class="goalbar"><i style="width:${Math.min(100, game.lines / spec.goal * 100)}%"></i></span>`;
   $("hintBtn").disabled = !playing();
-  $("undoBtn").disabled = !game.history.length || game.over;
-  G.relabel($("lickBtn"), `Lick (${game.licks})`, "swat");
-  $("lickBtn").hidden = !game.licks; $("lickBtn").disabled = !playing();
-  $("board").classList.toggle("licking", licking);
-  paintHint();
+  $("undoBtn").disabled = !game.history.length || game.won;
+  $("restartBtn").disabled = !game.history.length || game.won;
+  G.relabel($("shuffleBtn"), `Mix it up (${game.mixes})`, "shuffle");
+  $("shuffleBtn").hidden = !game.mixes; $("shuffleBtn").disabled = !playing();
+  paintHint(); showCursor();
 }
 function say() {
   if (!game) return;
-  const rows = [...Array(N).keys()].map(r => `row ${r + 1}: ${[...Array(N).keys()].map(c => { const b = game.grid[r * N + c]; return b ? COLOURS[b.c].name : "empty"; }).join(", ")}`);
-  G.describe($("grid"), `Blocks of paint, ${N} by ${N}. ${G.listed(rows, "; ")}. Arrow keys slide them all.`);
+  const rows = [...Array(N).keys()].map(r => `row ${r + 1}: ${[...Array(N).keys()].map(c => { const v = game.grid[r * N + c]; return v < 0 ? "empty" : COLOURS[v].name; }).join(", ")}`);
+  G.describe($("grid"), `Blocks of paint, ${N} by ${N}. ${G.listed(rows, "; ")}. Arrow keys pick a square; Shift with an arrow slides its row or column that way.`);
 }
 
 /* ---------- playing ---------- */
-const snap = () => JSON.stringify({grid: game.grid, lines: game.lines, swipes: game.swipes, licks: game.licks, nextId: game.nextId});
-function swipe(dx, dy) {
-  if (!playing() || licking) return;
-  const r = slide(game.grid, dx, dy);
-  if (same(game.grid, r.grid)) { G.note("Nothing moves that way.", 1500); return; }
-  game.history.push(snap()); if (game.history.length > 30) game.history.shift();
+function slideMove(ax, l, back) {
+  if (!playing()) return;
+  const after = game.grid.slice(), r = slideLine(after, lineOf(ax, l, back));
+  if (!r.moves.length) { G.note("Nothing in that line can move that way.", 1800); return; }
+  game.started = true;
+  game.history.push(snap()); if (game.history.length > 50) game.history.shift();
   clearGhost(); hints.clear(false);
-  for (const m of r.moves) { const el = els.get(m.id); if (el) place(el, m.to); }
+  for (const m of r.moves) { const el = blocks[m.from]; if (el) place(el, m.to); }
   busy = true;
-  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches, spec = levelSpec(game.level);
   setTimeout(() => {
-    // blocks that went into another go; the one that stays takes the mix
-    const stay = new Map(); r.keep.forEach((b, i) => { if (b) stay.set(b.id, b); });
-    for (const [id, el] of els) { const b = stay.get(id); if (!b) { el.remove(); els.delete(id); } else if (r.merged.length && b.c !== +el.dataset.c) { paint(el, b); el.classList.add("pop"); } el.dataset.c = b ? b.c : ""; }
-    const madeMix = r.merged.map(i => r.keep[i]).find(b => b.c % 2);
-    if (madeMix) G.note(`${COLOURS[madeMix.c].name[0].toUpperCase() + COLOURS[madeMix.c].name.slice(1)}! It stays put now.`, 1800);
-    game.grid = r.grid; game.swipes++;
-    if (r.lines.length) {
-      const had = game.lines; game.lines += r.lines.length;
-      for (const i of new Set(r.lines.flat())) { const b = r.keep[i], el = b && els.get(b.id); if (el) { el.classList.add("gone"); setTimeout(() => el.remove(), reduce ? 0 : 500); els.delete(b.id); } }
-      G.note(r.lines.length > 1 ? `${r.lines.length} lines at once!` : "A whole line!", 2000);
-      if (had < THIRD_AT && game.lines >= THIRD_AT) G.note(`Here comes ${COLOURS[PRIMARIES.find(c => !game.pair.includes(c))].name}!`, 3000);
-      G.track(`Mew Hue ${game.lines} lines`);
-    }
-    const i = add(game); if (i >= 0) { const b = game.grid[i], el = blkEl(b); el.dataset.c = b.c; place(el, i); el.classList.add("fresh"); $("grid").append(el); els.set(b.id, el); }
-    busy = false;
-    if (!canMove(game.grid)) over();
-    queueMicrotask(say); update(); save();
+    game.grid = after; draw(); busy = true;
+    r.merged.forEach(i => blocks[i] && blocks[i].classList.add("pop"));
+    const made = r.merged.map(i => after[i]);
+    if (made.includes(6)) G.note("All three marks: it's set into stone!", 2200);
+    else { const mix = made.find(c => c % 2); if (mix != null) G.note(`${Cap(COLOURS[mix].name)}: two marks, so it's full now.`, 2000); }
+    const cleared = after.slice(), c = clearLines(cleared);
+    const finish = () => {
+      game.grid = cleared; game.moves++;
+      const counted = c.lines.filter(x => !spec.stone || x.c === 6).length;
+      game.lines += counted;
+      if (c.lines.length) { G.note(c.lines.length > 1 ? `${c.lines.length} lines at once!` : c.lines[0].c === 6 ? "A line of stone!" : "A whole line!", 2000); }
+      if (spec.stone && c.lines.length && !counted) G.note("This level only counts lines of stone.", 2500);
+      if (game.lines >= spec.goal) { busy = false; draw(); win(); return; }
+      const i = drop(game);
+      busy = false; draw(); if (i >= 0 && blocks[i]) blocks[i].classList.add("fresh");
+      if (!slides(game.grid).length) lose();
+      save();
+    };
+    if (!c.lines.length) { finish(); return; }
+    new Set([...c.lines.flatMap(x => x.cells), ...c.crumble]).forEach(i => blocks[i] && blocks[i].classList.add("gone"));
+    setTimeout(finish, reduce ? 0 : 450);
   }, reduce ? 0 : 130);
 }
+// Drag a row or column: the line you start on, the way you drag. While you drag it lights up, with + where blocks
+// will combine, ● where they'll set into stone, and ★ on lines that will clear.
 let touch = null;
-$("board").addEventListener("pointerdown", e => { if (!game) return; touch = {x: e.clientX, y: e.clientY, dir: null}; try { $("board").setPointerCapture(e.pointerId); } catch (er) {} });
-const dirOf = (dx, dy) => Math.max(Math.abs(dx), Math.abs(dy)) < 18 ? null : Math.abs(dx) > Math.abs(dy) ? [Math.sign(dx), 0] : [0, Math.sign(dy)];
+const cellAt = e => { const r = $("grid").getBoundingClientRect(), x = Math.floor((e.clientX - r.left) / r.width * N), y = Math.floor((e.clientY - r.top) / r.height * N); return x < 0 || y < 0 || x >= N || y >= N ? -1 : y * N + x; };
+const dragOf = (t, e) => { const dx = e.clientX - t.x, dy = e.clientY - t.y; if (Math.max(Math.abs(dx), Math.abs(dy)) < 16) return null;
+  const [x, y] = xyOf(t.i); return Math.abs(dx) > Math.abs(dy) ? [0, y, dx < 0] : [1, x, dy < 0]; };
+$("board").addEventListener("pointerdown", e => { if (!playing()) return; const i = cellAt(e); if (i < 0) return; touch = {x: e.clientX, y: e.clientY, i, d: null}; try { $("board").setPointerCapture(e.pointerId); } catch (er) {} });
 $("board").addEventListener("pointermove", e => {
-  if (!touch || !playing() || licking) return;
-  const d = dirOf(e.clientX - touch.x, e.clientY - touch.y);
-  if (String(d) !== String(touch.dir)) { touch.dir = d; d ? showGhost(...d) : clearGhost(); }
+  if (!touch || !playing()) return;
+  const d = dragOf(touch, e);
+  if (String(d) !== String(touch.d)) { touch.d = d; d ? showGhost(...d) : clearGhost(); }
 });
-$("board").addEventListener("pointerup", e => {
-  if (!touch) return;
-  const d = dirOf(e.clientX - touch.x, e.clientY - touch.y); touch = null; clearGhost();
-  if (licking) { const rr = $("grid").getBoundingClientRect(), x = Math.floor((e.clientX - rr.left) / rr.width * N), y = Math.floor((e.clientY - rr.top) / rr.height * N); if (x >= 0 && y >= 0 && x < N && y < N) lick(y * N + x); return; }
-  if (d) swipe(...d);
-});
+$("board").addEventListener("pointerup", e => { if (!touch) return; const d = dragOf(touch, e); touch = null; clearGhost(); if (d) slideMove(...d); else G.note("Drag a row or column to slide it.", 2000); });
 $("board").addEventListener("pointercancel", () => { touch = null; clearGhost(); });
-// While you drag: + where two blocks will mix or join, ★ on a line that will clear.
-function showGhost(dx, dy) {
+function showGhost(ax, l, back) {
   clearGhost();
-  const r = slide(game.grid, dx, dy), put = (i, t) => { const g = document.createElement("div"); g.className = "ghost"; const [x, y] = xyOf(i); g.style.left = x * 20 + "%"; g.style.top = y * 20 + "%"; g.innerHTML = `<span>${t}</span>`; $("grid").append(g); };
-  r.merged.forEach(i => put(i, "+")); new Set(r.lines.flat()).forEach(i => put(i, "★"));
+  const L = lineOf(ax, l, back), h = game.grid.slice(), r = slideLine(h, L), c = clearLines(h.slice());
+  L.forEach(i => $("grid").querySelector(`.slot[data-i="${i}"]`).classList.add("lit"));
+  const put = (i, t) => { const g = document.createElement("div"); g.className = "ghost"; const [x, y] = xyOf(i); g.style.left = x * 20 + "%"; g.style.top = y * 20 + "%"; g.innerHTML = `<span>${t}</span>`; $("grid").append(g); };
+  r.merged.forEach(i => put(i, h[i] === 6 ? "●" : "+"));
+  new Set(c.lines.flatMap(x => x.cells)).forEach(i => put(i, "★"));
 }
-function clearGhost() { $("grid").querySelectorAll(".ghost").forEach(g => g.remove()); }
-document.addEventListener("keydown", e => {
-  if (e.ctrlKey || e.metaKey || e.altKey || document.querySelector(".spot") || $("overlay").classList.contains("show") || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
-  if (e.key === "Escape" && licking) { licking = false; update(); G.note(""); return; }
-  const k = {ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1]}[e.key]; if (!k) return;
-  e.preventDefault(); swipe(...k);
+function clearGhost() { $("grid").querySelectorAll(".ghost").forEach(g => g.remove()); $("grid").querySelectorAll(".slot.lit").forEach(s => s.classList.remove("lit")); }
+// Keys: the arrows move a cursor; Shift with an arrow slides the cursor's row or column that way.
+function showCursor() { $("grid").querySelectorAll(".slot.kbcursor").forEach(s => s.classList.remove("kbcursor")); const i = keys ? keys.at() : -1; if (i >= 0) { const s = $("grid").querySelector(`.slot[data-i="${i}"]`); if (s) s.classList.add("kbcursor"); } }
+const keys = G.gridKeys({
+  on: () => playing(), show: () => showCursor(), size: () => [N, N], start: () => 12,
+  move(i, dx, dy, e) {
+    const [x, y] = xyOf(i);
+    if (e && e.shiftKey) { if (dx) slideMove(0, y, dx < 0); else slideMove(1, x, dy < 0); return i; }
+    return Math.max(0, Math.min(N - 1, y + dy)) * N + Math.max(0, Math.min(N - 1, x + dx));
+  },
+  act: () => false,
 });
 document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
-function undo() { if (!playing() || !game.history.length) return; Object.assign(game, JSON.parse(game.history.pop())); licking = false; draw(); save(); }
+function undo() { if (!game || busy || !game.history.length || game.won) return; game.undid = true; game.lost = false; Object.assign(game, JSON.parse(game.history.pop())); G.closeCard(); draw(); save(); }
 $("undoBtn").onclick = undo;
-// Lick: the cat licks one block clean away. Three a game.
-$("lickBtn").onclick = () => { if (!playing() || !game.licks) return; licking = !licking; update(); G.note(licking ? "Tap a block for the cat to lick away." : "", licking ? 0 : 1); };
-function lick(i) {
-  const b = game.grid[i]; if (!b) { G.note("Tap a block, not a gap.", 2000); return; }
-  game.history.push(snap()); game.grid[i] = null; game.licks--; licking = false;
-  const el = els.get(b.id); if (el) { el.classList.add("gone"); setTimeout(() => el.remove(), 500); els.delete(b.id); }
-  G.note(`Lick! The ${COLOURS[b.c].name} is gone.`, 2000); update(); save();
-}
+$("restartBtn").onclick = () => {
+  if (!game || busy || !game.history.length || game.won) return;
+  game.undid = true; game.history.push(snap());
+  Object.assign(game, JSON.parse(game.start), {lines: 0, moves: 0, mixes: MIXES, lost: false});
+  G.closeCard(); draw(); save(); G.note("Back to the start of the level. Undo brings it back.", 3500);
+};
+// Mix it up: the cat bats the cloth and every block that isn't stone lands somewhere new. Two a level.
+$("shuffleBtn").onclick = () => {
+  if (!playing() || !game.mixes) return;
+  game.history.push(snap()); game.mixes--; game.mixed = true;
+  const r = seeded(game.seed * 31 + game.moves * 7 + game.mixes), free = game.grid.map((c, i) => c === 6 ? -1 : i).filter(i => i >= 0);
+  const vals = free.map(i => game.grid[i]);
+  for (let k = vals.length - 1; k > 0; k--) { const j = Math.floor(r() * (k + 1)); [vals[k], vals[j]] = [vals[j], vals[k]]; }
+  free.forEach((i, k) => { game.grid[i] = vals[k]; });
+  // shuffling can't leave a whole line done for you
+  clearLines(game.grid);
+  game.lost = false; G.closeCard(); draw(); save(); G.note("The cat mixed it up!", 2000);
+};
 
 /* ---------- hints ---------- */
-const hints = G.hinter({game: () => game, key: () => game ? JSON.stringify(game.grid) : "", draw: () => paintHint()});
+// Hint tries every slide and shows the best: lines that count, then blocks lining up, then room.
+const hints = G.hinter({game: () => game, key: () => game ? game.grid.join() : "", draw: () => paintHint()});
 function paintHint() { $("grid").querySelectorAll(".slot.hintcell").forEach(s => s.classList.remove("hintcell")); const m = hints.current(); if (m) for (const i of m.cells) $("grid").querySelector(`.slot[data-i="${i}"]`).classList.add("hintcell"); }
+function score(g, spec) {
+  let s = g.filter(c => c < 0).length * 3;
+  for (let l = 0; l < N; l++) for (const ax of [0, 1]) { const cnt = {}; lineOf(ax, l, true).forEach(i => { if (g[i] >= 0) cnt[g[i]] = (cnt[g[i]] || 0) + 1; }); for (const [c, n] of Object.entries(cnt)) s += n * n * (spec.stone && +c === 6 ? 3 : 1); }
+  return s;
+}
 $("hintBtn").onclick = () => {
   if (!playing()) return;
-  let best = null;
-  for (const [dx, dy, name] of [[-1, 0, "left"], [1, 0, "right"], [0, -1, "up"], [0, 1, "down"]]) {
-    const r = slide(game.grid, dx, dy); if (same(game.grid, r.grid)) continue;
-    const sc = r.lines.length * 100 + r.merged.filter(i => r.keep[i].c % 2 === 0).length * 6 + r.merged.length * 2 + r.grid.filter(b => !b).length;
-    if (!best || sc > best.sc) best = {sc, name, r};
+  const spec = levelSpec(game.level); let best = null;
+  for (const [ax, l, back] of slides(game.grid)) {
+    const h = game.grid.slice(); slideLine(h, lineOf(ax, l, back)); const c = clearLines(h);
+    const sc = c.lines.filter(x => !spec.stone || x.c === 6).length * 1000 + c.lines.length * 200 + score(h, spec);
+    if (!best || sc > best.sc) best = {sc, ax, l, back, c};
   }
-  if (!best) { G.note("No swipe moves anything. Try a Lick.", 3000); return; }
-  const cells = best.r.lines.length ? [...new Set(best.r.lines.flat())] : best.r.merged;
-  hints.show({cells}, `Swipe ${best.name}${best.r.lines.length ? ": it clears a line" : best.r.merged.length ? ": the gold blocks combine" : ": it makes room"}.`);
+  if (!best) { G.note("Nothing can slide. Try Mix it up, or Undo.", 3000); return; }
+  game.hinted = true; save();
+  const way = best.ax ? (best.back ? "up" : "down") : (best.back ? "left" : "right");
+  hints.show({cells: lineOf(best.ax, best.l, true)}, `Slide the gold ${best.ax ? "column" : "row"} ${way}${best.c.lines.length ? ": it clears a line" : ""}.`);
 };
 
-/* ---------- the end ---------- */
-function over() {
-  game.over = true; const first = !game.best || game.lines > game.best; if (game.lines > (game.best || 0)) game.best = game.lines; save();
-  G.track(`Mew Hue game over ${game.lines} lines`);
-  setTimeout(() => G.openCard("No moves left", `You cleared ${game.lines} line${game.lines === 1 ? "" : "s"} in ${game.swipes} swipes.${game.lines && first ? " That's your best yet!" : game.best ? ` Your best is ${game.best}.` : ""}`,
-    [["Play again", () => { G.closeCard(); newGame(); }, true], ["Look at the board", G.closeCard], G.homeBtn()]), 600);
+/* ---------- endings ---------- */
+function win() {
+  game.won = true; G.finishClock(game); update(); save();
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save();
+  G.track(`Mew Hue won level ${game.level}`);
+  const gold = !game.undid && !game.hinted && !game.mixed, spec = levelSpec(game.level);
+  let text = `You cleared ${game.lines} ${spec.stone ? "lines of stone" : "lines"} in ${game.moves} moves.`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the last level; here's another cloth." : ` Next up: level ${next}, ${levelName(next).toLowerCase()}.`;
+  setTimeout(() => G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the cloth", game.result,
+    {title: "Lined up!", gold, goldWhy: "No hints, undos or mix-ups!", next: next > game.level ? `Next: level ${next}` : "Next cloth",
+     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")}), 500);
 }
-// Share: there's no puzzle to pass on, so it sends your lines (and best) with a link here.
-$("linkBtn").onclick = () => {
-  const n = game ? game.lines : 0, best = game ? game.best || 0 : 0;
-  G.track("Mew Hue shared");
-  G.sendLink("Mew Hue", `I cleared ${n} line${n === 1 ? "" : "s"} in Mew Hue${best > n ? ` (my best is ${best})` : ""}. Can you beat it?`, location.origin + location.pathname);
-};
+function lose() {
+  game.lost = true; G.breakStreak(); save();
+  G.track(`Mew Hue stuck level ${game.level}`);
+  const btns = [["Undo", undo, true]];
+  if (game.mixes) btns.push([`Mix it up (${game.mixes} left)`, () => $("shuffleBtn").onclick()]);
+  btns.push(["Restart", () => $("restartBtn").onclick()], ["New cloth", () => { G.closeCard(); newGame(); }], G.homeBtn());
+  setTimeout(() => G.openCard("Stuck!", `Nothing can slide. You cleared ${game.lines} of ${levelSpec(game.level).goal}.`, btns), 400);
+}
+
+/* ---------- new cloths ---------- */
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newGame(); }
+function newGame(seed = Math.floor(Math.random() * 2 ** 31)) {
+  game = deal(settings.level, seed); hints.clear(false); draw(); save();
+  G.track(`Mew Hue new cloth level ${settings.level}`);
+  helpOnFirstVisit();
+}
+$("linkBtn").onclick = () => { if (game) G.shareCard({name: "Mew Hue", won: game.won, what: "cloth", puzzle: () => ({g: "mewhue", N: game.level, s: game.seed})}); };
+function openShared(d) { if (!(d.N >= 1 && d.N <= MAX_LEVEL) || !Number.isInteger(d.s)) { G.note("That share link didn't work.", 5000); return; } settings.level = d.N; $("levelSel").value = d.N; newGame(d.s); }
 
 /* ---------- how to play ---------- */
-function showHelp() { settings.seen = false; helpOnFirstVisit(); }
-function helpOnFirstVisit() {
-  if (!game || !playing() || settings.seen || document.querySelector(".spot")) return;
-  const all = [...Array(N * N).keys()].map(xyOf), turn = G.yourTurn(() => game, g => { game = g; }, draw);
+// The first cloth gets the whole walkthrough; each later level, the first time, a step for what's new.
+function showHelp() { if (game) { settings.seen = {}; helpOnFirstVisit(true); } }
+function helpOnFirstVisit(all) {
+  if (!game || !playing() || document.querySelector(".spot")) return;
+  const n = game.level, first = all || !Object.keys(settings.seen).length;
+  if (settings.seen[n] && !all) return;
+  // a row that can slide, for the your-turn step, and which way
+  const cells = [...Array(N * N).keys()].map(xyOf), can = slides(game.grid).find(([ax]) => ax === 0) || [0, 2, false];
+  const row = cells.filter(([, y]) => y === can[1]), way = can[2] ? "left" : "right";
+  const turn = G.yourTurn(() => game, g => { game = g; }, draw);
   let was = 0;
-  G.spotlight({grid: $("grid"), w: N, h: N, done: () => { settings.seen = true; save(); }, steps: [
-    {say: "Swipe: every block slides 🐈", lit: all},
-    {say: "Swipe any way", lit: all, ...turn.upTo, try: {done: () => game.swipes !== was}, enter() { turn.from.enter(); was = game.swipes; }},
-    {say: "Two colours mix: their marks join", els: [$("rules")]},
-    {say: "Mixes stay put", els: [$("rules")]},
-    {say: "Line up one colour to clear it", lit: all.filter(([, y]) => y === N - 1), tone: "ok"},
-    {say: "Lick takes one block away", els: [$("lickBtn")]},
-    {say: "Stuck? Hint shows a good swipe", els: [$("hintBtn")]},
-  ]});
+  const newSay = {1: "Two marks mix into one block", 2: "Some mixes fall in ready-made", 3: "These two never mix", 4: "A mark meets the mix without it: stone", 5: "Here comes blue's ring", 6: "Everything at once"}[n];
+  const steps = first ? [
+    {say: "Each colour has a mark 🐈", els: [$("rules")]},
+    {say: `Drag this row ${way}`, lit: row, ...turn.upTo, try: {done: () => game.moves !== was}, enter() { turn.from.enter(); was = game.moves; }},
+    ...(n > 1 ? [{say: newSay, els: [$("rules")]}] : [{say: newSay, els: [$("rules")]}]),
+    {say: "A mix holds two marks: it's full", els: [$("rules")], later: n < 2},
+    {say: "Line up one kind to clear it", lit: cells.filter(([x]) => x === 0), tone: "ok"},
+    {say: "Mix it up shuffles the cloth", els: [$("shuffleBtn")]},
+    {say: "Stuck? Hint shows a good slide", els: [$("hintBtn")]},
+  ] : [{say: `New: ${newSay.toLowerCase()}`, els: [$("rules")]}];
+  G.spotlight({grid: $("grid"), w: N, h: N, steps, finish: first ? undefined : false, done: () => { settings.seen[n] = true; if (first) for (let k = 1; k <= n; k++) settings.seen[k] = true; save(); }});
 }
 
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(`${n} · ${levelName(n)}`, n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
 $("newBtn").onclick = () => { G.closeCard(); newGame(); };
 $("helpBtn").onclick = showHelp;
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
 G.nav("mewhue");
-drawRules();
-if (game && game.grid && game.grid.length === N * N && !game.over) { draw(); helpOnFirstVisit(); } else newGame();
+G.checkClock(game);
+G.setupTimer({name: "mewhue", game: () => game, playing: g => !g.won && !g.lost, save, label: n => `${n} · ${levelName(n)}`, noun: "level"});
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+const shared = G.readShare("mewhue");
+if (game) G.reopen(() => { if (!levelSpec(game.level) || game.grid.length !== N * N) throw new Error("the saved cloth doesn't fit"); draw(); if (game.lost) lose(); else helpOnFirstVisit(); },
+  why => { game = null; newGame(); G.note(why, 0); });
+else if (!shared) newGame();
+if (shared) G.offerShare(shared, {name: "Mew Hue", inProgress: !!(game && game.history.length && !game.won), open: openShared, after: helpOnFirstVisit, fresh: game ? null : why => { newGame(); G.note(why, 6000); }});
+window.addEventListener("hashchange", () => { const d = G.readShare("mewhue"); if (d) G.offerShare(d, {name: "Mew Hue", inProgress: !!(game && game.history.length && !game.won), open: openShared, after: helpOnFirstVisit}); });
 </script>
 <!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
 <script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
