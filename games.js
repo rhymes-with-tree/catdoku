@@ -1,6 +1,23 @@
 /* Shared helpers for the Catdoku family of games: links between games,
    saved progress, background puzzle building, and the win card. */
 const G = (() => {
+  // Featured cats' links: a featured cat's owner shares a link ending in ?cat=<name> (?cat=bugsy,
+  // ?cat=bowtie…), and opening one counts "Via bugsy: new player" (nothing saved on this device yet)
+  // or "Via bugsy: returning player" on the GoatCounter dashboard, so it shows who each feature
+  // brought in. The tag then comes off the address, so a reload or a link shared on from here
+  // doesn't count again. Checked first thing, before anything is saved.
+  (function viaCat() {
+    const q = new URLSearchParams(location.search);
+    if (!q.has("cat")) return;
+    const cat = (q.get("cat") || "").trim().toLowerCase();
+    let returning = false;
+    try { returning = Object.keys(localStorage).some(k => k.startsWith("catdoku.")); } catch (e) {}
+    q.delete("cat");
+    const rest = q.toString();
+    history.replaceState(history.state, "", location.pathname + (rest ? "?" + rest : "") + location.hash);
+    if (/^[a-z0-9-]{1,24}$/.test(cat)) track(`Via ${cat}: ${returning ? "returning" : "new"} player`);
+  })();
+
   // Every game: name, folder, one line about it, its colour in the games menu, its shelf (see GROUPS),
   // words to find it by in search (the puzzle it's based on and what it's like), and for games added from
   // 2026-10-18 on, the date it was added (so the daily challenge gives it a few days first; see daily).
