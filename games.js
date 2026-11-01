@@ -267,14 +267,16 @@ const G = (() => {
       // a long name gets a little smaller rather than going onto two lines beside the tools, unless even that won't do
       const h1 = head.querySelector("h1"), fit = () => {
         h1.style.fontSize = ""; let fs = parseFloat(getComputedStyle(h1).fontSize);
-        const t = h1.closest(".title") || h1, one = () => h1.getBoundingClientRect().height < fs * 1.5 && t.getBoundingClientRect().right <= tools.getBoundingClientRect().left;
+        // clear of Games and the star: left of them, or on another row (at the larger text sizes they sit above the title)
+        const t = h1.closest(".title") || h1, apart = () => { const a = t.getBoundingClientRect(), b = tools.getBoundingClientRect(); return a.right <= b.left + 1 || a.top >= b.bottom - 1 || a.bottom <= b.top + 1; };
+        const one = () => h1.getBoundingClientRect().height < fs * 1.5 && apart();
         // never smaller than a little over the body text (at the larger text sizes that's big): past that, two lines
         const floor = Math.max(20, parseFloat(getComputedStyle(document.body).fontSize) * 1.15);
         while (!one() && fs > floor) { fs -= 1; h1.style.fontSize = fs + "px"; }
         if (!one()) {   // too long even then: two lines at a size that reads...
           fs = Math.max(24, floor); h1.style.fontSize = fs + "px";
           // ...unless one word on its own is too wide for the room (Caboodle on a small phone): then smaller, till it fits
-          const clear = () => t.getBoundingClientRect().right <= tools.getBoundingClientRect().left + 1 && h1.scrollWidth <= h1.clientWidth + 1;
+          const clear = () => apart() && h1.scrollWidth <= h1.clientWidth + 1;
           while (!clear() && fs > 20) { fs -= 1; h1.style.fontSize = fs + "px"; }
         }
       };
