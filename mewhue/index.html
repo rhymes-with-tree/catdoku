@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mew Hue</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-11-01.13"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<meta name="theme-color" content="#ECEEE7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1F1C24" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-11-01.13">
+<style>
+/* Blobs of paint on a drop cloth. Swipe and they all slide; when two bump, where they sit on the 12-colour wheel
+   says what happens: the same colour joins and grows, a colour halfway between them makes them mix into it,
+   opposites cancel out, and anything else just bumps. */
+.cloth{background:color-mix(in srgb,#2A2530 8%,#F7F8F3);border:3px solid var(--ink);border-radius:12px;overflow:hidden;
+  touch-action:none;user-select:none;-webkit-user-select:none}
+.cloth .grid{position:absolute;inset:2%;outline:none}
+.slot{position:absolute;width:20%;height:20%;display:grid;place-items:center}
+.slot::before{content:"";width:78%;height:78%;border-radius:50%;background:color-mix(in srgb,#2A2530 6%,transparent)}
+.blob{position:absolute;left:0;top:0;width:20%;height:20%;transition:transform .12s ease-out;pointer-events:none}
+.blob .b{position:absolute;left:50%;top:50%;border-radius:50%;transform:translate(-50%,-50%);
+  box-shadow:inset 0 -4px 0 rgba(42,37,48,.18),0 2px 3px rgba(42,37,48,.25);transition:width .15s,height .15s}
+.blob.s1 .b{width:62%;height:62%} .blob.s2 .b{width:84%;height:84%}
+/* a dot at the blob's place on the colour wheel: opposites point opposite ways */
+.blob .dial{position:absolute;left:50%;top:50%;width:0;height:0}
+.blob .dial i{position:absolute;border-radius:50%;width:9px;height:9px;margin:-4.5px;background:#F7F8F3;box-shadow:0 0 0 1.5px rgba(42,37,48,.55)}
+.blob.pop .b{animation:pop .36s ease-out forwards}
+@keyframes pop{50%{transform:translate(-50%,-50%) scale(1.25)}to{transform:translate(-50%,-50%) scale(0);opacity:0}}
+.blob.grow .b{animation:grow .25s ease-out}
+@keyframes grow{50%{transform:translate(-50%,-50%) scale(1.18)}}
+.blob.fresh .b{animation:fresh .25s ease-out}
+@keyframes fresh{from{transform:translate(-50%,-50%) scale(.2)}}
+/* what a swipe will do, shown while you drag: + mix, ✕ cancel, ✦ burst, = joins */
+.ghost{position:absolute;width:20%;height:20%;display:grid;place-items:center;pointer-events:none;z-index:3}
+.ghost span{min-width:1.6em;height:1.6em;border-radius:999px;background:#2A2530;color:#F7F8F3;font:800 clamp(12px,4vw,18px)/1.6em "Baloo 2",system-ui,sans-serif;text-align:center}
+.slot.hintcell::before{background:rgba(236,168,24,.55)}
+/* the wheel beside the score: the colour you tap lights up, with its opposite and the colours it mixes with */
+.wheelrow{display:flex;align-items:center;gap:12px;width:var(--board);justify-content:space-between}
+#wheel{width:76px;height:76px;flex:none}
+#wheel .seg{stroke:#F7F8F3;stroke-width:1.5}
+#wheel .dim{opacity:.25}
+.goal{font-size:calc(15px*var(--ts));color:var(--ink-soft)}
+.goal b{color:var(--ink);font-size:calc(20px*var(--ts))}
+.bar2{height:8px;border-radius:999px;background:var(--line);overflow:hidden;margin-top:4px;width:min(220px,50vw)}
+.bar2 i{display:block;height:100%;background:#ECA818;border-radius:999px;transition:width .3s}
+@media (prefers-reduced-motion:reduce){.blob,.blob .b{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Mew Hue</h1><div class="stripe"></div><p class="tagline">Swipe paint round the colour wheel</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+  <div class="wheelrow">
+    <div class="goal"><div id="goalText"></div><div class="bar2"><i id="goalBar"></i></div></div>
+    <svg id="wheel" viewBox="-50 -50 100 100" role="img" aria-label="The colour wheel"></svg>
+  </div>
+
+  <div class="wrap cloth stage" id="board">
+    <div class="grid" id="grid" tabindex="0" role="application" aria-label="Blobs of paint. Swipe, or press an arrow key, to slide them all."></div>
+  </div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="linkBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New cloth</button>
+  </div>
+
+</main>
+
+<script src="../games.js?v=2026-11-01.13"></script>
+<script>
+/* ---------- the colour wheel and its rules ---------- */
+// Twelve colours round the wheel, red at the top going clockwise: red, red-orange, orange, yellow-orange, yellow,
+// yellow-green, green, blue-green, blue, blue-violet, purple, red-purple. Every one is from the site's palette or
+// Yarn's colourways.
+const HUES = [
+  ["red", "#BD5538"], ["red-orange", "#E16A4A"], ["orange", "#EC814D"], ["yellow-orange", "#F0AB44"], ["yellow", "#FACE55"],
+  ["yellow-green", "#B3B94B"], ["green", "#6AA673"], ["blue-green", "#30A6B3"], ["blue", "#4A5BAB"], ["blue-violet", "#6E4B9F"],
+  ["purple", "#9874CA"], ["red-purple", "#B94588"]];
+const N = 5;
+// How far apart two colours sit round the wheel (0 to 6).
+function apart(a, b) { const d = Math.abs(a - b) % 12; return Math.min(d, 12 - d); }
+// What happens when blob b slides into blob a: join (same colour), mix (a colour exactly halfway between them,
+// the short way round), cancel (opposites) or bump (anything else).
+function bump(a, b) {
+  const d = apart(a.h, b.h);
+  if (d === 0) return {kind: "join", h: a.h};
+  if (d === 6) return {kind: "cancel"};
+  if (d % 2) return {kind: "bump"};
+  const lo = (b.h - a.h + 12) % 12 === d ? a.h : b.h;   // the one the other is clockwise from
+  return {kind: "mix", h: (lo + d / 2) % 12};
+}
+// Levels: which colours fall in, how many blobs to clear, and how often two fall in at once.
+function levelSpec(n) {
+  return [null, {drops: [0, 4], goal: 15, start: 4, two: 0}, {drops: [0, 4, 8], goal: 20, start: 4, two: 0},
+    {drops: [0, 4, 8], goal: 30, start: 5, two: 0}, {drops: [0, 4, 8], goal: 40, start: 5, two: 4},
+    {drops: [0, 4, 8], goal: 50, start: 6, two: 3}, {drops: [0, 4, 8], goal: 70, start: 6, two: 2}][n];
+}
+function seeded(seed) { return () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+// Slide every blob one way (dx, dy). Each blob bumps at most once a swipe. A join or mix whose size comes to 3 or
+// more bursts, and so does a cancel: those squares empty once the swipe is over. Returns the new grid, where each
+// blob went, and what happened where.
+function slide(grid, dx, dy) {
+  const g = new Array(N * N).fill(null), moves = [], fx = [];
+  for (let a = 0; a < N; a++) {
+    const L = [];
+    for (let k = 0; k < N; k++) { const t = (dx || dy) > 0 ? N - 1 - k : k; L.push(dx ? a * N + t : t * N + a); }
+    const out = [];   // {b, done, at}
+    for (const i of L) {
+      const b = grid[i]; if (!b) continue;
+      const last = out[out.length - 1];
+      if (last && !last.done) {
+        const r = bump(last.b, b);
+        if (r.kind !== "bump") {
+          const at = L[out.length - 1];
+          moves.push({id: b.id, to: at});
+          if (r.kind === "cancel") { last.done = true; last.gone = r; fx.push({at, kind: "cancel", n: last.b.s + b.s, ids: [last.b.id, b.id]}); continue; }
+          const s = last.b.s + b.s;
+          if (s >= 3) { last.done = true; last.gone = r; fx.push({at, kind: "burst", h: r.h, n: s, ids: [last.b.id, b.id]}); continue; }
+          fx.push({at, kind: r.kind, h: r.h, ids: [last.b.id, b.id]});
+          last.b = {id: last.b.id, h: r.h, s}; last.done = true; continue;
+        }
+      }
+      out.push({b, done: false});
+      moves.push({id: b.id, to: L[out.length - 1]});
+    }
+    out.forEach((o, k) => { if (!o.gone) g[L[k]] = o.b; });
+  }
+  // whole rows and columns of one colour clear too
+  for (let a = 0; a < N; a++) for (const L of [[...Array(N)].map((_, k) => a * N + k), [...Array(N)].map((_, k) => k * N + a)]) {
+    const h = g[L[0]] && g[L[0]].h;
+    if (h != null && L.every(i => g[i] && g[i].h === h)) fx.push({kind: "line", cells: L.slice(), n: L.reduce((t, i) => t + g[i].s, 0), h});
+  }
+  for (const f of fx) if (f.kind === "line") for (const i of f.cells) g[i] = null;
+  return {grid: g, moves, fx, cleared: fx.reduce((t, f) => t + (f.n || 0), 0)};
+}
+const changed = (a, b) => a.some((x, i) => (x && x.id) !== (b[i] && b[i].id) || (x && b[i] && (x.h !== b[i].h || x.s !== b[i].s)));
+function canMove(grid) {
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (changed(grid, slide(grid, dx, dy).grid)) return true;
+  return false;
+}
+
+/* ---------- game state ---------- */
+// game: {level, seed, grid (a blob {id, h, s} or null in each square), drops (how many have fallen, for the seeded
+//        random), cleared, swipes, nextId, start (the level as dealt), history, won, lost, hinted, undid, clock…}
+const STORE = "catdoku.mewhue.v1", MAX_LEVEL = 6, $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1, seen: false}, state.settings);
+let game = state.game || null, busy = false;
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !game.lost && !busy && !$("overlay").classList.contains("show");
+const levelName = n => { const s = levelSpec(n); return `${n} · clear ${s.goal}${s.drops.length === 2 ? ", red and yellow" : ""}`; };
+// The next blob to fall in, from the level's seed and how many have fallen.
+function drop(g) {
+  const spec = levelSpec(g.level), r = seeded(g.seed * 7919 + g.drops++);
+  const empty = g.grid.map((b, i) => b ? -1 : i).filter(i => i >= 0);
+  if (!empty.length) return -1;
+  const i = empty[Math.floor(r() * empty.length)];
+  g.grid[i] = {id: g.nextId++, h: spec.drops[Math.floor(r() * spec.drops.length)], s: 1};
+  return i;
+}
+function deal(level, seed) {
+  const g = {level, seed, grid: new Array(N * N).fill(null), drops: 0, cleared: 0, swipes: 0, nextId: 1, history: [], won: false, lost: false, ...G.freshClock()};
+  for (let k = 0; k < levelSpec(level).start; k++) drop(g);
+  g.start = JSON.stringify({grid: g.grid, drops: g.drops, nextId: g.nextId});
+  return g;
+}
+
+/* ---------- drawing ---------- */
+let blobEls = new Map();
+const xyOf = i => [i % N, Math.floor(i / N)];
+const place = (el, i) => { const [x, y] = xyOf(i); el.style.transform = `translate(${x * 100}%, ${y * 100}%)`; };
+function blobEl(b) {
+  const el = document.createElement("div"); el.className = "blob s" + b.s;
+  el.innerHTML = `<div class="b"></div><div class="dial"><i></i></div>`;
+  paint(el, b); return el;
+}
+function paint(el, b) {
+  el.className = "blob s" + b.s;
+  el.querySelector(".b").style.background = HUES[b.h][1];
+}
+function draw() {
+  queueMicrotask(say);
+  const grid = $("grid");
+  if (!grid.querySelector(".slot")) for (let i = 0; i < N * N; i++) { const s = document.createElement("div"); s.className = "slot"; s.dataset.i = i; const [x, y] = xyOf(i); s.style.left = x * 20 + "%"; s.style.top = y * 20 + "%"; grid.append(s); }
+  grid.querySelectorAll(".blob,.ghost").forEach(e => e.remove()); blobEls = new Map();
+  game.grid.forEach((b, i) => { if (!b) return; const el = blobEl(b); place(el, i); grid.append(el); blobEls.set(b.id, el); dialOf(el, b); });
+  update();
+}
+// the dot round the rim, in pixels of the square it sits in
+function dialOf(el, b) {
+  const a = (b.h * 30 - 90) * Math.PI / 180, cell = $("grid").clientWidth / N, r = cell * (b.s === 2 ? .42 : .31) - 5;
+  const i = el.querySelector(".dial i"); i.style.left = (Math.cos(a) * r).toFixed(1) + "px"; i.style.top = (Math.sin(a) * r).toFixed(1) + "px"; i.style.transform = "";
+}
+function update() {
+  const spec = levelSpec(game.level);
+  $("count").textContent = `Level ${game.level}`;
+  $("goalText").innerHTML = `<b>${Math.min(game.cleared, spec.goal)}</b> of ${spec.goal} cleared`;
+  $("goalBar").style.width = Math.min(100, game.cleared / spec.goal * 100) + "%";
+  $("hintBtn").disabled = !playing();
+  $("undoBtn").disabled = !game.history.length || game.won || game.lost;
+  $("restartBtn").disabled = !game.history.length || game.won;
+  paintHint();
+}
+function say() {
+  if (!game) return;
+  const rows = [...Array(N).keys()].map(r => `row ${r + 1}: ${[...Array(N).keys()].map(c => { const b = game.grid[r * N + c]; return b ? (b.s === 2 ? "big " : "") + HUES[b.h][0] : "empty"; }).join(", ")}`);
+  G.describe($("grid"), `Blobs of paint, ${N} by ${N}. ${G.listed(rows, "; ")}. Arrow keys slide them all.`);
+}
+// The wheel: twelve slices. With a colour picked (tap a blob), its slice stays bright with a ring, its opposite
+// gets a cross, and the colours it mixes with (every second one round) a dot; the rest dim.
+function drawWheel(pick = -1) {
+  let s = "";
+  for (let k = 0; k < 12; k++) {
+    const a0 = (k * 30 - 105) * Math.PI / 180, a1 = (k * 30 - 75) * Math.PI / 180, R = 48, r = 20;
+    const p = (rad, ang) => `${(rad * Math.cos(ang)).toFixed(1)} ${(rad * Math.sin(ang)).toFixed(1)}`;
+    const d = pick < 0 ? -1 : apart(k, pick), dim = pick >= 0 && d !== 0 && d !== 6 && d % 2 ? " dim" : "";
+    s += `<path class="seg${dim}" d="M${p(r, a0)} L${p(R, a0)} A${R} ${R} 0 0 1 ${p(R, a1)} L${p(r, a1)} A${r} ${r} 0 0 0 ${p(r, a0)} Z" fill="${HUES[k][1]}"/>`;
+    const am = (k * 30 - 90) * Math.PI / 180, cx = 34 * Math.cos(am), cy = 34 * Math.sin(am);
+    if (d === 0) s += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="6" fill="none" stroke="#2A2530" stroke-width="2.5"/>`;
+    else if (d === 6) s += `<path d="M${cx - 4} ${cy - 4}L${cx + 4} ${cy + 4}M${cx + 4} ${cy - 4}L${cx - 4} ${cy + 4}" stroke="#2A2530" stroke-width="2.5" stroke-linecap="round"/>`;
+    else if (d > 0 && d % 2 === 0) s += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="2.6" fill="#2A2530"/>`;
+  }
+  $("wheel").innerHTML = s;
+}
+
+/* ---------- playing ---------- */
+function swipe(dx, dy) {
+  if (!playing()) return;
+  const r = slide(game.grid, dx, dy);
+  if (!changed(game.grid, r.grid)) { G.note("Nothing moves that way.", 1500); return; }
+  game.started = true;
+  game.history.push(JSON.stringify({grid: game.grid, drops: game.drops, nextId: game.nextId, cleared: game.cleared, swipes: game.swipes}));
+  if (game.history.length > 50) game.history.shift();
+  clearGhost(); hints.clear(false);
+  // glide every blob to where it goes, then show the result
+  for (const m of r.moves) { const el = blobEls.get(m.id); if (el) place(el, m.to); }
+  busy = true;
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  setTimeout(() => {
+    const gone = new Set(r.fx.flatMap(f => f.ids || []));
+    // blobs that merged into another go; the one that stays takes the new colour and size
+    const keep = new Map(); r.grid.forEach((b, i) => { if (b) keep.set(b.id, b); });
+    for (const [id, el] of blobEls) {
+      const b = keep.get(id);
+      if (b) { const was = el.className; paint(el, b); dialOf(el, b); if (r.fx.some(f => f.ids && f.ids[0] === id)) { void el.offsetWidth; el.classList.add("grow"); } }
+      else { el.classList.add("pop"); setTimeout(() => el.remove(), reduce ? 0 : 360); blobEls.delete(id); }
+    }
+    game.grid = r.grid; game.cleared += r.cleared; game.swipes++;
+    const said = r.fx.find(f => f.kind === "line") ? "A whole line of one colour!" : r.fx.find(f => f.kind === "cancel") ? "Opposites cancel out!" :
+      r.fx.find(f => f.kind === "burst") ? `${HUES[r.fx.find(f => f.kind === "burst").h][0][0].toUpperCase() + HUES[r.fx.find(f => f.kind === "burst").h][0].slice(1)} bursts!` :
+      r.fx.find(f => f.kind === "mix") ? `${r.fx.filter(f => f.kind === "mix").map(f => HUES[f.h][0]).join(", ")}!` : "";
+    if (said) G.note(said, 1600);
+    if (game.cleared >= levelSpec(game.level).goal) { busy = false; win(); return; }
+    // new paint falls in: one, or two every so often on later levels
+    const spec = levelSpec(game.level), n = spec.two && game.swipes % spec.two === 0 ? 2 : 1;
+    for (let k = 0; k < n; k++) { const i = drop(game); if (i >= 0) { const b = game.grid[i], el = blobEl(b); place(el, i); el.classList.add("fresh"); $("grid").append(el); blobEls.set(b.id, el); dialOf(el, b); } }
+    busy = false;
+    if (!canMove(game.grid)) lose();
+    queueMicrotask(say); update(); save();
+  }, reduce ? 0 : 130);
+}
+// Swipe on the board; while you drag, little marks show what that swipe would do. Tap a blob to see its colour on the wheel.
+let touch = null;
+$("board").addEventListener("pointerdown", e => {
+  if (!game) return;
+  touch = {x: e.clientX, y: e.clientY, dir: null};
+  try { $("board").setPointerCapture(e.pointerId); } catch (er) {}
+});
+const dirOf = (dx, dy) => Math.max(Math.abs(dx), Math.abs(dy)) < 18 ? null : Math.abs(dx) > Math.abs(dy) ? [Math.sign(dx), 0] : [0, Math.sign(dy)];
+$("board").addEventListener("pointermove", e => {
+  if (!touch || !playing()) return;
+  const d = dirOf(e.clientX - touch.x, e.clientY - touch.y);
+  if (String(d) !== String(touch.dir)) { touch.dir = d; d ? showGhost(...d) : clearGhost(); }
+});
+$("board").addEventListener("pointerup", e => {
+  if (!touch) return;
+  const d = dirOf(e.clientX - touch.x, e.clientY - touch.y); touch = null; clearGhost();
+  if (d) { swipe(...d); return; }
+  // a tap: show that blob's colour on the wheel
+  const r = $("grid").getBoundingClientRect(), x = Math.floor((e.clientX - r.left) / r.width * N), y = Math.floor((e.clientY - r.top) / r.height * N);
+  const b = x >= 0 && y >= 0 && x < N && y < N && game.grid[y * N + x];
+  if (b) { drawWheel(b.h); G.note(`${HUES[b.h][0][0].toUpperCase() + HUES[b.h][0].slice(1)}: ✕ cancels it, • mix with it`, 3000); }
+  else drawWheel();
+});
+$("board").addEventListener("pointercancel", () => { touch = null; clearGhost(); });
+function showGhost(dx, dy) {
+  clearGhost();
+  const r = slide(game.grid, dx, dy), mark = {join: "=", mix: "+", cancel: "✕", burst: "✦"};
+  for (const f of r.fx) for (const i of f.kind === "line" ? f.cells : [f.at]) {
+    const g = document.createElement("div"); g.className = "ghost"; const [x, y] = xyOf(i);
+    g.style.left = x * 20 + "%"; g.style.top = y * 20 + "%"; g.innerHTML = `<span>${f.kind === "line" ? "★" : mark[f.kind]}</span>`;
+    $("grid").append(g);
+  }
+}
+function clearGhost() { $("grid").querySelectorAll(".ghost").forEach(g => g.remove()); }
+document.addEventListener("keydown", e => {
+  if (e.ctrlKey || e.metaKey || e.altKey || document.querySelector(".spot") || $("overlay").classList.contains("show")) return;
+  if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+  const k = {ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1]}[e.key]; if (!k) return;
+  e.preventDefault(); swipe(...k);
+});
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
+
+function undo() {
+  if (!playing() || !game.history.length) return;
+  game.undid = true;
+  Object.assign(game, JSON.parse(game.history.pop()));
+  draw(); save();
+}
+$("undoBtn").onclick = undo;
+$("restartBtn").onclick = () => {
+  if (!game || !game.history.length || busy) return;
+  game.undid = true;
+  game.history.push(JSON.stringify({grid: game.grid, drops: game.drops, nextId: game.nextId, cleared: game.cleared, swipes: game.swipes}));
+  Object.assign(game, JSON.parse(game.start), {cleared: 0, swipes: 0, lost: false});
+  G.closeCard(); draw(); save();
+  G.note("Back to the start of the level. Undo brings it back.", 3500);
+};
+
+/* ---------- hints ---------- */
+// Hint tries all four swipes and shows the best: the most paint cleared, then the most mixes, then the most room.
+const hints = G.hinter({game: () => game, key: () => game ? JSON.stringify(game.grid) : "", draw: () => paintHint()});
+function paintHint() {
+  $("grid").querySelectorAll(".slot.hintcell").forEach(s => s.classList.remove("hintcell"));
+  const m = hints.current(); if (!m) return;
+  for (const i of m.cells) { const s = $("grid").querySelector(`.slot[data-i="${i}"]`); if (s) s.classList.add("hintcell"); }
+}
+$("hintBtn").onclick = () => {
+  if (!playing()) return;
+  let best = null;
+  for (const [dx, dy, name] of [[-1, 0, "left"], [1, 0, "right"], [0, -1, "up"], [0, 1, "down"]]) {
+    const r = slide(game.grid, dx, dy); if (!changed(game.grid, r.grid)) continue;
+    const mixes = r.fx.filter(f => f.kind === "mix" || f.kind === "join").length, room = r.grid.filter(b => !b).length;
+    const score = r.cleared * 100 + mixes * 10 + room;
+    if (!best || score > best.score) best = {score, name, r};
+  }
+  if (!best) { G.note("No swipe moves anything.", 3000); return; }
+  game.hinted = true; save();
+  const cells = best.r.fx.flatMap(f => f.kind === "line" ? f.cells : [f.at]);
+  const why = best.r.cleared ? `it clears ${best.r.cleared}` : best.r.fx.length ? "the gold blobs mix" : "it makes room";
+  hints.show({cells}, `Swipe ${best.name}: ${why}.`);
+};
+
+/* ---------- endings ---------- */
+function win() {
+  game.won = true; G.finishClock(game); update(); save();
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save();
+  G.track(`Mew Hue won level ${game.level}`);
+  const gold = !game.undid && !game.hinted;
+  let text = `You cleared ${game.cleared} blobs of paint in ${game.swipes} swipes.`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  setTimeout(() => G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the cloth", game.result,
+    {title: "Splendid!", gold, goldWhy: "No hints or undos!", next: next > game.level ? `Next: level ${next}` : "Next cloth",
+     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")}), 400);
+}
+function lose() {
+  game.lost = true; G.breakStreak(); save();
+  G.track(`Mew Hue out of moves level ${game.level}`);
+  setTimeout(() => G.openCard("Out of room", `The cloth is full and nothing can bump. You cleared ${game.cleared} of ${levelSpec(game.level).goal}.`,
+    [["Undo", () => { G.closeCard(); game.lost = false; undo(); }, true], ["Restart", () => { G.closeCard(); $("restartBtn").onclick(); }], ["New cloth", () => { G.closeCard(); newGame(); }], G.homeBtn()]), 500);
+}
+
+/* ---------- new games ---------- */
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newGame(); }
+function newGame(seed = Math.floor(Math.random() * 2 ** 31)) {
+  game = deal(settings.level, seed); hints.clear(false);
+  draw(); drawWheel(); save();
+  G.track(`Mew Hue new cloth level ${settings.level}`);
+  helpOnFirstVisit();
+}
+$("linkBtn").onclick = () => { if (game) G.shareCard({name: "Mew Hue", won: game.won, what: "cloth", puzzle: () => ({g: "mewhue", N: game.level, s: game.seed})}); };
+function openShared(d) {
+  if (!(d.N >= 1 && d.N <= MAX_LEVEL) || !Number.isInteger(d.s)) { G.note("That share link didn't work.", 5000); return; }
+  settings.level = d.N; $("levelSel").value = d.N; newGame(d.s);
+}
+
+/* ---------- how to play ---------- */
+function showHelp() { settings.seen = false; helpOnFirstVisit(); if (!document.querySelector(".spot")) { settings.seen = true; G.helpLater(); } }
+function helpOnFirstVisit() {
+  if (!game || !playing() || settings.seen || document.querySelector(".spot")) return;
+  const all = [...Array(N * N).keys()].map(xyOf), turn = G.yourTurn(() => game, g => { game = g; }, () => { draw(); drawWheel(); });
+  let was = 0;
+  const steps = [
+    {say: "Swipe: every blob slides 🐈", lit: all},
+    {say: "Swipe any way", lit: all, ...turn.upTo, try: {done: () => game.swipes !== was}, enter() { turn.from.enter(); was = game.swipes; }},
+    {say: "Same colours join and grow", lit: all},
+    {say: "The halfway colour mixes", els: [$("wheel")]},
+    {say: "Opposites cancel out", els: [$("wheel")]},
+    {say: "Tap a blob to see its partners", lit: all, later: true},
+    {say: "Stuck? Hint shows a good swipe", els: [$("hintBtn")]},
+  ];
+  G.spotlight({grid: $("grid"), w: N, h: N, steps, done: () => { settings.seen = true; save(); }});
+}
+
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = () => { G.closeCard(); newGame(); };
+$("helpBtn").onclick = showHelp;
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+addEventListener("resize", () => { if (game) for (const [id, el] of blobEls) { const b = game.grid.find(x => x && x.id === id); if (b) dialOf(el, b); } });
+
+G.nav("mewhue");
+G.checkClock(game);
+G.setupTimer({name: "mewhue", game: () => game, playing: g => !g.won && !g.lost, save, label: n => `Level ${levelName(n)}`, noun: "level"});
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+drawWheel();
+const shared = G.readShare("mewhue");
+if (game) G.reopen(() => { if (!levelSpec(game.level) || game.grid.length !== N * N) throw new Error("the saved cloth doesn't fit"); draw(); helpOnFirstVisit(); },
+  why => { game = null; newGame(); G.note(why, 0); });
+else if (!shared) newGame();
+if (shared) G.offerShare(shared, {name: "Mew Hue", inProgress: !!(game && game.history.length && !game.won), open: openShared, after: helpOnFirstVisit, fresh: game ? null : why => { newGame(); G.note(why, 6000); }});
+window.addEventListener("hashchange", () => { const d = G.readShare("mewhue"); if (d) G.offerShare(d, {name: "Mew Hue", inProgress: !!(game && game.history.length && !game.won), open: openShared, after: helpOnFirstVisit}); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
