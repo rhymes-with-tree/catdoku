@@ -999,7 +999,7 @@ const G = (() => {
     }
     const redraw = () => k >= 0 && k < o.steps.length && show();
     function close() {
-      clearInterval(ticker); removeEventListener("resize", redraw); removeEventListener("scroll", redraw); document.removeEventListener("pointerup", tried, true);
+      clearInterval(ticker); removeEventListener("resize", redraw); removeEventListener("scroll", redraw); document.removeEventListener("pointerup", onUp, true);
       for (const ev of ["pointerdown", "click"]) window.removeEventListener(ev, guard, true);
       for (const f of new Set(o.steps.map(st => st.restore).filter(Boolean))) f();   // Your turn steps: the board as it was
       holes = []; layer.remove(); if (o.done) o.done();
@@ -1007,15 +1007,18 @@ const G = (() => {
     // Skip (or Escape): the walkthrough ends here, and counts as seen; How to play has it all again.
     function end() { const was = o.steps[k]; if (was && was.leave) was.leave(); k = o.steps.length; close(); }
     // after a tap on an interactive step's squares: once it's done, say so in green and go on
-    function tried() {
+    // (checked for a moment after each tap, as a move can finish after a short slide or animation)
+    function tried(n = 0) {
       setTimeout(() => {
         const st = o.steps[k];
-        if (!st || !st.try || st.tried || !st.try.done()) return;
+        if (!st || !st.try || st.tried) return;
+        if (!st.try.done()) { if (n < 15) tried(n + 1); return; }
         st.tried = true; st.tone = "ok"; if (st.try.yes) st.say = st.try.yes;
         show(); setTimeout(() => { if (o.steps[k] === st) next(); }, st.try.yes ? 1400 : 350);   // a quick step needs no pause
       }, 60);
     }
-    document.addEventListener("pointerup", tried, true);
+    const onUp = () => tried(0);
+    document.addEventListener("pointerup", onUp, true);
     function next(e) {
       if (e) { e.preventDefault(); e.stopPropagation(); }
       const was = o.steps[k]; if (was && was.leave) was.leave();
