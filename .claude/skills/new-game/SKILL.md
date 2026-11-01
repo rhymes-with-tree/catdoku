@@ -143,6 +143,10 @@ in its notes.
     on). Save the game in `enter` and put it back in `leave` exactly as it was (clock, lives, undo and all), so nothing
     is given away or lost (see Catdoku's "Your turn" step).
   - **Optional:** every walkthrough has Skip and a row of dots (shared); don't add your own.
+  - **Switches:** a step pointing at an on/off switch in `.toggles` (Auto check…) is never in the walkthrough;
+    `G.spotlight` keeps it and shows it once, the first time the switch is turned on. Write it for that moment
+    ("Auto grade: a wrong 🐱 costs a life").
+  - **Bookmark** (`G.guesser`, ids `guessBtn` and `backBtn`) is labelled Bookmark and Back to bookmark, never Guess.
   - **Few words around it too:** "Tap to go on" shows on the first step only, and an interactive step needs no
     extra line (its `tip` is optional); let the lit squares and the dots do the talking. It must work at any point in an unfinished puzzle:
   a step that changes the board for show (`enter`/`leave`) puts back exactly what was there, and once

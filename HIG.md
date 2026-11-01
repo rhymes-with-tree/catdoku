@@ -11,7 +11,7 @@ the reason they don't apply.
 
 ### Design principles
 - ✅ **Purpose, simplicity, delight:** one game per page, the board first, cats and gold paws for delight.
-- ✅ **Agency: help people recover from mistakes:** Undo (and Ctrl/⌘Z), Restart, Undo guess, revives.
+- ✅ **Agency: help people recover from mistakes:** Undo (and Ctrl/⌘Z), Restart, Back to bookmark (once called Undo guess), revives.
 - ✅ **Familiarity: provide clear feedback:** message line, red/green marks, win cards.
 - ✅ **Flexibility: preserve a person's context:** every game saves progress and reopens it.
 - ✅ **Flexibility: a variety of input methods:** touch, mouse and keyboard in every game.
@@ -69,7 +69,7 @@ the reason they don't apply.
 
 ### Color
 - ✅ **Don't use the same colour to mean different things:** gold for a hint or a gold paw, red for a mistake, green
-  for done, violet for a guess.
+  for done, violet for a bookmarked try.
 - 🔧 **Colours work in light, dark and increased contrast.**
 - ✅ **Avoid relying on colour alone.**
 
@@ -114,6 +114,8 @@ the reason they don't apply.
 - 🔧 **Teach through interactivity:** a walkthrough step can now wait for the player to do it on the real board
   (`try` in `G.spotlight`). Catdoku has the first two: tap twice for a cat, then drag for paws; the board goes back as it was.
   ❌ The other 46 games still teach by showing; each needs its own interactive step (see "Still to do").
+- 🔧 **Switches are taught when they're used:** Auto grade, Auto check and the like aren't in the walkthrough; each says what it does, once, the first time it's turned on.
+- 🔧 **Use concepts that people know** (Design principles: familiarity): Guess is now Bookmark, and Undo guess is Back to bookmark.
 - 🔧 **Context-specific tips instead of one flow:** on a first visit, steps that only point at a tool or a setting are
   kept back and come later as one-off tips: the Hint tip after 45 seconds without a move, the others a few seconds after
   the first move of a visit, at most one a day.
