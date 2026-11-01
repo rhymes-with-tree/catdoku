@@ -287,9 +287,11 @@ carry over if the site ever became an app:
   `maximum-scale` or `user-scalable=no`). Nothing smaller than 11 pixels. `--ts` goes up to 1.6, so check the page at
   that size.
 - **Contrast:** at least 4.5 to 1 for words and 3 to 1 for icons and the lines that matter, in light and dark.
-- **VoiceOver:** every button has words or an `aria-label` (an icon alone needs a label), the board has a role and a
-  label (`role="grid"` with each square labelled, as in `catdoku/`, or `aria-label` on an SVG board), and the message
-  line is `aria-live="polite"`.
+- **VoiceOver:** every button has words or an `aria-label` (an icon alone needs a label), and the message line is
+  `aria-live="polite"`. A board of HTML squares labels each one (`role="grid"`, as in `catdoku/`); a board drawn as one
+  picture (SVG or canvas) is described in words with `G.describe(el, text)` after every draw (`queueMicrotask(say)` at
+  the top of `draw`, or every half second for one drawn each frame): what's where (`G.at(i, W)` for "row 2, column 3",
+  `G.listed` for lists), the square picked, and which keys play it (see `highperch/`, `tangle/`, `pounce/`).
 - **Motion:** reduce motion turns animations off (`games.css`); nothing a player needs may only show while moving
   (step 3, "Hints"), and nothing a player needs to read may go away on a timer (hints stay until the board changes).
 - **Increase Contrast:** `games.css` strengthens `--ink-soft` and `--line` under `prefers-contrast: more`; colours of
