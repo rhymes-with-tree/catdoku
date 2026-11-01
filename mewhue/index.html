@@ -286,15 +286,18 @@ function slideMove(ax, l, back) {
     game.grid = after; draw(); busy = true;
     r.merged.forEach(i => blocks[i] && blocks[i].classList.add("pop"));
     const made = r.merged.map(i => after[i]);
-    if (r.vanish.length) G.note("Black wipes them both out!", 2000);
+    if (game.demo) {}   // the walkthrough says it
+    else if (r.vanish.length) G.note("Black wipes them both out!", 2000);
     else if (made.includes(6)) G.note("All three marks: it's set into stone!", 2200);
     else { const mix = made.find(c => c % 2); if (mix != null) G.note(`${Cap(COLOURS[mix].name)}: two marks, so it's full now.`, 2000); }
     const cleared = after.slice(), c = clearLines(cleared);
     const finish = () => {
       game.grid = cleared; game.moves++;
+      // a walkthrough demo: show what happened, nothing more (no new block, no lines counted)
+      if (game.demo) { busy = false; draw(); return; }
       const counted = c.lines.filter(x => !spec.stone || x.c === 6).length;
       game.lines += counted;
-      if (c.lines.length) { G.note(c.lines.length > 1 ? `${c.lines.length} lines at once!` : c.lines[0].c === 6 ? "A line of stone!" : "A whole line!", 2000); }
+      if (c.lines.length && !game.demo) { G.note(c.lines.length > 1 ? `${c.lines.length} lines at once!` : c.lines[0].c === 6 ? "A line of stone!" : "A whole line!", 2000); }
       if (spec.stone && c.lines.length && !counted) G.note("This level only counts lines of stone.", 2500);
       if (game.lines >= spec.goal) { busy = false; draw(); win(); return; }
       const i = drop(game);
@@ -432,25 +435,37 @@ function openShared(d) {
 /* ---------- how to play ---------- */
 // The first board gets the whole walkthrough; each later level, the first time, a step for what's new.
 function showHelp() { if (game) { settings.seen = {}; helpOnFirstVisit(true); } }
+// The walkthrough shows each rule by doing it: a step sets out a few blocks on an empty board and you make the
+// slide, then it says what happened. G.yourTurn puts your own board back afterwards, exactly as it was. The first
+// board gets a mix and a line; each later level, the first time, a demo of what's new on it.
 function helpOnFirstVisit(all) {
   if (!game || !playing() || document.querySelector(".spot")) return;
   const n = game.level, first = all || !Object.keys(settings.seen).length;
   if (settings.seen[n] && !all) return;
-  // a row that can slide, for the your-turn step, and which way
-  const cells = [...Array(N * N).keys()].map(xyOf), can = slides(game.grid).find(([ax]) => ax === 0) || [0, 2, false];
-  const row = cells.filter(([, y]) => y === can[1]), way = can[2] ? "left" : "right";
   const turn = G.yourTurn(() => game, g => { game = g; }, draw);
+  const PAIRS = [[0, 2, 1], [0, 4, 5], [2, 4, 3]], COMP = {0: 3, 2: 5, 4: 1};
+  const name = c => Cap(COLOURS[c].name), row2 = [10, 11, 12, 13, 14].map(xyOf), col4 = [4, 9, 14, 19, 24].map(xyOf);
   let was = 0;
-    const newSay = {1: "Two marks mix into one block", 2: "A new mark joins in", 3: "Ready-made mixes are full", 4: "These two never mix", 5: "A mark meets the mix without it: stone", 6: "All three marks at once", 7: "Black wipes out what it hits"}[n];
-  const steps = first ? [
-    {say: "Each colour has a mark 🐈", els: [$("rules")]},
-    {say: `Drag this row ${way}`, lit: row, ...turn.upTo, try: {done: () => game.moves !== was}, enter() { turn.from.enter(); was = game.moves; }},
-    ...(n > 1 ? [{say: newSay, els: [$("rules")]}] : [{say: newSay, els: [$("rules")]}]),
-    {say: "A mix holds two marks: it's full", els: [$("rules")], later: n < 2},
-    {say: "Line up one kind to clear it", lit: cells.filter(([x]) => x === 0), tone: "ok"},
-    {say: "Mix it up shuffles the board", els: [$("shuffleBtn")]},
-    {say: "Stuck? Hint shows a good slide", els: [$("hintBtn")]},
-  ] : [{say: `New: ${newSay.toLowerCase()}`, els: [$("rules")]}, ...(n === 7 ? [{say: "White takes the colour it slides to", els: [$("rules")]}, {say: "Black and white make stone", els: [$("rules")]}] : [])];
+  // a demo: blocks set out ([square, colour]…), the squares to light, what to do, and what you see after
+  const demo = (say, put, lit, yes) => ({say, lit, ...turn.from, try: {done: () => game.moves !== was, yes},
+    enter() { turn.from.enter(); const g = new Array(N * N).fill(-1); for (const [i, c] of put) g[i] = c; Object.assign(game, {grid: g, demo: true}); was = game.moves; hints.clear(false); draw(); }});
+  // slide a row left: a on the left, b further along, so b slides up to a
+  const meet = (a, b, yes) => demo("Drag this row left", [[10, a], [13, b]], row2, yes);
+  const pair = k => PAIRS[game.order[k]];
+  const [a1, b1, m1] = pair(0);
+  const steps = [];
+  if (first) steps.push(meet(a1, b1, `${name(m1)}! Both marks in one`),
+    // four in a row, and a fifth pushed up the last column, stopping under two mixes that won't take it
+    demo("Drag this column up", [[10, a1], [11, a1], [12, a1], [13, a1], [4, m1], [9, m1], [24, a1]], col4, "A whole line clears!"));
+  const sp = boardColours(n, game.seed, game.order);
+  if (n === 2) { const [a, b, m] = pair(1); steps.push(meet(a, b, `${name(m)}! A new mark joins in`)); }
+  if (n === 3) { const [a, , m] = pair(2); steps.push(meet(m, a, `${name(m)} is full: it stays put`)); }
+  if (n === 4) { const [s1, s2] = sp.key.map(b => b[0]); steps.push(meet(s1, s2, "Two mixes never mix")); }
+  if (n === 5) { const [p, , q] = sp.key[0]; steps.push(meet(p, q, "Stone! It never moves")); }
+  if (n === 7) steps.push(meet(0, 7, "Black wipes them both out"), meet(0, 8, "White copies the colour"), meet(8, 7, "White and black make stone"));
+  if (!steps.length) { settings.seen[n] = true; save(); return; }
+  steps[steps.length - 1].leave = turn.upTo.leave;   // put the real board back after the last demo
+  if (first) steps.push({say: "Mix it up shuffles the board", els: [$("shuffleBtn")]}, {say: "Stuck? Hint shows a good slide", els: [$("hintBtn")]});
   G.spotlight({grid: $("grid"), w: N, h: N, steps, finish: first ? undefined : false, done: () => { settings.seen[n] = true; if (first) for (let k = 1; k <= n; k++) settings.seen[k] = true; save(); }});
 }
 
