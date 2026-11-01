@@ -72,6 +72,23 @@ const G = (() => {
   const SHELF_COLOUR = {logic: "#BD5538", numbers: "#ECA818", lines: "#73A7AE", words: "#B94588", teasers: "#7885BA", quick: "#6AA673", travels: "#4E577D"};
   const $ = id => document.getElementById(id);
 
+  /* ---------- text size ---------- */
+  // On an iPhone or iPad, the text follows the size set in Settings (Display & Brightness, Text Size, and
+  // Accessibility's Larger Text), as Apple's apps do: games.css multiplies its text sizes by --ts. The system's body
+  // text is 17 points at the standard setting, so --ts is how far it is from that, kept within reason (from a little
+  // smaller to a third bigger) so the boards and buttons still fit. Elsewhere, the browser's own zoom does this.
+  function textSize() {
+    if (!(window.CSS && CSS.supports("font", "-apple-system-body"))) return;
+    const probe = document.createElement("span");
+    probe.style.cssText = "font:-apple-system-body;position:absolute;visibility:hidden";
+    document.body.append(probe);
+    const px = parseFloat(getComputedStyle(probe).fontSize) || 17;
+    probe.remove();
+    document.documentElement.style.setProperty("--ts", Math.min(1.33, Math.max(0.88, px / 17)).toFixed(3));
+  }
+  if (document.body) textSize(); else document.addEventListener("DOMContentLoaded", textSize);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) textSize(); });
+
   /* ---------- the daily challenge ---------- */
   // One game a day is today's challenge, the same game for everyone on a given date: win any puzzle in it that
   // day (in Pawlette, clear 3 lines in one Swipe game) to do it. The games come round in cycles: the first, from
@@ -457,14 +474,14 @@ const G = (() => {
     .timer{background:none;border:none;border-radius:8px;padding:0 6px;font:inherit;font-weight:600;color:var(--ink-soft);font-variant-numeric:tabular-nums;cursor:pointer;white-space:nowrap}
     .timer:hover{background:none;color:var(--ink)}
     .card .goldpaw{width:84px;height:84px;margin:0 auto 10px;display:block}
-    .card p.goldwhy{margin:-4px 0 12px;font-weight:800;color:#B07A10}
+    .card p.goldwhy{margin:-4px 0 12px;font-weight:800;color:var(--gold-text)}
     .card .timeline{font-weight:800;color:var(--ink);margin:0 0 12px}
     .bests{width:100%;border-collapse:collapse;margin:0 0 14px;font-variant-numeric:tabular-nums;color:var(--ink)}
     .bests th,.bests td{padding:4px 6px;text-align:left;border-bottom:1px solid var(--line)}
-    .bests th{font-size:13px;color:var(--ink-soft);font-weight:600}
+    .bests th{font-size:calc(13px*var(--ts));color:var(--ink-soft);font-weight:600}
     .bests td.num,.bests th.num{text-align:right}
     .bests tr.now td{font-weight:800}
-    .card h3{margin:4px 0 6px;font-size:18px}
+    .card h3{margin:4px 0 6px;font-size:calc(18px*var(--ts))}
     .spot{position:fixed;inset:0;z-index:9;cursor:pointer;animation:spotIn .35s ease-out;-webkit-tap-highlight-color:transparent;touch-action:none}
     .spot:focus{outline:none}
     .spot svg{position:absolute;inset:0;display:block}
@@ -637,7 +654,7 @@ const G = (() => {
     try { await navigator.clipboard.writeText(all); done(o.btn ? "Copied! Paste it into a message." : "Copied. Paste it into a message."); return; } catch (e) {}
     // No share sheet and no clipboard: a box to copy from, under the button (or on a card of its own)
     const box = document.createElement("textarea"); box.value = all; box.readOnly = true; box.rows = 3;
-    box.style.cssText = "width:100%;font:inherit;font-size:13px;margin:0;border:2px solid var(--line);border-radius:8px;padding:6px";
+    box.style.cssText = "width:100%;font:inherit;font-size:calc(13px*var(--ts));margin:0;border:2px solid var(--line);border-radius:8px;padding:6px";
     if (o.btn) { if (!o.btn.nextElementSibling || o.btn.nextElementSibling.tagName !== "TEXTAREA") o.btn.after(box); else o.btn.nextElementSibling.select(); }
     else openCard("Copy this", "Select it and copy it into a message.", [["Done", closeCard, true]], box);
     box.focus(); box.select();

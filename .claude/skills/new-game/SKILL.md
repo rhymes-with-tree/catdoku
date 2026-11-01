@@ -40,7 +40,9 @@ Look for art the site already has before drawing anything new, and say what you'
 - **Colours:** use the site's palette for anything new: the colours in `games.css` (`:root`, and the seven in
   `--gradient`: brick, coral, gold, lime, sage, pacific blue and plum, plus periwinkle, spring blue and
   lavender), or tints and shades of them (`color-mix` with white or ink). `colorways.js` and the toys are
-  drawn from it too. Don't bring in new hues; a soft or pastel version is a tint of a palette colour.
+  drawn from it too. Don't bring in new hues; a soft or pastel version is a tint of a palette colour. For anything
+  outside the board (status line, trays, labels), use the variables (`--ink`, `--ink-soft`, `--panel`, `--paper`,
+  `--line`, `--star`, `--gold-text`, `--bad-text`) rather than hex, so it follows Dark Mode (step 3, "Apple's guidelines").
 - **Other games' pages:** drawings that live in one page, such as Night Light's cat heads, Open the Door!'s
   running cat, Tunnel Run's tunnels or Knock It Off's table things. When a new game wants one, move it into a
   shared file (as `cattower.js` was) and point both games at it, rather than copying it.
@@ -243,6 +245,34 @@ and anything drawn on or around it (often `.wrap`). The rest of `main` becomes t
 - **Full screen** keeps its own layout: the shared rule only applies without `body.full`.
 - A page whose board can't be one box of `main` lays it out itself in the same way (see `keyboardcat/`).
 
+### Apple's guidelines
+
+The site is a web app today, played in Safari or from the home screen, and it follows Apple's Human Interface
+Guidelines where they fit a web page (README, "Across every game"). Keep a new game in line with them, so it would
+carry over if the site ever became an app:
+
+- **Touch targets: 44 × 44 points at least** for every control a finger uses. The shared buttons, pickers, stars and
+  timer already are (`games.css`, "Touch targets"). A game's own controls (a number pad, a turn button, a tray of
+  pieces) are 44 tall, or get an invisible 44-point square with the `hit44` class or an `::after` of their own
+  (`catpile/`'s `.turnBtn`). Squares on the board at the biggest level may be smaller where the genre needs it (a
+  14 × 14 Catdoku); say what size they come out on an iPhone SE when you report.
+- **Dark Mode.** `games.css` has a dark set of colours. Boards keep the light set: `.board`, `.wrap` and `.stage` get it
+  back, so a board drawn against the light colours looks the same either way. Everything else follows the dark set,
+  and so do cards, wherever they sit. So outside the board use the variables, never hex, for words and backgrounds
+  (a red word is `var(--bad-text)`, a gold one `var(--gold-text)`). Part of the board drawn in lines straight on the
+  page with nothing behind it (Toe Beans' paw) takes the class `darkOk` to follow the dark set too. A colour that
+  must stay dark in both (writing on a gold paw) is `#2A2530`, not `var(--ink)`.
+- **Text size.** Text sizes in shared CSS are `calc(<n>px*var(--ts))`, so they follow the iPhone's text size setting
+  (`textSize` in `games.js` sets `--ts`). In a game's own CSS, scale words outside the board the same way (status
+  lines, a word list, a clue); leave the board's own lettering as it is. Never stop pinch to zoom (no
+  `maximum-scale` or `user-scalable=no`). Nothing smaller than 11 pixels.
+- **Contrast:** at least 4.5 to 1 for words and 3 to 1 for icons and the lines that matter, in light and dark.
+- **VoiceOver:** every button has words or an `aria-label` (an icon alone needs a label), the board has a role and a
+  label (`role="grid"` with each square labelled, as in `catdoku/`, or `aria-label` on an SVG board), and the message
+  line is `aria-live="polite"`.
+- **Motion:** reduce motion turns animations off (`games.css`); nothing a player needs may only show while moving
+  (step 3, "Hints").
+
 ### Lives
 
 Most games have none. A game that does follows Catdoku, Twirl and Toydoku: three hearts drawn as `♥` in
@@ -316,6 +346,13 @@ SE, 320 × 460, as well as a laptop at 1280 × 720. Load Playwright with
 - every losing card has Back to the front page;
 - a game with a Next preview: over a run of drops, Next never shows the piece in play, and each piece that comes
   in is the one Next showed just before;
+- Apple's guidelines (step 3): every control outside the board is at least 44 × 44 to a finger (probe 21 pixels each
+  side of its centre with `document.elementFromPoint` on a viewport tall enough to show the whole page); with
+  `colorScheme: "dark"` on the context, take screenshots and look at them, and check every word against what's behind
+  it (at least 4.5 to 1, worked out from the computed colours), the cards included; light mode is unchanged; with
+  `--ts` set to 1.33 on the page (`document.documentElement.style.setProperty("--ts", "1.33")`, as the largest text
+  setting would), nothing runs off the side at 320 × 460 or sideways at 667 × 323; and each button, the board and its
+  squares read out sensibly (their `aria-label`s or words);
 - no page errors (failed loads of fonts, GoatCounter and cat photos are expected offline);
 - the front page shows the new tile and icon;
 - any game whose drawings moved to a shared file still draws and plays them;
