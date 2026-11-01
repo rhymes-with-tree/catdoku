@@ -131,8 +131,8 @@ in its notes.
   before using it. A puzzle opened with progress isn't timed (`game.timed = false`).
 - **How to play:** a first-visit walkthrough with `G.spotlight({grid, w, h, steps, done})`, and the How
   to play button plays it again. There's no rules card, so every rule, control and tip goes in a step,
-  ending with "Stuck? Hint …" pointing at `hintBtn`. Keep it succinct: one short line per step (a few
-  words, under about ten), one idea each, and only the steps a new player needs; leave out anything
+  ending with "Stuck? Hint …" pointing at `hintBtn`. Keep it succinct: one short line per step (six
+  words or fewer, like "One 🐱 in every row" or "Tap twice for a 🐱"), one idea each, and only the steps a new player needs; leave out anything
   the board already makes obvious. Follow Apple's onboarding guidance (`HIG.md`, "Onboarding"):
   - **Brief:** the first visit at most about six steps. `G.spotlight` keeps back, on a first visit, every step that only
     points at a button or setting in `.actions`, `.bar` or `.toggles` (by id, or an id inside it) and shows each later
@@ -142,7 +142,9 @@ in its notes.
     on a step with `lit` squares (only they take taps; it waits until `done()` is true, then says `yes` in green and goes
     on). Save the game in `enter` and put it back in `leave` exactly as it was (clock, lives, undo and all), so nothing
     is given away or lost (see Catdoku's "Your turn" step).
-  - **Optional:** every walkthrough has Skip and a row of dots (shared); don't add your own. It must work at any point in an unfinished puzzle:
+  - **Optional:** every walkthrough has Skip and a row of dots (shared); don't add your own.
+  - **Few words around it too:** "Tap to go on" shows on the first step only, and an interactive step needs no
+    extra line (its `tip` is optional); let the lit squares and the dots do the talking. It must work at any point in an unfinished puzzle:
   a step that changes the board for show (`enter`/`leave`) puts back exactly what was there, and once
   the player has started, steps point at their own pieces rather than revealing part of the answer
   (see `copycat/` and `unravel/`). If something is still moving or loading, wait and try again rather

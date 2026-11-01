@@ -112,7 +112,7 @@ the reason they don't apply.
 
 ### Onboarding (and Offering help)
 - 🔧 **Teach through interactivity:** a walkthrough step can now wait for the player to do it on the real board
-  (`try` in `G.spotlight`). Catdoku has the first one: tap the middle square twice for a cat; the board goes back as it was.
+  (`try` in `G.spotlight`). Catdoku has the first two: tap twice for a cat, then drag for paws; the board goes back as it was.
   ❌ The other 46 games still teach by showing; each needs its own interactive step (see "Still to do").
 - 🔧 **Context-specific tips instead of one flow:** on a first visit, steps that only point at a tool or a setting are
   kept back and come later as one-off tips: the Hint tip after 45 seconds without a move, the others a few seconds after
