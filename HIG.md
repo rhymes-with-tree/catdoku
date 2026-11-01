@@ -113,7 +113,7 @@ the reason they don't apply.
 ### Onboarding (and Offering help)
 - 🔧 **Teach through interactivity:** a walkthrough step can now wait for the player to do it on the real board
   (`try` in `G.spotlight`). Catdoku has the first two: tap twice for a cat, then drag for paws; the board goes back as it was.
-  ❌ The other 46 games still teach by showing; each needs its own interactive step (see "Still to do").
+  🔧 Now every game but the action games, Cat Burglar and Catlas has one (README, How to play).
 - 🔧 **Switches are taught when they're used:** Auto grade, Auto check and the like aren't in the walkthrough; each says what it does, once, the first time it's turned on.
 - 🔧 **Use concepts that people know** (Design principles: familiarity): Guess is now Bookmark, and Undo guess is Back to bookmark.
 - 🔧 **Context-specific tips instead of one flow:** on a first visit, steps that only point at a tool or a setting are
@@ -200,8 +200,7 @@ snippets, status bars, text views, web views, right-to-left, SF Symbols, materia
 
 ## Still to do
 
-1. **An interactive step for every game,** like Catdoku's: one move the player makes on the real board in the first
-   few steps, put back afterwards. Each game needs its own (which square, what counts as done).
+1. ✅ ~~An interactive step for every game~~: done, except the action games, Cat Burglar and Catlas.
 2. **Shorter first visits** for Bubbles, Stash, Catwalk, Fish Bones, Patches, Pawlette and Toydoku: fold steps
    together, or move rules that only matter later into tips.
 3. **VoiceOver on every board:** squares and pieces labelled, the way Catdoku's are.

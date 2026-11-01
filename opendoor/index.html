@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-01.5"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-01.7"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-01.5">
+<link rel="stylesheet" href="../games.css?v=2026-11-01.7">
 <style>
 /* A KenKen house: every row and column holds 1 to N once, and walls split the floor into rooms whose numbers
    must make the room's sign. Each room has a door that opens when the room is right; with every door open,
@@ -105,7 +105,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-01.5"></script>
+<script src="../games.js?v=2026-11-01.7"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N grid where every row and column holds 1 to N once, cut into rooms (cages). Each room has a sign:
@@ -617,23 +617,29 @@ function helpOnFirstVisit() {
   // a − or ÷ room, to say the order doesn't matter, and a bent room (not all in one line), where a number can repeat
   const extra = [], one = plan.rooms.find(r => r.cells.length === 1), diff = plan.rooms.find(r => r.op === "-" || r.op === "/");
   if (one) extra.push({say: `A one-square room is its number: ${one.t}`, lit: one.cells.map(xy), outline: [one.cells.map(xy)]});
-  if (diff) extra.push({say: `${diff.t}${OPS[diff.op]}: bigger ${diff.op === "-" ? "minus" : "divided by"} smaller`, lit: diff.cells.map(xy), outline: [diff.cells.map(xy)]});
+  if (diff) extra.push({later: true, say: `${diff.t}${OPS[diff.op]}: bigger ${diff.op === "-" ? "minus" : "divided by"} smaller`, lit: diff.cells.map(xy), outline: [diff.cells.map(xy)]});
   const bent = plan.rooms.find(r => new Set(r.cells.map(i => i % N)).size > 1 && new Set(r.cells.map(i => Math.floor(i / N))).size > 1);
-  if (bent) extra.push({say: "Rooms can repeat, rows can't", lit: bent.cells.map(xy), outline: [bent.cells.map(xy)]});
+  if (bent) extra.push({later: true, say: "Rooms can repeat, rows can't", lit: bent.cells.map(xy), outline: [bent.cells.map(xy)]});
+  const e = [...Array(N * N).keys()].filter(i => !game.grid[i]).sort((a, b) => Math.hypot(a % N - (N - 1) / 2, Math.floor(a / N) - (N - 1) / 2) - Math.hypot(b % N - (N - 1) / 2, Math.floor(b / N) - (N - 1) / 2))[0], turn = G.yourTurn(() => game, g => { game = g; }, () => { sel = -1; draw(); });
   const steps = [
-    {say: `Fill every square with a number from 1 to ${N}`, lit: all},
+    {say: `A number from 1 to ${N} in every square`, lit: all},
     {say: "Each number once per row", lit: row(Math.floor(N / 2))},
     {say: "So does every column", lit: col(Math.floor(N / 2))},
     {say: `This room must ${what} ${room.t}`, lit, outline: [lit]},
     ...extra,
     {say: "A right room opens its door 🚪", lit, outline: [lit], tone: "ok", enter: () => { forceOpen = k; draw(); }, leave: () => { forceOpen = -1; draw(); }},
     {say: "Open every door 😴", lit: all, tone: "ok"},
-    {say: "Tap a square, then a number", els: [$("pad")]},
+    // Your turn: put a number in on the real board (G.yourTurn takes it out again afterwards)
+    ...(e === undefined ? [{say: "Tap a square, then a number", els: [$("pad")]}] : [
+      {say: "Tap this square", lit: [xy(e)], try: {done: () => sel === e}, ...turn.from},
+      {say: "Now pick a number", els: [$("pad")], try: {done: () => game.grid[e] > 0, yes: "In it goes!"}, ...turn.upTo}]),
     {say: "Notes for maybes", els: [$("notesBtn")]},
     {say: "All notes fills in every maybe", els: [$("allNotesBtn")]},
     {say: "Not sure? Bookmark, then try an idea. Back to bookmark undoes it", els: [$("guessBtn")]},
     {say: "Stuck? Hint fixes or gives a number", els: [$("hintBtn")]},
   ];
+  // the Your turn steps come early: doing comes before the rest of the rules
+  { const t = steps.findIndex(st => st.try); if (t > 1) steps.splice(1, 0, ...steps.splice(t, 2)); }
   G.spotlight({grid: $("cells"), w: N, h: N, steps, done: () => { settings.seenHelp = true; save(); }});
 }
 

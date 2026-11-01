@@ -140,8 +140,11 @@ in its notes.
     with an id. The board and its rules make up the first visit.
   - **Interactive:** one step, early on, where the player does the main move on the real board: `try: {done, yes, tip}`
     on a step with `lit` squares (only they take taps; it waits until `done()` is true, then says `yes` in green and goes
-    on). Save the game in `enter` and put it back in `leave` exactly as it was (clock, lives, undo and all), so nothing
-    is given away or lost (see Catdoku's "Your turn" step).
+    on). Use `G.yourTurn(() => game, g => { game = g; }, redraw)`: `...turn.from` on each step of a run of them and
+    `...turn.upTo` on the last, and the game goes back exactly as it was (clock, lives, undo and all), so nothing is
+    given away or lost; a first move that gives nothing away (the first, always-safe box) may be kept instead. Mark
+    rarer rules and gold-paw details `later: true` (How to play only). If a game's input ignores taps while a `.spot`
+    is up, let `.spot.trying` through (see `keyboardcat/`).
   - **Optional:** every walkthrough has Skip and a row of dots (shared); don't add your own.
   - **Switches:** a step pointing at an on/off switch in `.toggles` (Auto check…) is never in the walkthrough;
     `G.spotlight` keeps it and shows it once, the first time the switch is turned on. Write it for that moment
