@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-01.11"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-01.12"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,18 +25,18 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-01.11">
+<link rel="stylesheet" href="../games.css?v=2026-11-01.12">
 <style>
 /* A picture of a cat on a patchwork quilt, cut into squares and shuffled. Slide pieces into the gap, shift whole
    rows and columns round, or turn blocks of four, until the picture's back together. */
-.shuf{--pad:0%;background:#DCD3C2;border:3px solid var(--ink);border-radius:10px;overflow:hidden;
+.shuf{--pad:0%;background:color-mix(in srgb,#2A2530 14%,#F7F8F3);border:3px solid var(--ink);border-radius:10px;overflow:hidden;
   touch-action:manipulation;user-select:none;-webkit-user-select:none}
 .shuf.shift{touch-action:none}
 .shuf .grid{position:absolute;inset:var(--pad);outline:none}
 .tile{position:absolute;left:0;top:0;background-repeat:no-repeat;cursor:pointer;
   box-shadow:inset 0 0 0 1px rgba(247,248,243,.85);transition:transform .14s ease-out,box-shadow .5s,opacity .5s}
 .tile.gap{opacity:0;pointer-events:none}
-.tile .num{position:absolute;left:4%;top:4%;min-width:1.5em;padding:0 .25em;border-radius:999px;background:rgba(247,248,243,.88);
+.tile .num{position:absolute;left:50%;bottom:5%;transform:translateX(-50%);min-width:1.5em;padding:0 .25em;border-radius:999px;background:rgba(247,248,243,.88);
   color:#2A2530;font:700 clamp(11px,3.4vw,15px)/1.45 "Baloo 2",system-ui,sans-serif;text-align:center;pointer-events:none;display:none}
 .shuf.numbers .tile .num{display:block}
 /* once it's back together, the lines between the pieces fade, and Slide's missing piece comes back */
@@ -83,22 +83,17 @@
     <button id="helpBtn">How to play</button>
   </div>
   <div class="bar">
-    <label>Size <select id="size" aria-label="Size"><option value="3">3 × 3</option><option value="4">4 × 4</option><option value="5">5 × 5</option></select></label>
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
     <button id="newBtn" class="primary">New picture</button>
   </div>
   <div class="bar toggles">
-    <div class="opt"><label>Moves
-      <select id="modeSel" aria-label="How the pieces move">
-        <option value="0">Slide</option><option value="1">Shift</option><option value="2">Turn</option>
-      </select>
-    </label><span class="hint">Slide into the gap, shift rows round, or turn fours</span></div>
     <div class="opt"><label class="toggle"><input type="checkbox" id="numTgl"><span class="sw"></span>Numbers</label><span class="hint">Number each piece by where it goes</span></div>
   </div>
 
 </main>
 
-<script src="../games.js?v=2026-11-01.11"></script>
-<script src="../colorways.js?v=2026-11-01.11"></script>
+<script src="../games.js?v=2026-11-01.12"></script>
+<script src="../colorways.js?v=2026-11-01.12"></script>
 <script>
 /* ---------- the pieces and their moves (plain functions, also run in a background worker) ---------- */
 // The picture is cut into N × N pieces, numbered by where they belong (0 top left, row by row). pos[i] is the
@@ -159,8 +154,10 @@ function makeMix(mode, N) {
   if (trail.length < L || out < Math.ceil(N * N * 2 / 3)) return null;
   return trail;
 }
+// Levels: 3 × 3 to slide, turn and shift, then 4 × 4 the same, then 5 × 5.
+function levelSpec(n) { return {mode: [0, 2, 1][(n - 1) % 3], N: 3 + Math.floor((n - 1) / 3)}; }
 function makePuzzle(level) {
-  const mode = Math.floor(level / 10), N = level % 10;
+  const {mode, N} = levelSpec(level);
   const trail = makeMix(mode, N);
   if (!trail) return null;
   return {mode, N, trail, seed: Math.floor(Math.random() * 2 ** 31)};
@@ -269,7 +266,7 @@ function hintPlan(o) {
 }
 
 /* ---------- game state ---------- */
-// game: {level (mode * 10 + N, what best times are kept by), mode, N, trail (the moves that mixed the picture),
+// game: {level (1–9, levelSpec), mode, N, trail (the moves that mixed the picture),
 //        seed and way (the quilt), cat, pos (which piece is on each square), start (pos as dealt),
 //        history (each a list of moves, or {pos} for a Restart), won, hinted, undid, clock…}
 const STORE = "catdoku.catshuffle.v1", $ = G.$;
@@ -281,12 +278,13 @@ const catSrc = f => (window.CAT_SRC || {})[f] || `../cats/${f}.webp`;
 // The quilt's colours: Yarn's blends and variegated colourways (colorways.js)
 const WAYS = [...Object.values(BLENDS), ...Object.values(VARIEGATED)];
 let state = G.load(STORE);
-let settings = Object.assign({N: 3, mode: 0, numbers: false, seen: {}}, state.settings);
+let settings = Object.assign({level: 1, numbers: false, seen: {}}, state.settings);
 let game = state.game || null, busy = false, hinting = false, plan = null;
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !busy && !$("overlay").classList.contains("show");
-const levelName = n => `${MODES[Math.floor(n / 10)]} ${n % 10} × ${n % 10}`;
-const build = G.builder([moveCount, undoOf, applyMove, solvedPos, isSolved, mixLength, makeMix, makePuzzle], "makePuzzle");
+const MAX_LEVEL = 9;
+const levelName = n => { const {mode, N} = levelSpec(n); return `${n} · ${MODES[mode]} ${N} × ${N}`; };
+const build = G.builder([moveCount, undoOf, applyMove, solvedPos, isSolved, mixLength, makeMix, levelSpec, makePuzzle], "makePuzzle");
 const hintWork = G.builder([moveCount, undoOf, applyMove, solvedPos, isSolved, slideSolve, wayBack, hintPlan], "hintPlan");
 const GAP = () => game.N * game.N - 1;
 const who = cat => { const n = cat.split("-")[0]; return n === "bugsy" && cat.includes("bowtie") ? "Bugsy and Bowtie" : /^c\d/.test(n) ? "" : n[0].toUpperCase() + n.slice(1); };
@@ -351,8 +349,8 @@ const KNOB = '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M25 16a9 9 0 
 function draw() {
   queueMicrotask(say);
   const N = game.N, grid = $("grid"), board = $("board");
-  // Shift needs a strip round the edge for the arrows: 0.36 of a piece each side
-  const pad = game.mode === 1 ? 36 / (N + .72) : 0, cell = (100 - 2 * pad) / N;
+  // Shift needs a strip round the edge for the arrows: 0.58 of a piece each side, so they stay big enough to tap
+  const pad = game.mode === 1 ? 58 / (N + 1.16) : 0, cell = (100 - 2 * pad) / N;
   board.style.setProperty("--pad", pad + "%");
   board.classList.toggle("shift", game.mode === 1);
   board.classList.toggle("numbers", !!settings.numbers);
@@ -553,7 +551,7 @@ $("numTgl").onchange = e => { settings.numbers = e.target.checked; save(); $("bo
 /* ---------- hints ---------- */
 // Hint works out a way back to the picture (in the background) and shows its first move: a gold piece to slide,
 // a gold row or column to shift, or a gold block to turn. The player makes the move; following hints alone gets
-// there. A hint keeps the player on the same size and costs the gold paw.
+// there. A hint keeps the player on the same level and costs the gold paw.
 const hints = G.hinter({game: () => game, key: () => game ? game.pos.join() : "", draw: () => paintHint()});
 function paintHint() {
   document.querySelectorAll(".shuf .hintcell, .shuf .hinted").forEach(x => x.classList.remove("hintcell", "hinted"));
@@ -600,39 +598,39 @@ $("hintBtn").onclick = async () => {
 /* ---------- endings ---------- */
 function win() {
   game.won = true; G.finishClock(game); keys.hide(); hints.clear(false); plan = null;
-  const next = game.hinted ? game.N : Math.min(5, game.N + 1);
-  settings.N = next; $("size").value = next; save();
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save();
   $("board").classList.add("whole"); update(); say();
   G.track(`Cat Shuffle solved ${levelName(game.level)}`);
-  build.prefetch(settings.mode * 10 + next);
+  build.prefetch(next);
   const g = game;
   setTimeout(() => { if (game === g) finishCard(); }, matchMedia("(prefers-reduced-motion: reduce)").matches ? 300 : 1100);
 }
 function finishCard() {
-  const next = settings.N, N = game.N, gold = !game.undid && !game.hinted, name = who(game.cat);
+  const next = settings.level, N = game.N, gold = !game.undid && !game.hinted, name = who(game.cat);
   let text = `${name ? `${name} ${name.includes(" and ") ? "are" : "is"}` : "The cat is"} back in the picture, ${N} × ${N}.`;
-  text += game.hinted ? ` You had a hint, so here's another at ${next} × ${next}.` : N === 5 ? " That's the biggest; here's another." : ` Next up: ${next} × ${next}.`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}, ${levelName(next).split(" · ")[1]}.`;
   // a gold paw shows the picture you put back together in place of the random cat photo
   const im = new Image(); im.className = "whole"; im.src = pic.url; im.alt = `The finished picture: ${name || "a cat"} on a patchwork quilt`;
-  G.winCard(text, () => { G.closeCard(); startSize(next); }, "Admire the picture", game.result,
-    {title: "All in place!", gold, goldWhy: "No hints or undos!", goldPic: [im], top: N === 5,
-     next: next > N ? `Next: ${next} × ${next}` : "Next picture", after: G.otherSize($("size"), next, startSize)});
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the picture", game.result,
+    {title: "All in place!", gold, goldWhy: "No hints or undos!", goldPic: [im],
+     next: next > game.level ? `Next: level ${next}` : "Next picture", after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
 }
 
 /* ---------- new pictures ---------- */
-function startSize(n) { settings.N = n; $("size").value = n; save(); newPuzzle(); }
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
 function begin(p, extra = {}) {
   const pos = posOf(p.mode, p.N, p.trail);
-  game = {level: p.mode * 10 + p.N, mode: p.mode, N: p.N, trail: p.trail.slice(), seed: p.seed, way: p.way, cat: p.cat,
+  game = {level: p.level, mode: p.mode, N: p.N, trail: p.trail.slice(), seed: p.seed, way: p.way, cat: p.cat,
     pos, start: pos.slice(), history: [], won: false, ...G.freshClock(), ...extra};
   plan = null; keys.hide(); hints.clear(false);
 }
 async function newPuzzle() {
   if (busy) return;
   busy = true;
-  const n = settings.mode * 10 + settings.N;
+  const n = settings.level;
   G.openCard("Shuffling the picture…", "", []);
-  const p = await build.take(n);
+  const p = await build.take(n); p.level = n;
   p.way = Math.floor(Math.random() * WAYS.length);
   // a different cat from the last picture
   const last = game && game.cat;
@@ -662,8 +660,9 @@ function reachable(mode, N, pos) {
 }
 async function openShared(d) {
   const fail = () => G.note("That share link didn't work.", 5000);
-  const mode = Math.floor(d.N / 10), N = d.N % 10;
-  if (!(mode >= 0 && mode <= 2 && N >= 3 && N <= 5) || !PICS[d.c] || !WAYS[d.w] || !Number.isInteger(d.s) || typeof d.m !== "string" || d.m.length > 600) { fail(); return; }
+  if (!(Number.isInteger(d.N) && d.N >= 1 && d.N <= MAX_LEVEL)) { fail(); return; }
+  const {mode, N} = levelSpec(d.N);
+  if ( !PICS[d.c] || !WAYS[d.w] || !Number.isInteger(d.s) || typeof d.m !== "string" || d.m.length > 600) { fail(); return; }
   const trail = [...d.m].map(c => parseInt(c, 36));
   let pos = solvedPos(N);
   for (const m of trail) { if (!(m >= 0 && m < moveCount(mode, N))) { fail(); return; } pos = applyMove(mode, N, pos, m); if (!pos) { fail(); return; } }
@@ -673,9 +672,9 @@ async function openShared(d) {
     const q = [...d.p.p].map(c => parseInt(c, 36));
     if (q.length === N * N && new Set(q).size === N * N && q.every(v => v >= 0 && v < N * N) && reachable(mode, N, q)) now = q;
   }
-  begin({mode, N, trail, seed: d.s, way: d.w, cat: PICS[d.c]});
+  begin({level: d.N, mode, N, trail, seed: d.s, way: d.w, cat: PICS[d.c]});
   if (now) { game.pos = now; game.timed = false; }
-  settings.mode = mode; settings.N = N; $("modeSel").value = mode; $("size").value = N;
+  settings.level = d.N; $("levelSel").value = d.N;
   try { await picture(game); } catch (e) {}
   draw(); save(); build.prefetch(game.level);
   if (now && isSolved(now)) win(); else helpOnFirstVisit();
@@ -736,29 +735,28 @@ function helpOnFirstVisit() {
   G.spotlight({grid: $("grid"), w: N, h: N, steps, done});
 }
 
-$("size").onchange = e => { G.closeCard(); startSize(+e.target.value); };
-$("modeSel").onchange = e => { G.closeCard(); settings.mode = +e.target.value; save(); newPuzzle(); };
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
 $("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
 $("helpBtn").onclick = showHelp;
-$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.mode * 10 + settings.N);
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
 
 G.nav("catshuffle");
 G.checkClock(game);
-G.setupTimer({name: "catshuffle", game: () => game, playing: g => !g.won, save, label: levelName, noun: "puzzle"});
+G.setupTimer({name: "catshuffle", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
 
-if (![3, 4, 5].includes(settings.N)) settings.N = 3;
-if (![0, 1, 2].includes(settings.mode)) settings.mode = 0;
-$("size").value = settings.N; $("modeSel").value = settings.mode; $("numTgl").checked = !!settings.numbers;
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level; $("numTgl").checked = !!settings.numbers;
 const shared = G.readShare("catshuffle");
 const hadSave = !!game;
 if (hadSave) G.reopen(() => {
     const N = game.N;
-    if (!PICS.includes(game.cat) || !WAYS[game.way] || ![3, 4, 5].includes(N) || game.pos.length !== N * N || !reachable(game.mode, N, game.pos)) throw new Error("the saved picture doesn't fit");
-    settings.mode = game.mode; $("modeSel").value = game.mode;
+    const spec = levelSpec(game.level);
+    if (!(game.level >= 1 && game.level <= MAX_LEVEL) || spec.mode !== game.mode || spec.N !== N || !PICS.includes(game.cat) || !WAYS[game.way] || game.pos.length !== N * N || !reachable(game.mode, N, game.pos)) throw new Error("the saved picture doesn't fit");
     picture(game).catch(() => {}).then(() => {
       draw();
       if (game.won) finishCard(); else helpOnFirstVisit();
-      build.prefetch(settings.mode * 10 + settings.N);
+      build.prefetch(settings.level);
     });
   }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
 else if (!shared) newPuzzle();
