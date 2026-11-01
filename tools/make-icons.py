@@ -231,18 +231,38 @@ def hideseek():
 
 
 # Pawlette: blocks of colour with their marks.
-def pawlette():
-    cols = [["#E16251", "#3FA9AE", "#F0B323"], ["#3FA9AE", "#E16251", "#E16251"], ["#F0B323", "#F0B323", "#3FA9AE"]]
+# Mew Hue (it was Pawlette's icon while Pawlette had Swipe): blocks of paint with their marks, red a bar down,
+# yellow a bar across, blue a ring, and an orange block in the middle made of red and yellow, carrying both marks.
+def mewhue():
+    cols = [["#E16251", "#3FA9AE", "#F0B323"], ["#3FA9AE", "#EC814D", "#E16251"], ["#F0B323", "#F0B323", "#3FA9AE"]]
     out = ""
     for r in range(3):
         for c in range(3):
             x, y, k = 15 + c * 24, 15 + r * 24, cols[r][c]
             out += f'<rect x="{x}" y="{y}" width="22" height="22" rx="5" fill="{k}" stroke="{INK}" stroke-width="1.5"/>'
-            if k == "#E16251": out += f'<rect x="{x+9.5}" y="{y+5}" width="3" height="12" rx="1.5" fill="#fff"/>'
-            elif k == "#3FA9AE": out += f'<circle cx="{x+11}" cy="{y+11}" r="3.2" fill="#fff"/>'
-            else: out += f'<rect x="{x+5}" y="{y+9.5}" width="12" height="3" rx="1.5" fill="#fff"/>'
+            if k in ("#E16251", "#EC814D"): out += f'<rect x="{x+9.5}" y="{y+5}" width="3" height="12" rx="1.5" fill="#fff"/>'
+            if k in ("#F0B323", "#EC814D"): out += f'<rect x="{x+5}" y="{y+9.5}" width="12" height="3" rx="1.5" fill="#fff"/>'
+            if k == "#3FA9AE": out += f'<circle cx="{x+11}" cy="{y+11}" r="3.2" fill="#fff"/>'
     return frame("#E9E3F2", out)
 
+
+# Pawlette: a ball of yarn dyed in a colourway's stripes (Sunset, from colorways.js), with three pots of paint, red,
+# yellow and blue, to mix them from.
+def pawlette():
+    stripes = ["#FFDD8A", "#EBAF5B", "#DE775D", "#B34D3E", "#6E234F"]
+    cx, cy, R = 50, 40, 25
+    out = f'<clipPath id="pball"><circle cx="{cx}" cy="{cy}" r="{R}"/></clipPath><g clip-path="url(#pball)">'
+    for k, col in enumerate(stripes):
+        out += f'<rect x="{cx - R}" y="{cy - R + k * 2 * R / 5}" width="{2 * R}" height="{2 * R / 5 + .5}" fill="{col}" transform="rotate(-28 {cx} {cy})"/>'
+    out += '</g>'
+    out += (f'<path d="M{cx-R*.7} {cy-R*.3}Q{cx} {cy+R*.45} {cx+R*.75} {cy-R*.25}M{cx-R*.55} {cy+R*.5}Q{cx+R*.1} {cy-R*.05} {cx+R*.6} {cy+R*.55}" '
+            f'fill="none" stroke="{INK}" stroke-width="1.6" stroke-linecap="round" opacity=".45"/>')
+    out += f'<circle cx="{cx}" cy="{cy}" r="{R}" fill="none" stroke="{INK}" stroke-width="2.5"/>'
+    for k, col in enumerate(("#E16251", "#F0B323", "#3FA9AE")):
+        x = 22 + k * 22
+        out += (f'<path d="M{x} 70h16l-2 16h-12z" fill="#F7F8F3" stroke="{INK}" stroke-width="2" stroke-linejoin="round"/>'
+                f'<ellipse cx="{x + 8}" cy="70" rx="8" ry="3" fill="{col}" stroke="{INK}" stroke-width="2"/>')
+    return frame("#E9E3F2", out)
 
 # Tangle: balls of yarn, their strands crossing in the middle.
 def tangle():
@@ -904,7 +924,7 @@ def catshuffle():
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle, "mewhue": mewhue}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")

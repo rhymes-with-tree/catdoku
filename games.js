@@ -15,7 +15,7 @@ const G = (() => {
     ["Toe Beans", "toebeans", "Make the number on the big pad", "#DD9DAD", "numbers", "countdown 24 sums arithmetic maths math"],
     ["Knock It Off", "knockitoff", "Help Fred push everything off the table", "#7885BA", "teasers", "push sokoban table"],
     ["Hide & Seek", "hideseek", "Find Jan Brady and friends hiding in the boxes", "#C9A26B", "logic", "minesweeper mines boxes"],
-    ["Pawlette", "pawlette", "Mix colours: zen out, or swipe and line them up", "#9874CA", "quick", "colour color mixing paint zen"],
+    ["Pawlette", "pawlette", "Mix colours like paint and zen out", "#9874CA", "quick", "colour color mixing paint zen"],
     ["Tangle", "tangle", "Untangle the yarn the cat got into", "#3C8681", "lines", "untangle planarity knots"],
     ["Catwalk", "catwalk", "Link the perches of a giant cat tower", "#A98663", "lines", "bridges hashi"],
     ["Fair Play", "tango", "Share two toys out fairly", "#B94588", "logic", "tango binary takuzu unruly"],
@@ -53,7 +53,7 @@ const G = (() => {
     ["L-M-N-O-Pom", "lmnopom", "Spell words in the falling pompoms for Marmalade to pounce on", "#B94588", "words", "tetris letris falling letters words scrabble blocks drop pompoms pom poms alphabet lmnop", "2026-10-31"],
     ["Window Ledges", "windowledges", "Add up the windows to match every total", "#B3B94B", "numbers", "kakuro cross sums sums arithmetic maths math", "2026-10-31"],
     ["Cat Shuffle", "catshuffle", "Put the cat's picture back together", "#9874CA", "teasers", "fifteen 15 puzzle sixteen twiddle sliding tiles slide puzzle picture shuffle scramble rotate turn", "2026-11-01"],
-    ["Mew Hue", "mewhue", "Slide paint together and line up the colours", "#B94588", "quick", "colour color mixing paint swipe 2048 merge hue lines", "2026-11-01"],
+    ["Mew Hue", "mewhue", "Slide paint together and line up the colours", "#B94588", "quick", "colour color mixing paint swipe slide merge lines rows columns 2048 hue pawlette", "2026-11-01"],
   ];
   // The shelves the front page and the games menu sort the games onto, in order: key (also a plain name for it,
   // for search), heading, one line.

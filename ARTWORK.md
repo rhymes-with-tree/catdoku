@@ -142,7 +142,7 @@ each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the 
   `-4` walking (front); `-5` reaching for a butterfly; `-6` in a cardboard box; `-7` curled up (from above); `-8`
   napping (side). Kitten Caboodle uses `marmalade-kitten-1`, `-2`, `-4`, `-5` and `-6` as kittens.
 - **Willow** (`willow-…`, a Siamese: slim and elegant, a short sleek cream coat with dark brown points, striking blue
-  eyes, large ears and a long, slender tail) is a she, and friends with Gus, Peanut and Marmalade. She stars in Window Ledges: `willow-1` (sitting, front) is beside the title, `willow-4` (lying down) lies along the roof ridge, and `willow-6` (stretching) is on the gold-paw card. From her sheet, grown up: `willow-1` sitting
+  eyes, large ears and a long, slender tail) is a she, and friends with Gus, Peanut and Marmalade. She stars in Window Ledges: `willow-1` (sitting, front) is beside the title, `willow-4` (lying down) lies along the roof ridge, and `willow-6` (stretching) is on the gold-paw card. She stars in Mew Hue too: `willow-2` (standing, side) strolls past the title, her face (`willow-7`) rises over each line that clears, and `willow-5` (asleep, curled up) is on the gold-paw card. From her sheet, grown up: `willow-1` sitting
   (front); `willow-2` standing (side); `willow-3` from behind; `willow-4` lying down, looking at you; `willow-5` asleep,
   curled up; `willow-6` stretching; `willow-7` her face. As a kitten: `willow-kitten-1` sitting (front); `-2` playing
   with a blue feather; `-3` curled up asleep; `-4` walking (front); `-5` looking up at a butterfly; `-6` in a round

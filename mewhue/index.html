@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-01.13"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-01.14"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-01.13">
+<link rel="stylesheet" href="../games.css?v=2026-11-01.14">
 <style>
 /* Blocks of paint, each with a mark: red a bar down, yellow a bar across, blue a ring. Drag a row
    or column and its blocks slide to that end. Two different marks mix, and the mix carries both (orange is a
@@ -44,7 +44,7 @@
   box-shadow:inset 0 -4px 0 rgba(42,37,48,.2),0 2px 3px rgba(42,37,48,.25)}
 .blk .b svg{width:66%;height:66%}
 .blk.full .b{box-shadow:inset 0 0 0 3px rgba(247,248,243,.8),inset 0 -4px 0 rgba(42,37,48,.2),0 2px 3px rgba(42,37,48,.25)}
-.blk.stone .b{border-radius:12%;box-shadow:inset 0 -5px 0 rgba(0,0,0,.3),0 2px 3px rgba(42,37,48,.35)}
+.blk.stone .b{border-radius:12%;box-shadow:inset 0 -5px 0 rgba(42,37,48,.4),0 2px 3px rgba(42,37,48,.35)}
 .blk.pop .b{animation:pop .3s ease-out}
 @keyframes pop{50%{transform:scale(1.15)}}
 .blk.gone .b{animation:gone .45s ease-in forwards}
@@ -60,12 +60,18 @@
 .goalbar{height:8px;border-radius:999px;background:var(--line);overflow:hidden;width:min(140px,30vw)}
 .goalbar i{display:block;height:100%;background:#ECA818;border-radius:999px;transition:width .3s}
 #count{display:flex;align-items:center;gap:8px}
+/* Willow: strolling by the title, her face rising over each line that clears, asleep on the gold-paw card */
+.sitter{display:block;height:58px;width:auto;margin-bottom:-4px}
+@media (max-height:760px){.sitter{height:42px;margin-bottom:-3px}}
+.peek{position:absolute;width:30%;height:auto;pointer-events:none;z-index:4;transform:translate(-50%,-50%);animation:peek .9s ease-out forwards}
+@keyframes peek{0%{opacity:0;transform:translate(-50%,-20%) scale(.6)}25%{opacity:1;transform:translate(-50%,-55%) scale(1)}75%{opacity:1}100%{opacity:0;transform:translate(-50%,-70%) scale(1)}}
+.card img.goldpic{display:block;width:62%;max-width:240px;height:auto;margin:0 auto 14px}
 @media (prefers-reduced-motion:reduce){.blk{transition:none}}
 </style>
 </head>
 <body>
 <main>
-  <header><h1>Mew Hue</h1><div class="stripe"></div><p class="tagline">Slide paint together and line up the colours</p></header>
+  <header><div class="title"><h1>Mew Hue</h1><img class="sitter" id="sitter" alt="Willow strolling past the title"></div><div class="stripe"></div><p class="tagline">Slide paint together and line up the colours</p></header>
   <nav class="games" id="games" aria-label="Games"></nav>
 
   <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
@@ -92,7 +98,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-01.13"></script>
+<script src="../games.js?v=2026-11-01.14"></script>
 <script>
 /* ---------- marks, colours and rules (plain functions) ---------- */
 // Colours by number: 0 red (a bar down), 1 orange (bar down and across), 2 yellow (a bar across), 3 green (across
@@ -140,21 +146,24 @@ function clearLines(g) {
   kill.forEach(i => { g[i] = -1; }); crumble.forEach(i => { g[i] = -1; });
   return {lines, crumble};
 }
-// Levels: what falls in (colour: weight), how many lines to clear, which lines count (only stone on level 5), and
-// on level 6 one primary much rarer than the others (which one, from the board's seed).
-function levelSpec(n) {
-  return [null,
-    {drops: {0: 1, 2: 1}, goal: 1},
-    {drops: {4: 1, 0: 1}, goal: 1},
-    {drops: {4: 1, 2: 1, 3: .5}, goal: 1},
-    {drops: {1: 1, 3: 1}, goal: 2},
-    {drops: {2: 3, 5: 1}, goal: 1, stone: true},
-    {drops: {0: 1, 2: 1, 4: 1}, goal: 3, rare: .35}][n];
+// Levels: how many lines to clear, and which count (only stone on level 5). The colours come from boardColours.
+function levelSpec(n) { return [null, {goal: 1}, {goal: 1}, {goal: 1}, {goal: 2}, {goal: 1, stone: true}, {goal: 3}][n]; }
+// Each board's colours: what falls in (colour: weight) and the key's bars. Levels 1 to 3 take the three pairs of
+// primaries in the player's own order (order, kept on the device), so level 2 brings in the third mark and by level
+// 3 they've made all three mixes; level 3 also drops that pair's mix ready-made. The rest pick from the board's
+// seed: level 4 any two mixes, level 5 any primary with the mix that hasn't its mark (they set into stone), and
+// level 6 all three primaries with any one of them rarer.
+function boardColours(level, seed, order) {
+  const PAIRS = [[0, 2, 1], [0, 4, 5], [2, 4, 3]], COMP = {0: 3, 2: 5, 4: 1}, PRIM = [0, 2, 4], k = seed % 3, d = {};
+  if (level <= 3) { const [a, b, m] = PAIRS[order[level - 1]]; d[a] = 1; d[b] = 1; if (level === 3) d[m] = .5; return {drops: d, key: [[a, m, b]]}; }
+  if (level === 4) { const two = [1, 3, 5].filter((_, i) => i !== k); d[two[0]] = 1; d[two[1]] = 1; return {drops: d, key: [[two[0]], [two[1]]]}; }
+  if (level === 5) { const p = PRIM[k]; d[p] = 3; d[COMP[p]] = 1; return {drops: d, key: [[p, 6, COMP[p]]]}; }
+  const rare = PRIM[k], other = PRIM[(k + 1) % 3]; PRIM.forEach(c => { d[c] = c === rare ? .35 : 1; });
+  return {drops: d, key: [[0, 1, 2, 3, 4, 5, 0], [other, 6, COMP[other]]]};
 }
-function pickDrop(spec, r, seed) {
-  const d = Object.assign({}, spec.drops); if (spec.rare) d[[0, 2, 4][seed % 3]] = spec.rare;
-  const e = Object.entries(d), tot = e.reduce((t, [, w]) => t + w, 0); let x = r * tot; for (const [c, w] of e) { if ((x -= w) < 0) return +c; } return +e[0][0]; }
+function pickDrop(drops, r) { const e = Object.entries(drops), tot = e.reduce((t, [, w]) => t + w, 0); let x = r * tot; for (const [c, w] of e) { if ((x -= w) < 0) return +c; } return +e[0][0]; }
 
+const catSrc = f => (window.CAT_SRC || {})[f] || `../cats/${f}.webp`;
 function seeded(seed) { return () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 
 /* ---------- looks ---------- */
@@ -172,15 +181,12 @@ function inkFor(hex) {
 const mark = c => { const ink = inkFor(COLOURS[c].hex); return `<svg viewBox="0 0 24 24" fill="${ink}" stroke="${ink}" aria-hidden="true">${COLOURS[c].marks.join("")}</svg>`; };
 const chip = c => `<span class="chip" style="background:${COLOURS[c].hex}" title="${COLOURS[c].name}">${mark(c)}</span>`;
 const Cap = w => w[0].toUpperCase() + w.slice(1);
-// Each level's key: bars that blend from one colour to the next, each with its mark, so a mix sits between the two
-// colours it's made of. Colours that don't mix get bars of their own.
-function keyOf(n) {
-  return [null, [[0, 1, 2]], [[0, 5, 4]], [[2, 3, 4]], [[1], [3]], [[2, 6, 5]], [[0, 1, 2, 3, 4, 5, 0]]][n];
-}
+// The key: bars that blend from one colour to the next, each with its mark, so a mix sits between the two colours
+// it's made of. Colours that don't mix get bars of their own, and stone sits between the two that make it.
 const PAPER = "#F7F8F3";
 const keyMark = c => `<svg viewBox="0 0 24 24" fill="${PAPER}" stroke="${PAPER}" aria-hidden="true">${COLOURS[c].marks.join("")}</svg>`;
-function drawKey(n) {
-  $("rules").innerHTML = keyOf(n).map(bar => {
+function drawKey(g) {
+  $("rules").innerHTML = boardColours(g.level, g.seed, g.order).key.map(bar => {
     const bg = bar.length > 1 ? `linear-gradient(90deg,${bar.map((c, k) => `${COLOURS[c].hex} ${(k / (bar.length - 1) * 100).toFixed(0)}%`).join(",")})` : COLOURS[bar[0]].hex;
     return `<div class="keybar" style="background:${bg}" aria-label="${bar.map(c => COLOURS[c].name).join(", then ")}">${bar.map(keyMark).join("")}</div>`;
   }).join("");
@@ -191,17 +197,20 @@ function drawKey(n) {
 //        start (the board as dealt), history, won, lost, hinted, undid, clock…}
 const STORE = "catdoku.mewhue.v3", MAX_LEVEL = 6, MIXES = 2, $ = G.$;
 let saved = G.load(STORE), settings = Object.assign({level: 1, seen: {}}, saved.settings);
+// the order levels 1 to 3 take the pairs of primaries in, picked once for this device
+const isOrder = o => Array.isArray(o) && o.length === 3 && [0, 1, 2].every(k => o.includes(k));
+if (!isOrder(settings.order)) settings.order = [0, 1, 2].sort(() => Math.random() - .5);
 let game = saved.game || null, busy = false;
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !game.lost && !busy && !$("overlay").classList.contains("show");
-const levelName = n => [null, "Red and yellow", "Blue and red", "Blue, yellow, green", "Orange and green", "Stone", "All three"][n];
+const levelName = n => [null, "Two colours", "A new colour", "All three mixes", "Two mixes", "Stone", "All three"][n];
 function drop(g) {
   const r = seeded(g.seed * 7919 + g.drops++), empty = g.grid.map((c, i) => c < 0 ? i : -1).filter(i => i >= 0);
   if (!empty.length) return -1;
-  const i = empty[Math.floor(r() * empty.length)]; g.grid[i] = pickDrop(levelSpec(g.level), r(), g.seed); return i;
+  const i = empty[Math.floor(r() * empty.length)]; g.grid[i] = pickDrop(boardColours(g.level, g.seed, g.order).drops, r()); return i;
 }
-function deal(level, seed) {
-  const g = {level, seed, grid: new Array(N * N).fill(-1), drops: 0, lines: 0, moves: 0, mixes: MIXES, history: [], won: false, lost: false, ...G.freshClock()};
+function deal(level, seed, order) {
+  const g = {level, seed, order: (order || settings.order).slice(), grid: new Array(N * N).fill(-1), drops: 0, lines: 0, moves: 0, mixes: MIXES, history: [], won: false, lost: false, ...G.freshClock()};
   for (let k = 0; k < 4; k++) drop(g);
   g.start = JSON.stringify({grid: g.grid, drops: g.drops});
   return g;
@@ -225,7 +234,7 @@ function draw() {
   if (!grid.querySelector(".slot")) for (let i = 0; i < N * N; i++) { const s = document.createElement("div"); s.className = "slot"; s.dataset.i = i; const [x, y] = xyOf(i); s.style.left = x * 20 + "%"; s.style.top = y * 20 + "%"; grid.append(s); }
   grid.querySelectorAll(".blk,.ghost").forEach(e => e.remove());
   blocks = game.grid.map((c, i) => c >= 0 ? blk(c, i) : null);
-  drawKey(game.level);
+  drawKey(game);
   update();
 }
 function update() {
@@ -276,6 +285,12 @@ function slideMove(ax, l, back) {
     };
     if (!c.lines.length) { finish(); return; }
     new Set([...c.lines.flatMap(x => x.cells), ...c.crumble]).forEach(i => blocks[i] && blocks[i].classList.add("gone"));
+    // Willow's face rises over the middle of each line that clears
+    for (const ln of c.lines) {
+      const [x, y] = xyOf(ln.cells[2]), im = new Image(); im.className = "peek"; im.alt = ""; im.src = catSrc("willow-7");
+      im.style.left = (2 + (x + .5) * 19.2) + "%"; im.style.top = (2 + (y + .5) * 19.2) + "%";
+      $("board").append(im); setTimeout(() => im.remove(), 950);
+    }
     setTimeout(finish, reduce ? 0 : 450);
   }, reduce ? 0 : 130);
 }
@@ -368,9 +383,10 @@ function win() {
   let text = `You cleared ${game.lines} ${spec.stone ? "line" : "line"}${game.lines === 1 ? "" : "s"}${spec.stone ? " of stone" : ""} in ${game.moves} moves.`;
   text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the last level; here's another board." : ` Next up: level ${next}, ${levelName(next).toLowerCase()}.`;
   setTimeout(() => G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the board", game.result,
-    {title: "Lined up!", gold, goldWhy: "No hints, undos or mix-ups!", next: next > game.level ? `Next: level ${next}` : "Next board",
+    {title: "Lined up!", gold, goldWhy: "No hints, undos or mix-ups!", goldTitle: "Willow's having a nap!", goldPic: [goldPic()], next: next > game.level ? `Next: level ${next}` : "Next board",
      after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")}), 500);
 }
+function goldPic() { const im = new Image(); im.className = "goldpic"; im.src = catSrc("willow-5"); im.alt = "Willow curled up asleep"; return im; }
 function lose() {
   game.lost = true; G.breakStreak(); save();
   G.track(`Mew Hue stuck level ${game.level}`);
@@ -382,13 +398,17 @@ function lose() {
 
 /* ---------- new boards ---------- */
 function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newGame(); }
-function newGame(seed = Math.floor(Math.random() * 2 ** 31)) {
-  game = deal(settings.level, seed); hints.clear(false); draw(); save();
+function newGame(seed = Math.floor(Math.random() * 2 ** 31), order) {
+  game = deal(settings.level, seed, order); hints.clear(false); draw(); save();
   G.track(`Mew Hue new board level ${settings.level}`);
   helpOnFirstVisit();
 }
-$("linkBtn").onclick = () => { if (game) G.shareCard({name: "Mew Hue", won: game.won, what: "board", puzzle: () => ({g: "mewhue", N: game.level, s: game.seed})}); };
-function openShared(d) { if (!(d.N >= 1 && d.N <= MAX_LEVEL) || !Number.isInteger(d.s)) { G.note("That share link didn't work.", 5000); return; } settings.level = d.N; $("levelSel").value = d.N; newGame(d.s); }
+$("linkBtn").onclick = () => { if (game) G.shareCard({name: "Mew Hue", won: game.won, what: "board", puzzle: () => ({g: "mewhue", N: game.level, s: game.seed, o: game.order.join("")})}); };
+function openShared(d) {
+  const o = typeof d.o === "string" ? [...d.o].map(Number) : settings.order;
+  if (!(d.N >= 1 && d.N <= MAX_LEVEL) || !Number.isInteger(d.s) || d.s < 0 || !isOrder(o)) { G.note("That share link didn't work.", 5000); return; }
+  settings.level = d.N; $("levelSel").value = d.N; newGame(d.s, o);
+}
 
 /* ---------- how to play ---------- */
 // The first board gets the whole walkthrough; each later level, the first time, a step for what's new.
@@ -402,7 +422,7 @@ function helpOnFirstVisit(all) {
   const row = cells.filter(([, y]) => y === can[1]), way = can[2] ? "left" : "right";
   const turn = G.yourTurn(() => game, g => { game = g; }, draw);
   let was = 0;
-    const newSay = {1: "Two marks mix into one block", 2: "A new mark: the ring", 3: "Ready-mixed green is full", 4: "These two never mix", 5: "A mark meets the mix without it: stone", 6: "All three marks at once"}[n];
+    const newSay = {1: "Two marks mix into one block", 2: "A new mark joins in", 3: "Ready-made mixes are full", 4: "These two never mix", 5: "A mark meets the mix without it: stone", 6: "All three marks at once"}[n];
   const steps = first ? [
     {say: "Each colour has a mark 🐈", els: [$("rules")]},
     {say: `Drag this row ${way}`, lit: row, ...turn.upTo, try: {done: () => game.moves !== was}, enter() { turn.from.enter(); was = game.moves; }},
@@ -421,12 +441,13 @@ $("newBtn").onclick = () => { G.closeCard(); newGame(); };
 $("helpBtn").onclick = showHelp;
 $("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
 G.nav("mewhue");
+$("sitter").src = catSrc("willow-2");
 G.checkClock(game);
 G.setupTimer({name: "mewhue", game: () => game, playing: g => !g.won && !g.lost, save, label: n => `${n} · ${levelName(n)}`, noun: "level"});
 if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
 $("levelSel").value = settings.level;
 const shared = G.readShare("mewhue");
-if (game) G.reopen(() => { if (!levelSpec(game.level) || game.grid.length !== N * N) throw new Error("the saved board doesn't fit"); draw(); if (game.lost) lose(); else helpOnFirstVisit(); },
+if (game) G.reopen(() => { if (!levelSpec(game.level) || game.grid.length !== N * N || !isOrder(game.order)) throw new Error("the saved board doesn't fit"); draw(); if (game.lost) lose(); else helpOnFirstVisit(); },
   why => { game = null; newGame(); G.note(why, 0); });
 else if (!shared) newGame();
 if (shared) G.offerShare(shared, {name: "Mew Hue", inProgress: !!(game && game.history.length && !game.won), open: openShared, after: helpOnFirstVisit, fresh: game ? null : why => { newGame(); G.note(why, 6000); }});
