@@ -76,7 +76,7 @@ const G = (() => {
   // On an iPhone or iPad, the text follows the size set in Settings (Display & Brightness, Text Size, and
   // Accessibility's Larger Text), as Apple's apps do: games.css multiplies its text sizes by --ts. The system's body
   // text is 17 points at the standard setting, so --ts is how far it is from that: from a little smaller (14 points)
-  // up to 1.6 times (27 points, about the first of Apple's larger accessibility sizes), as far as the pages still fit. Elsewhere, the browser's own zoom does this.
+  // up to 2.4 times (41 points, about Apple's third larger accessibility size, AX3); titles grow less (--ts-big). Elsewhere, the browser's own zoom does this.
   function textSize() {
     if (!(window.CSS && CSS.supports("font", "-apple-system-body"))) return;
     const probe = document.createElement("span");
@@ -84,7 +84,12 @@ const G = (() => {
     document.body.append(probe);
     const px = parseFloat(getComputedStyle(probe).fontSize) || 17;
     probe.remove();
-    document.documentElement.style.setProperty("--ts", Math.min(1.6, Math.max(0.88, px / 17)).toFixed(3));
+    const ts = Math.min(2.4, Math.max(0.88, px / 17));
+    document.documentElement.style.setProperty("--ts", ts.toFixed(3));
+    // at the larger accessibility sizes some layouts change (games.css, .bigText): fewer tiles across, switches one
+    // under another, Games as its icon alone; then the title is fitted again
+    document.documentElement.classList.toggle("bigText", ts >= 1.6);
+    dispatchEvent(new Event("resize"));
   }
   if (document.body) textSize(); else document.addEventListener("DOMContentLoaded", textSize);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) textSize(); });
@@ -1059,6 +1064,17 @@ const G = (() => {
     next(); layer.focus({preventScroll: true});
   }
 
+  /* ---------- slower ---------- */
+  // Slower (Apple asks games to offer difficulty accommodations, such as more time to react): a switch, #slowTgl, in an
+  // action game's settings, kept on this device for each game; while it's on the game runs at two-thirds speed.
+  // Returns a function giving the factor to stretch the game's times by (1, or 1.5 with Slower on).
+  const SLOWER = "catdoku.slower.v1";
+  function slower(slug) {
+    const box = $("slowTgl");
+    if (box) { box.checked = !!load(SLOWER)[slug]; box.addEventListener("change", () => { const d = load(SLOWER); d[slug] = box.checked; save(SLOWER, d); }); }
+    return () => (box ? box.checked : !!load(SLOWER)[slug]) ? 1.5 : 1;
+  }
+
   /* ---------- boards in words ---------- */
   // A board drawn as one picture (SVG or canvas) can't be explored square by square with VoiceOver, so it's described
   // in words instead: el (the board's box) becomes an image whose label says what's where, set again after every
@@ -1476,6 +1492,6 @@ const G = (() => {
     }
   }
 
-  return {GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, meaning, plainText,
+  return {GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, slower, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();
