@@ -75,8 +75,8 @@ const G = (() => {
   /* ---------- text size ---------- */
   // On an iPhone or iPad, the text follows the size set in Settings (Display & Brightness, Text Size, and
   // Accessibility's Larger Text), as Apple's apps do: games.css multiplies its text sizes by --ts. The system's body
-  // text is 17 points at the standard setting, so --ts is how far it is from that, kept within reason (from a little
-  // smaller to a third bigger) so the boards and buttons still fit. Elsewhere, the browser's own zoom does this.
+  // text is 17 points at the standard setting, so --ts is how far it is from that: from a little smaller (14 points)
+  // up to 1.6 times (27 points, about the first of Apple's larger accessibility sizes), as far as the pages still fit. Elsewhere, the browser's own zoom does this.
   function textSize() {
     if (!(window.CSS && CSS.supports("font", "-apple-system-body"))) return;
     const probe = document.createElement("span");
@@ -84,7 +84,7 @@ const G = (() => {
     document.body.append(probe);
     const px = parseFloat(getComputedStyle(probe).fontSize) || 17;
     probe.remove();
-    document.documentElement.style.setProperty("--ts", Math.min(1.33, Math.max(0.88, px / 17)).toFixed(3));
+    document.documentElement.style.setProperty("--ts", Math.min(1.6, Math.max(0.88, px / 17)).toFixed(3));
   }
   if (document.body) textSize(); else document.addEventListener("DOMContentLoaded", textSize);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) textSize(); });
@@ -324,10 +324,19 @@ const G = (() => {
       b.onclick = fn; row.append(b);
     }
     card.append(row); if (after) card.append(after);
+    // a dialog to VoiceOver, named by its title
+    h.id = "cardTitle"; card.setAttribute("role", "dialog"); card.setAttribute("aria-modal", "true"); card.setAttribute("aria-labelledby", "cardTitle");
     $("overlay").classList.add("show");
     const first = row.querySelector("button"); if (first) first.focus();
   }
   function closeCard() { $("overlay").classList.remove("show"); }
+  // Escape takes a card's way out where it has one (Close, Cancel, Keep playing, Done, or a look at the board), as
+  // Escape cancels on Apple's platforms; a card that needs a choice (out of lives) stays.
+  document.addEventListener("keydown", e => {
+    const ov = $("overlay"); if (e.key !== "Escape" || !ov || !ov.classList.contains("show") || document.querySelector(".spot")) return;
+    const out = [...ov.querySelectorAll(".btns button")].find(b => /^(Close|Cancel|Keep playing|Done|Admire|Look at)/.test(b.textContent.trim()));
+    if (out) { e.preventDefault(); out.click(); }
+  });
 
   // Moving up: after a clean win the next puzzle is one size bigger, up to the largest the page's size
   // list offers. The finishing cards also offer every other size, so players can always choose.
@@ -497,6 +506,16 @@ const G = (() => {
     .spot .say b .w{white-space:nowrap}
     .spot .say b .emo img{display:inline-block;width:1.15em;height:1.15em;vertical-align:-.2em}
     .spot .say b .emo{-webkit-text-stroke:0;display:inline-block;background:#FFF4D2;border:3px solid var(--ink);border-radius:999px;padding:0 .12em;margin:0 .04em;line-height:1.15;font-size:.85em;vertical-align:.06em}
+    /* the walkthrough's own bar, centred at the bottom of the screen: a dot for each step (Apple's page control) and Skip */
+    .spot .spotBar{position:fixed;left:50%;transform:translateX(-50%);bottom:max(14px,env(safe-area-inset-bottom));display:flex;align-items:center;gap:14px;
+      padding:4px 6px 4px 16px;border-radius:999px;background:rgba(42,37,48,.82);pointer-events:auto;cursor:default}
+    .spot .dots{display:flex;gap:7px}
+    .spot .dots i{width:8px;height:8px;border-radius:50%;background:rgba(255,244,210,.35)}
+    .spot .dots i.on{background:#FFF4D2}
+    .spot .spotBar button{min-height:44px;min-width:64px;padding:0 16px;border:none;border-radius:999px;background:none;color:#FFF4D2;font:inherit;font-weight:800;font-size:calc(16px*var(--ts));cursor:pointer}
+    .spot .spotBar button:hover,.spot .spotBar button:focus-visible{background:rgba(255,244,210,.16)}
+    .spot.trying{pointer-events:none}   /* an interactive step: taps on the lit squares reach the board... */
+    .spot .block{position:fixed;pointer-events:auto}   /* ...and nowhere else */
     .spotGo{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;pointer-events:none;animation:spotGo 1.3s ease-out forwards}
     .spotGo b{font-size:clamp(34px,10vw,52px);font-weight:800;color:#FFF4D2;-webkit-text-stroke:7px var(--ink);paint-order:stroke fill}
     @keyframes spotGo{0%{opacity:0;transform:scale(.7)}18%{opacity:1;transform:scale(1.06)}30%{transform:scale(1)}70%{opacity:1}100%{opacity:0;transform:scale(1.08)}}
@@ -754,11 +773,40 @@ const G = (() => {
   // map: () => ({ox, oy, cw, ch}) in page pixels, when the squares don't simply fill `grid`.
   // finish: false leaves out "Let's Play!" (for a one-off tip in the middle of a game).
   // It covers the screen, so taps on it never reach the game (or start its timer), and the timer waits.
+  // How to play plays the whole walkthrough. A first visit (the walkthrough starting by itself) keeps to the board and
+  // its rules, as Apple's onboarding guidance asks (brief, interactive, optional): steps that only point at a tool or a
+  // setting (Erase, Guess, Hint, Auto grade…) are kept back as tips, shown one at a time later, in context (tips, below).
+  let helpTappedAt = 0;
+  document.addEventListener("click", e => { if (e.target.closest && e.target.closest("#helpBtn")) helpTappedAt = Date.now(); }, true);
+  const TIPS = "catdoku.tips.v1", SLUG = location.pathname.split("/").filter(Boolean).pop() || "";
+  const resolveEls = els => (els || []).map(e => typeof e === "function" ? e() : e).flat().filter(Boolean);
+  // where a page element can be found again on a later visit: its id, or the id of something in it and its class
+  function findable(el) {
+    if (el.id) return {id: el.id};
+    const inner = el.querySelector && el.querySelector("[id]");
+    return inner && el.classList[0] ? {id: inner.id, up: "." + el.classList[0]} : null;
+  }
+  function findEl(f) { const e = document.getElementById(f.id); return e && f.up ? e.closest(f.up) : e; }
+  const isToolStep = st => !st.try && !st.enter && !(st.lit && st.lit.length) && !st.marks && !st.shapes && !st.lines && !st.arrows &&
+    resolveEls(st.els).length && resolveEls(st.els).every(e => e.closest && e.closest(".actions,.bar,.toggles") && findable(e));
+  function keepTips(steps) {
+    const d = load(TIPS);
+    d[SLUG] = steps.map(st => ({say: st.say, els: resolveEls(st.els).map(findable)}));
+    save(TIPS, d);
+  }
+
   function spotlight(o) {
+    const tip = o.finish === false;
+    if (!tip && Date.now() - helpTappedAt > 2000) {   // a first visit: tools and settings wait for later
+      const later = o.steps.filter(isToolStep);
+      if (later.length && later.length < o.steps.length) { o = {...o, steps: o.steps.filter(st => !isToolStep(st))}; keepTips(later); }
+    }
+    else if (!tip) { const d = load(TIPS); if (d[SLUG]) { delete d[SLUG]; save(TIPS, d); } }   // the whole walkthrough covers them
     const wrap = o.grid.parentElement, layer = document.createElement("div"), ns = "http://www.w3.org/2000/svg";
     layer.className = "spot"; layer.tabIndex = 0; layer.setAttribute("role", "dialog"); layer.setAttribute("aria-live", "polite");
     document.body.append(layer);
     let k = -1, frame = 0, ticker = null;
+    const steps = () => o.steps;
     const svgEl = (t, a) => { const e = document.createElementNS(ns, t); for (const n in a) e.setAttribute(n, a[n]); return e; };
     // Bring the board (and anything else the steps light) into view first.
     {
@@ -781,6 +829,7 @@ const G = (() => {
         return {x: l - p, y: t - p, w: r - l + 2 * p, h: btm - t + 2 * p};
       });
       layer.innerHTML = "";
+      layer.classList.toggle("trying", !!(st.try && !st.tried));
       const svg = svgEl("svg", {viewBox: `0 0 ${W} ${H}`, width: W, height: H, "aria-hidden": "true"});
       // Shapes in page pixels (for boards that aren't squares): {poly: [[x, y]…]} is lit and outlined,
       // {path: [[x, y]…], width} is a lit band along a line (a track), {arrow: [x, y], from: [dx, dy]}.
@@ -840,10 +889,32 @@ const G = (() => {
         if (sh.arrow) arrow(sh.arrow[0], sh.arrow[1], sh.from[0], sh.from[1], sh.size || 40);
       }
       layer.append(svg);
+      // An interactive step (st.try): the player does it on the real board. Only the lit squares take taps; blocks
+      // cover the rest of the screen.
+      if (st.try && !st.tried && lit.length) {
+        const x1 = Math.min(...lit.map(([x]) => X(x))), y1 = Math.min(...lit.map(([, y]) => Y(y))), x2 = Math.max(...lit.map(([x]) => X(x + 1))), y2 = Math.max(...lit.map(([, y]) => Y(y + 1)));
+        for (const [l, t, w, h] of [[0, 0, W, y1], [0, y2, W, H - y2], [0, y1, x1, y2 - y1], [x2, y1, W - x2, y2 - y1]]) {
+          const bl = document.createElement("div"); bl.className = "block"; Object.assign(bl.style, {left: l + "px", top: t + "px", width: w + "px", height: Math.max(0, h) + "px"});
+          bl.addEventListener("pointerdown", e => { e.preventDefault(); e.stopPropagation(); });   // a tap elsewhere does nothing
+          layer.append(bl);
+        }
+      }
+      // the bar: a dot for each step, and Skip (or, for a single tip, Got it)
+      const bar = document.createElement("div"); bar.className = "spotBar";
+      if (steps().length > 1) {
+        const dots = document.createElement("span"); dots.className = "dots"; dots.setAttribute("aria-hidden", "true");
+        steps().forEach((_, i) => { const d = document.createElement("i"); if (i === k) d.className = "on"; dots.append(d); });
+        bar.append(dots);
+      }
+      else bar.style.paddingLeft = "6px";
+      const skip = document.createElement("button"); skip.type = "button"; skip.textContent = steps().length > 1 ? "Skip" : "Got it";
+      skip.addEventListener("pointerdown", e => e.stopPropagation()); skip.addEventListener("click", e => { e.stopPropagation(); end(); });
+      bar.append(skip); bar.addEventListener("pointerdown", e => e.stopPropagation()); layer.append(bar);
       const say = document.createElement("div"); say.className = "say";
       say.style.left = `${b.left + b.width * 0.04}px`; say.style.width = `${b.width * 0.92}px`;
       const bw = document.createElement("b"); sayWith(bw, st.say);
-      const tap = document.createElement("small"); tap.textContent = "Tap to go on";
+      const tap = document.createElement("small");
+      tap.textContent = st.try && !st.tried ? (st.try.tip || "Your turn") : "Tap to go on";
       say.append(bw, tap); layer.append(say);
       // The words go over the board where they cover the least of the lit squares (and, among those,
       // nearest the middle), so they never sit on what the step is pointing at if they can help it.
@@ -873,7 +944,7 @@ const G = (() => {
         if (cost < bestCost) { bestCost = cost; best = t; }
       }
       say.style.top = `${best}px`;
-      layer.setAttribute("aria-label", `${st.say}. ${tap.textContent}.`);
+      layer.setAttribute("aria-label", `${steps().length > 1 ? `Step ${k + 1} of ${steps().length}. ` : ""}${st.say}. ${tap.textContent}.`);
     }
     // Emoji in the words keep their own colours (no outline) on a pale chip, and never start a line
     // on their own: each sticks to the word before it.
@@ -899,11 +970,27 @@ const G = (() => {
       }
     }
     const redraw = () => k >= 0 && k < o.steps.length && show();
+    function close() {
+      clearInterval(ticker); removeEventListener("resize", redraw); removeEventListener("scroll", redraw); document.removeEventListener("pointerup", tried, true);
+      layer.remove(); if (o.done) o.done();
+    }
+    // Skip (or Escape): the walkthrough ends here, and counts as seen; How to play has it all again.
+    function end() { const was = o.steps[k]; if (was && was.leave) was.leave(); k = o.steps.length; close(); }
+    // after a tap on an interactive step's squares: once it's done, say so in green and go on
+    function tried() {
+      setTimeout(() => {
+        const st = o.steps[k];
+        if (!st || !st.try || st.tried || !st.try.done()) return;
+        st.tried = true; st.tone = "ok"; if (st.try.yes) st.say = st.try.yes;
+        show(); setTimeout(() => { if (o.steps[k] === st) next(); }, 1400);
+      }, 60);
+    }
+    document.addEventListener("pointerup", tried, true);
     function next(e) {
       if (e) { e.preventDefault(); e.stopPropagation(); }
       const was = o.steps[k]; if (was && was.leave) was.leave();
       if (++k >= o.steps.length) {   // all done: "Let's Play!" shows over the board and fades by itself
-        clearInterval(ticker); removeEventListener("resize", redraw); removeEventListener("scroll", redraw); layer.remove(); if (o.done) o.done();
+        close();
         if (o.finish === false) return;   // a one-off tip in the middle of a game just goes away
         const go = document.createElement("div"); go.className = "spotGo"; go.setAttribute("aria-hidden", "true");
         const b = document.createElement("b"); b.textContent = "Let's Play!"; go.append(b); wrap.append(go);
@@ -931,10 +1018,53 @@ const G = (() => {
       was = now; requestAnimationFrame(follow);
     })();
     layer.addEventListener("pointerdown", next);
-    layer.addEventListener("keydown", e => { if (e.key === " " || e.key === "Enter" || e.key === "Escape") next(e); });
+    layer.addEventListener("keydown", e => {
+      if (e.key === "Escape") { e.preventDefault(); end(); }   // Escape cancels, as everywhere on Apple's platforms
+      else if (e.key === " " || e.key === "Enter") next(e);   // on an interactive step too, so the keyboard never gets stuck
+    });
     ticker = setInterval(() => { const st = o.steps[k]; if (st && (st.marks || []).some(m => Array.isArray(m[2]))) { frame++; show(); } }, 900);
     next(); layer.focus({preventScroll: true});
   }
+
+  /* ---------- tips ---------- */
+  // The walkthrough's tool steps, kept back on a first visit (spotlight), come back one at a time as tips, as Apple's
+  // guidance on tips asks (short, in context, at a reasonable pace, and only for people who'd benefit): the Hint tip
+  // once a started puzzle has had no move for 45 seconds, the others a few seconds after the first move on the board in
+  // a visit, at most one a day. A tip for something the player has already used is dropped unseen.
+  (function tips() {
+    const list = () => load(TIPS)[SLUG] || [];
+    const drop = t => { const d = load(TIPS); d[SLUG] = (d[SLUG] || []).filter(x => x.say !== t.say); if (!d[SLUG].length) delete d[SLUG]; save(TIPS, d); };
+    const isHint = t => t.els.some(f => f && f.id === "hintBtn");
+    const free = () => !document.hidden && !document.querySelector(".spot") && !document.querySelector(".overlay.show");
+    function show(t) {
+      const els = t.els.map(f => f && findEl(f));
+      if (!$("board") || els.some(e => !e || !e.offsetParent || e.disabled)) return false;
+      spotlight({grid: $("board"), w: 1, h: 1, steps: [{say: t.say, els}], finish: false, done: () => drop(t)});
+      return true;
+    }
+    document.addEventListener("click", e => {   // used it already: no need for its tip
+      const el = e.target.closest && e.target.closest("[id]"); if (!el || el.closest(".spot")) return;
+      for (const t of list()) if (t.els.some(f => f && f.id === el.id)) drop(t);
+    }, true);
+    let idle = 0;
+    const playing = () => { const g = T && T.game(); return !!(g && g.started && T.playing(g)); };
+    const poke = () => {
+      clearTimeout(idle);
+      if (!list().some(isHint)) return;
+      idle = setTimeout(() => { const t = list().find(isHint); if (t && playing() && free() && show(t)) return; poke(); }, 45000);
+    };
+    for (const ev of ["pointerdown", "keydown"]) document.addEventListener(ev, poke, true);
+    let waiting = false;
+    document.addEventListener("pointerdown", e => {
+      if (waiting || !e.target.closest || !e.target.closest("#board")) return;
+      waiting = true;
+      setTimeout(() => {
+        if (Date.now() - (load(TIPS)._at || 0) < 20 * 3600e3) return;
+        const t = list().find(x => !isHint(x));
+        if (t && free() && show(t)) { const d = load(TIPS); d._at = Date.now(); save(TIPS, d); }
+      }, 4000);
+    }, true);
+  })();
 
   // How to play plays a game's walkthrough on its board. When there's no puzzle out to show it on (it's
   // finished), say how to get one.
@@ -956,9 +1086,11 @@ const G = (() => {
   // o: {key() (the board as it stands, as a string), draw() (redraws; it reads the mark with current()),
   //     game() (the puzzle being played, so a new one that happens to look the same starts afresh)}
   // show(mark, say, {ms, uncounted}): uncounted shows a mark that isn't a hint (Audit's), so it doesn't add a level.
-  const HINT_MS = 5000, HINT = {gold: "#ECA818", red: "#C8392B"};
+  // A hint's mark and words stay until the board or the puzzle changes (Apple: avoid things that go away on a timer,
+  // which can leave too little time to take them in); a game can still pass ms for a mark that should go by itself.
+  const HINT_MS = 0, HINT = {gold: "#ECA818", red: "#C8392B"};
   function hinter(o) {
-    let mark = null, at = null, of = null, shown = 0, timer = 0;
+    let mark = null, at = null, of = null, shown = 0, timer = 0, said = "";
     const same = () => o.game() === of && o.key() === at;
     return {
       level() { if (!same()) shown = 0; return shown; },
@@ -966,11 +1098,14 @@ const G = (() => {
         clearTimeout(timer);
         if (!same()) shown = 0;
         mark = m; at = o.key(); of = o.game(); if (!uncounted) shown++;
-        o.draw(); if (say) note(say, ms);
-        timer = setTimeout(() => { if (mark === m) { mark = null; o.draw(); } }, ms);
+        o.draw(); if (say) { note(say, ms); said = say; }
+        if (ms) timer = setTimeout(() => { if (mark === m) { mark = null; o.draw(); } }, ms);
       },
       // the mark to draw, while the board is as it was when it was shown
-      current() { if (mark && !same()) mark = null; return mark; },
+      current() {
+        if (mark && !same()) { mark = null; if (said && $("msg") && $("msg").textContent === said) note(""); said = ""; }   // its words go with it
+        return mark;
+      },
       clear(redraw = true) { clearTimeout(timer); if (mark) { mark = null; if (redraw) o.draw(); } },
     };
   }

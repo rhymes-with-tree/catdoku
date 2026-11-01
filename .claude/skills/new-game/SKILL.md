@@ -133,7 +133,16 @@ in its notes.
   to play button plays it again. There's no rules card, so every rule, control and tip goes in a step,
   ending with "Stuck? Hint …" pointing at `hintBtn`. Keep it succinct: one short line per step (a few
   words, under about ten), one idea each, and only the steps a new player needs; leave out anything
-  the board already makes obvious. It must work at any point in an unfinished puzzle:
+  the board already makes obvious. Follow Apple's onboarding guidance (`HIG.md`, "Onboarding"):
+  - **Brief:** the first visit at most about six steps. `G.spotlight` keeps back, on a first visit, every step that only
+    points at a button or setting in `.actions`, `.bar` or `.toggles` (by id, or an id inside it) and shows each later
+    as a one-off tip, so write those as steps of their own (no `lit`, `marks` or `enter`), each pointing at one control
+    with an id. The board and its rules make up the first visit.
+  - **Interactive:** one step, early on, where the player does the main move on the real board: `try: {done, yes, tip}`
+    on a step with `lit` squares (only they take taps; it waits until `done()` is true, then says `yes` in green and goes
+    on). Save the game in `enter` and put it back in `leave` exactly as it was (clock, lives, undo and all), so nothing
+    is given away or lost (see Catdoku's "Your turn" step).
+  - **Optional:** every walkthrough has Skip and a row of dots (shared); don't add your own. It must work at any point in an unfinished puzzle:
   a step that changes the board for show (`enter`/`leave`) puts back exactly what was there, and once
   the player has started, steps point at their own pieces rather than revealing part of the answer
   (see `copycat/` and `unravel/`). If something is still moving or loading, wait and try again rather
@@ -251,7 +260,8 @@ The site is a web app today, played in Safari or from the home screen, and it fo
 Guidelines where they fit a web page (README, "Across every game"). Keep a new game in line with them, so it would
 carry over if the site ever became an app:
 
-- **Touch targets: 44 × 44 points at least** for every control a finger uses. The shared buttons, pickers, stars and
+- **Touch targets: 44 × 44 points at least** for every control a finger uses (Apple's minimum is 28 × 28, for
+  where there's truly no room). The shared buttons, pickers, stars and
   timer already are (`games.css`, "Touch targets"). A game's own controls (a number pad, a turn button, a tray of
   pieces) are 44 tall, or get an invisible 44-point square with the `hit44` class or an `::after` of their own
   (`catpile/`'s `.turnBtn`). Squares on the board at the biggest level may be smaller where the genre needs it (a
@@ -265,13 +275,19 @@ carry over if the site ever became an app:
 - **Text size.** Text sizes in shared CSS are `calc(<n>px*var(--ts))`, so they follow the iPhone's text size setting
   (`textSize` in `games.js` sets `--ts`). In a game's own CSS, scale words outside the board the same way (status
   lines, a word list, a clue); leave the board's own lettering as it is. Never stop pinch to zoom (no
-  `maximum-scale` or `user-scalable=no`). Nothing smaller than 11 pixels.
+  `maximum-scale` or `user-scalable=no`). Nothing smaller than 11 pixels. `--ts` goes up to 1.6, so check the page at
+  that size.
 - **Contrast:** at least 4.5 to 1 for words and 3 to 1 for icons and the lines that matter, in light and dark.
 - **VoiceOver:** every button has words or an `aria-label` (an icon alone needs a label), the board has a role and a
   label (`role="grid"` with each square labelled, as in `catdoku/`, or `aria-label` on an SVG board), and the message
   line is `aria-live="polite"`.
 - **Motion:** reduce motion turns animations off (`games.css`); nothing a player needs may only show while moving
-  (step 3, "Hints").
+  (step 3, "Hints"), and nothing a player needs to read may go away on a timer (hints stay until the board changes).
+- **Increase Contrast:** `games.css` strengthens `--ink-soft` and `--line` under `prefers-contrast: more`; colours of
+  your own outside the board should do the same if they're faint.
+- **Cards:** `G.openCard` makes them dialogs, and Escape presses a button starting Close, Cancel, Keep playing, Done,
+  Admire or Look at, so give a card that can simply be put away one of those.
+- `HIG.md` is the full review against Apple's guidelines; check a new game against its "Still to do" list too.
 
 ### Lives
 
@@ -332,7 +348,9 @@ SE, 320 × 460, as well as a laptop at 1280 × 720. Load Playwright with
   through (play a move, reload, and look for page errors). Test the iPhone way too, with
   `Element.prototype.requestFullscreen = undefined` in an init script (headless Chromium's own full screen also
   blocks resizing the viewport);
-- the walkthrough plays on a first visit and lines up with the board;
+- the walkthrough plays on a first visit and lines up with the board, has at most about six steps there, its
+  interactive step waits for the move, says so in green and puts the board back as it was (compare the game's state
+  before and after), Skip ends it, and How to play plays every step;
 - the buttons and settings are in the standard order (step 3);
 - Hint, Undo (and Ctrl+Z) and Restart work, and following hints alone reaches the win at every level
   (pressing Hint twice where the first only shows where to look);
@@ -350,8 +368,8 @@ SE, 320 × 460, as well as a laptop at 1280 × 720. Load Playwright with
   side of its centre with `document.elementFromPoint` on a viewport tall enough to show the whole page); with
   `colorScheme: "dark"` on the context, take screenshots and look at them, and check every word against what's behind
   it (at least 4.5 to 1, worked out from the computed colours), the cards included; light mode is unchanged; with
-  `--ts` set to 1.33 on the page (`document.documentElement.style.setProperty("--ts", "1.33")`, as the largest text
-  setting would), nothing runs off the side at 320 × 460 or sideways at 667 × 323; and each button, the board and its
+  `--ts` set to 1.6 on the page (`document.documentElement.style.setProperty("--ts", "1.6")`, as the largest text
+  setting it follows would), nothing runs off the side at 320 × 460 or sideways at 667 × 323; and each button, the board and its
   squares read out sensibly (their `aria-label`s or words);
 - no page errors (failed loads of fonts, GoatCounter and cat photos are expected offline);
 - the front page shows the new tile and icon;
