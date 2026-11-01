@@ -792,6 +792,7 @@ const G = (() => {
   function keepTips(steps) {
     const d = load(TIPS);
     d[SLUG] = steps.map(st => ({say: st.say, els: resolveEls(st.els).map(findable)}));
+    d._at = Date.now();   // and the first tip waits a day: the walkthrough is enough for one visit
     save(TIPS, d);
   }
 
@@ -914,7 +915,9 @@ const G = (() => {
       say.style.left = `${b.left + b.width * 0.04}px`; say.style.width = `${b.width * 0.92}px`;
       const bw = document.createElement("b"); sayWith(bw, st.say);
       const tap = document.createElement("small");
-      tap.textContent = st.try && !st.tried ? (st.try.tip || "Your turn") : "Tap to go on";
+      // "Tap to go on" only on the first step: after that the dots say there's more, and the fewer words the better
+      tap.textContent = st.try && !st.tried ? (st.try.tip || "") : k === 0 && steps().length > 1 ? "Tap to go on" : "";
+      if (!tap.textContent) tap.hidden = true;
       say.append(bw, tap); layer.append(say);
       // The words go over the board where they cover the least of the lit squares (and, among those,
       // nearest the middle), so they never sit on what the step is pointing at if they can help it.
@@ -944,7 +947,7 @@ const G = (() => {
         if (cost < bestCost) { bestCost = cost; best = t; }
       }
       say.style.top = `${best}px`;
-      layer.setAttribute("aria-label", `${steps().length > 1 ? `Step ${k + 1} of ${steps().length}. ` : ""}${st.say}. ${tap.textContent}.`);
+      layer.setAttribute("aria-label", `${steps().length > 1 ? `Step ${k + 1} of ${steps().length}. ` : ""}${st.say}.${tap.textContent ? ` ${tap.textContent}.` : ""}`);
     }
     // Emoji in the words keep their own colours (no outline) on a pale chip, and never start a line
     // on their own: each sticks to the word before it.
@@ -1056,7 +1059,7 @@ const G = (() => {
     for (const ev of ["pointerdown", "keydown"]) document.addEventListener(ev, poke, true);
     let waiting = false;
     document.addEventListener("pointerdown", e => {
-      if (waiting || !e.target.closest || !e.target.closest("#board")) return;
+      if (waiting || document.querySelector(".spot") || !e.target.closest || !e.target.closest("#board")) return;
       waiting = true;
       setTimeout(() => {
         if (Date.now() - (load(TIPS)._at || 0) < 20 * 3600e3) return;
