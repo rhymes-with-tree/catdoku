@@ -53,12 +53,10 @@
 @keyframes fresh{from{transform:scale(.2)}}
 .ghost{position:absolute;width:20%;height:20%;display:grid;place-items:center;pointer-events:none;z-index:3}
 .ghost span{min-width:1.6em;height:1.6em;border-radius:999px;background:#2A2530;color:#F7F8F3;font:800 clamp(12px,4vw,18px)/1.6em "Baloo 2",system-ui,sans-serif;text-align:center}
-/* the rules, written in the blocks' own marks; only what this level uses */
-.rules{display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:center;font-size:calc(14px*var(--ts));color:var(--ink-soft);width:var(--board)}
-.rules .r{display:flex;align-items:center;gap:4px}
-.rules .new{color:var(--ink);font-weight:600}
-.chip{width:24px;height:24px;border-radius:5px;display:grid;place-items:center;flex:none}
-.chip svg{width:70%;height:70%}
+/* the key: a bar blending from colour to colour, with each colour's mark */
+.rules{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;width:var(--board)}
+.keybar{display:flex;align-items:center;justify-content:space-between;gap:clamp(8px,4vw,26px);height:46px;padding:0 clamp(10px,3.5vw,18px);border-radius:14px;flex:0 1 auto}
+.keybar svg{width:30px;height:30px;flex:none}
 .goalbar{height:8px;border-radius:999px;background:var(--line);overflow:hidden;width:min(140px,30vw)}
 .goalbar i{display:block;height:100%;background:#ECA818;border-radius:999px;transition:width .3s}
 #count{display:flex;align-items:center;gap:8px}
@@ -75,7 +73,7 @@
   <div class="wrap paintboard stage" id="board">
     <div class="grid" id="grid" tabindex="0" role="application" aria-label="Blocks of paint. Drag a row or column to slide it."></div>
   </div>
-  <div class="rules" id="rules" aria-label="How the marks mix"></div>
+  <div class="rules" id="rules" role="img" aria-label="How the marks mix"></div>
   <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
 
   <div class="actions helpers"><button id="shuffleBtn">Mix it up</button></div>
@@ -174,17 +172,18 @@ function inkFor(hex) {
 const mark = c => { const ink = inkFor(COLOURS[c].hex); return `<svg viewBox="0 0 24 24" fill="${ink}" stroke="${ink}" aria-hidden="true">${COLOURS[c].marks.join("")}</svg>`; };
 const chip = c => `<span class="chip" style="background:${COLOURS[c].hex}" title="${COLOURS[c].name}">${mark(c)}</span>`;
 const Cap = w => w[0].toUpperCase() + w.slice(1);
-// Each level's rules strip, in marks: [the rule, whether it's new on this level]
-function rulesOf(n, seed) {
-  const mixR = (a, b, m) => `${chip(a)}+${chip(b)}=${chip(m)}`, same = c => `${chip(c)}+${chip(c)}=${chip(c)}`, line = isNew => [`a line of one kind clears`, isNew];
-  const rare = [0, 2, 4][seed % 3];
-  return [null,
-    [[mixR(0, 2, 1), 1], [same(0), 1], line(1)],
-    [[mixR(0, 4, 5), 1], [same(4), 1], line(0)],
-    [[mixR(2, 4, 3), 1], [`${chip(3)} is full: it stays put`, 1], line(0)],
-    [[`${chip(1)} ${chip(3)} never mix`, 1], line(0)],
-    [[`${chip(2)}+${chip(5)}=${chip(6)}`, 1], [`${chip(6)} never moves`, 1], [`goal: a line of ${chip(6)}`, 1]],
-    [[mixR(0, 2, 1), 0], [mixR(2, 4, 3), 0], [mixR(0, 4, 5), 0], [`a mark + the mix without it = ${chip(6)}`, 1], [`${chip(rare)} is rare`, 1], [`${chip(6)} crumbles beside a cleared line`, 1]]][n];
+// Each level's key: bars that blend from one colour to the next, each with its mark, so a mix sits between the two
+// colours it's made of. Colours that don't mix get bars of their own.
+function keyOf(n) {
+  return [null, [[0, 1, 2]], [[0, 5, 4]], [[2, 3, 4]], [[1], [3]], [[2, 6, 5]], [[0, 1, 2, 3, 4, 5, 0]]][n];
+}
+const PAPER = "#F7F8F3";
+const keyMark = c => `<svg viewBox="0 0 24 24" fill="${PAPER}" stroke="${PAPER}" aria-hidden="true">${COLOURS[c].marks.join("")}</svg>`;
+function drawKey(n) {
+  $("rules").innerHTML = keyOf(n).map(bar => {
+    const bg = bar.length > 1 ? `linear-gradient(90deg,${bar.map((c, k) => `${COLOURS[c].hex} ${(k / (bar.length - 1) * 100).toFixed(0)}%`).join(",")})` : COLOURS[bar[0]].hex;
+    return `<div class="keybar" style="background:${bg}" aria-label="${bar.map(c => COLOURS[c].name).join(", then ")}">${bar.map(keyMark).join("")}</div>`;
+  }).join("");
 }
 
 /* ---------- game state ---------- */
@@ -226,7 +225,7 @@ function draw() {
   if (!grid.querySelector(".slot")) for (let i = 0; i < N * N; i++) { const s = document.createElement("div"); s.className = "slot"; s.dataset.i = i; const [x, y] = xyOf(i); s.style.left = x * 20 + "%"; s.style.top = y * 20 + "%"; grid.append(s); }
   grid.querySelectorAll(".blk,.ghost").forEach(e => e.remove());
   blocks = game.grid.map((c, i) => c >= 0 ? blk(c, i) : null);
-  $("rules").innerHTML = rulesOf(game.level, game.seed).map(([t, isNew]) => `<span class="r${isNew ? " new" : ""}">${t}</span>`).join("");
+  drawKey(game.level);
   update();
 }
 function update() {
@@ -403,7 +402,7 @@ function helpOnFirstVisit(all) {
   const row = cells.filter(([, y]) => y === can[1]), way = can[2] ? "left" : "right";
   const turn = G.yourTurn(() => game, g => { game = g; }, draw);
   let was = 0;
-    const newSay = {1: "Two marks mix into one block", 2: "A new mark: the ring", 3: "Ready-mixed green is full", 4: "These two never mix", 5: "A mark meets the mix without it: stone", 6: "All three marks, one rare"}[n];
+    const newSay = {1: "Two marks mix into one block", 2: "A new mark: the ring", 3: "Ready-mixed green is full", 4: "These two never mix", 5: "A mark meets the mix without it: stone", 6: "All three marks at once"}[n];
   const steps = first ? [
     {say: "Each colour has a mark 🐈", els: [$("rules")]},
     {say: `Drag this row ${way}`, lit: row, ...turn.upTo, try: {done: () => game.moves !== was}, enter() { turn.from.enter(); was = game.moves; }},
