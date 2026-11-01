@@ -26,7 +26,8 @@ device, not in the session.
 
 Check the README's game sections and `G.GAMES`; if an existing game already uses the same mechanic,
 say which. Look the idea up in `IDEAS.md`, the list of every puzzle considered, and use its row (rules,
-what it's close to, theme notes). Offer a few cat themes for the user's idea and recommend one.
+what it's close to, theme notes). Offer a few cat themes for the user's idea and recommend one. If the row starts with "Shortlist" and says "Cat theme picked", that theme is decided: use it
+(name, setting, pieces) without offering others, unless the user asks for changes.
 
 Ask whether there's a particular cat the user wants as the game's mascot or star. The named cats and the
 games they're meant for are in `ARTWORK.md` ("Who's who in `cats/`"); Bowtie in Tunnel Run is the example
@@ -325,7 +326,7 @@ revive keeps the player on the same level and costs the gold paw.
   cat photo. Add the game to the Gold paw, Share and Keys lists under "Across every game", to the Hints list
   if a second hint says more, and to Help if its rule differs.
 - **Ideas list:** keep `IDEAS.md` up to date with every decision, in the same PR. Set the game's row to
-  Built, name it "<Game> (<puzzle it's based on>)", and move it below the Idea rows of its group; add a row
+  Built, name it "<Game> (<puzzle it's based on>)", and set its Shelf to the shelf it went on, and move it below the Idea rows of that shelf; add a row
   if the game wasn't listed. When two ideas become one game, merge their rows; when an idea becomes a mode
   or levels of an existing game, mark it Built and say where (Notes); drop rows the user rules out; and note
   new ideas, themes or changes of plan that come up while talking it through.

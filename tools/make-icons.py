@@ -883,10 +883,28 @@ def windowledges():
     out += shutter(14, 66, "5") + win(40, 66, False, "") + win(66, 66, True, "2")
     return frame(RED, out)
 
+# Cat Shuffle: a cat's face on a patchwork quilt, cut into nine pieces with thin gaps between; the piece from the middle
+# of the right-hand side has slid down into the gap. Palette colours: the quilt in tints of teal, gold, plum and
+# periwinkle, the cat in coral, on lavender's palette neighbour (a tint of plum).
+def catshuffle():
+    x0, t = 14, 24
+    patches = "".join(f'<rect x="{x0 + c * 18}" y="{x0 + r * 18}" width="18" height="18" fill="{tint((TEAL, YELLOW, PLUM, PERI)[(r * 3 + c * 2) % 4], .5)}"/>'
+                      for r in range(4) for c in range(4))
+    pic = f'<g id="pic">{patches}{catface(50, 54, 21, ORANGE)}</g>'
+    out = f'<defs>{pic}' + "".join(f'<clipPath id="cs{p}"><rect x="{x0 + p % 3 * t}" y="{x0 + p // 3 * t}" width="{t}" height="{t}"/></clipPath>' for p in range(9)) + '</defs>'
+    out += f'<rect x="{x0}" y="{x0}" width="{3 * t}" height="{3 * t}" fill="{tint(INK, .25)}"/>'
+    where = {p: p for p in range(8)}; where[5] = 8   # piece 5 slid down into the bottom right; the gap is where it was
+    for p, sq in where.items():
+        dx, dy = (sq % 3 - p % 3) * t, (sq // 3 - p // 3) * t
+        out += f'<g transform="translate({dx} {dy})"><use href="#pic" clip-path="url(#cs{p})"/></g>'
+    out += "".join(f'<path d="M{x0 + k * t} {x0}V{x0 + 3 * t}M{x0} {x0 + k * t}H{x0 + 3 * t}" stroke="{PAPER}" stroke-width="1.6"/>' for k in (1, 2))
+    out += f'<rect x="{x0}" y="{x0}" width="{3 * t}" height="{3 * t}" fill="none" stroke="{INK}" stroke-width="2.5"/>'
+    return frame(tint(PLUM, .35), out)
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")

@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cat Shuffle</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-11-01.12"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<meta name="theme-color" content="#ECEEE7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1F1C24" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-11-01.12">
+<style>
+/* A picture of a cat on a patchwork quilt, cut into squares and shuffled. Slide pieces into the gap, shift whole
+   rows and columns round, or turn blocks of four, until the picture's back together. */
+.shuf{--pad:0%;background:color-mix(in srgb,#2A2530 14%,#F7F8F3);border:3px solid var(--ink);border-radius:10px;overflow:hidden;
+  touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.shuf.shift{touch-action:none}
+.shuf .grid{position:absolute;inset:var(--pad);outline:none}
+.tile{position:absolute;left:0;top:0;background-repeat:no-repeat;cursor:pointer;
+  box-shadow:inset 0 0 0 1px rgba(247,248,243,.85);transition:transform .14s ease-out,box-shadow .5s,opacity .5s}
+.tile.gap{opacity:0;pointer-events:none}
+.tile .num{position:absolute;left:50%;bottom:5%;transform:translateX(-50%);min-width:1.5em;padding:0 .25em;border-radius:999px;background:rgba(247,248,243,.88);
+  color:#2A2530;font:700 clamp(11px,3.4vw,15px)/1.45 "Baloo 2",system-ui,sans-serif;text-align:center;pointer-events:none;display:none}
+.shuf.numbers .tile .num{display:block}
+/* once it's back together, the lines between the pieces fade, and Slide's missing piece comes back */
+.shuf.whole .tile{box-shadow:none} .shuf.whole .tile.gap{opacity:1}
+.shuf.whole .tile .num,.shuf.whole .arrow,.shuf.whole .knob{display:none!important}
+/* Turn: a round knob where four pieces meet; tap it to turn them clockwise, press and hold to turn them back */
+.knob{position:absolute;transform:translate(-50%,-50%);border-radius:50%;background:rgba(247,248,243,.9);
+  border:2px solid #2A2530;box-shadow:0 1px 4px rgba(42,37,48,.35);cursor:pointer;display:grid;place-items:center;z-index:3}
+.knob svg{width:66%;height:66%;fill:none;stroke:#2A2530;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.knob::after{content:"";position:absolute;left:50%;top:50%;width:44px;height:44px;transform:translate(-50%,-50%)}
+.knob.hinted{background:#ECA818;animation:hintcell .6s ease-in-out 6 alternate}
+.knob.kbcursor{outline-offset:2px}
+/* Shift: an arrow at each end of every row and column */
+.arrow{position:absolute;display:grid;place-items:center;cursor:pointer}
+.arrow svg{width:70%;height:70%;fill:#2A2530;opacity:.5;transition:opacity .15s}
+.arrow:hover svg{opacity:.85}
+/* Peek: the whole picture over the board until the next tap */
+.peek{position:absolute;inset:var(--pad);background-size:100% 100%;z-index:5;display:none;pointer-events:none}
+.shuf.peeking .peek{display:block}
+.card img.whole{display:block;width:70%;max-width:260px;height:auto;margin:0 auto 14px;border-radius:8px;border:3px solid var(--ink)}
+@media (prefers-reduced-motion:reduce){.tile{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Cat Shuffle</h1><div class="stripe"></div><p class="tagline">Put the cat's picture back together</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap shuf stage" id="board">
+    <div class="grid" id="grid" tabindex="0" role="application" aria-label="Pieces of a cat picture"></div>
+    <div class="peek" id="peek" aria-hidden="true"></div>
+  </div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="peekBtn">Peek</button>
+    <button id="linkBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New picture</button>
+  </div>
+  <div class="bar toggles">
+    <div class="opt"><label class="toggle"><input type="checkbox" id="numTgl"><span class="sw"></span>Numbers</label><span class="hint">Number each piece by where it goes</span></div>
+  </div>
+
+</main>
+
+<script src="../games.js?v=2026-11-01.12"></script>
+<script src="../colorways.js?v=2026-11-01.12"></script>
+<script>
+/* ---------- the pieces and their moves (plain functions, also run in a background worker) ---------- */
+// The picture is cut into N × N pieces, numbered by where they belong (0 top left, row by row). pos[i] is the
+// piece on square i. Three ways to play (mode): 0 Slide (Fifteen: the last piece is missing, and pieces slide into
+// the gap), 1 Shift (Sixteen: a whole row or column moves round one square, what goes off one end coming on at the
+// other) and 2 Turn (Twiddle: four pieces in a 2 × 2 block turn round together).
+// A move is one small number: Slide, the way the gap goes (0 up, 1 right, 2 down, 3 left); Shift, row or column
+// (axis 0 or 1), which one, and forwards (right or down) or back, as (axis * N + line) * 2 + back; Turn, the block
+// by its top left corner, and clockwise or back, as (y * (N - 1) + x) * 2 + back.
+function moveCount(mode, N) { return mode === 0 ? 4 : mode === 1 ? 4 * N : 2 * (N - 1) * (N - 1); }
+function undoOf(mode, m) { return mode === 0 ? (m + 2) % 4 : m ^ 1; }
+// The pieces after move m, or null if it can't be made (the gap at the edge).
+function applyMove(mode, N, pos, m) {
+  const p = pos.slice();
+  if (mode === 0) {
+    const g = p.indexOf(N * N - 1), x = g % N, y = (g - x) / N;
+    const t = m === 0 ? (y > 0 ? g - N : -1) : m === 1 ? (x < N - 1 ? g + 1 : -1) : m === 2 ? (y < N - 1 ? g + N : -1) : (x > 0 ? g - 1 : -1);
+    if (t < 0) return null;
+    p[g] = p[t]; p[t] = N * N - 1;
+    return p;
+  }
+  if (mode === 1) {
+    const back = m & 1, axis = Math.floor((m >> 1) / N), l = (m >> 1) % N, k = back ? N - 1 : 1;
+    for (let t = 0; t < N; t++) {
+      const from = axis ? t * N + l : l * N + t, to = axis ? ((t + k) % N) * N + l : l * N + (t + k) % N;
+      p[to] = pos[from];
+    }
+    return p;
+  }
+  const back = m & 1, b = m >> 1, x = b % (N - 1), y = (b - x) / (N - 1);
+  const a = y * N + x, ring = [a, a + 1, a + N + 1, a + N];   // clockwise round the block
+  for (let k = 0; k < 4; k++) p[back ? ring[k] : ring[(k + 1) % 4]] = pos[back ? ring[(k + 1) % 4] : ring[k]];
+  return p;
+}
+function solvedPos(N) { return [...Array(N * N).keys()]; }
+function isSolved(pos) { return pos.every((p, i) => p === i); }
+// How far each level mixes the picture: the number of moves from the picture to the puzzle, with no going round in circles.
+function mixLength(mode, N) { return [[0, 0, 0, 40, 120, 260], [0, 0, 0, 7, 11, 15], [0, 0, 0, 7, 13, 19]][mode][N]; }
+// A new puzzle: a random walk away from the picture, cutting out any loop (back to a mix seen before), so the
+// walk back is a way to solve it. At least two thirds of the pieces end up out of place.
+function makeMix(mode, N) {
+  const L = mixLength(mode, N), M = moveCount(mode, N);
+  let pos = solvedPos(N), trail = [], seen = new Map([[pos.join(), 0]]), states = [pos], tries = 0;
+  while (trail.length < L && tries++ < L * 40) {
+    const m = Math.floor(Math.random() * M);
+    if (trail.length && m === undoOf(mode, trail[trail.length - 1])) continue;
+    const q = applyMove(mode, N, pos, m);
+    if (!q) continue;
+    const k = q.join();
+    if (seen.has(k)) {   // a loop: go back to where it was before
+      const j = seen.get(k);
+      for (let i = j + 1; i < states.length; i++) seen.delete(states[i].join());
+      trail = trail.slice(0, j); states = states.slice(0, j + 1); pos = q; continue;
+    }
+    trail.push(m); pos = q; states.push(q); seen.set(k, trail.length);
+  }
+  const out = pos.filter((p, i) => p !== i).length;
+  if (trail.length < L || out < Math.ceil(N * N * 2 / 3)) return null;
+  return trail;
+}
+// Levels: 3 × 3 to slide, turn and shift, then 4 × 4 the same, then 5 × 5.
+function levelSpec(n) { return {mode: [0, 2, 1][(n - 1) % 3], N: 3 + Math.floor((n - 1) / 3)}; }
+function makePuzzle(level) {
+  const {mode, N} = levelSpec(level);
+  const trail = makeMix(mode, N);
+  if (!trail) return null;
+  return {mode, N, trail, seed: Math.floor(Math.random() * 2 ** 31)};
+}
+function posOf(mode, N, trail) { let p = solvedPos(N); for (const m of trail) p = applyMove(mode, N, p, m); return p; }
+
+/* ---------- the way back (for hints) ---------- */
+// Slide: a weighted A* search with each piece's distance from home (and pieces in their own row or column but in
+// each other's way); fast, and short enough to follow. Returns the moves, or null if it ran out of room.
+function slideSolve(N, pos, limit) {
+  const G = N * N - 1, W = N <= 3 ? 1 : N === 4 ? 2 : 3;
+  const dist = (v, i) => Math.abs(i % N - v % N) + Math.abs(Math.floor(i / N) - Math.floor(v / N));
+  // each piece's distance from home, plus two for each pair in their own row or column the wrong way round
+  const h = p => {
+    let d = 0;
+    for (let i = 0; i < p.length; i++) if (p[i] !== G) d += dist(p[i], i);
+    for (let r = 0; r < N; r++) for (let a = 0; a < N; a++) for (let b = a + 1; b < N; b++) {
+      const u = p[r * N + a], v = p[r * N + b];
+      if (u !== G && v !== G && Math.floor(u / N) === r && Math.floor(v / N) === r && u > v) d += 2;
+      const s = p[a * N + r], t = p[b * N + r];
+      if (s !== G && t !== G && s % N === r && t % N === r && s > t) d += 2;
+    }
+    return d;
+  };
+  const key = p => String.fromCharCode.apply(null, p);
+  // a binary heap of [f, g, key, pos, h]
+  const heap = [], push = x => { heap.push(x); let i = heap.length - 1; while (i) { const j = (i - 1) >> 1; if (heap[j][0] <= x[0]) break; heap[i] = heap[j]; i = j; } heap[i] = x; };
+  const pop = () => { const top = heap[0], x = heap.pop(); if (heap.length) { let i = 0; for (;;) { let c = 2 * i + 1; if (c >= heap.length) break; if (c + 1 < heap.length && heap[c + 1][0] < heap[c][0]) c++; if (heap[c][0] >= x[0]) break; heap[i] = heap[c]; i = c; } heap[i] = x; } return top; };
+  const start = key(pos), came = new Map([[start, null]]), cost = new Map([[start, 0]]);
+  push([W * h(pos), 0, start, pos]);
+  let n = 0;
+  while (heap.length) {
+    const [, g, k, p] = pop();
+    if (g > cost.get(k)) continue;
+    if (isSolved(p)) {
+      const moves = []; let at = k;
+      while (came.get(at)) { const [prev, m] = came.get(at); moves.push(m); at = prev; }
+      return moves.reverse();
+    }
+    if (++n > limit) return null;
+    for (let m = 0; m < 4; m++) {
+      const q = applyMove(0, N, p, m); if (!q) continue;
+      const qk = key(q);
+      if (cost.has(qk) && cost.get(qk) <= g + 1) continue;
+      cost.set(qk, g + 1); came.set(qk, [k, m]);
+      push([g + 1 + W * h(q), g + 1, qk, q]);
+    }
+  }
+  return null;
+}
+// Any mode: the puzzle's own way back (the mix undone), joined from where the player is by a short search. Known
+// mixes, each with how many moves it is from the picture: the picture, every mix along the way back, and every mix
+// the player has been through (their moves undone, then the way back). The search looks a few moves out from here
+// for the known mix that's closest to the picture, counting the moves to get to it.
+function wayBack(mode, N, trail, past, pos, budget) {
+  const known = new Map();
+  let p = solvedPos(N); known.set(p.join(), {d: 0, next: null});
+  const along = [p];
+  trail.forEach(m => { p = applyMove(mode, N, p, m); along.push(p); });
+  for (let k = 1; k < along.length; k++) { const key = along[k].join(); if (!known.has(key)) known.set(key, {d: k, next: undoOf(mode, trail[k - 1])}); }
+  // the player's moves: past is [mix, move] from the start, so each mix is one undo from the next
+  let d0 = trail.length;
+  for (const [q, m] of past) { const key = q.join(); d0++; if (!known.has(key) || known.get(key).d > d0) known.set(key, {d: d0, next: null, undo: m}); }
+  const M = moveCount(mode, N), startKey = pos.join();
+  let best = known.has(startKey) ? {cost: known.get(startKey).d, path: []} : null;
+  const seen = new Set([startKey]);
+  let layer = [[pos, []]], n = 0;
+  for (let depth = 1; layer.length && n < budget; depth++) {
+    if (best && depth >= best.cost) break;
+    const next = [];
+    for (const [q, path] of layer) {
+      for (let m = 0; m < M && n < budget; m++) {
+        const r = applyMove(mode, N, q, m); if (!r) continue;
+        const key = r.join(); if (seen.has(key)) continue;
+        seen.add(key); n++;
+        const pth = [...path, m];
+        if (known.has(key) && (!best || depth + known.get(key).d < best.cost)) best = {cost: depth + known.get(key).d, path: pth};
+        next.push([r, pth]);
+      }
+    }
+    layer = next;
+  }
+  if (!best) return null;
+  // follow the known mixes down to the picture
+  const moves = best.path.slice();
+  let q = pos; for (const m of moves) q = applyMove(mode, N, q, m);
+  for (let guard = 0; guard < 2000 && !isSolved(q); guard++) {
+    const k = known.get(q.join());
+    if (!k) return null;
+    let m = k.next;
+    if (m == null) m = undoOf(mode, k.undo);   // one of the player's mixes: undo the move that led there
+    // a known mix may be reached a shorter way: take any move to a known mix that's nearer
+    const r = applyMove(mode, N, q, m);
+    if (!r) return null;
+    moves.push(m); q = r;
+  }
+  return isSolved(q) ? moves : null;
+}
+
+// For hints, in the background: the moves from here to the picture.
+function hintPlan(o) {
+  let s = o.mode === 0 ? slideSolve(o.N, o.pos, 30000) : null;
+  const w = wayBack(o.mode, o.N, o.trail, o.past, o.pos, 20000);
+  if (!s || (w && w.length < s.length)) s = w;
+  return {moves: s || []};
+}
+
+/* ---------- game state ---------- */
+// game: {level (1–9, levelSpec), mode, N, trail (the moves that mixed the picture),
+//        seed and way (the quilt), cat, pos (which piece is on each square), start (pos as dealt),
+//        history (each a list of moves, or {pos} for a Restart), won, hinted, undid, clock…}
+const STORE = "catdoku.catshuffle.v1", $ = G.$;
+const MODES = ["Slide", "Shift", "Turn"];
+// The cats in the pictures: general cats, and named ones (who's who in ARTWORK.md), whole and big enough to fill it.
+const PICS = ["c14-34", "c14-35", "c14-36", "c15-5", "c15-6", "c15-38", "c14-63", "bowtie-6", "bugsy-4", "bugsy-6", "bugsy-bowtie-boxes",
+  "crunch-4", "crunch-5", "crunch-6", "crunch-7", "dottie-5", "dottie-22", "laya-2", "laya-3", "laya-4", "laya-7"];
+const catSrc = f => (window.CAT_SRC || {})[f] || `../cats/${f}.webp`;
+// The quilt's colours: Yarn's blends and variegated colourways (colorways.js)
+const WAYS = [...Object.values(BLENDS), ...Object.values(VARIEGATED)];
+let state = G.load(STORE);
+let settings = Object.assign({level: 1, numbers: false, seen: {}}, state.settings);
+let game = state.game || null, busy = false, hinting = false, plan = null;
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !busy && !$("overlay").classList.contains("show");
+const MAX_LEVEL = 9;
+const levelName = n => { const {mode, N} = levelSpec(n); return `${n} · ${MODES[mode]} ${N} × ${N}`; };
+const build = G.builder([moveCount, undoOf, applyMove, solvedPos, isSolved, mixLength, makeMix, levelSpec, makePuzzle], "makePuzzle");
+const hintWork = G.builder([moveCount, undoOf, applyMove, solvedPos, isSolved, slideSolve, wayBack, hintPlan], "hintPlan");
+const GAP = () => game.N * game.N - 1;
+const who = cat => { const n = cat.split("-")[0]; return n === "bugsy" && cat.includes("bowtie") ? "Bugsy and Bowtie" : /^c\d/.test(n) ? "" : n[0].toUpperCase() + n.slice(1); };
+
+/* ---------- the picture ---------- */
+// A cat on a patchwork quilt, drawn once for each puzzle (the same every time from its seed). The quilt's patches
+// don't line up with the pieces, and each has a pattern, so every piece looks different.
+function seeded(seed) { return () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const hexRGB = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+const mix = (a, b, t) => { const x = hexRGB(a), y = hexRGB(b); return "#" + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, "0")).join(""); };
+const imgs = {};
+const loadImg = src => imgs[src] || (imgs[src] = new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }));
+let pic = {key: "", url: ""};
+async function picture(g) {
+  const key = `${g.cat}|${g.way}|${g.seed}`;
+  if (pic.key === key) return pic.url;
+  const S = 720, c = document.createElement("canvas"); c.width = c.height = S;
+  const x = c.getContext("2d"), rnd = seeded(g.seed), cols = WAYS[g.way] || WAYS[0], K = 7, s = S / K;
+  const grid = [];
+  for (let r = 0; r < K; r++) for (let q = 0; q < K; q++) {
+    let col;
+    do col = cols[Math.floor(rnd() * cols.length)]; while ((q && grid[r * K + q - 1] === col) || (r && grid[(r - 1) * K + q] === col));
+    grid.push(col);
+    const X = q * s, Y = r * s, light = mix(col, "#F7F8F3", .5), dark = mix(col, "#2A2530", .22);
+    x.fillStyle = col; x.fillRect(X, Y, s + 1, s + 1);
+    x.save(); x.beginPath(); x.rect(X, Y, s, s); x.clip();
+    const kind = Math.floor(rnd() * 6);
+    if (kind === 1) { x.fillStyle = light; for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) { x.beginPath(); x.arc(X + s * (a + .5 + (b % 2) * .25) / 3, Y + s * (b + .5) / 3, s * .055, 0, 7); x.fill(); } }
+    else if (kind === 2) { x.strokeStyle = light; x.lineWidth = s * .07; for (let a = -1; a < 5; a++) { x.beginPath(); x.moveTo(X + a * s / 4, Y); x.lineTo(X + a * s / 4 + s, Y + s); x.stroke(); } }
+    else if (kind === 3) { x.fillStyle = light; x.globalAlpha = .45; for (let a = 0; a < 4; a++) { x.fillRect(X + a * s / 4, Y, s / 8, s); x.fillRect(X, Y + a * s / 4, s, s / 8); } x.globalAlpha = 1; }
+    else if (kind === 4) {   // paw prints
+      x.fillStyle = dark;
+      for (const [px, py, sc] of [[.32, .36, 1], [.7, .7, .85]]) {
+        const cx = X + px * s, cy = Y + py * s, u = s * .07 * sc;
+        x.beginPath(); x.ellipse(cx, cy + u * .9, u * 1.3, u * 1.05, 0, 0, 7); x.fill();
+        for (const [dx, dy] of [[-1.35, -.55], [-.5, -1.45], [.5, -1.45], [1.35, -.55]]) { x.beginPath(); x.ellipse(cx + dx * u, cy + dy * u, u * .45, u * .55, 0, 0, 7); x.fill(); }
+      }
+    } else if (kind === 5) {   // a little flower
+      const cx = X + s / 2, cy = Y + s / 2, u = s * .12;
+      x.fillStyle = light; for (let a = 0; a < 5; a++) { const t = a * 2 * Math.PI / 5; x.beginPath(); x.arc(cx + Math.cos(t) * u, cy + Math.sin(t) * u, u * .75, 0, 7); x.fill(); }
+      x.fillStyle = dark; x.beginPath(); x.arc(cx, cy, u * .55, 0, 7); x.fill();
+    }
+    // the stitching round each patch
+    x.strokeStyle = "rgba(247,248,243,.7)"; x.lineWidth = 2.5; x.setLineDash([9, 7]);
+    x.strokeRect(X + 6, Y + 6, s - 12, s - 12); x.restore();
+  }
+  // the cat, as big as fits, with a soft shadow on the quilt
+  const img = await loadImg(catSrc(g.cat)), fit = S * .86 / Math.max(img.width, img.height);
+  const w = img.width * fit, h = img.height * fit;
+  x.save(); x.shadowColor = "rgba(42,37,48,.45)"; x.shadowBlur = 22; x.shadowOffsetY = 10;
+  x.drawImage(img, (S - w) / 2, (S - h) / 2, w, h); x.restore();
+  pic = {key, url: c.toDataURL("image/jpeg", .9)};
+  return pic.url;
+}
+
+/* ---------- drawing ---------- */
+// Each piece is a square showing its part of the picture, moved to its square with a CSS transform (so moves glide).
+let tiles = [], knobs = [], arrows = [];
+const sqOf = p => game.pos.indexOf(p);
+const ARROW = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M7 5L3 1.5v7z"/></svg>';
+const KNOB = '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M25 16a9 9 0 1 1-2.6-6.4"/><path d="M23 4v6h-6"/></svg>';
+function draw() {
+  queueMicrotask(say);
+  const N = game.N, grid = $("grid"), board = $("board");
+  // Shift needs a strip round the edge for the arrows: 0.58 of a piece each side, so they stay big enough to tap
+  const pad = game.mode === 1 ? 58 / (N + 1.16) : 0, cell = (100 - 2 * pad) / N;
+  board.style.setProperty("--pad", pad + "%");
+  board.classList.toggle("shift", game.mode === 1);
+  board.classList.toggle("numbers", !!settings.numbers);
+  board.classList.toggle("whole", !!game.won);
+  board.classList.remove("peeking");
+  grid.innerHTML = ""; board.querySelectorAll(".arrow").forEach(a => a.remove());
+  tiles = []; knobs = []; arrows = [];
+  const url = pic.url;
+  $("peek").style.backgroundImage = `url(${url})`;
+  for (let p = 0; p < N * N; p++) {
+    const t = document.createElement("div"); t.className = "tile"; t.dataset.p = p; t.setAttribute("aria-hidden", "true");
+    t.style.width = t.style.height = 100 / N + "%";
+    t.style.backgroundImage = `url(${url})`; t.style.backgroundSize = `${N * 100}% ${N * 100}%`;
+    t.style.backgroundPosition = `${(p % N) / (N - 1) * 100}% ${Math.floor(p / N) / (N - 1) * 100}%`;
+    if (game.mode === 0 && p === GAP()) t.classList.add("gap");
+    const n = document.createElement("span"); n.className = "num"; n.textContent = p + 1; t.append(n);
+    grid.append(t); tiles.push(t);
+  }
+  if (game.mode === 2) for (let y = 0; y < N - 1; y++) for (let x = 0; x < N - 1; x++) {
+    const k = document.createElement("div"); k.className = "knob"; k.dataset.b = y * (N - 1) + x;
+    k.setAttribute("role", "button"); k.setAttribute("aria-label", `Turn the four pieces round row ${y + 1}–${y + 2}, column ${x + 1}–${x + 2}`);
+    k.style.left = (x + 1) * 100 / N + "%"; k.style.top = (y + 1) * 100 / N + "%";
+    k.style.width = k.style.height = 40 / N + "%"; k.innerHTML = KNOB;
+    grid.append(k); knobs.push(k);
+  }
+  if (game.mode === 1) {
+    // m: the move code; at: where along the edge; side: which edge
+    const add = (m, l, side) => {
+      const a = document.createElement("div"); a.className = "arrow"; a.dataset.m = m;
+      const axis = side === "l" || side === "r" ? 0 : 1, back = side === "l" || side === "t";
+      a.setAttribute("role", "button");
+      a.setAttribute("aria-label", `Shift ${axis ? "column" : "row"} ${l + 1} ${axis ? (back ? "up" : "down") : (back ? "left" : "right")}`);
+      const along = pad + (l + .5) * cell;
+      Object.assign(a.style, {width: (axis ? cell : pad) + "%", height: (axis ? pad : cell) + "%",
+        left: (axis ? along - cell / 2 : side === "l" ? 0 : 100 - pad) + "%", top: (axis ? (side === "t" ? 0 : 100 - pad) : along - cell / 2) + "%"});
+      a.innerHTML = ARROW; a.firstChild.style.transform = `rotate(${{r: 0, b: 90, l: 180, t: 270}[side]}deg)`;
+      board.append(a); arrows.push(a);
+    };
+    for (let l = 0; l < N; l++) { add(l * 2 + 1, l, "l"); add(l * 2, l, "r"); add((N + l) * 2 + 1, l, "t"); add((N + l) * 2, l, "b"); }
+  }
+  placeAll(); update();
+}
+function placeAll() {
+  const N = game.N;
+  game.pos.forEach((p, i) => { tiles[p].style.transform = `translate(${i % N * 100}%, ${Math.floor(i / N) * 100}%)`; });
+}
+// The board in words, for VoiceOver (G.describe): which piece is on each square, by its number.
+function say() {
+  if (!game) return;
+  const N = game.N, name = p => game.mode === 0 && p === GAP() ? "gap" : p + 1;
+  const rows = [...Array(N).keys()].map(r => `row ${r + 1}: ${[...Array(N).keys()].map(c => name(game.pos[r * N + c])).join(", ")}`);
+  const how = ["Arrow keys pick a square; Space slides that piece into the gap.", "Arrow keys pick a square; Shift with an arrow shifts its row or column.",
+    "Arrow keys pick a knob; Space turns its four pieces clockwise, Shift and Space turns them back."][game.mode];
+  G.describe($("grid"), `A cat picture in ${N} by ${N} pieces, numbered by where they go. ${G.listed(rows, "; ")}. ${game.won ? "It's back together." : how}`);
+}
+function update() {
+  const N = game.N, all = game.mode === 0 ? N * N - 1 : N * N;
+  const home = game.pos.filter((p, i) => p === i && !(game.mode === 0 && p === GAP())).length;
+  $("count").textContent = game.won ? "Back together!" : `${home} of ${all} in place`;
+  $("hintBtn").disabled = game.won || hinting;
+  $("undoBtn").disabled = !game.history.length || game.won;
+  $("restartBtn").disabled = !game.history.length || game.won;
+  $("peekBtn").disabled = game.won;
+  paintHint(); showCursor();
+}
+
+/* ---------- playing ---------- */
+// Make moves (one tap can make several: a Slide along a row, a Shift dragged two squares), as one Undo.
+function play(moves, glide = true) {
+  if (!playing() || !moves.length) return;
+  game.started = true;
+  for (const m of moves) { const q = applyMove(game.mode, game.N, game.pos, m); if (!q) return; game.pos = q; }
+  game.history.push(moves);
+  // keep a hint's plan while the player follows it
+  if (plan && moves.every((m, k) => plan.moves[k] === m)) plan = {moves: plan.moves.slice(moves.length), key: game.pos.join()};
+  else plan = null;
+  $("board").classList.remove("peeking");
+  if (!glide) tiles.forEach(t => { t.style.transition = "none"; });
+  placeAll();
+  if (!glide) { void $("grid").offsetWidth; tiles.forEach(t => { t.style.transition = ""; }); }
+  update();
+  if (isSolved(game.pos)) { win(); return; }
+  save();
+}
+// Slide: the piece on square i, and any between it and the gap, slide along into the gap.
+function slideFrom(i) {
+  const N = game.N, g = game.pos.indexOf(GAP()), gx = g % N, gy = Math.floor(g / N), x = i % N, y = Math.floor(i / N);
+  if (i === g) return;
+  if (x !== gx && y !== gy) { G.note("Only pieces in line with the gap can slide.", 2500); return; }
+  const d = y < gy ? 0 : x > gx ? 1 : y > gy ? 2 : 3, n = Math.abs(x - gx) + Math.abs(y - gy);
+  play(Array(n).fill(d));
+}
+// Shift: move code for a row (axis 0) or column (axis 1) l, k squares on (negative goes back), the short way round.
+function shiftMoves(axis, l, k) {
+  const N = game.N; k = ((k % N) + N) % N; if (!k) return [];
+  const back = k > N / 2, n = back ? N - k : k;
+  return Array(n).fill((axis * N + l) * 2 + (back ? 1 : 0));
+}
+const cellOf = e => { const r = $("grid").getBoundingClientRect(), N = game.N, x = Math.floor((e.clientX - r.left) / r.width * N), y = Math.floor((e.clientY - r.top) / r.height * N); return x < 0 || y < 0 || x >= N || y >= N ? -1 : y * N + x; };
+let press = null, drag = null;
+$("board").addEventListener("pointerdown", e => {
+  if ($("board").classList.contains("peeking")) { $("board").classList.remove("peeking"); return; }
+  if (!playing()) return;
+  const a = e.target.closest(".arrow");
+  if (a) { play([+a.dataset.m]); return; }
+  const k = e.target.closest(".knob");
+  if (k) { const b = +k.dataset.b; press = {b, held: false, t: setTimeout(() => { press.held = true; play([b * 2 + 1]); }, 450)}; return; }
+  const i = cellOf(e); if (i < 0) return;
+  if (game.mode === 0) slideFrom(i);
+  else if (game.mode === 1) {
+    const r = $("grid").getBoundingClientRect();
+    drag = {x0: e.clientX, y0: e.clientY, x: i % game.N, y: Math.floor(i / game.N), axis: -1, off: 0, cell: r.width / game.N};
+    $("board").setPointerCapture(e.pointerId);
+  } else G.note("Tap a round knob to turn the four pieces round it.", 3000);
+});
+$("board").addEventListener("pointermove", e => {
+  if (!drag || !playing()) return;
+  const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0, N = game.N;
+  if (drag.axis < 0) { if (Math.max(Math.abs(dx), Math.abs(dy)) < 10) return; drag.axis = Math.abs(dx) > Math.abs(dy) ? 0 : 1; }
+  drag.off = drag.axis ? dy : dx;
+  for (let t = 0; t < N; t++) {
+    const i = drag.axis ? t * N + drag.x : drag.y * N + t, el = tiles[game.pos[i]], x = i % N, y = Math.floor(i / N);
+    el.style.transition = "none";
+    el.style.transform = drag.axis ? `translate(${x * 100}%, calc(${y * 100}% + ${drag.off}px))` : `translate(calc(${x * 100}% + ${drag.off}px), ${y * 100}%)`;
+  }
+});
+function endDrag() {
+  if (!drag) return;
+  const d = drag; drag = null;
+  tiles.forEach(t => { t.style.transition = ""; });
+  if (d.axis < 0) { G.note("Drag a row or column, or tap its arrows.", 2500); return; }
+  const k = Math.round(d.off / d.cell), moves = shiftMoves(d.axis, d.axis ? d.x : d.y, k);
+  if (moves.length) play(moves, false); else placeAll();
+}
+$("board").addEventListener("pointerup", e => {
+  if (drag) { endDrag(); return; }
+  if (!press) return;
+  clearTimeout(press.t);
+  if (!press.held) play([press.b * 2]);
+  press = null;
+});
+$("board").addEventListener("pointercancel", () => { if (drag) endDrag(); if (press) { clearTimeout(press.t); press = null; } });
+$("board").addEventListener("contextmenu", e => {
+  e.preventDefault(); if (press) { clearTimeout(press.t); press = null; }
+  const k = e.target.closest(".knob"); if (k && playing()) play([+k.dataset.b * 2 + 1]);
+});
+
+// Keys: the arrows move a cursor over the squares (over the knobs in Turn). Space slides the piece under it (Slide)
+// or turns the knob's four (Turn; with Shift, back). In Shift, Shift with an arrow shifts the cursor's row or column.
+function showCursor() {
+  document.querySelectorAll(".shuf .kbcursor").forEach(x => x.classList.remove("kbcursor"));
+  const i = keys ? keys.at() : -1; if (i < 0 || !game || game.won) return;
+  const el = game.mode === 2 ? knobs[i] : tiles[game.pos[i]];
+  if (el) el.classList.add("kbcursor");
+}
+const keys = G.gridKeys({
+  on: () => playing(),
+  show: () => showCursor(),
+  size: () => game.mode === 2 ? [game.N - 1, game.N - 1] : [game.N, game.N],
+  start: () => { if (game.mode !== 0) return 0; const g = game.pos.indexOf(GAP()), N = game.N; return g % N ? g - 1 : g + 1; },
+  move(i, dx, dy, e) {
+    const [W, H] = game.mode === 2 ? [game.N - 1, game.N - 1] : [game.N, game.N], x = i % W, y = Math.floor(i / W);
+    if (game.mode === 1 && e && e.shiftKey) {
+      play(dx ? shiftMoves(0, y, dx) : shiftMoves(1, x, dy));
+      return ((y + dy + H) % H) * W + (x + dx + W) % W;   // the cursor goes with its piece
+    }
+    return Math.max(0, Math.min(H - 1, y + dy)) * W + Math.max(0, Math.min(W - 1, x + dx));
+  },
+  act(i, key, e) {
+    if (game.mode === 0) slideFrom(i);
+    else if (game.mode === 2) play([i * 2 + (e.shiftKey ? 1 : 0)]);
+    else return false;
+  },
+});
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
+
+// Undo takes back a move (or a whole slide or drag), or a Restart.
+function undo() {
+  if (!playing() || !game.history.length) return;
+  game.undid = true; plan = null;
+  const h = game.history.pop();
+  if (!Array.isArray(h)) game.pos = h.pos.slice();
+  else for (let k = h.length - 1; k >= 0; k--) game.pos = applyMove(game.mode, game.N, game.pos, undoOf(game.mode, h[k]));
+  placeAll(); update(); save();
+}
+$("undoBtn").onclick = undo;
+$("restartBtn").onclick = () => {
+  if (!playing() || !game.history.length) return;
+  game.undid = true; plan = null;
+  game.history.push({pos: game.pos.slice()});
+  game.pos = game.start.slice();
+  placeAll(); update(); save();
+  G.note("Back to how the picture started. Undo brings your moves back.", 4000);
+};
+$("peekBtn").onclick = () => { if (playing()) $("board").classList.toggle("peeking"); };
+$("numTgl").onchange = e => { settings.numbers = e.target.checked; save(); $("board").classList.toggle("numbers", settings.numbers); };
+
+/* ---------- hints ---------- */
+// Hint works out a way back to the picture (in the background) and shows its first move: a gold piece to slide,
+// a gold row or column to shift, or a gold block to turn. The player makes the move; following hints alone gets
+// there. A hint keeps the player on the same level and costs the gold paw.
+const hints = G.hinter({game: () => game, key: () => game ? game.pos.join() : "", draw: () => paintHint()});
+function paintHint() {
+  document.querySelectorAll(".shuf .hintcell, .shuf .hinted").forEach(x => x.classList.remove("hintcell", "hinted"));
+  const m = hints.current(); if (!m || !game) return;
+  for (const i of m.sq) tiles[game.pos[i]].classList.add("hintcell");
+  if (m.knob != null && knobs[m.knob]) knobs[m.knob].classList.add("hinted");
+}
+// The past mixes since the start (or the last Restart), each with the move that led to it, for the search.
+function past() {
+  let q = game.start.slice(), out = [];
+  for (const h of game.history) {
+    if (!Array.isArray(h)) { q = game.start.slice(); out = []; continue; }   // a Restart: back to the start
+    for (const m of h) { q = applyMove(game.mode, game.N, q, m); out.push([q, m]); }
+  }
+  return out;
+}
+$("hintBtn").onclick = async () => {
+  if (!playing() || hinting) return;
+  const g = game, key = game.pos.join();
+  if (!plan || plan.key !== key || !plan.moves.length) {
+    hinting = true; update();
+    const slow = setTimeout(() => G.note("Thinking…", 0), 300);
+    const r = await hintWork.take({mode: g.mode, N: g.N, trail: g.trail, past: past(), pos: g.pos.slice()});
+    clearTimeout(slow); hinting = false;
+    if (game !== g || game.pos.join() !== key) { update(); return; }
+    plan = {moves: r.moves, key};
+    if (!r.moves.length) { G.note("No hint found. Try Restart, or Undo a few moves.", 4000); update(); return; }
+  }
+  const m = plan.moves[0], N = game.N;
+  game.hinted = true; game.started = true; save(); update();
+  if (game.mode === 0) {
+    const gp = game.pos.indexOf(GAP()), t = [gp - N, gp + 1, gp + N, gp - 1][m];
+    hints.show({sq: [t]}, "Slide the gold piece into the gap.");
+  } else if (game.mode === 1) {
+    const back = m & 1, axis = Math.floor((m >> 1) / N), l = (m >> 1) % N;
+    const sq = [...Array(N).keys()].map(t => axis ? t * N + l : l * N + t);
+    hints.show({sq}, `Shift the gold ${axis ? "column" : "row"} one square ${axis ? (back ? "up" : "down") : (back ? "left" : "right")}.`);
+  } else {
+    const b = m >> 1, x = b % (N - 1), y = Math.floor(b / (N - 1)), a = y * N + x;
+    hints.show({sq: [a, a + 1, a + N, a + N + 1], knob: b}, m & 1 ? "Turn the gold four back: press and hold their knob." : "Turn the gold four clockwise: tap their knob.");
+  }
+};
+
+/* ---------- endings ---------- */
+function win() {
+  game.won = true; G.finishClock(game); keys.hide(); hints.clear(false); plan = null;
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save();
+  $("board").classList.add("whole"); update(); say();
+  G.track(`Cat Shuffle solved ${levelName(game.level)}`);
+  build.prefetch(next);
+  const g = game;
+  setTimeout(() => { if (game === g) finishCard(); }, matchMedia("(prefers-reduced-motion: reduce)").matches ? 300 : 1100);
+}
+function finishCard() {
+  const next = settings.level, N = game.N, gold = !game.undid && !game.hinted, name = who(game.cat);
+  let text = `${name ? `${name} ${name.includes(" and ") ? "are" : "is"}` : "The cat is"} back in the picture, ${N} × ${N}.`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}, ${levelName(next).split(" · ")[1]}.`;
+  // a gold paw shows the picture you put back together in place of the random cat photo
+  const im = new Image(); im.className = "whole"; im.src = pic.url; im.alt = `The finished picture: ${name || "a cat"} on a patchwork quilt`;
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the picture", game.result,
+    {title: "All in place!", gold, goldWhy: "No hints or undos!", goldPic: [im],
+     next: next > game.level ? `Next: level ${next}` : "Next picture", after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- new pictures ---------- */
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
+function begin(p, extra = {}) {
+  const pos = posOf(p.mode, p.N, p.trail);
+  game = {level: p.level, mode: p.mode, N: p.N, trail: p.trail.slice(), seed: p.seed, way: p.way, cat: p.cat,
+    pos, start: pos.slice(), history: [], won: false, ...G.freshClock(), ...extra};
+  plan = null; keys.hide(); hints.clear(false);
+}
+async function newPuzzle() {
+  if (busy) return;
+  busy = true;
+  const n = settings.level;
+  G.openCard("Shuffling the picture…", "", []);
+  const p = await build.take(n); p.level = n;
+  p.way = Math.floor(Math.random() * WAYS.length);
+  // a different cat from the last picture
+  const last = game && game.cat;
+  do p.cat = PICS[Math.floor(Math.random() * PICS.length)]; while (p.cat === last);
+  begin(p);
+  try { await picture(game); } catch (e) { G.reportError && G.reportError("picture didn't load", "catshuffle"); }
+  busy = false; G.closeCard(); G.note("");
+  draw(); save();
+  build.prefetch(n);
+  G.track(`Cat Shuffle new puzzle ${levelName(n)}`);
+  helpOnFirstVisit();
+}
+
+/* ---------- sharing ---------- */
+// The picture (cat, colours and seed) and the moves that mixed it, one base-36 digit each; with progress, the pieces now.
+const b36 = a => a.map(v => v.toString(36)).join("");
+$("linkBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Cat Shuffle", won: game.won,
+  puzzle: () => ({g: "catshuffle", N: game.level, c: PICS.indexOf(game.cat), w: game.way, s: game.seed, m: b36(game.trail)}),
+  progress: () => ({p: b36(game.pos)})}); };
+// Whether pieces can get from the picture to pos at all (a link someone has typed by hand might not).
+function reachable(mode, N, pos) {
+  let odd = 0; const seen = new Uint8Array(N * N);
+  for (let i = 0; i < N * N; i++) if (!seen[i]) { let j = i, len = 0; while (!seen[j]) { seen[j] = 1; j = pos[j]; len++; } odd ^= (len - 1) & 1; }
+  if (mode === 0) { const g = pos.indexOf(N * N - 1); return odd === ((N - 1 - g % N + N - 1 - Math.floor(g / N)) & 1); }
+  if (mode === 1) return N % 2 === 0 || !odd;
+  return true;
+}
+async function openShared(d) {
+  const fail = () => G.note("That share link didn't work.", 5000);
+  if (!(Number.isInteger(d.N) && d.N >= 1 && d.N <= MAX_LEVEL)) { fail(); return; }
+  const {mode, N} = levelSpec(d.N);
+  if ( !PICS[d.c] || !WAYS[d.w] || !Number.isInteger(d.s) || typeof d.m !== "string" || d.m.length > 600) { fail(); return; }
+  const trail = [...d.m].map(c => parseInt(c, 36));
+  let pos = solvedPos(N);
+  for (const m of trail) { if (!(m >= 0 && m < moveCount(mode, N))) { fail(); return; } pos = applyMove(mode, N, pos, m); if (!pos) { fail(); return; } }
+  if (isSolved(pos)) { fail(); return; }
+  let now = null;
+  if (d.p && typeof d.p.p === "string") {
+    const q = [...d.p.p].map(c => parseInt(c, 36));
+    if (q.length === N * N && new Set(q).size === N * N && q.every(v => v >= 0 && v < N * N) && reachable(mode, N, q)) now = q;
+  }
+  begin({level: d.N, mode, N, trail, seed: d.s, way: d.w, cat: PICS[d.c]});
+  if (now) { game.pos = now; game.timed = false; }
+  settings.level = d.N; $("levelSel").value = d.N;
+  try { await picture(game); } catch (e) {}
+  draw(); save(); build.prefetch(game.level);
+  if (now && isSolved(now)) win(); else helpOnFirstVisit();
+}
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  if (game) settings.seen[game.mode] = false;
+  helpOnFirstVisit();
+  if (!document.querySelector(".spot")) { if (game) settings.seen[game.mode] = true; G.helpLater(); }
+}
+// The first time each way of playing comes up, a walkthrough of it on the board that's out.
+function helpOnFirstVisit() {
+  if (!game || !playing() || document.querySelector(".spot") || settings.seen[game.mode]) return;
+  const N = game.N, xy = i => [i % N, Math.floor(i / N)], all = [...Array(N * N).keys()].map(xy);
+  const turn = G.yourTurn(() => game, g => { game = g; plan = null; }, draw);
+  let was = "";
+  const tryStep = (say, lit) => ({say, lit, ...turn.upTo, try: {done: () => game.pos.join() !== was},
+    enter() { turn.from.enter(); was = game.pos.join(); }});
+  const done = () => { settings.seen[game.mode] = true; save(); };
+  const numStep = {say: "Each piece shows where it goes", els: [$("numTgl").closest(".opt")]};
+  const peekStep = {say: "Peek shows the whole picture", els: [$("peekBtn")]};
+  let steps;
+  if (game.mode === 0) {
+    const g = game.pos.indexOf(GAP()), gx = g % N, gy = Math.floor(g / N);
+    const by = all.filter(([x, y]) => Math.abs(x - gx) + Math.abs(y - gy) === 1);
+    steps = [
+      {say: "Put the cat's picture back 🐈", lit: all},
+      tryStep("Tap a piece by the gap", by),
+      {say: "Tap further along to slide more", lit: all.filter(([x, y]) => (x === gx || y === gy) && !(x === gx && y === gy)), later: true},
+      {say: "The last piece comes back at the end", lit: [[N - 1, N - 1]], later: true},
+      {say: "Every piece in its place", lit: all, tone: "ok"},
+      peekStep, numStep,
+      {say: "Stuck? Hint shows a piece to slide", els: [$("hintBtn")]},
+    ];
+  } else if (game.mode === 1) {
+    const row = all.filter(([, y]) => y === 0);
+    steps = [
+      {say: "Rows and columns shift round 🐈", lit: all},
+      tryStep("Drag this row sideways", row),
+      {say: "Off one end, on the other", lit: row, later: true},
+      {say: "Or tap the arrows round the edge", lit: [], els: [() => arrows.slice(0, 4)], later: true},
+      {say: "Every piece in its place", lit: all, tone: "ok"},
+      peekStep, numStep,
+      {say: "Stuck? Hint shows a row to shift", els: [$("hintBtn")]},
+    ];
+  } else {
+    const block = [[0, 0], [1, 0], [0, 1], [1, 1]];
+    steps = [
+      {say: "Turn blocks of four pieces 🐈", lit: all},
+      tryStep("Tap the knob to turn its four", block),
+      {say: "Press and hold to turn back", lit: block, later: true},
+      {say: "Every piece in its place", lit: all, tone: "ok"},
+      peekStep, numStep,
+      {say: "Stuck? Hint shows a four to turn", els: [$("hintBtn")]},
+    ];
+  }
+  G.spotlight({grid: $("grid"), w: N, h: N, steps, done});
+}
+
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
+$("helpBtn").onclick = showHelp;
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+
+G.nav("catshuffle");
+G.checkClock(game);
+G.setupTimer({name: "catshuffle", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
+
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level; $("numTgl").checked = !!settings.numbers;
+const shared = G.readShare("catshuffle");
+const hadSave = !!game;
+if (hadSave) G.reopen(() => {
+    const N = game.N;
+    const spec = levelSpec(game.level);
+    if (!(game.level >= 1 && game.level <= MAX_LEVEL) || spec.mode !== game.mode || spec.N !== N || !PICS.includes(game.cat) || !WAYS[game.way] || game.pos.length !== N * N || !reachable(game.mode, N, game.pos)) throw new Error("the saved picture doesn't fit");
+    picture(game).catch(() => {}).then(() => {
+      draw();
+      if (game.won) finishCard(); else helpOnFirstVisit();
+      build.prefetch(settings.level);
+    });
+  }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
+else if (!shared) newPuzzle();
+const shareOpts = () => ({name: "Cat Shuffle", inProgress: !!(game && !game.won && game.history.length), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, {...shareOpts(), fresh: hadSave ? null : why => Promise.resolve(newPuzzle()).then(() => { G.note(why, 6000); })});
+window.addEventListener("hashchange", () => { const d = G.readShare("catshuffle"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>

@@ -68,6 +68,8 @@ Cat Pile lays the napping cats from Sunbeams (the `SLEEPERS` list, the same in b
   `fred-23` prowls on the floor below the shelf of yarn he knocked out of order, Dottie (`dottie-22`, with her teal crochet)
   settles in there once it's sorted, and `fred-16` crouches to pounce on the gold-paw card.
 
+Cat Shuffle has no star cat: its cats are shuffled too. Each puzzle draws one of 21 big, whole pictures as large as fits on a patchwork quilt and cuts the picture into pieces: the general cats `c14-34`, `c14-35`, `c14-36`, `c15-5`, `c15-6` (curled up), `c15-38` and `c14-63` (sitting), and the named cats `bowtie-6`, `bugsy-4`, `bugsy-6`, `bugsy-bowtie-boxes`, `crunch-4` to `crunch-7`, `dottie-5`, `dottie-22`, `laya-2`, `laya-3`, `laya-4` and `laya-7` (the list `PICS` in `catshuffle/index.html`). The win card names a named cat ("Crunch is back in the picture"), and the gold-paw card shows the finished picture.
+
 Meowbile puts a general cat beside its title, `c18-21` (a calico sitting and looking up at the mobile), and `c18-38` (a ginger cat leaping up) is on the gold-paw card.
 
 Shelf Life's skeins of yarn (`shelflife/skeins/skein-1` to `-9`) are the owner's drawing of nine shop-wound skeins, all near enough square, cut apart:
