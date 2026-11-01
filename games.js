@@ -788,7 +788,7 @@ const G = (() => {
   }
   function findEl(f) { const e = document.getElementById(f.id); return e && f.up ? e.closest(f.up) : e; }
   const isToolStep = st => !st.try && !st.enter && !(st.lit && st.lit.length) && !st.marks && !st.shapes && !st.lines && !st.arrows &&
-    resolveEls(st.els).length && resolveEls(st.els).every(e => e.closest && e.closest(".actions,.bar,.toggles") && findable(e));
+    resolveEls(st.els).length && resolveEls(st.els).every(e => e.closest && e.closest(".actions,.bar,.toggles,main > .tools") && findable(e));
   // A step about an on/off switch (Auto grade, Auto check…) isn't in the walkthrough at all: it's shown once, by
   // itself, the first time the player turns that switch on, which is when it means something (tips, below).
   const isSwitchStep = st => isToolStep(st) && resolveEls(st.els).every(e => e.closest(".toggles") && e.querySelector && e.querySelector("input[type=checkbox]"));
@@ -813,8 +813,13 @@ const G = (() => {
       if (sw.length && sw.length < o.steps.length) { o = {...o, steps: o.steps.filter(st => !isSwitchStep(st))}; keepSwitchTips(sw); }
     }
     if (!tip && Date.now() - helpTappedAt > 2000) {   // a first visit: tools and settings wait for later
-      const later = o.steps.filter(isToolStep);
-      if (later.length && later.length < o.steps.length) { o = {...o, steps: o.steps.filter(st => !isToolStep(st))}; keepTips(later); }
+      // a step marked later: true waits too (for How to play, or as a tip if what it points at can be found again)
+      const isLater = st => isToolStep(st) || (st.later && !st.try);
+      const later = o.steps.filter(isLater);
+      if (later.length && later.length < o.steps.length) {
+        o = {...o, steps: o.steps.filter(st => !isLater(st))};
+        keepTips(later.filter(st => resolveEls(st.els).length && resolveEls(st.els).every(findable)));
+      }
     }
     else if (!tip) { const d = load(TIPS); if (d[SLUG]) { delete d[SLUG]; save(TIPS, d); } }   // the whole walkthrough covers them
     const wrap = o.grid.parentElement, layer = document.createElement("div"), ns = "http://www.w3.org/2000/svg";
@@ -916,6 +921,7 @@ const G = (() => {
       holes = st.try && !st.tried ? [
         ...(lit.length ? [[Math.min(...lit.map(([x]) => X(x))), Math.min(...lit.map(([, y]) => Y(y))), Math.max(...lit.map(([x]) => X(x + 1))), Math.max(...lit.map(([, y]) => Y(y + 1)))]] : []),
         ...els.map(r => [r.x, r.y, r.x + r.w, r.y + r.h])] : [];
+      layer.dataset.holes = JSON.stringify(holes.map(h => h.map(Math.round)));   // where taps go through (handy for tests)
       // the bar: a dot for each step, and Skip (or, for a single tip, Got it)
       const bar = document.createElement("div"); bar.className = "spotBar";
       if (steps().length > 1) {
@@ -994,6 +1000,7 @@ const G = (() => {
     function close() {
       clearInterval(ticker); removeEventListener("resize", redraw); removeEventListener("scroll", redraw); document.removeEventListener("pointerup", tried, true);
       for (const ev of ["pointerdown", "click"]) window.removeEventListener(ev, guard, true);
+      for (const f of new Set(o.steps.map(st => st.restore).filter(Boolean))) f();   // Your turn steps: the board as it was
       holes = []; layer.remove(); if (o.done) o.done();
     }
     // Skip (or Escape): the walkthrough ends here, and counts as seen; How to play has it all again.
@@ -1046,6 +1053,21 @@ const G = (() => {
     });
     ticker = setInterval(() => { const st = o.steps[k]; if (st && (st.marks || []).some(m => Array.isArray(m[2]))) { frame++; show(); } }, 900);
     next(); layer.focus({preventScroll: true});
+  }
+
+  /* ---------- your turn ---------- */
+  // Your turn steps in a walkthrough (st.try) are played on the real board; this keeps the game as it was before the
+  // first of a run of them and puts it back after the last, or whenever the walkthrough ends (Skip included), so
+  // nothing is given away or lost (clock, lives and undos too). get/set reach the page's game; redraw shows it again.
+  // Put `...turn.from` on each step of the run and `...turn.upTo` on its last.
+  function yourTurn(get, set, redraw) {
+    let was = null;
+    const putBack = () => {
+      if (was != null && JSON.stringify(get()) !== was) { set(JSON.parse(was)); note(""); }
+      was = null; if (redraw) redraw();
+    };
+    const from = {enter() { if (was == null) was = JSON.stringify(get()); }, restore: putBack};
+    return {from, upTo: {...from, leave: putBack}, putBack};
   }
 
   /* ---------- tips ---------- */
@@ -1432,6 +1454,6 @@ const G = (() => {
     }
   }
 
-  return {GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, relabel, icon: iconSVG, guesser, meaning, plainText,
+  return {GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, relabel, icon: iconSVG, guesser, yourTurn, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();
