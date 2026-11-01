@@ -326,7 +326,7 @@ revive keeps the player on the same level and costs the gold paw.
   cat photo. Add the game to the Gold paw, Share and Keys lists under "Across every game", to the Hints list
   if a second hint says more, and to Help if its rule differs.
 - **Ideas list:** keep `IDEAS.md` up to date with every decision, in the same PR. Set the game's row to
-  Built, name it "<Game> (<puzzle it's based on>)", and move it below the Idea rows of its group; add a row
+  Built, name it "<Game> (<puzzle it's based on>)", and set its Shelf to the shelf it went on, and move it below the Idea rows of that shelf; add a row
   if the game wasn't listed. When two ideas become one game, merge their rows; when an idea becomes a mode
   or levels of an existing game, mark it Built and say where (Notes); drop rows the user rules out; and note
   new ideas, themes or changes of plan that come up while talking it through.
