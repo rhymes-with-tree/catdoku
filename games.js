@@ -496,7 +496,7 @@ const G = (() => {
     .bests td.num,.bests th.num{text-align:right}
     .bests tr.now td{font-weight:800}
     .card h3{margin:4px 0 6px;font-size:calc(18px*var(--ts))}
-    .spot{position:fixed;inset:0;z-index:9;cursor:pointer;animation:spotIn .35s ease-out;-webkit-tap-highlight-color:transparent;touch-action:none}
+    .spot{position:fixed;inset:0;z-index:9;overflow:hidden;cursor:pointer;animation:spotIn .35s ease-out;-webkit-tap-highlight-color:transparent;touch-action:none}
     .spot:focus{outline:none}
     .spot svg{position:absolute;inset:0;display:block}
     .spot .dim{fill:rgba(42,37,48,.66)}
@@ -505,14 +505,14 @@ const G = (() => {
     .spot .arrowLine{fill:none;stroke:#FFF4D2;stroke-linecap:round}
     .spot .arrowLine.back{stroke:var(--ink)}
     .spot .arrowHead{fill:#FFF4D2;stroke:var(--ink);stroke-linejoin:round;paint-order:stroke fill}
-    .spot .say{position:absolute;left:4%;right:4%;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;pointer-events:none}
+    .spot .say{position:absolute;left:4%;right:4%;max-width:100vw;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;pointer-events:none}
     .spot .say b{font-size:clamp(24px,7vw,36px);font-weight:800;line-height:1.1;color:#FFF4D2;-webkit-text-stroke:6px var(--ink);paint-order:stroke fill;text-wrap:balance}
     .spot .say small{font-size:15px;font-weight:600;color:#FFF4D2;-webkit-text-stroke:3px var(--ink);paint-order:stroke fill;opacity:.9;animation:spotTap 1.6s ease-in-out infinite}
     .spot .say b .w{white-space:nowrap}
     .spot .say b .emo img{display:inline-block;width:1.15em;height:1.15em;vertical-align:-.2em}
     .spot .say b .emo{-webkit-text-stroke:0;display:inline-block;background:#FFF4D2;border:3px solid var(--ink);border-radius:999px;padding:0 .12em;margin:0 .04em;line-height:1.15;font-size:.85em;vertical-align:.06em}
     /* the walkthrough's own bar, centred at the bottom of the screen: a dot for each step (Apple's page control) and Skip */
-    .spot .spotBar{position:fixed;left:50%;transform:translateX(-50%);bottom:max(14px,env(safe-area-inset-bottom));display:flex;align-items:center;gap:14px;
+    .spot .spotBar{position:fixed;left:50%;transform:translateX(-50%);max-width:calc(100vw - 24px);bottom:max(14px,env(safe-area-inset-bottom));display:flex;align-items:center;gap:14px;
       padding:4px 6px 4px 16px;border-radius:999px;background:rgba(42,37,48,.82);pointer-events:auto;cursor:default}
     .spot .dots{display:flex;gap:7px}
     .spot .dots i{width:8px;height:8px;border-radius:50%;background:rgba(255,244,210,.35)}
