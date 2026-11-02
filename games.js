@@ -98,7 +98,7 @@ const G = (() => {
 
   /* ---------- the daily challenge ---------- */
   // One game a day is today's challenge, the same game for everyone on a given date: win any puzzle in it that
-  // day (in Pawlette, clear 3 lines in one Swipe game) to do it. The games come round in cycles: the first, from
+  // day (in Pawlette, dye a whole skein) to do it. The games come round in cycles: the first, from
   // DAILY_START, begins with Catdoku and then takes the rest in a shuffled order; each later cycle is shuffled
   // afresh, never the same game two days running. A new game (one with an added date) joins the first cycle
   // that starts at least DAILY_WAIT days after it was added, so it has a few days on the site first.
@@ -135,7 +135,7 @@ const G = (() => {
   const dailyDoneToday = () => dailyDates().includes(today());
   let CURRENT = null;   // the game on this page, from nav
   let HOME = "../";     // the front page, from nav's base
-  // A win just now on this page (in Pawlette, 3 lines cleared in one Swipe game): if it's today's challenge, mark
+  // A win just now on this page (in Pawlette, a whole skein dyed): if it's today's challenge, mark
   // it done. Called at the moment of winning (finishClock), never when a solved puzzle is reopened, so an old
   // win doesn't count for today. Returns the line for the win card, or "".
   let justDone = false;   // whether the latest win on this page is the one that did today's challenge
@@ -291,7 +291,7 @@ const G = (() => {
     // on today's challenge, a badge under the menu button says so
     if (current && current === dslug) {
       const badge = document.createElement("span"); badge.className = "dailyBadge"; badge.id = "dailyBadge";
-      const set = () => { const done = dailyDoneToday(), k = dailyStreak(); badge.textContent = done ? `Today's challenge: solved!${k > 1 ? ` ${k}-day streak!` : ""}` : current === "pawlette" ? "Today's challenge: can you clear 3 lines in Swipe?" : "Today's challenge: can you solve one?"; badge.classList.toggle("done", done); };
+      const set = () => { const done = dailyDoneToday(), k = dailyStreak(); badge.textContent = done ? `Today's challenge: solved!${k > 1 ? ` ${k}-day streak!` : ""}` : current === "pawlette" ? "Today's challenge: can you dye a skein?" : "Today's challenge: can you solve one?"; badge.classList.toggle("done", done); };
       set(); badge.refresh = set; el.append(badge);
     }
   }
@@ -429,11 +429,15 @@ const G = (() => {
   const goldPaws = slug => (load(GOLD).counts || {})[slug] || 0;
   const mastered = slug => !!(load(GOLD).top || {})[slug];
   // A mastered game's tile keeps its shelf's colour and gets a small gold Mastered label; extra (the front page's "12 solved")
-  // joins it as "Mastered · 12 solved", and a phone, short of room, shows just the extra in the gold label.
+  // joins it as "Mastered · 12 solved", and a phone, short of room, shows just "Mastered" in the gold label.
   const masterPill = (extra = "") => {
     const m = document.createElement("span"); m.className = "masterPill"; m.title = "Mastered: a gold paw at the top level";
     if (!extra) m.textContent = "Mastered";
-    else { const w = document.createElement("span"); w.className = "masterWord"; w.textContent = "Mastered · "; m.append(w, extra); }
+    else {   // "Mastered · 12 solved"; a phone tile, short of room, shows just "Mastered" (index.html)
+      const w = document.createElement("span"); w.className = "masterWord"; w.textContent = "Mastered";
+      const c = document.createElement("span"); c.className = "masterCount"; c.textContent = ` · ${extra}`;
+      m.append(w, c);
+    }
     return m;
   };
   // the highest level or size in the page's picker
