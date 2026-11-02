@@ -54,7 +54,7 @@ const G = (() => {
     ["Window Ledges", "windowledges", "Add up the windows to match every total", "#B3B94B", "numbers", "kakuro cross sums sums arithmetic maths math", "2026-10-31"],
     ["Cat Shuffle", "catshuffle", "Put the cat's picture back together", "#9874CA", "teasers", "fifteen 15 puzzle sixteen twiddle sliding tiles slide puzzle picture shuffle scramble rotate turn", "2026-11-01"],
     ["Mew Hue", "mewhue", "Slide paint together and line up the colours", "#B94588", "quick", "colour color mixing paint swipe slide merge lines rows columns 2048 hue pawlette", "2026-11-01"],
-    ["Kitty Plinko", "kittyplinko", "Take turns with Gus and Peanut dropping yarn down the cat tree into the cat beds", "#7885BA", "quick", "plinko pachinko pegs pegboard galton board drop balls bounce physics yarn cat tree beds action", "2026-11-02"],
+    ["Kitty Plinko", "kittyplinko", "Take turns with Gus and Peanut knocking toys down the cat tree into the cat beds", "#7885BA", "quick", "plinko pachinko pegs pegboard galton board drop balls bounce physics yarn cat tree beds action", "2026-11-02"],
   ];
   // The shelves the front page and the games menu sort the games onto, in order: key (also a plain name for it,
   // for search), heading, one line.
