@@ -59,7 +59,10 @@
 .keybar svg{width:30px;height:30px;flex:none}
 .goalbar{height:8px;border-radius:999px;background:var(--line);overflow:hidden;width:min(140px,30vw)}
 .goalbar i{display:block;height:100%;background:#ECA818;border-radius:999px;transition:width .3s}
-#count{display:flex;align-items:center;gap:8px}
+#count{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#count .need{display:inline-flex;align-items:center;gap:4px;padding:1px 8px 1px 4px;border-radius:999px;border:2px solid var(--line)}
+#count .need.ok{border-color:#6AA673}
+#count .need .chip{width:20px;height:20px}
 /* Willow: strolling by the title, her face rising over each line that clears, asleep on the gold-paw card */
 .sitter{display:block;height:58px;width:auto;margin-bottom:-4px}
 @media (max-height:760px){.sitter{height:42px;margin-bottom:-3px}}
@@ -160,26 +163,47 @@ function clearLines(g) {
   return {lines, crumble};
 }
 // Levels: how many lines to clear, and which count (only stone on level 5). The colours come from boardColours.
-function levelSpec(n) { return [null, {goal: 1}, {goal: 1}, {goal: 1}, {goal: 2}, {goal: 1, stone: true}, {goal: 3}, {goal: 4}, {goal: 4}, {goal: 4}][n]; }
+function levelSpec(n) { return [null, {goal: 1}, {goal: 1}, {goal: 1}, {goal: 2}, {goal: 1, stone: true}, {goal: 3}, {goal: 4}, {goal: 4}, {goal: 4},
+  {task: 1}, {task: 1}, {task: 1}, {task: 1}, {task: 1}, {task: 1}][n]; }
+// Levels 10 to 15 ask for something particular (from the board's seed where it names a colour): need, lines of those
+// kinds (a colour twice means two lines of it); or lines, then none of the without colours left on the board.
+function taskOf(level, seed) {
+  const MIX = [1, 3, 5][seed % 3], PRIM = [0, 2, 4][(seed >> 2) % 3];
+  return {10: {need: [MIX, 6]}, 11: {lines: 4, without: [PRIM]}, 12: {need: [1, 3, 5]}, 13: {lines: 4, without: [6]},
+    14: {need: [6, 6, MIX]}, 15: {lines: 5, without: [7, 8]}}[level];
+}
+// Whether a game has done its level's goal.
+function goalDone(g) {
+  const spec = levelSpec(g.level);
+  if (!spec.task) return g.lines >= spec.goal;
+  const t = taskOf(g.level, g.seed), got = (g.got || []).slice();
+  if (t.need) return t.need.every(c => { const k = got.indexOf(c); if (k < 0) return false; got.splice(k, 1); return true; });
+  return g.lines >= t.lines && !g.grid.some(c => t.without.includes(c));
+}
 // Each board's colours: what falls in (colour: weight) and the key's bars. Levels 1 to 3 take the three pairs of
 // primaries in the player's own order (order, kept on the device), so level 2 brings in the third mark and by level
 // 3 they've made all three mixes; level 3 also drops that pair's mix ready-made. The rest pick from the board's
 // seed: level 4 any two mixes, level 5 any primary with the mix that hasn't its mark (they set into stone), and
 // level 6 all three primaries with any one of them rarer.
 // Levels 7 to 9 drop black and white this often (each, where it comes up), against 1 for each common primary.
-const BLACK_WHITE = .2;
+const BLACK_WHITE = .2, READY = .35;
 function boardColours(level, seed, order) {
   const PAIRS = [[0, 2, 1], [0, 4, 5], [2, 4, 3]], COMP = {0: 3, 2: 5, 4: 1}, PRIM = [0, 2, 4], k = seed % 3, d = {};
   if (level <= 3) { const [a, b, m] = PAIRS[order[level - 1]]; d[a] = 1; d[b] = 1; if (level === 3) d[m] = .5; return {drops: d, key: [[a, m, b]]}; }
   if (level === 4) { const two = [1, 3, 5].filter((_, i) => i !== k); d[two[0]] = 1; d[two[1]] = 1; return {drops: d, key: [[two[0]], [two[1]]]}; }
   if (level === 5) { const p = PRIM[k]; d[p] = 3; d[COMP[p]] = 1; return {drops: d, key: [[p, 6, COMP[p]]]}; }
-  const rare = PRIM[k]; PRIM.forEach(c => { d[c] = c === rare ? .35 : 1; });
+  // one primary rarer than the others on levels 6 to 9; all three alike from level 10
+  const rare = PRIM[k]; PRIM.forEach(c => { d[c] = c === rare && level < 10 ? .35 : 1; });
   // with all three primaries about, every way to make stone shows: red and green, yellow and purple, blue and orange
   const stones = PRIM.map(p => [p, 6, COMP[p]]);
   // black on level 7, white on 8, both on 9 (where they make stone together)
   if (level === 7) { d[7] = BLACK_WHITE; return {drops: d, key: [[0, 1, 2, 3, 4, 5, 0], ...stones, [7]]}; }
   if (level === 8) { d[8] = BLACK_WHITE; return {drops: d, key: [[0, 1, 2, 3, 4, 5, 0], ...stones, [8]]}; }
-  if (level === 9) { d[7] = BLACK_WHITE; d[8] = BLACK_WHITE; return {drops: d, key: [[0, 1, 2, 3, 4, 5, 0], ...stones, [8, 6, 7]]}; }
+  // a goal that names mixes drops them ready-made now and then too, so its lines can be built
+  if (level >= 10) for (const c of new Set((taskOf(level, seed).need || []).filter(c => c % 2))) d[c] = READY;
+  // Every mix is mostly the mixes themselves, sorted into lines, as on level 4
+  if (level === 12) { PRIM.forEach(c => { d[c] = .25; }); [1, 3, 5].forEach(c => { d[c] = 1; }); }
+  if (level >= 9) { d[7] = level === 12 ? .6 : BLACK_WHITE; d[8] = BLACK_WHITE; return {drops: d, key: [[0, 1, 2, 3, 4, 5, 0], ...stones, [8, 6, 7]]}; }
   return {drops: d, key: [[0, 1, 2, 3, 4, 5, 0], ...stones]};
 }
 function pickDrop(drops, r) { const e = Object.entries(drops), tot = e.reduce((t, [, w]) => t + w, 0); let x = r * tot; for (const [c, w] of e) { if ((x -= w) < 0) return +c; } return +e[0][0]; }
@@ -219,7 +243,7 @@ function drawKey(g) {
 /* ---------- game state ---------- */
 // game: {level, seed, grid (a colour number or -1 in each square), drops, lines, moves, mixes (Mix it ups left),
 //        start (the board as dealt), history, won, lost, hinted, undid, clock…}
-const STORE = "catdoku.mewhue.v3", MAX_LEVEL = 9, MIXES = 2, $ = G.$;
+const STORE = "catdoku.mewhue.v3", MAX_LEVEL = 15, MIXES = 2, $ = G.$;
 let saved = G.load(STORE), settings = Object.assign({level: 1, seen: {}}, saved.settings);
 // the order levels 1 to 3 take the pairs of primaries in, picked once for this device
 const isOrder = o => Array.isArray(o) && o.length === 3 && [0, 1, 2].every(k => o.includes(k));
@@ -227,19 +251,19 @@ if (!isOrder(settings.order)) settings.order = [0, 1, 2].sort(() => Math.random(
 let game = saved.game || null, busy = false;
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !game.lost && !busy && !$("overlay").classList.contains("show");
-const levelName = n => [null, "Two colours", "A new colour", "All three mixes", "Two mixes", "Stone", "All three", "Black", "White", "Black and white"][n];
+const levelName = n => [null, "Two colours", "A new colour", "All three mixes", "Two mixes", "Stone", "All three", "Black", "White", "Black and white", "A mix and stone", "Clean sweep", "Every mix", "No stone left", "Two stones and a mix", "Spotless"][n];
 function drop(g) {
   const r = seeded(g.seed * 7919 + g.drops++), empty = g.grid.map((c, i) => c < 0 ? i : -1).filter(i => i >= 0);
   if (!empty.length) return -1;
   const i = empty[Math.floor(r() * empty.length)]; g.grid[i] = pickDrop(boardColours(g.level, g.seed, g.order).drops, r()); return i;
 }
 function deal(level, seed, order) {
-  const g = {level, seed, order: (order || settings.order).slice(), grid: new Array(N * N).fill(-1), drops: 0, lines: 0, moves: 0, mixes: MIXES, history: [], won: false, lost: false, ...G.freshClock()};
+  const g = {level, seed, order: (order || settings.order).slice(), grid: new Array(N * N).fill(-1), drops: 0, lines: 0, got: [], moves: 0, mixes: MIXES, history: [], won: false, lost: false, ...G.freshClock()};
   for (let k = 0; k < 4; k++) drop(g);
   g.start = JSON.stringify({grid: g.grid, drops: g.drops});
   return g;
 }
-const snap = () => JSON.stringify({grid: game.grid, drops: game.drops, lines: game.lines, moves: game.moves, mixes: game.mixes});
+const snap = () => JSON.stringify({grid: game.grid, drops: game.drops, lines: game.lines, got: game.got || [], moves: game.moves, mixes: game.mixes});
 // Every slide that would change something: [axis, line, back]
 function slides(g) {
   const out = [];
@@ -261,9 +285,18 @@ function draw() {
   drawKey(game);
   update();
 }
+// A goal level's goal, for the status line: each line it needs with its colour's mark (ticked once done), or the
+// lines so far and the colours that mustn't be left.
+const tick = (ok, inner) => `<span class="need${ok ? " ok" : ""}">${ok ? "✓ " : ""}${inner}</span>`;
+function taskText(g, plain) {
+  const t = taskOf(g.level, g.seed), got = (g.got || []).slice(), nm = c => COLOURS[c].name;
+  if (t.need) return t.need.map(c => { const k = got.indexOf(c), ok = k >= 0; if (ok) got.splice(k, 1); return plain ? `a ${nm(c)} line` : tick(ok, `${chip(c)} line`); }).join(plain ? " and " : " ");
+  const left = g.grid.filter(c => t.without.includes(c)).length, none = t.without.map(c => plain ? nm(c) : chip(c)).join(plain ? " or " : "");
+  return plain ? `${t.lines} lines, then no ${none} left` : `${tick(g.lines >= t.lines, `${Math.min(g.lines, t.lines)} of ${t.lines} lines`)} ${tick(!left, `no ${none} left`)}`;
+}
 function update() {
   const spec = levelSpec(game.level);
-  $("count").innerHTML = `Level ${game.level} · ${Math.min(game.lines, spec.goal)} of ${spec.goal} ${spec.stone ? "stone " : ""}line${spec.goal === 1 ? "" : "s"} <span class="goalbar"><i style="width:${Math.min(100, game.lines / spec.goal * 100)}%"></i></span>`;
+  $("count").innerHTML = spec.task ? `Level ${game.level} · ${taskText(game)}` : `Level ${game.level} · ${Math.min(game.lines, spec.goal)} of ${spec.goal} ${spec.stone ? "stone " : ""}line${spec.goal === 1 ? "" : "s"} <span class="goalbar"><i style="width:${Math.min(100, game.lines / spec.goal * 100)}%"></i></span>`;
   $("hintBtn").disabled = !playing();
   $("undoBtn").disabled = !game.history.length || game.won;
   $("restartBtn").disabled = !game.history.length || game.won;
@@ -302,10 +335,10 @@ function slideMove(ax, l, back) {
       // a walkthrough demo: show what happened, nothing more (no new block, no lines counted)
       if (game.demo) { busy = false; draw(); return; }
       const counted = c.lines.filter(x => !spec.stone || x.c === 6).length;
-      game.lines += counted;
+      game.lines += counted; game.got = [...(game.got || []), ...c.lines.map(x => x.c)];
       if (c.lines.length && !game.demo) { G.note(c.lines.length > 1 ? `${c.lines.length} lines at once!` : c.lines[0].c === 6 ? "A line of stone!" : "A whole line!", 2000); }
       if (spec.stone && c.lines.length && !counted) G.note("This level only counts lines of stone.", 2500);
-      if (game.lines >= spec.goal) { busy = false; draw(); win(); return; }
+      if (goalDone(game)) { busy = false; draw(); win(); return; }
       const i = drop(game);
       busy = false; draw(); if (i >= 0 && blocks[i]) blocks[i].classList.add("fresh");
       if (!slides(game.grid).length) lose();
@@ -362,7 +395,7 @@ $("undoBtn").onclick = undo;
 $("restartBtn").onclick = () => {
   if (!game || busy || !game.history.length || game.won) return;
   game.undid = true; game.history.push(snap());
-  Object.assign(game, JSON.parse(game.start), {lines: 0, moves: 0, mixes: MIXES, lost: false});
+  Object.assign(game, JSON.parse(game.start), {lines: 0, got: [], moves: 0, mixes: MIXES, lost: false});
   G.closeCard(); draw(); save(); G.note("Back to the start of the level. Undo brings it back.", 3500);
 };
 // Mix it up: the cat bats the board and every block that isn't stone lands somewhere new. Two a level.
@@ -387,12 +420,20 @@ function score(g, spec) {
   for (let l = 0; l < N; l++) for (const ax of [0, 1]) { const cnt = {}; lineOf(ax, l, true).forEach(i => { if (g[i] >= 0) cnt[g[i]] = (cnt[g[i]] || 0) + 1; }); for (const [c, n] of Object.entries(cnt)) s += n * n * (spec.stone && +c === 6 ? 3 : 1); }
   return s;
 }
+// On a goal level, how much a slide's lines (and the board after) help: a line of a colour still needed, or lines while
+// more are wanted, then fewer of the colours that mustn't be left.
+function taskValue(lines, h) {
+  const t = taskOf(game.level, game.seed);
+  if (t.need) { const want = t.need.slice(); for (const c of game.got || []) { const k = want.indexOf(c); if (k >= 0) want.splice(k, 1); }
+    return lines.filter(x => { const k = want.indexOf(x.c); if (k < 0) return false; want.splice(k, 1); return true; }).length * 1000; }
+  return (game.lines < t.lines ? lines.length * 1000 : 0) - h.filter(c => t.without.includes(c)).length * 60;
+}
 $("hintBtn").onclick = () => {
   if (!playing()) return;
   const spec = levelSpec(game.level); let best = null;
   for (const [ax, l, back] of slides(game.grid)) {
     const h = game.grid.slice(); slideLine(h, lineOf(ax, l, back)); const c = clearLines(h);
-    const sc = c.lines.filter(x => !spec.stone || x.c === 6).length * 1000 + c.lines.length * 200 + score(h, spec);
+    const sc = (spec.task ? taskValue(c.lines, h) : c.lines.filter(x => !spec.stone || x.c === 6).length * 1000) + c.lines.length * 200 + score(h, spec);
     if (!best || sc > best.sc) best = {sc, ax, l, back, c};
   }
   if (!best) { G.note("Nothing can slide. Try Mix it up, or Undo.", 3000); return; }
@@ -408,7 +449,7 @@ function win() {
   settings.level = next; $("levelSel").value = next; save();
   G.track(`Mew Hue won level ${game.level}`);
   const gold = !game.undid && !game.hinted && !game.mixed, spec = levelSpec(game.level);
-  let text = `You cleared ${game.lines} ${spec.stone ? "line" : "line"}${game.lines === 1 ? "" : "s"}${spec.stone ? " of stone" : ""} in ${game.moves} moves.`;
+  let text = spec.task ? `Done: ${taskText(game, true)}, in ${game.moves} moves.` : `You cleared ${game.lines} ${spec.stone ? "line" : "line"}${game.lines === 1 ? "" : "s"}${spec.stone ? " of stone" : ""} in ${game.moves} moves.`;
   text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the last level; here's another board." : ` Next up: level ${next}, ${levelName(next).toLowerCase()}.`;
   setTimeout(() => G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the board", game.result,
     {title: "Lined up!", gold, goldWhy: "No hints, undos or mix-ups!", goldTitle: "Willow's having a nap!", goldPic: [goldPic()], next: next > game.level ? `Next: level ${next}` : "Next board",
@@ -421,7 +462,7 @@ function lose() {
   const btns = [["Undo", undo, true]];
   if (game.mixes) btns.push([`Mix it up (${game.mixes} left)`, () => $("shuffleBtn").onclick()]);
   btns.push(["Restart", () => $("restartBtn").onclick()], ["New board", () => { G.closeCard(); newGame(); }], G.homeBtn());
-  setTimeout(() => G.openCard("Stuck!", `Nothing can slide. You cleared ${game.lines} of ${levelSpec(game.level).goal}.`, btns), 400);
+  setTimeout(() => G.openCard("Stuck!", (levelSpec(game.level).task ? `Nothing can slide. The goal was ${taskText(game, true)}.` : `Nothing can slide. You cleared ${game.lines} of ${levelSpec(game.level).goal}.`), btns), 400);
 }
 
 /* ---------- new boards ---------- */
@@ -471,6 +512,7 @@ function helpOnFirstVisit(all) {
   if (n === 7) steps.push(meet(0, 7, "Black wipes them both out"));
   if (n === 8) steps.push(meet(0, 8, "White copies the colour"));
   if (n === 9) steps.push(meet(8, 7, "White and black make stone"));
+  if (n === 10) steps.push({say: "Now each level has its own goal", els: [$("count")]});
   if (!steps.length) { settings.seen[n] = true; save(); return; }
   steps[steps.length - 1].leave = turn.upTo.leave;   // put the real board back after the last demo
   if (first) steps.push({say: "Mix it up shuffles the board", els: [$("shuffleBtn")]}, {say: "Stuck? Hint shows a good slide", els: [$("hintBtn")]});
