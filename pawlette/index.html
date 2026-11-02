@@ -200,17 +200,24 @@ const recipeCache = {};
 const recipesFor = n => recipeCache[n] || (recipeCache[n] = recipes(levelSpec(n).max, levelSpec(n).pots));
 // A new skein: a colourway with at least as many colours as stretches, and for each colour picked from it (spread
 // out along it), the mixable colour nearest it; no two stretches the same.
+// How many recent colourways to skip when picking the next.
+const RECENT = 10;
 function deal(level) {
-  const spec = levelSpec(level), R = recipesFor(level), ok = WAYS.filter(([, c]) => c.length >= (spec.all || spec.n));
-  const [way, cols] = ok[Math.floor(Math.random() * ok.length)], n = spec.all ? cols.length : spec.n;
-  const pick = [...Array(n).keys()].map(k => cols[Math.round(k * (cols.length - 1) / (n - 1))]);
+  const spec = levelSpec(level), R = recipesFor(level), key = ([w, c]) => w + "|" + c.length;
+  // a colourway long enough, and not one of the last few you've dyed (if there's another to pick)
+  const long = WAYS.filter(([, c]) => c.length >= (spec.all || spec.n)), fresh = long.filter(w => !(settings.recent || []).includes(key(w)));
+  const ok = fresh.length ? fresh : long, [way, cols] = ok[Math.floor(Math.random() * ok.length)], n = spec.all ? cols.length : spec.n;
+  settings.recent = [...(settings.recent || []).filter(k => k !== key([way, cols])), key([way, cols])].slice(-RECENT);
+  // which of its colours to match: any n of them, kept in order along the strand
+  const idx = [...Array(cols.length).keys()].sort(() => Math.random() - .5).slice(0, n).sort((a, b) => a - b);
+  const pick = idx.map(i => cols[i]);
   const used = new Set(), targets = [];
   for (const h of pick) {
     const c = hexRGB(h); let best = null, bd = 1e9;
     for (const r of R) { if (used.has(r.rgb.join())) continue; const e = deltaE(c, r.rgb); if (e < bd) { bd = e; best = r; } }
     used.add(best.rgb.join()); targets.push({d: best.d, rgb: best.rgb});
   }
-  return {level, way, cols: cols.slice(), targets, at: 0, cup: [0, 0, 0, 0, 0], dyed: [], history: [], won: false, ...G.freshClock()};
+  return {level, way, cols: cols.slice(), idx, targets, at: 0, cup: [0, 0, 0, 0, 0], dyed: [], history: [], won: false, ...G.freshClock()};
 }
 const cupRGB = () => paintRGB(game.cup);
 const drops = d => d.reduce((a, b) => a + b, 0);
@@ -232,7 +239,8 @@ function drawSkein() {
   s += `<path d="${wave}" fill="none" stroke="url(#strandGrad)" stroke-width="15" stroke-linecap="round"/>`;
   s += `<path d="${wave}" fill="none" stroke="#2A2530" stroke-opacity=".22" stroke-width="15" stroke-dasharray="1.6 5"/>`;
   // just below, your skein: undyed cream, taking each colour you dye at its ring's place along the strand
-  const xs = [...Array(n).keys()].map(k => 14 + 292 * Math.round(k * (L - 1) / Math.max(1, n - 1)) / Math.max(1, L - 1));
+  const at = k => game.idx ? game.idx[k] : Math.round(k * (L - 1) / Math.max(1, n - 1));   // (a skein saved before idx was kept: spread evenly)
+  const xs = [...Array(n).keys()].map(k => 14 + 292 * at(k) / Math.max(1, L - 1));
   s += `<defs><linearGradient id="mineGrad" gradientUnits="userSpaceOnUse" x1="14" x2="306">${xs.map((x, k) => `<stop offset="${((x - 14) / 292 * 100).toFixed(1)}%" stop-color="${game.dyed[k] ? rgbCss(game.dyed[k].rgb) : "#EFE6D2"}"/>`).join("")}</linearGradient></defs>`;
   const mine = "M" + [...Array(74).keys()].map(j => { const x = 14 + j * 4; return `${x} ${(strandY(x) + 62).toFixed(1)}`; }).join(" L");
   s += `<path d="${mine}" fill="none" stroke="#2A2530" stroke-width="19" stroke-linecap="round" stroke-linejoin="round"/>`;
