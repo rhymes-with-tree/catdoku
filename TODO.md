@@ -23,8 +23,8 @@ Test each on a real iPhone: Safari's AutoFill doesn't show in the headless brows
 
 ## Shelf tidy-up
 
-Talked through with the owner on 2026-11-02. Nothing here is decided until it's done; the reasoning is kept so it
-can be weighed again. Shelves live in `GROUPS` in `games.js`, and a game's shelf is the fifth field of its row in
+Talked through with the owner on 2026-11-02. The owner has decided on moving Toy Box and Night Light to Curious
+Cat; the rest is still to weigh, and the reasoning is kept for that. Shelves live in `GROUPS` in `games.js`, and a game's shelf is the fifth field of its row in
 `GAMES`. Moving a game changes its tile colour (`SHELF_COLOUR`), where it sits on the front page and in the games menu,
 shelf search, and its shelf in `IDEAS.md` and the README's shelf list.
 
@@ -36,13 +36,15 @@ and route things") holds together: every game there is drawing or routing lines.
 logic puzzles with one answer, but drawing lines puts them on Trails, and that's on purpose. Nothing on Trails or
 Curious Cat belongs on Cat Math or Cat Spells.
 
-Moves, by that test:
-- **Cat Pile** (Blockudoku), Curious Cat → Kitten Play: random pieces keep coming, so it plays like Kitten Play.
+Decided:
 - **Toy Box** (ball sort), Kitten Play → Curious Cat: a fixed board to plan through, like Shelf Life, the other sort
   game, already on Curious Cat. The two sort games should be on the same shelf.
+- **Night Light** (Lights Out), Cat Logic → Curious Cat: it's planning moves on a fixed board, like Cat Mat. The rest
+  of Cat Logic is deduction and placing things with one answer.
+
+Still to weigh, by the same test:
+- **Cat Pile** (Blockudoku), Curious Cat → Kitten Play: random pieces keep coming, so it plays like Kitten Play.
 - **Pawlette** (mix paint to order), Kitten Play → Curious Cat: a set puzzle to work out, not a quick game.
-- **Night Light** (Lights Out), maybe, Cat Logic → Curious Cat: it's planning moves on a fixed board, like Cat Mat. The
-  rest of Cat Logic is deduction and placing things with one answer.
 - Borderline but staying: Pick of the Pile (mahjong solitaire, partly spotting pairs, still a fixed board to clear in
   a good order) and Shelf Life (judged by eye more than planned).
 
@@ -65,7 +67,10 @@ two groups:
 The action group is two to five games today, too few for a shelf. Once a couple of the shortlisted ones (Kitty Plinko,
 Paw-ball, Pounce Up) are built, split it.
 
-**Keep an eye on Cat Spells.** With its five shortlisted ideas it would have 13 games, and 21 with every idea. If it
-gets crowded, the natural split is making words (Keyboard Cat, Knit Pick, Kitten Caboodle, Sock Drawer, Morning
-Stretch) and moving letters (Spelling String, Fish Bones, L-M-N-O-Pom, Cat Flap, Swap-a-Pom). Cat Math has no ideas
-waiting, but six games is a fine shelf; leave it.
+**Cat Spells stays one shelf.** With its five shortlisted ideas it would have 13 games, and 21 with every idea, but
+there's no natural split: finding words and moving letters to make words are the same kind of game (the owner's call).
+Cat Math has no ideas waiting, but six games is a fine shelf; leave it.
+
+**Colour games, just noted.** Cat Mat (flood fill), Mew Hue (slide and mix paint), Shelf Life (colour gradient) and
+Pawlette (mix paint to order) are all colour games, spread over Curious Cat and Kitten Play. Nothing to do about it
+yet; worth keeping in mind when shelves are next weighed.
