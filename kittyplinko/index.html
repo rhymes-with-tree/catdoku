@@ -129,7 +129,7 @@ function plinkoLevels() {
 }
 // The things Gus and Peanut knock off the shelf, and how each one falls: r its size, g how heavy (gravity's share),
 // e how much it bounces off a post, drag how much the air slows it, wob how far each knock turns it aside.
-// Yarn is soft, a tennis ball bouncy, a fluffball and a feather drift, a bell or a mug drops like a stone, a wiffle
+// Yarn is soft (and unwinds as it falls, leaving a strand across the wall), a tennis ball bouncy, a fluffball and a feather drift, a bell or a mug drops like a stone, a wiffle
 // ball or a spiky ball flies off any which way. lv: the first level it comes on.
 function plinkoKinds() {
   return {
@@ -138,7 +138,6 @@ function plinkoKinds() {
     fluff:   {name: "fluffball",    r: 10, g: .6,   e: .55, drag: 1.1, wob: .35, lv: 1},
     bell:    {name: "bell",         r: 8,  g: 1.3,  e: .15, drag: 0,   wob: .08, lv: 2},
     mouse:   {name: "toy mouse",    r: 9,  g: 1,    e: .2,  drag: .3,  wob: .3,  lv: 2},
-    lemon:   {name: "lemon",        r: 10, g: 1.1,  e: .3,  drag: 0,   wob: .2,  lv: 3},
     wiffle:  {name: "wiffle ball",  r: 10, g: .8,   e: .6,  drag: .8,  wob: .5,  lv: 3},
     mug:     {name: "coffee mug",   r: 11, g: 1.35, e: .1,  drag: 0,   wob: .1,  lv: 4, spill: "#6B4A3B"},
     glass:   {name: "glass of water", r: 10, g: 1.3, e: .08, drag: 0,  wob: .15, lv: 4, spill: "#8EC5E8"},
@@ -146,7 +145,7 @@ function plinkoKinds() {
     spiky:   {name: "spiky ball",   r: 9,  g: 1,    e: .45, drag: 0,   wob: .7,  lv: 5},
     phone:   {name: "phone",        r: 10, g: 1.2,  e: .05, drag: 0,   wob: .25, lv: 5},
     plant:   {name: "succulent",    r: 11, g: 1.25, e: .12, drag: 0,   wob: .15, lv: 6},
-    spring:  {name: "spring toy",   r: 10, g: .85,  e: .8,  drag: .3,  wob: .35, lv: 3},
+    coil:    {name: "coil spring",  r: 10, g: .9,   e: .75, drag: .2,  wob: .4,  lv: 2},
   };
 }
 function plinkoRng(s) { return () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -191,9 +190,10 @@ function makeWall(n, seed) {
   const items = Array.from({length: L.balls}, () => ({k: pool[Math.floor(rnd() * pool.length)], c: Math.floor(rnd() * 8)}));
   return {n, seed, posts: keep, perches, springs, beds, balls: L.balls, items};
 }
-// One step of a ball (1/240 s). Bounces off posts, springs, perches, the bed walls and the sides; a little seeded wobble
-// at each post keeps it from being too predictable.
-function plinkoStep(t, b) {
+// One step of a thing in the air (1/240 s). It bounces off the holds, springs, perches, strands of yarn, the things
+// stuck on the wall, the bed walls and the sides; a little seeded wobble at each knock keeps it from being too
+// predictable. A stuck thing hit hard enough is knocked loose (marked loose; plinkoWorld sets it moving).
+function plinkoStep(t, b, w) {
   const C = plinkoGeom(), h = 1 / 240, G = 900 * b.g, R = b.r;
   const rnd = () => { b.s = (b.s + 0x6D2B79F5) | 0; let q = Math.imul(b.s ^ (b.s >>> 15), 1 | b.s); q = (q + Math.imul(q ^ (q >>> 7), 61 | q)) ^ q; return ((q ^ (q >>> 14)) >>> 0) / 4294967296; };
   b.vy += G * h;
@@ -208,28 +208,48 @@ function plinkoStep(t, b) {
     const vn = b.vx * nx + b.vy * ny;
     if (vn < 0) {
       b.vx -= (1 + e) * vn * nx; b.vy -= (1 + e) * vn * ny;
-      if (kick) { const out = b.vx * nx + b.vy * ny; if (out < kick) { b.vx += (kick - out) * nx; b.vy += (kick - out) * ny; } }
-      // the wobble: turn the speed a little, more the harder it hit
+      // a spring throws it off, always a little to one side, so nothing bounces straight up and down on it for ever
+      if (kick) { const out = b.vx * nx + b.vy * ny; if (out < kick) { b.vx += (kick - out) * nx; b.vy += (kick - out) * ny; } b.vx += (rnd() < .5 ? -1 : 1) * (70 + rnd() * 80); }
+      // the wobble: turn the speed a little
       const a = (rnd() - .5) * b.wob, c = Math.cos(a), s2 = Math.sin(a), vx = b.vx;
       b.vx = vx * c - b.vy * s2; b.vy = vx * s2 + b.vy * c;
-      b.hits++;
+      if (-vn > 220) b.hard = (b.hard || 0) + 1;
     }
     return true;
   };
   const hitSeg = (x1, y1, x2, y2, hr, e) => {
-    const ex = x2 - x1, ey = y2 - y1, l2 = ex * ex + ey * ey, u = Math.max(0, Math.min(1, ((b.x - x1) * ex + (b.y - y1) * ey) / l2));
+    const ex = x2 - x1, ey = y2 - y1, l2 = ex * ex + ey * ey, u = l2 ? Math.max(0, Math.min(1, ((b.x - x1) * ex + (b.y - y1) * ey) / l2)) : 0;
     const px = x1 + ex * u, py = y1 + ey * u, dx = b.x - px, dy = b.y - py, d2 = dx * dx + dy * dy, s = R + hr;
     if (d2 >= s * s) return false;
     const d = Math.sqrt(d2) || .001, nx = dx / d, ny = dy / d;
     b.x = px + nx * s; b.y = py + ny * s;
     const vn = b.vx * nx + b.vy * ny;
-    if (vn < 0) { b.vx -= (1 + e) * vn * nx; b.vy -= (1 + e) * vn * ny; b.vx *= .995; }
+    if (vn < 0) { b.vx -= (1 + e) * vn * nx; b.vy -= (1 + e) * vn * ny; b.vx *= .995; if (-vn > 220) b.hard = (b.hard || 0) + 1; }
     return true;
   };
   if (b.y > C.ROW0 - 22 && b.y < C.BED_TOP) {
     for (const p of t.posts) if (Math.abs(p.y - b.y) < 20 && Math.abs(p.x - b.x) < 20) hitRound(p.x, p.y, C.PEG, b.e, 0);
-    for (const s of t.springs) if (Math.abs(s.y - b.y) < 22 && Math.abs(s.x - b.x) < 22 && hitRound(s.x, s.y, C.SPRING, Math.max(.9, b.e), 330)) b.boing = (b.boing || 0) + 1;
+    for (const s of t.springs) if (Math.abs(s.y - b.y) < 22 && Math.abs(s.x - b.x) < 22 && hitRound(s.x, s.y, C.SPRING, Math.max(.9, b.e), (b.boing || 0) < 4 ? 330 : 0)) b.boing = (b.boing || 0) + 1;
     for (const q of t.perches) if (b.y > Math.min(q.y1, q.y2) - 20 && b.y < Math.max(q.y1, q.y2) + 20) hitSeg(q.x1, q.y1, q.x2, q.y2, 4, .25);
+    // strands of yarn left by balls of yarn before: thin and soft, they catch things and send them along them, but
+    // they're slippery: a thing that's slowed almost to a stop on one slides through it
+    if (b.still > .15) b.slip = .5;
+    if (b.slip > 0) b.slip -= h; else for (const q of w.strands) for (let k = 1; k < q.pts.length; k++) {
+      const [x1, y1] = q.pts[k - 1], [x2, y2] = q.pts[k];
+      if (b.y < Math.min(y1, y2) - 14 || b.y > Math.max(y1, y2) + 14 || b.x < Math.min(x1, x2) - 14 || b.x > Math.max(x1, x2) + 14) continue;
+      if (hitSeg(x1, y1, x2, y2, 1.5, .12)) { b.vx *= .985; b.vy *= .985; }
+    }
+    // things stuck on the wall: a hard enough knock (for how heavy each one is) sends the stuck one off, and it
+    // takes some of the speed; a softer one just bounces off it
+    for (const o of w.stuck) {
+      if (o.loose) continue;
+      const dx = b.x - o.x, dy = b.y - o.y, s = R + o.r;
+      if (dx * dx + dy * dy >= s * s) continue;
+      const d = Math.sqrt(dx * dx + dy * dy) || .001, nx = dx / d, ny = dy / d, vn = b.vx * nx + b.vy * ny;
+      const m1 = b.g * R * R, m2 = o.g * o.r * o.r, J = vn < 0 ? -vn * 1.5 * m1 * m2 / (m1 + m2) : 0;
+      if (J / m2 > 70) { o.loose = true; o.vx = -nx * J / m2; o.vy = -ny * J / m2; b.x = o.x + nx * s; b.y = o.y + ny * s; b.vx += nx * J / m1; b.vy += ny * J / m1; }
+      else hitRound(o.x, o.y, o.r, b.e, 0);
+    }
   }
   // the bed walls: a post between each pair of beds
   if (b.y > C.BED_TOP - 14) for (const bd of t.beds) if (bd.x1 > 1) hitSeg(bd.x1, C.BED_TOP, bd.x1, C.H, 3, .3);
@@ -237,39 +257,76 @@ function plinkoStep(t, b) {
   if (b.x > C.W - R) { b.x = C.W - R; if (b.vx > 0) b.vx = -b.vx * .5; }
   if (b.y < R) { b.y = R; if (b.vy < 0) b.vy = 0; }
 }
-// A new ball, dropped at x by the i-th throw (seeded by the wall's seed and i).
+// A new thing, knocked off the shelf at x on the i-th throw (seeded by the wall's seed and i).
 function plinkoBall(t, x, i) {
   const C = plinkoGeom(), it = t.items[i], K = plinkoKinds()[it.k];
-  return {x: Math.max(K.r, Math.min(C.W - K.r, x)), y: C.DROP, vx: 0, vy: 40, hits: 0, t: 0, i, k: it.k, r: K.r, g: K.g, e: K.e, drag: K.drag, wob: K.wob, s: (t.seed ^ Math.imul(i + 1, 0x9E3779B1)) | 0};
+  return {x: Math.max(K.r, Math.min(C.W - K.r, x)), y: C.DROP, vx: 0, vy: 40, t: 0, still: 0, i, k: it.k, c: it.c, r: K.r, g: K.g, e: K.e, drag: K.drag, wob: K.wob, s: (t.seed ^ Math.imul(i + 1, 0x9E3779B1)) | 0};
 }
-// Has it landed? Once it's down in a bed; returns that bed's index.
+// Which bed a thing has landed in, once it's down in one, or -1.
 function plinkoLanded(t, b) {
   const C = plinkoGeom();
-  if (b.y < C.H - b.r - 14 && b.t < 30) return -1;
+  if (b.y < C.H - b.r - 14) return -1;
   for (let k = 0; k < t.beds.length; k++) if (b.x < t.beds[k].x2 || k === t.beds.length - 1) return k;
   return -1;
 }
-// Where a ball dropped at x ends up: the bed, and (if asked) the path it takes.
-function plinkoRun(t, x, i, path) {
-  const b = plinkoBall(t, x, i), pts = path ? [] : null;
-  for (let s = 0; s < 240 * 30; s++) {
-    plinkoStep(t, b); b.t += 1 / 240;
-    if (pts && s % 6 === 0) pts.push([b.x, b.y]);
-    const k = plinkoLanded(t, b); if (k >= 0) return {bed: k, pts, boing: b.boing || 0};
+// The wall as it stands: w = {moving (things in the air), stuck (things that came to rest on the wall, which stay put
+// until something knocks them loose), strands (of yarn), landed [{bed, i, v}], last (the bed the last thing landed in),
+// score}. A new empty one:
+function plinkoWorld() { return {moving: [], stuck: [], strands: [], landed: [], last: -1, score: 0}; }
+// One step of the whole wall: moves everything in the air, and returns what happened, for the page to show:
+// [{land, bed, v, both}, {stuck}, {loose}, {boing}, {spill}] (each with the thing).
+function plinkoTick(t, w) {
+  const C = plinkoGeom(), out = [];
+  for (const b of w.moving) {
+    const boing = b.boing || 0, hard = b.hard || 0;
+    plinkoStep(t, b, w); b.t += 1 / 240;
+    if ((b.boing || 0) > boing) out.push({boing: b});
+    if ((b.hard || 0) > hard && !b.spilt && plinkoKinds()[b.k].spill) { b.spilt = true; out.push({spill: b, x: b.x, y: b.y}); }
+    // yarn unwinds as it goes on its first fall: a point of its strand every 9 units, from the top row of holds down to
+    // the beds' rim (so the top of the wall stays clear for the next throw)
+    if (b.k === "yarn" && !b.wound && b.y > C.ROW0 - 8 && b.y < C.BED_TOP - 4) { const q = b.trail || (b.trail = [[Math.round(b.x), Math.round(b.y)]]), [lx, ly] = q[q.length - 1]; if (Math.hypot(b.x - lx, b.y - ly) >= 9) q.push([Math.round(b.x), Math.round(b.y)]); }
+    const bed = plinkoLanded(t, b);
+    // it's come to rest on the wall when it's barely moved for a moment (or has been bouncing about too long)
+    const slow = b.vx * b.vx + b.vy * b.vy < 400 && b.y < C.BED_TOP;
+    b.still = slow ? b.still + 1 / 240 : 0;
+    if (bed >= 0) {
+      const v0 = t.beds[bed].v, both = w.last === bed && v0 > 0, v = v0 * (both ? 2 : 1);
+      w.score += v; w.last = bed; w.landed.push({bed, i: b.i, v}); b.done = true;
+      out.push({land: b, bed, v, both});
+    } else if (b.still > .6 || b.t > 12) { b.done = true; b.vx = b.vy = 0; b.loose = false; w.stuck.push(b); out.push({stuck: b}); }
+    if (b.done && b.trail) { if (b.trail.length > 1) w.strands.push({c: b.c, pts: b.trail}); delete b.trail; b.wound = true; }
   }
-  return {bed: plinkoLanded(t, Object.assign(b, {t: 99})), pts, boing: 0};
+  w.moving = w.moving.filter(b => !b.done);
+  // things knocked loose start falling again
+  for (const o of w.stuck) if (o.loose) { o.loose = false; o.done = false; o.still = 0; o.t = 0; o.boing = 0; w.moving.push(o); out.push({loose: o}); }
+  w.stuck = w.stuck.filter(o => !w.moving.includes(o));
+  return out;
 }
-// For each throw, the bed every drop spot leads to (every 4 units across). The target score and the hint are worked
-// out from these.
+// Knock the i-th thing off at x, on a copy of the wall w, and let everything settle: the points it makes (with
+// anything it knocks loose), the bed it lands in (-1 if it sticks), and, if asked, its path.
+function plinkoRun(t, x, i, path, w) {
+  w = w ? JSON.parse(JSON.stringify(w)) : plinkoWorld();
+  const b = plinkoBall(t, x, i), pts = path ? [] : null, before = w.score;
+  w.moving = [b];
+  let bed = -1;
+  for (let s = 0; s < 240 * 40 && w.moving.length; s++) {
+    for (const e of plinkoTick(t, w)) if (e.land === b) bed = e.bed;
+    if (pts && s % 6 === 0 && !b.done) pts.push([b.x, b.y]);
+  }
+  if (pts) pts.push([b.x, b.y]);
+  return {bed, pts, gain: w.score - before};
+}
+// For each throw, what every drop spot makes (every 4 units across). The target score and the hint come from these.
 function plinkoAims() { const C = plinkoGeom(), xs = []; for (let x = C.R; x <= C.W - C.R; x += 4) xs.push(x); return xs; }
-function plinkoMap(t, i) { return plinkoAims().map(x => plinkoRun(t, x, i).bed); }
+function plinkoMap(t, i, w) { return plinkoAims().map(x => plinkoRun(t, x, i, false, w)); }
 // The puzzle maker: a wall, with a target for the score (what fair aiming makes) and a higher one for the gold paw.
 function makePlinko(n) { return plinkoTargets(makeWall(n, (Math.random() * 2 ** 31) | 0)); }
 function plinkoTargets(t) {
-  // what each drop spot scores, throw by throw; then what a player makes dropping at random, and dropping every
-  // ball round the best spot (within 20 either side). The target is halfway between; gold is the best spot's score.
+  // what each drop spot scores, throw by throw, on an empty wall; then what a player makes dropping at random, and
+  // dropping everything round the best spot (within 20 either side). The target is halfway between; gold is the best
+  // spot's score.
   const maps = [];
-  for (let i = 0; i < t.balls; i++) maps.push(plinkoMap(t, i).map(k => t.beds[k].v));
+  for (let i = 0; i < t.balls; i++) maps.push(plinkoMap(t, i).map(r => r.bed >= 0 ? t.beds[r.bed].v : 0));
   const n = maps[0].length, avg = xs => xs.reduce((a, b) => a + b, 0) / xs.length;
   const random = maps.reduce((s, m) => s + avg(m), 0);
   let spot = 0;
@@ -284,14 +341,14 @@ function plinkoTargets(t) {
 const C = plinkoGeom(), W = C.W, H = C.H, CAT = 66, M = 8;
 const CATS = [{name: "Gus", pic: "gus-12"}, {name: "Peanut", pic: "peanut-12"}];
 const KINDS = plinkoKinds();
-// yarn comes in Wind Up's colours; the toys are from the toy library, and the mug, lemon, phone and succulent from Knock It Off's table
+// yarn comes in Wind Up's colours; the toys are from the toy library, and the mug, glass, phone and succulent from Knock It Off's table
 const YARN = ["#ECA818", "#4E577D", "#E16A4A", "#73A7AE", "#B94588", "#B3B94B", "#7885BA", "#6AA673"];
-const TOY = {tennis: "tennis", bell: "bell-purple", mouse: "mouse", wiffle: "wiffle-red", feather: "feather-rainbow", spiky: "spiky-lime", spring: "spring"};
-// the springs on the wall: a coil seen end-on, cut from the owner's sheet of springs (toys/sheets/springs-grey.webp) and tinted
-const COILS = ["#ECA818", "#E16A4A", "#73A7AE", "#B94588", "#7885BA"];
-const ON_TABLE = {lemon: "l", mug: "m", glass: "g", phone: "h", plant: "s"};
+const TOY = {tennis: "tennis", bell: "bell-purple", mouse: "mouse", wiffle: "wiffle-red", feather: "feather-rainbow", spiky: "spiky-lime"};
+// a coil spring to knock off, lying on its side, cut from the owner's sheet of springs (toys/sheets/springs-grey.webp) and tinted
+const COILS = ["#ECA818", "#E16A4A", "#73A7AE", "#B94588", "#7885BA", "#B3B94B"];
+const ON_TABLE = {mug: "m", glass: "g", phone: "h", plant: "s"};   // never the lemon: cats can't stand citrus
 const catOf = i => CATS[i % 2];
-const src = f => (window.EMBED && window.EMBED[f]) || (f === "coil-end" || Object.values(TOY).includes(f) ? `../toys/${f}.webp` : f === "pompom" || f === "eye" ? `../fuzzyspelling/${f}.webp` : `../cats/${f}.webp`);
+const src = f => (window.EMBED && window.EMBED[f]) || (f === "spring" || f === "coil" || Object.values(TOY).includes(f) ? `../toys/${f}.webp` : f === "pompom" || f === "eye" ? `../fuzzyspelling/${f}.webp` : `../cats/${f}.webp`);
 const picCache = {};
 const pic = f => picCache[f] || (picCache[f] = Object.assign(new Image(), {src: src(f)}));
 // a ball of yarn from colorways.js, drawn once as a picture for each colour
@@ -308,7 +365,7 @@ function sprite(color) {
 // a fluffball: Spelling String's grey pompom with googly eyes, as in Wind Up
 function fluffSprite() {
   if (sprites.fluff) return sprites.fluff;
-  const c = document.createElement("canvas"); c.width = c.height = 128; c.ok = false;
+  const c = sprites.fluff = document.createElement("canvas"); c.width = c.height = 128; c.ok = false;   // kept before it's drawn: drawing it repaints
   const pom = pic("pompom"), eye = pic("eye");
   const done = () => {
     if (!(pom.complete && pom.naturalWidth && eye.complete && eye.naturalWidth) || c.ok) return;
@@ -317,24 +374,24 @@ function fluffSprite() {
     c.ok = true; paintHud();
   };
   pom.addEventListener("load", done); eye.addEventListener("load", done); done();
-  return sprites.fluff = c;
+  return c;
 }
 // a coil spring in one of the palette's colours: the grey lightened (× 1.45) and multiplied by the colour (× 1.22), as the
 // sheet's notes say
 function coilSprite(color) {
   const key = "coil" + color; if (sprites[key]) return sprites[key];
-  const c = document.createElement("canvas"); c.ok = false;
-  const im = pic("coil-end"), [R, G2, B] = [1, 3, 5].map(k => parseInt(color.slice(k, k + 2), 16) * 1.22 / 255);
+  const c = sprites[key] = document.createElement("canvas"); c.ok = false;   // kept before it's drawn: drawing it repaints
+  const im = pic("coil"), [R, G2, B] = [1, 3, 5].map(k => parseInt(color.slice(k, k + 2), 16) * 1.22 / 255);
   const done = () => {
     if (c.ok || !(im.complete && im.naturalWidth)) return;
     c.width = im.naturalWidth; c.height = im.naturalHeight;
     const x = c.getContext("2d"); x.drawImage(im, 0, 0);
     const d = x.getImageData(0, 0, c.width, c.height), p = d.data;
     for (let k = 0; k < p.length; k += 4) { const l = p[k] * 1.45; p[k] = Math.min(255, l * R); p[k + 1] = Math.min(255, l * G2); p[k + 2] = Math.min(255, l * B); }
-    x.putImageData(d, 0, 0); c.ok = true;
+    x.putImageData(d, 0, 0); c.ok = true; paintHud();
   };
   im.addEventListener("load", done); done();
-  return sprites[key] = c;
+  return c;
 }
 // a Knock It Off thing, without its shadow
 function tableSprite(k) {
@@ -347,6 +404,7 @@ function tableSprite(k) {
 function look(it) {
   if (it.k === "yarn") return [sprite(YARN[it.c % YARN.length]), 2.1];
   if (it.k === "fluff") return [fluffSprite(), 2.3];
+  if (it.k === "coil") return [coilSprite(COILS[it.c % COILS.length]), 2.5];
   if (TOY[it.k]) { const im = pic(TOY[it.k]); im.ok = im.complete && im.naturalWidth > 0; if (!im.hooked) { im.hooked = true; im.addEventListener("load", paintHud); } return [im, 2.2]; }
   return [tableSprite(ON_TABLE[it.k]), 2.9];
 }
@@ -364,13 +422,14 @@ let state = G.load(STORE);
 let settings = Object.assign({level: 1}, state.settings);
 let game = null, loading = 0;
 const cv = $("cv"), ctx = cv.getContext("2d");
-const builder = G.builder([plinkoLevels, plinkoKinds, plinkoRng, plinkoGeom, makeWall, plinkoStep, plinkoBall, plinkoLanded, plinkoRun, plinkoAims, plinkoMap, plinkoTargets, makePlinko], "makePlinko");
+const builder = G.builder([plinkoLevels, plinkoKinds, plinkoRng, plinkoGeom, makeWall, plinkoStep, plinkoBall, plinkoLanded, plinkoWorld, plinkoTick, plinkoRun, plinkoAims, plinkoMap, plinkoTargets, makePlinko], "makePlinko");
 const levelName = n => { const L = LEVELS[n], bits = [`${L.beds.length} beds`];
   if (L.perches) bits.push("perches"); if (L.springs) bits.push("springs"); if (L.naps) bits.push("napping cats");
   return `Level ${n} · ${bits.join(", ")}`; };
 const save = () => G.save(STORE, {settings, game: game && ["ready", "running"].includes(game.state) ? {
-  level: game.level, seed: game.wall.seed, target: game.wall.target, gold: game.wall.gold, i: game.i, score: game.score, landed: game.landed, splats: game.splats || [],
-  ball: game.ball, aim: game.aim, hinted: game.hinted, ms: game.ms, started: game.started, timed: game.timed} : null});
+  level: game.level, seed: game.wall.seed, target: game.wall.target, gold: game.wall.gold, i: game.i, w: game.w, splats: game.splats,
+  aim: game.aim, hinted: game.hinted, ms: game.ms, started: game.started, timed: game.timed} : null});
+const busy = g => g.w.moving.length > 0;
 
 function newGame(n) {
   const ask = ++loading;
@@ -379,7 +438,7 @@ function newGame(n) {
 }
 function startWall(t) {
   G.closeCard(); loading++;
-  game = {level: t.n, wall: t, i: 0, ball: null, landed: [], splats: [], score: 0, aim: W / 2, hinted: false, fx: [], acc: 0, state: "ready", ...G.freshClock()};
+  game = {level: t.n, wall: t, i: 0, w: plinkoWorld(), splats: [], aim: W / 2, hinted: false, fx: [], acc: 0, state: "ready", ...G.freshClock()};
   builder.prefetch(t.n);
   status(); paintHud(); save();
 }
@@ -388,7 +447,7 @@ const clampAim = x => { const it = game && game.wall.items[game.i], r = it ? KIN
 function status() {
   if (!game) return;
   const g = game, t = g.wall, left = t.balls - g.i;
-  $("score").textContent = `${g.score} points`;
+  $("score").textContent = `${g.w.score} points`;
   $("targetTxt").textContent = t.target;
   $("goldTxt").textContent = t.gold;
   $("leftTxt").textContent = left > 0 ? `${left} left` : "All dropped";
@@ -414,33 +473,36 @@ function tick(g, dt) {
   g.acc = (g.acc || 0) + Math.min(dt, .05);
   while (g.acc >= STEP) {
     g.acc -= STEP;
-    const b = g.ball;
-    if (b) {
-      const boing = b.boing || 0, hits = b.hits, fast = Math.hypot(b.vx, b.vy) > 220;
-      plinkoStep(g.wall, b); b.t += STEP;
-      // coffee and water spill the first time they're knocked hard, leaving a splat on the wall
-      const spill = KINDS[b.k].spill;
-      if (spill && !b.spilt && b.hits > hits && fast) { b.spilt = true; splat(g, b.x, b.y, spill); }
-      if ((b.boing || 0) > boing) { const s = g.wall.springs.reduce((a, s) => Math.hypot(s.x - b.x, s.y - b.y) < Math.hypot(a.x - b.x, a.y - b.y) ? s : a); g.fx.push({spring: s, t: 0, T: .35}); }
-      const k = plinkoLanded(g.wall, b); if (k >= 0) land(g, k);
+    if (busy(g)) {
+      for (const e of plinkoTick(g.wall, g.w)) {
+        if (e.boing) { const b = e.boing, s = g.wall.springs.reduce((a, s) => Math.hypot(s.x - b.x, s.y - b.y) < Math.hypot(a.x - b.x, a.y - b.y) ? s : a); g.fx.push({spring: s, t: 0, T: .35}); }
+        // coffee and water spill the first time they're knocked hard, leaving a splat on the wall
+        if (e.spill) splat(g, e.x, e.y, KINDS[e.spill.k].spill);
+        if (e.land) land(g, e);
+        if (e.stuck) G.note(`The ${nameOf(e.stuck)} is stuck on the wall. Knock it loose!`, 3000);
+        if (e.loose) G.note(`Knocked the ${nameOf(e.loose)} loose!`, 2500);
+        if ((e.land || e.stuck) && e[e.land ? "land" : "stuck"].k === "yarn" && g.w.strands.length === 1 && !g.strandNote) { g.strandNote = true; G.note("The yarn left a strand: things catch on it now.", 3500); }
+      }
+      if (!busy(g)) settled(g);
     }
     for (const f of g.fx) f.t += STEP;
     g.fx = g.fx.filter(f => f.t < f.T);
   }
 }
-// A ball lands: the bed's points, doubled when it's the same bed as the ball before (Gus and Peanut working in tandem).
-function land(g, k) {
-  const bed = g.wall.beds[k], prev = g.landed[g.landed.length - 1], both = !!(prev && prev.bed === k && bed.v > 0);
-  const v = bed.v * (both ? 2 : 1);
-  g.score += v; g.landed.push({bed: k, i: g.i, v});
-  const mid = (bed.x1 + bed.x2) / 2, spill = KINDS[g.wall.items[g.i].k].spill;
-  if (spill) splat(g, g.ball.x, H - 12, spill);   // and whatever's left splashes into the bed
-  g.fx.push({text: bed.nap ? "Zzz" : `+${v}`, x: mid, y: C.BED_TOP - 4, t: 0, T: 1.3, c: bed.nap ? "#8D78AD" : both ? "#B94588" : INK});
-  G.note(bed.nap ? "Shh! A napping cat: no points." : both ? `In tandem! ${catOf(g.i).name} matched ${catOf(g.i - 1).name}: ${v} points.` : `${v} points for ${catOf(g.i).name}'s ${nameOf(g.wall.items[g.i])}.`, 2500);
-  g.ball = null; g.i++;
+// Something lands in a bed: its points, doubled when it's the same bed as the last thing in (Gus and Peanut working in
+// tandem). Worked out in plinkoTick; here it's shown.
+function land(g, e) {
+  const b = e.land, bed = g.wall.beds[e.bed], mid = (bed.x1 + bed.x2) / 2, spill = KINDS[b.k].spill;
+  if (spill) splat(g, b.x, H - 12, spill);   // whatever's left splashes into the bed
+  g.fx.push({text: bed.nap ? "Zzz" : `+${e.v}`, x: mid, y: C.BED_TOP - 4, t: 0, T: 1.3, c: bed.nap ? "#8D78AD" : e.both ? "#B94588" : INK});
+  G.note(bed.nap ? "Shh! A napping cat: no points." : e.both ? `In tandem! Same bed twice running: ${e.v} points.` : `${e.v} points for ${catOf(b.i).name}'s ${nameOf(b)}.`, 2500);
+  status();
+}
+// Everything has stopped (landed or stuck): the next throw, or the end of the wall.
+function settled(g) {
   if (g.i >= g.wall.balls) { g.state = "done"; setTimeout(() => finish(g), 900); }
   status(); paintHud(); save();
-  // a walkthrough waiting for the first ball to land checks again now
+  // a walkthrough waiting for the first throw to settle checks again now
   if (document.querySelector(".spot.trying")) document.dispatchEvent(new PointerEvent("pointerup"));
 }
 
@@ -470,7 +532,8 @@ function size() {
 }
 function drawThing(c, it, x, y, r, a = 0) {
   const [im, k] = look(it); if (!im.ok) return;
-  c.save(); c.translate(x, y); c.rotate(a); const s = r * k; c.drawImage(im, -s / 2, -s / 2, s, s); c.restore();
+  const s = r * k, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, w = iw >= ih ? s : s * iw / ih, h = iw >= ih ? s * ih / iw : s;   // a long picture (the coil) keeps its shape
+  c.save(); c.translate(x, y); c.rotate(a); c.drawImage(im, -w / 2, -h / 2, w, h); c.restore();
 }
 // where the i-th ball to land in a bed rests, in rows from the bottom
 function restAt(bed, n) {
@@ -493,7 +556,7 @@ function paint() {
   // the back of the wall, and the two sisal sides
   ctx.fillStyle = WALL; ctx.fillRect(0, 0, W, H);
   // a hint's bed, glowing gold behind
-  if (hint) { const bd = t.beds[hint.bed]; ctx.fillStyle = "rgba(236,168,24,.28)"; ctx.fillRect(bd.x1, C.BED_TOP - 8, bd.x2 - bd.x1, H - C.BED_TOP + 8); }
+  if (hint && t.beds[hint.bed]) { const bd = t.beds[hint.bed]; ctx.fillStyle = "rgba(236,168,24,.28)"; ctx.fillRect(bd.x1, C.BED_TOP - 8, bd.x2 - bd.x1, H - C.BED_TOP + 8); }
   // spilt coffee and water on the wall
   for (const sp of g.splats || []) if (sp.y < C.BED_TOP) drawSplat(sp);
   // the beds: a round cushioned bed between each pair of posts, with its points over it
@@ -514,7 +577,7 @@ function paint() {
   for (const sp of g.splats || []) if (sp.y >= C.BED_TOP) drawSplat(sp);
   // things already in the beds
   const count = t.beds.map(() => 0);
-  for (const l of g.landed) { const bd = t.beds[l.bed]; if (bd.nap) continue; const [x, y] = restAt(bd, count[l.bed]++); drawThing(ctx, t.items[l.i], x, y, 7, l.i * 1.7); }
+  for (const l of g.w.landed) { const bd = t.beds[l.bed]; if (bd.nap) continue; const [x, y] = restAt(bd, count[l.bed]++); drawThing(ctx, t.items[l.i], x, y, 7, l.i * 1.7); }
   // the posts between the beds
   for (const bd of t.beds) if (bd.x1 > 1) sisalPost(bd.x1, C.BED_TOP, H, 6);
   // sisal posts end-on, carpeted perches and springs
@@ -527,8 +590,8 @@ function paint() {
     ctx.lineWidth = 7; ctx.strokeStyle = CARPETS[(j + 1) % CARPETS.length]; ctx.stroke();
   });
   t.springs.forEach((s, j) => {
-    const sp = coilSprite(COILS[j % COILS.length]), f = g.fx.find(f => f.spring && f.spring.x === s.x && f.spring.y === s.y), u = f ? Math.sin(f.t / f.T * Math.PI) : 0, r = C.SPRING + 3;
-    if (sp.ok) ctx.drawImage(sp, s.x - r * (1 + .25 * u), s.y - r * (1 - .2 * u), 2 * r * (1 + .25 * u), 2 * r * (1 - .2 * u));
+    const sp = pic("spring"), f = g.fx.find(f => f.spring && f.spring.x === s.x && f.spring.y === s.y), u = f ? Math.sin(f.t / f.T * Math.PI) : 0, r = C.SPRING + 3;
+    if (sp.complete && sp.naturalWidth) ctx.drawImage(sp, s.x - r * (1 + .25 * u), s.y - r * (1 - .2 * u), 2 * r * (1 + .25 * u), 2 * r * (1 - .2 * u));
     else { ctx.beginPath(); ctx.arc(s.x, s.y, C.SPRING, 0, 7); ctx.strokeStyle = "#4E577D"; ctx.lineWidth = 3; ctx.stroke(); }
   });
   // the frame: sisal sides, the top shelf the cats sit on, a carpeted base
@@ -537,17 +600,22 @@ function paint() {
   ctx.fillStyle = CARPETS[0]; ctx.strokeStyle = INK; ctx.lineWidth = 2.5;
   ctx.beginPath(); ctx.roundRect(-M, H, W + 2 * M, M, 3); ctx.fill(); ctx.stroke();
   ctx.beginPath(); ctx.roundRect(-M, -7, W + 2 * M, 9, 4); ctx.fill(); ctx.stroke();
+  // strands of yarn, and the one unwinding behind a ball of yarn as it falls
+  const strand = (pts, c) => { ctx.beginPath(); pts.forEach(([x, y], n) => n ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.lineWidth = 3.4; ctx.strokeStyle = "rgba(42,37,48,.55)"; ctx.stroke(); ctx.lineWidth = 2; ctx.strokeStyle = c; ctx.stroke(); };
+  for (const q of g.w.strands) strand(q.pts, YARN[q.c % YARN.length]);
+  for (const b of g.w.moving) if (b.trail) strand([...b.trail, [b.x, b.y]], YARN[b.c % YARN.length]);
   // a hint: a gold ring where to drop, and on a second hint the way it will go
   if (hint) {
     if (hint.pts) { ctx.save(); ctx.strokeStyle = GOLD; ctx.lineWidth = 3; ctx.setLineDash([2, 7]); ctx.beginPath(); hint.pts.forEach(([x, y], n) => n ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke(); ctx.restore(); }
     ctx.beginPath(); ctx.arc(hint.x, C.DROP, KINDS[t.items[g.i] ? t.items[g.i].k : "yarn"].r + 6, 0, 7); ctx.lineWidth = 4; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 2.5; ctx.strokeStyle = GOLD; ctx.stroke();
-    const bd = t.beds[hint.bed]; ctx.lineWidth = 3; ctx.strokeStyle = GOLD; ctx.strokeRect(bd.x1 + 1.5, C.BED_TOP - 6, bd.x2 - bd.x1 - 3, H - C.BED_TOP + 4);
+    const bd = t.beds[hint.bed]; if (bd) { ctx.lineWidth = 3; ctx.strokeStyle = GOLD; ctx.strokeRect(bd.x1 + 1.5, C.BED_TOP - 6, bd.x2 - bd.x1 - 3, H - C.BED_TOP + 4); }
   }
-  // the thing falling
-  if (g.ball) drawThing(ctx, t.items[g.ball.i], g.ball.x, g.ball.y, g.ball.r, (g.ball.x - g.ball.y * .3) / g.ball.r);
+  // things stuck on the wall, and things falling (a coil tumbles end over end)
+  for (const b of g.w.stuck) drawThing(ctx, b, b.x, b.y, b.r, b.a || 0);
+  for (const b of g.w.moving) { b.a = b.k === "coil" ? b.t * 9 * (b.s & 1 ? 1 : -1) + (b.a0 || 0) : (b.x - b.y * .3) / b.r; drawThing(ctx, b, b.x, b.y, b.r, b.a); }
   // the cat on the shelf, holding the next ball over where it'll drop, and a faint line below it
   if (["ready", "running"].includes(g.state) && g.i < t.balls) {
-    const cat = catOf(g.i), im = pic(cat.pic), ax = clampAim(g.aim), busy = !!g.ball, it = t.items[g.i], r = KINDS[it.k].r;
+    const cat = catOf(g.i), im = pic(cat.pic), ax = clampAim(g.aim), busy = g.w.moving.length > 0, it = t.items[g.i], r = KINDS[it.k].r;
     if (!busy) { ctx.save(); ctx.strokeStyle = "rgba(42,37,48,.22)"; ctx.lineWidth = 2; ctx.setLineDash([3, 7]); ctx.beginPath(); ctx.moveTo(ax, C.DROP + r + 4); ctx.lineTo(ax, C.ROW0 - 12); ctx.stroke(); ctx.restore(); }
     if (im.complete && im.naturalWidth) { const h = CAT, w = h * im.naturalWidth / im.naturalHeight, x = Math.max(w / 2 - M, Math.min(W + M - w / 2, ax)); ctx.drawImage(im, x - w / 2, -CAT + 1, w, h); }
     if (!busy) drawThing(ctx, it, ax, C.DROP, r);
@@ -573,7 +641,7 @@ function say() {
     saying = false; if (!game) return;
     const g = game, t = g.wall, beds = t.beds.map(b => b.nap ? "a napping cat" : `${b.v}`);
     const who = g.i < t.balls ? `${catOf(g.i).name} is holding a ${nameOf(t.items[g.i])} ${Math.round(clampAim(g.aim) / W * 100)}% of the way across. ` : "";
-    G.describe($("board"), `A climbing wall, level ${g.level}. ${who}Beds from left to right: ${G.listed(beds)}. ${g.score} points of ${t.target}, ${t.balls - g.i} balls left. Left and right arrows aim, space or down arrow drops.`);
+    G.describe($("board"), `A climbing wall, level ${g.level}. ${who}Beds from left to right: ${G.listed(beds)}. ${g.w.stuck.length ? `Stuck on the wall: ${G.listed(g.w.stuck.map(b => `a ${nameOf(b)}`))}. ` : ""}${g.w.score} points of ${t.target}, ${t.balls - g.i} throws left. Left and right arrows aim, space or down arrow drops.`);
   });
 }
 
@@ -581,9 +649,9 @@ function say() {
 const spotBlocks = () => document.querySelector(".spot") && !document.querySelector(".spot.trying");
 function drop() {
   const g = game;
-  if (!g || !["ready", "running"].includes(g.state) || g.ball || g.i >= g.wall.balls || $("overlay").classList.contains("show") || spotBlocks()) return;
+  if (!g || !["ready", "running"].includes(g.state) || busy(g) || g.i >= g.wall.balls || $("overlay").classList.contains("show") || spotBlocks()) return;
   if (g.state === "ready") { g.state = "running"; g.started = true; }
-  g.ball = plinkoBall(g.wall, clampAim(g.aim), g.i);
+  g.w.moving.push(plinkoBall(g.wall, clampAim(g.aim), g.i)); g.i++;
   hints.clear(false);
   status(); save();
 }
@@ -608,35 +676,36 @@ const hints = G.hinter({game: () => game, key: () => game ? `${game.i}` : "", dr
 $("hintBtn").onclick = () => {
   const g = game;
   if (!g || !["ready", "running"].includes(g.state)) return;
-  if (g.ball) { G.note("Wait for it to land.", 2000); return; }
-  const t = g.wall, xs = plinkoAims(), beds = plinkoMap(t, g.i), prev = g.landed[g.landed.length - 1];
-  const worth = k => t.beds[k].v * (prev && prev.bed === k && t.beds[k].v > 0 ? 2 : 1);
-  const best = Math.max(...beds.map(worth));
+  if (busy(g)) { G.note("Wait for it to land.", 2000); return; }
+  const t = g.wall, xs = plinkoAims(), runs = plinkoMap(t, g.i, g.w), best = Math.max(...runs.map(r => r.gain));
+  // the middle of the widest stretch of spots that make the most (and send it to the same bed)
   let run = null;
-  for (let a = 0; a < beds.length;) {
-    if (worth(beds[a]) !== best) { a++; continue; }
-    let b = a; while (b + 1 < beds.length && beds[b + 1] === beds[a]) b++;
+  for (let a = 0; a < runs.length;) {
+    if (runs[a].gain !== best) { a++; continue; }
+    let b = a; while (b + 1 < runs.length && runs[b + 1].gain === best && runs[b + 1].bed === runs[a].bed) b++;
     if (!run || b - a > run[1] - run[0]) run = [a, b];
     a = b + 1;
   }
-  const x = xs[Math.round((run[0] + run[1]) / 2)], bed = beds[run[0]], deep = hints.level() > 0;
-  const mark = {x, bed, pts: deep ? plinkoRun(t, x, g.i, true).pts : null};
-  hints.show(mark, deep ? `Here's the way it goes from the gold ring: ${best} points.` : `Drop ${catOf(g.i).name}'s ${nameOf(t.items[g.i])} from the gold ring for ${best} points.${prev && t.beds[bed].v * 2 === best ? " That's a tandem!" : ""}`);
+  const x = xs[Math.round((run[0] + run[1]) / 2)], bed = runs[run[0]].bed, deep = hints.level() > 0;
+  const mark = {x, bed, pts: deep ? plinkoRun(t, x, g.i, true, g.w).pts : null};
+  const what = `${catOf(g.i).name}'s ${nameOf(t.items[g.i])}`;
+  if (best <= 0) hints.show(mark, `Nothing scores with ${what} from anywhere: the gold ring is as good as any.`);
+  else hints.show(mark, deep ? `Here's the way it goes from the gold ring: ${best} points.` : `Drop ${what} from the gold ring for ${best} points.`);
   g.hinted = true; save();
 };
 
 /* ---------- endings ---------- */
 function finish(g) {
   if (game !== g || g.state !== "done") return;
-  if (g.score >= g.wall.target) win(); else lose();
+  if (g.w.score >= g.wall.target) win(); else lose();
 }
 function win() {
   const g = game; g.state = "won"; G.finishClock(g);
-  const next = Math.min(MAX_LEVEL, g.level + 1), gold = !g.hinted && g.score >= g.wall.gold;
+  const next = Math.min(MAX_LEVEL, g.level + 1), gold = !g.hinted && g.w.score >= g.wall.gold;
   settings.level = next; $("levelSel").value = next; save(); status();
   G.track(`Kitty Plinko won level ${g.level}`);
   const im = new Image(); im.className = "pic"; im.src = src("peanut-7"); im.alt = "Peanut asleep in a round bed";
-  const text = `${g.score} points, over the target of ${g.wall.target}.` + (!gold && !g.hinted ? ` ${g.wall.gold} points with no hints wins a gold paw.` : "") + (g.level === MAX_LEVEL ? "" : ` Next up: level ${next}.`);
+  const text = `${g.w.score} points, over the target of ${g.wall.target}.` + (!gold && !g.hinted ? ` ${g.wall.gold} points with no hints wins a gold paw.` : "") + (g.level === MAX_LEVEL ? "" : ` Next up: level ${next}.`);
   G.winCard(text, () => startLevel(next), "Admire the wall", g.result,
     {title: "All tucked in!", gold, goldWhy: `${g.wall.gold} points with no hints!`, goldPic: [im], next: next > g.level ? `Next: level ${next}` : "New wall",
      top: g.level === MAX_LEVEL, after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
@@ -644,7 +713,7 @@ function win() {
 function lose() {
   const g = game; g.state = "lost"; status(); save();
   G.breakStreak(); G.track(`Kitty Plinko missed on level ${g.level}`);
-  G.openCard("Not quite!", `${g.score} points, ${g.wall.target - g.score} short of the target of ${g.wall.target}.`,
+  G.openCard("Not quite!", `${g.w.score} points, ${g.wall.target - g.w.score} short of the target of ${g.wall.target}.`,
     [["Try this wall again", () => startWall(g.wall), true], ["New wall", () => { G.closeCard(); newGame(g.level); }],
      ["Admire the wall", () => { G.closeCard(); G.note("Tap Restart to try this wall again.", 0); }], G.homeBtn()],
     null, G.otherSize($("levelSel"), g.level, startLevel, "Or play a different level:"));
@@ -660,11 +729,11 @@ function openShared(d) {
 }
 
 /* ---------- how to play ---------- */
-function showHelp() { settings.seenHelp = false; helpOnFirstVisit(); if (!document.querySelector(".spot") && !(game && game.ball)) { settings.seenHelp = true; G.helpLater(); } }
+function showHelp() { settings.seenHelp = false; helpOnFirstVisit(); if (!document.querySelector(".spot") && !(game && busy(game))) { settings.seenHelp = true; G.helpLater(); } }
 function helpOnFirstVisit(n = 0) {
   if (settings.seenHelp || document.querySelector(".spot")) return;
   if (!game || !["ready", "running"].includes(game.state)) return;
-  if (game.ball) { if (n < 40) setTimeout(() => helpOnFirstVisit(n + 1), 300); return; }   // let it land first
+  if (busy(game)) { if (n < 40) setTimeout(() => helpOnFirstVisit(n + 1), 300); return; }   // let it land first
   const cols = 8, rows = 10, row = y => Math.min(rows - 1, Math.floor((CAT + y) / (CAT + H + M) * rows)), col = x => Math.max(0, Math.min(cols - 1, Math.floor((x + M) / (W + 2 * M) * cols)));
   const top = [], beds = [];
   for (let x = 0; x < cols; x++) { for (let y = 0; y <= row(C.DROP); y++) top.push([x, y]); for (let y = row(C.BED_TOP); y < rows; y++) beds.push([x, y]); }
@@ -672,11 +741,13 @@ function helpOnFirstVisit(n = 0) {
   const naps = t.beds.filter(b => b.nap).flatMap(b => [...new Set([col(b.x1 + 4), col(b.x2 - 4)])].map(c => [c, rows - 1]));
   const i0 = game.i, turn = G.yourTurn(() => game, g => { game = g; }, () => { status(); paintHud(); });
   const steps = [
-    {say: "Drag to aim, let go to drop", lit: top, try: {done: () => game.i > i0, yes: "Into a bed!"}, ...turn.upTo},
+    {say: "Drag to aim, let go to drop", lit: top, try: {done: () => game.i > i0 && !busy(game), yes: "Nice!"}, ...turn.upTo},
     {say: "Each bed scores its points", lit: beds},
     {say: "Same bed twice running: double!", lit: beds, tone: "ok"},
     ...(naps.length ? [{say: "Napping cats score nothing", lit: naps}] : []),
     ...(t.springs.length ? [{say: "Springs bounce things back up", lit: t.springs.flatMap(s => at(s.x, s.y)), later: true}] : []),
+    {say: "Yarn leaves a strand to catch on", lit: [3, 4].flatMap(x => [3, 4, 5].map(y => [x, y])), later: true},
+    {say: "Stuck things stay till knocked loose", lit: [2, 3, 4, 5].flatMap(x => [4, 5].map(y => [x, y])), later: true},
     {say: "Reach the target to win", els: [$("goal")]},
     {say: "Stuck? Hint shows a good spot", els: [$("hintBtn")]},
   ];
@@ -702,9 +773,12 @@ if (!openedShare) {
   G.reopen(() => {
     if (!(s && s.level === settings.level && Number.isInteger(s.seed))) { newGame(settings.level); return; }
     const t = makeWall(s.level, s.seed); t.target = s.target; t.gold = s.gold;
-    if (!(s.i >= 0 && s.i <= t.balls && Array.isArray(s.landed) && s.landed.every(l => t.beds[l.bed]))) throw new Error("the saved wall didn't fit");
+    const w = s.w, num = Number.isFinite, okThing = b => b && num(b.x) && num(b.y) && KINDS[b.k] && num(b.i) && t.items[b.i];
+    if (!(s.i >= 0 && s.i <= t.balls && w && Array.isArray(w.moving) && Array.isArray(w.stuck) && Array.isArray(w.strands) && Array.isArray(w.landed) && num(w.score) &&
+      w.moving.every(okThing) && w.stuck.every(okThing) && w.landed.every(l => t.beds[l.bed] && t.items[l.i]) && w.strands.every(q => q && num(q.c) && Array.isArray(q.pts) && q.pts.every(p => Array.isArray(p) && p.every(num)))))
+      throw new Error("the saved wall didn't fit");
     startWall(t);
-    Object.assign(game, {i: s.i, score: s.score, landed: s.landed, splats: Array.isArray(s.splats) ? s.splats.filter(p => p && Number.isFinite(p.x) && Number.isFinite(p.y) && /^#[0-9A-F]{6}$/i.test(p.c)) : [], ball: s.ball && Number.isFinite(s.ball.x) ? s.ball : null, aim: s.aim || W / 2, hinted: !!s.hinted,
+    Object.assign(game, {i: s.i, w, splats: Array.isArray(s.splats) ? s.splats.filter(p => p && num(p.x) && num(p.y) && /^#[0-9A-F]{6}$/i.test(p.c)) : [], aim: s.aim || W / 2, hinted: !!s.hinted,
       ms: s.ms || 0, started: s.started, timed: s.timed !== false, state: s.started ? "running" : "ready"});
     G.checkClock(game); status(); paintHud();
   }, msg => { newGame(settings.level); G.note(msg, 5000); });
