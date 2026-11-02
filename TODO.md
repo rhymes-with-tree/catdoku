@@ -55,6 +55,12 @@ Paw-ball, Pounce Up) are built, split it.
 finding words and moving letters to make words are the same kind of game (the owner's call). Cat Math has no ideas
 waiting, but six games is a fine shelf; leave it.
 
-**Colour games, just noted.** Cat Mat (flood fill), Shelf Life (colour gradient), Pawlette (mix paint to order), all on
-Curious Cat, and Mew Hue (slide and mix paint) on Kitten Play are colour games. Nothing to do about it yet; worth
-keeping in mind when shelves are next weighed.
+**Colour games, if Curious Cat gets crowded.** Cat Mat (flood fill), Shelf Life (colour gradient), Pawlette (mix
+paint to order), all on Curious Cat, and Mew Hue (slide and mix paint) on Kitten Play are colour games. With its five
+shortlisted ideas built, Curious Cat would be the biggest shelf at 15. If that's too many, split the colour games off
+into a shelf of their own: a colour shelf of 4, leaving Curious Cat with 12. Not decided; weigh it once the shortlist
+is mostly built.
+
+With the shortlist built and both splits, the shelves would be (66 games): Cat Logic 12, Cat Math 6, Cat Trails 7,
+Cat Spells 13, Curious Cat 12, colour 4, Kitten Play (match and pop) 5, action 8. Without the colour split, Curious Cat
+15 and no colour shelf.
