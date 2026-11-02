@@ -217,7 +217,7 @@ const G = (() => {
       if (slug === current) a.setAttribute("aria-current", "page");
       const b = document.createElement("b"); b.textContent = name;
       const sm = document.createElement("small"); sm.textContent = slug === current ? "You're here" : blurb;
-      a.append(b, sm, ...(mastered(slug) ? [masterPill()] : []));
+      a.append(b, sm);   // (Mastered shows on the front page only)
       // the star sits beside the link, not in it, so tapping it doesn't open the game
       const w = document.createElement("div"); w.className = "favWrap"; w.dataset.slug = slug;
       w.append(a, favStar(slug, drawFavs)); return w;
