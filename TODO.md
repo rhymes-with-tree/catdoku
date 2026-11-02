@@ -23,8 +23,9 @@ Test each on a real iPhone: Safari's AutoFill doesn't show in the headless brows
 
 ## Shelf tidy-up
 
-Talked through with the owner on 2026-11-02. The owner has decided on moving Toy Box and Night Light to Curious
-Cat; the rest is still to weigh, and the reasoning is kept for that. Shelves live in `GROUPS` in `games.js`, and a game's shelf is the fifth field of its row in
+Talked through with the owner on 2026-11-02. Toy Box and Night Light moved to Curious Cat and Cat Pile to Kitten Play
+that day (by the test below: Toy Box and Night Light are fixed boards to plan through, and Cat Pile's random pieces
+keep coming). What's left is still to weigh, and the reasoning is kept for that. Shelves live in `GROUPS` in `games.js`, and a game's shelf is the fifth field of its row in
 `GAMES`. Moving a game changes its tile colour (`SHELF_COLOUR`), where it sits on the front page and in the games menu,
 shelf search, and its shelf in `IDEAS.md` and the README's shelf list.
 
@@ -36,14 +37,7 @@ and route things") holds together: every game there is drawing or routing lines.
 logic puzzles with one answer, but drawing lines puts them on Trails, and that's on purpose. Nothing on Trails or
 Curious Cat belongs on Cat Math or Cat Spells.
 
-Decided:
-- **Toy Box** (ball sort), Kitten Play → Curious Cat: a fixed board to plan through, like Shelf Life, the other sort
-  game, already on Curious Cat. The two sort games should be on the same shelf.
-- **Night Light** (Lights Out), Cat Logic → Curious Cat: it's planning moves on a fixed board, like Cat Mat. The rest
-  of Cat Logic is deduction and placing things with one answer.
-
-Still to weigh, by the same test:
-- **Cat Pile** (Blockudoku), Curious Cat → Kitten Play: random pieces keep coming, so it plays like Kitten Play.
+Still to weigh, by that test:
 - **Pawlette** (mix paint to order), Kitten Play → Curious Cat: a set puzzle to work out, not a quick game.
 - Borderline but staying: Pick of the Pile (mahjong solitaire, partly spotting pairs, still a fixed board to clear in
   a good order) and Shelf Life (judged by eye more than planned).
@@ -55,8 +49,8 @@ finding. So it fits Kitten Play without a new shelf.
 
 **Don't add shelves yet.** A phone shows three tiles across, and every shelf adds a label tile and starts a new row,
 so a shelf of two to four games costs a lot of screen for little. Seven shelves (six after Cat Travels goes) is plenty
-for about 50 games. Counts on 2026-11-02, games on the site / ideas in `IDEAS.md`: Cat Logic 10/14, Cat Math 6/0,
-Cat Trails 6/6, Cat Spells 8/13, Curious Cat 8/10, Kitten Play 10/8, Cat Travels 1/0.
+for about 50 games. Counts on 2026-11-02 after the moves, games on the site / ideas in `IDEAS.md`: Cat Logic 9/14, Cat Math
+6/0, Cat Trails 6/6, Cat Spells 8/13, Curious Cat 9/10, Kitten Play 10/8, Cat Travels 1/0.
 
 **Split Kitten Play once its action games arrive.** It's more than one kind of game sharing a shelf. Its ideas fall in
 two groups:
