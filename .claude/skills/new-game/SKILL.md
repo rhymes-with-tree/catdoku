@@ -327,8 +327,8 @@ revive keeps the player on the same level and costs the gold paw.
   if a second hint says more, and to Help if its rule differs.
 - **Ideas list:** keep `IDEAS.md` up to date with every decision, in the same PR. Set the game's row to
   Built, name it "<Game> (<puzzle it's based on>)", and set its Shelf to the shelf it went on, and move it below the Idea rows of that shelf; add a row
-  if the game wasn't listed. If it's on the shortlist, take it out of the Build order there (and if it was
-  the second action game built, remind the user that Kitten Play is due to be split; see `TODO.md`). When two ideas become one game, merge their rows; when an idea becomes a mode
+  if the game wasn't listed. If it's on the shortlist, take it out of the Build order there (and if it's
+  the second of Kitty Plinko, Pounce Up and Paw-ball to be built, remind the user that Kitten Play is due to be split; see `TODO.md`). When two ideas become one game, merge their rows; when an idea becomes a mode
   or levels of an existing game, mark it Built and say where (Notes); drop rows the user rules out; and note
   new ideas, themes or changes of plan that come up while talking it through.
 - **Artwork:** add the game's cats to "Who's who in `cats/`" in `ARTWORK.md`: for a named cat, which pictures
