@@ -20,3 +20,10 @@ Still to try:
 - make the box read-only until it's tapped, then drop `readonly` on focus
 - if none of that works, a `contenteditable` box styled like the input
 Test each on a real iPhone: Safari's AutoFill doesn't show in the headless browser the tests use.
+
+## Move Catlas so Cat Travels isn't a shelf of one
+
+Catlas is the only game on Cat Travels (`travels` in `GROUPS` in `games.js`), so that shelf is a label tile and one
+game. Move Catlas onto another shelf (and drop Cat Travels, or keep it only if more travel games are coming). Where it
+should go isn't decided yet. Moving it changes its tile colour, its place on the front page and in the games menu, the
+shelf shortcuts and shelf search, and the README's shelf list.
