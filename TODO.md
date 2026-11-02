@@ -64,3 +64,11 @@ is mostly built.
 With the shortlist built and both splits, the shelves would be (66 games): Cat Logic 12, Cat Math 6, Cat Trails 7,
 Cat Spells 13, Curious Cat 12, colour 4, Kitten Play (match and pop) 5, action 8. Without the colour split, Curious Cat
 15 and no colour shelf.
+
+## Kitty Plinko: sound effects
+
+The owner wants sound effects for Kitty Plinko, put aside for later (2026-11-02): a knock as each thing hits a hold,
+a boing off a coil spring, a splash when coffee or water spills, a soft thump as it lands in a bed (and a sleepy
+grumble from a napping cat), and a cheer for a tandem. No game on the site has sound yet, so this needs a shared way to
+play it first: a Sound switch in the settings (off by default, as browsers only play sound after a tap), quiet enough
+for a phone, and sounds that follow the thing's kind (a bell rings, a mug clunks, a feather makes none).
