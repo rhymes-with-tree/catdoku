@@ -190,7 +190,7 @@ Every game's hint goes through `G.hinter` (see `toydoku/` or `sunbeams/`).
   there's more to say, the first shows where to look and why it's settled ("Only one toy fits in the gold
   box"), and the next names the answer (see `toydoku/`, `toebeans/`, `catwalk/`).
 - **What to show.** Work from the game's own solver or stored answer: first a mistake if there is one
-  (in red, adding "(and 2 more)" when there are others), otherwise the next move, preferring the one with
+  (in red, adding `G.andMore(n)` when there are others: "(and 1 more is wrong)", "(and 2 more are wrong)", the same words in every game), otherwise the next move, preferring the one with
   the fewest options. If no hint can be found, say why in the message line rather than doing nothing.
 - **Bookkeeping.** Set `game.hinted = true` and save only when a mark is shown (a hint with nothing to show
   is free); disable `hintBtn` once the puzzle is won.

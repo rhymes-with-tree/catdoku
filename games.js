@@ -1102,6 +1102,9 @@ const G = (() => {
   }
   const at = (i, W) => `row ${Math.floor(i / W) + 1}, column ${i % W + 1}`;
   // a list in words: "a, b and c"
+  // After a hint's first mistake, how many others there are, said the same way in every game: " (and 1 more is
+  // wrong)", " (and 2 more are wrong)", or nothing when there are none. n is how many more.
+  const andMore = n => n > 0 ? ` (and ${n} more ${n === 1 ? "is" : "are"} wrong)` : "";
   const listed = (xs, sep = ", ") => xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(sep)}${sep === ", " ? " and " : sep}${xs[xs.length - 1]}`;   // ("; " between longer items)
 
   /* ---------- your turn ---------- */
@@ -1504,6 +1507,6 @@ const G = (() => {
     }
   }
 
-  return {GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, slower, meaning, plainText,
+  return {GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();
