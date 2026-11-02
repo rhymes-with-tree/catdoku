@@ -1,6 +1,6 @@
 # Catlas: notes and map data
 
-How Catlas (`atlas/`, on the Cat Travels shelf) was made, and the owner's decisions behind it. A country lights up on the world map, with a clue such as "Where's the lynx?" (a wild cat that lives there), and the player names the country. The game itself is `atlas/index.html`; this folder holds the data and scripts that went into it.
+How Catlas (`atlas/`, on the Kitten Play shelf; it started on Cat Travels, retired on 2026-11-02) was made, and the owner's decisions behind it. A country lights up on the world map, with a clue such as "Where's the lynx?" (a wild cat that lives there), and the player names the country. The game itself is `atlas/index.html`; this folder holds the data and scripts that went into it.
 
 ## Decisions the owner made
 

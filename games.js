@@ -9,13 +9,13 @@ const G = (() => {
     ["Yarn", "yarn", "Lead one strand through every ball", "#E16A4A", "lines", "zip path"],
     ["Patches", "patches", "Sew a four-fabric quilt", "#73A7AE", "logic", "map four colour color quilt"],
     ["Sunbeams", "sunbeams", "Every cat gets a warm spot", "#ECA818", "logic", "shikaku rectangles"],
-    ["Toy Box", "toybox", "Help Laya put every toy back in its basket", "#B3B94B", "quick", "sort ball sort"],
+    ["Toy Box", "toybox", "Help Laya put every toy back in its basket", "#B3B94B", "teasers", "sort ball sort"],
     ["Pounce", "pounce", "Line up three of a kind for Crunch to pounce on", "#6AA673", "quick", "match 3 match-3 three in a row"],
     ["Twirl", "twirl", "Clear every ribbon off the mat so Bugsy can nap", "#B94588", "teasers", "ribbons unblock"],
     ["Toe Beans", "toebeans", "Make the number on the big pad", "#DD9DAD", "numbers", "countdown 24 sums arithmetic maths math"],
     ["Knock It Off", "knockitoff", "Help Fred push everything off the table", "#7885BA", "teasers", "push sokoban table"],
     ["Hide & Seek", "hideseek", "Find Jan Brady and friends hiding in the boxes", "#C9A26B", "logic", "minesweeper mines boxes"],
-    ["Pawlette", "pawlette", "Mix paint to dye the yarn", "#9874CA", "quick", "colour color mixing paint mix to order match colourway colorway dye yarn skein"],
+    ["Pawlette", "pawlette", "Mix paint to dye the yarn", "#9874CA", "teasers", "colour color mixing paint mix to order match colourway colorway dye yarn skein"],
     ["Tangle", "tangle", "Untangle the yarn the cat got into", "#3C8681", "lines", "untangle planarity knots"],
     ["Catwalk", "catwalk", "Link the perches of a giant cat tower", "#A98663", "lines", "bridges hashi"],
     ["Fair Play", "tango", "Share two toys out fairly", "#B94588", "logic", "tango binary takuzu unruly"],
@@ -23,7 +23,7 @@ const G = (() => {
     ["Open the Door!", "opendoor", "Solve the puzzle so the cat can get through!", "#4E577D", "numbers", "kenken calcudoku keen sums sudoku"],
     ["Tunnel Run", "tunnelrun", "Assemble the tunnels for Bowtie to run through", "#7E63B8", "lines", "net pipes netslide"],
     ["Copycat", "copycat", "Find the boxes with matching toys", "#D08A4E", "quick", "memory pairs concentration"],
-    ["Night Light", "nightlight", "Help Dottie get every cat to close its eyes", "#3A3358", "logic", "lights out flip"],
+    ["Night Light", "nightlight", "Help Dottie get every cat to close its eyes", "#3A3358", "teasers", "lights out flip"],
     ["Unravel", "unravel", "Cover every line with one strand of yarn", "#E16A4A", "lines", "one line euler draw"],
     ["Tail Chase", "tailchase", "Help Jan Brady catch the toys without getting tangled", "#C9773F", "quick", "snake action"],
     ["Keyboard Cat", "keyboardcat", "Make words from the keys that still work", "#8D78AD", "words", "spelling bee"],
@@ -39,9 +39,9 @@ const G = (() => {
     ["Pick of the Pile", "pickpile", "Help Fred put the toy blocks away in pairs", "#7885BA", "teasers", "mahjong solitaire mahjongg shanghai tile match pairs"],
     ["Fridge Magnets", "magnets", "Help Crunch put every letter back on the fridge", "#BD5538", "words", "unolingo crossword alphabet letters", "2026-10-19"],
     ["Purrfect Square", "purrfect", "Make every row, column and diagonal add up the same", "#ECA818", "numbers", "magic square sums arithmetic maths math", "2026-10-20"],
-    ["Catlas", "atlas", "Name the country where each cat is hiding", "#5FA0C8", "travels", "geography countries world map quiz seterra flags places territories wild cats", "2026-10-22"],
+    ["Catlas", "atlas", "Name the country where each cat is hiding", "#5FA0C8", "quick", "geography countries world map quiz seterra flags places territories wild cats", "2026-10-22"],
     ["Cat Burglar", "catburglar", "Catch the cat that's sneaked into the painting", "#4E577D", "quick", "hidden object find spot seek paintings art museum met where's waldo wally", "2026-10-22"],
-    ["Cat Pile", "catpile", "Pile napping cats on the blanket and clear the lines", "#E16A4A", "teasers", "blockudoku block blast woodoku 1010 blocks shapes tetris polyomino sudoku lines", "2026-10-23"],
+    ["Cat Pile", "catpile", "Pile napping cats on the blanket and clear the lines", "#E16A4A", "quick", "blockudoku block blast woodoku 1010 blocks shapes tetris polyomino sudoku lines", "2026-10-23"],
     ["Fish Bones", "fishbones", "Swap the bones until Bowtie's fish spells words again", "#73A7AE", "words", "waffle swap letters crossword word puzzle fish skeleton", "2026-10-25"],
     ["Toy Stash", "stash", "Work out which toys the cat stashed in the boxes", "#7885BA", "logic", "mastermind guess code breaker codebreaker bulls and cows deduction colours colors hidden", "2026-10-26"],
     ["Knit Pick", "knitpick", "Help Laya find the words knitted into her blanket", "#8D78AD", "words", "word search wordsearch wonderword find a word hidden word puzzle", "2026-10-26"],
@@ -63,15 +63,14 @@ const G = (() => {
     ["lines", "Cat Trails", "Join, link and route things"],
     ["words", "Cat Spells", "Spell, find and climb words"],
     ["teasers", "Curious Cat", "Moves to plan and shapes to fit"],
-    ["quick", "Kitten Play", "Match, pop, sort and chase"],
-    ["travels", "Cat Travels", "Countries, maps and places"],
+    ["quick", "Kitten Play", "Match, pop, spot and chase"],
   ];
   // A shelf's games, A to Z by name (ignoring punctuation, so L-M-N-O-Pom sits among the Ls). GAMES itself keeps its own
   // order, which today's challenge takes its turns from.
   const onShelf = key => GAMES.filter(g => g[4] === key)
     .sort((a, b) => a[0].replace(/[^A-Za-z0-9 ]/g, "").localeCompare(b[0].replace(/[^A-Za-z0-9 ]/g, ""), "en", {sensitivity: "base"}));
   // Each shelf's colour: its games' tiles on the front page and in the games menu, and its label and shortcut.
-  const SHELF_COLOUR = {logic: "#BD5538", numbers: "#ECA818", lines: "#73A7AE", words: "#B94588", teasers: "#7885BA", quick: "#6AA673", travels: "#4E577D"};
+  const SHELF_COLOUR = {logic: "#BD5538", numbers: "#ECA818", lines: "#73A7AE", words: "#B94588", teasers: "#7885BA", quick: "#6AA673"};
   const $ = id => document.getElementById(id);
 
   /* ---------- text size ---------- */

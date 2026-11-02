@@ -314,8 +314,8 @@ revive keeps the player on the same level and costs the gold paw.
 ## 4. Housekeeping
 
 - **Game list:** add `[name, slug, blurb, colour, shelf, search words, added date]` to `G.GAMES` in `games.js`, with the added date as today's date (`"YYYY-MM-DD"`). The daily challenge leaves a new game out until the first cycle that starts at least 3 days later, so there's time to fix things first. The shelf is
-  one of the keys in `G.GROUPS` (logic, numbers, lines, words, teasers, quick, travels: shown as Cat Logic, Cat Math, Cat
-  Trails, Cat Spells, Curious Cat, Kitten Play and Cat Travels); the search words are the puzzle it's
+  one of the keys in `G.GROUPS` (logic, numbers, lines, words, teasers, quick: shown as Cat Logic, Cat Math, Cat
+  Trails, Cat Spells, Curious Cat and Kitten Play); the search words are the puzzle it's
   based on and other names for it ("minesweeper mines"), so the search boxes on the front page and in the games menu
   find it.
 - **Icon:** add a function to `tools/make-icons.py` and to its `ICONS` dict, then run
@@ -327,7 +327,8 @@ revive keeps the player on the same level and costs the gold paw.
   if a second hint says more, and to Help if its rule differs.
 - **Ideas list:** keep `IDEAS.md` up to date with every decision, in the same PR. Set the game's row to
   Built, name it "<Game> (<puzzle it's based on>)", and set its Shelf to the shelf it went on, and move it below the Idea rows of that shelf; add a row
-  if the game wasn't listed. When two ideas become one game, merge their rows; when an idea becomes a mode
+  if the game wasn't listed. If it's on the shortlist, take it out of the Build order there (and if it's
+  the second of Kitty Plinko, Pounce Up and Paw-ball to be built, remind the user that Kitten Play is due to be split; see `TODO.md`). When two ideas become one game, merge their rows; when an idea becomes a mode
   or levels of an existing game, mark it Built and say where (Notes); drop rows the user rules out; and note
   new ideas, themes or changes of plan that come up while talking it through.
 - **Artwork:** add the game's cats to "Who's who in `cats/`" in `ARTWORK.md`: for a named cat, which pictures
