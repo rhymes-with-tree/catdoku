@@ -21,9 +21,51 @@ Still to try:
 - if none of that works, a `contenteditable` box styled like the input
 Test each on a real iPhone: Safari's AutoFill doesn't show in the headless browser the tests use.
 
-## Move Catlas so Cat Travels isn't a shelf of one
+## Shelf tidy-up
 
-Catlas is the only game on Cat Travels (`travels` in `GROUPS` in `games.js`), so that shelf is a label tile and one
-game. Move Catlas onto another shelf (and drop Cat Travels, or keep it only if more travel games are coming). Where it
-should go isn't decided yet. Moving it changes its tile colour, its place on the front page and in the games menu, the
-shelf shortcuts and shelf search, and the README's shelf list.
+Talked through with the owner on 2026-11-02. Nothing here is decided until it's done; the reasoning is kept so it
+can be weighed again. Shelves live in `GROUPS` in `games.js`, and a game's shelf is the fifth field of its row in
+`GAMES`. Moving a game changes its tile colour (`SHELF_COLOUR`), where it sits on the front page and in the games menu,
+shelf search, and its shelf in `IDEAS.md` and the README's shelf list.
+
+**The test for Curious Cat and Kitten Play.** Curious Cat ("Moves to plan and shapes to fit") gives you a fixed board
+to plan your way through, and nothing new turns up while you think. Kitten Play ("Match, pop, sort and chase") keeps
+bringing new things (falling toys, the next bubble, birds, the snake moving), so chance and timing count as much as
+planning, and you play for a score or a level's goal rather than solving one set position. Cat Trails ("Join, link
+and route things") holds together: every game there is drawing or routing lines. Yarn, Catwalk and Tunnel Run are
+logic puzzles with one answer, but drawing lines puts them on Trails, and that's on purpose. Nothing on Trails or
+Curious Cat belongs on Cat Math or Cat Spells.
+
+Moves, by that test:
+- **Cat Pile** (Blockudoku), Curious Cat → Kitten Play: random pieces keep coming, so it plays like Kitten Play.
+- **Toy Box** (ball sort), Kitten Play → Curious Cat: a fixed board to plan through, like Shelf Life, the other sort
+  game, already on Curious Cat. The two sort games should be on the same shelf.
+- **Pawlette** (mix paint to order), Kitten Play → Curious Cat: a set puzzle to work out, not a quick game.
+- **Night Light** (Lights Out), maybe, Cat Logic → Curious Cat: it's planning moves on a fixed board, like Cat Mat. The
+  rest of Cat Logic is deduction and placing things with one answer.
+- Borderline but staying: Pick of the Pile (mahjong solitaire, partly spotting pairs, still a fixed board to clear in
+  a good order) and Shelf Life (judged by eye more than planned).
+
+**Retire Cat Travels; Catlas to Kitten Play.** Catlas is the only game on Cat Travels and `IDEAS.md` has no ideas for
+that shelf, so it would stay a shelf of one. Catlas ("Name the country where each cat is hiding") is the same kind of
+game as Cat Burglar ("Catch the cat that's sneaked into the painting") and Copycat: quick rounds of looking and
+finding. So it fits Kitten Play without a new shelf.
+
+**Don't add shelves yet.** A phone shows three tiles across, and every shelf adds a label tile and starts a new row,
+so a shelf of two to four games costs a lot of screen for little. Seven shelves (six after Cat Travels goes) is plenty
+for about 50 games. Counts on 2026-11-02, games on the site / ideas in `IDEAS.md`: Cat Logic 10/14, Cat Math 6/0,
+Cat Trails 6/6, Cat Spells 8/13, Curious Cat 8/10, Kitten Play 10/8, Cat Travels 1/0.
+
+**Split Kitten Play once its action games arrive.** It's more than one kind of game sharing a shelf. Its ideas fall in
+two groups:
+- match and pop: Onet-style pairs, SameGame groups, a triple-tile tray; with Pounce, Bubbles, Wind Up, Mew Hue and
+  Cat Pile
+- action: Kitty Plinko, Paw-ball, Pounce Up, a fling game, kneading in time with the purr; with Tail Chase and Bird
+  Watch, and the looking games (Copycat, Cat Burglar, Catlas) could go with them
+The action group is two to five games today, too few for a shelf. Once a couple of the shortlisted ones (Kitty Plinko,
+Paw-ball, Pounce Up) are built, split it.
+
+**Keep an eye on Cat Spells.** With its five shortlisted ideas it would have 13 games, and 21 with every idea. If it
+gets crowded, the natural split is making words (Keyboard Cat, Knit Pick, Kitten Caboodle, Sock Drawer, Morning
+Stretch) and moving letters (Spelling String, Fish Bones, L-M-N-O-Pom, Cat Flap, Swap-a-Pom). Cat Math has no ideas
+waiting, but six games is a fine shelf; leave it.
