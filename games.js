@@ -15,7 +15,7 @@ const G = (() => {
     ["Toe Beans", "toebeans", "Make the number on the big pad", "#DD9DAD", "numbers", "countdown 24 sums arithmetic maths math"],
     ["Knock It Off", "knockitoff", "Help Fred push everything off the table", "#7885BA", "teasers", "push sokoban table"],
     ["Hide & Seek", "hideseek", "Find Jan Brady and friends hiding in the boxes", "#C9A26B", "logic", "minesweeper mines boxes"],
-    ["Pawlette", "pawlette", "Mix colours like paint and zen out", "#9874CA", "quick", "colour color mixing paint zen"],
+    ["Pawlette", "pawlette", "Mix paint to dye the yarn", "#9874CA", "quick", "colour color mixing paint mix to order match colourway colorway dye yarn skein"],
     ["Tangle", "tangle", "Untangle the yarn the cat got into", "#3C8681", "lines", "untangle planarity knots"],
     ["Catwalk", "catwalk", "Link the perches of a giant cat tower", "#A98663", "lines", "bridges hashi"],
     ["Fair Play", "tango", "Share two toys out fairly", "#B94588", "logic", "tango binary takuzu unruly"],
