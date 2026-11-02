@@ -46,9 +46,9 @@ ideas: Cat Logic 9/3, Cat Math 6/0, Cat Trails 6/1, Cat Spells 8/5, Curious Cat 
 two groups:
 - match and pop: Onet-style pairs, SameGame groups, a triple-tile tray; with Pounce, Bubbles, Wind Up, Mew Hue and
   Cat Pile
-- action: Kitty Plinko, Paw-ball, Pounce Up, a fling game, kneading in time with the purr; with Tail Chase and Bird
+- action: Pawlinko (was Kitty Plinko), Paw-ball, Pounce Up, a fling game, kneading in time with the purr; with Tail Chase and Bird
   Watch, and the looking games (Copycat, Cat Burglar, Catlas) could go with them
-The action group is two to five games today, too few for a shelf. Once a couple of the shortlisted ones (Kitty Plinko,
+The action group is two to five games today, too few for a shelf. Once a couple of the shortlisted ones (Pawlinko,
 Paw-ball, Pounce Up) are built, split it.
 
 **Cat Spells stays one shelf.** With its five shortlisted ideas it would have 13 games, but there's no natural split:
@@ -65,9 +65,9 @@ With the shortlist built and both splits, the shelves would be (66 games): Cat L
 Cat Spells 13, Curious Cat 12, colour 4, Kitten Play (match and pop) 5, action 8. Without the colour split, Curious Cat
 15 and no colour shelf.
 
-## Kitty Plinko: sound effects
+## Pawlinko: sound effects
 
-The owner wants sound effects for Kitty Plinko, put aside for later (2026-11-02): a knock as each thing hits a hold,
+The owner wants sound effects for Pawlinko, put aside for later (2026-11-02): a knock as each thing hits a hold,
 a boing off a coil spring, a splash when coffee or water spills, a soft thump as it lands in a bed (and a sleepy
 grumble from a napping cat), and a cheer for a tandem. No game on the site has sound yet, so this needs a shared way to
 play it first: a Sound switch in the settings (off by default, as browsers only play sound after a tap), quiet enough
