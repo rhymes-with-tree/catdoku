@@ -921,10 +921,29 @@ def catshuffle():
     out += f'<rect x="{x0}" y="{x0}" width="{3 * t}" height="{3 * t}" fill="none" stroke="{INK}" stroke-width="2.5"/>'
     return frame(tint(PLUM, .35), out)
 
+
+# Pawlinko: the climbing wall: rows of sisal holds end-on, a perch, a ball of yarn falling with its strand trailing
+# from the top, and cat beds along the bottom with their points (the 100 in the middle), on the wall's periwinkle tint.
+def pawlinko():
+    sisal, line = "#C99A62", "#5A3D25"   # the sisal of cattower.js, as in the game
+    out = "".join(f'<circle cx="{x}" cy="{y}" r="3.6" fill="{sisal}" stroke="{line}" stroke-width="1.4"/>'
+                  for y, xs in ((24, (22, 42, 62, 82)), (38, (32, 52, 72)), (52, (22, 42, 62, 82))) for x in xs)
+    out += f'<path d="M64 59L82 64" stroke="{INK}" stroke-width="6.5" stroke-linecap="round"/><path d="M64 59L82 64" stroke="#E3B9A9" stroke-width="3.5" stroke-linecap="round"/>'
+    out += f'<path d="M30 12C33 22 26 30 36 38S38 48 43 54" fill="none" stroke="{INK}" stroke-width="3.6" stroke-linecap="round" opacity=".45"/>'
+    out += f'<path d="M30 12C33 22 26 30 36 38S38 48 43 54" fill="none" stroke="{PLUM}" stroke-width="2.2" stroke-linecap="round"/>'
+    out += yarnball(43, 56, 7, PLUM)
+    beds = ((10, 34, "25", "#B7C8BC"), (36, 64, "100", "#E8D9B8"), (66, 90, "50", "#C9B9D6"))
+    for x1, x2, v, c in beds:
+        out += f'<path d="M{x1 + 2} 78V88Q{x1 + 2} 91 {x1 + 6} 91H{x2 - 6}Q{x2 - 2} 91 {x2 - 2} 88V78Z" fill="{c}" stroke="{INK}" stroke-width="2" stroke-linejoin="round"/>'
+        out += text((x1 + x2) / 2, 72, v, 9)
+    out += "".join(f'<path d="M{x} 70V91" stroke="{line}" stroke-width="2.6"/>' for x in (35, 65))
+    return frame(tint(PERI, .14), out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle, "mewhue": mewhue}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle, "mewhue": mewhue, "pawlinko": pawlinko}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")

@@ -54,6 +54,7 @@ const G = (() => {
     ["Window Ledges", "windowledges", "Add up the windows to match every total", "#B3B94B", "numbers", "kakuro cross sums sums arithmetic maths math", "2026-10-31"],
     ["Cat Shuffle", "catshuffle", "Put the cat's picture back together", "#9874CA", "teasers", "fifteen 15 puzzle sixteen twiddle sliding tiles slide puzzle picture shuffle scramble rotate turn", "2026-11-01"],
     ["Mew Hue", "mewhue", "Slide paint together and line up the colours", "#B94588", "quick", "colour color mixing paint swipe slide merge lines rows columns 2048 hue pawlette", "2026-11-01"],
+    ["Pawlinko", "pawlinko", "Take turns with Gus and Peanut knocking toys down the climbing wall into the cat beds", "#7885BA", "quick", "plinko pachinko pegs pegboard galton board drop balls bounce plinko physics yarn toys cat climbing wall tree beds springs action", "2026-11-02"],
   ];
   // The shelves the front page and the games menu sort the games onto, in order: key (also a plain name for it,
   // for search), heading, one line.
@@ -1344,6 +1345,10 @@ const G = (() => {
     losecolor: '<path d="M5 21a11 11 0 0 1 22 0"/><path d="M9.5 21a6.5 6.5 0 0 1 13 0"/><path d="M19 27h9"/>',
     basketadd: '<path d="M4 14h17l-2.2 11H6.2z"/><path d="M8 14l3.5-6M17 14l-3.5-6"/><path d="M26 9v8M22 13h8"/>',
     wipe: '<rect x="5" y="5" width="22" height="22" rx="2"/><path d="M16 5v22M5 16h22"/><path d="M8.5 24C12 17 18 12 24.5 9.5" class="swipe"/>',
+    perch: '<path d="M4 18l22-8 1.6 4.2-22 8z"/><path d="M15.5 18v10M11 28h9"/>',   // a sloping perch on a post (Pawlinko)
+    reel: '<circle cx="12" cy="18" r="8"/><path d="M6.5 14.5c4 .5 8 3.5 10 9M7 22c3-3 7-5 12-4.5"/><path d="M20 17c3-1.5 5.5-5 7-10"/>',   // winding up a strand
+    sponge: '<rect x="4" y="12" width="24" height="13" rx="3.5"/><circle cx="10" cy="18" r="1.2"/><circle cx="16" cy="16" r="1.2"/><circle cx="21" cy="20" r="1.2"/><path d="M9 8c1.2-2 2.4-2 3.6 0M19 8c1.2-2 2.4-2 3.6 0"/>',
+    wallshake: '<rect x="10" y="5" width="12" height="22" rx="2"/><path d="M5 10v12M27 10v12M2 13v6M30 13v6"/>',
     keyboard: '<rect x="3" y="9" width="26" height="15" rx="3"/><path d="M8 14h.2M12 14h.2M16 14h.2M20 14h.2M24 14h.2M10 19h12"/>',
     left: '<path d="M11 9h15M11 16h15M11 23h15"/><path d="M5.5 9h.2M5.5 16h.2M5.5 23h.2"/>',
     pairs: '<path d="M4 25l5-15 5 15M6 20h6"/><path d="M19 10v15"/><circle cx="23" cy="20.5" r="4.5"/>',
@@ -1357,7 +1362,7 @@ const G = (() => {
     keepBtn: "keep", shuffleBtn: "shuffle", flipBtn: "flip", finishBtn: "near", completeBtn: "check", skipBtn: "skip",
     colBtn: "palette", linkBtn: "share", toysBtn: "toys", bestBtn: "best", helpBtn: "help", zoomIn: "zoomin", zoomOut: "zoomout", zoomFit: "fit",
     sightBtn: "sight", nipBtn: "catnip", shakeBtn: "bubbleshake", fluffBtn: "roller", swatBtn: "swat", netBtn: "net", rainbowBtn: "losecolor", basketBtn: "basketadd", wipeBtn: "wipe",
-    chooseBtn: "keyboard", revealBtn: "giveup", peekBtn: "peek"};
+    chooseBtn: "keyboard", revealBtn: "giveup", peekBtn: "peek", perchBtn: "perch", wakeBtn: "cat", reelBtn: "reel", mopBtn: "sponge"};
   // buttons that keep their own look with an icon in front of the word: every New (a +) and Catlas's Go (an arrow)
   const LEAD = {newBtn: "plus", sNewBtn: "plus", goBtn: "go", settingsSum: "sliders"};
   const iconSVG = name => `<svg class="ic" viewBox="0 0 32 32" aria-hidden="true">${ICON[name]}</svg>`;
