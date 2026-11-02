@@ -31,6 +31,36 @@ Rows are sorted by shelf, in the site's order (Cat Logic, Cat Math, Cat Trails, 
 | Paw-ball | Paw-ball | Kitten Play | A playroom table: paws for flippers, springs, box ramps, toy mice |
 | Pounce Up | Pounce Up | Kitten Play | Jump shelf to shelf up an endless bookcase, springs for boosts |
 
+### Build order
+
+The order the owner agreed on 2026-11-02 for building the shortlist. It's a plan, not a request: a game is still made
+only when the owner asks for it, and the order can bend around which new cats are drawn (each game's star cat is
+picked when it's made). The order puts games that reuse code or art already on the site first and builds two action
+games early so Kitten Play can be split. Shelves take turns so the New badge doesn't show the same shelf twice in a
+row, and the games needing new physics or new data come last. Take a game out of this list when it's built.
+
+| # | Game | Shelf | Why here |
+| --- | --- | --- | --- |
+| 1 | Kitty Plinko | Kitten Play (action) | Wind Up's drop-and-aim and physics plus pegs, so little new code; starts the action group |
+| 2 | Cross Stitch | Cat Logic | A well-known puzzle (nonograms), no new physics, and a cat picture as the reward |
+| 3 | Sock Drawer | Cat Spells | Close to Knit Pick and Keyboard Cat, using the word lists already here |
+| 4 | Pounce Up | Kitten Play (action) | The second action game, so Kitten Play can be split after it (see `TODO.md`) |
+| 5 | Zoomies | Cat Trails | Yarn's path generator makes the path; the only Trails game on the shortlist |
+| 6 | Under the Blanket | Cat Logic | Laser Pointer's ray tracing does most of it |
+| 7 | Bed Hog | Curious Cat | The long sleeping cats in `cats/` are the pieces, so no new art; needs a solver to make levels with an answer |
+| 8 | Swap-a-Pom | Cat Spells | Reuses L-M-N-O-Pom's pompoms and Pounce's swap-to-match |
+| 9 | Boing! | Curious Cat | Wind Up's physics plus the owner's spring sheet; builds the spring pieces Yarn Golf needs |
+| 10 | Morning Stretch | Cat Spells | Clues from the Wiktionary lookup (`G.meaning`) Fish Bones and Keyboard Cat already use |
+| 11 | Tape Trap | Cat Logic | A new kind of logic puzzle, so its generator is more work |
+| 12 | Yarn Golf | Curious Cat | Boing!'s springs and Wind Up's physics, plus a flick to shoot |
+| 13 | Cat Flap | Cat Spells | Its puzzle maker has to pair the letters so every row can spell a word |
+| 14 | Warm Seat | Curious Cat | After Bed Hog, to decide whether it's its own game or a mode of Bed Hog |
+| 15 | Paw-ball | Kitten Play (action) | Flippers are moving pieces, which Wind Up's physics doesn't have yet; the hardest to build |
+| 16 | Special Delivery | Curious Cat | The rules for the gifts, routes and dog still need working out |
+| 17 | Scent Trail | Cat Spells | Needs a thesaurus built first (Wiktionary's synonyms or WordNet) |
+
+Around games 12 to 14, Curious Cat reaches 13 or 14 games: the time to decide on the colour shelf (see `TODO.md`).
+
 ## Every idea
 
 | Puzzle | Shelf | How it plays | Clues? | From | Status | Notes |
