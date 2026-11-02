@@ -40,7 +40,7 @@ planned).
 
 **Don't add shelves yet.** A phone shows three tiles across, and every shelf adds a label tile and starts a new row,
 so a shelf of two to four games costs a lot of screen for little. Counts on 2026-11-02, games on the site / shortlist
-ideas: Cat Logic 9/3, Cat Math 6/0, Cat Trails 6/1, Cat Spells 8/5, Curious Cat 10/5, Kitten Play 10/3.
+ideas: Cat Logic 9/3, Cat Math 6/0, Cat Trails 6/1, Cat Spells 8/5, Curious Cat 10/5, Kitten Play 11/2.
 
 **Split Kitten Play once its action games arrive.** It's more than one kind of game sharing a shelf. Its ideas fall in
 two groups:

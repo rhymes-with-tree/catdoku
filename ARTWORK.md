@@ -45,6 +45,8 @@ Toy Stash sits one of six general cats on its boxes for each stash (`c19-44`, `c
 
 Kitten Caboodle's mother cat, beside her root on the sign, is one of Purrfect Square's 24 sitting cats, picked at random for each litter (the list `MOTHERS` in `kittencaboodle/index.html`).
 
+Pawlinko curls a napping cat from Sunbeams (the `NAPPERS` list in `cattower.js`) in some of its cat beds, picked from the wall's seed; those beds score nothing, and Wake a cat sends one off.
+
 Cat Pile lays the napping cats from Sunbeams (the `SLEEPERS` list, the same in both pages) on its clumps' blankets, a straight one or a round one in each spot, and `c14-36` curls up beside its title.
 
 - **Jan Brady** (`jan-brady-…`, fluffy black and white, long dark tail; he's a he) is a one-of-a-kind
@@ -111,13 +113,13 @@ each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the 
   `laya-8` have a hand in them, and `laya-1`, `laya-6` and `laya-7` are cut off partway.
 - **Gus** (`gus-…`, grey tabby: light, cool grey with taupe undertones, green eyes, a white and taupe muzzle and
   chin, short-haired, a moderately sized cat) looks like Higgins, but they're two different cats: Gus has none of
-  Higgins's weight or thick neck. Gus is friends with Peanut, Marmalade and Willow. He stars in Wind Up with Peanut: `gus-12` (sitting, front) is on the basket's rim, following where the yarn will drop, and beside the title. From his sheet: `gus-1` his face, large; `gus-2` sitting (from above); `gus-3`
+  Higgins's weight or thick neck. Gus is friends with Peanut, Marmalade and Willow. He stars in Wind Up with Peanut: `gus-12` (sitting, front) is on the basket's rim, following where the yarn will drop, and beside the title. He stars in Pawlinko with Peanut too: `gus-12` sits beside its title and takes turns with her on the climbing wall's top shelf, over where the next thing will drop, and shows beside the score while it's her turn. From his sheet: `gus-1` his face, large; `gus-2` sitting (from above); `gus-3`
   sitting (side); `gus-4` curled up (from above); `gus-5` sleeping (side); `gus-6` his face, smaller; `gus-7` knocking
   a cup over; `gus-8` pouncing; `gus-9` belly up; `gus-10` sitting (from behind); `gus-11` walking (from above);
   `gus-12` sitting (front); `gus-13` stretched out; `gus-14` his tail.
 - **Peanut** (`peanut-…`, solid black shorthair with green eyes, very petite and thin, a delicate build) is little,
   and often grumpy, though her sheet doesn't show it. Peanut isn't Dottie, who is stocky with two cricks in her tail.
-  Peanut is friends with Gus, Marmalade and Willow. She stars in Wind Up with Gus: `peanut-12` (sitting, front) watches beside the next ball. From her sheet: `peanut-1` her face, large; `peanut-2`
+  Peanut is friends with Gus, Marmalade and Willow. She stars in Wind Up with Gus: `peanut-12` (sitting, front) watches beside the next ball. She stars in Pawlinko with Gus too: `peanut-12` sits beside its title and takes turns with him on the climbing wall's top shelf (showing beside the score while it's his turn), and `peanut-7` (asleep in a round bed) is on the gold-paw card. From her sheet: `peanut-1` her face, large; `peanut-2`
   sitting (from above); `peanut-3` sitting (side); `peanut-4` curled up (from above); `peanut-5` sleeping (side);
   `peanut-6` her face, smaller; `peanut-7` asleep in a round bed; `peanut-8` knocking a ball; `peanut-9` pouncing;
   `peanut-10` sitting (from behind); `peanut-11` walking (from above); `peanut-12` sitting (front); `peanut-13`
