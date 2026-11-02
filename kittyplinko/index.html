@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kitty Plinko</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-11-02.10"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<meta name="theme-color" content="#ECEEE7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1F1C24" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-11-02.10">
+<style>
+/* Gus and Peanut take turns on the top shelf of a cat tree, dropping balls of yarn that bounce down through sisal posts,
+   perches and springs into the cat beds at the bottom. The one waiting shows beside the score with the next ball. */
+.title{display:flex;align-items:flex-end;gap:2px}
+.title img{display:block;height:50px;width:auto;margin-bottom:-2px}
+.title img:first-of-type{margin-left:6px}
+@media (max-height:760px){.title img{height:40px}}
+.hud{width:var(--board);display:flex;align-items:center;justify-content:space-between;gap:10px}
+.next{display:flex;align-items:flex-end;gap:6px;min-width:0}
+.next img{display:block;height:50px;width:auto}
+.next canvas{display:block;width:26px;height:26px;margin-bottom:4px}
+.hud small{display:block;font-size:calc(13px*var(--ts-big));font-weight:600;line-height:1.15;color:var(--ink-soft)}
+.hud b{font-size:calc(15px*var(--ts-big));line-height:1.1}
+.goal{text-align:right}
+.score{display:inline-flex;align-items:center;height:26px;padding:0 10px;border:2px solid var(--ink);border-radius:999px;
+  background:var(--panel);font-variant-numeric:tabular-nums;white-space:nowrap}
+.tree{position:relative;margin:0 auto;aspect-ratio:376/498;width:min(100%, calc((100svh - 330px) * 376 / 498));min-width:250px;max-width:100%;
+  touch-action:none;user-select:none;-webkit-user-select:none}
+.tree canvas{display:block;width:100%;height:100%;outline:none}
+.tree canvas:focus-visible{outline:3px solid var(--ink);outline-offset:3px;border-radius:6px}
+.stage{--aspect:1.324}
+@media (orientation:landscape) and (max-height:500px){body:not(.full) .tree{width:100%;min-width:0}}
+/* Full screen (G.fullScreen): the tree as tall as the screen allows, with Hint and the full screen button under it
+   (or in a column beside it on a phone held sideways). */
+body.full main{display:grid;grid-template-columns:minmax(0,1fr) auto auto minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr) auto;align-items:stretch;gap:6px 8px}
+body.full .status,body.full .hud{grid-column:1 / -1;width:100%}
+body.full .wrap{grid-column:1 / -1;width:100%;height:auto;min-height:0;display:flex;justify-content:center}
+body.full .tree{height:100%;width:auto;min-width:0;max-width:100%}
+body.full .actions{width:auto;grid-column:2;grid-row:4;align-self:center;flex-wrap:nowrap;gap:8px}
+body.full .actions > :not(#hintBtn),body.full .bar > :not(#fullBtn){display:none}
+body.full .bar{width:auto;grid-column:3;grid-row:4;align-self:center}
+.bar .fsBtn{padding:4px 10px}
+@media (max-width:600px) and (orientation:landscape),(max-height:500px) and (orientation:landscape){
+  body.full main{grid-template-columns:minmax(0,1fr) 186px;grid-template-rows:auto auto minmax(0,1fr) auto;gap:4px 8px}
+  body.full .tree{height:auto;width:min(100%, calc((100svh - 16px) * 376 / 498))}
+  body.full .hud .next img{height:36px}
+  body.full .status{grid-column:2;grid-row:1;flex-direction:column;align-items:flex-start;gap:2px}
+  body.full .msg{flex:none;text-align:left;font-size:14px}
+  body.full .hud{grid-column:2;grid-row:2;flex-direction:column;align-items:flex-start;gap:4px}
+  body.full .goal{text-align:left}
+  body.full .wrap{grid-column:1;grid-row:1 / 5}
+  body.full .actions{grid-column:2;grid-row:3;align-self:end;justify-self:start}
+  body.full .bar{grid-column:2;grid-row:3;align-self:end;justify-self:end}
+}
+.card img.pic{display:block;width:80%;max-width:260px;height:auto;margin:0 auto 14px}
+</style>
+</head>
+<body>
+<main>
+  <header><div class="title"><h1>Kitty Plinko</h1><img src="../cats/gus-12.webp" alt="Gus, a grey tabby, sitting"><img src="../cats/peanut-12.webp" alt="Peanut, a small black cat, sitting"></div><div class="stripe"></div><p class="tagline">Take turns with Gus and Peanut dropping yarn down the cat tree into the cat beds</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span class="left"><span class="score" id="score"></span></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+  <div class="hud">
+    <div class="next" id="next"><img id="nextCat" src="../cats/peanut-12.webp" alt=""><canvas id="nextCv" width="52" height="52" aria-hidden="true"></canvas><span><small id="nextTxt">Next: Peanut</small><b id="leftTxt"></b></span></div>
+    <div class="goal" id="goal"><small>Target</small><b id="targetTxt"></b><small id="goldTxt"></small></div>
+  </div>
+
+  <div class="wrap stage" style="height:auto"><div class="tree" id="board"><canvas id="cv" tabindex="0" role="application" aria-label="A cat tree"></canvas></div></div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="restartBtn">Restart</button>
+    <button id="linkBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New tree</button>
+    <button id="fullBtn"></button>
+  </div>
+</main>
+
+<script src="../games.js?v=2026-11-02.10"></script>
+<script src="../colorways.js?v=2026-11-02.10"></script>
+<script src="../cattower.js?v=2026-11-02.10"></script>
+<script>
+/* ---------- the cat tree (plain functions: the puzzle maker runs them in a worker too) ---------- */
+// World units: the tree is 360 wide and 424 tall. Balls of yarn drop from the top shelf, bounce down through rows of
+// sisal posts (seen end-on, as round pegs), carpeted perches and springs, and land in the cat beds along the bottom.
+// The physics is fixed-step and seeded, so a ball dropped from the same spot on the same tree always ends up in the
+// same bed: Restart, a shared link and the hint all see the same thing the player does.
+function plinkoLevels() {
+  // beds: the points for each bed, left to right (0 is a napping cat); naps: which of them are cats; perches, springs
+  // and holes (posts left out) come at random places; balls: how many Gus and Peanut have; aim: the target's share
+  // of what good aiming makes, gold: the gold paw's
+  return [null,
+    {beds: [10, 25, 50, 100, 50, 25, 10], perches: 0, springs: 0, holes: 0, balls: 10},
+    {beds: [25, 10, 50, 100, 50, 10, 25], perches: 2, springs: 0, holes: 2, balls: 10},
+    {beds: [50, 10, 25, 100, 25, 10, 50], perches: 2, springs: 2, holes: 2, balls: 10},
+    {beds: [25, 50, 100, 0, 100, 50, 25], perches: 3, springs: 2, holes: 3, balls: 10, naps: [3]},
+    {beds: [10, 100, 25, 0, 50, 25, 10], perches: 3, springs: 3, holes: 3, balls: 10, naps: [3], shuffle: true},
+    {beds: [25, 0, 50, 10, 100, 10, 0, 25], perches: 4, springs: 3, holes: 4, balls: 10, naps: [1, 6], shuffle: true},
+    {beds: [10, 50, 0, 25, 100, 0, 25, 50, 10], perches: 4, springs: 4, holes: 4, balls: 10, naps: [2, 5], shuffle: true},
+    {beds: [25, 0, 10, 100, 0, 50, 0, 25, 10], perches: 5, springs: 4, holes: 5, balls: 10, naps: [1, 4, 6], shuffle: true},
+  ];
+}
+function plinkoRng(s) { return () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function plinkoGeom() { return {W: 360, H: 424, R: 9, PEG: 6, SPRING: 10, BED_TOP: 356, ROW0: 66, ROWS: 8, DY: 35, DX: 40, DROP: 16}; }
+// The tree for a level and seed: posts, perches, springs and beds.
+function makeTree(n, seed) {
+  const L = plinkoLevels()[n], C = plinkoGeom(), rnd = plinkoRng(seed);
+  const pegs = [];
+  for (let k = 0; k < C.ROWS; k++) {
+    const y = C.ROW0 + k * C.DY;
+    // posts 40 apart, every other row shifted half a gap, never so near a side that a ball could wedge there
+    if (k % 2 === 0) for (let j = 1; j < 9; j++) pegs.push({x: j * C.DX, y, k, j});
+    else for (let j = 1; j < 8; j++) pegs.push({x: 20 + j * C.DX, y, k, j});
+  }
+  const pick = ok => { const c = pegs.filter(p => !p.gone && !p.used && ok(p)); return c.length ? c[Math.floor(rnd() * c.length)] : null; };
+  const perches = [], springs = [];
+  // a perch takes the place of two posts side by side in a row (not the top row or the bottom one), tilted so yarn rolls off
+  for (let i = 0; i < L.perches; i++) {
+    const a = pick(p => p.k > 0 && p.k < C.ROWS - 1 && pegs.some(q => q.k === p.k && q.j === p.j + 1 && !q.used && !q.gone));
+    if (!a) break;
+    const b = pegs.find(q => q.k === a.k && q.j === a.j + 1);
+    a.used = b.used = true;
+    for (const q of pegs) if (Math.abs(q.k - a.k) === 1 && q.x > a.x - 30 && q.x < b.x + 30) q.used = q.used || "near";
+    const tilt = rnd() < .5 ? -1 : 1;
+    perches.push({x1: a.x, y1: a.y - 9 * tilt, x2: b.x, y2: b.y + 9 * tilt});
+  }
+  for (let i = 0; i < L.springs; i++) {
+    const p = pick(p => p.k > 1 && p.x > 30 && p.x < C.W - 30);
+    if (!p) break;
+    p.used = true; springs.push({x: p.x, y: p.y});
+  }
+  for (let i = 0; i < L.holes; i++) { const p = pick(p => p.k > 0); if (!p) break; p.gone = true; }
+  const posts = pegs.filter(p => !p.gone && !(p.used === true)).map(p => ({x: p.x, y: p.y}));
+  // springs and perches replace the posts they stand for
+  const keep = posts.filter(p => !springs.some(s => s.x === p.x && s.y === p.y) && !perches.some(q => (q.x1 === p.x || q.x2 === p.x) && Math.abs((q.y1 + q.y2) / 2 - p.y) < 1));
+  let values = L.beds.slice(), naps = (L.naps || []).slice();
+  if (L.shuffle && rnd() < .5) { values.reverse(); naps = naps.map(i => values.length - 1 - i); }
+  const nb = values.length, bw = C.W / nb;
+  const beds = values.map((v, i) => ({x1: i * bw, x2: (i + 1) * bw, v, nap: naps.includes(i)}));
+  return {n, seed, posts: keep, perches, springs, beds, balls: L.balls};
+}
+// One step of a ball (1/240 s). Bounces off posts, springs, perches, the bed walls and the sides; a little seeded wobble
+// at each post keeps it from being too predictable.
+function plinkoStep(t, b) {
+  const C = plinkoGeom(), h = 1 / 240, G = 900;
+  const rnd = () => { b.s = (b.s + 0x6D2B79F5) | 0; let q = Math.imul(b.s ^ (b.s >>> 15), 1 | b.s); q = (q + Math.imul(q ^ (q >>> 7), 61 | q)) ^ q; return ((q ^ (q >>> 14)) >>> 0) / 4294967296; };
+  b.vy += G * h;
+  const sp = Math.hypot(b.vx, b.vy); if (sp > 900) { b.vx *= 900 / sp; b.vy *= 900 / sp; }
+  b.x += b.vx * h; b.y += b.vy * h;
+  const hitRound = (cx, cy, rr, e, kick) => {
+    const dx = b.x - cx, dy = b.y - cy, d2 = dx * dx + dy * dy, s = C.R + rr;
+    if (d2 >= s * s) return false;
+    const d = Math.sqrt(d2) || .001, nx = dx / d, ny = dy / d;
+    b.x = cx + nx * s; b.y = cy + ny * s;
+    const vn = b.vx * nx + b.vy * ny;
+    if (vn < 0) {
+      b.vx -= (1 + e) * vn * nx; b.vy -= (1 + e) * vn * ny;
+      if (kick) { const out = b.vx * nx + b.vy * ny; if (out < kick) { b.vx += (kick - out) * nx; b.vy += (kick - out) * ny; } }
+      // the wobble: turn the speed a little, more the harder it hit
+      const a = (rnd() - .5) * .15, c = Math.cos(a), s2 = Math.sin(a), vx = b.vx;
+      b.vx = vx * c - b.vy * s2; b.vy = vx * s2 + b.vy * c;
+      b.hits++;
+    }
+    return true;
+  };
+  const hitSeg = (x1, y1, x2, y2, hr, e) => {
+    const ex = x2 - x1, ey = y2 - y1, l2 = ex * ex + ey * ey, u = Math.max(0, Math.min(1, ((b.x - x1) * ex + (b.y - y1) * ey) / l2));
+    const px = x1 + ex * u, py = y1 + ey * u, dx = b.x - px, dy = b.y - py, d2 = dx * dx + dy * dy, s = C.R + hr;
+    if (d2 >= s * s) return false;
+    const d = Math.sqrt(d2) || .001, nx = dx / d, ny = dy / d;
+    b.x = px + nx * s; b.y = py + ny * s;
+    const vn = b.vx * nx + b.vy * ny;
+    if (vn < 0) { b.vx -= (1 + e) * vn * nx; b.vy -= (1 + e) * vn * ny; b.vx *= .995; }
+    return true;
+  };
+  if (b.y > C.ROW0 - 22 && b.y < C.BED_TOP) {
+    for (const p of t.posts) if (Math.abs(p.y - b.y) < 20 && Math.abs(p.x - b.x) < 20) hitRound(p.x, p.y, C.PEG, .35, 0);
+    for (const s of t.springs) if (Math.abs(s.y - b.y) < 22 && Math.abs(s.x - b.x) < 22 && hitRound(s.x, s.y, C.SPRING, .9, 330)) b.boing = (b.boing || 0) + 1;
+    for (const q of t.perches) if (b.y > Math.min(q.y1, q.y2) - 20 && b.y < Math.max(q.y1, q.y2) + 20) hitSeg(q.x1, q.y1, q.x2, q.y2, 4, .25);
+  }
+  // the bed walls: a post between each pair of beds
+  if (b.y > C.BED_TOP - 14) for (const bd of t.beds) if (bd.x1 > 1) hitSeg(bd.x1, C.BED_TOP, bd.x1, C.H, 3, .3);
+  if (b.x < C.R) { b.x = C.R; if (b.vx < 0) b.vx = -b.vx * .5; }
+  if (b.x > C.W - C.R) { b.x = C.W - C.R; if (b.vx > 0) b.vx = -b.vx * .5; }
+  if (b.y < C.R) { b.y = C.R; if (b.vy < 0) b.vy = 0; }
+}
+// A new ball, dropped at x by the i-th throw (seeded by the tree's seed and i).
+function plinkoBall(t, x, i) { const C = plinkoGeom(); return {x: Math.max(C.R, Math.min(C.W - C.R, x)), y: C.DROP, vx: 0, vy: 40, hits: 0, t: 0, i, s: (t.seed ^ Math.imul(i + 1, 0x9E3779B1)) | 0}; }
+// Has it landed? Once it's down in a bed; returns that bed's index.
+function plinkoLanded(t, b) {
+  const C = plinkoGeom();
+  if (b.y < C.H - C.R - 14 && b.t < 30) return -1;
+  for (let k = 0; k < t.beds.length; k++) if (b.x < t.beds[k].x2 || k === t.beds.length - 1) return k;
+  return -1;
+}
+// Where a ball dropped at x ends up: the bed, and (if asked) the path it takes.
+function plinkoRun(t, x, i, path) {
+  const b = plinkoBall(t, x, i), pts = path ? [] : null;
+  for (let s = 0; s < 240 * 30; s++) {
+    plinkoStep(t, b); b.t += 1 / 240;
+    if (pts && s % 6 === 0) pts.push([b.x, b.y]);
+    const k = plinkoLanded(t, b); if (k >= 0) return {bed: k, pts, boing: b.boing || 0};
+  }
+  return {bed: plinkoLanded(t, Object.assign(b, {t: 99})), pts, boing: 0};
+}
+// For each throw, the bed every drop spot leads to (every 4 units across). The target score and the hint are worked
+// out from these.
+function plinkoAims() { const C = plinkoGeom(), xs = []; for (let x = C.R; x <= C.W - C.R; x += 4) xs.push(x); return xs; }
+function plinkoMap(t, i) { return plinkoAims().map(x => plinkoRun(t, x, i).bed); }
+// The puzzle maker: a tree, with a target for the score (what fair aiming makes) and a higher one for the gold paw.
+function makePlinko(n) { return plinkoTargets(makeTree(n, (Math.random() * 2 ** 31) | 0)); }
+function plinkoTargets(t) {
+  // what each drop spot scores, throw by throw; then what a player makes dropping at random, and dropping every
+  // ball round the best spot (within 20 either side). The target is halfway between; gold is the best spot's score.
+  const maps = [];
+  for (let i = 0; i < t.balls; i++) maps.push(plinkoMap(t, i).map(k => t.beds[k].v));
+  const n = maps[0].length, avg = xs => xs.reduce((a, b) => a + b, 0) / xs.length;
+  const random = maps.reduce((s, m) => s + avg(m), 0);
+  let spot = 0;
+  for (let c = 0; c < n; c++) spot = Math.max(spot, maps.reduce((s, m) => s + avg(m.slice(Math.max(0, c - 5), c + 6)), 0));
+  const r5 = v => Math.max(5, Math.round(v / 5) * 5);
+  t.target = r5(random + (spot - random) * .5);
+  t.gold = Math.max(t.target + 50, r5(spot));
+  return t;
+}
+
+/* ---------- pictures ---------- */
+const C = plinkoGeom(), W = C.W, H = C.H, CAT = 66, M = 8;
+const CATS = [{name: "Gus", pic: "gus-12", color: "#7885BA"}, {name: "Peanut", pic: "peanut-12", color: "#E16A4A"}];
+const catOf = i => CATS[i % 2];
+const src = f => (window.EMBED && window.EMBED[f]) || (f === "spring" ? "../toys/spring.webp" : `../cats/${f}.webp`);
+const picCache = {};
+const pic = f => picCache[f] || (picCache[f] = Object.assign(new Image(), {src: src(f)}));
+// each cat's yarn, a ball from colorways.js drawn once as a picture
+const sprites = {};
+function sprite(color) {
+  if (sprites[color]) return sprites[color];
+  const svg = ballEl("svg", {viewBox: "-1.05 -1.05 2.1 2.1", width: 128, height: 128}); svg.append(ballDefs());
+  const g = yarnBall(color, 1); g.removeChild(g.firstChild);   // no ground shadow on a ball that turns
+  svg.append(g);
+  const im = new Image(); im.onload = () => { im.ok = true; paintHud(); };
+  im.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(new XMLSerializer().serializeToString(svg));
+  return sprites[color] = im;
+}
+// colours: the tree's carpets and sisal from cattower.js; the back wall is periwinkle at 12% on white, and gold is the hint's
+const CARPETS = TOWER.CARPETS, SISAL = "#C99A62", SISAL_LINE = "#5A3D25", INK = "#2A2530", WALL = "#EFF0F7", GOLD = G.HINT.gold;
+
+/* ---------- game ---------- */
+// game: {level, tree (makeTree's, with target and gold), i (the ball in play: even for Gus, odd for Peanut), ball (one
+//        falling, or null), landed [{bed, i, v}], score, aim, hinted, fx, state ("ready" | "running" | "done" | "won" | "lost")}
+const LEVELS = plinkoLevels(), MAX_LEVEL = LEVELS.length - 1;
+const STORE = "catdoku.kittyplinko.v1";
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1}, state.settings);
+let game = null, loading = 0;
+const cv = $("cv"), ctx = cv.getContext("2d");
+const builder = G.builder([plinkoLevels, plinkoRng, plinkoGeom, makeTree, plinkoStep, plinkoBall, plinkoLanded, plinkoRun, plinkoAims, plinkoMap, plinkoTargets, makePlinko], "makePlinko");
+const levelName = n => { const L = LEVELS[n], bits = [`${L.beds.length} beds`];
+  if (L.perches) bits.push("perches"); if (L.springs) bits.push("springs"); if (L.naps) bits.push("napping cats");
+  return `Level ${n} · ${bits.join(", ")}`; };
+const save = () => G.save(STORE, {settings, game: game && ["ready", "running"].includes(game.state) ? {
+  level: game.level, seed: game.tree.seed, target: game.tree.target, gold: game.tree.gold, i: game.i, score: game.score, landed: game.landed,
+  ball: game.ball, aim: game.aim, hinted: game.hinted, ms: game.ms, started: game.started, timed: game.timed} : null});
+
+function newGame(n) {
+  const ask = ++loading;
+  G.note("Growing a new cat tree…", 0);
+  builder.take(n).then(t => { if (ask !== loading) return; G.note(""); startTree(t); });
+}
+function startTree(t) {
+  G.closeCard(); loading++;
+  game = {level: t.n, tree: t, i: 0, ball: null, landed: [], score: 0, aim: W / 2, hinted: false, fx: [], acc: 0, state: "ready", ...G.freshClock()};
+  builder.prefetch(t.n);
+  status(); paintHud(); save();
+}
+const clampAim = x => Math.max(C.R, Math.min(W - C.R, x));
+
+function status() {
+  if (!game) return;
+  const g = game, t = g.tree, left = t.balls - g.i;
+  $("score").textContent = `${g.score} points`;
+  $("targetTxt").textContent = t.target;
+  $("goldTxt").textContent = `Gold paw: ${t.gold}`;
+  $("leftTxt").textContent = left > 0 ? `${left} ${left === 1 ? "ball" : "balls"} left` : "All dropped";
+  // Next: the cat (and yarn) after the one on the shelf now
+  const nx = g.i + 1 < t.balls ? catOf(g.i + 1) : null;
+  $("nextTxt").textContent = nx ? `Next: ${nx.name}` : left === 1 ? "Last ball!" : "";
+  $("nextCat").src = src((nx || catOf(g.i)).pic); $("nextCat").alt = nx ? `${nx.name}, waiting for a turn` : "";
+  $("nextCat").style.visibility = nx ? "" : "hidden";
+  $("hintBtn").disabled = !["ready", "running"].includes(g.state);
+  say();
+}
+
+/* ---------- the loop ---------- */
+const STEP = 1 / 240;
+let last = performance.now();
+function frame(now) {
+  const dt = (now - last) / 1000; last = now;
+  if (game && !$("overlay").classList.contains("show")) tick(game, dt);
+  paint();
+  requestAnimationFrame(frame);
+}
+function tick(g, dt) {
+  g.acc = (g.acc || 0) + Math.min(dt, .05);
+  while (g.acc >= STEP) {
+    g.acc -= STEP;
+    const b = g.ball;
+    if (b) {
+      const boing = b.boing || 0;
+      plinkoStep(g.tree, b); b.t += STEP;
+      if ((b.boing || 0) > boing) { const s = g.tree.springs.reduce((a, s) => Math.hypot(s.x - b.x, s.y - b.y) < Math.hypot(a.x - b.x, a.y - b.y) ? s : a); g.fx.push({spring: s, t: 0, T: .35}); }
+      const k = plinkoLanded(g.tree, b); if (k >= 0) land(g, k);
+    }
+    for (const f of g.fx) f.t += STEP;
+    g.fx = g.fx.filter(f => f.t < f.T);
+  }
+}
+// A ball lands: the bed's points, doubled when it's the same bed as the ball before (Gus and Peanut working in tandem).
+function land(g, k) {
+  const bed = g.tree.beds[k], prev = g.landed[g.landed.length - 1], both = !!(prev && prev.bed === k && bed.v > 0);
+  const v = bed.v * (both ? 2 : 1);
+  g.score += v; g.landed.push({bed: k, i: g.i, v});
+  const mid = (bed.x1 + bed.x2) / 2;
+  g.fx.push({text: bed.nap ? "Zzz" : `+${v}`, x: mid, y: C.BED_TOP - 4, t: 0, T: 1.3, c: bed.nap ? "#8D78AD" : both ? "#B94588" : INK});
+  G.note(bed.nap ? "Shh! A napping cat: no points." : both ? `In tandem! ${catOf(g.i).name} matched ${catOf(g.i - 1).name}: ${v} points.` : `${v} points for ${catOf(g.i).name}.`, 2500);
+  g.ball = null; g.i++;
+  if (g.i >= g.tree.balls) { g.state = "done"; setTimeout(() => finish(g), 900); }
+  status(); paintHud(); save();
+  // a walkthrough waiting for the first ball to land checks again now
+  if (document.querySelector(".spot.trying")) document.dispatchEvent(new PointerEvent("pointerup"));
+}
+
+/* ---------- drawing ---------- */
+function size() {
+  const r = cv.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1), w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+  if (w && (cv.width !== w || cv.height !== h)) { cv.width = w; cv.height = h; }
+  return cv.width / (W + 2 * M);
+}
+function drawYarn(c, color, x, y, r, a = 0) {
+  const im = sprite(color); if (!im.ok) return;
+  c.save(); c.translate(x, y); c.rotate(a); const s = r * 2.1; c.drawImage(im, -s / 2, -s / 2, s, s); c.restore();
+}
+// where the i-th ball to land in a bed rests, in rows from the bottom
+function restAt(bed, n) {
+  const per = Math.max(1, Math.floor((bed.x2 - bed.x1 - 14) / 14)), row = Math.floor(n / per), col = n % per, x0 = (bed.x1 + bed.x2) / 2 - (per - 1) * 7;
+  return [x0 + col * 14 + (row % 2 ? 4 : 0), H - 13 - row * 11];
+}
+function sisalPost(x, y1, y2, w) {
+  ctx.fillStyle = SISAL; ctx.strokeStyle = SISAL_LINE; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.roundRect(x - w / 2, y1, w, y2 - y1, w / 3); ctx.fill(); ctx.stroke();
+  ctx.save(); ctx.globalAlpha = .5; ctx.lineWidth = 1; ctx.beginPath();
+  for (let y = y1 + 4; y < y2 - 2; y += 5) { ctx.moveTo(x - w / 2 + 1, y); ctx.lineTo(x + w / 2 - 1, y + 2); }
+  ctx.stroke(); ctx.restore();
+}
+function paint() {
+  if (!game) return;
+  const k = size(), g = game, t = g.tree, hint = hints.current();
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.setTransform(k, 0, 0, k, k * M, k * CAT);
+  ctx.lineCap = ctx.lineJoin = "round";
+  // the back of the tree, and the two sisal sides
+  ctx.fillStyle = WALL; ctx.fillRect(0, 0, W, H);
+  // a hint's bed, glowing gold behind
+  if (hint) { const bd = t.beds[hint.bed]; ctx.fillStyle = "rgba(236,168,24,.28)"; ctx.fillRect(bd.x1, C.BED_TOP - 8, bd.x2 - bd.x1, H - C.BED_TOP + 8); }
+  // the beds: a round cushioned bed between each pair of posts, with its points over it
+  t.beds.forEach((bd, j) => {
+    const a = bd.x1 + 4, b = bd.x2 - 4, top = H - 30, col = CARPETS[(j * 3 + t.seed) % CARPETS.length >>> 0] || CARPETS[0];
+    ctx.fillStyle = col; ctx.strokeStyle = INK; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(a, top); ctx.lineTo(a, H - 10); ctx.quadraticCurveTo(a, H - 1, a + 10, H - 1); ctx.lineTo(b - 10, H - 1); ctx.quadraticCurveTo(b, H - 1, b, H - 10); ctx.lineTo(b, top); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.save(); ctx.fillStyle = "rgba(42,37,48,.18)"; ctx.beginPath(); ctx.ellipse((a + b) / 2, top + 4, (b - a) / 2 - 5, 5, 0, 0, 7); ctx.fill(); ctx.restore();
+    ctx.beginPath(); ctx.moveTo(a - 1, top); ctx.lineTo(b + 1, top); ctx.lineWidth = 9; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 5.5; ctx.strokeStyle = col; ctx.stroke();
+    if (bd.nap) {
+      const nm = TOWER.NAPPERS[(j + t.seed) % TOWER.NAPPERS.length >>> 0] || TOWER.NAPPERS[0], im = pic(nm);
+      if (im.complete && im.naturalWidth) { const w = Math.min(b - a + 6, 52), h = w * im.naturalHeight / im.naturalWidth; ctx.drawImage(im, (a + b) / 2 - w / 2, H - 6 - h, w, h); }
+    }
+    ctx.font = `800 ${t.beds.length > 7 ? 14 : 16}px "Baloo 2", sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = bd.nap ? "#6B5A8A" : INK; ctx.fillText(bd.nap ? "Zzz" : bd.v, (a + b) / 2, C.BED_TOP + 14);
+  });
+  // yarn already in the beds
+  const count = t.beds.map(() => 0);
+  for (const l of g.landed) { const bd = t.beds[l.bed]; if (bd.nap) continue; const [x, y] = restAt(bd, count[l.bed]++); drawYarn(ctx, catOf(l.i).color, x, y, 7, l.i * 1.7); }
+  // the posts between the beds
+  for (const bd of t.beds) if (bd.x1 > 1) sisalPost(bd.x1, C.BED_TOP, H, 6);
+  // sisal posts end-on, carpeted perches and springs
+  for (const p of t.posts) {
+    ctx.beginPath(); ctx.arc(p.x, p.y, C.PEG, 0, 7); ctx.fillStyle = SISAL; ctx.fill(); ctx.lineWidth = 1.8; ctx.strokeStyle = SISAL_LINE; ctx.stroke();
+    ctx.beginPath(); ctx.arc(p.x, p.y, C.PEG - 2.6, 0, 7); ctx.lineWidth = 1; ctx.globalAlpha = .45; ctx.stroke(); ctx.globalAlpha = 1;
+  }
+  t.perches.forEach((q, j) => {
+    ctx.beginPath(); ctx.moveTo(q.x1, q.y1); ctx.lineTo(q.x2, q.y2); ctx.lineWidth = 11; ctx.strokeStyle = INK; ctx.stroke();
+    ctx.lineWidth = 7; ctx.strokeStyle = CARPETS[(j + 1) % CARPETS.length]; ctx.stroke();
+  });
+  const sp = pic("spring");
+  for (const s of t.springs) {
+    const f = g.fx.find(f => f.spring && f.spring.x === s.x && f.spring.y === s.y), u = f ? Math.sin(f.t / f.T * Math.PI) : 0, r = C.SPRING + 4;
+    if (sp.complete && sp.naturalWidth) ctx.drawImage(sp, s.x - r * (1 + .25 * u), s.y - r * (1 - .2 * u), 2 * r * (1 + .25 * u), 2 * r * (1 - .2 * u));
+    else { ctx.beginPath(); ctx.arc(s.x, s.y, C.SPRING, 0, 7); ctx.strokeStyle = "#4E577D"; ctx.lineWidth = 3; ctx.stroke(); }
+  }
+  // the frame: sisal sides, the top shelf the cats sit on, a carpeted base
+  sisalPost(-M / 2, -4, H + M / 2, M);
+  sisalPost(W + M / 2, -4, H + M / 2, M);
+  ctx.fillStyle = CARPETS[0]; ctx.strokeStyle = INK; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.roundRect(-M, H, W + 2 * M, M, 3); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.roundRect(-M, -7, W + 2 * M, 9, 4); ctx.fill(); ctx.stroke();
+  // a hint: a gold ring where to drop, and on a second hint the way the yarn will go
+  if (hint) {
+    if (hint.pts) { ctx.save(); ctx.strokeStyle = GOLD; ctx.lineWidth = 3; ctx.setLineDash([2, 7]); ctx.beginPath(); hint.pts.forEach(([x, y], n) => n ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke(); ctx.restore(); }
+    ctx.beginPath(); ctx.arc(hint.x, C.DROP, C.R + 6, 0, 7); ctx.lineWidth = 4; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 2.5; ctx.strokeStyle = GOLD; ctx.stroke();
+    const bd = t.beds[hint.bed]; ctx.lineWidth = 3; ctx.strokeStyle = GOLD; ctx.strokeRect(bd.x1 + 1.5, C.BED_TOP - 6, bd.x2 - bd.x1 - 3, H - C.BED_TOP + 4);
+  }
+  // the falling ball
+  if (g.ball) drawYarn(ctx, catOf(g.ball.i).color, g.ball.x, g.ball.y, C.R, g.ball.x / C.R);
+  // the cat on the shelf, holding the next ball over where it'll drop, and a faint line below it
+  if (["ready", "running"].includes(g.state) && g.i < t.balls) {
+    const cat = catOf(g.i), im = pic(cat.pic), ax = clampAim(g.aim), busy = !!g.ball;
+    if (!busy) { ctx.save(); ctx.strokeStyle = "rgba(42,37,48,.22)"; ctx.lineWidth = 2; ctx.setLineDash([3, 7]); ctx.beginPath(); ctx.moveTo(ax, C.DROP + C.R + 4); ctx.lineTo(ax, C.ROW0 - 12); ctx.stroke(); ctx.restore(); }
+    if (im.complete && im.naturalWidth) { const h = CAT, w = h * im.naturalWidth / im.naturalHeight, x = Math.max(w / 2 - M, Math.min(W + M - w / 2, ax)); ctx.drawImage(im, x - w / 2, -CAT + 1, w, h); }
+    if (!busy) drawYarn(ctx, cat.color, ax, C.DROP, C.R);
+  }
+  // points popping up over a bed
+  for (const f of g.fx) if (f.text) {
+    const u = f.t / f.T; ctx.save(); ctx.globalAlpha = Math.min(1, 2 - 2 * u); ctx.font = `800 20px "Baloo 2", sans-serif`; ctx.textAlign = "center";
+    ctx.lineWidth = 4; ctx.strokeStyle = "#fff"; ctx.strokeText(f.text, f.x, f.y - 26 * u); ctx.fillStyle = f.c; ctx.fillText(f.text, f.x, f.y - 26 * u); ctx.restore();
+  }
+}
+function paintHud() {
+  const c = $("nextCv").getContext("2d"); c.clearRect(0, 0, 52, 52);
+  if (game && game.i + 1 < game.tree.balls) { const im = sprite(catOf(game.i + 1).color); if (im.ok) c.drawImage(im, 4, 4, 44, 44); }
+}
+addEventListener("resize", paint);
+// What's on the tree, in words, for VoiceOver.
+let saying = false;
+function say() {
+  if (saying) return; saying = true;
+  queueMicrotask(() => {
+    saying = false; if (!game) return;
+    const g = game, t = g.tree, beds = t.beds.map(b => b.nap ? "a napping cat" : `${b.v}`);
+    const who = g.i < t.balls ? `${catOf(g.i).name} is holding the yarn ${Math.round(clampAim(g.aim) / W * 100)}% of the way across. ` : "";
+    G.describe($("board"), `A cat tree, level ${g.level}. ${who}Beds from left to right: ${G.listed(beds)}. ${g.score} points of ${t.target}, ${t.balls - g.i} balls left. Left and right arrows aim, space or down arrow drops.`);
+  });
+}
+
+/* ---------- dropping ---------- */
+const spotBlocks = () => document.querySelector(".spot") && !document.querySelector(".spot.trying");
+function drop() {
+  const g = game;
+  if (!g || !["ready", "running"].includes(g.state) || g.ball || g.i >= g.tree.balls || $("overlay").classList.contains("show") || spotBlocks()) return;
+  if (g.state === "ready") { g.state = "running"; g.started = true; }
+  g.ball = plinkoBall(g.tree, clampAim(g.aim), g.i);
+  hints.clear(false);
+  status(); save();
+}
+function aimTo(e) { if (!game) return; const r = cv.getBoundingClientRect(); game.aim = clampAim((e.clientX - r.left) / r.width * (W + 2 * M) - M); say(); }
+let down = false;
+cv.addEventListener("pointerdown", e => { down = true; cv.setPointerCapture(e.pointerId); aimTo(e); });
+cv.addEventListener("pointermove", e => { if (e.pointerType === "mouse" || down) aimTo(e); });
+cv.addEventListener("pointerup", e => { if (down) { down = false; aimTo(e); drop(); } });
+cv.addEventListener("pointercancel", () => { down = false; });
+addEventListener("keydown", e => {
+  if (!game || e.target.closest("select,input,textarea") || e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key;
+  if (k === "ArrowLeft" || k === "ArrowRight") { e.preventDefault(); game.aim = clampAim(clampAim(game.aim) + (k === "ArrowLeft" ? -1 : 1) * (e.shiftKey ? 20 : 4)); game.started = game.started || game.state === "running"; say(); }
+  else if (k === "ArrowDown" || k === " " || k === "Enter") { if (e.target.closest("button")) return; e.preventDefault(); drop(); }
+});
+
+/* ---------- hint ---------- */
+// A hint works out where every spot on the shelf sends this ball (the tree's physics is the same every time) and
+// marks, in gold, the middle of the widest stretch that reaches the best bed it can, counting a bed matched in tandem
+// at double. Asked again on the same ball, it shows the way the yarn will go. It costs the gold paw.
+const hints = G.hinter({game: () => game, key: () => game ? `${game.i}` : "", draw: () => paint()});
+$("hintBtn").onclick = () => {
+  const g = game;
+  if (!g || !["ready", "running"].includes(g.state)) return;
+  if (g.ball) { G.note("Wait for the yarn to land.", 2000); return; }
+  const t = g.tree, xs = plinkoAims(), beds = plinkoMap(t, g.i), prev = g.landed[g.landed.length - 1];
+  const worth = k => t.beds[k].v * (prev && prev.bed === k && t.beds[k].v > 0 ? 2 : 1);
+  const best = Math.max(...beds.map(worth));
+  let run = null;
+  for (let a = 0; a < beds.length;) {
+    if (worth(beds[a]) !== best) { a++; continue; }
+    let b = a; while (b + 1 < beds.length && beds[b + 1] === beds[a]) b++;
+    if (!run || b - a > run[1] - run[0]) run = [a, b];
+    a = b + 1;
+  }
+  const x = xs[Math.round((run[0] + run[1]) / 2)], bed = beds[run[0]], deep = hints.level() > 0;
+  const mark = {x, bed, pts: deep ? plinkoRun(t, x, g.i, true).pts : null};
+  hints.show(mark, deep ? `Here's the way it goes from the gold ring: ${best} points.` : `Drop ${catOf(g.i).name}'s yarn from the gold ring for ${best} points.${prev && t.beds[bed].v * 2 === best ? " That's a tandem!" : ""}`);
+  g.hinted = true; save();
+};
+
+/* ---------- endings ---------- */
+function finish(g) {
+  if (game !== g || g.state !== "done") return;
+  if (g.score >= g.tree.target) win(); else lose();
+}
+function win() {
+  const g = game; g.state = "won"; G.finishClock(g);
+  const next = Math.min(MAX_LEVEL, g.level + 1), gold = !g.hinted && g.score >= g.tree.gold;
+  settings.level = next; $("levelSel").value = next; save(); status();
+  G.track(`Kitty Plinko won level ${g.level}`);
+  const im = new Image(); im.className = "pic"; im.src = src("peanut-7"); im.alt = "Peanut asleep in a round bed";
+  const text = `${g.score} points, over the target of ${g.tree.target}.` + (!gold && !g.hinted ? ` ${g.tree.gold} points with no hints wins a gold paw.` : "") + (g.level === MAX_LEVEL ? "" : ` Next up: level ${next}.`);
+  G.winCard(text, () => startLevel(next), "Admire the tree", g.result,
+    {title: "All tucked in!", gold, goldWhy: `${g.tree.gold} points with no hints!`, goldPic: [im], next: next > g.level ? `Next: level ${next}` : "New tree",
+     top: g.level === MAX_LEVEL, after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+function lose() {
+  const g = game; g.state = "lost"; status(); save();
+  G.breakStreak(); G.track(`Kitty Plinko missed on level ${g.level}`);
+  G.openCard("Not quite!", `${g.score} points, ${g.tree.target - g.score} short of the target of ${g.tree.target}.`,
+    [["Try this tree again", () => startTree(g.tree), true], ["New tree", () => { G.closeCard(); newGame(g.level); }],
+     ["Admire the tree", () => { G.closeCard(); G.note("Tap Restart to try this tree again.", 0); }], G.homeBtn()],
+    null, G.otherSize($("levelSel"), g.level, startLevel, "Or play a different level:"));
+}
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); G.closeCard(); newGame(n); }
+$("restartBtn").onclick = () => { if (game) startTree(game.tree); };
+$("newBtn").onclick = () => { if (game) newGame(game.level); };
+// Share: the level and the tree, as grown.
+$("linkBtn").onclick = () => { if (game) G.shareCard({name: "Kitty Plinko", what: "tree", won: game.state === "won", puzzle: () => ({g: "kittyplinko", N: game.level, s: game.tree.seed})}); };
+function openShared(d) {
+  if (!(Number.isInteger(d.N) && d.N >= 1 && d.N <= MAX_LEVEL) || !Number.isInteger(d.s)) throw new Error("the shared tree doesn't fit the game");
+  settings.level = d.N; $("levelSel").value = d.N; save(); startTree(plinkoTargets(makeTree(d.N, d.s)));
+}
+
+/* ---------- how to play ---------- */
+function showHelp() { settings.seenHelp = false; helpOnFirstVisit(); if (!document.querySelector(".spot") && !(game && game.ball)) { settings.seenHelp = true; G.helpLater(); } }
+function helpOnFirstVisit(n = 0) {
+  if (settings.seenHelp || document.querySelector(".spot")) return;
+  if (!game || !["ready", "running"].includes(game.state)) return;
+  if (game.ball) { if (n < 40) setTimeout(() => helpOnFirstVisit(n + 1), 300); return; }   // let the yarn land first
+  const cols = 8, rows = 10, row = y => Math.min(rows - 1, Math.floor((CAT + y) / (CAT + H + M) * rows)), col = x => Math.max(0, Math.min(cols - 1, Math.floor((x + M) / (W + 2 * M) * cols)));
+  const top = [], beds = [];
+  for (let x = 0; x < cols; x++) { for (let y = 0; y <= row(C.DROP); y++) top.push([x, y]); for (let y = row(C.BED_TOP); y < rows; y++) beds.push([x, y]); }
+  const t = game.tree, at = (x, y) => [[col(x), row(y)]];
+  const naps = t.beds.filter(b => b.nap).flatMap(b => [...new Set([col(b.x1 + 4), col(b.x2 - 4)])].map(c => [c, rows - 1]));
+  const i0 = game.i, turn = G.yourTurn(() => game, g => { game = g; }, () => { status(); paintHud(); });
+  const steps = [
+    {say: "Drag to aim, let go to drop", lit: top, try: {done: () => game.i > i0, yes: "Into a bed!"}, ...turn.upTo},
+    {say: "Gus and Peanut take turns", els: [$("next")]},
+    {say: "Each bed scores its points", lit: beds},
+    {say: "Same bed twice running: double!", lit: beds, tone: "ok"},
+    ...(naps.length ? [{say: "Napping cats score nothing", lit: naps}] : []),
+    ...(t.springs.length ? [{say: "Springs bounce yarn back up", lit: t.springs.flatMap(s => at(s.x, s.y)), later: true}] : []),
+    {say: "Reach the target to win", els: [$("goal")]},
+    {say: "Stuck? Hint shows a good spot", els: [$("hintBtn")]},
+  ];
+  G.spotlight({grid: cv, w: cols, h: rows, steps, done: () => { settings.seenHelp = true; save(); }});
+}
+$("helpBtn").onclick = showHelp;
+
+/* ---------- start ---------- */
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", "") + (n === MAX_LEVEL ? " (hardest)" : ""), n));
+$("levelSel").onchange = e => { startLevel(+e.target.value); $("levelSel").blur(); };
+G.nav("kittyplinko");
+G.fullScreen({btn: $("fullBtn"), name: "Kitty Plinko", change: () => paint()});
+G.setupTimer({name: "kittyplinko", game: () => game, playing: g => g.state === "running", save, label: levelName, noun: "level",
+  emptyText: "Reach the target on a level and your times will show up here. They're kept on this device only."});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+const shared = G.readShare("kittyplinko");
+let openedShare = false;
+if (shared) try { openShared(shared); openedShare = true; G.note("Here's the shared cat tree. Good luck!", 6000); G.track("Kitty Plinko shared puzzle opened"); } catch (e) { G.note("That share link didn't work.", 5000); }
+if (!openedShare) {
+  const s = state.game;
+  G.reopen(() => {
+    if (!(s && s.level === settings.level && Number.isInteger(s.seed))) { newGame(settings.level); return; }
+    const t = makeTree(s.level, s.seed); t.target = s.target; t.gold = s.gold;
+    if (!(s.i >= 0 && s.i <= t.balls && Array.isArray(s.landed) && s.landed.every(l => t.beds[l.bed]))) throw new Error("the saved tree didn't fit");
+    startTree(t);
+    Object.assign(game, {i: s.i, score: s.score, landed: s.landed, ball: s.ball && Number.isFinite(s.ball.x) ? s.ball : null, aim: s.aim || W / 2, hinted: !!s.hinted,
+      ms: s.ms || 0, started: s.started, timed: s.timed !== false, state: s.started ? "running" : "ready"});
+    G.checkClock(game); status(); paintHud();
+  }, msg => { newGame(settings.level); G.note(msg, 5000); });
+}
+window.addEventListener("hashchange", () => { const d = G.readShare("kittyplinko"); if (d) G.offerShare(d, {name: "Kitty Plinko", inProgress: !!(game && game.started && !["won", "lost"].includes(game.state)), open: d => { try { openShared(d); } catch (e) { G.note("That share link didn't work.", 5000); } }}); });
+requestAnimationFrame(frame);
+setTimeout(helpOnFirstVisit, 300);
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
