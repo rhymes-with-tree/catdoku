@@ -903,7 +903,7 @@ def windowledges():
     out += shutter(14, 66, "5") + win(40, 66, False, "") + win(66, 66, True, "2")
     return frame(RED, out)
 
-# Cat Shuffle: a cat's face on a patchwork quilt, cut into nine pieces with thin gaps between; the piece from the middle
+# Purrmutation (first called Cat Shuffle): a cat's face on a patchwork quilt, cut into nine pieces with thin gaps between; the piece from the middle
 # of the right-hand side has slid down into the gap. Palette colours: the quilt in tints of teal, gold, plum and
 # periwinkle, the cat in coral, on lavender's palette neighbour (a tint of plum).
 def catshuffle():
