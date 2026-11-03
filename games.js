@@ -52,7 +52,7 @@ const G = (() => {
     ["Wind Up", "windup", "Drop yarn for Gus and wind two of a kind into a bigger ball", "#B94588", "quick", "suika watermelon game merge drop physics 2048 yarn balls fluffballs pompoms", "2026-10-30"],
     ["L-M-N-O-Pom", "lmnopom", "Spell words in the falling pompoms for Marmalade to pounce on", "#B94588", "words", "tetris letris falling letters words scrabble blocks drop pompoms pom poms alphabet lmnop", "2026-10-31"],
     ["Window Ledges", "windowledges", "Add up the windows to match every total", "#B3B94B", "numbers", "kakuro cross sums sums arithmetic maths math", "2026-10-31"],
-    ["Cat Shuffle", "catshuffle", "Put the cat's picture back together", "#9874CA", "teasers", "fifteen 15 puzzle sixteen twiddle sliding tiles slide puzzle picture shuffle scramble rotate turn", "2026-11-01"],
+    ["Purrmutation", "catshuffle", "Put the cat's picture back together", "#9874CA", "teasers", "cat shuffle fifteen 15 puzzle sixteen twiddle sliding tiles slide puzzle picture shuffle scramble rotate turn", "2026-11-01"],
     ["Mew Hue", "mewhue", "Slide paint together and line up the colours", "#B94588", "quick", "colour color mixing paint swipe slide merge lines rows columns 2048 hue pawlette", "2026-11-01"],
     ["Pawlinko", "pawlinko", "Take turns with Gus and Peanut knocking toys down the climbing wall into the cat beds", "#7885BA", "quick", "plinko pachinko pegs pegboard galton board drop balls bounce plinko physics yarn toys cat climbing wall tree beds springs action", "2026-11-02"],
   ];
