@@ -153,18 +153,30 @@ const levelName = n => { const v = LV[n], bits = [...new Set(v.shape.split("+").
 // The shapes in the basket: a line of points with a half-thickness (a single point is a round peg), and for the corners
 // (net: part of the floor, which turns to net with it when the floor is dropped)
 // a polygon to fill. Balls roll off them like the walls.
+// Each basket is dealt from its seed (rnd), so the same level comes out a little different every time: a slope
+// steeper or gentler, the hump off to one side, ledges higher or lower, longer or shorter, the corners rounder;
+// and half the time the whole basket is the other way round. Restart and a shared link get the same basket.
+const span = (rnd, a, b) => a + (b - a) * rnd();
 const SHAPE = {
-  slope: () => [{pts: [[0, H - 80], [W, H]], hr: 3, fill: [[0, H - 80], [W, H], [0, H]], net: true}],   // the floor higher on the left, so balls roll right
-  slopeR: () => [{pts: [[W, H - 80], [0, H]], hr: 3, fill: [[W, H - 80], [0, H], [W, H]], net: true}],
-  hump: () => [{pts: [[W / 2, H + 14]], hr: 44}],
-  ledge: () => [{pts: [[0, 236], [84, 262]], hr: 5}],
-  ledgeR: () => [{pts: [[W, 250], [W - 84, 276]], hr: 5}],
-  ledges: () => [{pts: [[0, 200], [80, 226]], hr: 5}, {pts: [[W, 290], [W - 80, 316]], hr: 5}],
-  round: () => [-1, 1].map(side => {   // a curved corner each side of the floor: an arc of 60 units, filled in behind
-    const pts = Array.from({length: 9}, (_, k) => { const f = Math.PI / 2 * (k / 8), phi = side < 0 ? Math.PI - f : f; return [(side < 0 ? 60 : W - 60) + 60 * Math.cos(phi), H - 60 + 60 * Math.sin(phi)]; });
+  slope: rnd => { const h = span(rnd, 60, 100); return [{pts: [[0, H - h], [W, H]], hr: 3, fill: [[0, H - h], [W, H], [0, H]], net: true}]; },   // the floor higher on the left, so balls roll right
+  slopeR: rnd => { const h = span(rnd, 60, 100); return [{pts: [[W, H - h], [0, H]], hr: 3, fill: [[W, H - h], [0, H], [W, H]], net: true}]; },
+  hump: rnd => [{pts: [[W / 2 + span(rnd, -70, 70), H + span(rnd, 6, 20)]], hr: span(rnd, 38, 52)}],
+  ledge: rnd => { const y = span(rnd, 214, 262), len = span(rnd, 70, 100); return [{pts: [[0, y], [len, y + span(rnd, 16, 34)]], hr: 5}]; },
+  ledgeR: rnd => { const y = span(rnd, 228, 276), len = span(rnd, 70, 100); return [{pts: [[W, y], [W - len, y + span(rnd, 16, 34)]], hr: 5}]; },
+  ledges: rnd => { const y1 = span(rnd, 196, 220), y2 = y1 + span(rnd, 70, 92);
+    return [[0, y1, 1], [W, y2, -1]].map(([x, y, d]) => { const len = span(rnd, 66, 96); return {pts: [[x, y], [x + d * len, y + span(rnd, 16, 34)]], hr: 5}; }); },
+  round: rnd => { const R = span(rnd, 46, 74); return [-1, 1].map(side => {   // a curved corner each side of the floor: an arc of radius R, filled in behind
+    const pts = Array.from({length: 9}, (_, k) => { const f = Math.PI / 2 * (k / 8), phi = side < 0 ? Math.PI - f : f; return [(side < 0 ? R : W - R) + R * Math.cos(phi), H - R + R * Math.sin(phi)]; });
     return {pts, hr: 3, fill: [...pts, [side < 0 ? 0 : W, H]], net: true};
-  }),
+  }); },
 };
+function basketFor(seed, v) {
+  const rnd = mulberry(seed ^ 0x5BA5E7), flip = rnd() < .5;
+  const shapes = v.shape.split("+").filter(Boolean).flatMap(k => SHAPE[k](rnd));
+  if (!flip) return shapes;
+  const fx = ([x, y]) => [W - x, y];
+  return shapes.map(sh => ({...sh, pts: sh.pts.map(fx), fill: sh.fill && sh.fill.map(fx)}));
+}
 const POM_TOP = 6;   // puffballs wind up to this size; two of the biggest puff away
 const SHAKE_FOR = .9;   // seconds the basket wobbles after a shake
 const SUB = 6, STEP = 1 / 60, ITER = 4, GRACE = 1.1, LOSE_AFTER = 2.4, COOL = 0.4;
@@ -227,7 +239,8 @@ const save = () => G.save(STORE, {settings, game: game && ["running", "paused"].
 
 function newGame(n, seed) {
   closeCard();
-  game = {level: n, line: LV[n].line, shapes: LV[n].shape.split("+").filter(Boolean).flatMap(k => SHAPE[k]()), seed: seed || (Math.random() * 2 ** 31) | 0, i: 0, balls: [], score: 0, best: 0, cool: 0, net: 0, netReady: false, fell: 0, shakeT: 0, shakeCool: 0, overT: 0, aim: W / 2, fx: [], state: "ready", ...G.freshClock()};
+  seed = seed || (Math.random() * 2 ** 31) | 0;
+  game = {level: n, line: LV[n].line, shapes: basketFor(seed, LV[n]), seed, i: 0, balls: [], score: 0, best: 0, cool: 0, net: 0, netReady: false, fell: 0, shakeT: 0, shakeCool: 0, overT: 0, aim: W / 2, fx: [], state: "ready", ...G.freshClock()};
   $("tapgo").hidden = true; status(); paintHud(); save();
 }
 function closeCard() { G.closeCard(); }
