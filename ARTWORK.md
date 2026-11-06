@@ -41,7 +41,7 @@ is beside its title.
 
 Window Ledges sits a few of Purrfect Square's 24 sitting cats (the list `SITTERS`, the same in both pages) on the sills of its windows once every window is lit, picked for each puzzle from its totals, about one window in six and never two side by side.
 
-Toy Stash sits one of six general cats on its boxes for each stash (`c19-44`, `c19-45`, `c18-25`, `c19-11`, `c19-2`, `c18-33`, the list `GUARDS` in `stash/index.html`); once the stash is found, `c17-17` (batting a ball) or `c19-43` (pouncing on a feather) plays with the toys, and `c17-18` (pouncing on a ball) is on the gold-paw card.
+Mewstermind sits one of six general cats on its boxes for each stash (`c19-44`, `c19-45`, `c18-25`, `c19-11`, `c19-2`, `c18-33`, the list `GUARDS` in `stash/index.html`); once the stash is found, `c17-17` (batting a ball) or `c19-43` (pouncing on a feather) plays with the toys, and `c17-18` (pouncing on a ball) is on the gold-paw card.
 
 Kitten Caboodle's mother cat, beside her root on the sign, is one of Purrfect Square's 24 sitting cats, picked at random for each litter (the list `MOTHERS` in `kittencaboodle/index.html`).
 

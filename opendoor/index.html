@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-06.1"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-06.2"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-06.1">
+<link rel="stylesheet" href="../games.css?v=2026-11-06.2">
 <style>
 /* A KenKen house: every row and column holds 1 to N once, and walls split the floor into rooms whose numbers
    must make the room's sign. Each room has a door that opens when the room is right; with every door open,
@@ -49,6 +49,13 @@
 .cell .sign{position:absolute;left:calc(var(--cell) * .07);top:calc(var(--cell) * .02);font-size:max(10px,calc(var(--cell) * .24));font-weight:800;line-height:1.1;
   color:var(--ink);white-space:nowrap;pointer-events:none;z-index:2}
 .cell .sign.wrong{color:#C8392B}
+/* ÷ drawn, as the font's is so small it reads as a + */
+.sign .opdiv{display:inline-block;width:.72em;height:.72em;margin-left:.04em;vertical-align:-.04em;fill:currentColor}
+/* a finished house can be looked at with or without its numbers */
+.house.bare .v,.house.bare .sign,.house.bare .notes{visibility:hidden}
+.winhouse{display:flex;flex-direction:column;align-items:center;gap:8px;margin:0 0 12px}
+.winhouse .house{--board:min(240px,62vw);margin:0 auto;cursor:default}
+.winhouse button{min-height:36px;padding:2px 14px;font-size:calc(15px*var(--ts))}
 .cell .notes{position:absolute;inset:calc(var(--cell) * .26) calc(var(--cell) * .06) calc(var(--cell) * .04);display:grid;align-items:center;justify-items:center;
   font-size:max(8px,calc(var(--cell) * .2));font-weight:600;line-height:1;color:var(--ink-soft);pointer-events:none}
 .walls{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
@@ -94,6 +101,7 @@
     <button id="backBtn" hidden>Back to bookmark</button>
     <button id="notesBtn" aria-pressed="false">Notes</button>
     <button id="allNotesBtn">All notes</button>
+    <button id="numsBtn" data-icon="digits" aria-pressed="false" hidden>Numbers</button>
     <button id="linkBtn">Share</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
@@ -105,7 +113,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-06.1"></script>
+<script src="../games.js?v=2026-11-06.2"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N grid where every row and column holds 1 to N once, cut into rooms (cages). Each room has a sign:
@@ -286,6 +294,8 @@ let game = state.game || null, busy = false, sel = -1, noting = false, running =
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
 const OPS = {"+": "+", "-": "−", "x": "×", "/": "÷", "": ""};
+// on the board: the same, with ÷ drawn (two clear dots and a bar)
+const OPS_SHOWN = {...OPS, "/": '<svg class="opdiv" viewBox="0 0 10 10" aria-hidden="true"><circle cx="5" cy="1.7" r="1.35"/><rect x=".6" y="4.15" width="8.8" height="1.7" rx=".85"/><circle cx="5" cy="8.3" r="1.35"/></svg>'};
 const levelName = n => { const [N, ops, logic] = levelOf(n); return `Level ${n} · ${N} × ${N}${ops === "+-" ? ", + and − only" : ""}${logic ? "" : ", may need a guess"}`; };
 const build = G.builder([levelOf, randomLatin, cageValue, makeRooms, pickSign, solveRooms, makePuzzle], "makePuzzle");
 // floor colours for the rooms (no two rooms side by side match), and each one lit up once its room is right
@@ -354,13 +364,16 @@ function draw() {
     const r = Math.floor(i / N), c = i % N, peer = sel >= 0 && i !== sel && (r === sr || c === sc);
     const cls = ["cell", right[k] || (forceOpen === k) ? "done" : "", i === sel ? "sel" : "", peer ? "peer" : "", guessed.has(i) && g[i] ? "guessed" : "",
       clash.has(i) ? "clash" : "", flash && flash.i === i ? flash.kind : "", sel >= 0 && g[sel] && g[i] === g[sel] && i !== sel ? "same" : ""].filter(Boolean).join(" ");
-    const sign = plan.signAt[k] === i ? `<span class="sign${wrong[k] ? " wrong" : ""}">${room.t}${OPS[room.op]}</span>` : "";
+    const sign = plan.signAt[k] === i ? `<span class="sign${wrong[k] ? " wrong" : ""}">${room.t}${OPS_SHOWN[room.op]}</span>` : "";
     const notes = !g[i] && game.notes[i] ? `<span class="notes" style="grid-template-columns:repeat(${cols},1fr)">${[...Array(N)].map((_, v) => `<span>${game.notes[i] >> (v + 1) & 1 ? v + 1 : ""}</span>`).join("")}</span>` : "";
     const say = `Row ${r + 1}, column ${c + 1}: ${g[i] || "empty"}${sign ? `. Room sign ${room.t}${OPS[room.op]}` : ""}`;
     html += `<div class="${cls}" data-i="${i}" role="button" aria-label="${say}" style="--floor:${floor};--lit:${lit}">${sign}${g[i] ? `<span class="v">${g[i]}</span>` : notes}</div>`;
   }
   el.innerHTML = html;
   drawWalls(right);
+  // finished: the cats and doors, with the numbers shown or hidden (Numbers)
+  $("board").classList.toggle("bare", game.won && !settings.showNums);
+  $("numsBtn").hidden = !game.won; $("numsBtn").setAttribute("aria-pressed", String(!!settings.showNums));
   $("pad").classList.toggle("noting", noting);
   $("notesBtn").setAttribute("aria-pressed", String(noting));
   const open = right.filter(Boolean).length, rooms = plan.rooms.length;
@@ -556,12 +569,25 @@ function sleeperAt(k, d) {
   const len = Math.min(.62, .46 * ratio), w = len / ratio, cx = (x1 + x2) / 2, cy = (y1 + y2) / 2;
   return `<image class="sleeper" href="../cats/${file}.webp" x="${-len / 2}" y="${-w / 2}" width="${len}" height="${w}" preserveAspectRatio="none" transform="translate(${cx} ${cy}) rotate(${horiz ? 0 : 90})" aria-hidden="true"/>`;
 }
+// The finished house for the win card: the cats asleep in its doorways, and a button to show or hide the numbers.
+function winHouse() {
+  const box = document.createElement("div"); box.className = "winhouse";
+  const house = $("board").cloneNode(true); house.removeAttribute("id"); house.setAttribute("aria-hidden", "true");
+  house.style.setProperty("--cell", `calc(min(240px, 62vw) / ${game.N})`);
+  house.querySelectorAll("[id]").forEach(e => e.removeAttribute("id"));
+  const btn = document.createElement("button");
+  const show = () => { house.classList.toggle("bare", !settings.showNums); btn.textContent = settings.showNums ? "Hide the numbers" : "Show the numbers"; };
+  btn.onclick = () => { settings.showNums = !settings.showNums; save(); show(); draw(); };
+  show(); box.append(house, btn);
+  return [box];
+}
+$("numsBtn").onclick = () => { if (!game || !game.won) return; settings.showNums = !settings.showNums; save(); draw(); };
 function finishCard() {
   const next = settings.level, N = game.N;
   let text = `Every door in the ${N} × ${N} house is open, and a cat's fast asleep in every doorway.`;
   text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my house", game.result,
-    {title: "Door's open!", gold: !game.undid && !game.hinted, goldWhy: "No undos or hints!", next: next > game.level ? `Next: level ${next}` : "Next board", after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+    {title: "Door's open!", pic: winHouse(), gold: !game.undid && !game.hinted, goldWhy: "No undos or hints!", next: next > game.level ? `Next: level ${next}` : "Next board", after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
 }
 
 /* ---------- new puzzles ---------- */
