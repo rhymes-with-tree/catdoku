@@ -55,6 +55,7 @@ const G = (() => {
     ["Purrmutation", "catshuffle", "Put the cat's picture back together", "#9874CA", "teasers", "cat shuffle fifteen 15 puzzle sixteen twiddle sliding tiles slide puzzle picture shuffle scramble rotate turn", "2026-11-01"],
     ["Mew Hue", "mewhue", "Slide paint together and line up the colours", "#B94588", "quick", "colour color mixing paint swipe slide merge lines rows columns 2048 hue pawlette", "2026-11-01"],
     ["Pawlinko", "pawlinko", "Take turns with Gus and Peanut knocking toys down the climbing wall into the cat beds", "#7885BA", "quick", "plinko pachinko pegs pegboard galton board drop balls bounce plinko physics yarn toys cat climbing wall tree beds springs action", "2026-11-02"],
+    ["Cross Stitch", "crossstitch", "Stitch the sampler by the counts to see the picture", "#BD5538", "logic", "nonogram nonograms picross griddlers paint by numbers hanjie pattern pic-a-pix logic pictures cross stitch sampler embroidery", "2026-11-06"],
   ];
   // The shelves the front page and the games menu sort the games onto, in order: key (also a plain name for it,
   // for search), heading, one line.
@@ -413,7 +414,8 @@ const G = (() => {
   // o.lines adds lines of the game's own under the text.
   // A perfect clear (no help, nothing lost, no undo) earns a gold paw: o.gold puts one on the win card,
   // with o.goldWhy saying what earned it, o.goldTitle in place of "Gold paw!", and o.goldPic (a picture
-  // and its caption) in place of the random cat photo and name.
+  // and its caption) in place of the random cat photo and name. o.pic does the same on every win (Cross Stitch shows
+  // the finished sampler).
   const PAW = "M100 6 C126 6 141 28 153 46 C172 50 197 70 195 101 C193 133 166 147 140 141 C125 138 112 131 100 131 C88 131 75 138 60 141 C34 147 7 133 5 101 C3 70 28 50 47 46 C59 28 74 6 100 6Z";
   function goldPaw() {
     const box = document.createElement("div");
@@ -480,7 +482,7 @@ const G = (() => {
     if (dl) { const d = document.createElement("p"); d.className = "dailyline"; d.textContent = dl; media.append(d); }
     // the picture on its own, so a phone held sideways can set it beside the rest (games.css)
     const pic = document.createElement("div"); pic.className = "winpic";
-    if (o.gold && o.goldPic) pic.append(...o.goldPic); else pic.append(catPhoto(), name);
+    if (o.gold && o.goldPic) pic.append(...o.goldPic); else if (o.pic) pic.append(...o.pic); else pic.append(catPhoto(), name);
     media.append(pic);
     const btns = [[o.next || "New puzzle", onNext, true]];
     if (admire !== null) btns.push([admire, () => { closeCard(); if (o.onAdmire) o.onAdmire(); else note(admireNote(), 0); }]);
@@ -892,6 +894,7 @@ const G = (() => {
     windowledges: ["Arrow keys: pick a window", "1 to 9: put in a digit (Shift: a note)", "Backspace or 0: take it out", "N or P: notes on or off", "Escape: let go"],
     catshuffle: ["Arrow keys: pick a square", "Space: slide the piece there, or turn the knob (Shift turns it back)", "Shift with an arrow: shift its row or column"],
     mewhue: ["Arrow keys: pick a square", "Shift with an arrow: slide its row or column that way"],
+    crossstitch: ["Arrow keys: pick a square", "Space or Enter: stitch it, or take the stitch out", "X or .: a dot, for a square that stays empty", "Backspace: clear the square", "Shift with an arrow: carry what you put down along the row or column"],
     pawlinko: ["Setting up: arrows move the next piece, Enter places it, R flips a perch, Space throws", "Left and right: aim (Shift for big steps)", "Down, Space or Enter: knock it off", "X: swap in the next thing", "Placing a perch: arrows move it, R flips it, Enter puts it there", "Winding a strand: arrows pick one, Enter winds it", "Escape: put a helper away"],
   };
   const keyboardish = () => matchMedia("(hover: hover) and (pointer: fine)").matches;
@@ -1425,6 +1428,7 @@ const G = (() => {
     keep: '<circle cx="16" cy="16" r="10" class="green"/>',
     shuffle: '<path d="M4 10h5c7 0 8 12 15 12h4"/><path d="M24 18l4 4-4 4"/><path d="M4 22h5c2 0 3.5-1.5 5-3.5M18 12.5c1.5-1.5 3-2.5 6-2.5h4"/><path d="M24 6l4 4-4 4"/>',
     flip: '<path d="M16 4v24"/><path d="M12 8L4 22h8z"/><path d="M20 8l8 14h-8z"/>',
+    dot: '<rect x="6" y="6" width="20" height="20" rx="3"/><circle cx="16" cy="16" r="2.6" fill="currentColor"/>',   // mark a square to stay empty (Cross Stitch)
     near: '<path d="M6 12.5c3-3 6 3 10 0s7 3 10 0M6 19.5c3-3 6 3 10 0s7 3 10 0"/>',
     check: '<circle cx="16" cy="16" r="11"/><path d="M11 16.5l3.5 3.5 6.5-7.5"/>',
     skip: '<path d="M7 7l12 9-12 9z"/><path d="M24 7v18"/>',
@@ -1465,7 +1469,7 @@ const G = (() => {
   const ICON_OF = {hintBtn: "hint", undoBtn: "undo", backBtn: "undoguess", restartBtn: "restart", auditBtn: "audit", notesBtn: "pencil",
     allNotesBtn: "pencils", clearNotesBtn: "erase", eraseBtn: "erase", pauseBtn: "pause", guessBtn: "guess", giveUpBtn: "giveup",
     keepBtn: "keep", shuffleBtn: "shuffle", flipBtn: "flip", finishBtn: "near", completeBtn: "check", skipBtn: "skip",
-    colBtn: "palette", linkBtn: "share", toysBtn: "toys", bestBtn: "best", helpBtn: "help", zoomIn: "zoomin", zoomOut: "zoomout", zoomFit: "fit",
+    colBtn: "palette", dotBtn: "dot", linkBtn: "share", toysBtn: "toys", bestBtn: "best", helpBtn: "help", zoomIn: "zoomin", zoomOut: "zoomout", zoomFit: "fit",
     sightBtn: "sight", nipBtn: "catnip", shakeBtn: "bubbleshake", fluffBtn: "roller", swatBtn: "swat", netBtn: "net", rainbowBtn: "losecolor", basketBtn: "basketadd", wipeBtn: "wipe",
     chooseBtn: "keyboard", revealBtn: "giveup", peekBtn: "peek", perchBtn: "perch", wakeBtn: "cat", reelBtn: "reel", mopBtn: "sponge"};
   // buttons that keep their own look with an icon in front of the word: every New (a +) and Catlas's Go (an arrow)

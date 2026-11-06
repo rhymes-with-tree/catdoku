@@ -940,10 +940,28 @@ def pawlinko():
     return frame(tint(PERI, .14), out)
 
 
+def crossstitch():
+    # an embroidery hoop (two wooden rings, a brass screw) round aida cloth, with a ginger cat's face cross-stitched on it
+    wood, dark = "#D78326", "#8F5A28"   # gold 55% with brick, and that shaded with ink, as the page's hoop
+    out = f'<rect x="44" y="84" width="12" height="7" rx="2" fill="{YELLOW}" stroke="{INK}" stroke-width="2"/>'
+    out += f'<circle cx="50" cy="49" r="35" fill="{tint(YELLOW, .09)}" stroke="{dark}" stroke-width="9"/>'
+    out += f'<circle cx="50" cy="49" r="35" fill="none" stroke="{wood}" stroke-width="6"/>'
+    out += f'<circle cx="50" cy="49" r="35" fill="none" stroke="{dark}" stroke-width="1.2"/>'
+    face = ["g.....g", "gg...gg", "ggggggg", "g.ggg.g", "ggggggg", ".ggggg.", "..ggg.."]
+    c = 6
+    for y, row in enumerate(face):
+        for x, ch in enumerate(row):
+            if ch == ".":
+                continue
+            x0, y0 = 29 + x * c, 28 + y * c
+            out += f'<path d="M{x0 + 1} {y0 + 1}L{x0 + c - 1} {y0 + c - 1}M{x0 + c - 1} {y0 + 1}L{x0 + 1} {y0 + c - 1}" stroke="{ORANGE}" stroke-width="1.9" stroke-linecap="round"/>'
+    return frame(tint(RED, .14), out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle, "mewhue": mewhue, "pawlinko": pawlinko}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle, "mewhue": mewhue, "pawlinko": pawlinko, "crossstitch": crossstitch}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")
