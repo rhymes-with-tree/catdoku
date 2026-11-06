@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sock Drawer</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-11-06.7"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<meta name="theme-color" content="#ECEEE7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1F1C24" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-11-06.7">
+<style>
+/* The drawer: a wooden frame (brick, shaded with ink) round a dark inside, packed with rolled-up socks, each with a
+   letter on its cuff. Dottie peeks over the back edge; a sock no word still needs comes out of the drawer (it fades
+   to an outline), and once every word is found Dottie curls up in the empty drawer. */
+.drawerwrap{height:auto;--side:min(var(--board),calc(var(--tall) * .84));--aspect:1.16}
+.drawerbox{position:relative;width:var(--side);margin:0 auto;padding-top:calc(var(--side) * .15)}
+.dottie{position:absolute;top:0;left:50%;transform:translateX(-50%);height:calc(var(--side) * .2);width:auto;pointer-events:none;z-index:0}
+.drawer{position:relative;z-index:1;width:var(--side);aspect-ratio:1;max-width:100%;border-radius:14px;padding:calc(var(--side) * .035);
+  background:linear-gradient(180deg,color-mix(in srgb,#BD5538 70%,#2A2530),color-mix(in srgb,#BD5538 55%,#2A2530));
+  box-shadow:inset 0 0 0 3px #2A2530,inset 0 6px 0 3px color-mix(in srgb,#BD5538 82%,#fff);touch-action:none;user-select:none;-webkit-user-select:none;cursor:pointer}
+.inside{position:relative;width:100%;height:100%;border-radius:6px;background:color-mix(in srgb,#4E577D 45%,#2A2530);box-shadow:inset 0 4px 10px rgba(0,0,0,.45)}
+.socks{position:absolute;inset:0;display:grid;padding:2%}
+.sock{position:relative;display:flex;align-items:center;justify-content:center;transition:opacity .5s,transform .15s}
+.sock .ball{position:absolute;inset:6%;border-radius:50%;background:
+  radial-gradient(circle at 35% 30%,rgba(255,255,255,.35),transparent 55%),
+  repeating-linear-gradient(var(--tilt,20deg),transparent 0 12%,rgba(255,255,255,.28) 12% 20%),var(--c);
+  box-shadow:inset 0 -4px 6px rgba(0,0,0,.25),0 2px 3px rgba(0,0,0,.35)}
+.sock .cuff{position:relative;width:62%;aspect-ratio:1;border-radius:50%;background:color-mix(in srgb,var(--c) 14%,#fff);
+  display:flex;align-items:center;justify-content:center;font-weight:800;font-size:var(--fs);line-height:1;color:#2A2530;box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--c) 60%,#2A2530)}
+.sock.on{transform:scale(1.1);z-index:3}
+.sock.on .cuff{background:#ECA818}
+.sock.out .ball{opacity:.16;box-shadow:none}
+.sock.out .cuff{background:transparent;color:#fff;box-shadow:inset 0 0 0 2px rgba(255,255,255,.35)}
+.sock.hintcell{border-radius:50%}
+.sock.kbcursor{border-radius:50%}
+.won .sock{opacity:0}
+.chain{position:absolute;inset:0;pointer-events:none;z-index:2}
+.chain polyline{fill:none;stroke:#ECA818;stroke-linecap:round;stroke-linejoin:round;opacity:.85}
+.chain.miss polyline{stroke:#BD5538}
+.chain.bonus polyline{stroke:#73A7AE}
+.curled{position:absolute;left:50%;top:50%;width:70%;height:auto;transform:translate(-50%,-50%) scale(.6);opacity:0;transition:opacity .8s .3s,transform .8s .3s;pointer-events:none;z-index:4}
+.won .curled{opacity:1;transform:translate(-50%,-50%) scale(1)}
+/* the word being spelled, and the words to find, by length */
+.spell{min-height:calc(34px*var(--ts));font-weight:800;font-size:calc(24px*var(--ts));letter-spacing:.12em;text-align:center;line-height:1.3}
+.spell.miss{color:var(--bad-text)}
+.listbox{width:var(--board);display:flex;flex-direction:column;gap:6px}
+.lens{display:flex;flex-direction:column;gap:4px}
+.lenrow{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 6px}
+.lenrow b{font-size:calc(14px*var(--ts));color:var(--ink-soft);min-width:5.4em}
+.lenrow span{font-weight:700;font-size:calc(15px*var(--ts));letter-spacing:.08em;padding:0 7px;border-radius:999px;border:2px solid var(--line);background:var(--panel);color:var(--ink-soft)}
+.lenrow span.found{color:var(--ink);border-color:#73A7AE;background:color-mix(in srgb,#73A7AE 22%,var(--panel))}
+.lenrow span.new{animation:pop .5s}
+@keyframes pop{50%{transform:scale(1.18)}}
+.bonus{font-size:calc(14px*var(--ts));color:var(--ink-soft);text-align:center}
+@media (orientation:landscape) and (max-height:500px){
+  .lenrow span{font-size:calc(13px*var(--ts))}
+}
+.card img.dottiepic{display:block;width:80%;max-width:260px;height:auto;margin:0 auto 14px}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Sock Drawer</h1><div class="stripe"></div><p class="tagline">Pull words out of Dottie's sock drawer, one chain of socks at a time</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap drawerwrap stage"><div class="drawerbox">
+    <img class="dottie" id="dottie" src="../cats/dottie-face-2.webp" alt="Dottie, a black cat, peeking over the back of the drawer">
+    <div class="drawer" id="board" role="grid" aria-label="The sock drawer"><div class="inside">
+      <div class="socks" id="socks"></div>
+      <svg class="chain" id="chain" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polyline points=""/></svg>
+      <img class="curled" id="curled" src="../cats/dottie-21.webp" alt="">
+    </div></div>
+  </div></div>
+  <div class="spell" id="spell" aria-live="polite"></div>
+  <div class="listbox">
+    <div class="lens" id="lens" aria-label="Words to find"></div>
+    <div class="bonus" id="bonus"></div>
+  </div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="restartBtn">Restart</button>
+    <button id="linkBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New drawer</button>
+  </div>
+</main>
+
+<script src="../games.js?v=2026-11-06.7"></script>
+<script>
+/* ---------- levels ---------- */
+// [drawer size, shortest word, longest word to find, fewest words, most words]. Every sock is in at least one word.
+const LEVELS = [null, [4, 4, 6, 8, 14], [4, 4, 8, 15, 24], [5, 4, 7, 20, 32], [5, 4, 9, 30, 45], [6, 5, 9, 25, 40]];
+const MAX_LEVEL = LEVELS.length - 1;
+const levelName = n => { const [N, min] = LEVELS[n]; return `Level ${n} · ${N} × ${N}, ${min}+ letters`; };
+const COLOURS = ["#BD5538", "#E16A4A", "#73A7AE", "#ECA818", "#B3B94B", "#6AA673", "#B94588", "#7885BA", "#4E577D", "#8D78AD"];
+const CAT_SRC = {};  // filled with embedded pictures when the page is bundled into one file
+const catSrc = f => CAT_SRC[f] || `../cats/${f}.webp`;
+
+/* ---------- making a drawer ---------- */
+// Every word in the familiar list that can be spelled by a chain of neighbouring socks (any of eight ways, each sock
+// once) is one to find; other words in the bigger lists count as bonus words. A drawer starts as letters drawn by
+// how often they're used in English, then one sock at a time is changed while it doesn't get worse, until the
+// number of words is in the level's range and every sock is in one.
+function makeTrie(words) {
+  const root = {};
+  for (const w of words) { let t = root; for (const c of w) t = t[c] || (t[c] = {}); t.$ = w; }
+  return root;
+}
+// every word the trie holds in the grid, with every path for each (up to `cap` of them)
+function solve(grid, N, trie, min, cap) {
+  const out = new Map(), used = new Array(N * N).fill(false);
+  const go = (i, t, path) => {
+    const u = t[grid[i]]; if (!u) return;
+    used[i] = true; path.push(i);
+    if (u.$ && u.$.length >= min) { const ps = out.get(u.$) || []; if (ps.length < cap) ps.push(path.slice()); out.set(u.$, ps); }
+    const x = i % N, y = (i / N) | 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const xx = x + dx, yy = y + dy;
+      if ((dx || dy) && xx >= 0 && yy >= 0 && xx < N && yy < N && !used[yy * N + xx]) go(yy * N + xx, u, path);
+    }
+    used[i] = false; path.pop();
+  };
+  for (let i = 0; i < N * N; i++) go(i, trie, []);
+  return out;
+}
+function sockDrawer(n, words) {
+  const [N, min, max, lo, hi] = LEVELS[n];
+  const FREQ = "EEEEEEEEEEEEAAAAAAAAAIIIIIIIIOOOOOOOONNNNNNRRRRRRTTTTTTLLLLSSSSUUUUDDDDGGGBBCCMMPPFFHHVWWYKJXZ";
+  const T = trieFor(words, min, max);
+  const score = g => {
+    const s = solve(g, N, T, min, 1), cover = new Set([...s.values()].flat(2)).size, k = s.size;
+    return {s, bad: (k < lo ? lo - k : k > hi ? k - hi : 0) * 2 + (N * N - cover) * 3};
+  };
+  let g = Array.from({length: N * N}, () => FREQ[Math.random() * FREQ.length | 0]), best = score(g);
+  for (let step = 0; step < 3000 && best.bad > 0; step++) {
+    const h = g.slice(); h[Math.random() * N * N | 0] = FREQ[Math.random() * FREQ.length | 0];
+    const r = score(h); if (r.bad <= best.bad) { g = h; best = r; }
+  }
+  return best.bad > 0 ? null : g.join("");
+}
+const TRIES = {};
+function trieFor(words, min, max) { const k = min + "," + max; return TRIES[k] || (TRIES[k] = makeTrie(words.filter(w => w.length >= min && w.length <= max))); }
+// the words to find in a drawer, shortest first, each with its paths
+function wordsIn(n, grid) {
+  const [N, min, max] = LEVELS[n], s = solve(grid, N, trieFor(FAMILIAR, min, max), min, 24);
+  return [...s.keys()].sort((a, b) => a.length - b.length || (a < b ? -1 : 1)).map(w => ({w, paths: s.get(w)}));
+}
+
+/* ---------- words ---------- */
+let FAMILIAR = null, KNOWN = null;
+function loadWords() {
+  if (FAMILIAR) return Promise.resolve();
+  const got = window.WORDS_INLINE ? Promise.resolve(window.WORDS_INLINE) : fetch(`../words/words.json?v=${window.SITE_BUILD || ""}`).then(r => { if (!r.ok) throw new Error("couldn't load the word list"); return r.json(); });
+  return got.then(w => {
+    const up = s => s.split(" ").map(x => x.toUpperCase()).filter(x => /^[A-Z]{3,12}$/.test(x));
+    FAMILIAR = up(w.familiar); KNOWN = new Set(FAMILIAR.concat(up(w.common)));
+  });
+}
+
+/* ---------- game ---------- */
+// game: {level, N, grid, found (words found, in order), bonus (bonus words found), hinted, restarted, won}
+// The words to find are worked out again from the grid (`list`), so a save or a share link only needs the letters.
+const STORE = "catdoku.sockdrawer.v1";
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1}, state.settings);
+let game = state.game || null, list = [], making = 0;
+let chain = [], typed = "", flash = null;   // the socks picked; letters typed; a word just tried {cells, kind}
+const hints = G.hinter({game: () => game, key: () => game ? game.found.join() : "", draw: () => draw()});   // marks {cells}
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !$("overlay").classList.contains("show");
+const foundSet = () => new Set(game.found);
+const left = () => { const f = foundSet(); return list.filter(o => !f.has(o.w)); };
+
+function deal(n, grid) { return {level: n, N: LEVELS[n][0], grid, found: [], bonus: [], hinted: false, restarted: false, won: false, ...G.freshClock()}; }
+async function newPuzzle() {
+  G.closeCard(); hints.clear(false); chain = []; typed = ""; flash = null;
+  const ticket = ++making, n = settings.level;
+  try { await loadWords(); } catch (e) { G.note(`Couldn't open the drawer: ${e.message}.`, 0); return; }
+  if (ticket !== making) return;
+  let grid = null; for (let k = 0; k < 20 && !grid; k++) grid = sockDrawer(n, FAMILIAR);
+  if (!grid) { G.note("Couldn't fill that drawer. Try New drawer.", 5000); return; }
+  game = deal(n, grid); list = wordsIn(n, grid); draw(); save();
+  G.track(`Sock Drawer new puzzle level ${game.level}`);
+}
+function startLevel(n) { settings.level = n; $("levelSel").value = n; newPuzzle(); }
+
+/* ---------- drawing ---------- */
+const centre = i => { const N = game.N; return [(i % N + .5) / N * 96 + 2, (Math.floor(i / N) + .5) / N * 96 + 2]; };
+// socks still in the drawer: those on a path of a word still to find
+function inDrawer() { const s = new Set(); for (const o of left()) for (const p of o.paths) p.forEach(i => s.add(i)); return s; }
+function draw() {
+  if (!game) return;
+  queueMicrotask(say);
+  const {N, grid} = game, socks = $("socks"), hm = hints.current(), keep = inDrawer();
+  if (socks.children.length !== N * N || socks.dataset.grid !== grid) {
+    socks.innerHTML = ""; socks.dataset.grid = grid; socks.style.gridTemplateColumns = `repeat(${N}, 1fr)`; socks.style.gridTemplateRows = `repeat(${N}, 1fr)`;
+    for (let i = 0; i < N * N; i++) {
+      const d = document.createElement("div"); d.className = "sock"; d.dataset.i = i; d.setAttribute("role", "gridcell");
+      // each sock's colour and stripes come from its place and letter, so a drawer always looks the same
+      const h = (i * 7 + grid.charCodeAt(i) * 3) % COLOURS.length;
+      d.style.setProperty("--c", COLOURS[h]); d.style.setProperty("--tilt", `${(i * 47) % 180}deg`);
+      d.innerHTML = `<i class="ball"></i><span class="cuff"></span>`; socks.append(d);
+    }
+  }
+  $("board").style.setProperty("--fs", `${Math.max(12, $("board").clientWidth / N * .36)}px`);
+  const lit = flash ? flash.cells : chain;
+  [...socks.children].forEach((d, i) => {
+    d.lastChild.textContent = grid[i];
+    d.classList.toggle("on", lit.includes(i));
+    d.classList.toggle("out", !keep.has(i) && !game.won);
+    d.classList.toggle("hintcell", !!(hm && hm.cells.includes(i)));
+    d.setAttribute("aria-label", `${grid[i]}, row ${Math.floor(i / N) + 1}, column ${i % N + 1}${lit.includes(i) ? ", picked" : ""}${keep.has(i) ? "" : ", out of the drawer"}`);
+  });
+  $("board").classList.toggle("won", !!game.won);
+  const svg = $("chain"), pl = svg.firstElementChild;
+  pl.setAttribute("points", lit.map(centre).map(p => p.join(",")).join(" "));
+  pl.setAttribute("stroke-width", 30 / N);
+  svg.classList.toggle("miss", !!(flash && flash.kind === "miss")); svg.classList.toggle("bonus", !!(flash && flash.kind === "bonus"));
+  const sp = $("spell"); sp.textContent = flash ? flash.word : lit.map(i => grid[i]).join(""); sp.classList.toggle("miss", !!(flash && flash.kind === "miss"));
+  // the words, by length: found ones spelled out, the rest as blanks
+  const f = foundSet(), lens = [...new Set(list.map(o => o.w.length))], el = $("lens");
+  const html = lens.map(L => `<div class="lenrow"><b>${L} letters</b>${list.filter(o => o.w.length === L).map(o => f.has(o.w) ? `<span class="found${o.w === game.found[game.found.length - 1] && flash ? " new" : ""}">${o.w}</span>` : `<span aria-label="${L} letters, not found yet">${"_".repeat(L).split("").join(" ")}</span>`).join("")}</div>`).join("");
+  if (el.innerHTML !== html) el.innerHTML = html;
+  $("bonus").textContent = game.bonus.length ? `Bonus words: ${game.bonus.join(", ")}` : "";
+  $("count").textContent = game.won ? "Drawer empty!" : `${game.found.length} of ${list.length} words`;
+  $("hintBtn").disabled = game.won;
+  $("restartBtn").disabled = game.won || (!game.found.length && !game.bonus.length);
+}
+function say() {
+  if (!game) return;
+  const N = game.N, rows = [...Array(N).keys()].map(y => `Row ${y + 1}: ${game.grid.slice(y * N, y * N + N).split("").join(" ")}`);
+  G.describe($("board"), `Sock drawer, ${N} by ${N}. ${rows.join(". ")}. ${chain.length ? `Picked: ${chain.map(i => game.grid[i]).join("")}.` : ""} Type a word and press Enter, or use the arrow keys and Space.`);
+}
+addEventListener("resize", () => { if (game) draw(); });
+
+/* ---------- pulling out a word ---------- */
+const near = (a, b) => { const N = game.N; return a !== b && Math.abs(a % N - b % N) <= 1 && Math.abs(Math.floor(a / N) - Math.floor(b / N)) <= 1; };
+let flashTimer = 0;
+function showFlash(cells, word, kind, ms) {
+  clearTimeout(flashTimer); flash = {cells, word, kind}; draw();
+  flashTimer = setTimeout(() => { flash = null; draw(); }, ms);
+}
+// Try the socks in `cells` as a word.
+function submit(cells) {
+  chain = []; typed = "";
+  if (!game || cells.length < 2) { draw(); return; }
+  const w = cells.map(i => game.grid[i]).join(""), min = LEVELS[game.level][1];
+  game.started = true;
+  const o = list.find(o => o.w === w);
+  if (o && !game.found.includes(w)) {
+    game.found.push(w); save(); showFlash(cells, w, "found", 700);
+    if (game.found.length === list.length) win();
+    return;
+  }
+  if (o) { showFlash(cells, w, "miss", 700); G.note(`You've found ${w} already.`, 2500); return; }
+  if (w.length >= min && KNOWN.has(w)) {
+    if (game.bonus.includes(w)) G.note(`${w} is a bonus word you've found already.`, 2500);
+    else { game.bonus.push(w); save(); G.note(`${w}: a bonus word! It isn't on the list, but well spotted.`, 3000); }
+    showFlash(cells, w, "bonus", 700); return;
+  }
+  showFlash(cells, w, "miss", 700);
+  G.note(w.length < min ? `Words need ${min} letters or more here.` : `${w} isn't a word we know.`, 2500);
+}
+// Pointer: drag across socks to spell a word (back over the last one to take it off), or tap them one by one
+// and tap the last one again to pull the word out.
+function sockAt(e, strict) {
+  const r = $("socks").getBoundingClientRect(), N = game.N;
+  const fx = (e.clientX - r.left) / r.width * N, fy = (e.clientY - r.top) / r.height * N, x = Math.floor(fx), y = Math.floor(fy);
+  if (x < 0 || y < 0 || x >= N || y >= N) return -1;
+  // while dragging, only the middle of a sock counts, so a diagonal doesn't catch its neighbours on the way
+  if (strict && Math.hypot(fx - x - .5, fy - y - .5) > .36) return -1;
+  return y * N + x;
+}
+let drag = null;
+$("board").addEventListener("pointerdown", e => {
+  if (!playing() || e.button > 0) return;
+  const i = sockAt(e, false); if (i < 0) return;
+  clearTimeout(flashTimer); flash = null; typed = "";
+  drag = {start: i, moved: false, was: chain.slice()};
+  if (!chain.length || !(chain.includes(i) || near(chain[chain.length - 1], i))) chain = [i];
+  else if (!chain.includes(i)) chain.push(i);
+  $("board").setPointerCapture(e.pointerId); draw();
+});
+$("board").addEventListener("pointermove", e => {
+  if (!drag) return;
+  const i = sockAt(e, true); if (i < 0) return;
+  const last = chain[chain.length - 1];
+  if (i === last) return;
+  if (chain.length > 1 && i === chain[chain.length - 2]) chain.pop();
+  else if (!chain.includes(i) && near(last, i)) chain.push(i);
+  else return;
+  drag.moved = true; draw();
+});
+$("board").addEventListener("pointerup", () => {
+  if (!drag) return;
+  const d = drag; drag = null;
+  if (d.moved) { submit(chain); return; }
+  tapSock(d.start, d.was);
+});
+$("board").addEventListener("pointercancel", () => { drag = null; chain = []; draw(); });
+// a tap (or Space): add the sock to the chain; tapping the chain's last sock again pulls the word out
+function tapSock(i, was) {
+  if (!playing()) return;
+  const last = was[was.length - 1];
+  if (was.length && i === last) { submit(was); return; }
+  if (was.includes(i)) chain = was.slice(0, was.indexOf(i) + 1);
+  else if (was.length && near(last, i)) chain = was.concat(i);
+  else chain = [i];
+  draw();
+}
+// Keys: type a word and press Enter (Backspace takes a letter off, Escape lets go), or move the cursor with the
+// arrows and press Space on each sock, then on the last one again.
+const keys = G.gridKeys({on: () => playing(), size: () => [game.N, game.N],
+  show: i => [...$("socks").children].forEach((d, k) => d.classList.toggle("kbcursor", k === i)),
+  act: i => { typed = ""; tapSock(i, chain.slice()); },
+  escape: () => { chain = []; typed = ""; draw(); }});
+// a path for the letters typed, preferring socks still in the drawer
+function pathFor(word) {
+  const N = game.N, keep = inDrawer(); let best = null;
+  const go = (k, path) => {
+    if (k === word.length) { const sc = path.filter(i => keep.has(i)).length; if (!best || sc > best.sc) best = {path: path.slice(), sc}; return; }
+    for (let i = 0; i < N * N; i++) if (game.grid[i] === word[k] && !path.includes(i) && (!k || near(path[k - 1], i))) { path.push(i); go(k + 1, path); path.pop(); }
+  };
+  go(0, []); return best && best.path;
+}
+document.addEventListener("keydown", e => {
+  if (e.ctrlKey || e.metaKey || e.altKey || !playing() || document.querySelector(".spot") || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+  if (/^[a-z]$/i.test(e.key)) {
+    const t = typed + e.key.toUpperCase(), p = pathFor(t);
+    keys.hide();
+    if (p) { typed = t; chain = p; flash = null; draw(); }
+    else G.note(`No chain of socks spells ${t}.`, 2000);
+    e.preventDefault();
+  } else if (e.key === "Backspace" && typed) { typed = typed.slice(0, -1); chain = typed ? pathFor(typed) : []; draw(); e.preventDefault(); }
+  else if (e.key === "Enter" && typed) { submit(chain); e.preventDefault(); e.stopImmediatePropagation(); }
+}, true);
+
+/* ---------- hints ---------- */
+// The shortest word still to find: first the sock it starts on, then its first half, then the whole chain.
+function hint() {
+  if (!playing()) return;
+  const o = left()[0]; if (!o) return;
+  const p = o.paths[0], L = o.w.length, lv = hints.level();
+  game.hinted = true; save();
+  if (lv === 0) hints.show({cells: [p[0]]}, `A ${L}-letter word starts on the gold sock.`);
+  else if (lv === 1) { const h = Math.ceil(L / 2); hints.show({cells: p.slice(0, h)}, `A ${L}-letter word starts ${o.w.slice(0, h)}…`); }
+  else hints.show({cells: p}, `There's ${o.w}: pull out the gold socks.`);
+}
+$("hintBtn").onclick = hint;
+// Restart: every word back in the drawer. It costs the gold paw.
+$("restartBtn").onclick = () => {
+  if (!game || game.won) return;
+  Object.assign(game, {found: [], bonus: [], restarted: true}); chain = []; typed = "";
+  hints.clear(false); draw(); save();
+  G.note("Every sock is back in the drawer.", 3000);
+};
+
+/* ---------- winning ---------- */
+const goldOK = () => !game.hinted && !game.restarted;
+function win() {
+  game.won = true; chain = []; G.finishClock(game);
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save(); draw();
+  G.track(`Sock Drawer solved level ${game.level}`);
+  const g = game;
+  setTimeout(() => { if (game === g) finishCard(); }, 1800);
+}
+function dottiePic() { const im = new Image(); im.className = "dottiepic"; im.src = catSrc("dottie-28"); im.alt = "Dottie, a black cat with a teal bow, lying among the socks"; return im; }
+function finishCard() {
+  const next = settings.level, n = list.length, b = game.bonus.length;
+  let text = `All ${n} words pulled out${b ? `, and ${b} bonus word${b > 1 ? "s" : ""}` : ""}. The drawer's empty, so Dottie has curled up in it.`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the biggest drawer; here's another." : ` Next up: level ${next}.`;
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the drawer", game.result,
+    {title: "Drawer empty!", gold: goldOK(), goldWhy: "No hints or restarts!", goldTitle: "Gold paw, Dottie!", goldPic: [dottiePic()], next: next > game.level ? `Next: level ${next}` : "Next drawer",
+     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- sharing ---------- */
+$("linkBtn").onclick = () => { if (game) G.shareCard({name: "Sock Drawer", won: game.won,
+  puzzle: () => ({g: "sockdrawer", N: game.level, grid: game.grid}), progress: () => ({f: game.found, b: game.bonus})}); };
+async function openShared(d) {
+  const lv = LEVELS[d.N];
+  if (!lv || typeof d.grid !== "string" || d.grid.length !== lv[0] * lv[0] || !/^[A-Z]+$/.test(d.grid)) { G.note("That share link didn't work.", 5000); return; }
+  try { await loadWords(); } catch (e) { G.note(`Couldn't open the drawer: ${e.message}.`, 0); return; }
+  game = deal(d.N, d.grid); list = wordsIn(d.N, d.grid); chain = []; typed = "";
+  if (!list.length) { G.note("That share link didn't work.", 5000); return newPuzzle(); }
+  if (d.p) {
+    const ws = new Set(list.map(o => o.w)), ok = a => Array.isArray(a) ? a.filter(w => typeof w === "string") : [];
+    game.found = [...new Set(ok(d.p.f).filter(w => ws.has(w)))];
+    game.bonus = [...new Set(ok(d.p.b).filter(w => /^[A-Z]{3,12}$/.test(w) && KNOWN.has(w) && !ws.has(w)))];
+    game.timed = false;
+    if (game.found.length === list.length) game.won = true;
+  }
+  settings.level = d.N; $("levelSel").value = d.N;
+  draw(); save();
+}
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  settings.seenHelp = false; helpOnFirstVisit();
+  if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
+}
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || !playing() || document.querySelector(".spot")) return;
+  const {N} = game, xy = i => [i % N, Math.floor(i / N)], all = [...Array(N * N).keys()].map(xy);
+  const o = left()[0], had = game.found.length, min = LEVELS[game.level][1];
+  const turn = G.yourTurn(() => game, g => { game = g; }, draw);
+  const steps = [
+    {say: "Each sock has a letter", lit: all},
+    ...(o ? [{say: `Drag ${o.w} out of the drawer`, lit: o.paths[0].map(xy), try: {done: () => game.found.length > had, yes: "Found! Tapping works too"}, ...turn.upTo}] : []),
+    {say: "Neighbours touch, corners too", lit: all},
+    {say: `Find every word of ${min}+ letters`, els: [$("lens")]},
+    {say: "Done socks come out", lit: all, later: true},
+    {say: "Other words are bonus words", els: [$("bonus")], later: true},
+    {say: "Stuck? Hint shows a start", els: [$("hintBtn")]},
+  ];
+  G.spotlight({grid: $("socks"), w: N, h: N, steps, done: () => { settings.seenHelp = true; save(); }});
+}
+
+/* ---------- start ---------- */
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", "") + (n === MAX_LEVEL ? " (biggest)" : ""), n));
+$("levelSel").onchange = e => startLevel(+e.target.value);
+$("newBtn").onclick = newPuzzle;
+$("helpBtn").onclick = showHelp;
+
+G.nav("sockdrawer");
+G.checkClock(game);
+G.setupTimer({name: "sockdrawer", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level",
+  emptyText: "Empty a drawer and your times will show up here. They're kept on this device only."});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+const shared = G.readShare("sockdrawer");
+const hadSave = !!(game && typeof game.grid === "string");
+if (hadSave) loadWords().then(() => G.reopen(() => {
+    const lv = LEVELS[game.level];
+    if (!lv || game.N !== lv[0] || game.grid.length !== game.N * game.N || !Array.isArray(game.found) || !Array.isArray(game.bonus)) throw new Error("the saved drawer doesn't fit its level");
+    list = wordsIn(game.level, game.grid);
+    if (!list.length) throw new Error("the saved drawer had no words");
+    draw();
+    if (game.won) finishCard(); else helpOnFirstVisit();
+  }, why => { game = null; newPuzzle(); G.note(why, 0); }), e => G.note(`Couldn't open the drawer: ${e.message}.`, 0));
+else if (!shared) newPuzzle().then(helpOnFirstVisit);
+const shareOpts = () => ({name: "Sock Drawer", inProgress: !!(game && !game.won && game.found.length), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, {...shareOpts(), fresh: hadSave ? null : why => Promise.resolve(newPuzzle()).then(() => { G.note(why, 6000); helpOnFirstVisit(); })});
+window.addEventListener("hashchange", () => { const d = G.readShare("sockdrawer"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
