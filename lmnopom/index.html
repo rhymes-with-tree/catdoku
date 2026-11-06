@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-06.8"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-06.9"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -24,7 +24,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-06.8">
+<link rel="stylesheet" href="../games.css?v=2026-11-06.9">
 <style>
 /* Marmalade has knocked the pompoms out of the craft basket, and they tumble down into a pile, each with a letter.
    Any word spelled across or down, he pounces on and bats away, and the pompoms above fall into the gap. Reach the
@@ -106,28 +106,38 @@
   <section class="found" id="found" hidden><h2>Marmalade pounced on</h2><p id="foundList"></p></section>
 </main>
 
-<script src="../games.js?v=2026-11-06.8"></script>
+<script src="../games.js?v=2026-11-06.9"></script>
 <script>
 /* ---------- the pile ---------- */
 // The pile is COLS pompoms across and ROWS down. Pieces are one pompom or a pair on a string, dealt from shuffled bags
 // of letters like Scrabble tiles (Q comes as QU), with fluffballs as blanks, gold 2L pompoms that count their letter
-// twice and brick 2W pompoms that count the whole word twice.
+// twice and brick 2W pompoms that count the whole word twice. Some pieces are a common beginning or ending on a string
+// instead (ING, ED, UN…), two or three pompoms long.
 const COLS = 7, ROWS = 10, MAXW = 7;
 const VAL = {a: 1, b: 3, c: 3, d: 2, e: 1, f: 4, g: 2, h: 4, i: 1, j: 8, k: 5, l: 1, m: 3, n: 1, o: 1, p: 3, qu: 10, r: 1, s: 1, t: 1, u: 1, v: 4, w: 4, x: 8, y: 4, z: 10, "?": 0};
 const BAG = {e: 12, a: 9, i: 8, o: 8, n: 6, r: 6, t: 6, l: 4, s: 6, u: 3, d: 4, g: 3, b: 2, c: 2, m: 2, p: 2, f: 2, h: 2, v: 2, w: 2, y: 2, k: 1, j: 1, x: 1, qu: 1, z: 1, "?": 2};
-// Ten levels: the points to reach, how long a pompom takes to fall one row (ms), how often one is 2L (gold) or 2W
-// (maple, as it's brick), how often a piece is a pair, whether fluffballs come, and how many rows are already down.
+// The early levels' bag: more of the letters most words are made of (the vowels and Y, C, D, L, M, N, P, R, S, T),
+// fewer of the awkward ones, and no J, X, Qu or Z. A level's bag is a mix of the two (its "easy", 1 all this one).
+const EASY_BAG = {e: 12, a: 9, i: 8, o: 8, n: 7, r: 7, t: 7, l: 5, s: 7, u: 4, d: 5, g: 2, b: 1, c: 4, m: 4, p: 4, f: 1, h: 2, v: 1, w: 1, y: 3, k: 1, j: 0, x: 0, qu: 0, z: 0, "?": 2};
+// Common beginnings and endings (Keyboard Cat's endings, and the beginnings and endings the word list has most of),
+// dealt as one piece on a string; the number is how often each comes, by how many words in the list use it.
+const CHUNKS = {ed: 6, ing: 5, es: 5, er: 5, re: 4, ers: 3, ly: 3, de: 3, al: 2, ier: 2, ies: 2, est: 2, un: 2, in: 2,
+  ex: 1, con: 1, ish: 1, ty: 1, ful: 1, ous: 1, ive: 1, ity: 1, ion: 1, ent: 1};
+const CHUNK_BAG = Object.entries(CHUNKS).flatMap(([c, n]) => Array(n).fill(c));// Ten levels: the points to reach, how long a pompom takes to fall one row (ms), how often one is 2L (gold) or 2W
+// (maple, as it's brick), how often a piece is a pair, whether fluffballs come, how many rows are already down, how
+// far the letters lean to the common ones (easy, 1 the early bag, 0 Scrabble's) and how often a piece is a common
+// beginning or ending (chunks).
 const LV = [null,
-  {goal: 40, ms: 900, gold: .08, maple: .03, pairs: .45, fluff: false, pile: 0},
-  {goal: 60, ms: 800, gold: .08, maple: .03, pairs: .5, fluff: false, pile: 0},
-  {goal: 80, ms: 720, gold: .07, maple: .03, pairs: .5, fluff: true, pile: 0},
-  {goal: 100, ms: 650, gold: .07, maple: .03, pairs: .5, fluff: true, pile: 2},
-  {goal: 125, ms: 580, gold: .07, maple: .03, pairs: .55, fluff: true, pile: 2},
-  {goal: 150, ms: 520, gold: .06, maple: .03, pairs: .55, fluff: true, pile: 3},
-  {goal: 175, ms: 460, gold: .06, maple: .03, pairs: .6, fluff: true, pile: 3},
-  {goal: 200, ms: 410, gold: .06, maple: .03, pairs: .6, fluff: true, pile: 4},
-  {goal: 230, ms: 360, gold: .05, maple: .03, pairs: .6, fluff: true, pile: 4},
-  {goal: 260, ms: 320, gold: .05, maple: .03, pairs: .65, fluff: true, pile: 5}];
+  {goal: 40, ms: 900, gold: .08, maple: .03, pairs: .45, fluff: false, pile: 0, easy: 1, chunks: .22},
+  {goal: 60, ms: 800, gold: .08, maple: .03, pairs: .5, fluff: false, pile: 0, easy: 1, chunks: .2},
+  {goal: 80, ms: 720, gold: .07, maple: .03, pairs: .5, fluff: true, pile: 0, easy: .8, chunks: .17},
+  {goal: 100, ms: 650, gold: .07, maple: .03, pairs: .5, fluff: true, pile: 2, easy: .6, chunks: .14},
+  {goal: 125, ms: 580, gold: .07, maple: .03, pairs: .55, fluff: true, pile: 2, easy: .4, chunks: .12},
+  {goal: 150, ms: 520, gold: .06, maple: .03, pairs: .55, fluff: true, pile: 3, easy: .2, chunks: .1},
+  {goal: 175, ms: 460, gold: .06, maple: .03, pairs: .6, fluff: true, pile: 3, easy: 0, chunks: .08},
+  {goal: 200, ms: 410, gold: .06, maple: .03, pairs: .6, fluff: true, pile: 4, easy: 0, chunks: .07},
+  {goal: 230, ms: 360, gold: .05, maple: .03, pairs: .6, fluff: true, pile: 4, easy: 0, chunks: .06},
+  {goal: 260, ms: 320, gold: .05, maple: .03, pairs: .65, fluff: true, pile: 5, easy: 0, chunks: .05}];
 const MAX_LEVEL = LV.length - 1;
 const levelName = n => `Level ${n} · ${LV[n].goal} points` + (LV[n].pile ? `, ${LV[n].pile} rows down` : "");
 const mulberry = s => () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -137,27 +147,34 @@ function dealPoms(seed, n, lv) {
   const rnd = mulberry(seed), out = [];
   while (out.length < n) {
     const bag = [];
-    for (const [l, c] of Object.entries(BAG)) if (l !== "?" || lv.fluff) for (let i = 0; i < c; i++) bag.push(l);
+    for (const [l, c] of Object.entries(BAG)) if (l !== "?" || lv.fluff) for (let i = Math.round(c + (EASY_BAG[l] - c) * (lv.easy || 0)); i > 0; i--) bag.push(l);
     for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [bag[i], bag[j]] = [bag[j], bag[i]]; }
     for (const l of bag) { const r = rnd(); out.push({l, k: l === "?" ? 0 : r < lv.gold ? 1 : r < lv.gold + lv.maple ? 2 : 0}); }
   }
   return out.slice(0, n);
 }
-// Piece i for a seed: one pompom or a pair, the same every time, so Restart and a share link deal the same pile.
+// Piece i for a seed: one pompom, a pair, or a common beginning or ending, the same every time, so Restart and a share
+// link deal the same pile.
 const dealt = {};
 function pieceOf(seed, level, i) {
   const key = seed + ":" + level;
   let d = dealt[key];
   if (!d) {
-    const lv = LV[level], rnd = mulberry(seed ^ 0x51ED), poms = dealPoms(seed, 4000, lv), pieces = [];
-    for (let k = 0; pieces.length < 1800;) { const two = rnd() < lv.pairs; pieces.push(two ? [poms[k], poms[k + 1]] : [poms[k]]); k += two ? 2 : 1; }
+    const lv = LV[level], rnd = mulberry(seed ^ 0x51ED), crnd = mulberry(seed ^ 0xC4A2), poms = dealPoms(seed, 4000, lv), pieces = [];
+    const chunk = () => { const c = CHUNK_BAG[Math.floor(crnd() * CHUNK_BAG.length)]; return [...c].map(l => { const r = crnd(); return {l, k: r < lv.gold ? 1 : r < lv.gold + lv.maple ? 2 : 0}; }); };
+    for (let k = 0; pieces.length < 1800;) {
+      if (crnd() < lv.chunks) { pieces.push(chunk()); continue; }
+      const two = rnd() < lv.pairs; pieces.push(two ? [poms[k], poms[k + 1]] : [poms[k]]); k += two ? 2 : 1;
+    }
     d = dealt[key] = pieces;
   }
   return d[i % d.length].map(t => ({...t}));
 }
 // A piece's cells for its spot and turn: r 0 across (a, b), 1 down (a over b), 2 across (b, a), 3 down (b over a).
+// Three on a string (an ending such as ING) stay in order, across or down, turning about the middle one.
 function cellsOf(p, x, y, r) {
   if (p.length === 1) return [[x, y, p[0]]];
+  if (p.length === 3) return p.map((t, k) => r % 2 ? [x, y - 1 + k, t] : [x - 1 + k, y, t]);
   const [a, b] = r >= 2 ? [p[1], p[0]] : p;
   return r % 2 ? [[x, y, a], [x, y + 1, b]] : [[x, y, a], [x + 1, y, b]];
 }
@@ -356,9 +373,12 @@ function move(dx) {
 function turn() {
   if (!canAct()) return;
   const pc = game.piece; if (pc.p.length < 2) return;
-  const r = (pc.r + 1) % 4;
-  // a pair against a wall or the pile slides over to turn
-  for (const [dx, dy] of [[0, 0], [-1, 0], [1, 0], [0, -1]]) if (fits(game.board, cellsOf(pc.p, pc.x + dx, pc.y + dy, r))) { pc.x += dx; pc.y += dy; pc.r = r; game.lockT = 0; return; }
+  const r = (pc.r + 1) % (pc.p.length === 3 ? 2 : 4);
+  // a piece against a wall or the pile slides over to turn (never up past the top)
+  for (const [dx, dy] of [[0, 0], [-1, 0], [1, 0], [0, 1], [0, -1]]) {
+    const cells = cellsOf(pc.p, pc.x + dx, pc.y + dy, r);
+    if (cells.every(([, y]) => y >= 0) && fits(game.board, cells)) { pc.x += dx; pc.y += dy; pc.r = r; game.lockT = 0; return; }
+  }
 }
 function landY() { const pc = game.piece; let y = pc.y; while (fits(game.board, cellsOf(pc.p, pc.x, y + 1, pc.r))) y++; return y; }
 function hardDrop() {
@@ -366,8 +386,9 @@ function hardDrop() {
   game.piece.y = landY(); lock();
 }
 function lock() {
-  const g = game, pc = g.piece;
-  for (const [x, y, t] of cellsOf(pc.p, pc.x, pc.y, pc.r)) g.board[y * COLS + x] = t;
+  const g = game, pc = g.piece, cells = cellsOf(pc.p, pc.x, pc.y, pc.r);
+  if (cells.some(([, y]) => y < 0)) { g.piece = null; return lose(); }   // three down, poking out above the top
+  for (const [x, y, t] of cells) g.board[y * COLS + x] = t;
   g.piece = null; g.i++; g.chain = 0;
   startSettle(); paintNext();
 }
@@ -464,13 +485,12 @@ function paint() {
   }
   if (g.piece && ["ready", "running", "paused"].includes(g.state)) {
     const pc = g.piece, sm = g.phase === "fall" && g.state === "running" && !softDown ? Math.min(1, g.fallT / (LV[g.level].ms * slow() / 1000)) * .25 : 0;
-    for (const [x, y, t] of cellsOf(pc.p, pc.x, pc.y, pc.r)) {
-      const can = fits(g.board, cellsOf(pc.p, pc.x, pc.y + 1, pc.r));
-      if (pc.p.length > 1 && pc.r % 2 === 0) { // the string joining a pair
-        ctx.save(); ctx.strokeStyle = GOLD; ctx.lineWidth = 4; ctx.lineCap = "round"; ctx.beginPath(); const yy = (pc.y + .5 + (can ? sm : 0)) * CELL; ctx.moveTo((pc.x + .5) * CELL, yy); ctx.lineTo((pc.x + 1.5) * CELL, yy); ctx.stroke(); ctx.restore();
-      }
-      drawPom(ctx, t, (x + .5) * CELL, (y + .5 + (can ? sm : 0)) * CELL, CELL * .94);
+    const cells = cellsOf(pc.p, pc.x, pc.y, pc.r), can = fits(g.board, cellsOf(pc.p, pc.x, pc.y + 1, pc.r));
+    if (pc.p.length > 1 && pc.r % 2 === 0) { // the string joining a pair (or three)
+      const xs = cells.map(c => c[0]), yy = (pc.y + .5 + (can ? sm : 0)) * CELL;
+      ctx.save(); ctx.strokeStyle = GOLD; ctx.lineWidth = 4; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo((Math.min(...xs) + .5) * CELL, yy); ctx.lineTo((Math.max(...xs) + .5) * CELL, yy); ctx.stroke(); ctx.restore();
     }
+    for (const [x, y, t] of cells) drawPom(ctx, t, (x + .5) * CELL, (y + .5 + (can ? sm : 0)) * CELL, CELL * .94);
   }
   for (const f of g.fx) {
     const u = f.t / f.T;
@@ -485,7 +505,8 @@ function paintNext() {
   const c = $("nextCv").getContext("2d"); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, 192, 96);
   if (!game) return;
   const p = pieceOf(game.seed, game.level, game.i + 1);   // the piece after the one falling (or about to fall), never the same one
-  p.forEach((t, k) => drawPom(c, {...t, id: k + 1}, (p.length === 1 ? 96 : 48 + k * 96), 48, 86));
+  if (p.length === 3) p.forEach((t, k) => drawPom(c, {...t, id: k + 1}, 33 + k * 63, 48, 60));
+  else p.forEach((t, k) => drawPom(c, {...t, id: k + 1}, (p.length === 1 ? 96 : 48 + k * 96), 48, 86));
 }
 addEventListener("resize", paint);
 
@@ -611,7 +632,7 @@ function helpOnFirstVisit() {
   const top = row(0), bottom = [...row(ROWS - 2), ...row(ROWS - 1)];
   const steps = [
     {say: "Drag falling letters, or use arrows", lit: top, els: [$("leftBtn"), $("rightBtn")]},
-    {say: "Tap to turn a pair", lit: top, els: [$("turnBtn")]},
+    {say: "Tap to turn a string of pompoms", lit: top, els: [$("turnBtn")]},
     {say: "Flick down to drop", els: [$("dropBtn")]},
     {say: "Spell words across or down", lit: bottom, tone: "ok"},
     // scoring details wait for How to play: the first round shows how it goes
