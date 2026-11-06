@@ -58,6 +58,8 @@
 /* the word being spelled, and the words to find, by length */
 .spell{min-height:calc(34px*var(--ts));font-weight:800;font-size:calc(24px*var(--ts));letter-spacing:.12em;text-align:center;line-height:1.3}
 .spell.miss{color:var(--bad-text)}
+.said{min-height:calc(22px*var(--ts));font-size:calc(16px*var(--ts));font-weight:600;text-align:center;color:var(--ink-soft);line-height:1.35}
+.said.good{color:var(--ink)}
 .listbox{width:var(--board);display:flex;flex-direction:column;gap:6px}
 .lens{display:flex;flex-direction:column;gap:4px}
 .lenrow{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 6px}
@@ -89,7 +91,8 @@
       <img class="curled" id="curled" src="../cats/dottie-21.webp" alt="">
     </div></div>
   </div></div>
-  <div class="spell" id="spell" aria-live="polite"></div>
+  <div class="spell" id="spell"></div>
+  <div class="said" id="said" aria-live="polite"></div>
   <div class="listbox">
     <div class="lens" id="lens" aria-label="Words to find"></div>
     <div class="bonus" id="bonus"></div>
@@ -99,6 +102,7 @@
   <div class="actions">
     <button id="hintBtn">Hint</button>
     <button id="restartBtn">Restart</button>
+    <button id="leftBtn" data-icon="peek">Words left</button>
     <button id="linkBtn">Share</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
@@ -285,12 +289,14 @@ function draw() {
   svg.classList.toggle("miss", !!(flash && flash.kind === "miss")); svg.classList.toggle("bonus", !!(flash && flash.kind === "bonus"));
   const sp = $("spell"); sp.textContent = flash ? flash.word : lit.map(i => grid[i]).join(""); sp.classList.toggle("miss", !!(flash && flash.kind === "miss"));
   // the words, by length: found ones spelled out, the rest as blanks
-  const f = foundSet(), lens = [...new Set(list.map(o => o.w.length))], el = $("lens");
-  const html = lens.map(L => `<div class="lenrow"><b>${L} letters</b>${list.filter(o => o.w.length === L).map(o => f.has(o.w) ? `<span class="found${o.w === game.found[game.found.length - 1] && flash ? " new" : ""}">${o.w}</span>` : `<span aria-label="${L} letters, not found yet">${"_".repeat(L).split("").join(" ")}</span>`).join("")}</div>`).join("");
+  // the words found, by length; after Words left, the ones still to find show as blanks among them
+  const f = foundSet(), el = $("lens"), shown = list.filter(o => game.showLeft || f.has(o.w)), lens = [...new Set(shown.map(o => o.w.length))];
+  const html = lens.map(L => `<div class="lenrow"><b>${L} letters</b>${shown.filter(o => o.w.length === L).map(o => f.has(o.w) ? `<span class="found${o.w === game.found[game.found.length - 1] && flash ? " new" : ""}">${o.w}</span>` : `<span aria-label="${L} letters, not found yet">${"_".repeat(L).split("").join(" ")}</span>`).join("")}</div>`).join("");
   if (el.innerHTML !== html) el.innerHTML = html;
   $("bonus").textContent = game.bonus.length ? `Bonus words: ${game.bonus.join(", ")}` : "";
   $("count").textContent = game.won ? "All found!" : `${game.found.length} of ${list.length} words`;
   $("hintBtn").disabled = game.won;
+  $("leftBtn").hidden = !!(game.showLeft || game.won);
   $("restartBtn").disabled = game.won || (!game.found.length && !game.bonus.length);
 }
 function say() {
@@ -303,6 +309,12 @@ addEventListener("resize", () => { if (game) draw(); });
 /* ---------- connecting a word ---------- */
 const near = (a, b) => { const N = game.N; return a !== b && Math.abs(a % N - b % N) <= 1 && Math.abs(Math.floor(a / N) - Math.floor(b / N)) <= 1; };
 let flashTimer = 0;
+// a line under the board saying how a word went
+let saidTimer = 0;
+function sayBelow(text, good, ms = 3000) {
+  clearTimeout(saidTimer); const el = $("said"); el.textContent = text; el.classList.toggle("good", !!good);
+  saidTimer = setTimeout(() => { if (el.textContent === text) el.textContent = ""; }, ms);
+}
 function showFlash(cells, word, kind, ms) {
   clearTimeout(flashTimer); flash = {cells, word, kind}; draw();
   flashTimer = setTimeout(() => { flash = null; draw(); }, ms);
@@ -315,18 +327,18 @@ function submit(cells) {
   game.started = true;
   const o = list.find(o => o.w === w);
   if (o && !game.found.includes(w)) {
-    game.found.push(w); save(); showFlash(cells, w, "found", 700);
+    game.found.push(w); save(); showFlash(cells, w, "found", 700); $("said").textContent = "";
     if (game.found.length === list.length && !game.demo) win();
     return;
   }
-  if (o) { showFlash(cells, w, "miss", 700); G.note(`You've found ${w} already.`, 2500); return; }
+  if (o) { showFlash(cells, w, "miss", 700); sayBelow(`You've found ${w} already.`); return; }
   if (w.length >= min && KNOWN.has(w)) {
-    if (game.bonus.includes(w)) G.note(`${w} is a bonus word you've found already.`, 2500);
-    else { game.bonus.push(w); save(); G.note(`${w}: a bonus word! It isn't on the list, but well spotted.`, 3000); }
+    if (game.bonus.includes(w)) sayBelow(`${w} is a bonus word you've found already.`);
+    else { game.bonus.push(w); save(); sayBelow(`${w}: a bonus word! It isn't one to find, but well spotted.`, true); }
     showFlash(cells, w, "bonus", 700); return;
   }
   showFlash(cells, w, "miss", 700);
-  G.note(w.length < min ? `Words need ${min} letters or more here.` : `${w} isn't a word we know.`, 2500);
+  sayBelow(w.length < min ? `Words need ${min} letters or more here.` : `${w} isn't a word we know.`);
 }
 // Pointer: drag across magnets to spell a word (back over the last one to take it off), or tap them one by one
 // and tap the last one again to connect the word.
@@ -406,7 +418,7 @@ document.addEventListener("keydown", e => {
     const t = typed + e.key.toUpperCase(), p = pathFor(t);
     keys.hide();
     if (p) { typed = t; chain = p; flash = null; draw(); }
-    else G.note(`No chain of magnets spells ${t}.`, 2000);
+    else sayBelow(`No chain of magnets spells ${t}.`);
     e.preventDefault();
   } else if (e.key === "Backspace" && typed) { typed = typed.slice(0, -1); chain = typed ? pathFor(typed) : []; draw(); e.preventDefault(); }
   else if ((e.key === "Enter" && typed) || (e.key === " " && chain.length)) { submit(chain); e.preventDefault(); e.stopImmediatePropagation(); }
@@ -424,10 +436,17 @@ function hint() {
   else hints.show({cells: p}, `There's ${o.w}: connect the gold magnets.`);
 }
 $("hintBtn").onclick = hint;
+// Words left: show how many words of each length are still to find, as blanks in the list. Like a hint, it costs the
+// gold paw; it lasts for the rest of the puzzle.
+$("leftBtn").onclick = () => {
+  if (!playing() || game.showLeft) return;
+  game.showLeft = true; game.hinted = true; save(); draw();
+  const n = left().length; sayBelow(`${n} word${n === 1 ? "" : "s"} still to find, shown as blanks in the list.`, true, 4000);
+};
 // Restart: every word to find again. It costs the gold paw.
 $("restartBtn").onclick = () => {
   if (!game || game.won) return;
-  Object.assign(game, {found: [], bonus: [], restarted: true}); chain = []; typed = "";
+  Object.assign(game, {found: [], bonus: [], restarted: true, showLeft: false}); chain = []; typed = "";
   hints.clear(false); draw(); save();
   G.note("Every word is to find again.", 3000);
 };
@@ -497,6 +516,7 @@ function helpOnFirstVisit() {
     {say: "Spell with the fridge magnets", lit: all, enter: demoOn},
     {say: "Connect TAIL", lit: DEMO.words[0].paths[0].map(xy), enter: demoOn, try: {done: () => game.found.length > 0, yes: "Found! Tapping works too"}},
     {say: `Find every word of ${min}+ letters`, els: [$("lens")]},
+    {say: "Words left shows what's to find", els: [$("leftBtn")]},
     {say: "Used-up magnets fade", lit: all, later: true},
     {say: "Other words are bonus words", els: [$("bonus")], later: true},
     {say: "Stuck? Hint shows a start", els: [$("hintBtn")]},
