@@ -18,7 +18,6 @@ Rows are sorted by shelf, in the site's order (Cat Logic, Cat Math, Cat Trails, 
 | Signpost | Zoomies | Cat Trails | Retrace the cat's 3 a.m. sprint, each piece of furniture pointing to its next jump |
 | Fliptogram | Cat Flap | Cat Spells | Each tile is a cat flap that swings to its partner letter |
 | Upwordly | Morning Stretch | Cat Spells | A waking cat stretches further with each longer word |
-| Boggle | Sock Drawer | Cat Spells | Letters on rolled socks in a drawer; the cat pulls out a chain of neighbouring socks for each word |
 | Gram Jam | Swap-a-Pom | Cat Spells | Letter pompoms in a craft tray (L-M-N-O-Pom's); swap them to spell words, and the cat bats each word away |
 | Synonym trail | Scent Trail | Cat Spells | Follow the nose from word to same-meaning word to the treat |
 | Bed Hog | Bed Hog | Curious Cat | Slide the sprawled cats until there's room for the human |
@@ -41,21 +40,20 @@ row, and the games needing new physics or new data come last. Take a game out of
 
 | # | Game | Shelf | Why here |
 | --- | --- | --- | --- |
-| 1 | Sock Drawer | Cat Spells | Close to Knit Pick and Keyboard Cat, using the word lists already here |
-| 2 | Pounce Up | Kitten Play (action) | The second action game, so Kitten Play can be split after it (see `TODO.md`) |
-| 3 | Zoomies | Cat Trails | Yarn's path generator makes the path; the only Trails game on the shortlist |
-| 4 | Under the Blanket | Cat Logic | Laser Pointer's ray tracing does most of it |
-| 5 | Bed Hog | Curious Cat | The long sleeping cats in `cats/` are the pieces, so no new art; needs a solver to make levels with an answer |
-| 6 | Swap-a-Pom | Cat Spells | Reuses L-M-N-O-Pom's pompoms and Pounce's swap-to-match |
-| 7 | Boing! | Curious Cat | Wind Up's physics plus the owner's spring sheet; builds the spring pieces Yarn Golf needs |
-| 8 | Morning Stretch | Cat Spells | Clues from the Wiktionary lookup (`G.meaning`) Fish Bones and Keyboard Cat already use |
-| 9 | Tape Trap | Cat Logic | A new kind of logic puzzle, so its generator is more work |
-| 10 | Yarn Golf | Curious Cat | Boing!'s springs and Wind Up's physics, plus a flick to shoot |
-| 11 | Cat Flap | Cat Spells | Its puzzle maker has to pair the letters so every row can spell a word |
-| 12 | Warm Seat | Curious Cat | After Bed Hog, to decide whether it's its own game or a mode of Bed Hog |
-| 13 | Paw-ball | Kitten Play (action) | Flippers are moving pieces, which Wind Up's physics doesn't have yet; the hardest to build |
-| 14 | Special Delivery | Curious Cat | The rules for the gifts, routes and dog still need working out |
-| 15 | Scent Trail | Cat Spells | Needs a thesaurus built first (Wiktionary's synonyms or WordNet) |
+| 1 | Pounce Up | Kitten Play (action) | The second action game, so Kitten Play can be split after it (see `TODO.md`) |
+| 2 | Zoomies | Cat Trails | Yarn's path generator makes the path; the only Trails game on the shortlist |
+| 3 | Under the Blanket | Cat Logic | Laser Pointer's ray tracing does most of it |
+| 4 | Bed Hog | Curious Cat | The long sleeping cats in `cats/` are the pieces, so no new art; needs a solver to make levels with an answer |
+| 5 | Swap-a-Pom | Cat Spells | Reuses L-M-N-O-Pom's pompoms and Pounce's swap-to-match |
+| 6 | Boing! | Curious Cat | Wind Up's physics plus the owner's spring sheet; builds the spring pieces Yarn Golf needs |
+| 7 | Morning Stretch | Cat Spells | Clues from the Wiktionary lookup (`G.meaning`) Fish Bones and Keyboard Cat already use |
+| 8 | Tape Trap | Cat Logic | A new kind of logic puzzle, so its generator is more work |
+| 9 | Yarn Golf | Curious Cat | Boing!'s springs and Wind Up's physics, plus a flick to shoot |
+| 10 | Cat Flap | Cat Spells | Its puzzle maker has to pair the letters so every row can spell a word |
+| 11 | Warm Seat | Curious Cat | After Bed Hog, to decide whether it's its own game or a mode of Bed Hog |
+| 12 | Paw-ball | Kitten Play (action) | Flippers are moving pieces, which Wind Up's physics doesn't have yet; the hardest to build |
+| 13 | Special Delivery | Curious Cat | The rules for the gifts, routes and dog still need working out |
+| 14 | Scent Trail | Cat Spells | Needs a thesaurus built first (Wiktionary's synonyms or WordNet) |
 
 Around games 11 to 13, Curious Cat reaches 13 or 14 games: the time to decide on the colour shelf (see `TODO.md`).
 
@@ -111,7 +109,6 @@ Around games 11 to 13, Curious Cat reaches 13 or 14 games: the time to decide on
 | 7 Little Words | Cat Spells | Seven clues and a pool of two- and three-letter chunks; join chunks to spell each answer | Definitions | GoComics | Idea | Clues from Wiktionary through `G.meaning`. Cat theme picked: Nine Lives, nine clues, one per life |
 | Hex words (Lexigo, Hex 10) | Cat Spells | Find words by winding through neighbouring hexagon letter tiles: Hex 10 keeps your 10 highest-scoring; Lexigo answers clues, each answer starting with the last letter of the one before | None (Definitions for Lexigo's clues) | GoComics | Idea | Lexigo and Hex 10 merged: one hex board of letters, with Hex 10's scoring and Lexigo's chain of clued words as two ways to play. Clues from Wiktionary through `G.meaning`; the hex board is new |
 | Anagram | Cat Spells | Unscramble a word | None | Idea list | Idea | |
-| Boggle (Squaredle) | Cat Spells | Find words by joining neighbouring letters in a grid | None | Idea list, wordleunlimited | Idea | Shortlist. Cat theme picked: Sock Drawer, letters on rolled-up socks packed in a drawer; the cat pulls out a chain of neighbouring socks for each word and leaves them strewn on the floor. Close to Knit Pick and Keyboard Cat |
 | Letter Boxed | Cat Spells | 12 letters around a square; chain words that use every letter, never taking two in a row from the same side | None | wordleunlimited | Idea | |
 | Word Be-Gone | Cat Spells | Split the board into two- to five-letter words, using every letter exactly once | None | GoComics | Idea | |
 | Gram Jam | Cat Spells | Swap letter tiles so they spell words, which clear like match-3 | None | wordleunlimited | Idea | Shortlist. Cat theme picked: Swap-a-Pom, letter pompoms in a craft tray; swap them to spell words, and the cat bats each word away. Reuses L-M-N-O-Pom's letter pompoms (Spelling String's pompom photo, tinted), so no new art. Close to Pounce (match-3) with letters |
@@ -124,6 +121,7 @@ Around games 11 to 13, Curious Cat reaches 13 or 14 games: the time to decide on
 | Kitten Caboodle (Rootonym) | Cat Spells | A mother cat's word root, what it means and where it comes from; spell the everyday words made from it, each a kitten that wakes up when its word is spelled, from Wiktionary definitions | — | GoComics | Built | The kittens are kitten Gus, Peanut, Marmalade and Willow; the mothers general cats. 116 roots and their words made by `tools/make-roots.py` from kaikki.org's copy of Wiktionary and SCOWL (Wiktionary's own API refuses cloud sessions with 429, too many requests, even when allowed, so the tool reads kaikki.org instead, which was already allowed; this had come up before). Each clue says the language a word came into English from, and the words got are listed with where they come from, so an old word whose meaning moved on (UPSET was "to set up") makes sense. Hints show one letter. Name picked by the owner from Kit & Kin, Mama Cat, Kindle of Kittens, Family Tree and Whose Kitten? |
 | L-M-N-O-Pom (Tetris with words, Letris) | Cat Spells | Letter pompoms fall one or two at a time into a pile 7 × 10; move and turn them as they fall, and any word across or down is pounced on and cleared, the pile falling into the gap. Scrabble letter values, × (length − 2), 2L and 2W pompoms, fluffballs as blanks, chains; reach the level's points before the pile reaches the top | — | Owner, this chat | Built | Starring Marmalade (his first game). First built as Leaf Pile, letter leaves drifting into a garden pile (the owner picked it over Snow Day, Kibble Bowl and Toy Chest); the owner then preferred Spelling String's pompoms by far, so the leaves went and the owner named it L-M-N-O-Pom. Rake became Swat (Marmalade bats the bottom two rows away, once a level). Words are the shared list's familiar and common words less slurs and rude words; the familiar list alone left too few words for a pile of loose letters. Next first showed the piece already falling, as Wind Up's once did; the new-game skill now says to check it |
 | Knit Pick (Word search, WonderWord) | Cat Spells | Find the words knitted into Laya's blanket; the letters no word uses spell a hidden word or saying | — | Idea list, GoComics | Built | Starring Laya. The blanket is plain yarn until a word is found, which dyes it, so finding the words brings out a colourful pattern; the hidden word dyes last, letter by letter. Cat themes or everyday words; a gold paw for guessing the hidden word before the last word. First tried with yarn strands over the words, and with the pattern faded rather than plain: too hard to tell found letters from the rest |
+| Junk Drawer (Boggle, Squaredle) | Cat Spells | Connect neighbouring fridge magnets (sides and corners) in Dottie's junk drawer to spell every word; other real words count as bonus words | None | Idea list, wordleunlimited | Built | Was on the shortlist as Sock Drawer (letters on rolled-up socks); the owner found socks didn't read as socks, so it became a junk drawer with Fridge Magnets' letters among batteries, pens and keys, and words are connected rather than pulled out. Words left (blanks by length) is a helper that costs the gold paw |
 | Keyboard Cat (Spelling Bee) | Cat Spells | Make words from the seven keys the cat didn't break | — | Fair Play chat | Built | |
 | Up a Tree (Word ladder, Weaver) | Cat Spells | Change one letter at a time to climb a cat tree from the start word to the goal word at the top, where a feather toy hangs | — | Idea list, Word Dictionaries chat, wordleunlimited | Built | Tap the letter to change, then its new letter (or type the word); the goal goes up by itself from one letter away. Brought in a shared word list (`words/`) with S words and American spellings, which Spelling String now uses too. Starring Dottie (the icon climbs CAT, COT, DOT) |
 | Squared Away | Cat Spells | Two mini crosswords side by side with their clues mixed together | Written | GoComics | No | |

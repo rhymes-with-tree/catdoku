@@ -45,6 +45,7 @@ const G = (() => {
     ["Fish Bones", "fishbones", "Swap the bones until Bowtie's fish spells words again", "#73A7AE", "words", "waffle swap letters crossword word puzzle fish skeleton", "2026-10-25"],
     ["Mewstermind", "stash", "Work out which toys the cat stashed in the boxes", "#7885BA", "logic", "toy stash mastermind guess code breaker codebreaker bulls and cows deduction colours colors hidden", "2026-10-26"],
     ["Knit Pick", "knitpick", "Help Laya find the words knitted into her blanket", "#8D78AD", "words", "word search wordsearch wonderword find a word hidden word puzzle", "2026-10-26"],
+    ["Junk Drawer", "junkdrawer", "Connect the fridge magnets in Dottie's junk drawer to spell words", "#E16A4A", "words", "boggle squaredle word grid word hunt find words letter grid", "2026-11-06"],
     ["Bird Watch", "birdwatch", "Help Bugsy and Bowtie spot the birds without waking the human", "#73A7AE", "quick", "whack-a-mole whack a mole birds window tapping action reflexes", "2026-10-26"],
     ["Shelf Life", "shelflife", "Help Fred put the yarn back in order", "#B94588", "teasers", "i love hue gradient colour color sort shades swap yarn", "2026-10-26"],
     ["Meowbile", "meowbile", "Weigh the toys on the cat's mobile", "#7885BA", "numbers", "solveme mobiles mobile balance scales weights weigh algebra equations maths math", "2026-10-27"],
@@ -74,6 +75,9 @@ const G = (() => {
   // Each shelf's colour: its games' tiles on the front page and in the games menu, and its label and shortcut.
   const SHELF_COLOUR = {logic: "#BD5538", numbers: "#ECA818", lines: "#73A7AE", words: "#B94588", teasers: "#7885BA", quick: "#6AA673"};
   const $ = id => document.getElementById(id);
+  // Fridge Magnets' alphabet magnets (shared with Junk Drawer, styled by .fmag in games.css): pacific blue, each letter
+  // lying at its own tilt
+  const MAGNET = {colour: "#73A7AE", tilt: ch => [-9, 6, -4, 10, -7, 3, 8, -5, 0][(ch.toLowerCase().charCodeAt(0) - 97) % 9]};
 
   /* ---------- text size ---------- */
   // On an iPhone or iPad, the text follows the size set in Settings (Display & Brightness, Text Size, and
@@ -885,6 +889,7 @@ const G = (() => {
     fishbones: ["Arrow keys: go from bone to bone", "Space or Enter: pick one up, then put it down on another", "Escape: let go"],
     stash: ["1 to 8: put in a toy (Shift: mark it nope)", "Left and right: pick a box", "Backspace: take a toy out", "Enter: check"],
     knitpick: ["Arrow keys: pick a letter", "Space or Enter: the first letter, then the last"],
+    junkdrawer: ["Letters: type a word", "Backspace: take a letter off", "Arrow keys: move round the drawer", "Enter: add the magnet there to your word", "Space (or Enter after typing): try the word", "Escape: let go"],
     birdwatch: ["1 to 9: tap that pane (laid out like a keypad)", "Arrow keys and Space: pick a pane and tap it", "P: pause"],
     shelflife: ["Arrow keys: pick a cubby", "Space: pick a ball, swap, or spin"],
     meowbile: ["Arrow keys: pick a kind of toy", "1 to 9: weigh it", "Backspace or 0: take the weight away", "Escape: let go"],
@@ -1643,6 +1648,6 @@ const G = (() => {
     }
   }
 
-  return {GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, meaning, plainText,
+  return {MAGNET, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();

@@ -27,8 +27,11 @@ def words(top, lo=3, hi=8):
             if size <= top and os.path.exists(f):
                 found |= {w.strip() for w in open(f, encoding="latin-1")}
     return {w for w in found if re.fullmatch(f"[a-z]{{{lo},{hi}}}", w) and w not in SLURS}
+# everyday words SCOWL doesn't have, added by hand
+ALSO = set("droid droids".split())
 def write(path, lo, hi):
     every, common, familiar = words(70, lo, hi), words(50, lo, hi) - CRUDE, words(20, lo, hi) - CRUDE
+    common |= {w for w in ALSO if lo <= len(w) <= hi}
     # a plural or a past tense reads as a form of another word, not a word of its own, so it's never a start or goal
     familiar = {w for w in familiar if not re.search(r"([^s]s|ed)$", w)}
     data = {"familiar": " ".join(sorted(familiar)), "common": " ".join(sorted(common - familiar)), "more": " ".join(sorted(every - common - familiar))}
