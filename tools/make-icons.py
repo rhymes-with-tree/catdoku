@@ -794,6 +794,25 @@ def knitpick():
     return frame(PAPER, out)
 
 
+def junkdrawer():
+    """Dottie's junk drawer from above: magnet letters spelling JUNK on a chain, with a pen and a paper clip, and Dottie
+    peeking over the back."""
+    wood = "#" + "".join(f"{round(int(RED[k:k + 2], 16) * .62 + int(INK[k:k + 2], 16) * .38):02X}" for k in (1, 3, 5))
+    out = dottieface(50, 22, 9)
+    out += f'<rect x="12" y="28" width="76" height="62" rx="6" fill="{wood}" stroke="{INK}" stroke-width="2.5"/>'
+    out += f'<rect x="18" y="34" width="64" height="50" rx="3" fill="{tint(YELLOW, .22)}"/>'
+    # a pen and a paper clip under the magnets
+    out += (f'<g transform="rotate(-18 60 75)"><rect x="38" y="73" width="36" height="4" rx="1.5" fill="#4E577D" stroke="{INK}" stroke-width="1"/>'
+            f'<path d="M74 73 L80 75 L74 77 Z" fill="{PAPER}" stroke="{INK}" stroke-width="1"/></g>')
+    out += f'<path d="M24 50 L34 50 A2.8 2.8 0 0 0 34 44.4 L25 44.4 A1.8 1.8 0 0 0 25 48 L33 48" fill="none" stroke="{PERI}" stroke-width="1.3" stroke-linecap="round"/>'
+    # the word's line, then the magnets on it
+    pts = [(30, 62), (43, 52), (57, 60), (70, 48)]
+    out += f'<polyline points="{" ".join(f"{x},{y}" for x, y in pts)}" fill="none" stroke="{YELLOW}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity=".5"/>'
+    for (x, y), ch, c, r in zip(pts, "JUNK", (RED, TEAL, PLUM, GREEN), (-9, 6, -4, 10)):
+        out += f'<g transform="rotate({r} {x} {y})" style="filter:drop-shadow(1px 1.6px 0 rgba(42,37,48,.3))">{text(x, y, ch, 17, c)}</g>'
+    return frame(PAPER, out)
+
+
 def birdwatch():
     """A tall window of three panes on a periwinkle wall, a robin on the middle pane, and Zzz from the napping human."""
     sky, white = tint(TEAL, .4), PAPER
@@ -961,7 +980,7 @@ def crossstitch():
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle, "mewhue": mewhue, "pawlinko": pawlinko, "crossstitch": crossstitch}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle, "mewhue": mewhue, "pawlinko": pawlinko, "crossstitch": crossstitch, "junkdrawer": junkdrawer}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")
