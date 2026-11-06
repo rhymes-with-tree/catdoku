@@ -889,7 +889,7 @@ const G = (() => {
     fishbones: ["Arrow keys: go from bone to bone", "Space or Enter: pick one up, then put it down on another", "Escape: let go"],
     stash: ["1 to 8: put in a toy (Shift: mark it nope)", "Left and right: pick a box", "Backspace: take a toy out", "Enter: check"],
     knitpick: ["Arrow keys: pick a letter", "Space or Enter: the first letter, then the last"],
-    junkdrawer: ["Letters: type a word, then Enter", "Backspace: take a letter off", "Arrow keys: pick a magnet", "Enter: add that magnet to your word", "Enter again on the last one: try the word", "Escape: let go"],
+    junkdrawer: ["Letters: type a word", "Backspace: take a letter off", "Arrow keys: move round the drawer", "Enter: add the magnet there to your word", "Space (or Enter after typing): try the word", "Escape: let go"],
     birdwatch: ["1 to 9: tap that pane (laid out like a keypad)", "Arrow keys and Space: pick a pane and tap it", "P: pause"],
     shelflife: ["Arrow keys: pick a cubby", "Space: pick a ball, swap, or spin"],
     meowbile: ["Arrow keys: pick a kind of toy", "1 to 9: weigh it", "Backspace or 0: take the weight away", "Escape: let go"],
