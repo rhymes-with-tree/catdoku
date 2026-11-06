@@ -86,3 +86,9 @@ sure where she was looking. The Best times card already names each level, and th
 "your best" is for ("Your best at Level 4 · 6 × 6 is 1:05"). If that isn't it, ask her: perhaps she wants every
 game's best times in one place on the front page, or the fastest list for every level rather than only the current
 one.
+
+## Cross Stitch: a star cat
+
+Cross Stitch (2026-11-06) went on the site with general cats for now (one of Purrfect Square's sitting cats beside the
+title). Its samplers are mostly Gus, Peanut, Marmalade and Willow. Once the owner picks a star (or draws one), put
+them beside the title and in `ARTWORK.md`, and perhaps on the gold-paw card.

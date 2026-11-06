@@ -13,7 +13,7 @@ Rows are sorted by shelf, in the site's order (Cat Logic, Cat Math, Cat Trails, 
 | Idea | Game name | Shelf | Cat theme |
 | --- | --- | --- | --- |
 | Cat Trap | Tape Trap | Cat Logic | Masking-tape squares on the floor; every cat walks to its nearest one and sits |
-| Nonogram | Cross Stitch | Cat Logic | A cross-stitch sampler filled in by the counts; it ends up a picture |
+| Nonogram | Cross Stitch (built) | Cat Logic | A cross-stitch sampler filled in by the counts; it ends up a picture |
 | Black Box | Under the Blanket | Cat Logic | Cats hiding under the blanket; a feather wand slid under from the edge finds the lumps |
 | Signpost | Zoomies | Cat Trails | Retrace the cat's 3 a.m. sprint, each piece of furniture pointing to its next jump |
 | Fliptogram | Cat Flap | Cat Spells | Each tile is a cat flap that swings to its partner letter |
@@ -41,24 +41,23 @@ row, and the games needing new physics or new data come last. Take a game out of
 
 | # | Game | Shelf | Why here |
 | --- | --- | --- | --- |
-| 1 | Cross Stitch | Cat Logic | A well-known puzzle (nonograms), no new physics, and a cat picture as the reward |
-| 2 | Sock Drawer | Cat Spells | Close to Knit Pick and Keyboard Cat, using the word lists already here |
-| 3 | Pounce Up | Kitten Play (action) | The second action game, so Kitten Play can be split after it (see `TODO.md`) |
-| 4 | Zoomies | Cat Trails | Yarn's path generator makes the path; the only Trails game on the shortlist |
-| 5 | Under the Blanket | Cat Logic | Laser Pointer's ray tracing does most of it |
-| 6 | Bed Hog | Curious Cat | The long sleeping cats in `cats/` are the pieces, so no new art; needs a solver to make levels with an answer |
-| 7 | Swap-a-Pom | Cat Spells | Reuses L-M-N-O-Pom's pompoms and Pounce's swap-to-match |
-| 8 | Boing! | Curious Cat | Wind Up's physics plus the owner's spring sheet; builds the spring pieces Yarn Golf needs |
-| 9 | Morning Stretch | Cat Spells | Clues from the Wiktionary lookup (`G.meaning`) Fish Bones and Keyboard Cat already use |
-| 10 | Tape Trap | Cat Logic | A new kind of logic puzzle, so its generator is more work |
-| 11 | Yarn Golf | Curious Cat | Boing!'s springs and Wind Up's physics, plus a flick to shoot |
-| 12 | Cat Flap | Cat Spells | Its puzzle maker has to pair the letters so every row can spell a word |
-| 13 | Warm Seat | Curious Cat | After Bed Hog, to decide whether it's its own game or a mode of Bed Hog |
-| 14 | Paw-ball | Kitten Play (action) | Flippers are moving pieces, which Wind Up's physics doesn't have yet; the hardest to build |
-| 15 | Special Delivery | Curious Cat | The rules for the gifts, routes and dog still need working out |
-| 16 | Scent Trail | Cat Spells | Needs a thesaurus built first (Wiktionary's synonyms or WordNet) |
+| 1 | Sock Drawer | Cat Spells | Close to Knit Pick and Keyboard Cat, using the word lists already here |
+| 2 | Pounce Up | Kitten Play (action) | The second action game, so Kitten Play can be split after it (see `TODO.md`) |
+| 3 | Zoomies | Cat Trails | Yarn's path generator makes the path; the only Trails game on the shortlist |
+| 4 | Under the Blanket | Cat Logic | Laser Pointer's ray tracing does most of it |
+| 5 | Bed Hog | Curious Cat | The long sleeping cats in `cats/` are the pieces, so no new art; needs a solver to make levels with an answer |
+| 6 | Swap-a-Pom | Cat Spells | Reuses L-M-N-O-Pom's pompoms and Pounce's swap-to-match |
+| 7 | Boing! | Curious Cat | Wind Up's physics plus the owner's spring sheet; builds the spring pieces Yarn Golf needs |
+| 8 | Morning Stretch | Cat Spells | Clues from the Wiktionary lookup (`G.meaning`) Fish Bones and Keyboard Cat already use |
+| 9 | Tape Trap | Cat Logic | A new kind of logic puzzle, so its generator is more work |
+| 10 | Yarn Golf | Curious Cat | Boing!'s springs and Wind Up's physics, plus a flick to shoot |
+| 11 | Cat Flap | Cat Spells | Its puzzle maker has to pair the letters so every row can spell a word |
+| 12 | Warm Seat | Curious Cat | After Bed Hog, to decide whether it's its own game or a mode of Bed Hog |
+| 13 | Paw-ball | Kitten Play (action) | Flippers are moving pieces, which Wind Up's physics doesn't have yet; the hardest to build |
+| 14 | Special Delivery | Curious Cat | The rules for the gifts, routes and dog still need working out |
+| 15 | Scent Trail | Cat Spells | Needs a thesaurus built first (Wiktionary's synonyms or WordNet) |
 
-Around games 12 to 14, Curious Cat reaches 13 or 14 games: the time to decide on the colour shelf (see `TODO.md`).
+Around games 11 to 13, Curious Cat reaches 13 or 14 games: the time to decide on the colour shelf (see `TODO.md`).
 
 ## Every idea
 
@@ -66,7 +65,6 @@ Around games 12 to 14, Curious Cat reaches 13 or 14 games: the time to decide on
 | --- | --- | --- | --- | --- | --- | --- |
 | Tents | Cat Logic | Place a tent beside each tree to match row and column counts; tents never touch | None | Tatham | Idea | Theme: each cat needs its own bed beside it. Catdoku's solver already handles no-touching and counts. Cat theme picked: Cat Nap, a cat bed beside every cushion, beds never touching; a sleeper curls up in each bed placed |
 | Cat Trap | Cat Logic | Place tape squares on the floor so every cat walks to its nearest one and sits | None | Fair Play chat | Idea | Shortlist. Cat theme picked: Tape Trap, masking-tape squares on the floor; each cat walks to the nearest square and sits in it |
-| Nonogram (Pattern) | Cat Logic | Shade squares to match the run lengths given for each row and column; solving draws a picture | None | Idea list, Tatham | Idea | Shortlist. solving could draw a cat. Cat theme picked: Cross Stitch, fill the stitches on a cross-stitch sampler by the counts; the finished sampler is a cat or a toy |
 | Dominosa | Cat Logic | Split a grid of numbers into a full set of dominoes, each pair used once | None | Tatham | Idea | |
 | Fillomino (Filling) | Cat Logic | Write numbers so every region of joined same numbers has exactly that many squares | None | Tatham | Idea | |
 | Galaxies | Cat Logic | Divide the grid into regions, each symmetric around the dot inside it | None | Tatham | Idea | Making symmetric regions with one answer is slow to generate |
@@ -78,6 +76,7 @@ Around games 12 to 14, Curious Cat reaches 13 or 14 games: the time to decide on
 | Slant | Cat Logic | Draw a diagonal in every square; numbers count the lines meeting at each corner, with no loops | None | Tatham | Idea | |
 | Undead | Cat Logic | Place ghosts, vampires and zombies so the counts seen along each line, through mirrors, match | None | Tatham | Idea | Needs art for three kinds of monster and mirrors |
 | Black Box | Cat Logic | Fire rays into a box and find the hidden balls from where the rays come out | None | Tatham | Idea | Shortlist. Laser Pointer's ray tracing does most of it. Cat theme picked: Under the Blanket, cats hiding under the blanket; slide a feather wand under from the edge and where it pops out finds the lumps |
+| Cross Stitch (Nonogram, Pattern) | Cat Logic | Stitch squares to match the run lengths given for each row and column; the finished sampler is a picture | None | Idea list, Tatham | Built | Was on the shortlist. A sampler in an embroidery hoop; each pattern is cross-stitched from one of the site's pictures (mostly Gus, Peanut, Marmalade and Willow, grown up and as kittens, plus a few toys and general cats), which shows through behind the stitches once it's finished. Star cat not picked yet (general cats beside the title for now) |
 | Scratch That (Light Up, Akari) | Cat Logic | Place scratching posts so Dottie sees one in her row or column wherever she is (the furniture blocks her view); no two posts in line with each other, and a number on a sofa says how many posts stand beside it | — | Fair Play chat, Tatham | Built | Starring Dottie. The furniture is sofas and armchairs seen from above. 8 levels, up to a fiendish 10 × 10. Drag to dot, Dot first switch, keyboard play. Not done yet: friends scratching the other posts (needs a picture of a cat reaching up to scratch) |
 | Toydoku (Sudoku, Solo) | Cat Logic | Sudoku with toys in place of numbers (a Numbers switch shows 1 to N), from 4 × 4 up to nightmare 9 × 9s that need trial and error; toys go in toy-first (tap for one, hold to keep it) or square-first, with Pencil, Guess and Undo to guess, and Auto grade with lives as in Catdoku | — | You play, GoComics, Tatham | Built | Starring Laya. Not done yet: 16 × 16 with letters, and the diagonals counting too |
 | High Perch (Skyscrapers, Futoshiki, Towers, High Rise, Unequal) | Cat Logic | Cat trees 1 to N perches tall, one of each height per row and column; arrows point down to the shorter tree and lookout cats count the trees they can see | — | You play, Tatham | Built | One ladder: trees standing, then arrows, then lookouts |

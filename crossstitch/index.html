@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cross Stitch</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-11-06.4"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<meta name="theme-color" content="#ECEEE7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1F1C24" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-11-06.4">
+<style>
+/* A cross-stitch sampler: aida cloth held in a wooden embroidery hoop, with a chart's grid on it (a darker line every
+   five squares), and the counts for each row down the left and each column along the top. Stitches are crosses in one
+   thread while you work; once the sampler's finished, the grid and dots go, each stitch takes its colour, and the
+   picture it was stitched from shows through behind it. */
+.title{display:flex;align-items:flex-end;gap:6px}
+.sitter{display:block;height:64px;width:auto;margin-bottom:-4px}
+@media (max-height:760px){.sitter{height:46px;margin-bottom:-3px}}
+.sampler{position:relative;width:var(--board);height:var(--board);display:grid;--cell:20px;--band:60px;--fs:12px;
+  --pad:8px;--hw:8px;--hr:28px;--edge:calc(var(--pad) + var(--hw));
+  grid-template-columns:var(--band) calc(var(--cell) * var(--n) + 2 * var(--edge));grid-template-rows:var(--band) calc(var(--cell) * var(--n) + 2 * var(--edge));
+  justify-content:center;align-content:center;user-select:none;-webkit-user-select:none;
+  background:var(--paper);border-radius:14px}   /* the board keeps its light colours in Dark Mode, counts and all */
+/* the hoop: two wooden rings (a double border) with the cloth caught between them, and its brass screw at the bottom */
+.hoop{--wood:color-mix(in srgb,#ECA818 55%,#BD5538);--aida:color-mix(in srgb,#ECA818 9%,#fff);
+  grid-column:2;grid-row:2;position:relative;padding:var(--pad);border:var(--hw) double var(--wood);border-radius:var(--hr);background:var(--aida);
+  box-shadow:0 0 0 1.5px color-mix(in srgb,var(--wood) 55%,#2A2530),inset 0 0 0 1.5px color-mix(in srgb,var(--wood) 55%,#2A2530),0 3px 8px rgba(42,37,48,.18)}
+.hoop::after{content:"";position:absolute;left:50%;bottom:calc(-1 * var(--hw) - 1.5px - var(--hw) * 1.1);width:calc(var(--hw) * 2.6);height:calc(var(--hw) * 1.1);
+  transform:translateX(-50%);border-radius:3px;background:#ECA818;border:1.5px solid color-mix(in srgb,#ECA818 45%,#2A2530)}
+.sampler .board{--gl:rgba(42,37,48,.14);--gl5:rgba(42,37,48,.42);position:relative;
+  background:none;border:none;border-radius:0;
+  grid-template-columns:repeat(var(--n),var(--cell));grid-template-rows:repeat(var(--n),var(--cell))}
+/* the picture the sampler was stitched from, behind the stitches once it's finished */
+.real{position:absolute;pointer-events:none;opacity:0;max-width:none;transition:opacity 1.4s}
+.sampler.won .real{opacity:.5}
+.cell{position:relative;cursor:pointer;--rx:1px;--by:1px;--lr:var(--gl);--lb:var(--gl);
+  box-shadow:inset calc(-1 * var(--rx)) 0 0 var(--lr),inset 0 calc(-1 * var(--by)) 0 var(--lb)}
+.cell.x5{--rx:2px;--lr:var(--gl5)} .cell.y5{--by:2px;--lb:var(--gl5)}
+.cell.xe{--rx:0px} .cell.ye{--by:0px}
+/* a stitch: two strokes of thread, the top one going / as stitchers do */
+.cell.st::before,.cell.st::after{content:"";position:absolute;left:50%;top:50%;width:104%;height:19%;border-radius:99px;
+  background:var(--th,#4E577D);transform:translate(-50%,-50%) rotate(-45deg);transition:background .8s}
+.cell.st::after{transform:translate(-50%,-50%) rotate(45deg);box-shadow:0 0 0 .6px rgba(42,37,48,.25)}
+/* a dot: this square stays empty */
+.cell.dot::after{content:"";position:absolute;left:38%;top:38%;width:24%;height:24%;border-radius:50%;background:rgba(42,37,48,.5)}
+.cell.cur{background:color-mix(in srgb,#73A7AE 14%,transparent)}
+/* the counts */
+.clues{display:grid;font-weight:800;color:var(--ink);font-size:var(--fs);line-height:1}
+.colClues{grid-column:2;grid-row:1;grid-template-columns:repeat(var(--n),var(--cell));padding:0 var(--edge) 4px}
+.rowClues{grid-column:1;grid-row:2;grid-template-rows:repeat(var(--n),var(--cell));padding:var(--edge) 6px var(--edge) 0}
+.colClues > div{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:calc(var(--fs) * .18)}
+.rowClues > div{display:flex;justify-content:flex-end;align-items:center;gap:calc(var(--fs) * .42)}
+.clues > div:nth-child(odd){background:color-mix(in srgb,var(--ink) 5%,transparent)}
+.colClues > div{border-radius:6px 6px 0 0} .rowClues > div{border-radius:6px 0 0 6px}
+.clues > div.done{color:var(--ink-soft);opacity:.45}
+.clues > div.cur{background:color-mix(in srgb,#73A7AE 28%,transparent)}
+.clues > div.hint{background:color-mix(in srgb,#ECA818 55%,transparent);opacity:1;color:var(--ink)}
+.corner{grid-column:1;grid-row:1;display:flex;align-items:center;justify-content:center}
+.corner svg{width:min(80%,64px);height:auto;overflow:visible}
+/* finished: the chart's grid and the dots go, and each stitch takes its colour */
+.sampler.won .cell{box-shadow:none} .sampler.won .cell.dot::after{display:none} .sampler.won .clues{opacity:.35}
+@media (prefers-reduced-motion:reduce){.cell.st::before,.cell.st::after,.real{transition:none}}
+/* the finished sampler on the win card */
+.winSampler{display:block;width:min(230px,70vw);height:auto;margin:0 auto}
+.sampler .overlay{grid-column:1 / -1;grid-row:1 / -1}
+</style>
+</head>
+<body>
+<main>
+  <header><div class="title"><h1>Cross Stitch</h1><img class="sitter" id="sitter" alt="A cat sitting beside the title"></div><div class="stripe"></div><p class="tagline">Stitch the sampler by the counts to see the picture</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="sampler stage" id="sampler">
+    <div class="corner" id="corner" aria-hidden="true"></div>
+    <div class="clues colClues" id="colClues" aria-hidden="true"></div>
+    <div class="clues rowClues" id="rowClues" aria-hidden="true"></div>
+    <div class="hoop" id="hoop"><div class="board" id="board" role="grid" aria-label="The sampler"></div></div>
+  </div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="dotBtn" aria-pressed="false">Dot</button>
+    <button id="linkBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New sampler</button>
+  </div>
+
+</main>
+
+<script src="../games.js?v=2026-11-06.4"></script>
+<script>
+/* ---------- the patterns ---------- */
+// Each pattern is stitched from one of the site's pictures of the cats and their toys, square by square: "." is bare
+// cloth (white in the picture is left bare, as stitchers do), a letter a stitch in that thread. [what it shows, the
+// picture (in cats/ or toys/), size, rows, the picture's size and the box round what's drawn in it ([w, h, x, y, bw, bh],
+// for laying it behind the stitches)]. Each one has exactly one answer, and the counts give it a row or column at a
+// time with no guessing; its mirror image is a pattern too.
+const PATTERNS = [
+  ["a ginger cat curled up asleep", "cats/c14-36", 8, ["........","..yyga..",".yayyag.","yyaaaagg","yyyyacyg",".gyayyay",".ygyyag.","...ggg.."], [420, 383, 2, 1, 417, 381]],
+  ["a grey cat sitting", "cats/c19-5", 8, ["...dd...","...dd...","...dd...","...ddd..","..dddd..","..dddd..","..dddd..","...dd..."], [104, 206, 0, 1, 103, 204]],
+  ["Gus sitting", "cats/gus-3", 8, ["...d....","...dd...","..ud....","..ddd...",".uddd...",".uddd...","..udd...","..uduu.."], [141, 194, 9, 3, 126, 187]],
+  ["Gus asleep", "cats/gus-5", 8, ["........","..ddd...","ddedddd.","ddefddd.",".ddddedu","...euddu","....ddu.","........"], [193, 146, 6, 3, 185, 134]],
+  ["Peanut as a kitten", "cats/kitten-3", 8, ["........","...kk...","...kku..","...kk...","...ku...","..kkk...","..kkk...","..kkk..."], [161, 274, 3, 0, 158, 274]],
+  ["Gus as a kitten, curled up asleep", "cats/kitten-4", 8, ["........","...ed...",".udeudu.",".uuddddu","eddddddu","fddduuuu","..kuuuu.","........"], [249, 175, 0, 0, 246, 175]],
+  ["Marmalade sitting", "cats/marmalade-1", 8, ["...ba...","..ggg...","..aca...","..gcaa..","..gcaa..","..gagg..","..gaaa..","..gaaa.."], [146, 238, 2, 0, 144, 228]],
+  ["Marmalade as a kitten, curled up asleep", "cats/marmalade-kitten-3", 8, ["........","...ggg..",".gggggg.",".bbagggg","ggbbaagg","gggaaggg",".ggagb..","........"], [166, 127, 0, 0, 166, 122]],
+  ["Peanut asleep in her bed", "cats/peanut-7", 8, ["........","..fccf..",".fkkkec.","fkkkkkkf","fkkkkkkf","eekkkff.",".erfff..","........"], [200, 140, 4, 2, 189, 134]],
+  ["the toy fish", "toys/fish", 8, ["........",".tttt...",".ttttttt","tktttttt","tttttttt","tttdtt..",".tttt...","........"], [256, 256, 12, 35, 232, 185]],
+  ["the toy mouse", "toys/mouse", 8, ["........",".reddd..",".rddrrd.",".ddoord.",".roouuo.","..dooo..","........","........"], [256, 256, 12, 34, 233, 188]],
+  ["a ginger cat curled up asleep", "cats/c14-36", 10, ["..........","..gyggaa..",".gyyggyag.",".yaaayaag.","yyyaaaacgy","gyyyyaaayg",".gyyyygggy",".gyyayygg.","..gygygyy.",".....g...."], [420, 383, 2, 1, 417, 381]],
+  ["Gus sitting", "cats/gus-3", 10, ["...e.d....","...ddd....","...dee....","...dde....","..udde....","..dddd....","..udde....","..uddd....","..uddd....","...duuud.."], [141, 194, 9, 3, 126, 187]],
+  ["Gus asleep", "cats/gus-5", 10, ["..........","...ud.....",".ddddddu..","dddeedddu.","dddefdddd.",".deeddeedu","...eeddddu",".....uuud.",".......u..",".........."], [193, 146, 6, 3, 185, 134]],
+  ["Gus knocking a cup over", "cats/gus-7", 10, ["..........","..........","..ddd.....",".ddddddd..","dddddddd..","d.d.dddd..","udd..d..d.","........dt","..........",".........."], [291, 177, 13, 5, 275, 170]],
+  ["Peanut as a kitten", "cats/kitten-3", 10, ["..........","....kk....","....kkko..","....kku...","...kkk....","...kkk....","...kkkk...","...kkkk...","...kkkk...","...kkk...."], [161, 274, 3, 0, 158, 274]],
+  ["Peanut as a kitten, batting yarn", "cats/kitten-5", 10, ["..kk......",".k........",".kk.......",".kkkk.....",".kkkkkk...",".kkkkkk...",".kfkkkk...","...fkkkkv.","....fkknv.","......knn."], [247, 275, 8, 0, 239, 275]],
+  ["Gus asleep on Peanut, as kittens", "cats/kitten-7", 10, ["..........","....e.....","..uuddd...",".eddddddd.",".kkdkkedd.","kkkkkuedeu","kkkkkkkudu","fkkkkkkddu",".kkkkkkku.",".........."], [277, 229, 3, 0, 273, 229]],
+  ["Marmalade sitting", "cats/marmalade-1", 10, ["...a.a....","...ggg....","...ggaa...","..aacaa...","..gacaa...","..aacag...","..ggaaga..","..ggagaa..","..aaaaag..","...gaaa..."], [146, 238, 2, 0, 144, 228]],
+  ["Marmalade lying down", "cats/marmalade-4", 10, ["..........","..........",".aba.g....",".ggagggg..","aaaagaggg.","aaaaaaaagg","caacaaaagg",".....aagg.","..........",".........."], [253, 151, 0, 0, 252, 149]],
+  ["Marmalade as a kitten", "cats/marmalade-kitten-1", 10, [".....gga..","...aabga..","...ggaag..","...gaaca..","...ggcaa..","..ggaaaaa.","..ggaaca..",".gggacaa..",".gggaaaa..","..ggacaa.."], [117, 154, 1, 0, 115, 154]],
+  ["Marmalade as a kitten, with his yarn", "cats/marmalade-kitten-2", 10, ["..........","......g...",".g..ggggg.",".bgbgggya.",".gbgggaaa.",".gggaaea..",".gagaanwn.",".aacgannn.","..........",".........."], [192, 148, 0, 0, 192, 147]],
+  ["Peanut asleep in her bed", "cats/peanut-7", 10, ["..........","..........","..fkkkeff.",".fkkkkkkkf","fkkkkkkkkf","fkkkkkkkkf","eekkkkkcff",".erffffff.","....r.....",".........."], [200, 140, 4, 2, 189, 134]],
+  ["Peanut pouncing", "cats/peanut-9", 10, [".........k",".........k","....kkkkkk","...kkkkk..","...kkkkk..",".kkkkk.k..",".kkkk.....",".kkkk.....",".k.k......",".........."], [214, 211, 1, 2, 209, 206]],
+  ["Willow curled up asleep", "cats/willow-5", 10, ["..........","..........","...cc.....",".aaccccu..",".acccccu..","eecccaaku.","ouccooukc.",".kkku.....","..........",".........."], [232, 126, 1, 0, 228, 122]],
+  ["the toy fish", "toys/fish", 10, ["..........","..tttt....",".tttttt.tt","tttttttttt","ttktttttt.","tttttdtttt","tttttttt.t",".tttdtt...","..tttt....",".........."], [256, 256, 12, 35, 232, 185]],
+  ["the ribbon ball", "toys/ribbon-tail", 10, ["..ggd.....",".rllld....","pllqyyb...","lqqyybo...",".yygbbop..",".ygbbohbp.","..gboohyg.",".....olyg.","....ohhy..",".....l...."], [256, 256, 17, 12, 220, 232]],
+  ["Gus sitting", "cats/gus-3", 12, ["....e.d.....","....ddd.....","....dde.....","....dee.....","...udde.....","..udded.....","..uddde.....","..uddde.....","..uuddd.....","..uuddd.....","...udue.f...","....uuudud.."], [141, 194, 9, 3, 126, 187]],
+  ["Gus asleep", "cats/gus-5", 12, ["............","............","..eddddo....",".deeeddduu..","dddfeeddddu.","ddddffddddu.",".ddeedddrfdu","...eeeeddddu",".....uuuuudu","......uuduu.","............","............"], [193, 146, 6, 3, 185, 134]],
+  ["Gus knocking a cup over", "cats/gus-7", 12, ["............","............","...uo.......","..ddddd.....",".dddddddud..","ddddddddd...","d.dd.dede...","udd...d.dud.",".......d..tt","............","............","............"], [291, 177, 13, 5, 275, 170]],
+  ["Gus pouncing", "cats/gus-8", 12, [".........du.","........du..",".d.....uu...",".eduuddd....",".ddudddd....",".dddddddd...",".ddddddddd..",".deddddeed..",".ddfded..de.",".effdd......","defed.......","df.e........"], [187, 179, 3, 2, 180, 173]],
+  ["Gus and Peanut as kittens", "cats/kitten-1", 12, ["............","....ee.u....",".ddudd.uk.u.","..ddddkkkku.","..dece.kku..","..udeddkkk..",".dudfekkku..",".uuefekkkk..",".dddedkkkk..",".uddeekkkk..",".uuddddkkkk.","..kked......"], [243, 272, 6, 0, 237, 272]],
+  ["Peanut as a kitten, batting yarn", "cats/kitten-5", 12, ["...k........","..k.........","..k.........","..kkk.......","..kkkk......",".kkkkkkko...",".kkkkkkkk...",".k.kkkkk....",".kffkkkkk...","....fkkfkvv.",".....fkknnv.",".......venn."], [247, 275, 8, 0, 239, 275]],
+  ["Gus asleep on Peanut, as kittens", "cats/kitten-7", 12, ["............",".....r......","....ue......","...uuddddd..","..dddddeddd.",".kkukkkeddd.","kkkkkkuedddu","kkkkkkkeuddu","kkkkkkkkkddu",".kkkkkueedk.","..kkk.fkkk..","............"], [277, 229, 3, 0, 273, 229]],
+  ["Marmalade standing", "cats/marmalade-2", 12, [".a..........","gggy........","aggg........",".aggbbggg...","caaggggbgg..","ccggggggggg.",".cggaaggggg.",".cabaggagggg","..abaaaagggg","..aa...aaaag","..aa...ggaga","..cc...gggg."], [226, 229, 0, 0, 226, 226]],
+  ["Marmalade playing on his back", "cats/marmalade-6", 12, ["............","............","............",".ac.g...aa..","ggaaaaccagg.","aggaccccaaga","ggggaaaaagg.",".ggaagggabg.","..gggboggb..","............","............","............"], [255, 138, 4, 0, 248, 136]],
+  ["Marmalade as a kitten, with his yarn", "cats/marmalade-kitten-2", 12, ["............","............","ag....ggyg..",".ggggggggac.",".gbbgggggy..",".gbbgggaaa..",".ggggaaeaa..",".agggaaenw..","..gaagannnn.","..aacfacnnn.","............","............"], [192, 148, 0, 0, 192, 147]],
+  ["Marmalade as a kitten, after a butterfly", "cats/marmalade-kitten-5", 12, ["...........w","......g...dw","....aagg....","....ggyaa...","...ggggcccc.","...gbgacaa..","..ggbbaca...","..ggggga....","ggbggga.....","gggggaa.....",".gggaeac....","..ggac......"], [163, 163, 0, 0, 162, 160]],
+  ["Marmalade as a kitten, in a box", "cats/marmalade-kitten-6", 12, ["............","....aaggga..","..agagagaaa.","..gbgaaaagl.",".gggaaccaal.","ooggacccall.","aaaaaalalll.","aaaaaaaalllc","aaaaaaaallc.","aaaaaaaagg..",".aaaaaalg...","......ll...."], [157, 151, 2, 0, 155, 148]],
+  ["Peanut asleep in her bed", "cats/peanut-7", 12, ["............","............","...ffcccf...",".ffkkkkkefc.",".fkkkkkkkkuf","fekkkkkkkkkf","fkkkkkkkkkff","rfkkkkkkkcff",".effffcccff.",".ferrfffff..","............","............"], [200, 140, 4, 2, 189, 134]],
+  ["Willow out for a stroll", "cats/willow-2", 12, ["............","............","keu.........","ucc.........",".ccaccaa....",".cacccaaao..","..acccccau..","..ah...ca...","..o.....o.k.","..u.....o.k.","..k....kk...","............"], [265, 213, 2, 0, 262, 209]],
+  ["Willow stretching", "cats/willow-6", 12, ["............","............",".....caa....",".....aac....","....aaccu...","....aaaau...","...aaceo....","..kuccoo....","..duac.k....","uku.........","............","............"], [284, 205, 0, 1, 282, 202]],
+  ["Bugsy and Bowtie in their boxes", "cats/bugsy-bowtie-boxes", 15, ["...............","...............","...............","........o......",".......cccuggl.",".kkkkkhcccuuug.",".kkkkkkcccuuuh.",".kkkkkkuccooou.","kkkkkkkccccuukh","ukkkkkhkuccckkh","dkkkkhhkhheehhh",".hhllhh.hhhhhh.","...............","...............","..............."], [420, 265, 0, 0, 420, 265]],
+  ["a grey tabby sitting", "cats/c14-63", 15, [".....r.........",".....rduudr....",".....dddddr....","....ddededd....","....udkfkeu....","....kdfffd.....","....ddeeedd....","....udfffdd....","...ddddfdddd...","...ududddudu...","....duddddd....",".....udddkdu...","......fffkn....",".........un....","........uu....."], [240, 420, 1, 1, 238, 418]],
+  ["Gus sitting", "cats/gus-3", 15, [".....e..e......",".....eddd......",".....dddd......",".....dede......","....udde.......","....udde.......","...udddde......","...udddde......","...dddde.......","..uudddde......","...uuddde......","...uddddd......","...uuddde......","....udueeufu...",".....duuuuud..."], [141, 194, 9, 3, 126, 187]],
+  ["Gus asleep", "cats/gus-5", 15, ["...............","...............","....uudo.......","..ddddddduu....",".ddeeeeddddu...","udddfeeeddddu..","ddddfffededddu.",".ddedffddddeed.",".ddddffdeerfduu","....eeeeddddddu","......fuuuuueud",".......kuufudd.",".........kdu...","...............","..............."], [193, 146, 6, 3, 185, 134]],
+  ["Gus knocking a cup over", "cats/gus-7", 15, ["...............","...............","...............","...uddd........","..udddddu......",".ddddddddddd...","uddddddddddd...","d.ddeddddddd...","u.dd..ddddde...","kded...dd..ddn.",".u......ee..dtt",".............dt","...............","...............","..............."], [291, 177, 13, 5, 275, 170]],
+  ["Gus and Peanut as kittens", "cats/kitten-1", 15, ["......e........",".....er........",".dedudd..u.....","..ddudddukkkko.","..dddedekkkkk..","..uddcfekkkuu..","..udeeed.kkk...","..uudffdkkkk...","..uudffdkkkku..",".uuueefekkkku..",".ddudeddkkkkk..",".dddddedkkkkk..",".uuddedekkkkk..",".ukkdddefkkkk..","...kked........"], [243, 272, 6, 0, 237, 272]],
+  ["Peanut as a kitten, batting yarn", "cats/kitten-5", 15, ["...kkk.........","..kk...........","..kk...........","..kk...........","..kkkk.........","..kkkkk........","..kkkkkkkko....","..kkkkukkkk....","..kkkkkkkkk....",".kk.kkkkkku....","..kffkkkkkk....",".....fkkkkkkv..","......fkkknnvv.",".......fkkknnn.","..........fnn.."], [247, 275, 8, 0, 239, 275]],
+  ["Marmalade standing", "cats/marmalade-2", 15, ["..a............",".gag...........","ggggy..........","aaggyg.........",".caggbbgggg....","ccaagbgggbggg..","ccagggggggggg..",".cagggaagggggg.",".cagbagagggggg.","..agbagagagggg.","..aabaaaaaggggg","...aa..aaagaagg","...aa....agaaag","..cac....gggggg","...c.....gggg.."], [226, 229, 0, 0, 226, 226]],
+  ["Marmalade playing on his back", "cats/marmalade-6", 15, ["...............","...............","...............","...............",".aac.ba..agag..",".gaaaaaacagagg.","gggaaccccccagg.","ggggaaacccaagga","aggggaagagaggg.",".gbggaggggabgg.","..bgggbobggbg..",".....b.........","...............","...............","..............."], [255, 138, 4, 0, 248, 136]],
+  ["Marmalade as a kitten, with his yarn", "cats/marmalade-kitten-2", 15, ["...............","...............","ag......ggya...",".gg....ggbgyg..",".ggggggggggya..",".gbbbgggyggay..","..gbgggggaaag..",".aggggaaacaaa..",".aggggaaaeea...","..ggggyacenwn..","..ggaagaannnn..","..aaacfgacnnn..",".......nfnnnf..","...............","..............."], [192, 148, 0, 0, 192, 147]],
+  ["Marmalade as a kitten, after a butterfly", "cats/marmalade-kitten-5", 15, ["..............w",".............qq","......aggc.....",".....ggaga.....","....aggyaga....","....ggggacccc..","....gbggacaaa..","...ggbbgacag...","..gbgbggaaa....","..gbgbggga.....","aabggggaa......","gggggggac......",".ggggaaaacc....",".fgggacga......","...ggcc........"], [163, 163, 0, 0, 162, 160]],
+  ["Peanut asleep in her bed", "cats/peanut-7", 15, ["...............","...............","......ccc......","...ffkkkffff...","..fkkkkkkkeecc.",".fekkkkkkkkkko.","ffkkkkkkkkkkkff","fekkkkkkkkkkkff","ffkkkkkkkkkkkff","rfkkkkkkkkkcff.",".eefffkfccccff.",".feerfffffffef.","...eerrrrrr....","...............","..............."], [200, 140, 4, 2, 189, 134]],
+  ["Willow sitting", "cats/willow-1", 15, ["........k......",".....ocko......",".....kkc.......",".....eku.......",".....cac.......",".....cfc.......",".....ccc.......","....accca......","....acccc......","....aaeaa......","....coeocc.....","....cueuc......","....ekkka......","....kkkkkuk....","..............."], [125, 228, 0, 0, 122, 228]],
+  ["Willow out for a stroll", "cats/willow-2", 15, ["...............","...............",".du............","uec............",".fcc...........","..ccacccaa.....","..cacccaaaag...","..cacccaacaa...","..caccacccauu..","...ah...dca.u..","...o.....do.k..","...u......ou.k.","..ku.....kk..k.","...............","..............."], [265, 213, 2, 0, 262, 209]],
+  ["Willow stretching", "cats/willow-6", 15, ["...............","...............",".......aa......","......caac.....","......aacco....",".....aaaccu....",".....aaaccu....","....accaae.u...","..ucuccado.k...","...kaccu.o...kk","..ekuackkk.....",".uuuu..........","..u............","...............","..............."], [284, 205, 0, 1, 282, 202]]
+];
+// The threads: the site's colours, and tints (with white) and shades (with ink) of them.
+const THREADS = {
+  k: "#2A2530", d: "#7B787F", e: "#AEACB0", f: "#D4D3D6",   // ink, and three greys: ink 62%, 38% and 20% with white
+  g: "#E16A4A", b: "#BD5538", o: "#7B3F34", u: "#563332",   // coral, brick, and brick shaded 55% and 30% with ink
+  y: "#ECA818", a: "#F5CF80", h: "#9E7422",                 // gold, gold 55% with white, gold 60% with ink
+  l: "#B3B94B", s: "#6AA673", t: "#73A7AE", q: "#B9D3D6",   // lime, sage, pacific blue, and pacific 50% with white
+  p: "#B94588", r: "#DCA2C4", w: "#7885BA", n: "#4E577D",   // plum, plum 50% with white, periwinkle, spring blue
+  v: "#8D78AD", c: "#FBECCC"};                              // lavender, gold 22% with white
+const LEVELS = [null, 8, 10, 12, 15];
+const MAX_LEVEL = LEVELS.length - 1;
+// A level's patterns: [index into PATTERNS, mirrored].
+function levelPatterns(n) {
+  const out = [];
+  PATTERNS.forEach((p, k) => { if (p[2] === LEVELS[n]) out.push([k, 0], [k, 1]); });
+  return out;
+}
+// The pattern as a list of thread letters ("" for bare cloth), mirrored if asked.
+function patternCells(k, flip) {
+  const [, , N, rows] = PATTERNS[k], out = [];
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const ch = rows[y][flip ? N - 1 - x : x]; out.push(ch === "." ? "" : ch); }
+  return out;
+}
+const picSrc = f => (window.CAT_SRC || {})[f] || `../${f}.webp`;
+// Where the picture goes behind a sampler of side S, mirrored if asked: {left, top, width, height}.
+function picBox(k, flip, S) {
+  const [w, h, bx, by, bw, bh] = PATTERNS[k][4], sc = S / Math.max(bw, bh);
+  const left = (S - bw * sc) / 2 - (flip ? w - bx - bw : bx) * sc, top = (S - bh * sc) / 2 - by * sc;
+  return {left, top, width: w * sc, height: h * sc};
+}
+// The counts of a line of 0s and 1s: the lengths of its runs of stitches, in order.
+function runsOf(line) { const r = []; let n = 0; for (const v of line) { if (v) n++; else if (n) { r.push(n); n = 0; } } if (n) r.push(n); return r; }
+
+/* ---------- the line solver (for hints) ---------- */
+// One row or column: cells are -1 (not known), 1 (a stitch) or 0 (bare). Every way the counts can be laid along
+// the line that keeps what's known is looked at; a square every way stitches, or every way leaves bare, is settled.
+// Returns the line with those filled in, or null if the counts can't fit at all.
+function lineSolve(clue, cells) {
+  const L = cells.length, k = clue.length, f = [];
+  for (let i = 0; i <= L + 1; i++) f.push(new Uint8Array(k + 1));
+  f[L][k] = f[L + 1][k] = 1;
+  const fits = (i, n) => { if (i + n > L) return false; for (let q = i; q < i + n; q++) if (cells[q] === 0) return false; return true; };
+  // f[i][j]: runs j onward can still be laid from square i
+  for (let i = L - 1; i >= 0; i--) for (let j = k; j >= 0; j--) {
+    let ok = cells[i] !== 1 && f[i + 1][j];
+    if (!ok && j < k && fits(i, clue[j])) { const n = clue[j]; ok = i + n === L ? j + 1 === k : cells[i + n] !== 1 && f[i + n + 1][j + 1]; }
+    f[i][j] = ok ? 1 : 0;
+  }
+  if (!f[0][0]) return null;
+  const canOn = new Uint8Array(L), canOff = new Uint8Array(L), seen = [], todo = [[0, 0]];
+  for (let i = 0; i <= L + 1; i++) seen.push(new Uint8Array(k + 1));
+  seen[0][0] = 1;
+  const go = (i, j) => { if (!seen[i][j]) { seen[i][j] = 1; todo.push([i, j]); } };
+  while (todo.length) {
+    const [i, j] = todo.pop();
+    if (i >= L) continue;
+    if (cells[i] !== 1 && f[i + 1][j]) { canOff[i] = 1; go(i + 1, j); }
+    if (j < k && fits(i, clue[j])) {
+      const n = clue[j];
+      if (i + n === L) { if (j + 1 === k) for (let q = i; q < L; q++) canOn[q] = 1; }
+      else if (cells[i + n] !== 1 && f[i + n + 1][j + 1]) { for (let q = i; q < i + n; q++) canOn[q] = 1; canOff[i + n] = 1; go(i + n + 1, j + 1); }
+    }
+  }
+  const out = cells.slice();
+  for (let i = 0; i < L; i++) {
+    if (canOn[i] && !canOff[i]) out[i] = 1; else if (canOff[i] && !canOn[i]) out[i] = 0; else if (!canOn[i] && !canOff[i]) return null;
+  }
+  return out;
+}
+
+/* ---------- the game ---------- */
+// game: {level, k (the pattern), flip, N, grid (0 bare, 1 a stitch, 2 a dot), history, won, hinted, undid…}
+const STORE = "catdoku.crossstitch.v1";
+const SITTERS = "c14-63 c18-6 c18-7 c18-17 c18-19 c18-21 c18-26 c18-27 c18-32 c18-40 c19-1 c19-5 c19-6 c19-14 c19-16 c19-17 c19-28 c19-32 c19-37 c19-40 c20-1 c20-17 c20-18 c20-30".split(" ");
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1, seen: {}}, state.settings);
+let game = state.game || null, dotting = false, running = false, cursor = -1;
+let plan = null, cellEls = [];   // what doesn't change while playing: the pattern's letters, the answer and the counts
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !running && !$("overlay").classList.contains("show");
+const levelName = n => `Level ${n} · ${LEVELS[n]} × ${LEVELS[n]}`;
+const said = t => t[0].toUpperCase() + t.slice(1);   // "the toy fish" at the start of a line
+
+function makePlan() {
+  const N = game.N, cells = patternCells(game.k, game.flip), sol = cells.map(c => c ? 1 : 0);
+  const rows = [...Array(N)].map((_, y) => runsOf(sol.slice(y * N, y * N + N)));
+  const cols = [...Array(N)].map((_, x) => runsOf([...Array(N)].map((_, y) => sol[y * N + x])));
+  plan = {cells, sol, rows, cols, name: PATTERNS[game.k][0], pic: PATTERNS[game.k][1]};
+}
+const lineCells = (isRow, a) => [...Array(game.N)].map((_, q) => isRow ? a * game.N + q : q * game.N + a);
+const lineDone = (isRow, a) => { const l = lineCells(isRow, a).map(i => game.grid[i] === 1 ? 1 : 0), want = (isRow ? plan.rows : plan.cols)[a], got = runsOf(l);
+  return got.length === want.length && got.every((v, q) => v === want[q]); };
+
+/* ---------- the board ---------- */
+function buildBoard() {
+  const N = game.N, b = $("board"), s = $("sampler");
+  s.style.setProperty("--n", N);
+  let html = "";
+  for (let i = 0; i < N * N; i++) {
+    const x = i % N, y = Math.floor(i / N);
+    const cls = ["cell", x % 5 === 4 && x < N - 1 ? "x5" : "", y % 5 === 4 && y < N - 1 ? "y5" : "", x === N - 1 ? "xe" : "", y === N - 1 ? "ye" : ""].filter(Boolean).join(" ");
+    html += `<div class="${cls}" data-i="${i}" role="gridcell"></div>`;
+  }
+  b.innerHTML = `<img class="real" id="real" alt="" src="${picSrc(plan.pic)}"${game.flip ? ' style="transform:scaleX(-1)"' : ""}>` + html;
+  cellEls = [...b.querySelectorAll(".cell")];
+  const nums = list => (list.length ? list : [0]).map(v => `<span>${v}</span>`).join("");
+  $("colClues").innerHTML = plan.cols.map(c => `<div>${nums(c)}</div>`).join("");
+  $("rowClues").innerHTML = plan.rows.map(r => `<div>${nums(r)}</div>`).join("");
+  $("corner").innerHTML = NEEDLE;
+  layout();
+}
+// A needle and thread in the corner by the counts.
+const NEEDLE = `<svg viewBox="0 0 64 64"><path d="M14 52 L50 12" stroke="#5E5866" stroke-width="3.2" stroke-linecap="round"/><ellipse cx="46.5" cy="16" rx="2" ry="4.6" transform="rotate(42 46.5 16)" fill="none" stroke="#fff" stroke-width="1.6"/>
+  <path d="M46 16 C58 22 56 40 40 44 C26 48 22 58 30 62" fill="none" stroke="#B94588" stroke-width="2.6" stroke-linecap="round"/></svg>`;
+// Squares as big as fit: the counts take a band down the left and along the top, as wide as the longest list needs,
+// and the hoop round the cloth a little more.
+function layout() {
+  const N = game.N, s = $("sampler");
+  const W = s.clientWidth, H = G.sideways() ? Math.min(innerHeight - 12, W) : W;
+  const room = Math.min(W, H) - 8, pad = Math.max(6, Math.round(room * .022)), hw = Math.max(6, Math.round(room * .02)), screw = Math.round(hw * 1.2);
+  const longRow = Math.max(...plan.rows.map(r => r.reduce((t, v) => t + String(v).length * .56, 0) + (r.length - 1) * .42 + .3));
+  const longCol = Math.max(...plan.cols.map(c => c.length * 1.18 + .2));
+  let cell = 20, fs = 12;
+  for (let t = 0; t < 3; t++) {   // the text can't go below 11 pixels, so the band may need more of the room
+    const band = Math.max(longRow, longCol) * fs + 8;
+    cell = Math.floor((room - band - 2 * (pad + hw) - screw) / N);
+    fs = Math.max(11, Math.min(22, cell * .6));
+  }
+  const band = Math.ceil(Math.max(longRow, longCol) * fs + 8);
+  for (const [k, v] of [["--cell", cell], ["--fs", fs], ["--band", band], ["--pad", pad], ["--hw", hw], ["--hr", Math.round(pad * 3.2 + hw)]]) s.style.setProperty(k, v + "px");
+  const box = picBox(game.k, game.flip, cell * N), im = $("real");
+  if (im) Object.assign(im.style, {left: box.left + "px", top: box.top + "px", width: box.width + "px", height: box.height + "px"});
+}
+
+const hints = G.hinter({game: () => game, key: () => game ? game.grid.join("") : "", draw: () => draw()});   // marks {cells, bad, line: "r3" or "c3"}
+function draw() {
+  const N = game.N, g = game.grid, kids = cellEls, m = hints.current(), marked = new Set(m ? m.cells : []);
+  const won = game.won, cx = cursor >= 0 ? cursor % N : -1, cy = cursor >= 0 ? Math.floor(cursor / N) : -1;
+  for (let i = 0; i < N * N; i++) {
+    const c = kids[i], x = i % N, y = Math.floor(i / N);
+    c.classList.toggle("st", g[i] === 1); c.classList.toggle("dot", g[i] === 2 && !won);
+    c.classList.toggle("hintcell", marked.has(i)); c.classList.toggle("bad", marked.has(i) && !!m.bad);
+    c.classList.toggle("kbcursor", i === cursor);
+    c.style.setProperty("--th", won && plan.cells[i] ? THREADS[plan.cells[i]] : "");
+    c.setAttribute("aria-label", `Row ${y + 1}, column ${x + 1}: ${g[i] === 1 ? "stitched" : g[i] === 2 ? "dot, stays bare" : "bare"}`);
+  }
+  [...$("rowClues").children].forEach((d, y) => { d.classList.toggle("done", lineDone(true, y)); d.classList.toggle("cur", y === cy); d.classList.toggle("hint", !!m && m.line === "r" + y); });
+  [...$("colClues").children].forEach((d, x) => { d.classList.toggle("done", lineDone(false, x)); d.classList.toggle("cur", x === cx); d.classList.toggle("hint", !!m && m.line === "c" + x); });
+  $("sampler").classList.toggle("won", won);
+  // VoiceOver: each row's and column's counts go with its squares
+  for (let y = 0; y < N; y++) kids[y * N].setAttribute("aria-label", kids[y * N].getAttribute("aria-label") + `. Row ${y + 1} counts ${plan.rows[y].join(" ") || "0"}`);
+  for (let x = 0; x < N; x++) kids[x].setAttribute("aria-label", kids[x].getAttribute("aria-label") + `. Column ${x + 1} counts ${plan.cols[x].join(" ") || "0"}`);
+  const done = g.filter(v => v === 1).length, total = plan.sol.filter(Boolean).length;
+  $("count").textContent = won ? `Finished: ${plan.name}!` : `🧵 ${done} of ${total} stitches`;
+  $("dotBtn").setAttribute("aria-pressed", String(dotting));
+  $("hintBtn").disabled = won; $("dotBtn").disabled = won;
+  $("undoBtn").disabled = !game.history.length || won; $("restartBtn").disabled = !g.some(Boolean) || won;
+}
+
+/* ---------- playing ---------- */
+// A tap stitches a square (or takes its stitch out); with Dot on, it puts a dot in (or takes it out) instead.
+// Dragging along a row or column carries the same change to every square passed that was like the first.
+const goal = from => dotting ? (from === 2 ? 0 : 2) : (from === 1 ? 0 : 1);
+const snapshot = () => { game.history.push(game.grid.join("")); if (game.history.length > 400) game.history.shift(); };
+let stroke = null;
+const board = $("board");
+board.addEventListener("pointerdown", e => {
+  if (!playing()) return;
+  const i = G.cellAt(e.clientX, e.clientY); if (i < 0) return;
+  e.preventDefault();
+  try { board.setPointerCapture(e.pointerId); } catch (_) {}
+  game.started = true;
+  stroke = {start: i, from: game.grid[i], to: goal(game.grid[i]), before: game.grid.slice(), axis: null};
+  snapshot(); game.grid[i] = stroke.to; draw();
+});
+board.addEventListener("pointermove", e => {
+  if (!stroke) return;
+  const N = game.N, i = G.cellAt(e.clientX, e.clientY); if (i < 0) return;
+  const sx = stroke.start % N, sy = Math.floor(stroke.start / N), x = i % N, y = Math.floor(i / N);
+  if (!stroke.axis) { if (x === sx && y === sy) return; stroke.axis = Math.abs(x - sx) >= Math.abs(y - sy) ? "row" : "col"; }
+  const from = stroke.axis === "row" ? sx : sy, to = stroke.axis === "row" ? x : y;
+  game.grid = stroke.before.slice();
+  for (let q = Math.min(from, to); q <= Math.max(from, to); q++) {
+    const j = stroke.axis === "row" ? sy * N + q : q * N + sx;
+    if (stroke.before[j] === stroke.from) game.grid[j] = stroke.to;
+  }
+  draw();
+});
+function endStroke() {
+  if (!stroke) return;
+  stroke = null;
+  if (game.history[game.history.length - 1] === game.grid.join("")) game.history.pop();
+  afterMove();
+}
+board.addEventListener("pointerup", endStroke);
+board.addEventListener("pointercancel", endStroke);
+function afterMove() {
+  if (plan.sol.every((v, i) => v ? game.grid[i] === 1 : game.grid[i] !== 1)) { win(); return; }
+  draw(); save();
+}
+function setCell(i, v) { if (game.grid[i] === v) return; game.started = true; snapshot(); game.grid[i] = v; afterMove(); }
+// Keys: the arrows move a cursor; Space or Enter stitches, X or . puts a dot, Backspace clears. Shift with an arrow
+// carries the square's stitch, dot or bare cloth on to the next.
+const keys = G.gridKeys({on: playing, size: () => [game.N, game.N], keys: ["x", ".", "backspace", "delete"],
+  show: i => { cursor = i; draw(); },
+  move: (i, dx, dy, e) => {
+    const N = game.N, x = Math.max(0, Math.min(N - 1, i % N + dx)), y = Math.max(0, Math.min(N - 1, Math.floor(i / N) + dy)), j = y * N + x;
+    if (e && e.shiftKey && j !== i) setCell(j, game.grid[i]);
+    return j;
+  },
+  act: (i, key) => {
+    if (key === " ") setCell(i, game.grid[i] === 1 ? 0 : 1);
+    else if (key === "x" || key === ".") setCell(i, game.grid[i] === 2 ? 0 : 2);
+    else setCell(i, 0);
+  },
+  escape: () => { cursor = -1; draw(); }});
+function undo() { if (playing() && game.history.length) { game.undid = true; game.grid = game.history.pop().split("").map(Number); draw(); save(); } }
+$("undoBtn").onclick = undo;
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); } });
+$("restartBtn").onclick = () => {
+  if (!playing() || !game.grid.some(Boolean)) return;
+  game.undid = true; snapshot(); game.grid = game.grid.map(() => 0); draw(); save();
+  G.note("Every stitch is out. Undo puts them back.", 3500);
+};
+$("dotBtn").onclick = () => { if (!game || game.won) return; dotting = !dotting; draw(); G.note(dotting ? "Dot is on: a tap marks a square that stays bare" : "", dotting ? 3500 : 0); };
+
+/* ---------- hints ---------- */
+// A hint shows; it never stitches. First a mistake if there is one (a stitch where the picture has bare cloth, or a
+// dot on a square the picture stitches). Otherwise a row or column whose counts settle squares not yet done, going by
+// your stitches and dots: the first time, the line and its counts glow gold; asked again, the squares it settles.
+// Lines that settle a stitch come before ones that only settle bare squares. Any hint keeps you on this level and
+// costs the gold paw.
+function nextStep() {
+  const N = game.N, g = game.grid, known = g.map(v => v === 1 ? 1 : v === 2 ? 0 : -1);
+  let best = null;
+  for (const isRow of [true, false]) for (let a = 0; a < N; a++) {
+    const cells = lineCells(isRow, a), cur = cells.map(i => known[i]), got = lineSolve((isRow ? plan.rows : plan.cols)[a], cur);
+    if (!got) continue;
+    const on = cells.filter((i, q) => cur[q] < 0 && got[q] === 1), off = cells.filter((i, q) => cur[q] < 0 && got[q] === 0 && g[i] !== 2);
+    const score = on.length ? 1000 + on.length : off.length;
+    if (score && (!best || score > best.score)) best = {isRow, a, cells, on, off, score};
+  }
+  return best;
+}
+function hint() {
+  if (!playing()) return;
+  const g = game.grid, sol = plan.sol;
+  const wrong = g.map((v, i) => (v === 1 && !sol[i]) || (v === 2 && sol[i]) ? i : -1).filter(i => i >= 0);
+  if (wrong.length) {
+    game.hinted = true; game.started = true; save();
+    const i = wrong[0];
+    hints.show({cells: [i], bad: true}, (g[i] === 1 ? "That stitch shouldn't be there" : "That square needs a stitch, not a dot") + G.andMore(wrong.length - 1) + ".");
+    return;
+  }
+  const s = nextStep();
+  if (!s) { G.note("Couldn't find a hint here. Try Undo.", 4000); return; }
+  game.hinted = true; game.started = true; save();
+  const line = s.isRow ? `Row ${s.a + 1}` : `Column ${s.a + 1}`, counts = (s.isRow ? plan.rows : plan.cols)[s.a].join(" ") || "0";
+  if (!hints.level()) hints.show({cells: s.cells, line: (s.isRow ? "r" : "c") + s.a},
+    `${line}'s counts (${counts}) settle ${s.on.length ? "a stitch" : "a bare square"} in the gold ${s.isRow ? "row" : "column"}.`);
+  else if (s.on.length) hints.show({cells: s.on, line: (s.isRow ? "r" : "c") + s.a}, `Stitch the gold square${s.on.length > 1 ? "s" : ""}: ${line.toLowerCase()}'s counts only fit that way.`);
+  else hints.show({cells: s.off, line: (s.isRow ? "r" : "c") + s.a}, `The gold square${s.off.length > 1 ? "s stay" : " stays"} bare. Dot ${s.off.length > 1 ? "them" : "it"} to keep track.`);
+}
+$("hintBtn").onclick = hint;
+
+/* ---------- endings ---------- */
+// The last stitch: the chart's grid and the dots go, each stitch takes its colour, then the card.
+function win() {
+  game.won = true; G.finishClock(game); cursor = -1; dotting = false; keys.hide();
+  const done = settings.seen[game.level] || [];
+  if (!done.includes(key(game))) done.push(key(game));
+  settings.seen[game.level] = done;
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save();
+  draw();
+  G.track(`Cross Stitch solved level ${game.level}`);
+  const g = game, still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  running = true;
+  setTimeout(() => { running = false; if (game === g) finishCard(); }, still ? 1800 : 3400);
+}
+// The finished sampler, for the win card: the stitches in their colours over the picture they came from.
+function samplerPic() {
+  const N = game.N, im = picBox(game.k, 0, N);   // laid as drawn, and mirrored with the stitches' grid if the pattern is
+  let x = "";
+  plan.cells.forEach((t, i) => { if (!t) return; const cx = i % N, cy = Math.floor(i / N);
+    x += `<path d="M${cx + .14} ${cy + .14}L${cx + .86} ${cy + .86}M${cx + .86} ${cy + .14}L${cx + .14} ${cy + .86}" stroke="${THREADS[t]}"/>`; });
+  const flip = game.flip ? ` transform="translate(${N} 0) scale(-1 1)"` : "";
+  const d = document.createElement("div");
+  d.innerHTML = `<svg class="winSampler" viewBox="-.6 -.6 ${N + 1.2} ${N + 1.2}" role="img" aria-label="Your finished sampler: ${plan.name}">
+    <rect x="-.45" y="-.45" width="${N + .9}" height="${N + .9}" rx="${N * .09}" fill="#FDF7EA" stroke="#D78326" stroke-width=".3"/>
+    <g${flip}><image href="${picSrc(plan.pic)}" x="${im.left}" y="${im.top}" width="${im.width}" height="${im.height}" opacity=".5"/></g>
+    <g stroke-width=".2" stroke-linecap="round">${x}</g></svg>`;
+  const p = document.createElement("p"); p.className = "catname"; p.textContent = said(plan.name);
+  return [d.firstElementChild, p];
+}
+function finishCard() {
+  const next = settings.level, N = game.N;
+  let text = `You've stitched ${plan.name} on the ${N} × ${N} sampler.`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the biggest; here's another." : ` Next up: level ${next}.`;
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my sampler", game.result,
+    {title: "Finished!", gold: !game.undid && !game.hinted, goldWhy: "No undos or hints!", pic: samplerPic(),
+     next: next > game.level ? `Next: level ${next}` : "Next sampler", after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- new samplers ---------- */
+// A new sampler is a pattern from the level you haven't finished yet, picked at random; once you've done them all,
+// they all come round again.
+const key = g => `${g.k}${g.flip ? "m" : ""}`;
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
+function begin(level, k, flip) {
+  const N = PATTERNS[k][2];
+  game = {level, k, flip: flip ? 1 : 0, N, grid: new Array(N * N).fill(0), history: [], won: false, ...G.freshClock()};
+  cursor = -1; dotting = false; makePlan(); buildBoard();
+}
+function newPuzzle() {
+  const n = settings.level, all = levelPatterns(n), done = settings.seen[n] || [];
+  let left = all.filter(([k, f]) => !done.includes(`${k}${f ? "m" : ""}`) && !(game && game.level === n && game.k === k && game.flip === f));
+  if (!left.length) { settings.seen[n] = []; left = all.filter(([k, f]) => !(game && game.level === n && game.k === k && game.flip === f)); }
+  const [k, f] = left[Math.floor(Math.random() * left.length)];
+  begin(n, k, f);
+  G.closeCard(); G.note(""); draw(); save();
+  G.track(`Cross Stitch new puzzle level ${n}`);
+}
+
+/* ---------- sharing ---------- */
+$("linkBtn").onclick = () => { if (game) G.shareCard({name: "Cross Stitch", won: game.won,
+  puzzle: () => ({g: "crossstitch", N: game.level, k: game.k, f: game.flip}),
+  progress: () => ({grid: game.grid.join("")})}); };
+// A sampler from a share link: a level, and a pattern of that level's size; its stitches so far if they were sent
+// (that isn't timed).
+function openShared(d) {
+  const ok = Number.isInteger(d.N) && d.N >= 1 && d.N <= MAX_LEVEL && Number.isInteger(d.k) && PATTERNS[d.k] && PATTERNS[d.k][2] === LEVELS[d.N]
+    && (d.f === 0 || d.f === 1);
+  const N = ok && LEVELS[d.N];
+  if (!ok || (d.p && !(typeof d.p.grid === "string" && d.p.grid.length === N * N && /^[012]*$/.test(d.p.grid)))) { G.note("That share link didn't work.", 5000); return; }
+  begin(d.N, d.k, d.f);
+  if (d.p) { game.grid = d.p.grid.split("").map(Number); game.timed = false; }
+  settings.level = d.N; $("levelSel").value = d.N;
+  draw(); save();
+  if (d.p && plan.sol.every((v, i) => v ? game.grid[i] === 1 : game.grid[i] !== 1)) win();
+}
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  settings.seenHelp = false; helpOnFirstVisit();
+  if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
+}
+// First visit: the counts on a row and a column of the sampler that's out, then a stitch of your own (taken out
+// again afterwards).
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || !playing() || document.querySelector(".spot")) return;
+  const N = game.N, xy = i => [i % N, Math.floor(i / N)];
+  // the example row and column: the ones with the most counts (two or more runs if there are any), near the middle
+  const pick = (list, isRow) => [...list.keys()].sort((a, b) => (list[b].length > 1) - (list[a].length > 1) || Math.abs(a - (N - 1) / 2) - Math.abs(b - (N - 1) / 2))[0];
+  const ry = pick(plan.rows, true), cx = pick(plan.cols, false);
+  const row = lineCells(true, ry).map(xy), col = lineCells(false, cx).map(xy);
+  const rowEl = () => $("rowClues").children[ry], colEl = () => $("colClues").children[cx];
+  const counts = plan.rows[ry];
+  // a square to stitch: the middle stitch of the example row's longest run, if it's still bare
+  const runs = []; { let start = -1; for (let q = 0; q <= N; q++) { const on = q < N && plan.sol[ry * N + q]; if (on && start < 0) start = q; if (!on && start >= 0) { runs.push([start, q - start]); start = -1; } } }
+  const long = runs.sort((a, b) => b[1] - a[1])[0], e = long ? ry * N + long[0] + Math.floor(long[1] / 2) : -1;
+  const turn = G.yourTurn(() => game, g => { game = g; }, () => draw());
+  const steps = [
+    {say: counts.length > 1 ? `Runs of ${G.listed(counts.map(String))} stitches, in order` : `A run of ${counts[0] || 0} stitches`, lit: row, els: [rowEl]},
+    {say: "Columns count down", lit: col, els: [colEl]},
+    {say: "A gap between runs", later: true, lit: row, els: [rowEl]},
+    ...(e >= 0 && game.grid[e] !== 1 ? [{say: "Tap to stitch", lit: [xy(e)], try: {done: () => game.grid[e] === 1, yes: "Stitched!"}, ...turn.from, ...turn.upTo}] : []),
+    {say: "Drag along a line to stitch a run", later: true, lit: row},
+    {say: "Finish it to see who it is 🐱", lit: [...Array(N * N).keys()].map(xy), tone: "ok"},
+    {say: "Dot: mark squares that stay bare", els: [$("dotBtn")]},
+    {say: "Stuck? Hint shows a line to look at", els: [$("hintBtn")]},
+  ];
+  { const t = steps.findIndex(st => st.try); if (t > 1) steps.splice(1, 0, ...steps.splice(t, 1)); }
+  G.spotlight({grid: $("board"), w: N, h: N, steps, done: () => { settings.seenHelp = true; save(); }});
+}
+
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", "") + (n === MAX_LEVEL ? " (hardest)" : ""), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
+$("helpBtn").onclick = showHelp;
+addEventListener("resize", () => { if (game && plan) layout(); });
+$("sitter").src = picSrc("cats/" + SITTERS[Math.floor(Math.random() * SITTERS.length)]);
+
+G.nav("crossstitch");
+G.checkClock(game);
+G.setupTimer({name: "crossstitch", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+const shared = G.readShare("crossstitch");
+const hadSave = !!(game && Array.isArray(game.grid));
+if (hadSave) G.reopen(() => {
+    if (!PATTERNS[game.k] || PATTERNS[game.k][2] !== LEVELS[game.level] || game.grid.length !== game.N * game.N || game.N !== LEVELS[game.level]) throw new Error("the saved sampler doesn't fit its level");
+    makePlan(); buildBoard(); draw();
+    if (game.won) finishCard();
+    helpOnFirstVisit();
+  }, why => { game = null; newPuzzle(); G.note(why, 0); });
+else if (!shared) { newPuzzle(); helpOnFirstVisit(); }
+const shareOpts = () => ({name: "Cross Stitch", inProgress: !!(game && !game.won && game.history.length), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, {...shareOpts(), fresh: hadSave ? null : why => { newPuzzle(); G.note(why, 6000); helpOnFirstVisit(); }});
+window.addEventListener("hashchange", () => { const d = G.readShare("crossstitch"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
