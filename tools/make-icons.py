@@ -750,7 +750,7 @@ def fishbones():
     return frame(PAPER, out)
 
 
-# Toy Stash: three shut boxes along the top, two guesses of toys under them, and paw prints beside each guess
+# Mewstermind: three shut boxes along the top, two guesses of toys under them, and paw prints beside each guess
 # (dark for a right toy in the right box, light for a right toy in another box).
 def pawprint(x, y, s, fill):
     toes = "".join(f'<ellipse cx="{x+dx*s}" cy="{y+dy*s}" rx="{s*.2}" ry="{s*.24}" fill="{fill}" stroke="{INK}" stroke-width="1"/>'
