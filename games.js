@@ -480,8 +480,7 @@ const G = (() => {
     if (dl) { const d = document.createElement("p"); d.className = "dailyline"; d.textContent = dl; media.append(d); }
     // the picture on its own, so a phone held sideways can set it beside the rest (games.css)
     const pic = document.createElement("div"); pic.className = "winpic";
-    // o.pic: a picture of the game's own (a finished board) in place of the random cat photo
-    if (o.gold && o.goldPic) pic.append(...o.goldPic); else if (o.pic) pic.append(...o.pic); else pic.append(catPhoto(), name);
+    if (o.gold && o.goldPic) pic.append(...o.goldPic); else pic.append(catPhoto(), name);
     media.append(pic);
     const btns = [[o.next || "New puzzle", onNext, true]];
     if (admire !== null) btns.push([admire, () => { closeCard(); if (o.onAdmire) o.onAdmire(); else note(admireNote(), 0); }]);
