@@ -35,8 +35,9 @@ before finishing one when there's a better way to do the rest, stop and say so w
   Preview and Port, or before Test), suggest a fresh session and give a few lines to paste in: the slug, the
   branch, what's decided and what's left.
 
-Say it in one or two lines and let the user choose; carry on as asked if they'd rather not. Don't suggest the same
-switch twice in one session.
+Say it in one or two lines and let the user choose; carry on as asked if they'd rather not. Suggest a switch again
+whenever the work changes enough to call for it (back to the larger model for a design call, then down again for
+the next mechanical stage), but not again for the same stretch of work after the user has said no.
 
 ## 1. Theme
 
