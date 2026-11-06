@@ -230,7 +230,7 @@ let settings = Object.assign({level: 1}, state.settings);
 let game = state.game || null, list = [], making = 0;
 let chain = [], typed = "", flash = null;   // the magnets picked; letters typed; a word just tried {cells, kind}
 const hints = G.hinter({game: () => game, key: () => game ? game.found.join() : "", draw: () => draw()});   // marks {cells}
-const save = () => G.save(STORE, {settings, game});
+const save = () => G.save(STORE, {settings, game: real ? real.game : game});
 const playing = () => game && !game.won && !$("overlay").classList.contains("show");
 const foundSet = () => new Set(game.found);
 const left = () => { const f = foundSet(); return list.filter(o => !f.has(o.w)); };
@@ -316,7 +316,7 @@ function submit(cells) {
   const o = list.find(o => o.w === w);
   if (o && !game.found.includes(w)) {
     game.found.push(w); save(); showFlash(cells, w, "found", 700);
-    if (game.found.length === list.length) win();
+    if (game.found.length === list.length && !game.demo) win();
     return;
   }
   if (o) { showFlash(cells, w, "miss", 700); G.note(`You've found ${w} already.`, 2500); return; }
@@ -467,23 +467,32 @@ function showHelp() {
   settings.seenHelp = false; helpOnFirstVisit();
   if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
 }
+// The walkthrough plays on a little practice drawer of its own: TAIL runs across, then on a corner, then down, so
+// connecting it shows that neighbours and corners both touch. The real drawer comes back, just as it was, at the end.
+const DEMO = {grid: "TAQZXJIVKBLWFGUY", words: [{w: "TAIL", paths: [[0, 1, 6, 10]]}]};
+let real = null;   // the real game and its words while the practice drawer is out
+function demoOn() {
+  if (real) return;
+  real = {game, list, chain, typed}; chain = []; typed = ""; hints.clear(false);
+  game = Object.assign(deal(1, DEMO.grid), {demo: true}); list = DEMO.words; draw();
+}
+function demoOff() {
+  if (!real) return;
+  ({game, list, chain, typed} = real); real = null; hints.clear(false); draw();
+}
 function helpOnFirstVisit() {
   if (settings.seenHelp || !game || !playing() || document.querySelector(".spot")) return;
-  const {N} = game, xy = i => [i % N, Math.floor(i / N)], all = [...Array(N * N).keys()].map(xy);
-  const o = left()[0], had = game.found.length, min = LEVELS[game.level][1];
-  const turn = G.yourTurn(() => game, g => { game = g; }, draw);
+  const xy = i => [i % 4, Math.floor(i / 4)], all = [...Array(16).keys()].map(xy), min = LEVELS[game.level][1];
   const steps = [
-    {say: "Spell with the fridge magnets", lit: all},
-    ...(o ? [{say: `Connect ${o.w}`, lit: o.paths[0].map(xy), try: {done: () => game.found.length > had, yes: "Found! Tapping works too"}, ...turn.upTo}] : []),
-    // a magnet near the middle, then the ones beside it, then the ones at its corners
-    {say: "Neighbours touch", lit: [[1, 1], [0, 1], [2, 1], [1, 0], [1, 2]]},
-    {say: "Corners touch too", lit: [[1, 1], [0, 0], [2, 0], [0, 2], [2, 2]]},
+    {say: "Spell with the fridge magnets", lit: all, enter: demoOn},
+    {say: "Connect TAIL", lit: DEMO.words[0].paths[0].map(xy), enter: demoOn, try: {done: () => game.found.length > 0, yes: "Found! Tapping works too"}},
     {say: `Find every word of ${min}+ letters`, els: [$("lens")]},
     {say: "Used-up magnets fade", lit: all, later: true},
     {say: "Other words are bonus words", els: [$("bonus")], later: true},
     {say: "Stuck? Hint shows a start", els: [$("hintBtn")]},
   ];
-  G.spotlight({grid: $("mags"), w: N, h: N, steps, done: () => { settings.seenHelp = true; save(); }});
+  demoOn();
+  G.spotlight({grid: $("mags"), w: 4, h: 4, steps, done: () => { demoOff(); settings.seenHelp = true; save(); }});
 }
 
 /* ---------- start ---------- */
