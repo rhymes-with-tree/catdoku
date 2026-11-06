@@ -72,3 +72,17 @@ a boing off a coil spring, a splash when coffee or water spills, a soft thump as
 grumble from a napping cat), and a cheer for a tandem. No game on the site has sound yet, so this needs a shared way to
 play it first: a Sound switch in the settings (off by default, as browsers only play sound after a tap), quiet enough
 for a phone, and sounds that follow the thing's kind (a bell rings, a mug clunks, a feather makes none).
+
+## Fair Play: keys
+
+Every game is meant to be playable from a keyboard, but Fair Play (`tango/`) has only ⌘Z for Undo: no cursor for the
+squares. Give it `G.gridKeys` (arrows move, Space or Enter taps a square as a tap does), then add its line to `KEYS`
+in `games.js` so ? and the walkthrough's last step show it. Found 2026-11-06 while adding the Keys card.
+
+## Best times: which level?
+
+From play-testing (2026-11-06): Anne wanted to know her best times and couldn't tell what levels they were at. Not
+sure where she was looking. The Best times card already names each level, and the win card now says which level its
+"your best" is for ("Your best at Level 4 · 6 × 6 is 1:05"). If that isn't it, ask her: perhaps she wants every
+game's best times in one place on the front page, or the fastest list for every level rather than only the current
+one.

@@ -196,6 +196,7 @@ const G = (() => {
   // Game pages sit one folder below the front page, so links start with ../ unless `base` says otherwise.
   function nav(current, base = "../") {
     CURRENT = current || null; HOME = base || "./";
+    if ($("keysBtn") && CURRENT && KEYS[CURRENT] && keyboardish() && !$("chooseBtn")) $("keysBtn").hidden = false;   // (not beside Keyboard Cat's Choose keys)
     const el = $("games"); el.innerHTML = "";
     const btn = document.createElement("button");
     btn.className = "gamesBtn"; btn.type = "button";
@@ -614,9 +615,11 @@ const G = (() => {
   }
   function timeLine(r) {
     if (!r || r.ms == null) return "";
-    if (r.isBest && r.best !== null) return `Time ${clock(r.ms)}. New personal best! (was ${clock(r.best)})`;
-    if (r.isBest) return `Time ${clock(r.ms)}. Your first time at this ${noun()}.`;
-    return `Time ${clock(r.ms)}. Your best is ${clock(r.best)}.`;
+    // which level (or size) the best is for, by name: "Level 4 · 6 × 6"
+    const at = T && r.n != null ? ` at ${/^[A-Z]/.test(label(r.n)) ? label(r.n) : `${noun()} ${label(r.n)}`}` : "";
+    if (r.isBest && r.best !== null) return `Time ${clock(r.ms)}. New personal best${at}! (was ${clock(r.best)})`;
+    if (r.isBest) return `Time ${clock(r.ms)}. Your first time${at}.`;
+    return `Time ${clock(r.ms)}. Your best${at} is ${clock(r.best)}.`;
   }
   function timeLineEl(r) { const t = timeLine(r); if (!t) return null; const p = document.createElement("p"); p.className = "timeline"; p.textContent = t; return p; }
 
@@ -837,8 +840,82 @@ const G = (() => {
     save(TIPS, d);
   }
 
+
+  /* ---------- keys ---------- */
+  // Each game's keys, for the Keys card: press ? (on a computer, How to play ends by saying so). Undo (⌘Z or Ctrl+Z)
+  // and full screen (F) are added where the page has them.
+  const KEYS = {
+    catdoku: ["Arrow keys: pick a square", "Space or Enter: a paw, then a cat"],
+    yarn: ["Arrow keys: move, and lead the strand along from its end", "Space or Enter: start the strand on a ball, or cut it back"],
+    patches: ["Arrow keys: pick a patch", "1 to 4: pick a fabric and sew it there", "Space or Enter: sew with the fabric picked", "Backspace: unpick the patch"],
+    sunbeams: ["Arrow keys: move; while a sunbeam's started, stretch it", "Space or Enter: start a sunbeam, then let the light in", "Backspace: take away the sunbeam there", "Escape: drop one half made"],
+    toybox: ["Arrow keys: pick a basket", "Space or Enter: send its front toys", "Shift+Space: send the other front toy"],
+    pounce: ["Arrow keys: move", "Space or Enter: pick a toy, then swap it"],
+    twirl: ["Arrow keys: move over the mat", "Space or Enter: tap the ribbon there"],
+    toebeans: ["Arrow keys: move between the numbers and toe beans", "Space or Enter: tap the one picked"],
+    knockitoff: ["Arrow keys or WASD: step"],
+    hideseek: ["Arrow keys: pick a box", "Space or Enter: check it", "M: doodle a cat on it"],
+    pawlette: ["Left and right: pick a pot", "Space: add a drop of it", "D: dye", "Backspace: empty the cup"],
+    tangle: ["Arrow keys: pick a ball", "Space or Enter: pick it up; the arrows move it (Shift for big steps)", "Space, Enter or Escape: put it down"],
+    catwalk: ["Arrow keys: pick a perch", "Space or Enter: tap it"],
+    bubbles: ["Left and right: aim", "Space: bat", "Down: swap in the next bubble"],
+    opendoor: ["Arrow keys: pick a square", "1 to 9: put in a number", "Backspace or 0: take it out", "N: notes on or off", "Escape: let go of the square"],
+    tunnelrun: ["Arrow keys: pick a piece", "Space or Enter: turn it (Shift turns it back)", "Shift with an arrow: slide its track"],
+    copycat: ["Arrow keys: pick a box", "Space or Enter: open it"],
+    nightlight: ["Arrow keys: pick a cat", "Space or Enter: tap it"],
+    unravel: ["Arrow keys: go from peg to peg", "Space or Enter: start there, go on to it, or wind back to it"],
+    tailchase: ["Arrow keys or WASD: steer", "Space: pause"],
+    keyboardcat: ["Letters: type a word", "Enter: try it", "Backspace: take a letter off", "Space: mix the keys"],
+    iffits: ["Tab: pick a piece", "Arrow keys: move it", "R or Space: turn it (Shift turns it back)", "F: flip it"],
+    highperch: ["Arrow keys: pick a square", "1 to 9: put in a height", "Backspace or 0: take it out", "N: notes on or off", "Escape: let go of the square"],
+    fuzzyspelling: ["Left and right: pick a toy", "Up and down: slide it"],
+    catastrophe: ["1 to 9: knock over that pot"],
+    laserpointer: ["Arrow keys: pick a mirror", "Space or Enter: tip it"],
+    treattime: ["Arrow keys: pick a pile", "Space: put it back or take it out", "K or Enter: mark it to stay"],
+    upatree: ["Letters: change the letter picked, or type a whole word", "Enter: climb with the word typed", "Backspace: take a letter off"],
+    toydoku: ["Arrow keys: pick a square", "1 to 9: put in a toy", "Backspace or 0: take it out", "N: notes on or off", "Escape: let go of the square"],
+    pickpile: ["Arrow keys: pick a block that's free", "Space or Enter: take it"],
+    scratchthat: ["Arrow keys: move round the room", "Space or Enter: tap", "P: a post", "X or .: a dot", "Backspace: clear"],
+    magnets: ["Arrow keys: pick a square", "Letters: put one up", "Backspace: take a letter down", "Space: turn to the other word"],
+    purrfect: ["Arrow keys: pick a square", "Digits: type a number (two quickly for 10 and up)", "Backspace: take it out"],
+    atlas: ["Arrow keys: move round the map", "+ and −: zoom", "Type your answer and press Enter"],
+    catburglar: ["Arrow keys: move the crosshair", "Space or Enter: tap there", "+ and −: zoom"],
+    catpile: ["1 to 3: pick a clump", "Arrow keys: move it", "R: turn it", "Space: put it down"],
+    fishbones: ["Arrow keys: go from bone to bone", "Space or Enter: pick one up, then put it down on another", "Escape: let go"],
+    stash: ["1 to 8: put in a toy (Shift: mark it nope)", "Left and right: pick a box", "Backspace: take a toy out", "Enter: check"],
+    knitpick: ["Arrow keys: pick a letter", "Space or Enter: the first letter, then the last"],
+    birdwatch: ["1 to 9: tap that pane (laid out like a keypad)", "Arrow keys and Space: pick a pane and tap it", "P: pause"],
+    shelflife: ["Arrow keys: pick a cubby", "Space: pick a ball, swap, or spin"],
+    meowbile: ["Arrow keys: pick a kind of toy", "1 to 9: weigh it", "Backspace or 0: take the weight away", "Escape: let go"],
+    kittencaboodle: ["Letters: type the word", "Backspace: take a letter off", "Enter, Tab or Down: the next kitten still asleep", "Up or Shift+Tab: back one"],
+    windup: ["Arrow keys: move", "Down, Space or Enter: drop", "P: pause", "S: shake", "L: de-fluff", "N: drop the floor"],
+    lmnopom: ["Left and right: move", "Up or X: turn", "Down: fall faster", "Space or Enter: drop", "P: pause", "S: swat"],
+    windowledges: ["Arrow keys: pick a window", "1 to 9: put in a digit (Shift: a note)", "Backspace or 0: take it out", "N or P: notes on or off", "Escape: let go"],
+    catshuffle: ["Arrow keys: pick a square", "Space: slide the piece there, or turn the knob (Shift turns it back)", "Shift with an arrow: shift its row or column"],
+    mewhue: ["Arrow keys: pick a square", "Shift with an arrow: slide its row or column that way"],
+    pawlinko: ["Left and right: aim (Shift for big steps)", "Down, Space or Enter: knock it off", "Placing a perch: arrows move it, R flips it, Enter puts it there", "Winding a strand: arrows pick one, Enter winds it", "Escape: put a helper away"],
+  };
+  const keyboardish = () => matchMedia("(hover: hover) and (pointer: fine)").matches;
+  function keysCard() {
+    const list = [...(KEYS[CURRENT] || [])];
+    if ($("undoBtn")) list.push("⌘Z or Ctrl+Z: undo");
+    if (document.querySelector(".fsBtn")) list.push("F: full screen");
+    list.push("?: these keys");
+    const ul = document.createElement("ul"); ul.className = "keysList";
+    for (const k of list) { const li = document.createElement("li"), i = k.indexOf(": "); const b = document.createElement("b"); b.textContent = k.slice(0, i); li.append(b, k.slice(i)); ul.append(li); }
+    openCard("Keys", "", [["Close", closeCard, true]], ul);
+  }
+  document.addEventListener("keydown", e => {
+    if (e.key !== "?" || e.ctrlKey || e.metaKey || e.altKey || !CURRENT || !KEYS[CURRENT] || document.querySelector(".spot") || $("overlay").classList.contains("show")) return;
+    if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) || e.target.isContentEditable) return;
+    e.preventDefault(); keysCard();
+  });
+
   function spotlight(o) {
     const tip = o.finish === false;
+    // on a computer, the whole walkthrough ends by pointing to the keys
+    if (!tip && CURRENT && KEYS[CURRENT] && keyboardish() && !o.steps.some(st => st.keysStep))
+      o = {...o, steps: [...o.steps, {say: "On a keyboard? Press ? for the keys", keysStep: true, els: [o.grid]}]};
     if (!tip) {   // switches are taught when they're turned on, never in the walkthrough
       const sw = o.steps.filter(isSwitchStep);
       if (sw.length && sw.length < o.steps.length) { o = {...o, steps: o.steps.filter(st => !isSwitchStep(st))}; keepSwitchTips(sw); }
@@ -1214,6 +1291,16 @@ const G = (() => {
     if (!r) { r = document.createElement("div"); r.id = "readOut"; r.setAttribute("aria-live", "polite"); r.style.cssText = "position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap"; document.body.append(r); }
     r.textContent = ""; setTimeout(() => { r.textContent = text; }, 50);
   }
+  // A hint's words go just above the play tools, under the board, beside the Hint button that asked for them (the
+  // line toolify makes); a page without one says them in the note line as before. `was`: clear only these words.
+  let hintTimer = 0;
+  function hintSay(text, ms, was) {
+    const line = $("hintLine");
+    if (!line) { if (was === undefined || ($("msg") && $("msg").textContent === was)) note(text, ms); return; }
+    if (was !== undefined && line.textContent !== was) return;
+    clearTimeout(hintTimer); line.textContent = text;
+    if (text && ms) hintTimer = setTimeout(() => { if (line.textContent === text) line.textContent = ""; }, ms);
+  }
   const HINT_MS = 0, HINT = {gold: "#ECA818", red: "#C8392B"};
   function hinter(o) {
     let mark = null, at = null, of = null, shown = 0, timer = 0, said = "";
@@ -1225,12 +1312,12 @@ const G = (() => {
         clearTimeout(timer);
         if (!same()) shown = 0;
         mark = m; at = o.key(); of = o.game(); if (!uncounted) shown++;
-        o.draw(); if (say && quiet) readOut(say); else if (say) { note(say, ms); said = say; }
+        o.draw(); if (say && quiet) readOut(say); else if (say) { hintSay(say, ms); said = say; }
         if (ms) timer = setTimeout(() => { if (mark === m) { mark = null; o.draw(); } }, ms);
       },
       // the mark to draw, while the board is as it was when it was shown
       current() {
-        if (mark && !same()) { mark = null; if (said && $("msg") && $("msg").textContent === said) note(""); said = ""; }   // its words go with it
+        if (mark && !same()) { mark = null; if (said) hintSay("", 0, said); said = ""; }   // its words go with it
         return mark;
       },
       clear(redraw = true) { clearTimeout(timer); if (mark) { mark = null; if (redraw) o.draw(); } },
@@ -1391,7 +1478,26 @@ const G = (() => {
     l.textContent = text;
     if (icon && ICON[icon]) b.querySelector(".ic").outerHTML = iconSVG(icon);
   }
+  // Buttons not used while playing (Share, Best times, How to play, Toys) go in a small row above the board, under
+  // the title; the play tools stay under the board, with a line above them for a hint's words.
+  const PAGE_TOOLS = ["toysBtn", "linkBtn", "bestBtn", "helpBtn"];
+  function pageTools() {
+    const main = document.querySelector("main"), head = main && main.querySelector("header");
+    if (!head || $("pageTools")) return;
+    const moving = PAGE_TOOLS.map(id => document.getElementById(id)).filter(b => b && b.closest("main .actions") && !b.closest(".wall, .card, .overlay"));
+    if (moving.length) {
+      const row = document.createElement("div"); row.id = "pageTools"; row.className = "pageTools tools";
+      row.append(...moving);
+      // on a computer, the game's keys (shown once nav() knows the game, if it has a list)
+      const kb = document.createElement("button"); kb.id = "keysBtn"; kb.hidden = true; kb.textContent = "Keys"; kb.dataset.icon = "keyboard";
+      kb.onclick = () => keysCard(); row.append(kb);
+      const nav = head.parentElement.querySelector(":scope > nav.games"); (nav || head).after(row);
+    }
+    const hb = $("hintBtn"), tools = hb && hb.closest("main .actions");
+    if (tools) { const line = document.createElement("p"); line.id = "hintLine"; line.className = "hintLine"; line.setAttribute("aria-live", "polite"); tools.before(line); }
+  }
   function toolify() {
+    pageTools();
     for (const [id, name] of Object.entries(LEAD)) {
       const b = document.getElementById(id); if (!b || b.querySelector(".ic")) continue;
       b.innerHTML = iconSVG(name) + `<span class="lbl">${b.textContent.trim()}</span>`; b.classList.add("lead");
@@ -1405,7 +1511,7 @@ const G = (() => {
       if (!sel.getAttribute("aria-label")) sel.setAttribute("aria-label", "Level");
       label.title = sel.getAttribute("aria-label");
     }
-    for (const row of document.querySelectorAll("main .actions, main .zoom")) {
+    for (const row of document.querySelectorAll("main .actions, main .zoom, main .pageTools")) {
       if (row.closest(".wall")) continue;   // Cat Burglar's zoom sits on the painting
       let any = false;
       for (const b of row.querySelectorAll(":scope > button")) any = makeTool(b) || any;
