@@ -1,4 +1,4 @@
-// Cardboard boxes, shut and opened, drawn for Copycat and used by Toy Stash too: a toy hides in each.
+// Cardboard boxes, shut and opened, drawn for Copycat and used by Mewstermind too: a toy hides in each.
 // The opened box has its flaps folded out.
 const BOX = `<svg viewBox="0 0 100 100" aria-hidden="true">
   <rect x="3" y="3" width="94" height="94" rx="6" fill="#D9A86C" stroke="#7A4E2C" stroke-width="4"/>
