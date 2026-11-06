@@ -22,6 +22,22 @@ kaikki.org instead, which is already allowed: it publishes Wiktionary as JSON, o
 site's pages can still look words up on Wiktionary while you play (`G.meaning`), since that runs on the player's
 device, not in the session.
 
+**Keeping tokens down:** the owner wants each game to cost as few tokens as it can. Before starting a stage, and
+before finishing one when there's a better way to do the rest, stop and say so when any of these would save tokens:
+
+- **Be more specific:** if the request leaves something open that would mean exploring or guessing (which
+  mechanic, which cat, which theme from `IDEAS.md`, what "done" means for this step), ask one short question
+  instead of working it out by reading around.
+- **Switch model:** suggest a smaller model (Sonnet or Haiku, with `/model`) for mechanical stages, such as
+  housekeeping, copying a pattern from another game, or fixing test failures; suggest the larger model only for
+  design calls or a tricky bug.
+- **Start a new chat:** when the conversation is long and the next stage doesn't need most of it (often between
+  Preview and Port, or before Test), suggest a fresh session and give a few lines to paste in: the slug, the
+  branch, what's decided and what's left.
+
+Say it in one or two lines and let the user choose; carry on as asked if they'd rather not. Don't suggest the same
+switch twice in one session.
+
 ## 1. Theme
 
 Check the README's game sections and `G.GAMES`; if an existing game already uses the same mechanic,
