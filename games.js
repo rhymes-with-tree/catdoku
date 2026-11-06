@@ -453,7 +453,16 @@ const G = (() => {
   }
   // The win cards' way out to every game.
   const homeBtn = () => ["Back to the front page", () => { location.href = HOME; }];
+  // Leaving a win for the front page means you're done with that board: next time the game opens it deals the next
+  // one rather than showing the same win card again. The win is remembered (by game, result and text) as the home
+  // button is tapped, and a win card for it shown as the page opens takes its next-puzzle button instead.
+  const LEFT_WIN = "catdoku.leftwin.v1";
   function winCard(text, onNext, admire = "Admire my board", result, o = {}) {
+    const sig = `${CURRENT}|${JSON.stringify(result || null)}|${text}`, left = load(LEFT_WIN);
+    if (CURRENT && left[CURRENT]) {
+      const was = left[CURRENT]; delete left[CURRENT]; save(LEFT_WIN, left);
+      if (was === sig && performance.now() < 15000) { onNext(); return; }
+    }
     const media = document.createElement("div"); media.className = "winmedia";
     // what earned the gold paw ("No undos!"), under the paw
     if (o.gold) { countGold(result, text, o.top); media.append(goldPaw()); if (o.goldWhy) { const g = document.createElement("p"); g.className = "goldwhy"; g.textContent = o.goldWhy; media.append(g); } }
@@ -470,11 +479,13 @@ const G = (() => {
     if (dl) { const d = document.createElement("p"); d.className = "dailyline"; d.textContent = dl; media.append(d); }
     // the picture on its own, so a phone held sideways can set it beside the rest (games.css)
     const pic = document.createElement("div"); pic.className = "winpic";
-    if (o.gold && o.goldPic) pic.append(...o.goldPic); else pic.append(catPhoto(), name);
+    // o.pic: a picture of the game's own (a finished board) in place of the random cat photo
+    if (o.gold && o.goldPic) pic.append(...o.goldPic); else if (o.pic) pic.append(...o.pic); else pic.append(catPhoto(), name);
     media.append(pic);
     const btns = [[o.next || "New puzzle", onNext, true]];
     if (admire !== null) btns.push([admire, () => { closeCard(); if (o.onAdmire) o.onAdmire(); else note(admireNote(), 0); }]);
-    btns.push(["Share my result", e => shareResult(result, o.gold, e.currentTarget)], homeBtn());
+    btns.push(["Share my result", e => shareResult(result, o.gold, e.currentTarget)],
+      [homeBtn()[0], () => { if (CURRENT) { const l = load(LEFT_WIN); l[CURRENT] = sig; save(LEFT_WIN, l); } location.href = HOME; }]);
     openCard(o.gold ? o.goldTitle || "Gold paw!" : o.title || "Solved!", "", btns, media, o.after);
   }
 
@@ -1197,17 +1208,24 @@ const G = (() => {
   // show(mark, say, {ms, uncounted}): uncounted shows a mark that isn't a hint (Audit's), so it doesn't add a level.
   // A hint's mark and words stay until the board or the puzzle changes (Apple: avoid things that go away on a timer,
   // which can leave too little time to take them in); a game can still pass ms for a mark that should go by itself.
+  // Words for VoiceOver only: put in a live region that isn't seen.
+  function readOut(text) {
+    let r = $("readOut");
+    if (!r) { r = document.createElement("div"); r.id = "readOut"; r.setAttribute("aria-live", "polite"); r.style.cssText = "position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap"; document.body.append(r); }
+    r.textContent = ""; setTimeout(() => { r.textContent = text; }, 50);
+  }
   const HINT_MS = 0, HINT = {gold: "#ECA818", red: "#C8392B"};
   function hinter(o) {
     let mark = null, at = null, of = null, shown = 0, timer = 0, said = "";
     const same = () => o.game() === of && o.key() === at;
     return {
       level() { if (!same()) shown = 0; return shown; },
-      show(m, say, {ms = HINT_MS, uncounted = false} = {}) {
+      // quiet: the glow says it all, so the words are only read out by VoiceOver, not shown
+      show(m, say, {ms = HINT_MS, uncounted = false, quiet = o.quiet} = {}) {
         clearTimeout(timer);
         if (!same()) shown = 0;
         mark = m; at = o.key(); of = o.game(); if (!uncounted) shown++;
-        o.draw(); if (say) { note(say, ms); said = say; }
+        o.draw(); if (say && quiet) readOut(say); else if (say) { note(say, ms); said = say; }
         if (ms) timer = setTimeout(() => { if (mark === m) { mark = null; o.draw(); } }, ms);
       },
       // the mark to draw, while the board is as it was when it was shown
@@ -1355,6 +1373,7 @@ const G = (() => {
     marks: '<path d="M9 21l4-4 9-9 4 4-9 9-4 4h-4z"/><path d="M5 28h22"/>',
     sliders: '<path d="M5 9h22M5 16h22M5 23h22"/><circle cx="11" cy="9" r="2.6"/><circle cx="21" cy="16" r="2.6"/><circle cx="14" cy="23" r="2.6"/>',
     games: '<rect x="6" y="6" width="8" height="8" rx="2"/><rect x="18" y="6" width="8" height="8" rx="2"/><rect x="6" y="18" width="8" height="8" rx="2"/><rect x="18" y="18" width="8" height="8" rx="2"/>',
+    digits: '<path d="M4 11l3-2v14M11 12a3 3 0 1 1 5 2.5L11 23h6M21 9h6l-3.5 5a4.2 4.2 0 1 1-3.5 7"/>',
     palette: '<path d="M16 5C9.5 5 5 9.5 5 15.5S9.5 27 15 27c2 0 2.5-1.2 2-2.6-.6-1.6.4-3.4 2.4-3.4H23c2.5 0 4-1.8 4-4.4C27 9.8 22.5 5 16 5z"/><circle cx="11" cy="14" r="1.3"/><circle cx="15" cy="10" r="1.3"/><circle cx="20.5" cy="11" r="1.3"/>',
   };
   const ICON_OF = {hintBtn: "hint", undoBtn: "undo", backBtn: "undoguess", restartBtn: "restart", auditBtn: "audit", notesBtn: "pencil",
