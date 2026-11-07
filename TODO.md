@@ -134,6 +134,12 @@ Talked through on 2026-11-07. Sort every control by how often it's used while pl
 - the switches that change how strict it is, set once: Auto check, Audit as-you-go / Auto grade, Auto Notes, Dot first,
   Turning, Reverse, Slower
 - Give up (rarely wanted, and out of reach of a stray tap)
+- an Every game section at the bottom: today's challenge (the game's name, in gold, with the streak line; a link
+  from any other game, and on the challenge game itself its solved or not), the toy chest (one choice for every game,
+  so it can be reached from any of them, not only the toy games), the front page, and Add to Home Screen (only in a
+  browser, not once it's opened from the home screen; Safari can't be asked to add it, so it shows how: Share, then
+  Add to Home Screen). The Games menu already has the front page and today's challenge at its top; these are a
+  shortcut, not a move. Keep the badge under Games on the challenge game, since it's why you came.
 
 **Into New's menu with the levels**, as they decide the next puzzle: Yarn's colours, Catlas's answer style, Knit
 Pick's words.
