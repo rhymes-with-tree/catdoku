@@ -96,9 +96,13 @@ in its notes.
   back this same puzzle as it was dealt; `newBtn` deals a different one. Every game has Share, and New unless
   levels are a fixed list.
 - **Settings row** (`.bar`, under the buttons): `levelSel` labelled "Level" (or `size` labelled "Size"),
-  then `newBtn` (New puzzle, or a themed name: New box, New room…). Switches and extra pickers go in a
-  second row, `<div class="bar toggles">`, each in a `<div class="opt">` with a
-  `<span class="hint">` line saying what it does (see `yarn/` or `patches/`).
+  then `newBtn` (New puzzle, or a themed name: New box, New room…). Write them as
+  `<label>Level <select id="levelSel" aria-label="Level"></select></label>` beside the button, with the select's
+  `onchange` dealing that level: `toolify` hides the picker and folds it into New (`G.levelMenu`), so a tap on New
+  opens the levels and a double tap deals again at the same level. A walkthrough step about levels points at `newBtn`. Switches and extra pickers go in a
+  second row, `<div class="bar toggles">`, each in a `<div class="opt">`. A switch has just its short name, with
+  no line under it: a switch doesn't change how hard a puzzle counts, so it's safe to flip it to see what it does.
+  An extra picker can keep a `<span class="hint">` line saying what it does (see `yarn/`).
 
 - **Menu:** `G.nav(slug)`.
 - **Puzzles:** `G.builder([fns…], "entry")` makes them in a Web Worker; `take(n)` returns a promise of
@@ -150,7 +154,7 @@ in its notes.
   - **Switches:** a step pointing at an on/off switch in `.toggles` (Auto check…) is never in the walkthrough;
     `G.spotlight` keeps it and shows it once, the first time the switch is turned on. Write it for that moment
     ("Auto grade: a wrong 🐱 costs a life").
-  - **Bookmark** (`G.guesser`, ids `guessBtn` and `backBtn`) is labelled Bookmark and Back to bookmark, never Guess.
+  - **Bookmark** (`G.guesser`, ids `guessBtn` and `backBtn`) is labelled Bookmark and Return to Bookmark, never Guess.
   - **Few words around it too:** "Tap to go on" shows on the first step only, and an interactive step needs no
     extra line (its `tip` is optional); let the lit squares and the dots do the talking. It must work at any point in an unfinished puzzle:
   a step that changes the board for show (`enter`/`leave`) puts back exactly what was there, and once

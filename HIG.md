@@ -11,7 +11,7 @@ the reason they don't apply.
 
 ### Design principles
 - ✅ **Purpose, simplicity, delight:** one game per page, the board first, cats and gold paws for delight.
-- ✅ **Agency: help people recover from mistakes:** Undo (and Ctrl/⌘Z), Restart, Back to bookmark (once called Undo guess), revives.
+- ✅ **Agency: help people recover from mistakes:** Undo (and Ctrl/⌘Z), Restart, Return to Bookmark (once called Undo guess), revives.
 - ✅ **Familiarity: provide clear feedback:** message line, red/green marks, win cards.
 - ✅ **Flexibility: preserve a person's context:** every game saves progress and reopens it.
 - ✅ **Flexibility: a variety of input methods:** touch, mouse and keyboard in every game.
@@ -119,8 +119,8 @@ the reason they don't apply.
 - 🔧 **Teach through interactivity:** a walkthrough step can now wait for the player to do it on the real board
   (`try` in `G.spotlight`). Catdoku has the first two: tap twice for a cat, then drag for paws; the board goes back as it was.
   🔧 Now every game but the action games, Cat Burglar and Catlas has one (README, How to play).
-- 🔧 **Switches are taught when they're used:** Auto grade, Auto check and the like aren't in the walkthrough; each says what it does, once, the first time it's turned on.
-- 🔧 **Use concepts that people know** (Design principles: familiarity): Guess is now Bookmark, and Undo guess is Back to bookmark.
+- 🔧 **Switches are taught when they're used:** Audit as-you-go, Auto check, Auto Notes and the like aren't in the walkthrough; each says what it does, once, the first time it's turned on.
+- 🔧 **Use concepts that people know** (Design principles: familiarity): Guess is now Bookmark, and Undo guess is Return to Bookmark.
 - 🔧 **Context-specific tips instead of one flow:** on a first visit, steps that only point at a tool or a setting are
   kept back and come later as one-off tips: the Hint tip after 45 seconds without a move, the others a few seconds after
   the first move of a visit, at most one a day.
@@ -182,8 +182,9 @@ the reason they don't apply.
 
 ## Components
 - ✅ **Buttons:** press state, the prominent style for the likeliest action (New puzzle), familiar icons with words.
-- ⚠️ **Toggles:** Apple keeps the switch style for list rows; ours are switches in the settings row, each with a line
-  saying what it does, which reads like a list row. Left as is.
+- ⚠️ **Toggles:** Apple keeps the switch style for list rows; ours are switches in the settings row, each with just a
+  short name (no line under it since 2026-11-07: a switch doesn't change how hard a puzzle counts, so it's safe to
+  flip to find out, and its tip says what it does the first time). Left as is.
 - ✅ **Pickers** (level menus); ✅ **segmented control** (Pawlette's Zen and Swipe); ✅ **labels**; ✅ **lists and tables**
   (Best times); ✅ **collections** (the front page's tiles); ✅ **page controls** (🔧 the walkthrough's dots);
   ✅ **progress** (counts and the Catdoku streak).
