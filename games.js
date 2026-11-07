@@ -335,6 +335,9 @@ const G = (() => {
   }
 
   function openCard(title, text, btns, media, after) {
+    if (reopening && btns.some(b => b && b[0] === HOME_LABEL) && $("newBtn") && $("newBtn").onclick) {   // a lost puzzle reopened (see reopen)
+      reopening = false; setTimeout(() => $("newBtn").onclick()); return;   // New's own deal (a tap on it opens the levels)
+    }
     const card = $("card"); card.innerHTML = "";
     const h = document.createElement("h2"); h.textContent = title; card.append(h);
     const s = document.createElement("div"); s.className = "stripe"; card.append(s);
@@ -487,6 +490,8 @@ const G = (() => {
   // whether a win was on its top one).
   const GOLD = "catdoku.goldpaws.v1";
   const goldPaws = slug => (load(GOLD).counts || {})[slug] || 0;
+  // gold paws at each level or size (kept since 2026-11; earlier ones were counted for the game only)
+  const goldAt = (slug, n) => ((load(GOLD).levels || {})[slug] || {})[n] || 0;
   const mastered = slug => !!(load(GOLD).top || {})[slug];
   // A mastered game's tile keeps its shelf's colour and gets a small gold Mastered label; extra (the front page's "12 solved")
   // joins it as "Mastered · 12 solved", and a phone, short of room, shows just "Mastered" in the gold label.
@@ -506,23 +511,18 @@ const G = (() => {
     if (!CURRENT) return;
     const d = load(GOLD), sig = `${CURRENT}|${JSON.stringify(result || null)}|${text}`, seen = d.seen || [];
     if (seen.includes(sig)) return;
-    const counts = d.counts || {}, tops = d.top || {};
+    const counts = d.counts || {}, tops = d.top || {}, levels = d.levels || {};
     counts[CURRENT] = (counts[CURRENT] || 0) + 1;
+    if (result && result.n != null) { const l = levels[CURRENT] || (levels[CURRENT] = {}); l[result.n] = (l[result.n] || 0) + 1; }
     if (top ?? (result && result.n != null && result.n === topLevel())) tops[CURRENT] = true;
-    save(GOLD, {counts, top: tops, seen: [...seen, sig].slice(-30)});
+    save(GOLD, {counts, top: tops, levels, seen: [...seen, sig].slice(-30)});
   }
   // The win cards' way out to every game.
-  const homeBtn = () => ["Back to the front page", () => { location.href = HOME; }];
-  // Leaving a win for the front page means you're done with that board: next time the game opens it deals the next
-  // one rather than showing the same win card again. The win is remembered (by game, result and text) as the home
-  // button is tapped, and a win card for it shown as the page opens takes its next-puzzle button instead.
-  const LEFT_WIN = "catdoku.leftwin.v1";
+  const HOME_LABEL = "Back to the front page", homeBtn = () => [HOME_LABEL, () => { location.href = HOME; }];
+  // A win reopened (coming back to a game after winning, however you left it) isn't shown again: the game deals the
+  // next puzzle, as the win card's next-puzzle button does. See reopen.
   function winCard(text, onNext, admire = "Admire my board", result, o = {}) {
-    const sig = `${CURRENT}|${JSON.stringify(result || null)}|${text}`, left = load(LEFT_WIN);
-    if (CURRENT && left[CURRENT]) {
-      const was = left[CURRENT]; delete left[CURRENT]; save(LEFT_WIN, left);
-      if (was === sig && performance.now() < 15000) { onNext(); return; }
-    }
+    if (reopening) { reopening = false; setTimeout(onNext); return; }
     const media = document.createElement("div"); media.className = "winmedia";
     // what earned the gold paw ("No undos!"), under the paw
     if (o.gold) { countGold(result, text, o.top); media.append(goldPaw()); if (o.goldWhy) { const g = document.createElement("p"); g.className = "goldwhy"; g.textContent = o.goldWhy; media.append(g); } }
@@ -544,7 +544,7 @@ const G = (() => {
     const btns = [[o.next || "New puzzle", onNext, true]];
     if (admire !== null) btns.push([admire, () => { closeCard(); if (o.onAdmire) o.onAdmire(); else note(admireNote(), 0); }]);
     btns.push(["Share my result", e => shareResult(result, o.gold, e.currentTarget)],
-      [homeBtn()[0], () => { if (CURRENT) { const l = load(LEFT_WIN); l[CURRENT] = sig; save(LEFT_WIN, l); } location.href = HOME; }]);
+      homeBtn());
     openCard(o.gold ? o.goldTitle || "Gold paw!" : o.title || "Solved!", "", btns, media, o.after);
   }
 
@@ -689,12 +689,14 @@ const G = (() => {
       const p = document.createElement("p"); p.textContent = T.emptyText || "Solve a puzzle and your times will show up here. They're kept on this device only."; media.append(p);
     } else {
       const t = document.createElement("table"); t.className = "bests";
-      t.innerHTML = `<tr><th>${noun()[0].toUpperCase() + noun().slice(1)}</th><th class="num">Best</th><th class="num">Solved</th></tr>`;
+      const golds = sizes.some(n => goldAt(CURRENT, n));   // a gold paws column once there's one at any level
+      t.innerHTML = `<tr><th>${noun()[0].toUpperCase() + noun().slice(1)}</th><th class="num">Best</th><th class="num">Solved</th>${golds ? '<th class="num">Gold paws</th>' : ""}</tr>`;
       for (const n of sizes) {
         const r = t.insertRow(); if (n === N) r.className = "now";
         r.insertCell().textContent = label(n);
         const b = r.insertCell(); b.className = "num"; b.textContent = mine[n].times.length ? clock(mine[n].times[0].ms) : "–";
         const c = r.insertCell(); c.className = "num"; c.textContent = mine[n].solves;
+        if (golds) { const g = r.insertCell(); g.className = "num"; g.textContent = goldAt(CURRENT, n) ? `🐾 ${goldAt(CURRENT, n)}` : "–"; }
       }
       media.append(t);
       const top = (mine[N] || {times: []}).times;
@@ -953,6 +955,7 @@ const G = (() => {
     catshuffle: ["Arrow keys: pick a square", "Space: slide the piece there, or turn the knob (Shift turns it back)", "Shift with an arrow: shift its row or column"],
     mewhue: ["Arrow keys: pick a square", "Shift with an arrow: slide its row or column that way"],
     crossstitch: ["Arrow keys: pick a square", "Space or Enter: stitch it, or take the stitch out", "X or .: a dot, for a square that stays empty", "Backspace: clear the square", "Shift with an arrow: carry what you put down along the row or column"],
+    tango: ["Arrow keys: pick a square", "Space or Enter: tap it (one toy, then the other, then empty)"],
     pawlinko: ["Setting up: arrows move the next piece, Enter places it, R flips a perch, Space throws", "Left and right: aim (Shift for big steps)", "Down, Space or Enter: knock it off", "X: swap in the next thing", "Placing a perch: arrows move it, R flips it, Enter puts it there", "Winding a strand: arrows pick one, Enter winds it", "Escape: put a helper away"],
   };
   const keyboardish = () => matchMedia("(hover: hover) and (pointer: fine)").matches;
@@ -1696,7 +1699,15 @@ const G = (() => {
   window.addEventListener("unhandledrejection", e => reportError(String((e.reason && e.reason.message) || e.reason)));
   // Reopen a saved puzzle. If that fails, report why and start a fresh puzzle instead of
   // leaving an empty board.
+  // A saved puzzle that's already over (won or lost) isn't shown again with its end card: coming back to the game
+  // starts a new one instead, as its New button does. An end card is one with the way back to the front page
+  // (homeBtn); one opened while the saved puzzle is being reopened (up to the first tap or key, or a few seconds,
+  // as some games open it once the board's drawn) isn't shown, and the New button is pressed in its place.
+  let reopening = false;
+  const doneReopening = () => { reopening = false; };
+  ["pointerdown", "keydown"].forEach(t => addEventListener(t, doneReopening, true));
   function reopen(fn, fresh) {
+    reopening = true; setTimeout(doneReopening, 5000);
     try { fn(); }
     catch (e) {
       const why = `${e.message}${e.stack ? ` (${e.stack.split("\n")[0]})` : ""}`;
