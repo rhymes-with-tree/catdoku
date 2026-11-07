@@ -97,7 +97,9 @@ pieces under the board for the five tap-to-fill games with no pad (`G.pieces`: t
 Mark, Fair Play's Mark, Cross Stitch's Dot, Treat Time's Keep and Catdoku's Erase), and Scratch That's Dot first
 switch made a piece beside Post first. (The games with a pad, pots, tray or keys already had them under the board,
 with ⌫ or Erase among them, and Patches' Marker is among its fabrics.) Then the What's new card for returning
-visitors (`whatsNew`). Then `G.switch` for every on/off setting (21 pages). Still to do: the other shared helpers below. When it's done, the README's "Across every game" (Layout, Gold paw, Bookmark, Keys) and
+visitors (`whatsNew`). Then `G.switch` for every on/off setting (21 pages), and the names: Notes, Auto grade, Junk
+Drawer's Dim used-up magnets, Knit Pick's Guess button (`wordBtn`, so it's no longer taken for Bookmark) and Slower in
+Wind Up. Still to do: the other shared helpers below. When it's done, the README's "Across every game" (Layout, Gold paw, Bookmark, Keys) and
 `HIG.md` need rewriting to match.
 
 ### The page, top to bottom
@@ -114,7 +116,7 @@ visitors (`whatsNew`). Then `G.switch` for every on/off setting (21 pages). Stil
 5. **Board**, with zoom and full screen in its corner (as Cat Burglar's + and − already are).
 6. **Pieces**, the most used: digits, letters, toys, fabrics, paints, a tray of shapes, with ⌫ or Erase, and the
    game's marking tool among them (Mark, Dot, Keep, Patches' Marker), as Marker already sits with Patches' fabrics.
-7. **Free tools:** Undo, Pencil, Bookmark, Return to Bookmark, Complete. Shown only where the game has them, in this
+7. **Free tools:** Undo, Notes, Bookmark, Return to Bookmark, Complete. Shown only where the game has them, in this
    order, closing up the gaps.
 8. **Tools that cost the gold paw, grouped and in a dark brick red:** Hint, Audit, and the game's helpers. Not the
    red that marks mistakes on the boards; at least 3 to 1 in light and dark; and a small slashed paw on the icon's
@@ -164,13 +166,12 @@ Built 2026-11-07 (`whatsNew` in `games.js`), ahead of the shared helpers, which 
 - **Undo:** 33 pages write their own history. One `G.history` (push, undo, restart, ⌘Z), which Return to Bookmark
   and Restart use too.
 - **Bookmark:** `G.guesser` runs it in 7 games; move Toydoku and Fair Play onto it.
-- **Checking:** one name each. Auto check (rule breaks turn red as you play: Patches, Sunbeams, Fair Play, High
-  Perch, Toydoku, Scratch That); Audit (a one-off check: Catdoku, Fridge Magnets, Purrfect Square); and wrong answers
-  costing a life, called Audit as-you-go in Catdoku and Auto grade in Toydoku, the same thing. Complete (Catdoku) and
-  Check (Mewstermind) are one button.
-- **Pencil:** one name for Toydoku's Pencil, the Notes of Open the Door!, High Perch and Window Ledges, and Catdoku's
-  paws, with Auto Notes. The three digit-pad games share one pad helper (digits, ⌫, Pencil, Auto Notes). Toydoku's
-  Erase pencil (every pencil mark off at once) sits beside Pencil or is a long press on it.
+- **Checking:** the names are one each now (2026-11-07): Auto check (rule breaks turn red as you play), Audit (a
+  one-off check) and Auto grade (a wrong answer costs a life; Catdoku's was Audit as-you-go). Still to weigh: Complete
+  (Catdoku) and Check (Mewstermind) are one button.
+- **Notes:** one name since 2026-11-07 (Toydoku's Pencil and Erase pencil are Notes and Erase notes). The three
+  digit-pad games share one pad helper (digits, ⌫, Notes, Auto Notes). Toydoku's Erase notes sits beside Notes or is a
+  long press on it.
 - **Marking tools:** Hide & Seek's Mark, Fair Play's Mark (×), Cross Stitch's Dot, Treat Time's Keep, Patches'
   Marker, Catdoku's Erase and Scratch That's Dot first switch all change what a tap does. One helper; Scratch That's
   becomes a piece like the rest.
@@ -187,10 +188,3 @@ Built 2026-11-07 (`whatsNew` in `games.js`), ahead of the shared helpers, which 
 - **Hints by other names** go in the red group as hints: Keyboard Cat's Words left, Starts and Clues (switches today),
   and Junk Drawer's Words left.
 - **Hints:** Catlas and Cat Burglar don't use `G.hinter` yet.
-
-### Names to fix on the way
-
-- Junk Drawer's Auto Notes fades the magnets no word left uses; name it like Pick of the Pile's Dim stuck blocks.
-- Knit Pick's Guess button has the id `guessBtn`, which every other game uses for Bookmark (once called Guess).
-- Slower: Wind Up is the one real-time game without it.
-

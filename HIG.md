@@ -61,7 +61,7 @@ the reason they don't apply.
 - 🔧 **Minimize time-boxed elements:** hints no longer vanish after five seconds; they stay until the board changes.
   ⚠️ Short notes in the message line still clear after a few seconds (they repeat what the board already shows).
 - ✅ **Difficulty accommodations:** every game has levels; hints, Undo and revives.
-  🔧 Tail Chase, Bird Watch and L-M-N-O-Pom have a Slower switch (two-thirds speed). Wind Up has no clock to beat.
+  🔧 Tail Chase, Bird Watch, L-M-N-O-Pom and Wind Up have a Slower switch (two-thirds speed).
 - ✅ **Be cautious with fast-moving and blinking animations / Reduce Motion:** animations turn off, hint marks stay.
 - ⚠️ **Assistive Access, Switch Control, Voice Control:** not tested.
 
@@ -121,7 +121,7 @@ the reason they don't apply.
 - 🔧 **Teach through interactivity:** a walkthrough step can now wait for the player to do it on the real board
   (`try` in `G.spotlight`). Catdoku has the first two: tap twice for a cat, then drag for paws; the board goes back as it was.
   🔧 Now every game but the action games, Cat Burglar and Catlas has one (README, How to play).
-- 🔧 **Switches are taught when they're used:** Audit as-you-go, Auto check, Auto Notes and the like aren't in the walkthrough; each says what it does, once, the first time it's turned on.
+- 🔧 **Switches are taught when they're used:** Auto grade, Auto check, Auto Notes and the like aren't in the walkthrough; each says what it does, once, the first time it's turned on.
 - 🔧 **Use concepts that people know** (Design principles: familiarity): Guess is now Bookmark, and Undo guess is Return to Bookmark.
 - 🔧 **Context-specific tips instead of one flow:** on a first visit, steps that only point at a tool or a setting are
   kept back and come later as one-off tips: the Hint tip after 45 seconds without a move, the others a few seconds after
