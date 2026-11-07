@@ -92,8 +92,11 @@ the games over a few at a time.
 the menu, with Settings holding every game's switches and pickers. Then the dark-red paw-costing group
 (`PAW_COST` and `arrange` in `games.js`), the tool order, and Restart beside New. Then Undo, Bookmark and Return to
 Bookmark made free and Restart made to cost the paw in every game (`game.restarted`; see "The gold paw" below). Then
-the red going back to the usual colour once the paw is lost for the puzzle (`G.pawLost` on every page). Still to do:
-the pieces row with the marking tools in it; then the shared helpers below. When it's done, the README's "Across every game" (Layout, Gold paw, Bookmark, Keys) and
+the red going back to the usual colour once the paw is lost for the puzzle (`G.pawLost` on every page). Then a row of
+pieces under the board for the five tap-to-fill games with no pad (`G.pieces`: the plain tap beside Hide & Seek's
+Mark, Fair Play's Mark, Cross Stitch's Dot, Treat Time's Keep and Catdoku's Erase). Still to do: the games that
+already have a pad, pots, tray or keys moved to the same place under the board, with ⌫ or Erase there (Patches'
+Marker is already among its fabrics); Scratch That's Dot first switch made a piece; then the shared helpers below. When it's done, the README's "Across every game" (Layout, Gold paw, Bookmark, Keys) and
 `HIG.md` need rewriting to match.
 
 ### The page, top to bottom
