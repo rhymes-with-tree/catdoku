@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.12"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.13"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.12">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.13">
 <style>
 /* Sudoku with toys: every row, column and box holds one of each toy. The Numbers switch shows 1 to N instead. */
 .gridwrap{background:var(--panel);border:3px solid var(--ink);border-radius:10px;overflow:hidden;
@@ -122,7 +122,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-07.12"></script>
+<script src="../games.js?v=2026-11-07.13"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N grid in boxes of bw × bh squares: every row, column and box holds each of the N toys once. Toys are
@@ -346,8 +346,8 @@ function pickToys(N) {
 
 /* ---------- game state ---------- */
 // game: {level, N, bw, bh, sol, givens (the grid as dealt, 0 for empty), toys (picture for toys 1 to N, as
-//        toys[v - 1]), grid (0 for empty), notes (bit v set: v jotted down), guesses (squares filled as guesses, oldest
-//        first), wrong (squares Auto grade found wrong when it was switched on), hearts (lives left), livesUsed
+//        toys[v - 1]), grid (0 for empty), notes (bit v set: v jotted down), guesses (G.guesser's bookmarks, {i, at}),
+//        wrong (squares Auto grade found wrong when it was switched on), hearts (lives left), livesUsed
 //        (lives given out so far), helped (ran out of lives), history (undo steps), hinted, won}
 const STORE = "catdoku.toydoku.v1", MAX_LEVEL = 11;
 const $ = G.$;
@@ -361,7 +361,6 @@ G.pawLost(() => !game || game.won || game.hinted || game.restarted || game.helpe
 // armed: a toy (or 0, erase) picked on the pad, {v, sticky}: tapped, it goes in the next square tapped; held
 // down, it sticks and goes in every square tapped until another is picked.
 let armed = null;
-let guessing = false;   // the next toy put out is a guess
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
 const HOW = [null, "", "", "", "a head start", "", "", "tricky", "fiendish", "diabolical", "insane", "nightmare"];
@@ -404,7 +403,7 @@ function draw() {
     const cls = ["sq", isGiven(i) ? "given" : "", i === sel ? "sel" : sv && g[i] === sv ? "same" : peer ? "peer" : ""].filter(Boolean).join(" ");
     out += `<rect class="${cls}" data-i="${i}" x="${x}" y="${y}" width="100" height="100"/>`;
   }
-  for (const i of game.guesses || []) { const [r, c] = rc(i); out += `<rect class="guess" x="${c * 100 + 4}" y="${r * 100 + 4}" width="92" height="92" rx="12"/>`; }
+  for (const i of guesses.list()) if (game.grid[i]) { const [r, c] = rc(i); out += `<rect class="guess" x="${c * 100 + 4}" y="${r * 100 + 4}" width="92" height="92" rx="12"/>`; }
   for (let k = 1; k < N; k++) {
     out += `<line class="thin" x1="${k * 100}" y1="0" x2="${k * 100}" y2="${S}"/><line class="thin" x1="0" y1="${k * 100}" x2="${S}" y2="${k * 100}"/>`;
   }
@@ -440,9 +439,7 @@ function draw() {
   $("hearts").hidden = !settings.autoGrade;
   $("hearts").innerHTML = Array.from({length: Math.max(HEARTS, game.livesUsed)}, (_, k) => k < game.hearts ? "♥" : '<span class="lost">♥</span>').join("");
   $("hearts").setAttribute("aria-label", `${game.hearts} ${game.hearts === 1 ? "life" : "lives"} left`);
-  $("board").classList.toggle("guessing", guessing);
-  $("guessBtn").setAttribute("aria-pressed", String(guessing));
-  $("guessBtn").disabled = game.won; $("backBtn").hidden = !(game.guesses || []).length || game.won;
+  guesses.sync();
   const left = v => N - g.filter(x => x === v).length;
   [...$("pad").children].forEach(b => { const v = +b.dataset.v; b.classList.toggle("done", v > 0 && left(v) <= 0); });
   $("pencilBadge").textContent = noting ? "ON" : "OFF";
@@ -451,7 +448,7 @@ function draw() {
   const filled = g.filter(Boolean).length;
   $("count").textContent = game.won ? "Every toy's in place!" : filled === N * N ? "Something's not right" : `${filled} of ${N * N} ${nums ? "squares" : "toys"}`;
   const what = nums ? "number" : "toy", it = armed ? (armed.v ? (nums ? String(armed.v) : "the " + toyName(armed.v)) : "the eraser") : "";
-  $("key").textContent = game.won ? "" : guessing ? `Bookmarked: the next ${what} you put out glows, and Return to Bookmark returns here` : armed ? (armed.sticky ? `${it[0].toUpperCase() + it.slice(1)} sticks: tap squares${noting && armed.v ? " (or drag) to jot it down" : ""} (tap it for ${noting ? "pen" : "notes"}, hold to let go)` : `Tap a square for ${it}${noting && armed.v ? " (as a note)" : ""}`)
+  $("key").textContent = game.won ? "" : guesses.armed() ? `Bookmarked: the next ${what} you put out glows, and Return to Bookmark returns here` : armed ? (armed.sticky ? `${it[0].toUpperCase() + it.slice(1)} sticks: tap squares${noting && armed.v ? " (or drag) to jot it down" : ""} (tap it for ${noting ? "pen" : "notes"}, hold to let go)` : `Tap a square for ${it}${noting && armed.v ? " (as a note)" : ""}`)
     : sel >= 0 && isGiven(sel) ? "That one was already out" : "";
   $("hintBtn").disabled = game.won; $("clearNotesBtn").disabled = game.won || !game.notes.some(Boolean);
   $("undoBtn").disabled = !game.history.length || game.won; $("restartBtn").disabled = !game.history.length || game.won;
@@ -494,8 +491,11 @@ function padButton(b, v) {
 }
 
 /* ---------- playing ---------- */
-const snapshot = () => game.history.push({grid: game.grid.slice(), notes: game.notes.slice(), guesses: (game.guesses || []).slice()});
-function restore(h) { game.grid = h.grid; game.notes = h.notes; game.guesses = h.guesses || []; }
+const snapshot = () => game.history.push({grid: game.grid.slice(), notes: game.notes.slice()});
+function restore(h) { game.grid = h.grid; game.notes = h.notes; }
+// Bookmark: the next toy put out glows until it's undone; Return to Bookmark takes everything back to just before the
+// latest bookmark in one go, notes and all (G.guesser).
+const guesses = G.guesser({game: () => game, undo, draw: () => { draw(); save(); }, board: $("board"), what: "toy"});
 // Put toy v in square i (0 erases; the same toy again takes it off). In pencil, v is jotted down or crossed off.
 // o.quiet: no undo step of its own (a drag makes one for all its squares). o.mode, in a drag: "add" only puts
 // the toy (or mark) in a square without one, "remove" only takes it off one that has it. Returns whether it did anything.
@@ -508,7 +508,7 @@ function put(i, v, o = {}) {
   game.started = true;
   if (settings.autoGrade && !noting && v && v !== game.sol[i] && game.grid[i] !== v) { miss(i, v); return false; }
   game.wrong = (game.wrong || []).filter(k => k !== i);
-  if (!o.quiet) snapshot();
+  if (!o.quiet) { if (!noting && v && game.grid[i] !== v) guesses.before(i); snapshot(); }
   const was = game.grid[i];
   if (noting && v) {
     if (game.grid[i]) game.grid[i] = 0;
@@ -519,9 +519,6 @@ function put(i, v, o = {}) {
     if (game.grid[i]) { for (const u of unitsNow()) if (u.includes(i)) for (const p of u) game.notes[p] &= ~(1 << v); }
     else if (!v) game.notes[i] = 0;
     if (was && game.grid[i] !== was) autoBack(i, was);
-    const guesses = game.guesses || (game.guesses = []);
-    if (game.grid[i] && guessing) { guessing = false; if (!guesses.includes(i)) guesses.push(i); }
-    else if (!game.grid[i] && guesses.includes(i)) guesses.splice(guesses.indexOf(i), 1);  // emptied, so it's no longer a guess
   }
   if (game.grid.every((h, i) => h === game.sol[i])) { win(); return true; }
   if (armed && armed.v && !noting && game.grid.filter(x => x === armed.v).length >= game.N) armed = null;  // all out, so put it down
@@ -608,7 +605,7 @@ $("clearNotesBtn").onclick = () => {
 document.addEventListener("keydown", e => {
   if (!playing() || document.querySelector(".spot") || e.target.tagName === "SELECT" || e.target.tagName === "INPUT" || e.ctrlKey || e.metaKey || e.altKey) return;
   const N = game.N, k = e.key;
-  if (k === "Escape") { armed = null; sel = -1; guessing = false; draw(); return; }
+  if (k === "Escape") { armed = null; sel = -1; guesses.disarm(); draw(); return; }
   if (/^[1-9]$/.test(k) && +k <= N) { armed = null; if (sel < 0) sel = 0; put(sel, +k); e.preventDefault(); return; }
   if (k === "Backspace" || k === "Delete" || k === "0") { put(sel, 0); e.preventDefault(); return; }
   if (k === "n" || k === "N") { noting = !noting; draw(); return; }
@@ -624,20 +621,10 @@ document.addEventListener("keydown", e => {
 document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
 function undo() { if (playing() && game.history.length) { restore(game.history.pop()); draw(); save(); } }
 $("undoBtn").onclick = undo;
-// Bookmark: the next toy put out glows until it's undone. Return to Bookmark takes everything back to just before the
-// latest bookmark in one go, pencil marks and all.
-$("guessBtn").onclick = () => { if (!playing()) return; guessing = !guessing; draw(); };
-$("backBtn").onclick = () => {
-  if (!playing() || !(game.guesses || []).length) return;
-  const had = game.guesses.length;
-  while (game.history.length && (game.guesses || []).length >= had) restore(game.history.pop());
-  guessing = false; draw(); save();
-  G.note("Back at your bookmark.", 3000);   // Return to Bookmark
-};
 $("restartBtn").onclick = () => {
   if (!playing() || !game.history.length) return;
   snapshot(); game.restarted = true;
-  game.grid = game.givens.slice(); game.notes = game.notes.map(() => 0); game.guesses = []; game.wrong = []; guessing = false;
+  game.grid = game.givens.slice(); game.notes = game.notes.map(() => 0); guesses.clear(); game.wrong = [];
   if (settings.autoNotes) fillNotes();
   draw(); save(); G.note("Back to the start. Undo brings your toys back.", 3500);
 };
@@ -652,7 +639,7 @@ function hint() {
   const N = game.N, g = game.grid, U = unitsNow(), wrong = g.map((v, i) => v && v !== game.sol[i] ? i : -1).filter(i => i >= 0);
   let i, bad = false, say, say0;
   const what = settings.numbers ? "number" : "toy";
-  if (wrong.length) { i = wrong.includes(sel) ? sel : wrong.find(k => !(game.guesses || []).includes(k)) ?? wrong[0]; bad = true; say = `That ${settings.numbers ? "number" : "toy"}'s wrong${G.andMore(wrong.length - 1)}`; }
+  if (wrong.length) { i = wrong.includes(sel) ? sel : wrong.find(k => !guesses.list().includes(k)) ?? wrong[0]; bad = true; say = `That ${settings.numbers ? "number" : "toy"}'s wrong${G.andMore(wrong.length - 1)}`; }
   else {
     const open = k => { if (g[k]) return 0; let m = (1 << (N + 1)) - 2; for (const u of U) if (u.includes(k)) for (const p of u) if (g[p]) m &= ~(1 << g[p]); return m; };
     const ones = m => { let c = 0; while (m) { m &= m - 1; c++; } return c; };
@@ -727,15 +714,15 @@ function revive() {
 }
 function restartFresh() {
   snapshot();
-  game.grid = game.givens.slice(); game.notes = game.notes.map(() => 0); game.guesses = []; game.wrong = [];
-  game.hearts = HEARTS; game.livesUsed = HEARTS; guessing = false;
+  game.grid = game.givens.slice(); game.notes = game.notes.map(() => 0); guesses.clear(); game.wrong = [];
+  game.hearts = HEARTS; game.livesUsed = HEARTS;
   draw(); save();
 }
 
 /* ---------- endings ---------- */
 // Every toy right: the toys hop in a wave across the grid, then the finishing card.
 function win() {
-  game.won = true; guessing = false; G.finishClock(game); G.note(""); hints.clear(false); sel = -1; noting = false; armed = null;
+  game.won = true; guesses.disarm(); G.finishClock(game); G.note(""); hints.clear(false); sel = -1; noting = false; armed = null;
   const next = game.hinted || game.helped ? game.level : Math.min(MAX_LEVEL, game.level + 1);
   settings.level = next; $("levelSel").value = next; save();
   G.track(`Toydoku solved level ${game.level}`);
@@ -760,7 +747,7 @@ function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); ne
 function begin(p, level, toys) {
   game = {level, N: p.N, bw: p.bw, bh: p.bh, sol: p.sol, givens: p.givens, toys: toys || pickToys(p.N), grid: p.givens.slice(), guesses: [], wrong: [], hearts: HEARTS, livesUsed: HEARTS,
     notes: new Array(p.N * p.N).fill(0), history: [], won: false, ...G.freshClock()};
-  sel = -1; noting = false; armed = null; guessing = false; hints.clear(false); missMark = -1; makePad();
+  sel = -1; noting = false; armed = null; guesses.disarm(); hints.clear(false); missMark = -1; makePad();
   if (settings.autoNotes) fillNotes();
 }
 async function newPuzzle() {
