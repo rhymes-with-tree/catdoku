@@ -96,8 +96,8 @@ the red going back to the usual colour once the paw is lost for the puzzle (`G.p
 pieces under the board for the five tap-to-fill games with no pad (`G.pieces`: the plain tap beside Hide & Seek's
 Mark, Fair Play's Mark, Cross Stitch's Dot, Treat Time's Keep and Catdoku's Erase), and Scratch That's Dot first
 switch made a piece beside Post first. (The games with a pad, pots, tray or keys already had them under the board,
-with ⌫ or Erase among them, and Patches' Marker is among its fabrics.) Still to do: the shared helpers below, then
-the What's new card for returning visitors (below). When it's done, the README's "Across every game" (Layout, Gold paw, Bookmark, Keys) and
+with ⌫ or Erase among them, and Patches' Marker is among its fabrics.) Then the What's new card for returning
+visitors (`whatsNew`). Still to do: the shared helpers below. When it's done, the README's "Across every game" (Layout, Gold paw, Bookmark, Keys) and
 `HIG.md` need rewriting to match.
 
 ### The page, top to bottom
@@ -157,7 +157,7 @@ progress or seen tips on the device) opens a game after it ships, show a short c
 Keys and Settings (the switches that were under the board); Undo and Bookmark are free, and the red tools (Hint,
 Audit, helpers, Restart) cost the gold paw and turn plain once it's gone; the marking tool sits beside the plain tap
 under the board. It can light ☰ with a spotlight as a tip does. New visitors get the walkthrough instead, never this.
-Build it last, once the rest of the plan has shipped, so it describes the finished page.
+Built 2026-11-07 (`whatsNew` in `games.js`), ahead of the shared helpers, which players won't see.
 
 ### Shared helpers, so each is written once
 

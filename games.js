@@ -1,6 +1,9 @@
 /* Shared helpers for the Catdoku family of games: links between games,
    saved progress, background puzzle building, and the win card. */
 const G = (() => {
+  // What's new (whatsNew, below): anything saved on this device before this page loaded means they've played before.
+  const NEWS = "catdoku.news.v1";
+  const RETURNING = (() => { try { for (let i = 0; i < localStorage.length; i++) if (localStorage.key(i) !== NEWS) return true; } catch (e) {} return false; })();
   // Every game: name, folder, one line about it, its colour in the games menu, its shelf (see GROUPS),
   // words to find it by in search (the puzzle it's based on and what it's like), and for games added from
   // 2026-10-18 on, the date it was added (so the daily challenge gives it a few days first; see daily).
@@ -1772,6 +1775,26 @@ const G = (() => {
     }
   }
   setInterval(() => { if (!document.hidden) checkPaw(); }, 1000);
+  // What's new: the first time someone who played before the November 2026 redesign opens a game, a card says where
+  // things went, once (NEWS; a later change can use .v2). It waits for any walkthrough, tip or card to close. New
+  // visitors get the walkthrough instead and are marked as having seen it.
+  function whatsNew(tries = 0) {
+    if (!RETURNING || load(NEWS).seen || !GAMES.some(g => g[1] === SLUG) || !$("menuBtn") || !$("card")) return;
+    if (document.hidden || document.querySelector(".spot") || ($("overlay") && $("overlay").classList.contains("show"))) {
+      if (tries < 30) setTimeout(() => whatsNew(tries + 1), 2000); return;
+    }
+    save(NEWS, {seen: Date.now()});
+    const list = document.createElement("ul"); list.className = "news";
+    for (const t of ["☰ Menu, top left, now holds Share, Best times, How to play, Keys and Settings (the switches that were under the board).",
+      "Undo and Bookmark are free: they never cost the gold paw.",
+      "Tools in dark red (Hint, Audit, helpers and Restart) cost the gold paw. Once it's gone for a puzzle, they turn plain.",
+      "Where a tap can mark instead of fill, a row under the board picks which (Mark, Dot, Keep, Erase)."]) {
+      const li = document.createElement("li"); li.textContent = t; list.append(li);
+    }
+    openCard("What's new", "", [["Show me the menu", () => { closeCard(); $("menuBtn").click(); }, true], ["Got it", closeCard]], list);
+  }
+  if (!RETURNING) save(NEWS, {seen: Date.now(), firstVisit: true});
+  setTimeout(whatsNew, 1500);
   // Pieces for a game you tap to fill, with no pad or tray of its own: the plain tap (o.plain, its word) and the game's
   // marking tool (o.mark, its button's id) side by side in a row of their own under the board, one lit at a time. The
   // marking button keeps its own handler and aria-pressed; the plain piece only presses it off.
