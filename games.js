@@ -335,6 +335,9 @@ const G = (() => {
   }
 
   function openCard(title, text, btns, media, after) {
+    if (reopening && btns.some(b => b && b[0] === HOME_LABEL) && $("newBtn") && $("newBtn").onclick) {   // a lost puzzle reopened (see reopen)
+      reopening = false; setTimeout(() => $("newBtn").onclick()); return;   // New's own deal (a tap on it opens the levels)
+    }
     const card = $("card"); card.innerHTML = "";
     const h = document.createElement("h2"); h.textContent = title; card.append(h);
     const s = document.createElement("div"); s.className = "stripe"; card.append(s);
@@ -515,17 +518,11 @@ const G = (() => {
     save(GOLD, {counts, top: tops, levels, seen: [...seen, sig].slice(-30)});
   }
   // The win cards' way out to every game.
-  const homeBtn = () => ["Back to the front page", () => { location.href = HOME; }];
-  // Leaving a win for the front page means you're done with that board: next time the game opens it deals the next
-  // one rather than showing the same win card again. The win is remembered (by game, result and text) as the home
-  // button is tapped, and a win card for it shown as the page opens takes its next-puzzle button instead.
-  const LEFT_WIN = "catdoku.leftwin.v1";
+  const HOME_LABEL = "Back to the front page", homeBtn = () => [HOME_LABEL, () => { location.href = HOME; }];
+  // A win reopened (coming back to a game after winning, however you left it) isn't shown again: the game deals the
+  // next puzzle, as the win card's next-puzzle button does. See reopen.
   function winCard(text, onNext, admire = "Admire my board", result, o = {}) {
-    const sig = `${CURRENT}|${JSON.stringify(result || null)}|${text}`, left = load(LEFT_WIN);
-    if (CURRENT && left[CURRENT]) {
-      const was = left[CURRENT]; delete left[CURRENT]; save(LEFT_WIN, left);
-      if (was === sig && performance.now() < 15000) { onNext(); return; }
-    }
+    if (reopening) { reopening = false; setTimeout(onNext); return; }
     const media = document.createElement("div"); media.className = "winmedia";
     // what earned the gold paw ("No undos!"), under the paw
     if (o.gold) { countGold(result, text, o.top); media.append(goldPaw()); if (o.goldWhy) { const g = document.createElement("p"); g.className = "goldwhy"; g.textContent = o.goldWhy; media.append(g); } }
@@ -547,7 +544,7 @@ const G = (() => {
     const btns = [[o.next || "New puzzle", onNext, true]];
     if (admire !== null) btns.push([admire, () => { closeCard(); if (o.onAdmire) o.onAdmire(); else note(admireNote(), 0); }]);
     btns.push(["Share my result", e => shareResult(result, o.gold, e.currentTarget)],
-      [homeBtn()[0], () => { if (CURRENT) { const l = load(LEFT_WIN); l[CURRENT] = sig; save(LEFT_WIN, l); } location.href = HOME; }]);
+      homeBtn());
     openCard(o.gold ? o.goldTitle || "Gold paw!" : o.title || "Solved!", "", btns, media, o.after);
   }
 
@@ -1702,7 +1699,15 @@ const G = (() => {
   window.addEventListener("unhandledrejection", e => reportError(String((e.reason && e.reason.message) || e.reason)));
   // Reopen a saved puzzle. If that fails, report why and start a fresh puzzle instead of
   // leaving an empty board.
+  // A saved puzzle that's already over (won or lost) isn't shown again with its end card: coming back to the game
+  // starts a new one instead, as its New button does. An end card is one with the way back to the front page
+  // (homeBtn); one opened while the saved puzzle is being reopened (up to the first tap or key, or a few seconds,
+  // as some games open it once the board's drawn) isn't shown, and the New button is pressed in its place.
+  let reopening = false;
+  const doneReopening = () => { reopening = false; };
+  ["pointerdown", "keydown"].forEach(t => addEventListener(t, doneReopening, true));
   function reopen(fn, fresh) {
+    reopening = true; setTimeout(doneReopening, 5000);
     try { fn(); }
     catch (e) {
       const why = `${e.message}${e.stack ? ` (${e.stack.split("\n")[0]})` : ""}`;
