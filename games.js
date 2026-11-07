@@ -423,7 +423,7 @@ const G = (() => {
 
 
   function load(key) { try { return JSON.parse(localStorage.getItem(key)) || {}; } catch (e) { return {}; } }
-  function save(key, data) { try { localStorage.setItem(key, JSON.stringify(data)); } catch (e) {} }
+  function save(key, data) { try { localStorage.setItem(key, JSON.stringify(data)); } catch (e) {} setTimeout(checkPaw); }
 
   // Build puzzles off the main thread. `fns` are plain functions; `entry` is the one to call with the size.
   function builder(fns, entry) {
@@ -1736,7 +1736,7 @@ const G = (() => {
   const FREE_ORDER = ["undoBtn", "notesBtn", "allNotesBtn", "clearNotesBtn", "guessBtn", "backBtn", "completeBtn", "finishBtn"];
   function arrange() {
     for (const b of document.querySelectorAll("main button.tool[id]")) if (!b.closest(".card,.overlay,#pageTools") && costsPaw(b.id)) {
-      b.classList.add("costsPaw"); if (!b.title) b.title = "Costs the gold paw";
+      b.classList.add("costsPaw"); b.dataset.paw = b.title ? "own" : ""; if (!b.title) b.title = "Costs the gold paw";
     }
     for (const row of document.querySelectorAll("main .actions:not(.helpers)")) {
       if (row.closest(".card,.overlay")) continue;
@@ -1755,6 +1755,22 @@ const G = (() => {
   }
   toolify();
   arrange();
+  // Once the gold paw is lost for this puzzle (a hint taken, a restart, a life lost…), or there's none to win (zen), the
+  // tools that cost it go back to the usual colour, with no crossed-out paw: there's nothing left to lose. Each page
+  // says when with G.pawLost(() => true or false), looked at on every save and every second or so.
+  let pawGone = null, pawWas = null;
+  function pawLost(fn) { pawGone = fn; checkPaw(); }
+  function checkPaw() {
+    if (!pawGone) return;
+    let lost = false; try { lost = !!pawGone(); } catch (e) { return; }   // the page's game may not be set up yet
+    if (lost === pawWas) return;
+    pawWas = lost;
+    for (const b of document.querySelectorAll("main button[data-paw]")) {
+      b.classList.toggle("costsPaw", !lost);
+      if (b.dataset.paw !== "own") b.title = lost ? "" : "Costs the gold paw";
+    }
+  }
+  setInterval(() => { if (!document.hidden) checkPaw(); }, 1000);
 
   /* ---------- bookmarks (guesses) ---------- */
   // Bookmark (called Guess until 2026-11; the code keeps the old names), as in Toydoku and Fair Play, for a game whose
@@ -1872,6 +1888,6 @@ const G = (() => {
     }
   }
 
-  return {MAGNET, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, meaning, plainText,
+  return {MAGNET, pawLost, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();

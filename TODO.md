@@ -91,9 +91,9 @@ the games over a few at a time.
 **Built so far (2026-11-07):** the pinned title row (☰ Menu, name, flame, stripe), the cat and line under it, and
 the menu, with Settings holding every game's switches and pickers. Then the dark-red paw-costing group
 (`PAW_COST` and `arrange` in `games.js`), the tool order, and Restart beside New. Then Undo, Bookmark and Return to
-Bookmark made free and Restart made to cost the paw in every game (`game.restarted`; see "The gold paw" below). Still
-to do: the red going back to the usual colour once the paw is lost for the puzzle (needs each game to say so); the
-pieces row with the marking tools in it; then the shared helpers below. When it's done, the README's "Across every game" (Layout, Gold paw, Bookmark, Keys) and
+Bookmark made free and Restart made to cost the paw in every game (`game.restarted`; see "The gold paw" below). Then
+the red going back to the usual colour once the paw is lost for the puzzle (`G.pawLost` on every page). Still to do:
+the pieces row with the marking tools in it; then the shared helpers below. When it's done, the README's "Across every game" (Layout, Gold paw, Bookmark, Keys) and
 `HIG.md` need rewriting to match.
 
 ### The page, top to bottom
@@ -182,9 +182,3 @@ lost board, now for free. Each game's gold-paw line on the win card and the READ
 - Knit Pick's Guess button has the id `guessBtn`, which every other game uses for Bookmark (once called Guess).
 - Slower: Wind Up is the one real-time game without it.
 
-## README: corrections found with the controls table
-
-- Bookmark's list leaves out Window Ledges (it has Bookmark through `G.guesser`), and "one helper runs it" isn't yet
-  true of Toydoku and Fair Play.
-- Hints: Toydoku's words are quiet too (read out only by VoiceOver), not only Toe Beans'; and "every game's hints work
-  through `G.hinter`" leaves out Catlas and Cat Burglar.
