@@ -1720,7 +1720,43 @@ const G = (() => {
     if (count) { count.classList.add("count"); b.append(count); }
     b.classList.add("tool"); return true;
   }
+  // Which buttons cost the gold paw, game by game, as the gold paw stands today (README, Gold paw). Hint costs it
+  // everywhere but Hide & Seek; Audit wherever there is one. Undo and Restart only where they're listed. (Undo and
+  // Bookmark are to become free everywhere and Restart to cost it everywhere: TODO.md.)
+  const PAW_COST = {
+    undo: "yarn patches sunbeams catwalk tango opendoor tunnelrun unravel iffits highperch catastrophe laserpointer treattime upatree pickpile scratchthat magnets purrfect catpile fishbones meowbile windowledges catshuffle crossstitch mewhue",
+    restart: "yarn patches sunbeams catwalk tango opendoor tunnelrun copycat unravel iffits highperch catastrophe laserpointer treattime upatree pickpile scratchthat magnets purrfect atlas catpile stash knitpick meowbile kittencaboodle windowledges catshuffle crossstitch junkdrawer",
+    hintFree: "hideseek",
+    helpers: {toybox: "shakeBtn shuffleBtn rainbowBtn basketBtn", bubbles: "sightBtn nipBtn shakeBtn", pickpile: "shuffleBtn", mewhue: "shuffleBtn",
+      junkdrawer: "leftBtn", windup: "shakeBtn fluffBtn netBtn", lmnopom: "swatBtn", birdwatch: "wipeBtn"},
+  };
+  const has = (list, slug) => (list || "").split(" ").includes(slug);
+  const costsPaw = (id, slug = SLUG) => id === "hintBtn" ? !has(PAW_COST.hintFree, slug) : id === "auditBtn" ||
+    (id === "undoBtn" && has(PAW_COST.undo, slug)) || (id === "restartBtn" && has(PAW_COST.restart, slug)) || has(PAW_COST.helpers[slug], id);
+  // The play tools in one order everywhere: the free ones (Undo, Pencil, Bookmark…), then the game's own, then those
+  // that cost the gold paw (Hint, Audit, helpers), grouped. Restart goes down beside New, and Give up after New.
+  const FREE_ORDER = ["undoBtn", "notesBtn", "allNotesBtn", "clearNotesBtn", "guessBtn", "backBtn", "completeBtn", "finishBtn"];
+  function arrange() {
+    for (const b of document.querySelectorAll("main button.tool[id]")) if (!b.closest(".card,.overlay,#pageTools") && costsPaw(b.id)) {
+      b.classList.add("costsPaw"); if (!b.title) b.title = "Costs the gold paw";
+    }
+    for (const row of document.querySelectorAll("main .actions:not(.helpers)")) {
+      if (row.closest(".card,.overlay")) continue;
+      const bs = [...row.children].filter(b => b.tagName === "BUTTON");
+      const rank = b => b.classList.contains("costsPaw") ? 200 + (b.id === "hintBtn" ? 0 : b.id === "auditBtn" ? 1 : 2) :
+        FREE_ORDER.includes(b.id) ? FREE_ORDER.indexOf(b.id) : 100;
+      bs.map((b, i) => [b, rank(b), i]).sort((x, y) => x[1] - y[1] || x[2] - y[2]).forEach(([b]) => row.append(b));
+    }
+    const nb = $("newBtn"), bar = nb && nb.closest("main .bar");
+    if (!bar) return;
+    const slot = nb.closest(".newpick") || nb;
+    for (const id of ["restartBtn", "giveUpBtn"]) {
+      const b = $(id); if (!b || !b.closest("main .actions") || b.closest(".card,.overlay")) continue;
+      b.classList.add("moved"); if (id === "restartBtn") slot.before(b); else slot.after(b);
+    }
+  }
   toolify();
+  arrange();
 
   /* ---------- bookmarks (guesses) ---------- */
   // Bookmark (called Guess until 2026-11; the code keeps the old names), as in Toydoku and Fair Play, for a game whose

@@ -89,8 +89,11 @@ kind of control is written once and works the same everywhere. Build it in `game
 the games over a few at a time.
 
 **Built so far (2026-11-07):** the pinned title row (☰ Menu, name, flame, stripe), the cat and line under it, and
-the menu, with Settings holding every game's switches and pickers. Next: the dark-red paw-costing group, the tool
-order under the board, Undo and Bookmark made free, then the shared helpers below. When it's done, the README's "Across every game" (Layout, Gold paw, Bookmark, Keys) and
+the menu, with Settings holding every game's switches and pickers. Then the dark-red paw-costing group
+(`PAW_COST` and `arrange` in `games.js`), the tool order, and Restart beside New. Still to do: the red going back to
+the usual colour once the paw is lost for the puzzle (needs each game to say so); Undo and Bookmark made free (then
+take `undo` out of `PAW_COST`) and Restart made to cost it everywhere (then `restart` covers every game); the pieces
+row with the marking tools in it; then the shared helpers below. When it's done, the README's "Across every game" (Layout, Gold paw, Bookmark, Keys) and
 `HIG.md` need rewriting to match.
 
 ### The page, top to bottom
