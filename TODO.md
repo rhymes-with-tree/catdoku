@@ -97,7 +97,7 @@ pieces under the board for the five tap-to-fill games with no pad (`G.pieces`: t
 Mark, Fair Play's Mark, Cross Stitch's Dot, Treat Time's Keep and Catdoku's Erase), and Scratch That's Dot first
 switch made a piece beside Post first. (The games with a pad, pots, tray or keys already had them under the board,
 with ⌫ or Erase among them, and Patches' Marker is among its fabrics.) Then the What's new card for returning
-visitors (`whatsNew`). Still to do: the shared helpers below. When it's done, the README's "Across every game" (Layout, Gold paw, Bookmark, Keys) and
+visitors (`whatsNew`). Then `G.switch` for every on/off setting (21 pages). Still to do: the other shared helpers below. When it's done, the README's "Across every game" (Layout, Gold paw, Bookmark, Keys) and
 `HIG.md` need rewriting to match.
 
 ### The page, top to bottom
@@ -176,8 +176,6 @@ Built 2026-11-07 (`whatsNew` in `games.js`), ahead of the shared helpers, which 
   becomes a piece like the rest.
 - **Lives and revives:** "Wait, I'm only mostly dead!" is written out in Catdoku, Toydoku, Hide & Seek, Twirl and Cat
   Burglar, and Catlas has lives of its own. One `G.lives`.
-- **Switches:** 21 pages write their own. One `G.switch({id, label, line, key})`, drawn in the menu's Settings, with
-  its line and its first-time tip.
 - **Numbers:** one switch name in Yarn ("Show numbers"), Toydoku, Purrmutation and Wind Up ("Numbers").
 - **Admire:** after a win, a toggle that clears the marks to show the finished picture. Today it's Open the Door!'s
   Show/Hide numbers button and Cat Burglar's Show/Hide the rings on its gallery card; it goes with the win card's

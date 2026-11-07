@@ -1356,15 +1356,50 @@ const G = (() => {
     next(); layer.focus({preventScroll: true});
   }
 
-  /* ---------- slower ---------- */
+  /* ---------- switches ---------- */
+  // A setting that's on or off (Auto check, Numbers, Slower…), written once. G.switch({id, label, line, key, of, save,
+  // change, can, tip}) draws it in the menu's Settings (or, before the menu is made, in a row of switches in the page,
+  // which the menu then takes), its name with its line under it. key names the setting in of (the page's settings, or
+  // a function giving them), kept with save(); change(on) runs after. can() false leaves it as it was (Toe Beans,
+  // mid-move). tip is shown once, pointing at the switch, the first time it's turned on. Gives back the box, whose
+  // .sync() shows the setting again when the page changed it itself.
+  const SWITCH_TIPS = {};
+  function makeSwitch(o) {
+    const of = () => typeof o.of === "function" ? o.of() : o.of;
+    const opt = document.createElement("div"); opt.className = "opt";
+    opt.innerHTML = '<label class="toggle"><input type="checkbox"><span class="sw"></span><span class="swName"></span></label>';
+    const box = opt.querySelector("input"); box.id = o.id;
+    opt.querySelector(".swName").textContent = o.label;
+    if (o.line) {
+      const s = document.createElement("span"); s.className = "hint"; s.id = o.id + "Line"; s.textContent = o.line;
+      opt.append(s); box.setAttribute("aria-describedby", s.id);
+    }
+    box.sync = () => { box.checked = !!of()[o.key]; };
+    box.sync();
+    box.addEventListener("change", () => {
+      if (o.can && !o.can()) { box.sync(); return; }
+      of()[o.key] = box.checked; if (o.save) o.save();
+      if (o.change) o.change(box.checked);
+    });
+    if (o.tip) SWITCH_TIPS[o.id] = o.tip;
+    let list = $("menuSettings");
+    if (!list) {
+      list = document.querySelector("main .bar.toggles.switches");
+      if (!list) { list = document.createElement("div"); list.className = "bar toggles switches"; (document.querySelector("main") || document.body).append(list); }
+    }
+    list.append(opt);
+    return box;
+  }
+
   // Slower (Apple asks games to offer difficulty accommodations, such as more time to react): a switch, #slowTgl, in an
   // action game's settings, kept on this device for each game; while it's on the game runs at two-thirds speed.
   // Returns a function giving the factor to stretch the game's times by (1, or 1.5 with Slower on).
   const SLOWER = "catdoku.slower.v1";
   function slower(slug) {
-    const box = $("slowTgl");
-    if (box) { box.checked = !!load(SLOWER)[slug]; box.addEventListener("change", () => { const d = load(SLOWER); d[slug] = box.checked; save(SLOWER, d); }); }
-    return () => (box ? box.checked : !!load(SLOWER)[slug]) ? 1.5 : 1;
+    const d = {[slug]: !!load(SLOWER)[slug]};
+    makeSwitch({id: "slowTgl", label: "Slower", line: "Everything moves at two-thirds speed", key: slug, of: d,
+      save: () => { const all = load(SLOWER); all[slug] = d[slug]; save(SLOWER, all); }});
+    return () => d[slug] ? 1.5 : 1;
   }
 
   /* ---------- boards in words ---------- */
@@ -1426,9 +1461,11 @@ const G = (() => {
     // the first time a switch is turned on, its tip, pointing at the switch
     document.addEventListener("change", e => {
       const box = e.target; if (!box.matches || !box.matches("input[type=checkbox]") || !box.checked || !box.id) return;
-      const key = SLUG + ":on", d = load(TIPS), t = (d[key] || []).find(x => x.els.some(f => f && (f.id === box.id || !!document.getElementById(f.id)?.contains(box))));
+      const key = SLUG + ":on", d = load(TIPS), shown = d[SLUG + ":shown"] || [];
+      let t = SWITCH_TIPS[box.id] && !shown.includes(SWITCH_TIPS[box.id]) ? {say: SWITCH_TIPS[box.id], els: [{id: box.id, up: ".opt"}]} : null;
+      if (!t) t = (d[key] || []).find(x => x.els.some(f => f && (f.id === box.id || !!document.getElementById(f.id)?.contains(box))));   // kept by an older walkthrough
       if (!t) return;
-      d[key] = d[key].filter(x => x !== t); if (!d[key].length) delete d[key];
+      if (d[key]) { d[key] = d[key].filter(x => x.say !== t.say); if (!d[key].length) delete d[key]; }
       d[SLUG + ":shown"] = [...(d[SLUG + ":shown"] || []), t.say]; save(TIPS, d);
       setTimeout(() => { if (free() && $("board")) spotlight({grid: $("board"), w: 1, h: 1, steps: [{say: t.say, els: t.els.map(f => f && findEl(f)).filter(Boolean)}], finish: false}); }, 250);
     });
@@ -1924,6 +1961,6 @@ const G = (() => {
     }
   }
 
-  return {MAGNET, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, meaning, plainText,
+  return {MAGNET, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();
