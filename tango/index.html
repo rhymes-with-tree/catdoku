@@ -36,6 +36,7 @@
 .squares{display:grid;gap:4px}
 .sq{aspect-ratio:1;background:#F7F1E4;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;box-shadow:inset 0 -2px 0 rgba(42,37,48,.12)}
 .sq.given{background:#E0D2BA;cursor:default}
+.sq.kbcursor{outline:3px solid #73A7AE;outline-offset:2px;z-index:1}
 .sq img{width:82%;height:82%;object-fit:contain;pointer-events:none;animation:pop .18s ease-out}
 .sq.given img{animation:none}
 @keyframes pop{from{transform:scale(.6)}}
@@ -262,12 +263,13 @@ function problems() {
   game.signs.forEach((s, k) => { const a = g[s.a], b = g[s.b]; if (a !== -1 && b !== -1 && (a === b) !== s.same) { badSign.add(k); bad.add(s.a); bad.add(s.b); } });
   return {bad, badSign};
 }
+let keys = null;   // the keyboard cursor (G.gridKeys), set up below the tap handler
 function draw() {
   const N = game.N, el = $("squares"), found = problems(), {bad, badSign} = settings.autoCheck ? found : {bad: new Set(), badSign: new Set()};
   el.style.gridTemplateColumns = `repeat(${N}, 1fr)`;
   const guesses = game.guesses || [];
   const flash = hints.current();
-  el.innerHTML = game.grid.map((v, i) => `<div class="sq${game.givens[i] !== -1 ? " given" : ""}${bad.has(i) ? " bad" : ""}${guesses.includes(i) ? " guess" : ""}${flash && flash.i === i ? " " + flash.kind : ""}" data-i="${i}" role="button" aria-label="${v === -1 ? "Empty" : nameOf(game.toys[v])}">${v === -1 ? "" : img(game.toys[v])}</div>`).join("");
+  el.innerHTML = game.grid.map((v, i) => `<div class="sq${game.givens[i] !== -1 ? " given" : ""}${bad.has(i) ? " bad" : ""}${guesses.includes(i) ? " guess" : ""}${flash && flash.i === i ? " " + flash.kind : ""}${keys && keys.at() === i ? " kbcursor" : ""}" data-i="${i}" role="button" aria-label="${v === -1 ? "Empty" : nameOf(game.toys[v])}">${v === -1 ? "" : img(game.toys[v])}</div>`).join("");
   // each sign sits on the edge between its two squares
   const cells = [...el.children], box = $("board").getBoundingClientRect(), bl = $("board").clientLeft, bt = $("board").clientTop;
   $("board").querySelectorAll(".sign").forEach(s => s.remove());
@@ -328,16 +330,19 @@ $("board").addEventListener("click", e => {
   draw(); save();
 }, true);
 $("squares").addEventListener("click", e => {
-  if (!playing()) return;
-  const c = e.target.closest(".sq"); if (!c) return;
-  const i = +c.dataset.i; if (game.givens[i] !== -1) return;
+  const c = e.target.closest(".sq"); if (c) tap(+c.dataset.i);
+});
+function tap(i) {
+  if (!playing() || game.givens[i] !== -1) return;
   snapshot();
   game.grid[i] = game.grid[i] === -1 ? 0 : game.grid[i] === 0 ? 1 : -1;
   const guesses = game.guesses || (game.guesses = []);
   if (guessing) { guessing = false; if (game.grid[i] !== -1 && !guesses.includes(i)) guesses.push(i); }
   else if (game.grid[i] === -1 && guesses.includes(i)) guesses.splice(guesses.indexOf(i), 1);  // emptied, so it's no longer a guess
   if (!game.grid.includes(-1) && !problems().bad.size) win(); else { draw(); save(); }
-});
+}
+// Keys: the arrows move a cursor over the squares; Space or Enter taps the square as a tap does.
+keys = G.gridKeys({on: () => playing(), size: () => [game.N, game.N], show: () => draw(), act: i => tap(i)});
 $("undoBtn").onclick = () => { if (playing() && game.history.length) { game.undid = true; restore(game.history.pop()); draw(); save(); } };
 document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && !$("undoBtn").disabled) { e.preventDefault(); $("undoBtn").click(); } });
 $("restartBtn").onclick = () => { if (playing() && game.history.length) { game.undid = true; snapshot(); game.grid = game.givens.slice(); game.notes = []; game.guesses = []; draw(); save(); G.note("Back to the start. Undo brings your toys back.", 3500); } };
