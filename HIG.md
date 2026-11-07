@@ -12,6 +12,8 @@ the reason they don't apply.
 ### Design principles
 - ✅ **Purpose, simplicity, delight:** one game per page, the board first, cats and gold paws for delight.
 - ✅ **Agency: help people recover from mistakes:** Undo (and Ctrl/⌘Z), Restart, Return to Bookmark (once called Undo guess), revives.
+  Undo, Bookmark and Return to Bookmark never cost the gold paw (since 2026-11-07), so taking back a slip is never
+  held against you; Restart, starting the whole puzzle over, does.
 - ✅ **Familiarity: provide clear feedback:** message line, red/green marks, win cards.
 - ✅ **Flexibility: preserve a person's context:** every game saves progress and reopens it.
 - ✅ **Flexibility: a variety of input methods:** touch, mouse and keyboard in every game.

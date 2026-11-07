@@ -591,7 +591,7 @@ const G = (() => {
   // After admiring, point to the page's own new-puzzle button (New floor, New table…), or the level list.
   const admireNote = () => $("newBtn") ? `Done! Tap ${$("newBtn").textContent.trim()} when you're ready for another.` : "Done! Pick a level when you're ready for another.";
   // o.lines adds lines of the game's own under the text.
-  // A perfect clear (no help, nothing lost, no undo) earns a gold paw: o.gold puts one on the win card,
+  // A perfect clear (no help, nothing lost, no restart; Undo is free) earns a gold paw: o.gold puts one on the win card,
   // with o.goldWhy saying what earned it, o.goldTitle in place of "Gold paw!", and o.goldPic (a picture
   // and its caption) in place of the random cat photo and name. o.pic does the same on every win (Cross Stitch shows
   // the finished sampler).
@@ -643,7 +643,7 @@ const G = (() => {
   function winCard(text, onNext, admire = "Admire my board", result, o = {}) {
     if (reopening) { reopening = false; setTimeout(onNext); return; }
     const media = document.createElement("div"); media.className = "winmedia";
-    // what earned the gold paw ("No undos!"), under the paw
+    // what earned the gold paw ("No hints or restarts!"), under the paw
     if (o.gold) { countGold(result, text, o.top); media.append(goldPaw()); if (o.goldWhy) { const g = document.createElement("p"); g.className = "goldwhy"; g.textContent = o.goldWhy; media.append(g); } }
     const p = document.createElement("p"); p.textContent = text;
     const name = document.createElement("p"); name.className = "catname";
@@ -1720,19 +1720,17 @@ const G = (() => {
     if (count) { count.classList.add("count"); b.append(count); }
     b.classList.add("tool"); return true;
   }
-  // Which buttons cost the gold paw, game by game, as the gold paw stands today (README, Gold paw). Hint costs it
-  // everywhere but Hide & Seek; Audit wherever there is one. Undo and Restart only where they're listed. (Undo and
-  // Bookmark are to become free everywhere and Restart to cost it everywhere: TODO.md.)
+  // Which buttons cost the gold paw, game by game (README, Gold paw). Hint costs it everywhere but Hide & Seek;
+  // Audit and Restart wherever there is one; helpers where they're listed. Undo, Bookmark and Return to Bookmark
+  // are free everywhere.
   const PAW_COST = {
-    undo: "yarn patches sunbeams catwalk tango opendoor tunnelrun unravel iffits highperch catastrophe laserpointer treattime upatree pickpile scratchthat magnets purrfect catpile fishbones meowbile windowledges catshuffle crossstitch mewhue",
-    restart: "yarn patches sunbeams catwalk tango opendoor tunnelrun copycat unravel iffits highperch catastrophe laserpointer treattime upatree pickpile scratchthat magnets purrfect atlas catpile stash knitpick meowbile kittencaboodle windowledges catshuffle crossstitch junkdrawer",
     hintFree: "hideseek",
     helpers: {toybox: "shakeBtn shuffleBtn rainbowBtn basketBtn", bubbles: "sightBtn nipBtn shakeBtn", pickpile: "shuffleBtn", mewhue: "shuffleBtn",
       junkdrawer: "leftBtn", windup: "shakeBtn fluffBtn netBtn", lmnopom: "swatBtn", birdwatch: "wipeBtn"},
   };
   const has = (list, slug) => (list || "").split(" ").includes(slug);
-  const costsPaw = (id, slug = SLUG) => id === "hintBtn" ? !has(PAW_COST.hintFree, slug) : id === "auditBtn" ||
-    (id === "undoBtn" && has(PAW_COST.undo, slug)) || (id === "restartBtn" && has(PAW_COST.restart, slug)) || has(PAW_COST.helpers[slug], id);
+  const costsPaw = (id, slug = SLUG) => id === "hintBtn" ? !has(PAW_COST.hintFree, slug) : id === "auditBtn" || id === "restartBtn" ||
+    has(PAW_COST.helpers[slug], id);
   // The play tools in one order everywhere: the free ones (Undo, Pencil, Bookmark…), then the game's own, then those
   // that cost the gold paw (Hint, Audit, helpers), grouped. Restart goes down beside New, and Give up after New.
   const FREE_ORDER = ["undoBtn", "notesBtn", "allNotesBtn", "clearNotesBtn", "guessBtn", "backBtn", "completeBtn", "finishBtn"];
@@ -1761,7 +1759,7 @@ const G = (() => {
   /* ---------- bookmarks (guesses) ---------- */
   // Bookmark (called Guess until 2026-11; the code keeps the old names), as in Toydoku and Fair Play, for a game whose
   // moves go on an Undo list (game.history): Bookmark marks the board as it is, and the next thing put on it glows
-  // violet; Return to Bookmark takes everything back to the latest bookmark in one tap, through the game's own Undo (so it costs what Undo costs). A guess is kept as {i, at}: the square
+  // violet; Return to Bookmark takes everything back to the latest bookmark in one tap, through the game's own Undo (so it's free, as Undo is). A guess is kept as {i, at}: the square
   // and how long the Undo list was before it, so plain Undo past it, or the square being emptied, ends it.
   // o: {game: () => game, undo (one step), draw (after a change), board (the element that shows it's armed), what
   // ("toy", "number"…: for the note line), over (() => true once the puzzle's finished; game.won if not given),

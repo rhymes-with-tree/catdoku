@@ -90,10 +90,10 @@ the games over a few at a time.
 
 **Built so far (2026-11-07):** the pinned title row (☰ Menu, name, flame, stripe), the cat and line under it, and
 the menu, with Settings holding every game's switches and pickers. Then the dark-red paw-costing group
-(`PAW_COST` and `arrange` in `games.js`), the tool order, and Restart beside New. Still to do: the red going back to
-the usual colour once the paw is lost for the puzzle (needs each game to say so); Undo and Bookmark made free (then
-take `undo` out of `PAW_COST`) and Restart made to cost it everywhere (then `restart` covers every game); the pieces
-row with the marking tools in it; then the shared helpers below. When it's done, the README's "Across every game" (Layout, Gold paw, Bookmark, Keys) and
+(`PAW_COST` and `arrange` in `games.js`), the tool order, and Restart beside New. Then Undo, Bookmark and Return to
+Bookmark made free and Restart made to cost the paw in every game (`game.restarted`; see "The gold paw" below). Still
+to do: the red going back to the usual colour once the paw is lost for the puzzle (needs each game to say so); the
+pieces row with the marking tools in it; then the shared helpers below. When it's done, the README's "Across every game" (Layout, Gold paw, Bookmark, Keys) and
 `HIG.md` need rewriting to match.
 
 ### The page, top to bottom
@@ -137,10 +137,13 @@ steps and first-time tips that point at a switch or a page tool (`spotlight` `el
 
 ### The gold paw
 
-Undo and Bookmark (so Return to Bookmark too) become free in every game. Restart still costs it, as do Hint, Audit
-and helpers, and whatever result the game is about (fewest moves, first try, par…). Today Undo costs it in about 25
-games and is free in Catdoku, Toydoku and Shelf Life. Each game's gold-paw line on the win card, and the README's
-Gold paw list, change with it.
+Done 2026-11-07. Undo and Bookmark (so Return to Bookmark too) are free in every game. Restart costs it in every game
+that has one (`game.restarted`, set by Restart and Clear, never by Undo; in the action games, by playing the same
+board, flock or wall again once it's started, or by counting as a try where the paw is for a first try), as do Hint,
+Audit and helpers, and whatever result the game is about (fewest moves, first try, par…). In the games that count
+moves (Cat Mat's pots, Fish Bones' swaps, Up a Tree's steps, Knock It Off's moves), Undo gives the move back, as it
+already did in Knock It Off; Night Light's taps still count even when undone. Mew Hue's Undo can still take back a
+lost board, now for free. Each game's gold-paw line on the win card and the README's Gold paw list changed with it.
 
 ### Shared helpers, so each is written once
 
