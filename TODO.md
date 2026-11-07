@@ -81,87 +81,100 @@ Cross Stitch (2026-11-06) went on the site with general cats for now (one of Pur
 title). Its samplers are mostly Gus, Peanut, Marmalade and Willow. Once the owner picks a star (or draws one), put
 them beside the title and in `ARTWORK.md`, and perhaps on the gold-paw card.
 
-## Controls: one shared way for what's written many times
+## Every game's page: one layout, one menu, one set of tools (approved 2026-11-07)
 
-From a side-by-side table of every game's controls (2026-11-07), checked against the pages. Each is a helper for
-`games.js` that the games then move onto, one game at a time; most also make the games behave the same.
+Approved by the owner on 2026-11-07, after a table of every game's controls was checked against the pages. Three parts
+that go together: the page's order, a menu in place of Games and the row of page tools, and shared helpers so each
+kind of control is written once and works the same everywhere. Build it in `games.js` and `games.css` first, then move
+the games over a few at a time. When it's done, the README's "Across every game" (Layout, Gold paw, Bookmark, Keys) and
+`HIG.md` need rewriting to match.
 
-- **Undo:** 29 pages write their own `undo` and history list. A shared `G.history` (push, undo, restart, ⌘Z) would
-  also let Return to Bookmark and Restart work the same everywhere (Bookmark already undoes through the game's Undo).
-- **Bookmark:** `G.guesser` runs it in 7 games, but Toydoku and Fair Play have their own Bookmark code. Move them over.
-- **Checking, three kinds with mixed names:** Auto check (rule breaks go red as you play: Patches, Sunbeams, Fair Play,
-  High Perch, Toydoku, Scratch That); Audit (a one-off check: Catdoku, Fridge Magnets, Purrfect Square); and wrong
-  answers costing a life, called Audit as-you-go in Catdoku and Auto grade in Toydoku (the same thing). One name for
-  each and one helper; then see whether Catdoku wants Auto check and Fridge Magnets and Purrfect Square an as-you-go.
-- **Notes, four ways:** Catdoku's paws and Auto Notes; Toydoku's Pencil (ON/OFF badge) and Clear notes; a Notes button
-  and Auto Notes in Open the Door!, High Perch and Window Ledges; Shift with a number in Mewstermind. The three
-  digit-pad games could share one pad helper (digits, ⌫, Notes, Auto Notes).
-- **Mark tools:** Hide & Seek's Mark, Fair Play's Mark (×), Cross Stitch's Dot, Treat Time's Keep, Catdoku's Erase and
-  Scratch That's Dot first switch all change what a tap does. One helper for the button, its pressed look and its key
-  (Scratch That's would become a button like the rest).
-- **Numbers, five ways:** a switch in Yarn ("Show numbers"), Toydoku, Purrmutation and Wind Up ("Numbers"), and a
-  button shown only after a win in Open the Door!. One `G.numbers` switch with one name, kept per game like `G.slower`.
-- **Zoom, three ways:** Twirl (Fit, Zoom In, Zoom Out), Cat Burglar (+ and − in the frame's corner) and Catlas (+, −,
-  Recentre). One helper beside `G.fullScreen`.
+### The page, top to bottom
+
+1. **Title row, pinned** (it stays at the top while everything else scrolls, so you always see which game you're
+   playing): ☰ Menu at the left (where an iPhone app's Back is; its first row is Home), the game's name centred, the
+   win-streak flame at the right (every game counts streaks with `G.streak`; today only Catdoku shows the flame).
+   Tapping the flame shows the best streak and today's challenge; on the challenge game it says whether today's is
+   done (in place of the badge under Games). On a phone held sideways the title row is pinned at the top of the
+   column beside the board instead.
+2. The rainbow line, the full width.
+3. The game's cat beside its blurb (the tagline). These scroll away.
+4. **Status line:** level on the left; time, lives or both on the right.
+5. **Board**, with zoom and full screen in its corner (as Cat Burglar's + and − already are).
+6. **Pieces**, the most used: digits, letters, toys, fabrics, paints, a tray of shapes, with ⌫ or Erase, and the
+   game's marking tool among them (Mark, Dot, Keep, Patches' Marker), as Marker already sits with Patches' fabrics.
+7. **Free tools:** Undo, Pencil, Bookmark, Return to Bookmark, Complete. Shown only where the game has them, in this
+   order, closing up the gaps.
+8. **Tools that cost the gold paw, grouped and in a dark brick red:** Hint, Audit, and the game's helpers. Not the
+   red that marks mistakes on the boards; at least 3 to 1 in light and dark; and a small slashed paw on the icon's
+   corner, so the colour isn't the only sign. Once the paw is gone for this puzzle, they go back to the usual colour.
+9. **Restart (red: it costs the paw) beside New puzzle**, and Give up beside them where a game has it (Keyboard Cat,
+   Spelling String, Cat Burglar).
+
+Action games (Tail Chase, Bird Watch, L-M-N-O-Pom, Wind Up, Bubbles, Pawlinko): the free tools are their controls
+(arrows, Turn, Drop, Pause) and the red group their helpers.
+
+### The menu (☰, top left, in place of Games and the row of page tools)
+
+- **Home** (the front page; one name for it everywhere), **Today's Challenge**, **Toy Chest** (one choice for every
+  game, so it can be reached from any of them)
+- **GAME NAME:** Add to Favorites (or ★ In Favorites; the ☆ leaves the title), Share, Best Times, How to Play, Keys
+  (on a computer), and **Settings**, a row that opens the game's switches, each with its line
+- All games: the games panel opens from Home's row, or from a row of its own; the front page and today's challenge
+  stay at its top
+- No Add to Home Screen.
+
+`pageTools` in `games.js` is where the page tools are gathered today, so most of this is one change there. Walkthrough
+steps and first-time tips that point at a switch or a page tool (`spotlight` `els`) need to open the menu, or point at
+☰ and say what's in it.
+
+### The gold paw
+
+Undo and Bookmark (so Return to Bookmark too) become free in every game. Restart still costs it, as do Hint, Audit
+and helpers, and whatever result the game is about (fewest moves, first try, par…). Today Undo costs it in about 25
+games and is free in Catdoku, Toydoku and Shelf Life. Each game's gold-paw line on the win card, and the README's
+Gold paw list, change with it.
+
+### Shared helpers, so each is written once
+
+- **Undo:** 33 pages write their own history. One `G.history` (push, undo, restart, ⌘Z), which Return to Bookmark
+  and Restart use too.
+- **Bookmark:** `G.guesser` runs it in 7 games; move Toydoku and Fair Play onto it.
+- **Checking:** one name each. Auto check (rule breaks turn red as you play: Patches, Sunbeams, Fair Play, High
+  Perch, Toydoku, Scratch That); Audit (a one-off check: Catdoku, Fridge Magnets, Purrfect Square); and wrong answers
+  costing a life, called Audit as-you-go in Catdoku and Auto grade in Toydoku, the same thing. Complete (Catdoku) and
+  Check (Mewstermind) are one button.
+- **Pencil:** one name for Toydoku's Pencil, the Notes of Open the Door!, High Perch and Window Ledges, and Catdoku's
+  paws, with Auto Notes. The three digit-pad games share one pad helper (digits, ⌫, Pencil, Auto Notes). Toydoku's
+  Erase pencil (every pencil mark off at once) sits beside Pencil or is a long press on it.
+- **Marking tools:** Hide & Seek's Mark, Fair Play's Mark (×), Cross Stitch's Dot, Treat Time's Keep, Patches'
+  Marker, Catdoku's Erase and Scratch That's Dot first switch all change what a tap does. One helper; Scratch That's
+  becomes a piece like the rest.
 - **Lives and revives:** "Wait, I'm only mostly dead!" is written out in Catdoku, Toydoku, Hide & Seek, Twirl and Cat
   Burglar, and Catlas has lives of its own. One `G.lives`.
-- **Finishing:** Complete (Catdoku) and Check (Mewstermind) do the same job. Give up is only in Keyboard Cat, Spelling
-  String and Cat Burglar, though Tangle and Hide & Seek have no Restart either.
-- **Helpers:** Shake (Toy Box, Bubbles, Wind Up, Pawlinko) and Shuffle or Mix (Toy Box, Pick of the Pile, Mew Hue,
-  Keyboard Cat). The icon badge is shared; the uses left and what each costs are not.
-- **Switches:** 21 pages write their own switch markup and keep its setting their own way. A `G.switch({id, label,
-  line, key})` would also give the line under it and its first-time tip.
-- **Hints:** Catlas and Cat Burglar don't use `G.hinter`.
+- **Switches:** 21 pages write their own. One `G.switch({id, label, line, key})`, drawn in the menu's Settings, with
+  its line and its first-time tip.
+- **Numbers:** one switch name in Yarn ("Show numbers"), Toydoku, Purrmutation and Wind Up ("Numbers").
+- **Admire:** after a win, a toggle that clears the marks to show the finished picture. Today it's Open the Door!'s
+  Show/Hide numbers button and Cat Burglar's Show/Hide the rings on its gallery card; it goes with the win card's
+  Admire my board (`G.winCard`), and other games can use it (pencil marks, Hide & Seek's doodles).
+- **Zoom and full screen:** Twirl (Fit, Zoom In, Zoom Out), Cat Burglar (+ −) and Catlas (+ −, Recentre) each zoom
+  their own way. One helper beside `G.fullScreen`, in the board's corner.
+- **Helpers:** the icon badge is shared; the uses left and the gold-paw cost become shared too. Shake is in Toy Box,
+  Bubbles, Wind Up and Pawlinko; Shuffle or Mix in Toy Box, Pick of the Pile, Mew Hue and Keyboard Cat.
+- **Hints by other names** go in the red group as hints: Keyboard Cat's Words left, Starts and Clues (switches today),
+  and Junk Drawer's Words left.
+- **Hints:** Catlas and Cat Burglar don't use `G.hinter` yet.
+
+### Names to fix on the way
+
+- Junk Drawer's Auto Notes fades the magnets no word left uses; name it like Pick of the Pile's Dim stuck blocks.
+- Knit Pick's Guess button has the id `guessBtn`, which every other game uses for Bookmark (once called Guess).
+- Slower: Wind Up is the one real-time game without it.
 
 ## README: corrections found with the controls table
 
 - Bookmark's list leaves out Window Ledges (it has Bookmark through `G.guesser`), and "one helper runs it" isn't yet
-  true of Toydoku and Fair Play (see above).
+  true of Toydoku and Fair Play.
 - Hints: Toydoku's words are quiet too (read out only by VoiceOver), not only Toe Beans'; and "every game's hints work
   through `G.hinter`" leaves out Catlas and Cat Burglar.
-- Junk Drawer's Auto Notes fades the magnets no word left uses, more like Pick of the Pile's Dim stuck blocks than the
-  other Auto Notes; perhaps a different name.
-
-## A More menu, and what goes on the board (proposal, not decided)
-
-Talked through on 2026-11-07. Sort every control by how often it's used while playing:
-
-**Into a More (…) menu at the far right of the title, beside the ☆, in place of Games** (things used once a visit, or set
-once and left); its first row is All games, which opens today's games panel, so the Games button goes:
-- the page tools: Share, Best times, How to play, Keys, Toys (all of today's row under the title, so `pageTools` is
-  the one place to change)
-- the switches that change how the board looks: Numbers, Fabric patterns, Twisty ribbons, Show sets, Shelf, Cats, Dim
-  stuck blocks
-- the switches that change how strict it is, set once: Auto check, Audit as-you-go / Auto grade, Auto Notes, Dot first,
-  Turning, Reverse, Slower
-- Give up (rarely wanted, and out of reach of a stray tap)
-- an Every game section at the bottom: today's challenge (the game's name, in gold, with the streak line; a link
-  from any other game, and on the challenge game itself its solved or not), the toy chest (one choice for every game,
-  so it can be reached from any of them, not only the toy games), the front page, and Add to Home Screen (only in a
-  browser, not once it's opened from the home screen; Safari can't be asked to add it, so it shows how: Share, then
-  Add to Home Screen). The games panel (All games) keeps the front page and today's challenge at its top too. On the
-  challenge game, keep its badge under the title, since it's why you came.
-- Toydoku, as the busiest page: Bookmark joins Undo, Erase, Pencil and Hint under the board, Restart and Erase pencil
-  stay in a row below the toys, and the page fits on one phone screen. Its menu, with four switches, is taller than
-  the screen and scrolls inside its frame.
-
-**Into New's menu with the levels**, as they decide the next puzzle: Yarn's colours, Catlas's answer style, Knit
-Pick's words.
-
-**Stay in the action row:** Hint, Undo, Restart, Bookmark and Return to Bookmark, Audit, Complete or Check, and New
-below the board. The timer stays in the status line.
-
-**On the board, or right at its edge** (part of the play itself, near the thumb, as Toydoku already does):
-- pads and palettes: digits, letters, toys, fabrics, paints, with ⌫, Enter, Notes and Pencil beside them
-- tools that change what a tap does: Erase, Mark, Dot, Keep, Flip
-- zoom and full screen in a corner of the board, as Cat Burglar's + and − already are (Twirl and Catlas too)
-- the action games' controls: ◀ ▶ ▼, Turn, Drop, Swat, Pause
-- helpers that act on the board: Shake, Shuffle, Mix it up, Peek, Wipe, Pawlinko's and Toy Box's helpers
-
-To weigh first:
-- Apple discourages a ☰ menu for an app's main places, but an ellipsis More button for secondary actions is ordinary
-  (a pull-down button); use …, not ☰.
-- Walkthrough steps and first-time tips point at switches and page tools (`spotlight` `els`). In a menu they'd need
-  to open it, or point at … and say what's in it.
-- Half the switches lose their always-visible line saying what they do; the menu should keep those lines.
-- Sideways on a phone, the column beside the board gets shorter, which helps.
