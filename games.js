@@ -377,25 +377,28 @@ const G = (() => {
     return wrap;
   }
 
-  // New with the levels in it (Wind Up): one tap on New opens a menu of the levels, from the select `sel` (kept
-  // hidden, for otherSize and the page's own bookkeeping), and picking one deals at that level; a second tap straight
-  // after (a double tap) shuts the menu and deals again at the level you're on. o: {btn, sel, choose(n), again(),
-  // tip (the line at the top of the menu)}.
+  // New with the levels in it (every game with a Level or Size picker beside New; toolify sets it up): one tap on New
+  // opens a menu of the levels, from the select `sel` (kept hidden, for otherSize and the page's own bookkeeping), and
+  // picking one sets the select and fires its change, so the page deals at that level as it always has; a second tap
+  // straight after (a double tap) shuts the menu and lets the tap through to New, which deals again at the same level.
+  // o: {btn, sel, word ("Level", "Size"…)}.
   function levelMenu(o) {
-    const btn = o.btn, sel = o.sel, wrap = document.createElement("span"), menu = document.createElement("div");
+    const btn = o.btn, sel = o.sel, word = o.word || "Level", wrap = document.createElement("span"), menu = document.createElement("div");
     wrap.className = "newpick"; btn.before(wrap); wrap.append(btn, menu);
-    menu.className = "levelmenu"; menu.id = btn.id + "Menu"; menu.setAttribute("role", "menu"); menu.setAttribute("aria-label", "Level"); menu.hidden = true;
+    menu.className = "levelmenu"; menu.id = btn.id + "Menu"; menu.setAttribute("role", "menu"); menu.setAttribute("aria-label", word); menu.hidden = true;
     btn.setAttribute("aria-haspopup", "menu"); btn.setAttribute("aria-expanded", "false"); btn.setAttribute("aria-controls", menu.id);
     let opened = -1e9;
-    const items = () => [...menu.querySelectorAll("button")];
-    const close = (refocus) => { if (menu.hidden) return; menu.hidden = true; btn.setAttribute("aria-expanded", "false"); if (refocus) btn.focus(); };
+    const items = () => [...menu.querySelectorAll("button:not(:disabled)")];
+    const close = refocus => { if (menu.hidden) return; menu.hidden = true; btn.setAttribute("aria-expanded", "false"); if (refocus) btn.focus(); };
     const open = focus => {
       menu.innerHTML = "";
-      const tip = document.createElement("p"); tip.className = "menutip"; tip.textContent = o.tip || "Double-tap for the same level"; menu.append(tip);
+      const name = ((btn.querySelector(".lbl") || btn).textContent || "New").trim();
+      const tip = document.createElement("p"); tip.className = "menutip"; tip.textContent = `Double-tap ${name} for the same ${word.toLowerCase()}`; menu.append(tip);
       for (const op of sel.options) {
-        const b = document.createElement("button"), on = op.value === sel.value;
-        b.type = "button"; b.setAttribute("role", "menuitemradio"); b.setAttribute("aria-checked", String(on)); b.textContent = op.textContent;
-        b.onclick = () => { close(); o.choose(+op.value); };
+        const b = document.createElement("button"), on = op.value === sel.value, text = op.textContent.trim();
+        b.type = "button"; b.setAttribute("role", "menuitemradio"); b.setAttribute("aria-checked", String(on)); b.disabled = op.disabled;
+        b.textContent = /^\d/.test(text) ? `${word} ${text}` : text;   // "1 · 4 × 4" reads "Level 1 · 4 × 4"
+        b.onclick = () => { close(); sel.value = op.value; sel.dispatchEvent(new Event("change", {bubbles: true})); };
         menu.append(b);
       }
       menu.hidden = false; btn.setAttribute("aria-expanded", "true");
@@ -405,13 +408,17 @@ const G = (() => {
       menu.style.left = `${Math.round(Math.max(8, Math.min(want, document.documentElement.clientWidth - 8 - mw)) - w.left)}px`;
       const cur = menu.querySelector('[aria-checked="true"]');
       if (cur) cur.scrollIntoView({block: "nearest"});
-      if (focus) (cur || items()[0]).focus();
+      if (focus) (cur && !cur.disabled ? cur : items()[0]).focus();
     };
-    btn.onclick = e => {
+    // caught on the way down, before the page's own click on New
+    wrap.addEventListener("click", e => {
+      if (!btn.contains(e.target)) return;
       const now = performance.now();
-      if (!menu.hidden) { close(); if (now - opened < 450) o.again(); return; }
+      if (!menu.hidden) { close(); if (now - opened < 450) return; e.stopImmediatePropagation(); e.preventDefault(); return; }
+      e.stopImmediatePropagation(); e.preventDefault();
+      if (btn.disabled) return;
       opened = now; open(e.detail === 0);   // detail 0: pressed with a key, so the menu takes the focus
-    };
+    }, true);
     menu.addEventListener("keydown", e => {
       const list = items(), k = list.indexOf(document.activeElement);
       if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(true); }
@@ -1558,9 +1565,13 @@ const G = (() => {
     }
     for (const b of document.querySelectorAll("main .bar > #chooseBtn")) makeTool(b);
     // the Level (or Size, or Round) picker: a step icon in place of its word; the menu keeps the word as its name
+    // Where New sits beside it, the picker goes inside New (levelMenu): a tap on New opens the levels, a double tap deals
+    // again at the same level, and the picker itself is hidden (kept for the page's own bookkeeping and otherSize).
     for (const sel of document.querySelectorAll("main .bar label > select#levelSel, main .bar label > select#size")) {
-      const label = sel.parentElement;
+      const label = sel.parentElement, nb = label.parentElement.querySelector(":scope > #newBtn");
+      const word = [...label.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent.trim()).join(" ").trim() || "Level";
       for (const n of [...label.childNodes]) if (n.nodeType === 3) n.remove();
+      if (nb) { label.hidden = true; levelMenu({btn: nb, sel, word}); }
       label.insertAdjacentHTML("afterbegin", iconSVG("level")); label.classList.add("picker");
       if (!sel.getAttribute("aria-label")) sel.setAttribute("aria-label", "Level");
       label.title = sel.getAttribute("aria-label");

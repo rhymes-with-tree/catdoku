@@ -96,7 +96,10 @@ in its notes.
   back this same puzzle as it was dealt; `newBtn` deals a different one. Every game has Share, and New unless
   levels are a fixed list.
 - **Settings row** (`.bar`, under the buttons): `levelSel` labelled "Level" (or `size` labelled "Size"),
-  then `newBtn` (New puzzle, or a themed name: New box, New room…). Switches and extra pickers go in a
+  then `newBtn` (New puzzle, or a themed name: New box, New room…). Write them as
+  `<label>Level <select id="levelSel" aria-label="Level"></select></label>` beside the button, with the select's
+  `onchange` dealing that level: `toolify` hides the picker and folds it into New (`G.levelMenu`), so a tap on New
+  opens the levels and a double tap deals again at the same level. A walkthrough step about levels points at `newBtn`. Switches and extra pickers go in a
   second row, `<div class="bar toggles">`, each in a `<div class="opt">`. A switch has just its short name, with
   no line under it: a switch doesn't change how hard a puzzle counts, so it's safe to flip it to see what it does.
   An extra picker can keep a `<span class="hint">` line saying what it does (see `yarn/`).
