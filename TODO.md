@@ -99,7 +99,8 @@ switch made a piece beside Post first. (The games with a pad, pots, tray or keys
 with ⌫ or Erase among them, and Patches' Marker is among its fabrics.) Then the What's new card for returning
 visitors (`whatsNew`). Then `G.switch` for every on/off setting (21 pages), and the names: Notes, Auto grade, Junk
 Drawer's Dim used-up magnets, Yarn's Numbers (was Show numbers), Knit Pick's Guess button (`wordBtn`, so it's no longer taken for Bookmark) and Slower in
-Wind Up. Then Toydoku and Fair Play moved onto `G.guesser`. Still to do: the other shared helpers below. When it's done, the README's "Across every game" (Layout, Gold paw, Bookmark, Keys) and
+Wind Up. Then Toydoku and Fair Play moved onto `G.guesser`, and Catlas and Cat Burglar onto `G.hinter` (their hint's words go
+beside Hint and stay until the card or painting moves on; what the hint showed is still kept by the page). Still to do: the other shared helpers below. When it's done, the README's "Across every game" (Layout, Gold paw, Bookmark, Keys) and
 `HIG.md` need rewriting to match.
 
 ### The page, top to bottom
@@ -185,4 +186,3 @@ Built 2026-11-07 (`whatsNew` in `games.js`), ahead of the shared helpers, which 
   Bubbles, Wind Up and Pawlinko; Shuffle or Mix in Toy Box, Pick of the Pile, Mew Hue and Keyboard Cat.
 - **Hints by other names** go in the red group as hints: Keyboard Cat's Words left, Starts and Clues (switches today),
   and Junk Drawer's Words left.
-- **Hints:** Catlas and Cat Burglar don't use `G.hinter` yet.
