@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.2"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.4"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.2">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.4">
 <style>
 /* A room seen from above: a wooden floor inside a wall, with a laser pointer poking in at one edge. Cats sit on
    some squares and mirrors stand on others; tap a mirror to tip it the other way. The red dot runs straight and
@@ -102,7 +102,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-07.2"></script>
+<script src="../games.js?v=2026-11-07.4"></script>
 <script>
 /* ---------- laser puzzles (plain functions, also run in a background worker) ---------- */
 // The room is N × N squares. The laser pointer sits just off one edge and shines in along a row or column.
@@ -340,12 +340,14 @@ function makeLiveRoom(n) {
 // game: {level, N, start and dir (where the laser shines in, and which way), cat (0 or each cat's number, by
 //        square), sol (each mirror's answer: 0 /, 1 \, -1 for a spare or no mirror), tilt (how each mirror
 //        stands now, -1 for no mirror), first (how they stood at the start), history (squares tapped, or
-//        {tilt} for a Restart), won, hinted, undid…}
+//        {tilt} for a Restart), won, hinted, restarted…}
 const STORE = "catdoku.laserpointer.v1", MAX_LEVEL = 15, M = 56, NS = "http://www.w3.org/2000/svg";
 const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1}, state.settings);
 let game = state.game || null, busy = false, running = false, cursor = -1;
+// The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
+G.pawLost(() => !game || game.won || game.hinted || game.restarted);
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
 const levelName = n => { const s = levelSpec(n); return `Level ${n} · ${s.N} × ${s.N}${s.live ? ", moving" : ""}${s.order ? ", in order" : ""}`; };
@@ -647,7 +649,6 @@ document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.s
 // Undo takes back a tap, or a Restart.
 function undo() {
   if (!playing() || !game.history.length) return;
-  game.undid = true;
   const h = game.history.pop();
   if (typeof h === "number") { game.tilt[h] ^= 1; setTilt(h); }
   else { game.tilt = h.tilt; for (const i in mirrors) setTilt(+i); }
@@ -658,7 +659,7 @@ $("restartBtn").onclick = () => {
   if (!playing()) return;
   if (isLive()) {   // the laser goes off and the mirrors go back, ready for another run
     if (!game.history.length && !live.on) return;
-    game.undid = true; game.history = []; game.tilt = game.first.slice();
+    game.restarted = true; game.history = []; game.tilt = game.first.slice();
     for (const i in mirrors) setTilt(+i);
     liveReset();
     update(); save();
@@ -666,7 +667,7 @@ $("restartBtn").onclick = () => {
     return;
   }
   if (!game.history.length) return;
-  game.undid = true;
+  game.restarted = true;
   game.history.push({tilt: game.tilt.slice()});
   game.tilt = game.first.slice();
   for (const i in mirrors) setTilt(+i);
@@ -773,11 +774,11 @@ function tossToys(done) {
   })(t0);
 }
 function finishCard() {
-  const next = settings.level, gold = !game.undid && !game.hinted;
+  const next = settings.level, gold = !game.restarted && !game.hinted;
   let text = `The dot ran past all ${catAt.length} cats${order() ? " in order" : ""} in the ${game.N} × ${game.N} room.`;
   text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my room", game.result,
-    {title: "Got it!", gold, goldWhy: "No hints or undos!", next: next > game.level ? `Next: level ${next}` : "Next board",
+    {title: "Got it!", gold, goldWhy: "No hints or restarts!", next: next > game.level ? `Next: level ${next}` : "Next board",
      after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
   // a word for the humans, just above the buttons
   const psa = document.createElement("p"); psa.className = "psa";

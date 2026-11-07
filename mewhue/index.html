@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.2"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.4"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.2">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.4">
 <style>
 /* Blocks of paint, each with a mark: red a bar down, yellow a bar across, blue a ring. Drag a row
    or column and its blocks slide to that end. Two different marks mix, and the mix carries both (orange is a
@@ -101,7 +101,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-07.2"></script>
+<script src="../games.js?v=2026-11-07.4"></script>
 <script>
 /* ---------- marks, colours and rules (plain functions) ---------- */
 // Colours by number: 0 red (a bar down), 1 orange (bar down and across), 2 yellow (a bar across), 3 green (across
@@ -243,13 +243,15 @@ function drawKey(g) {
 
 /* ---------- game state ---------- */
 // game: {level, seed, grid (a colour number or -1 in each square), drops, lines, moves, mixes (Mix it ups left),
-//        start (the board as dealt), history, won, lost, hinted, undid, clock…}
+//        start (the board as dealt), history, won, lost, hinted, restarted, clock…}
 const STORE = "catdoku.mewhue.v3", MAX_LEVEL = 15, MIXES = 2, $ = G.$;
 let saved = G.load(STORE), settings = Object.assign({level: 1, seen: {}}, saved.settings);
 // the order levels 1 to 3 take the pairs of primaries in, picked once for this device
 const isOrder = o => Array.isArray(o) && o.length === 3 && [0, 1, 2].every(k => o.includes(k));
 if (!isOrder(settings.order)) settings.order = [0, 1, 2].sort(() => Math.random() - .5);
 let game = saved.game || null, busy = false;
+// The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
+G.pawLost(() => !game || game.won || game.hinted || game.restarted || game.mixed);
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !game.lost && !busy && !$("overlay").classList.contains("show");
 const levelName = n => [null, "Two colours", "A new colour", "All three mixes", "Two mixes", "Stone", "All three", "Black", "White", "Black and white", "Spotless", "A mix and stone", "No stone left", "Clean sweep", "Two stones and a mix", "Every mix"][n];
@@ -391,11 +393,11 @@ const keys = G.gridKeys({
   act: () => false,
 });
 document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
-function undo() { if (!game || busy || !game.history.length || game.won) return; game.undid = true; game.lost = false; Object.assign(game, JSON.parse(game.history.pop())); G.closeCard(); draw(); save(); }
+function undo() { if (!game || busy || !game.history.length || game.won) return; game.lost = false; Object.assign(game, JSON.parse(game.history.pop())); G.closeCard(); draw(); save(); }
 $("undoBtn").onclick = undo;
 $("restartBtn").onclick = () => {
   if (!game || busy || !game.history.length || game.won) return;
-  game.undid = true; game.history.push(snap());
+  game.restarted = true; game.history.push(snap());
   Object.assign(game, JSON.parse(game.start), {lines: 0, got: [], moves: 0, mixes: MIXES, lost: false});
   G.closeCard(); draw(); save(); G.note("Back to the start of the level. Undo brings it back.", 3500);
 };
@@ -450,11 +452,11 @@ function win() {
   const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
   settings.level = next; $("levelSel").value = next; save();
   G.track(`Mew Hue won level ${game.level}`);
-  const gold = !game.undid && !game.hinted && !game.mixed, spec = levelSpec(game.level);
+  const gold = !game.restarted && !game.hinted && !game.mixed, spec = levelSpec(game.level);
   let text = spec.task ? `Done: ${taskText(game, true)}, in ${game.moves} moves.` : `You cleared ${game.lines} ${spec.stone ? "line" : "line"}${game.lines === 1 ? "" : "s"}${spec.stone ? " of stone" : ""} in ${game.moves} moves.`;
   text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the last level; here's another board." : ` Next up: level ${next}, ${levelName(next).toLowerCase()}.`;
   setTimeout(() => G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the board", game.result,
-    {title: "Lined up!", gold, goldWhy: "No hints, undos or mix-ups!", goldTitle: "Willow's having a nap!", goldPic: [goldPic()], next: next > game.level ? `Next: level ${next}` : "Next board",
+    {title: "Lined up!", gold, goldWhy: "No hints, mix-ups or restarts!", goldTitle: "Willow's having a nap!", goldPic: [goldPic()], next: next > game.level ? `Next: level ${next}` : "Next board",
      after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")}), 500);
 }
 function goldPic() { const im = new Image(); im.className = "goldpic"; im.src = catSrc("willow-5"); im.alt = "Willow curled up asleep"; return im; }

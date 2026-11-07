@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.2"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.4"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -24,7 +24,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.2">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.4">
 <style>
 /* Gus and Peanut take turns on the top shelf of a climbing wall, knocking things off (yarn, toys, fluffballs, a mug…) that bounce
    down through sisal posts, perches and springs into the cat beds at the bottom. The score and target sit side by side, and
@@ -124,10 +124,10 @@ body.full .bar{width:auto;grid-column:3;grid-row:4;align-self:center}
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-07.2"></script>
-<script src="../colorways.js?v=2026-11-07.2"></script>
-<script src="../cattower.js?v=2026-11-07.2"></script>
-<script src="../tablethings.js?v=2026-11-07.2"></script>
+<script src="../games.js?v=2026-11-07.4"></script>
+<script src="../colorways.js?v=2026-11-07.4"></script>
+<script src="../cattower.js?v=2026-11-07.4"></script>
+<script src="../tablethings.js?v=2026-11-07.4"></script>
 <script>
 /* ---------- the climbing wall (plain functions: the puzzle maker runs them in a worker too) ---------- */
 // World units: the wall is 360 wide and 424 tall. Things knocked off the top shelf bounce down through rows of
@@ -573,6 +573,8 @@ if (state.settings && !settings.v2) {
 settings.v2 = true;
 G.save(STORE, {settings, game: state.game || null});   // kept at once, so a reload doesn't move them up again
 let game = null, loading = 0;
+// The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
+G.pawLost(() => !game || game.hinted || game.wall.restarted);
 const cv = $("cv"), ctx = cv.getContext("2d");
 const builder = G.builder([plinkoLevels, plinkoKinds, plinkoRng, plinkoGeom, makeWall, plinkoStep, plinkoBall, plinkoLanded, plinkoWorld, plinkoBonus, plinkoGoals, plinkoNeed, plinkoNaps, plinkoBed, plinkoTick, plinkoRun, plinkoAims, plinkoMap, plinkoBases, plinkoTargets, makePlinko], "makePlinko");
 const levelName = n => { const L = LEVELS[n], bits = [`${L.beds.length} beds`];
@@ -581,7 +583,7 @@ const levelName = n => { const L = LEVELS[n], bits = [`${L.beds.length} beds`];
 const save = () => G.save(STORE, {settings, game: game && ["ready", "running"].includes(game.state) ? {
   level: game.level, seed: game.wall.seed, target: game.wall.target, gold: game.wall.gold, i: game.i, w: game.w, splats: game.splats, helpers: game.helpers,
   items: game.wall.items.map(o => [o.k, o.c]), swaps: game.swaps, setup: game.setup, setting: !!game.setting,
-  aim: game.aim, hinted: game.hinted, ms: game.ms, started: game.started, timed: game.timed} : null});
+  aim: game.aim, hinted: game.hinted, restarted: !!game.wall.restarted, ms: game.ms, started: game.started, timed: game.timed} : null});
 const busy = g => g.w.moving.length > 0;
 // how many helpers a wall gets, by level (shared among all five)
 const HELPERS = [0, 4, 4, 3, 3, 3, 3, 2, 2, 2, 2];
@@ -1095,25 +1097,26 @@ function finish(g) {
 }
 function win() {
   const g = game; g.state = "won"; G.finishClock(g);
-  const next = Math.min(MAX_LEVEL, g.level + 1), gold = !g.hinted && g.w.score >= g.wall.gold;
+  const next = Math.min(MAX_LEVEL, g.level + 1), gold = !g.hinted && !g.wall.restarted && g.w.score >= g.wall.gold;
   settings.level = next; $("levelSel").value = next; save(); status();
   G.track(`Pawlinko won level ${g.level}`);
   const im = new Image(); im.className = "pic"; im.src = src("peanut-7"); im.alt = "Peanut asleep in a round bed";
-  const text = `${g.w.score} points, over the target of ${g.wall.target}.` + (g.w.gp && g.w.gp.done ? " Goal met, too!" : "") + (!gold && !g.hinted ? ` ${g.wall.gold} points with no hints wins a gold paw.` : "") + (g.level === MAX_LEVEL ? "" : ` Next up: level ${next}.`);
+  const text = `${g.w.score} points, over the target of ${g.wall.target}.` + (g.w.gp && g.w.gp.done ? " Goal met, too!" : "") + (!gold && !g.hinted && !g.wall.restarted ? ` ${g.wall.gold} points with no hints or restarts wins a gold paw.` : "") + (g.level === MAX_LEVEL ? "" : ` Next up: level ${next}.`);
   G.winCard(text, () => startLevel(next), "Admire the wall", g.result,
-    {title: "All tucked in!", gold, goldWhy: `${g.wall.gold} points with no hints!`, goldPic: [im], next: next > g.level ? `Next: level ${next}` : "New wall",
+    {title: "All tucked in!", gold, goldWhy: `${g.wall.gold} points with no hints or restarts!`, goldPic: [im], next: next > g.level ? `Next: level ${next}` : "New wall",
      top: g.level === MAX_LEVEL, after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
 }
 function lose() {
   const g = game; g.state = "lost"; status(); save();
   G.breakStreak(); G.track(`Pawlinko missed on level ${g.level}`);
   G.openCard("Not quite!", `${g.w.score} points, ${g.wall.target - g.w.score} short of the target of ${g.wall.target}.`,
-    [["Try this wall again", () => startWall(g.wall), true], ["New wall", () => { G.closeCard(); newGame(g.level); }],
+    [["Try this wall again", () => { g.wall.restarted = true; startWall(g.wall); }, true], ["New wall", () => { G.closeCard(); newGame(g.level); }],
      ["Admire the wall", () => { G.closeCard(); G.note("Tap Restart to try this wall again.", 0); }], G.homeBtn()],
     null, G.otherSize($("levelSel"), g.level, startLevel, "Or play a different level:"));
 }
 function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); G.closeCard(); newGame(n); }
-$("restartBtn").onclick = () => { if (game) startWall(game.wall); };
+// Restart: this wall again, as dealt; once a throw's been made, it costs the gold paw.
+$("restartBtn").onclick = () => { if (game) { if (game.i > 0 || game.state !== "ready") game.wall.restarted = true; startWall(game.wall); } };
 $("newBtn").onclick = () => { if (game) newGame(game.level); };
 // Share: the level and the wall, as built.
 $("linkBtn").onclick = () => { if (game) G.shareCard({name: "Pawlinko", what: "wall", won: game.state === "won", puzzle: () => ({g: "pawlinko", N: game.level, s: game.wall.seed, v: 2})}); };
@@ -1182,7 +1185,7 @@ if (!openedShare) {
   const s = state.game;
   G.reopen(() => {
     if (!(s && s.level === settings.level && Number.isInteger(s.seed))) { newGame(settings.level); return; }
-    const t = makeWall(s.level, s.seed); t.target = s.target; t.gold = s.gold;
+    const t = makeWall(s.level, s.seed); t.target = s.target; t.gold = s.gold; t.restarted = !!s.restarted;
     const w = s.w;
     if (w && !Array.isArray(w.springs)) w.springs = [];   // saved before you could place springs
     const order = Array.isArray(s.items) && s.items.length === t.items.length && s.items.every(o => Array.isArray(o) && KINDS[o[0]] && Number.isInteger(o[1])) ? s.items.map(([k, c]) => ({k, c})) : null; num = Number.isFinite, okThing = b => b && num(b.x) && num(b.y) && KINDS[b.k] && num(b.i) && t.items[b.i];

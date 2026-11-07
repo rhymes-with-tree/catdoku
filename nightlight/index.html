@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.2"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.4"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.2">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.4">
 <style>
 /* A dark room full of cats. Awake cats' eyes glow; tap a cat and it and the cats beside it blink, so open
    eyes shut and shut eyes open. When every cat's asleep, the room goes dark. */
@@ -78,7 +78,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-07.2"></script>
+<script src="../games.js?v=2026-11-07.4"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // Every cat has arrows, and a tap blinks the cat and the cats its arrows point at. Levels 1 to 9 are plain
@@ -187,6 +187,8 @@ const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1}, state.settings);
 let game = state.game || null, busy = false, lit = -1;
+// The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
+G.pawLost(() => !game || game.won || game.hinted || game.restarted || game.taps > game.par);
 const hints = G.hinter({game: () => game, key: () => game ? game.awake.join("") : "", draw: () => draw()});   // marks {i}: a cat to tap
 const save = () => G.save(STORE, {settings, game});
 // Until build 2026-11-02.9 there were 10 levels, with arrows from level 3; those are now levels 12 to 19.
@@ -245,13 +247,13 @@ $("board").addEventListener("click", e => { const c = e.target.closest(".cat"); 
 // Keys: the arrows move a cursor, and Space or Enter taps the cat under it.
 const keys = G.gridKeys({on: () => playing(), size: () => [game.W, game.H],
   show: i => [...$("board").children].forEach((c, k) => c.classList.toggle("kbcursor", k === i)), act: i => tap(i)});
-// Undo flips the last tap back (a tap undoes itself). Taps still count, so Undo and Restart are free but don't
-// win back the taps.
+// Undo flips the last tap back (a tap undoes itself). Taps still count, so Undo is free but doesn't win back the
+// taps; Restart costs the gold paw.
 $("undoBtn").onclick = () => { if (playing() && game.history.length) { flip(game.history.pop()); draw(); save(); } };
 document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && !$("undoBtn").disabled) { e.preventDefault(); $("undoBtn").click(); } });
 $("restartBtn").onclick = () => {
   if (!playing() || !game.history.length) return;
-  game.awake = game.start.slice(); game.history = []; draw(); save();
+  game.awake = game.start.slice(); game.history = []; game.restarted = true; draw(); save();
   G.note("Back to the start. Your taps still count.", 3500);
 };
 // Hint: glow a cat that's part of the shortest way from here (the player taps it). A hint keeps you on the same level.
@@ -266,7 +268,7 @@ function hint() {
 $("hintBtn").onclick = hint;
 
 /* ---------- endings ---------- */
-const goldOK = () => !game.hinted && game.taps <= game.par;
+const goldOK = () => !game.hinted && !game.restarted && game.taps <= game.par;
 function win() {
   game.won = true; G.finishClock(game);
   const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
@@ -283,7 +285,7 @@ function finishCard() {
   let text = `Every cat's asleep, in ${game.taps} tap${game.taps === 1 ? "" : "s"} (the fewest is ${game.par}).`;
   text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the dark", game.result,
-    {title: "Goodnight!", gold: goldOK(), goldWhy: "The fewest taps, and no hint!", goldTitle: "Goodnight, Dottie!", goldPic: [dottiePic()], next: next > game.level ? `Next: level ${next}` : "Next board",
+    {title: "Goodnight!", gold: goldOK(), goldWhy: "The fewest taps, with no hint or restart!", goldTitle: "Goodnight, Dottie!", goldPic: [dottiePic()], next: next > game.level ? `Next: level ${next}` : "Next board",
      after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
 }
 

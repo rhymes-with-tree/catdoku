@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.2"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.4"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.2">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.4">
 <style>
 /* Dottie, the star, beside the title */
 .title{display:flex;align-items:flex-end;gap:8px}
@@ -89,6 +89,7 @@
     <button id="hintBtn">Hint</button>
     <button id="undoBtn">Undo</button>
     <button id="restartBtn">Restart</button>
+    <button id="dotBtn" aria-pressed="false">Dot first</button>
     <button id="guessBtn" aria-pressed="false">Bookmark</button>
     <button id="backBtn" hidden>Return to Bookmark</button>
     <button id="linkBtn">Share</button>
@@ -100,13 +101,12 @@
     <button id="newBtn" class="primary">New room</button>
   </div>
   <div class="bar toggles">
-    <div class="opt"><label class="toggle"><input type="checkbox" id="dotSw"><span class="sw"></span>Dot first</label></div>
     <div class="opt"><label class="toggle"><input type="checkbox" id="checkTgl"><span class="sw"></span>Auto check</label></div>
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-07.2"></script>
-<script src="../cattower.js?v=2026-11-07.2"></script>
+<script src="../games.js?v=2026-11-07.4"></script>
+<script src="../cattower.js?v=2026-11-07.4"></script>
 <script>
 /* ---------- rooms ---------- */
 // A room is N × N squares, each floor (-1), furniture (-2) or furniture with a number (0 to 4).
@@ -259,12 +259,14 @@ const catSrc = f => CAT_SRC[f] || `../cats/${f}.webp`;
 
 /* ---------- game ---------- */
 // game: {level, N, g (the room), post (the answer), s (each floor square: 1 post, 0 dot, -1 empty), moves
-//        ([square, what it was]), hinted, undid, restarted, won}
+//        ([square, what it was]), hinted, restarted, won}
 const STORE = "catdoku.scratchthat.v1";
 const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1, autoCheck: true}, state.settings);
 let game = state.game || null;
+// The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
+G.pawLost(() => !game || game.won || game.hinted || game.restarted);
 const hints = G.hinter({game: () => game, key: () => game ? stateKey() : "", draw: () => draw()});   // marks {cells, bad}: a hint's squares
 const guesses = G.guesser({game: () => game, undo, draw: () => { draw(); save(); }, board: $("board"), what: "post", moves: gm => gm.moves});
 const save = () => G.save(STORE, {settings, game});
@@ -272,7 +274,7 @@ const playing = () => game && !game.won && !$("overlay").classList.contains("sho
 
 function fresh(r) {
   return {level: r.n, N: r.N, g: r.g, post: r.post.join ? r.post.join("") : r.post, s: r.g.map(() => -1), moves: [],
-          hinted: false, undid: false, restarted: false, won: false, ...G.freshClock()};
+          hinted: false, restarted: false, won: false, ...G.freshClock()};
 }
 let asking = 0;
 function newPuzzle() {
@@ -418,7 +420,6 @@ function undo() {
   if (!playing() || !game.moves.length) return;
   const m = game.moves.pop();
   for (const [i, was] of (typeof m[0] === "number" ? [m] : m).slice().reverse()) game.s[i] = was;
-  game.undid = true;
   draw(); save(); G.note("");
 }
 $("undoBtn").onclick = undo;
@@ -468,7 +469,7 @@ function hint() {
 $("hintBtn").onclick = hint;
 
 /* ---------- winning ---------- */
-const goldOK = () => !game.hinted && !game.undid && !game.restarted;
+const goldOK = () => !game.hinted && !game.restarted;
 function win() {
   game.won = true; G.finishClock(game); G.note("");
   const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
@@ -484,7 +485,7 @@ function finishCard() {
   let text = `${n} posts, all scratched up, and not a scratch on the furniture.`;
   text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the biggest room; here's another." : ` Next up: level ${next}.`;
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the room", game.result,
-    {title: "Furniture saved!", gold: goldOK(), goldWhy: "No hints or undos!", goldPic: [dottiePic()], next: next > game.level ? `Next: level ${next}` : "Next board",
+    {title: "Furniture saved!", gold: goldOK(), goldWhy: "No hints or restarts!", goldPic: [dottiePic()], next: next > game.level ? `Next: level ${next}` : "Next board",
      after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
 }
 
@@ -552,8 +553,10 @@ for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n
 $("levelSel").onchange = e => startLevel(+e.target.value);
 $("newBtn").onclick = newPuzzle;
 $("helpBtn").onclick = showHelp;
-$("dotSw").checked = !!settings.dotFirst;
-$("dotSw").onchange = e => { settings.dotFirst = e.target.checked; save(); };
+// Dot first (a switch until 2026-11): a piece under the board beside Post first, so the first tap on a square dots it.
+const dotBtn = $("dotBtn"); dotBtn.setAttribute("aria-pressed", String(!!settings.dotFirst));
+dotBtn.onclick = () => { settings.dotFirst = !settings.dotFirst; dotBtn.setAttribute("aria-pressed", String(settings.dotFirst)); save(); };
+G.pieces({plain: "Post first", mark: "dotBtn"});
 $("checkTgl").checked = settings.autoCheck;
 $("checkTgl").onchange = e => { settings.autoCheck = e.target.checked; save(); if (game) draw(); };
 

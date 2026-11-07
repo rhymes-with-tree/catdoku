@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.2";
+  var BUILD = "2026-11-07.4";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.2">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.4">
 <style>
 /* Pawlette: Mix to order. A skein of yarn waits to be dyed in one of Yarn's colourways, a colour at a time. Tap the
    pots to drip paint into the cup, mixing like real paint, until it matches the colour for the next stretch; a
@@ -121,8 +121,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-07.2"></script>
-<script src="../colorways.js?v=2026-11-07.2"></script>
+<script src="../games.js?v=2026-11-07.4"></script>
+<script src="../colorways.js?v=2026-11-07.4"></script>
 <script>
 /* ---------- paint (plain functions) ---------- */
 // A mix is drops of each pot: [red, yellow, blue, white, black]. Its colour: the red-yellow-blue part blended
@@ -188,6 +188,8 @@ const rgbCss = c => `rgb(${c.join(",")})`;
 const STORE = "catdoku.pawlette.v2", MAX_LEVEL = 5, $ = G.$;
 let saved = G.load(STORE), settings = Object.assign({level: 1, seen: false}, saved.settings);
 let game = saved.game || null;
+// The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
+G.pawLost(() => !game || game.won || game.hinted || game.restarted);
 const save = () => G.save(STORE, {settings, game});
 // held: the colour just dyed, kept on the swatches while its score pops ({target, cup} colours), or null
 let held = null;
@@ -350,20 +352,20 @@ function advice(p) {
 }
 $("pots").addEventListener("click", e => { const b = e.target.closest(".pot"); if (b) addDrop(+b.dataset.i); });
 $("dyeBtn").onclick = () => { if (!playing() || !drops(game.cup)) return; game.history.push(snap()); dye(closeness() < PERFECT); };
-$("emptyBtn").onclick = () => { if (!playing() || !drops(game.cup)) return; game.history.push(snap()); game.cup = [0, 0, 0, 0, 0]; game.undid = true; draw(); save(); };
-function undo() { if (!playing() || !game.history.length) return; Object.assign(game, JSON.parse(game.history.pop())); game.undid = true; draw(); save(); }
+$("emptyBtn").onclick = () => { if (!playing() || !drops(game.cup)) return; game.history.push(snap()); game.cup = [0, 0, 0, 0, 0]; draw(); save(); };
+function undo() { if (!playing() || !game.history.length) return; Object.assign(game, JSON.parse(game.history.pop())); draw(); save(); }
 $("undoBtn").onclick = undo;
 document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
-// Restart starts the whole strand again, so once anything's dyed it asks first, and offers Empty the cup for just
-// this colour.
-function restartStrand() { game.history.push(snap()); Object.assign(game, {at: 0, cup: [0, 0, 0, 0, 0], dyed: []}); game.undid = true; G.closeCard(); draw(); save(); G.note("Back to the start of the strand. Undo brings it back.", 3500); }
+// Restart starts the whole strand again (and costs the gold paw), so once anything's dyed it asks first, and offers
+// Empty the cup (free) for just this colour.
+function restartStrand() { game.history.push(snap()); Object.assign(game, {at: 0, cup: [0, 0, 0, 0, 0], dyed: []}); game.restarted = true; G.closeCard(); draw(); save(); G.note("Back to the start of the strand. Undo brings it back.", 3500); }
 $("restartBtn").onclick = () => {
   if (!playing() || !game.history.length) return;
   if (!game.dyed.length) { $("emptyBtn").onclick(); return; }
   const btns = [["Start the whole strand again", restartStrand, true]];
   if (drops(game.cup)) btns.push(["Empty the cup", () => { G.closeCard(); $("emptyBtn").onclick(); }]);
   btns.push(["Cancel", G.closeCard]);
-  G.openCard("Start the whole strand again?", `Every colour you've dyed (${game.dyed.length} so far) goes back to undyed. If you just want to start this colour again, pick Empty the cup.`, btns);
+  G.openCard("Start the whole strand again?", `Every colour you've dyed (${game.dyed.length} so far) goes back to undyed, and it costs the gold paw. If you just want to start this colour again, pick Empty the cup.`, btns);
 };
 // Keys: the left and right arrows pick a pot, Space adds a drop of it; Enter dyes a close mix, Backspace empties the cup.
 const keys = G.gridKeys({
@@ -406,12 +408,12 @@ function win() {
   const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
   settings.level = next; $("levelSel").value = next; save();
   G.track(`Pawlette dyed level ${game.level}`);
-  const gold = fewest && !game.hinted;
+  const gold = fewest && !game.hinted && !game.restarted;
   let text = `You dyed a skein of ${game.way}: ${perfect} of ${game.targets.length} colours a perfect match.`;
   text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the top level; here's another skein." : ` Next up: level ${next}.`;
   const box = document.createElement("div"); box.innerHTML = ballSVG();
   setTimeout(() => G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the skein", game.result,
-    {title: "Wound up!", gold, goldWhy: "Every colour perfect, in the fewest drops!", goldTitle: "A perfect skein!", goldPic: [box.firstChild],
+    {title: "Wound up!", gold, goldWhy: "Every colour perfect, in the fewest drops, with no hint or restart!", goldTitle: "A perfect skein!", goldPic: [box.firstChild],
      next: next > game.level ? `Next: level ${next}` : "Next skein", after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")}), 200);
 }
 

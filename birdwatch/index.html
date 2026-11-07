@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.2"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.4"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.2">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.4">
 <style>
 /* Three tall windows side by side, each with three panes. Birds land outside a pane for a moment: tap it to have
    Bugsy or Bowtie spot one. Squirrels and falling leaves go past too; leave
@@ -94,7 +94,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-07.2"></script>
+<script src="../games.js?v=2026-11-07.4"></script>
 <script>
 /* ---------- levels ---------- */
 // Level n: [birds in the flock, how long a bird stays (ms), time between arrivals (ms), most things at the windows
@@ -241,12 +241,15 @@ const STORE = "catdoku.birdwatch.v1";
 let state = G.load(STORE);
 let settings = Object.assign({level: 1, tries: {}, best: {}}, state.settings);
 let game = null, flock = null, frame = 0, lastNow = 0;
+// The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
+G.pawLost(() => !game || game.helped || game.restarted || game.escaped > 0 || game.taps > game.spotted);
 const save = () => G.save(STORE, {settings});
 
-function newRun(n, seed = Math.floor(Math.random() * 2 ** 31)) {
+// `again`: the same flock played again (Restart), which costs the gold paw once a run has been started.
+function newRun(n, seed = Math.floor(Math.random() * 2 ** 31), again = false) {
   cancelAnimationFrame(frame);
   game = {level: n, seed, flock: LEVELS[n][0], away: AWAY(n), spotted: 0, escaped: 0, taps: 0, budget: LEVELS[n][0] + SPARE, t: 0, up: Array(9).fill(null), lastGone: Array(9).fill(-1e9),
-          state: "ready", wipes: WIPES, helped: false, ...G.freshClock(), timed: false};
+          state: "ready", wipes: WIPES, helped: false, restarted: again, ...G.freshClock(), timed: false};
   flock = flockOf(n, seed); game.next = flock();
   for (const w of wins) { w.querySelector(".thing").innerHTML = ""; w.querySelector(".paw").innerHTML = ""; w.querySelector(".smudge").innerHTML = ""; w.classList.remove("bumped"); }
   $("tapgo").hidden = false; $("tapgo").textContent = "Tap to start";
@@ -387,7 +390,7 @@ function woke() {
   setTimeout(() => {
     if (game !== g) return;
     G.openCard("The human woke up!", `That was tap ${game.budget}, after ${game.spotted} of the ${game.flock} birds. Too much tapping on the glass!`,
-      [["Restart", () => { G.closeCard(); newRun(game.level, game.seed); }, true], ["New flock", () => { G.closeCard(); newRun(game.level); }], G.homeBtn()],
+      [["Restart", () => { G.closeCard(); newRun(game.level, game.seed, true); }, true], ["New flock", () => { G.closeCard(); newRun(game.level); }], G.homeBtn()],
       null, G.otherSize($("levelSel"), game.level, startLevel, "Or play a different level:"));
   }, 700);
 }
@@ -400,7 +403,7 @@ function lost() {
   setTimeout(() => {
     if (game !== g) return;
     G.openCard("Too many got away!", `${game.escaped} birds flew off before Bugsy and Bowtie spotted them. Only ${game.away} may get away on this level.`,
-      [["Restart", () => { G.closeCard(); newRun(game.level, game.seed); }, true], ["New flock", () => { G.closeCard(); newRun(game.level); }], G.homeBtn()],
+      [["Restart", () => { G.closeCard(); newRun(game.level, game.seed, true); }, true], ["New flock", () => { G.closeCard(); newRun(game.level); }], G.homeBtn()],
       null, G.otherSize($("levelSel"), game.level, startLevel, "Or play a different level:"));
   }, 600);
 }
@@ -438,7 +441,7 @@ $("wipeBtn").onclick = () => {
 function goldPic() { const im = new Image(); im.className = "goldpic"; im.src = catSrc("bugsy-bowtie-window"); im.alt = "Bugsy and Bowtie up at the window together"; return im; }
 function win() {
   game.state = "won"; cancelAnimationFrame(frame); G.finishClock(game);
-  const gold = game.taps === game.flock && game.escaped === 0 && !game.helped, beat = keepBest(true), next = game.helped ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  const gold = game.taps === game.flock && game.escaped === 0 && !game.helped && !game.restarted, beat = keepBest(true), next = game.helped ? game.level : Math.min(MAX_LEVEL, game.level + 1);
   settings.tries[game.level] = 0; settings.level = next; $("levelSel").value = next; save(); status();
   G.track(`Bird Watch won level ${game.level}`);
   const g = game;
@@ -447,13 +450,13 @@ function win() {
     for (const w of wins) w.querySelector(".thing").innerHTML = "";
     const text = (game.escaped ? `Bugsy and Bowtie spotted ${game.spotted} of the ${game.flock} birds.` : `Bugsy and Bowtie spotted all ${game.flock} birds.`) + (beat ? " That's a new best!" : "") + (game.helped ? ` You wiped the windows, so here's level ${next} again.` : game.level === MAX_LEVEL ? " That's the hardest level; here it is again." : ` Next up: level ${next}.`);
     G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the view", game.result,
-      {title: game.escaped ? "Well spotted!" : "All spotted!", gold, goldWhy: "Every bird, not a tap wasted, no wiping!", goldPic: [goldPic()], next: next > game.level ? `Next: level ${next}` : "Next board", after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+      {title: game.escaped ? "Well spotted!" : "All spotted!", gold, goldWhy: "Every bird, not a tap wasted, no wiping or restart!", goldPic: [goldPic()], next: next > game.level ? `Next: level ${next}` : "Next board", after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
   }, 600);
 }
 function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); G.closeCard(); newRun(n); }
 // Restart brings the same flock again; New flock brings a different one. Leaving a run partway counts as a try.
 const leaveRun = () => { if (["running", "paused"].includes(game.state)) { settings.tries[game.level] = (settings.tries[game.level] || 0) + 1; save(); } G.closeCard(); };
-$("restartBtn").onclick = () => { if (game) { leaveRun(); newRun(game.level, game.seed); } };
+$("restartBtn").onclick = () => { if (game) { const again = game.restarted || game.state !== "ready"; leaveRun(); newRun(game.level, game.seed, again); } };
 $("newBtn").onclick = () => { if (game) { leaveRun(); newRun(game.level); } };
 // Share: a link to this flock (its level and seed), so a friend gets the same birds at the same windows.
 $("linkBtn").onclick = () => { if (game) { pause(); G.shareCard({name: "Bird Watch", what: "flock", won: game.state === "won", puzzle: () => ({g: "birdwatch", N: game.level, s: game.seed})}); } };

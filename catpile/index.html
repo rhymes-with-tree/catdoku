@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.2"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.4"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -24,7 +24,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.2">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.4">
 <style>
 /* A quilted blanket in nine cushions. Clumps of napping cats are dragged onto it from the tray below; a full
    row, column or cushion wakes its cats and they wander off, taking any toys they were lying on. */
@@ -114,7 +114,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-07.2"></script>
+<script src="../games.js?v=2026-11-07.4"></script>
 <script>
 const $ = G.$;
 G.nav("catpile");
@@ -496,6 +496,8 @@ buildBlanket();
 /* ---------- playing ---------- */
 const STORE = "catdoku.catpile.v1", INTRO = "catdoku.catpile.intro.v1", PREFS = "catdoku.catpile.prefs.v1";
 let S = null;          // the blanket being played: {level, d (the saved state), …clock}
+// The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
+G.pawLost(() => !S || !S.level || S.over || S.d.hinted || S.d.restarted || S.d.turned);
 let climb = 1, zenBest = 0, picked = -1, cursor = -1, drag = null, ghost = null;
 let offToys = G.toysOff();
 const MIN_COLOURS = 3;
@@ -509,7 +511,7 @@ function deal(level, seed, kinds) {
   const d = makeLevel(level, seed, kinds);
   const rnd = seeded(seed * 3 + 1);
   d.look = KINDS.map((_, k) => { const ok = lookIdx(k); return ok[Math.floor(rnd() * ok.length)]; });
-  Object.assign(d, {kinds, moves: [], hinted: false, undid: false, restarted: false});
+  Object.assign(d, {kinds, moves: [], hinted: false, restarted: false});
   return d;
 }
 const colourOf = (d, t) => (d.seed + d.deals * 5 + t * 3) % COLOURS.length;
@@ -538,13 +540,13 @@ for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(n === MAX_L
 $("levelSel").append(new Option("Zen (no goals)", 0));
 $("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
 // A new blanket at this level; help already used on it still counts.
-$("newBtn").onclick = () => { if (!S) return; G.closeCard(); startLevel(S.level, S.level && !S.over ? {hinted: S.d.hinted, undid: S.d.undid, restarted: S.d.restarted} : null); };
+$("newBtn").onclick = () => { if (!S) return; G.closeCard(); startLevel(S.level, S.level && !S.over ? {hinted: S.d.hinted, restarted: S.d.restarted} : null); };
 // The same blanket again as it was dealt: the same toys and, played the same way, the same cats in the tray.
 function restart() {
   if (!S || !S.level) return;
   G.closeCard();
   const d = deal(S.level, S.d.seed, S.d.kinds);
-  Object.assign(d, {hinted: S.d.hinted, undid: S.d.undid, restarted: S.d.moves.length > 0 || S.d.restarted, look: S.d.look});
+  Object.assign(d, {hinted: S.d.hinted, restarted: S.d.moves.length > 0 || S.d.restarted, look: S.d.look});
   start(S.level, d, {timed: S.timed});
 }
 $("restartBtn").onclick = restart;
@@ -552,7 +554,8 @@ function undo() {
   if (!S || S.over && S.level && won(S.d) || !S.history.length) return;
   G.closeCard();
   const d = JSON.parse(S.history.pop());
-  d.undid = true; d.hinted = S.d.hinted;
+  // Undo is free, but a hint or a turn made since still counts
+  d.hinted = S.d.hinted; d.turned = S.d.turned || d.turned; d.restarted = S.d.restarted || d.restarted;
   S.d = d; S.over = false; picked = -1;
   layers.cats.innerHTML = ""; catEls.clear();
   draw(true); save();
@@ -612,7 +615,7 @@ function cheer(lines, combo) {
 function win() {
   S.over = true;
   G.track(`Cat Pile level ${S.level} done`);
-  const result = G.finishClock(S), helped = S.d.hinted || S.d.undid || S.d.restarted;
+  const result = G.finishClock(S), helped = S.d.hinted || S.d.restarted;
   const next = S.d.hinted ? S.level : Math.min(MAX_LEVEL, S.level + 1);
   climb = next; save();
   const text = S.d.hinted ? `Level ${S.level} done. You had a hint, so here's another at level ${next}.`
@@ -621,7 +624,7 @@ function win() {
   $("hintBtn").disabled = true;
   const game = S;
   setTimeout(() => S === game && G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my blanket", result,
-    {title: "Every toy collected!", gold: !helped && !S.d.turned, goldWhy: turnsOn ? "No hints, undos, restarts or turns!" : "No hints, undos or restarts!", next: next > S.level ? `Next: level ${next}` : "Next board",
+    {title: "Every toy collected!", gold: !helped && !S.d.turned, goldWhy: turnsOn ? "No hints, restarts or turns!" : "No hints or restarts!", next: next > S.level ? `Next: level ${next}` : "Next board",
      after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")}), 800);
 }
 function noRoom() {

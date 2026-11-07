@@ -92,7 +92,9 @@ in its notes.
   doesn't have, but don't reorder. `games.js` turns them into icons with the word small underneath (its `ICON_OF`
   table, by id): give a new kind of button an icon there (or `data-icon` where an id means something else in this
   game), and change a button's word with `G.relabel(btn, words, icon)`, never `textContent`, or the icon goes.
-  The game's ☆ goes just after its name in the title by itself. Undo also answers Ctrl+Z / ⌘Z (but not with Shift). Restart always puts
+  Share, Toys, Best times and How to play stay in the markup but are pressed from the game's menu (`G.gameMenu`, from
+  `G.nav`, puts them out of sight), as are the switches and pickers of the settings row, which move into the menu's
+  Settings; the ☰ Menu, the streak's flame and the game's favourite star come from `games.js` by themselves. Undo also answers Ctrl+Z / ⌘Z (but not with Shift). Restart always puts
   back this same puzzle as it was dealt; `newBtn` deals a different one. Every game has Share, and New unless
   levels are a fixed list.
 - **Settings row** (`.bar`, under the buttons): `levelSel` labelled "Level" (or `size` labelled "Size"),
@@ -123,9 +125,11 @@ in its notes.
   game (its tile gets a gold Mastered label); the win card works that out from `result.n` and the page's level or size picker,
   so pass `top: true` or `false` if the game's levels aren't the picker's values (see `atlas/`). Gold paw rules
   differ by game (README, "Across every game"). For a logic puzzle, follow Tunnel Run and Open the
-  Door!: a hint, Undo or Restart costs the gold paw; a hint also keeps the player on the same level, and
-  a win without one moves up. Say so on the win card: "You had a hint, so here's another at level N." Tunnel Run: `gold: !game.undid && !game.hinted`,
-  `goldWhy: "No hints or undos!"`. An Audit, if the game has one, never costs a life: like a hint, it keeps the
+  Door!: a hint or Restart costs the gold paw (Undo, Bookmark and Return to Bookmark never do); a hint also keeps the player on the same level, and
+  a win without one moves up. Say so on the win card: "You had a hint, so here's another at level N." Tunnel Run: `gold: !game.restarted && !game.hinted`,
+  `goldWhy: "No hints or restarts!"`. Every Restart costs it, so set `game.restarted = true` there (not in Undo). Say when the paw is gone with
+  `G.pawLost(() => !game || game.won || game.hinted || game.restarted)` (plus anything else that loses it for good, such
+  as a life lost), just after `game` is declared, so the red tools go back to the usual colour once there's nothing to lose. An Audit, if the game has one, never costs a life: like a hint, it keeps the
   player on the same level and costs the gold paw.
 - **Share links:** the Share button opens `G.shareCard({name, won, puzzle, progress})`. A game played against
   the clock (Pounce, Bubbles, Tail Chase) leaves out `progress` and passes `what` ("board", "rug"…), so the card

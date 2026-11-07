@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.2"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.4"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.2">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.4">
 <style>
 /* A tray of treat piles, each with a number. A tabby from Higgins's gang sits at the end of every row and column
    with a bowl showing how many treats it wants. Tap a pile to put it back in the jar; the piles left in a cat's
@@ -96,7 +96,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-07.2"></script>
+<script src="../games.js?v=2026-11-07.4"></script>
 <script>
 /* ---------- treat puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N tray of treat piles, each with a number. Some piles go back in the jar; the rest stay. The cat at the
@@ -182,12 +182,15 @@ function makeTray(n) {
 /* ---------- game state ---------- */
 // game: {level, N, nums (each pile's number), keep (the answer: 1 stays, 0 goes back), rowT and colT (what each
 //        cat wants), mark (each pile now: 0 untouched, 1 back in the jar, 2 marked to stay), history ([square,
-//        mark before] pairs, or {mark} for a Restart), won, hinted, undid…}
+//        mark before] pairs, or {mark} for a Restart), won, hinted, restarted…}
 const STORE = "catdoku.treattime.v1", MAX_LEVEL = 10;
 const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1}, state.settings);
 let game = state.game || null, busy = false, running = false, keepMode = false, cursor = -1;
+// The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
+G.pawLost(() => !game || game.won || game.hinted || game.restarted);
+G.pieces({plain: "Put back", mark: "keepBtn"});   // the plain tap beside Keep, in a row of their own under the board
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
 const levelName = n => { const s = levelSpec(n); return `Level ${n} · ${s.N} × ${s.N}, piles up to ${s.top}`; };
@@ -296,7 +299,6 @@ document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.s
 // Undo takes back a tap, or a Restart.
 function undo() {
   if (!playing() || !game.history.length) return;
-  game.undid = true;
   const h = game.history.pop();
   if (Array.isArray(h)) game.mark[h[0]] = h[1]; else game.mark = h.mark;
   update(); save();
@@ -304,7 +306,7 @@ function undo() {
 $("undoBtn").onclick = undo;
 $("restartBtn").onclick = () => {
   if (!playing() || !game.history.length) return;
-  game.undid = true;
+  game.restarted = true;
   game.history.push({mark: game.mark.slice()});
   game.mark = new Array(game.N * game.N).fill(0);
   update(); save();
@@ -354,13 +356,13 @@ function win() {
   setTimeout(done, left.length * step + 700);
 }
 function finishCard() {
-  const next = settings.level, gold = !game.undid && !game.hinted;
+  const next = settings.level, gold = !game.restarted && !game.hinted;
   let text = `All ${2 * game.N} cats got just enough treats.`;
   text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
   // a gold paw: a tabby curled up asleep with a full tummy, in place of the random cat photo
   const pic = new Image(); pic.className = "tabbypic"; pic.src = catSrc("c20-3"); pic.alt = "A tabby curled up asleep";
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my tray", game.result,
-    {title: "All fed!", gold, goldWhy: "No hints or undos!", goldTitle: "Purr-fect!", goldPic: [pic], next: next > game.level ? `Next: level ${next}` : "Next board",
+    {title: "All fed!", gold, goldWhy: "No hints or restarts!", goldTitle: "Purr-fect!", goldPic: [pic], next: next > game.level ? `Next: level ${next}` : "Next board",
      after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
 }
 

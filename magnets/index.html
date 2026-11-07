@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.2"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.4"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.2">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.4">
 <style>
 /* A fridge door with a crossword of squares on it, and the alphabet magnets Crunch knocked off it on the floor
    below. Every letter goes back on once, and every line of squares spells a word. */
@@ -149,7 +149,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-07.2"></script>
+<script src="../games.js?v=2026-11-07.4"></script>
 <script>
 /* ---------- fridges ---------- */
 // A fridge is a 10 × 10 crossword with 26 empty squares, and the 26 letters a–z on the floor to fill them, each
@@ -376,7 +376,7 @@ function solveSteps(idx, slots, sq, open) {
 
 /* ---------- game state ---------- */
 // game: {level, g (the answer: 100 letters, "." for a black square), open (the 26 squares to fill), put ({square: letter} for the letters you've put up),
-//        history (put before each change, for Undo), checked (put at the last Audit), won, hinted, undid…}
+//        history (put before each change, for Undo), checked (put at the last Audit), won, hinted, restarted…}
 // sel: the square picked (or -1), dir: 0 across or 1 down, for the word it's in; held: a letter picked up
 // from the floor with no square picked.
 const STORE = "catdoku.magnets.v1", MAX_LEVEL = 3, N = 10, NS = "http://www.w3.org/2000/svg", CS = 54, PADL = 50, PAD = 24;
@@ -390,6 +390,8 @@ const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1}, state.settings);
 let game = state.game || null, sel = -1, dir = 0, held = null, W = null, IDX = null, F = null;
+// The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
+G.pawLost(() => !game || game.won || game.hinted || game.restarted || game.audited);
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !running && !$("overlay").classList.contains("show");
 let running = false;
@@ -643,13 +645,13 @@ document.addEventListener("keydown", e => {
 // Undo takes back the last letter put up, taken down or moved (or a Restart).
 function undo() {
   if (!playing() || !game.history.length) return;
-  game.undid = true; game.put = game.history.pop(); held = null;
+  game.put = game.history.pop(); held = null;
   draw(); save();
 }
 $("undoBtn").onclick = undo;
 $("restartBtn").onclick = () => {
   if (!playing() || !Object.keys(game.put).length) return;
-  game.undid = true; game.history.push({...game.put}); game.put = {}; sel = -1; held = null; guesses.clear();
+  game.restarted = true; game.history.push({...game.put}); game.put = {}; sel = -1; held = null; guesses.clear();
   draw(); save();
   G.note("All your letters are back on the floor. Undo puts them back up.", 4000);
 };
@@ -706,13 +708,13 @@ function win() {
   setTimeout(() => { running = false; $("board").classList.remove("won"); if (game === g) finishCard(); }, matchMedia("(prefers-reduced-motion: reduce)").matches ? 500 : 1300);
 }
 function finishCard() {
-  const next = settings.level, gold = !game.undid && !game.hinted && !game.audited;
+  const next = settings.level, gold = !game.restarted && !game.hinted && !game.audited;
   let text = `All 26 letters back on the fridge, in ${F.slots.length} words.`;
   text += game.hinted || game.audited ? ` You had ${game.hinted ? "a hint" : "an audit"}, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
   // a gold paw: Crunch rolling about, in place of the random cat photo
   const pic = new Image(); pic.className = "rollpic"; pic.src = catSrc("crunch-6"); pic.alt = "Crunch rolling about on a green mat";
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my fridge", game.result,
-    {title: "Back on the fridge!", goldTitle: "Gold paw, Crunch!", gold, goldWhy: "No hints, audits or undos!", goldPic: [pic], next: next > game.level ? `Next: level ${next}` : "Next board",
+    {title: "Back on the fridge!", goldTitle: "Gold paw, Crunch!", gold, goldWhy: "No hints, audits or restarts!", goldPic: [pic], next: next > game.level ? `Next: level ${next}` : "Next board",
      after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
 }
 
@@ -723,7 +725,7 @@ const REQ = {}, req = n => REQ[n] = REQ[n] || {level: n, words: W};
 const wrapped = {take: n => fridges.take(req(n)), prefetch: n => fridges.prefetch(req(n))};
 function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
 function begin(p, level) {
-  game = {level, g: p.g, open: p.open, put: {}, history: [], won: false, hinted: false, undid: false, ...G.freshClock()};
+  game = {level, g: p.g, open: p.open, put: {}, history: [], won: false, hinted: false, restarted: false, ...G.freshClock()};
   sel = -1; held = null; hints.clear(false); derive();
 }
 let asking = 0;

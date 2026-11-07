@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.2"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.4"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.2">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.4">
 <style>
 /* A rug covered in pieces of cat tunnel, with the cat's bed in the middle. Turn the pieces until they all join
    into one network; pieces joined to the bed turn purple and crinkly, and when every one is joined the cat runs
@@ -101,7 +101,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-07.2"></script>
+<script src="../games.js?v=2026-11-07.4"></script>
 <script>
 /* ---------- tunnel networks (plain functions, also run in a background worker) ---------- */
 // A piece's tunnels are a 4-bit mask of the sides they open onto: 1 up, 2 right, 4 down, 8 left.
@@ -334,6 +334,8 @@ const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1}, state.settings);
 let game = state.game || null, busy = false, running = false, hinting = false, cursor = -1;
+// The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
+G.pawLost(() => !game || game.won || game.hinted || game.restarted);
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
 const tracksOf = n => { const s = levelSpec(n); return s.all ? "all slide" : s.rows + s.cols ? `${s.rows + s.cols} track${s.rows + s.cols > 1 ? "s" : ""}` : ""; };
@@ -601,7 +603,6 @@ document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.s
 // Undo takes back a turn or slide, or a Restart.
 function undo() {
   if (!playing() || !game.history.length) return;
-  game.undid = true;
   const h = game.history.pop(), N = game.N;
   if (!Array.isArray(h)) { game.turns = h.turns; game.trail = h.trail || game.trail; game.pos = posOf(N, game.trail); }
   else if (h.length === 3) { const back = [h[0], h[1], N - h[2]]; game.pos = applySlide(N, game.pos, back); game.trail = addSlide(N, game.trail, back); }
@@ -611,7 +612,7 @@ function undo() {
 $("undoBtn").onclick = undo;
 $("restartBtn").onclick = () => {
   if (!playing() || !game.history.length) return;
-  game.undid = true;
+  game.restarted = true;
   game.history.push({turns: game.turns.slice(), trail: game.trail});
   game.turns = game.start.turns.slice(); game.trail = game.start.trail.slice(); game.pos = posOf(game.N, game.trail);
   lineUp(); update(); save();
@@ -691,13 +692,13 @@ function win() {
   })(t0);
 }
 function finishCard() {
-  const next = settings.level, N = game.N, gold = !game.undid && !game.hinted;
+  const next = settings.level, N = game.N, gold = !game.restarted && !game.hinted;
   let text = `${gold ? "Bowtie" : "The cat"} zoomed through every tunnel on the ${N} × ${N} rug.`;
   text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
   // a gold paw gets Bowtie in the (gold) tunnel in place of the random cat photo
   const pic = new Image(); pic.className = "bowtiepic"; pic.src = BED.won; pic.alt = "Bowtie in a gold and purple cat tunnel";
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my tunnels", game.result,
-    {title: "Zoom!", gold, goldWhy: "No hints or undos!", goldTitle: "Zoom, Bowtie!", goldPic: [pic],
+    {title: "Zoom!", gold, goldWhy: "No hints or restarts!", goldTitle: "Zoom, Bowtie!", goldPic: [pic],
      next: next > game.level ? `Next: level ${next}` : "Next board", after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
 }
 

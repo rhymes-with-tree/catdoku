@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.2"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.4"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.2">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.4">
 <style>
 /* Two toys share out a grid in the toy box: every line holds as many of one as the other, no three alike in a row,
    and = / × signs between squares say whether neighbours match. */
@@ -95,7 +95,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-07.2"></script>
+<script src="../games.js?v=2026-11-07.4"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // A grid of N × N squares, each 0 or 1 (the two toys). Every row and column has N/2 of each, no three the same
@@ -241,6 +241,9 @@ const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1, autoCheck: true}, state.settings);
 let game = state.game || null, busy = false;
+// The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
+G.pawLost(() => !game || game.won || game.hinted || game.restarted);
+G.pieces({plain: "Toy", mark: "markBtn"});   // the plain tap beside Mark, in a row of their own under the board
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !busy && !$("overlay").classList.contains("show");
 const levelName = n => { const [N, extra] = levelOf(n); return `Level ${n} · ${N} × ${N}${extra ? ", a head start" : ""}`; };
@@ -343,11 +346,11 @@ function tap(i) {
 }
 // Keys: the arrows move a cursor over the squares; Space or Enter taps the square as a tap does.
 keys = G.gridKeys({on: () => playing(), size: () => [game.N, game.N], show: () => draw(), act: i => tap(i)});
-$("undoBtn").onclick = () => { if (playing() && game.history.length) { game.undid = true; restore(game.history.pop()); draw(); save(); } };
+$("undoBtn").onclick = () => { if (playing() && game.history.length) { restore(game.history.pop()); draw(); save(); } };
 document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && !$("undoBtn").disabled) { e.preventDefault(); $("undoBtn").click(); } });
-$("restartBtn").onclick = () => { if (playing() && game.history.length) { game.undid = true; snapshot(); game.grid = game.givens.slice(); game.notes = []; game.guesses = []; draw(); save(); G.note("Back to the start. Undo brings your toys back.", 3500); } };
+$("restartBtn").onclick = () => { if (playing() && game.history.length) { game.restarted = true; snapshot(); game.grid = game.givens.slice(); game.notes = []; game.guesses = []; draw(); save(); G.note("Back to the start. Undo brings your toys back.", 3500); } };
 // Bookmark: the next square you fill glows until it's undone. Return to Bookmark undoes everything back to
-// the latest bookmark in one go (it counts as an Undo for the gold paw).
+// the latest bookmark in one go (free, as Undo is).
 $("guessBtn").onclick = () => {
   if (!playing()) return;
   guessing = !guessing; marking = false; draw();
@@ -356,7 +359,7 @@ $("backBtn").onclick = () => {
   if (!playing() || !(game.guesses || []).length) return;
   const had = game.guesses.length;
   while (game.history.length && (game.guesses || []).length >= had) restore(game.history.pop());
-  game.undid = true; guessing = false; draw(); save();
+  guessing = false; draw(); save();
   G.note("Back at your bookmark.", 3000);
 };
 // Hint: first points out a toy that's wrong, if there is one; otherwise glows a square the rules force from what's
@@ -425,7 +428,7 @@ function finishCard() {
   let text = `Every row and column of the ${N} × ${N} toy box shares its toys out fairly.`;
   text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my toys", game.result,
-    {title: "Fair and square!", gold: !game.undid && !game.hinted, goldWhy: "No undos or hints!", next: next > game.level ? `Next: level ${next}` : "Next board", after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+    {title: "Fair and square!", gold: !game.restarted && !game.hinted, goldWhy: "No hints or restarts!", next: next > game.level ? `Next: level ${next}` : "Next board", after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
 }
 
 /* ---------- new puzzles ---------- */

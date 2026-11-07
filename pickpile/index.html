@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.2"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.4"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.2">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.4">
 <style>
 /* Fred, the star, beside the title */
 .title{display:flex;align-items:flex-end;gap:8px}
@@ -93,7 +93,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-07.2"></script>
+<script src="../games.js?v=2026-11-07.4"></script>
 <script>
 /* ---------- piles ---------- */
 // The pile for each level: blocks [x, y, z] in half-block steps, from rectangles [z, x, y, w, h] (x and y in
@@ -229,12 +229,14 @@ const pickToys = F => shuffle(ALL_LOOKS.filter(f => !offToys.has(f))).concat(shu
 /* ---------- game ---------- */
 // game: {level, toys (a picture per toy), f (the toy on each block), sol (a way to clear the pile, by pairs),
 //        left (blocks still on the pile), moves (pairs taken, or {shuffle: the toys before}), sel (a block picked, or -1),
-//        hinted, undid, shuffled, restarted, won}
+//        hinted, shuffled, restarted, won}
 const STORE = "catdoku.pickpile.v1";
 const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1, dim: true}, state.settings);
 let game = state.game || null, kbAt = -1;   // kbAt: the block the keyboard cursor is on
+// The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
+G.pawLost(() => !game || game.won || game.hinted || game.restarted || game.shuffled);
 const hints = G.hinter({game: () => game, key: () => game ? stateKey() : "", draw: () => draw()});   // marks {blocks, bad}: a hint's blocks
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !$("overlay").classList.contains("show");
@@ -251,7 +253,7 @@ function dealToys(sol, n) {
 }
 function fresh(n, p) {
   const {toys, f} = dealToys(p.sol, n);
-  return {level: n, toys, f, sol: p.sol, left: f.map(() => true), moves: [], sel: -1, hinted: false, undid: false, shuffled: false, restarted: false, won: false, ...G.freshClock()};
+  return {level: n, toys, f, sol: p.sol, left: f.map(() => true), moves: [], sel: -1, hinted: false, shuffled: false, restarted: false, won: false, ...G.freshClock()};
 }
 let asking = 0;
 function newPuzzle() {
@@ -346,7 +348,7 @@ function undo() {
   const m = game.moves.pop();
   if (m.shuffle) { game.f = m.shuffle; game.sol = m.sol; }
   else for (const k of m) game.left[k] = true;
-  game.sel = -1; game.undid = true;
+  game.sel = -1;
   draw(); save(); G.note("");
 }
 $("undoBtn").onclick = undo;
@@ -417,7 +419,7 @@ function hint() {
 $("hintBtn").onclick = hint;
 
 /* ---------- winning ---------- */
-const goldOK = () => !game.hinted && !game.undid && !game.shuffled && !game.restarted;
+const goldOK = () => !game.hinted && !game.shuffled && !game.restarted;
 function win() {
   game.won = true; G.finishClock(game); G.note("");
   const next = game.hinted || game.shuffled ? game.level : Math.min(MAX_LEVEL, game.level + 1);
@@ -434,7 +436,7 @@ function finishCard() {
   text += game.hinted || game.shuffled ? ` You had ${game.hinted ? "a hint" : "a shuffle"}, so here's another at level ${next}.`
     : game.level === MAX_LEVEL ? " That's the biggest pile; here's another." : ` Next up: level ${next}.`;
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire Fred", game.result,
-    {title: "Pile cleared!", gold: goldOK(), goldWhy: "No hints, undos or shuffles!", goldPic: [fredPic()], next: next > game.level ? `Next: level ${next}` : "Next board",
+    {title: "Pile cleared!", gold: goldOK(), goldWhy: "No hints, shuffles or restarts!", goldPic: [fredPic()], next: next > game.level ? `Next: level ${next}` : "Next board",
      after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
 }
 
@@ -451,7 +453,7 @@ function openShared(d) {
   const ok = b && nT && d.toys.every(f => ALL_LOOKS.includes(f)) && new Set(d.toys).size === nT && faces(d.f);
   if (!ok) { G.note("That share link didn't work.", 5000); return; }
   const sol = Array.isArray(d.sol) && d.sol.length === b.length / 2 && d.sol.every(p => Array.isArray(p) && p.length === 2 && p.every(i => Number.isInteger(i) && i >= 0 && i < b.length)) && new Set(d.sol.flat()).size === b.length ? d.sol : [];
-  game = {level: d.N, toys: d.toys, f: d.f.slice(), sol, left: b.map(() => true), moves: [], sel: -1, hinted: false, undid: false, shuffled: false, restarted: false, won: false, ...G.freshClock()};
+  game = {level: d.N, toys: d.toys, f: d.f.slice(), sol, left: b.map(() => true), moves: [], sel: -1, hinted: false, shuffled: false, restarted: false, won: false, ...G.freshClock()};
   const p = d.p;
   if (p && typeof p.left === "string" && p.left.length === b.length && /^[01]*$/.test(p.left) && faces(p.f)) {
     game.left = [...p.left].map(c => c === "1"); game.f = p.f.slice(); game.timed = false;
