@@ -126,7 +126,8 @@ From a side-by-side table of every game's controls (2026-11-07), checked against
 
 Talked through on 2026-11-07. Sort every control by how often it's used while playing:
 
-**Into a More (…) menu at the far right of the title, beside Games** (things used once a visit, or set once and left):
+**Into a More (…) menu at the far right of the title, beside the ☆, in place of Games** (things used once a visit, or set
+once and left); its first row is All games, which opens today's games panel, so the Games button goes:
 - the page tools: Share, Best times, How to play, Keys, Toys (all of today's row under the title, so `pageTools` is
   the one place to change)
 - the switches that change how the board looks: Numbers, Fabric patterns, Twisty ribbons, Show sets, Shelf, Cats, Dim
@@ -138,8 +139,11 @@ Talked through on 2026-11-07. Sort every control by how often it's used while pl
   from any other game, and on the challenge game itself its solved or not), the toy chest (one choice for every game,
   so it can be reached from any of them, not only the toy games), the front page, and Add to Home Screen (only in a
   browser, not once it's opened from the home screen; Safari can't be asked to add it, so it shows how: Share, then
-  Add to Home Screen). The Games menu already has the front page and today's challenge at its top; these are a
-  shortcut, not a move. Keep the badge under Games on the challenge game, since it's why you came.
+  Add to Home Screen). The games panel (All games) keeps the front page and today's challenge at its top too. On the
+  challenge game, keep its badge under the title, since it's why you came.
+- Toydoku, as the busiest page: Bookmark joins Undo, Erase, Pencil and Hint under the board, Restart and Erase pencil
+  stay in a row below the toys, and the page fits on one phone screen. Its menu, with four switches, is taller than
+  the screen and scrolls inside its frame.
 
 **Into New's menu with the levels**, as they decide the next puzzle: Yarn's colours, Catlas's answer style, Knit
 Pick's words.
@@ -156,7 +160,7 @@ below the board. The timer stays in the status line.
 
 To weigh first:
 - Apple discourages a ☰ menu for an app's main places, but an ellipsis More button for secondary actions is ordinary
-  (a pull-down button); use … and keep Games as it is.
+  (a pull-down button); use …, not ☰.
 - Walkthrough steps and first-time tips point at switches and page tools (`spotlight` `els`). In a menu they'd need
   to open it, or point at … and say what's in it.
 - Half the switches lose their always-visible line saying what they do; the menu should keep those lines.
