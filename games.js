@@ -197,11 +197,138 @@ const G = (() => {
     return q.toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter(Boolean).every(w => hay.includes(w));
   };
 
+  // The toy library as the toy chest shows it from a game with no toys of its own (the choice is one for every game):
+  // the toy games' colours, each with the toys that can stand for it.
+  const CHEST = [
+    {c: "#BD5538", looks: [["wiffle-red", "red wiffle balls"], ["swirl-red", "red swirl balls"], ["crochet-stars", "star balls"], ["tinsel", "tinsel balls"]]},
+    {c: "#ECA818", looks: [["wiffle-yellow", "yellow wiffle balls"]]},
+    {c: "#73A7AE", looks: [["wiffle-teal", "teal wiffle balls"], ["fish", "fish"]]},
+    {c: "#6AA673", looks: [["lattice", "lattice balls"]]},
+    {c: "#B3B94B", looks: [["spiky-lime", "spiky pom-poms"]]},
+    {c: "#B94588", looks: [["swirl-purple", "plum swirl balls"], ["bell-purple", "bell balls"]]},
+    {c: "#7885BA", looks: [["spring", "springs"], ["rope-blue", "rope balls"]]},
+    {c: "#825840", looks: [["cork-paw", "cork paw balls"], ["burlap-paws", "burlap balls"], ["rattan", "rattan balls"]]},
+    {c: "#5E5866", looks: [["mouse", "mice"]]},
+    {c: "#E16A4A", looks: [["felt-rainbow", "rainbow balls"], ["ribbon-tail", "ribbon balls"], ["spiky-rainbow", "spiky balls"]]},
+  ];
+  // The win streak's flame at the right of a game's title, with the count in it, from the first win on. A tap shows the
+  // streak and the best, and today's challenge. (Catdoku had it first, beside its title.)
+  const FLAME = '<span class="flame"><svg viewBox="0 0 34 40" aria-hidden="true"><path d="M17 1.5c1.6 6.4 9.5 10.6 11.5 18.7C30.6 29.2 25 38.5 17 38.5S3.4 31 4.6 22.8c.8-5.2 3.9-8.2 5.6-10 .1 3 .9 5.4 2.9 6.6C12 12.6 14.4 6.4 17 1.5z" fill="#E16A4A"/><path d="M17 15c1.4 4 6.4 6.6 6.6 13 .2 5.4-3 9-6.6 9s-7.1-3.4-6.6-8.4c.3-3 2-4.8 3-5.9.3 1.6.9 2.8 2 3.4-.6-3.6.4-7.6 1.6-11.1z" fill="#ECA818"/></svg><b id="streakN"></b></span><small>Streak</small>';
+  function refreshFlame() {
+    const el = $("streak"); if (!el || !CURRENT) return;
+    const st = streak(CURRENT); el.hidden = !st.best;
+    $("streakN").textContent = st.streak;
+    el.setAttribute("aria-label", `Win streak ${st.streak}, best ${st.best}`); el.title = `Best streak: ${st.best}`;
+  }
+  function streakCard() {
+    const st = streak(CURRENT), dslug = daily(), dg = GAMES.find(g => g[1] === dslug), k = dailyStreak();
+    const lines = [st.streak ? `${st.streak} ${st.streak === 1 ? "win" : "wins"} in a row here.` : "No wins in a row here just now.", `Your best: ${st.best}.`];
+    const today = dailyDoneToday() ? `Today's challenge (${dg[0]}) is done${k > 1 ? `: a ${k}-day streak` : ""}.` : `Today's challenge is ${dg[0]}${k ? ` (keep your ${k}-day streak going)` : ""}.`;
+    const btns = [["Close", closeCard, true]];
+    if (dslug !== CURRENT) btns.unshift([`Play ${dg[0]}`, () => { location.href = `${HOME}${dslug}/`; }]);
+    openCard("Win streak", `${lines.join(" ")} ${today}`, btns);
+  }
+
+  // A game's menu (☰ Menu, at the left of its title): Home, All games, Today's challenge and the Toy chest, then the
+  // game's own things: Favorite, Share, Best times, How to play, Keys (on a computer) and Settings, which opens the
+  // game's switches and pickers (moved here from under the board). Share, Best times and How to play are the page's
+  // own buttons, kept out of sight (pageTools), so a row here just presses one.
+  function gameMenu(head, current, base, o) {
+    const name = (GAMES.find(g => g[1] === current) || [current])[0];
+    head.classList.add("withMenu");
+    // the cat (or cats) beside the title and the game's line go on a row of their own under the title, and scroll
+    const title = head.querySelector(".title"), pics = title ? [...title.querySelectorAll(":scope > img")] : [];
+    const line = head.querySelector(".tagline"), stripe = head.querySelector(".stripe");
+    if (pics.length || line) {
+      const blurb = document.createElement("div"); blurb.className = "blurb";
+      if (pics.length) { const p = document.createElement("div"); p.className = "blurbPics"; p.append(...pics); blurb.append(p); }
+      if (line) blurb.append(line);
+      head.after(blurb);
+    }
+    const btn = document.createElement("button");
+    btn.type = "button"; btn.id = "menuBtn"; btn.className = "tool menuBtn";
+    btn.setAttribute("aria-expanded", "false"); btn.setAttribute("aria-controls", "menuPanel"); btn.setAttribute("aria-haspopup", "true");
+    btn.innerHTML = iconSVG("menu") + '<span class="lbl">Menu</span>';
+    const flame = $("streak") || Object.assign(document.createElement("button"), {id: "streak", type: "button", innerHTML: FLAME});
+    flame.classList.add("streak"); flame.onclick = streakCard;
+    head.prepend(btn); head.append(flame);
+    if (stripe) head.append(stripe);   // the stripe runs under the whole row
+    refreshFlame();
+
+    const menu = document.createElement("div");
+    menu.id = "menuPanel"; menu.className = "gameMenu"; menu.setAttribute("role", "menu"); menu.setAttribute("aria-label", "Menu"); menu.hidden = true;
+    const item = (icon, text, act, sub) => {
+      const b = document.createElement(typeof act === "string" ? "a" : "button");
+      if (typeof act === "string") b.href = act; else { b.type = "button"; b.onclick = e => { e.stopPropagation(); show(false); act(e); }; }
+      b.className = "menuItem"; b.setAttribute("role", "menuitem");
+      b.innerHTML = iconSVG(icon) + '<span class="mtext"><span class="mname"></span><small></small></span>';
+      b.querySelector(".mname").textContent = text; b.querySelector("small").textContent = sub || "";
+      menu.append(b); return b;
+    };
+    const set = (b, text, sub) => { b.querySelector(".mname").textContent = text; b.querySelector("small").textContent = sub || ""; };
+    const heading = text => { const h = document.createElement("p"); h.className = "menuHead"; h.textContent = text; menu.append(h); };
+    item("home", "Home", base || "./");
+    item("games", "All games", () => o.open());
+    const daily = o.dslug === current ? item("today", "Today's challenge", () => {}) : item("today", "Today's challenge", `${base}${o.dslug}/`);
+    const toys = item("toys", "Toy chest", () => {
+      if ($("toysBtn")) $("toysBtn").click();
+      else toyPicker({kinds: CHEST, off: toysOff(), min: 1, src: f => `${HOME}toys/${f}.webp`,
+        save: off => { saveToys(off); note("Saved. The toy games use them from their next board.", 3500); }});
+    }, "The toys every game uses");
+    heading(name);
+    const fav = item("star", "", () => {
+      const on = toggleFavorite(current);
+      document.querySelectorAll(".favStar").forEach(x => x.dataset.slug === current && x.refresh());
+      o.drawFavs(); note(on ? `${name} is in your favorites, at the top of the front page.` : `${name} is out of your favorites.`, 3500);
+    });
+    // the page's own buttons, pressed from here (and kept in step with them: hidden or not, ready or not)
+    const page = [["linkBtn", "share", "Share"], ["bestBtn", "best", "Best times"], ["helpBtn", "help", "How to play"]]
+      .map(([id, icon, text]) => [id, item(icon, $(id) ? ($(id).querySelector(".lbl") || $(id)).textContent.trim() || text : text, () => $(id) && $(id).click())]);
+    const keys = item("keyboard", "Keys", () => keysCard(), "Press ? for these");
+    const setRow = item("sliders", "Settings", () => {});
+    setRow.onclick = e => { e.stopPropagation(); const open = setList.hidden; setList.hidden = !open; setRow.setAttribute("aria-expanded", String(open)); if (open) setList.scrollIntoView({block: "nearest"}); };
+    setRow.setAttribute("aria-expanded", "false"); setRow.classList.add("more");
+    const setList = document.createElement("div"); setList.className = "toggles menuSettings"; setList.id = "menuSettings"; setList.hidden = true;
+    setRow.setAttribute("aria-controls", "menuSettings");
+    for (const opt of document.querySelectorAll("main .bar .opt")) if (!opt.closest(".card,.overlay")) setList.append(opt);
+    for (const bar of document.querySelectorAll("main .bar.toggles")) if (!bar.children.length) bar.remove();
+    menu.append(setList);
+    head.append(menu);
+
+    function sync() {
+      const done = dailyDoneToday(), k = dailyStreak();
+      set(daily, o.dslug === current ? "Today's challenge: this one" : `Today's challenge: ${o.dgame[0]}`,
+        done ? `Done today${k > 1 ? `: a ${k}-day streak` : ""}` : k ? `Solve one for a ${k + 1}-day streak` : "Can you solve one today?");
+      daily.classList.toggle("done", done);
+      const on = favorites().includes(current);
+      set(fav, on ? "In your favorites" : "Add to favorites", on ? "Tap to take it off" : "");
+      fav.querySelector(".ic").classList.toggle("on", on);
+      for (const [id, row] of page) { const b = $(id); row.hidden = !b || b.hidden; row.disabled = !!(b && b.disabled); }
+      keys.hidden = !(KEYS[current] && keyboardish() && !$("chooseBtn"));
+      setRow.hidden = ![...setList.children].some(x => !x.hidden);
+    }
+    function show(open) {
+      if (open) sync();
+      menu.hidden = !open; btn.setAttribute("aria-expanded", String(open)); head.classList.toggle("menuOpen", open);
+      if (open) (menu.querySelector(".menuItem:not([hidden])") || menu).focus({preventScroll: true});
+    }
+    btn.onclick = e => { e.stopPropagation(); show(menu.hidden); };
+    document.addEventListener("click", e => { if (!menu.hidden && !menu.contains(e.target) && !btn.contains(e.target)) show(false); });
+    document.addEventListener("keydown", e => {
+      if (menu.hidden) return;
+      if (e.key === "Escape") { show(false); btn.focus(); }
+      else if (e.key === "ArrowDown" || e.key === "ArrowUp") {   // up and down go through the rows, as in a menu
+        const rows = [...menu.querySelectorAll(".menuItem:not([hidden]), #menuSettings:not([hidden]) input, #menuSettings:not([hidden]) select")];
+        const i = rows.indexOf(document.activeElement), n = rows.length;
+        if (n) { e.preventDefault(); rows[(i + (e.key === "ArrowDown" ? 1 : n - 1) + (i < 0 ? n : 0)) % n].focus(); }
+      }
+    });
+  }
+
   // The games menu: an "All games" button that opens a grid of every game, with this one marked.
   // Game pages sit one folder below the front page, so links start with ../ unless `base` says otherwise.
   function nav(current, base = "../") {
     CURRENT = current || null; HOME = base || "./";
-    if ($("keysBtn") && CURRENT && KEYS[CURRENT] && keyboardish() && !$("chooseBtn")) $("keysBtn").hidden = false;   // (not beside Keyboard Cat's Choose keys)
     const el = $("games"); el.innerHTML = "";
     const btn = document.createElement("button");
     btn.className = "gamesBtn"; btn.type = "button";
@@ -262,38 +389,30 @@ const G = (() => {
     btn.onclick = e => { e.stopPropagation(); show(panel.hidden); };
     document.addEventListener("click", e => { if (!panel.hidden && !el.contains(e.target)) show(false); });
     document.addEventListener("keydown", e => { if (e.key === "Escape" && !panel.hidden) { show(false); btn.focus(); } });
-    // On a game's page the menu button (Games) and the game's own star stand at the far right of the title, as tools,
-    // with the title, its cat and the stripe centred between them and an empty column of the same width on the left;
-    // the menu opens under the title as before.
+    // On a game's page the title row is: ☰ Menu at the left, the name in the middle, the win streak's flame at the
+    // right, and the rainbow stripe under them, all pinned at the top while the page scrolls under it. The games panel
+    // opens from the menu's All games row (see gameMenu); the game's cat and its line come under the title, and scroll.
     const row = document.createElement("div"); row.className = "gamesRow";
     const head = current && document.querySelector("main header");
     if (head) {
-      btn.classList.add("tool"); btn.innerHTML = iconSVG("games") + '<span class="lbl">Games</span>';
-      const st = favStar(current, drawFavs, false, true); st.classList.add("tool", "headStar");
-      const tools = document.createElement("div"); tools.className = "headTools"; tools.append(btn, st);
-      head.classList.add("withTools"); head.append(tools);
-      // a long name gets a little smaller rather than going onto two lines beside the tools, unless even that won't do
+      gameMenu(head, current, base, {open: () => { show(true); el.scrollIntoView({block: "nearest"}); search.focus({preventScroll: true}); }, drawFavs, dslug, dgame});
+      // a long name gets a little smaller rather than going onto two lines, unless even that won't do
       const h1 = head.querySelector("h1"), fit = () => {
         h1.style.fontSize = ""; let fs = parseFloat(getComputedStyle(h1).fontSize);
-        // clear of Games and the star: left of them, or on another row (at the larger text sizes they sit above the title)
-        const t = h1.closest(".title") || h1, apart = () => { const a = t.getBoundingClientRect(), b = tools.getBoundingClientRect(); return a.right <= b.left + 1 || a.top >= b.bottom - 1 || a.bottom <= b.top + 1; };
-        const one = () => h1.getBoundingClientRect().height < fs * 1.5 && apart();
+        const one = () => h1.getBoundingClientRect().height < fs * 1.5 && h1.scrollWidth <= h1.clientWidth + 1;
         // never smaller than a little over the body text (at the larger text sizes that's big): past that, two lines
         const floor = Math.max(20, parseFloat(getComputedStyle(document.body).fontSize) * 1.15);
         while (!one() && fs > floor) { fs -= 1; h1.style.fontSize = fs + "px"; }
         if (!one()) {   // too long even then: two lines at a size that reads...
           fs = Math.max(24, floor); h1.style.fontSize = fs + "px";
           // ...unless one word on its own is too wide for the room (Caboodle on a small phone): then smaller, till it fits
-          const clear = () => apart() && h1.scrollWidth <= h1.clientWidth + 1;
-          while (!clear() && fs > 16) { fs -= 1; h1.style.fontSize = fs + "px"; }
+          while (h1.scrollWidth > h1.clientWidth + 1 && fs > 16) { fs -= 1; h1.style.fontSize = fs + "px"; }
         }
       };
-      if (h1) {
-        fit(); addEventListener("resize", fit); document.fonts?.ready.then(fit);
-        for (const img of head.querySelectorAll("img")) img.addEventListener("load", fit);   // the cat beside the name takes room once it's in
-      }
+      if (h1) { fit(); addEventListener("resize", fit); document.fonts?.ready.then(fit); }
     } else { row.append(btn); if (current) row.append(favStar(current, drawFavs, true)); }
-    el.append(row, panel);
+    if (row.children.length) el.append(row);
+    el.append(panel);
     // on today's challenge, a badge under the menu button says so
     if (current && current === dslug) {
       const badge = document.createElement("span"); badge.className = "dailyBadge"; badge.id = "dailyBadge";
@@ -652,6 +771,7 @@ const G = (() => {
   function setStreak(name, n) {
     const all = load(STREAKS), s = Object.assign({streak: 0, best: 0}, all[name]);
     s.streak = n; s.best = Math.max(s.best, n); all[name] = s; save(STREAKS, all);
+    refreshFlame();
   }
   function breakStreak() { if (T && streak(T.name).streak) setStreak(T.name, 0); }
   // A puzzle saved before the timer existed can't set a best time.
@@ -874,6 +994,9 @@ const G = (() => {
   document.addEventListener("click", e => { if (e.target.closest && e.target.closest("#helpBtn")) helpTappedAt = Date.now(); }, true);
   const TIPS = "catdoku.tips.v1", SLUG = location.pathname.split("/").filter(Boolean).pop() || "";
   const resolveEls = els => (els || []).map(e => typeof e === "function" ? e() : e).flat().filter(Boolean);
+  // where something a step points at shows: a switch, Share or the like lives in the game's menu, so while the menu's
+  // shut the step points at ☰ Menu instead
+  const onScreen = x => { const m = $("menuBtn"), p = $("menuPanel"); return m && x && x.closest && x.closest("#pageTools") || (m && p && p.hidden && x && x.closest && x.closest("#menuPanel")) ? m : x; };
   // where a page element can be found again on a later visit: its id, or the id of something in it and its class
   function findable(el) {
     if (el.id) return {id: el.id};
@@ -882,7 +1005,7 @@ const G = (() => {
   }
   function findEl(f) { const e = document.getElementById(f.id); return e && f.up ? e.closest(f.up) : e; }
   const isToolStep = st => !st.try && !st.enter && !(st.lit && st.lit.length) && !st.marks && !st.shapes && !st.lines && !st.arrows &&
-    resolveEls(st.els).length && resolveEls(st.els).every(e => e.closest && e.closest(".actions,.bar,.toggles,main > .tools") && findable(e));
+    resolveEls(st.els).length && resolveEls(st.els).every(e => e.closest && e.closest(".actions,.bar,.toggles,main > .tools,#pageTools,#menuPanel") && findable(e));
   // A step about an on/off switch (Auto grade, Auto check…) isn't in the walkthrough at all: it's shown once, by
   // itself, the first time the player turns that switch on, which is when it means something (tips, below).
   const isSwitchStep = st => isToolStep(st) && resolveEls(st.els).every(e => e.closest(".toggles") && e.querySelector && e.querySelector("input[type=checkbox]"));
@@ -1008,7 +1131,7 @@ const G = (() => {
     const svgEl = (t, a) => { const e = document.createElementNS(ns, t); for (const n in a) e.setAttribute(n, a[n]); return e; };
     // Bring the board (and anything else the steps light) into view first.
     {
-      const tops = [wrap, ...o.steps.flatMap(st => (st.els || []).map(e => typeof e === "function" ? e() : e).flat())].map(e => e.getBoundingClientRect());
+      const tops = [wrap, ...o.steps.flatMap(st => (st.els || []).map(e => typeof e === "function" ? e() : e).flat().map(onScreen))].map(e => e.getBoundingClientRect());
       const top = Math.min(...tops.map(r => r.top)), bottom = Math.max(...tops.map(r => r.bottom));
       if (top < 0 || bottom > innerHeight) scrollBy(0, bottom - top < innerHeight ? (top + bottom - innerHeight) / 2 : top - 8);
     }
@@ -1022,7 +1145,7 @@ const G = (() => {
       // each thing to light is an element, or a list of elements lit together as one box
       const els = (st.els || []).map(e => {
         if (typeof e === "function") e = e();   // for things the game redraws while the step is up
-        const rs = (Array.isArray(e) ? e : [e]).map(x => x.getBoundingClientRect()), p = 5;
+        const rs = [...new Set((Array.isArray(e) ? e : [e]).map(onScreen))].map(x => x.getBoundingClientRect()), p = 5;
         const l = Math.min(...rs.map(r => r.left)), t = Math.min(...rs.map(r => r.top)), r = Math.max(...rs.map(r => r.right)), btm = Math.max(...rs.map(r => r.bottom));
         return {x: l - p, y: t - p, w: r - l + 2 * p, h: btm - t + 2 * p};
       });
@@ -1203,7 +1326,7 @@ const G = (() => {
       }
       frame = 0; if (o.steps[k].enter) o.steps[k].enter();
       // bring what this step lights into view if it's off the screen
-      const rs = (o.steps[k].els || []).map(e => typeof e === "function" ? e() : e).flat().map(x => x.getBoundingClientRect());
+      const rs = (o.steps[k].els || []).map(e => typeof e === "function" ? e() : e).flat().map(onScreen).map(x => x.getBoundingClientRect());
       if (rs.length) {
         const top = Math.min(...rs.map(r => r.top)), bottom = Math.max(...rs.map(r => r.bottom));
         if (bottom > innerHeight - 8) scrollBy(0, bottom - innerHeight + 24); else if (top < 8) scrollBy(0, top - 24);
@@ -1472,6 +1595,10 @@ const G = (() => {
   // rows (Bubbles, Toy Box, Bird Watch), New and the level pickers stay as buttons. Change a tool's word with
   // relabel(), not textContent, or the icon goes.
   const ICON = {
+    menu: '<path d="M6 9h20M6 16h20M6 23h20"/>',
+    home: '<path d="M5 15l11-9 11 9"/><path d="M8 13v13h16V13"/><path d="M13 26v-7h6v7"/>',
+    today: '<rect x="5" y="7" width="22" height="20" rx="3"/><path d="M10 4v6M22 4v6M5 13h22"/><path d="M16 16l1.4 2.8 3.1.4-2.3 2.1.6 3-2.8-1.5-2.8 1.5.6-3-2.3-2.1 3.1-.4z"/>',
+    star: '<path d="M16 4l3.6 7.4 8.1 1.2-5.9 5.7 1.4 8.1L16 22.6l-7.2 3.8 1.4-8.1-5.9-5.7 8.1-1.2z"/>',
     hint: '<path d="M11 20a8 8 0 1 1 10 0c-1 1-1.5 2-1.5 3h-7c0-1-.5-2-1.5-3z"/><path d="M13 27h6"/>',
     undo: '<path d="M9 7v6h6"/><path d="M9.5 13A9 9 0 1 1 9 21"/>',
     restart: '<path d="M25 16a9 9 0 1 1-2.6-6.4"/><path d="M23 4v6h-6"/>',
@@ -1542,21 +1669,16 @@ const G = (() => {
     l.textContent = text;
     if (icon && ICON[icon]) b.querySelector(".ic").outerHTML = iconSVG(icon);
   }
-  // Buttons not used while playing (Share, Best times, How to play, Toys) go in a small row above the board, under
-  // the title; the play tools stay under the board, with a line above them for a hint's words.
+  // Buttons not used while playing (Share, Best times, How to play, Toys) are pressed from the game's menu (gameMenu):
+  // each page keeps them in its markup, and they're put out of sight here, with Keys (shown in the menu on a computer).
+  // The play tools stay under the board, with a line above them for a hint's words.
   const PAGE_TOOLS = ["toysBtn", "linkBtn", "bestBtn", "helpBtn"];
   function pageTools() {
     const main = document.querySelector("main"), head = main && main.querySelector("header");
     if (!head || $("pageTools")) return;
     const moving = PAGE_TOOLS.map(id => document.getElementById(id)).filter(b => b && b.closest("main .actions") && !b.closest(".wall, .card, .overlay"));
-    if (moving.length) {
-      const row = document.createElement("div"); row.id = "pageTools"; row.className = "pageTools tools";
-      row.append(...moving);
-      // on a computer, the game's keys (shown once nav() knows the game, if it has a list)
-      const kb = document.createElement("button"); kb.id = "keysBtn"; kb.hidden = true; kb.textContent = "Keys"; kb.dataset.icon = "keyboard";
-      kb.onclick = () => keysCard(); row.append(kb);
-      const nav = head.parentElement.querySelector(":scope > nav.games"); (nav || head).after(row);
-    }
+    const hold = document.createElement("div"); hold.id = "pageTools"; hold.hidden = true;
+    hold.append(...moving); main.append(hold);
     const hb = $("hintBtn"), tools = hb && hb.closest("main .actions");
     if (tools) { const line = document.createElement("p"); line.id = "hintLine"; line.className = "hintLine"; line.setAttribute("aria-live", "polite"); tools.before(line); }
   }

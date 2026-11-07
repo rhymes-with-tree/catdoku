@@ -86,7 +86,11 @@ them beside the title and in `ARTWORK.md`, and perhaps on the gold-paw card.
 Approved by the owner on 2026-11-07, after a table of every game's controls was checked against the pages. Three parts
 that go together: the page's order, a menu in place of Games and the row of page tools, and shared helpers so each
 kind of control is written once and works the same everywhere. Build it in `games.js` and `games.css` first, then move
-the games over a few at a time. When it's done, the README's "Across every game" (Layout, Gold paw, Bookmark, Keys) and
+the games over a few at a time.
+
+**Built so far (2026-11-07):** the pinned title row (☰ Menu, name, flame, stripe), the cat and line under it, and
+the menu, with Settings holding every game's switches and pickers. Next: the dark-red paw-costing group, the tool
+order under the board, Undo and Bookmark made free, then the shared helpers below. When it's done, the README's "Across every game" (Layout, Gold paw, Bookmark, Keys) and
 `HIG.md` need rewriting to match.
 
 ### The page, top to bottom

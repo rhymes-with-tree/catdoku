@@ -92,7 +92,9 @@ in its notes.
   doesn't have, but don't reorder. `games.js` turns them into icons with the word small underneath (its `ICON_OF`
   table, by id): give a new kind of button an icon there (or `data-icon` where an id means something else in this
   game), and change a button's word with `G.relabel(btn, words, icon)`, never `textContent`, or the icon goes.
-  The game's ☆ goes just after its name in the title by itself. Undo also answers Ctrl+Z / ⌘Z (but not with Shift). Restart always puts
+  Share, Toys, Best times and How to play stay in the markup but are pressed from the game's menu (`G.gameMenu`, from
+  `G.nav`, puts them out of sight), as are the switches and pickers of the settings row, which move into the menu's
+  Settings; the ☰ Menu, the streak's flame and the game's favourite star come from `games.js` by themselves. Undo also answers Ctrl+Z / ⌘Z (but not with Shift). Restart always puts
   back this same puzzle as it was dealt; `newBtn` deals a different one. Every game has Share, and New unless
   levels are a fixed list.
 - **Settings row** (`.bar`, under the buttons): `levelSel` labelled "Level" (or `size` labelled "Size"),
