@@ -94,9 +94,10 @@ the menu, with Settings holding every game's switches and pickers. Then the dark
 Bookmark made free and Restart made to cost the paw in every game (`game.restarted`; see "The gold paw" below). Then
 the red going back to the usual colour once the paw is lost for the puzzle (`G.pawLost` on every page). Then a row of
 pieces under the board for the five tap-to-fill games with no pad (`G.pieces`: the plain tap beside Hide & Seek's
-Mark, Fair Play's Mark, Cross Stitch's Dot, Treat Time's Keep and Catdoku's Erase). Still to do: the games that
-already have a pad, pots, tray or keys moved to the same place under the board, with ⌫ or Erase there (Patches'
-Marker is already among its fabrics); Scratch That's Dot first switch made a piece; then the shared helpers below. When it's done, the README's "Across every game" (Layout, Gold paw, Bookmark, Keys) and
+Mark, Fair Play's Mark, Cross Stitch's Dot, Treat Time's Keep and Catdoku's Erase), and Scratch That's Dot first
+switch made a piece beside Post first. (The games with a pad, pots, tray or keys already had them under the board,
+with ⌫ or Erase among them, and Patches' Marker is among its fabrics.) Still to do: the shared helpers below, then
+the What's new card for returning visitors (below). When it's done, the README's "Across every game" (Layout, Gold paw, Bookmark, Keys) and
 `HIG.md` need rewriting to match.
 
 ### The page, top to bottom
@@ -147,6 +148,16 @@ Audit and helpers, and whatever result the game is about (fewest moves, first tr
 moves (Cat Mat's pots, Fish Bones' swaps, Up a Tree's steps, Knock It Off's moves), Undo gives the move back, as it
 already did in Knock It Off; Night Light's taps still count even when undone. Mew Hue's Undo can still take back a
 lost board, now for free. Each game's gold-paw line on the win card and the README's Gold paw list changed with it.
+
+### What's new, for returning visitors (added 2026-11-07)
+
+Someone who played before this redesign won't know where things went. The first time a returning visitor (any saved
+progress or seen tips on the device) opens a game after it ships, show a short card once, kept in a key of its own
+(such as `catdoku.news.v1`) so a later change can show another: ☰ Menu now holds Share, Best times, How to play,
+Keys and Settings (the switches that were under the board); Undo and Bookmark are free, and the red tools (Hint,
+Audit, helpers, Restart) cost the gold paw and turn plain once it's gone; the marking tool sits beside the plain tap
+under the board. It can light ☰ with a spotlight as a tip does. New visitors get the walkthrough instead, never this.
+Build it last, once the rest of the plan has shipped, so it describes the finished page.
 
 ### Shared helpers, so each is written once
 
