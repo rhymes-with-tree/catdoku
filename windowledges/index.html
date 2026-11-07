@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-06.9"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.1"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-06.9">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.1">
 <style>
 /* Kakuro on a block of flats, at night. The brick is wall; the stone squares in it hold the totals (across at the top
    right, down at the bottom left of the slash); the windows take the numbers 1 to 9, none twice in a run of windows.
@@ -145,9 +145,8 @@
     <button id="undoBtn">Undo</button>
     <button id="restartBtn">Restart</button>
     <button id="guessBtn" aria-pressed="false">Bookmark</button>
-    <button id="backBtn" hidden>Back to bookmark</button>
+    <button id="backBtn" hidden>Return to Bookmark</button>
     <button id="notesBtn" aria-pressed="false">Notes</button>
-    <button id="allNotesBtn">All notes</button>
     <button id="linkBtn">Share</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
@@ -157,12 +156,13 @@
     <button id="newBtn" class="primary">New puzzle</button>
   </div>
   <div class="bar toggles">
-    <div class="opt"><label class="toggle"><input type="checkbox" id="setsTgl"><span class="sw"></span>Show sets</label><span class="hint">Which digits can make the totals of the selected window</span></div>
+    <div class="opt"><label class="toggle"><input type="checkbox" id="setsTgl"><span class="sw"></span>Show sets</label></div>
+    <div class="opt" id="autoOpt"><label class="toggle"><input type="checkbox" id="autoTgl"><span class="sw"></span>🔢 Auto&nbsp;Notes</label></div>
   </div>
 
 </main>
 
-<script src="../games.js?v=2026-11-06.9"></script>
+<script src="../games.js?v=2026-11-07.1"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // A block of flats on an R × C plan: walls (the top row and left column are always walls, holding the totals) and
@@ -402,7 +402,7 @@ function kMake(n) {
 const STORE = "catdoku.windowledges.v1", MAX_LEVEL = 5;
 const $ = G.$;
 let state = G.load(STORE);
-let settings = Object.assign({level: 1, sets: true}, state.settings);
+let settings = Object.assign({level: 1, sets: true, autoNotes: false}, state.settings);
 let game = state.game || null, busy = false, sel = -1, noting = false, running = false;
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
@@ -469,7 +469,7 @@ function draw() {
   const lights = [...Array(R * C).keys()].filter(i => w[i] && plan.at[i].every(k => right[k])).length, windows = w.reduce((a, b) => a + b, 0);
   $("count").textContent = game.won ? "Every window is lit!" : `${lights} of ${windows} windows lit`;
   $("key").textContent = noting ? "Notes: tap numbers to jot them down as maybes" : sel < 0 && !game.won ? "Tap a window, then a number" : "";
-  $("hintBtn").disabled = game.won; $("allNotesBtn").disabled = game.won; $("allNotesBtn").setAttribute("aria-pressed", String(!game.won && allNotesOn()));
+  $("hintBtn").disabled = game.won;
   $("undoBtn").disabled = !game.history.length || game.won; $("restartBtn").disabled = !game.history.length || game.won;
   drawSets(right);
   guesses.sync();
@@ -513,6 +513,7 @@ function put(v) {
   game.started = true;
   if (!(noting && v) && v && game.grid[sel] !== v) guesses.before(sel);
   snapshot();
+  const was = game.grid[sel];
   if (noting && v) {
     if (game.grid[sel]) game.grid[sel] = 0;
     game.notes[sel] ^= 1 << v;
@@ -521,6 +522,7 @@ function put(v) {
     // a digit put down comes off the notes in its runs
     if (game.grid[sel]) for (const k of plan.at[sel]) for (const j of plan.runs[k].cells) game.notes[j] &= ~(1 << v);
     else if (!v) game.notes[sel] = 0;
+    if (was && game.grid[sel] !== was) autoBack(sel, was);
   }
   const after = check();
   if (after.right.every(Boolean)) { win(); return; }
@@ -550,19 +552,24 @@ function candidates(i) {
   }
   return can;
 }
-// All notes is a switch: on puts every digit still possible in every empty window, off takes every note away (Undo
-// brings them back). It shows on while every empty window has notes.
-function allNotesOn() { return game.grid.some((v, i) => game.w[i] && !v) && game.grid.every((v, i) => !game.w[i] || v || game.notes[i]); }
-$("allNotesBtn").onclick = () => {
+// Auto Notes (a switch, kept with the settings, off at first): on, every empty window gets a note for each digit its
+// totals' sets still allow, at once and on every new puzzle; a digit put down comes off the notes in its runs, as
+// always, and one taken away goes back on them. Off takes every note away. Undo puts either back.
+const fillNotes = () => { game.notes = game.notes.map((m, i) => game.w[i] && !game.grid[i] ? candidates(i) : m); };
+// digit v has just come out of window i: with Auto Notes on, it goes back on the notes of the empty windows in its
+// runs that could take it, and window i gets all of its own
+function autoBack(i, v) {
+  if (!settings.autoNotes) return;
+  for (const k of plan.at[i]) for (const p of plan.runs[k].cells) if (!game.grid[p] && candidates(p) >> v & 1) game.notes[p] |= 1 << v;
+  if (!game.grid[i]) game.notes[i] = candidates(i);
+}
+$("autoTgl").onchange = e => {
+  settings.autoNotes = e.target.checked; save();
   if (!playing()) return;
-  if (allNotesOn()) {
-    snapshot(); game.notes = game.notes.map(() => 0); draw(); save();
-    G.note("Notes off: every note taken away. Undo brings them back.", 3000); return;
-  }
-  snapshot();
-  game.notes = game.notes.map((m, i) => game.w[i] && !game.grid[i] ? candidates(i) : m);
-  game.started = true; draw(); save();
-  G.note("Notes in every empty window: the digits its totals' sets still allow", 3500);
+  const before = game.notes.slice();
+  if (settings.autoNotes) fillNotes(); else game.notes = game.notes.map(() => 0);
+  if (game.notes.some((m, i) => m !== before[i])) { const now = game.notes; game.notes = before; snapshot(); game.notes = now; game.started = true; }
+  draw(); save();
 };
 document.addEventListener("keydown", e => {
   if (!playing() || document.querySelector(".spot") || e.target.tagName === "SELECT" || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -638,7 +645,7 @@ function whyDigit(i) {
   return "Only one digit fits in the glowing window, from the sets of its two totals and the digits already in its runs.";
 }
 $("hintBtn").onclick = hint;
-$("restartBtn").onclick = () => { if (playing() && game.history.length) { game.undid = true; snapshot(); guesses.clear(); game.grid = game.grid.map(() => 0); game.notes = game.notes.map(() => 0); draw(); save(); G.note("Every window's dark again. Undo brings your numbers back.", 3500); } };
+$("restartBtn").onclick = () => { if (playing() && game.history.length) { game.undid = true; snapshot(); guesses.clear(); game.grid = game.grid.map(() => 0); game.notes = game.notes.map(() => 0); if (settings.autoNotes) fillNotes(); draw(); save(); G.note("Every window's dark again. Undo brings your numbers back.", 3500); } };
 addEventListener("resize", () => { if (game && plan) draw(); });
 
 /* ---------- endings ---------- */
@@ -684,6 +691,7 @@ function begin(p, level) {
   const n = p.R * p.C;
   game = {level, R: p.R, C: p.C, w: Array.from(p.w, Number), sums: p.sums || p.runs.map(r => r.sum), grid: new Array(n).fill(0), notes: new Array(n).fill(0), history: [], won: false, cats: {}, ...G.freshClock()};
   sel = -1; noting = false; forceLit = new Set(); $("facade").classList.remove("won"); makePlan(); makePad();
+  if (settings.autoNotes) fillNotes();
 }
 async function newPuzzle() {
   if (busy) return;
@@ -716,7 +724,7 @@ function openShared(d) {
   if (!good) { G.note("That share link didn't work.", 5000); return; }
   begin({R: d.r, C: d.c, w: d.w, sums: d.s}, d.N);
   const n = d.r * d.c;
-  if (d.p && Array.isArray(d.p.grid) && d.p.grid.length === n) { game.grid = d.p.grid.map(v => (+v >= 1 && +v <= 9) ? +v : 0); if (Array.isArray(d.p.notes) && d.p.notes.length === n) game.notes = d.p.notes.map(v => (+v | 0) & 0x3FE); game.timed = false; }
+  if (d.p && Array.isArray(d.p.grid) && d.p.grid.length === n) { game.grid = d.p.grid.map(v => (+v >= 1 && +v <= 9) ? +v : 0); if (settings.autoNotes) fillNotes(); if (Array.isArray(d.p.notes) && d.p.notes.length === n) game.notes = d.p.notes.map(v => (+v | 0) & 0x3FE); game.timed = false; }
   settings.level = d.N; $("levelSel").value = d.N;
   draw(); save(); build.prefetch(d.N);
   if (d.p && check().right.every(Boolean)) win();
@@ -749,7 +757,8 @@ function helpOnFirstVisit() {
       {say: "Now pick a number", els: [$("pad")], try: {done: () => game.grid[e] > 0, yes: "In it goes!"}, ...turn.upTo}]),
     {say: "Show sets: digits for each total", els: [() => $("setsTgl").closest(".opt")]},
     {say: "Notes for maybes", els: [$("notesBtn")]},
-    {say: "Not sure? Bookmark, then try an idea. Back to bookmark undoes it", els: [$("guessBtn")]},
+    {say: "Auto Notes fills in every maybe for you", els: [$("autoOpt")]},
+    {say: "Not sure? Bookmark, then try an idea. Return to Bookmark undoes it", els: [$("guessBtn")]},
     {say: "Stuck? Hint fixes or gives a number", els: [$("hintBtn")]},
   ];
   // the Your turn steps come early: doing comes before the rest of the rules
@@ -762,6 +771,7 @@ $("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
 $("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
 $("helpBtn").onclick = showHelp;
 $("setsTgl").checked = settings.sets !== false;
+$("autoTgl").checked = !!settings.autoNotes;
 $("setsTgl").onchange = e => { settings.sets = e.target.checked; save(); if (game) draw(); };
 $("sitter").src = catSrc("willow-1");
 $("roofcat").src = catSrc("willow-4");

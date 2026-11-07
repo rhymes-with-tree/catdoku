@@ -377,6 +377,52 @@ const G = (() => {
     return wrap;
   }
 
+  // New with the levels in it (Wind Up): one tap on New opens a menu of the levels, from the select `sel` (kept
+  // hidden, for otherSize and the page's own bookkeeping), and picking one deals at that level; a second tap straight
+  // after (a double tap) shuts the menu and deals again at the level you're on. o: {btn, sel, choose(n), again(),
+  // tip (the line at the top of the menu)}.
+  function levelMenu(o) {
+    const btn = o.btn, sel = o.sel, wrap = document.createElement("span"), menu = document.createElement("div");
+    wrap.className = "newpick"; btn.before(wrap); wrap.append(btn, menu);
+    menu.className = "levelmenu"; menu.id = btn.id + "Menu"; menu.setAttribute("role", "menu"); menu.setAttribute("aria-label", "Level"); menu.hidden = true;
+    btn.setAttribute("aria-haspopup", "menu"); btn.setAttribute("aria-expanded", "false"); btn.setAttribute("aria-controls", menu.id);
+    let opened = -1e9;
+    const items = () => [...menu.querySelectorAll("button")];
+    const close = (refocus) => { if (menu.hidden) return; menu.hidden = true; btn.setAttribute("aria-expanded", "false"); if (refocus) btn.focus(); };
+    const open = focus => {
+      menu.innerHTML = "";
+      const tip = document.createElement("p"); tip.className = "menutip"; tip.textContent = o.tip || "Double-tap for the same level"; menu.append(tip);
+      for (const op of sel.options) {
+        const b = document.createElement("button"), on = op.value === sel.value;
+        b.type = "button"; b.setAttribute("role", "menuitemradio"); b.setAttribute("aria-checked", String(on)); b.textContent = op.textContent;
+        b.onclick = () => { close(); o.choose(+op.value); };
+        menu.append(b);
+      }
+      menu.hidden = false; btn.setAttribute("aria-expanded", "true");
+      // under the button's middle where it fits, kept 8px inside the screen's sides
+      menu.style.left = "0px";
+      const w = wrap.getBoundingClientRect(), mw = menu.offsetWidth, want = w.left + w.width / 2 - mw / 2;
+      menu.style.left = `${Math.round(Math.max(8, Math.min(want, document.documentElement.clientWidth - 8 - mw)) - w.left)}px`;
+      const cur = menu.querySelector('[aria-checked="true"]');
+      if (cur) cur.scrollIntoView({block: "nearest"});
+      if (focus) (cur || items()[0]).focus();
+    };
+    btn.onclick = e => {
+      const now = performance.now();
+      if (!menu.hidden) { close(); if (now - opened < 450) o.again(); return; }
+      opened = now; open(e.detail === 0);   // detail 0: pressed with a key, so the menu takes the focus
+    };
+    menu.addEventListener("keydown", e => {
+      const list = items(), k = list.indexOf(document.activeElement);
+      if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(true); }
+      else if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); e.stopPropagation(); list[(k + (e.key === "ArrowDown" ? 1 : list.length - 1)) % list.length].focus(); }
+      else if (e.key === "Home" || e.key === "End") { e.preventDefault(); list[e.key === "Home" ? 0 : list.length - 1].focus(); }
+      else if (e.key === "Tab") close();
+    });
+    document.addEventListener("pointerdown", e => { if (!wrap.contains(e.target)) close(); }, true);
+    return {close};
+  }
+
   // Names for the cat in the win card's photo (from Catdoku, which had the longest list).
   const CAT_NAMES = {
     classic: ["Oliver","Luna","Milo","Chloe","Leo","Bella","Simon","Tilly","Felix","Daisy","Oscar","Pearl","Jasper","Hazel","Gus","Mabel","Otis","Rosie","Arlo","Winnie",
@@ -1244,7 +1290,7 @@ const G = (() => {
     // the first time a switch is turned on, its tip, pointing at the switch
     document.addEventListener("change", e => {
       const box = e.target; if (!box.matches || !box.matches("input[type=checkbox]") || !box.checked || !box.id) return;
-      const key = SLUG + ":on", d = load(TIPS), t = (d[key] || []).find(x => x.els.some(f => f && f.id === box.id));
+      const key = SLUG + ":on", d = load(TIPS), t = (d[key] || []).find(x => x.els.some(f => f && (f.id === box.id || !!document.getElementById(f.id)?.contains(box))));
       if (!t) return;
       d[key] = d[key].filter(x => x !== t); if (!d[key].length) delete d[key];
       d[SLUG + ":shown"] = [...(d[SLUG + ":shown"] || []), t.say]; save(TIPS, d);
@@ -1420,7 +1466,7 @@ const G = (() => {
     undo: '<path d="M9 7v6h6"/><path d="M9.5 13A9 9 0 1 1 9 21"/>',
     restart: '<path d="M25 16a9 9 0 1 1-2.6-6.4"/><path d="M23 4v6h-6"/>',
     audit: '<circle cx="14" cy="14" r="9"/><path d="M21 21l6 6"/><path d="M10 14l3 3 5-6"/>',
-    undoguess: '<path d="M9 7v6h6"/><path d="M9.5 13A9 9 0 1 1 9 21"/><path d="M16 12h6v10l-3-2.2-3 2.2z"/>',   // back to bookmark
+    undoguess: '<path d="M7 3h18v26l-9-6.5-9 6.5z"/><path d="M20 8.5v3.5a2.5 2.5 0 0 1-2.5 2.5H12"/><path d="M14.5 11.5l-3 3 3 3"/>',   // Return to Bookmark: a bookmark with a return arrow in it
     pencil: '<path d="M21 5l6 6-14 14H7v-6z"/><path d="M18 8l6 6"/><path d="M7 27h18"/>',
     pencils: '<path d="M23 5l5 5-12 12h-5v-5z"/><path d="M20 8l5 5"/><path d="M4 9h7M4 14h5M4 27h20"/>',
     erase: '<path d="M18 6l8 8-11 11H9l-4-4z"/><path d="M12 12l8 8"/><path d="M15 25h11"/>',
@@ -1452,7 +1498,7 @@ const G = (() => {
     catnip: '<path d="M7 25C7 13 14 6 26 6c0 12-7 19-19 19z"/><path d="M7 25l11-11"/>',
     swat: '<path d="M9 21c0-4 3-6 7-6s7 2 7 6-3 5-7 5-7-1-7-5z"/><circle cx="8" cy="12" r="2.6"/><circle cx="13" cy="7.5" r="2.6"/><circle cx="19" cy="7.5" r="2.6"/><circle cx="24" cy="12" r="2.6"/>',
     net: '<path d="M4 9h24M4 16h24M4 23h24M9 5v22M16 5v22M23 5v22"/>',
-    roller: '<rect x="5" y="5" width="17" height="9" rx="3"/><path d="M22 9.5h4.5V19H15v4"/><rect x="12.5" y="23" width="5" height="6" rx="1.2"/>',
+    defluff: '<path d="M13 7.5A2.2 2.2 0 0 1 18.5 9.5A2.2 2.2 0 0 1 21.4 14.5A2.2 2.2 0 0 1 20.4 20.3A2.2 2.2 0 0 1 15.9 24A2.2 2.2 0 0 1 10.1 24A2.2 2.2 0 0 1 5.6 20.3A2.2 2.2 0 0 1 4.6 14.5A2.2 2.2 0 0 1 7.5 9.5A2.2 2.2 0 0 1 13 7.5z"/><circle cx="10" cy="15" r="1.4"/><circle cx="16" cy="15" r="1.4"/><path d="M25 10h4M26.5 16h3M25 22h4"/>',   // a fluffball whooshing off (De-fluff)
     bubbleshake: '<circle cx="13" cy="18" r="7"/><circle cx="23" cy="9" r="3.5"/><path d="M24 20l3 2M25 15.5h3.5"/>',
     basketshake: '<path d="M6 14h20l-2.5 11h-15z"/><path d="M11 14l4-6M21 14l-4-6"/><path d="M3 10l2 2M29 10l-2 2M3 18l2-1M29 18l-2-1"/>',
     losecolor: '<path d="M5 21a11 11 0 0 1 22 0"/><path d="M9.5 21a6.5 6.5 0 0 1 13 0"/><path d="M19 27h9"/>',
@@ -1475,7 +1521,7 @@ const G = (() => {
     allNotesBtn: "pencils", clearNotesBtn: "erase", eraseBtn: "erase", pauseBtn: "pause", guessBtn: "guess", giveUpBtn: "giveup",
     keepBtn: "keep", shuffleBtn: "shuffle", flipBtn: "flip", finishBtn: "near", completeBtn: "check", skipBtn: "skip",
     colBtn: "palette", dotBtn: "dot", linkBtn: "share", toysBtn: "toys", bestBtn: "best", helpBtn: "help", zoomIn: "zoomin", zoomOut: "zoomout", zoomFit: "fit",
-    sightBtn: "sight", nipBtn: "catnip", shakeBtn: "bubbleshake", fluffBtn: "roller", swatBtn: "swat", netBtn: "net", rainbowBtn: "losecolor", basketBtn: "basketadd", wipeBtn: "wipe",
+    sightBtn: "sight", nipBtn: "catnip", shakeBtn: "bubbleshake", fluffBtn: "defluff", swatBtn: "swat", netBtn: "net", rainbowBtn: "losecolor", basketBtn: "basketadd", wipeBtn: "wipe",
     chooseBtn: "keyboard", revealBtn: "giveup", peekBtn: "peek", perchBtn: "perch", wakeBtn: "cat", reelBtn: "reel", mopBtn: "sponge"};
   // buttons that keep their own look with an icon in front of the word: every New (a +) and Catlas's Go (an arrow)
   const LEAD = {newBtn: "plus", sNewBtn: "plus", goBtn: "go", settingsSum: "sliders"};
@@ -1543,7 +1589,7 @@ const G = (() => {
   /* ---------- bookmarks (guesses) ---------- */
   // Bookmark (called Guess until 2026-11; the code keeps the old names), as in Toydoku and Fair Play, for a game whose
   // moves go on an Undo list (game.history): Bookmark marks the board as it is, and the next thing put on it glows
-  // violet; Back to bookmark takes everything back to the latest bookmark in one tap, through the game's own Undo (so it costs what Undo costs). A guess is kept as {i, at}: the square
+  // violet; Return to Bookmark takes everything back to the latest bookmark in one tap, through the game's own Undo (so it costs what Undo costs). A guess is kept as {i, at}: the square
   // and how long the Undo list was before it, so plain Undo past it, or the square being emptied, ends it.
   // o: {game: () => game, undo (one step), draw (after a change), board (the element that shows it's armed), what
   // ("toy", "number"…: for the note line), over (() => true once the puzzle's finished; game.won if not given),
@@ -1562,7 +1608,7 @@ const G = (() => {
     };
     btn.onclick = () => {
       const gm = g(); if (!gm || (o.over ? o.over() : gm.won)) return;
-      armed = !armed; sync(); if (armed) note(`Bookmarked: the next ${o.what || "one"} you put in glows, and Back to bookmark returns here`, 3500); else note("");
+      armed = !armed; sync(); if (armed) note(`Bookmarked: the next ${o.what || "one"} you put in glows, and Return to Bookmark returns here`, 3500); else note("");
     };
     back.onclick = () => {
       const gm = g(), gs = list(); if (!gm || (o.over ? o.over() : gm.won) || !gs.length) return;
@@ -1648,6 +1694,6 @@ const G = (() => {
     }
   }
 
-  return {MAGNET, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, meaning, plainText,
+  return {MAGNET, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();
