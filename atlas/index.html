@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.14"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.15"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.14">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.15">
 <style>
 /* The map is the board: the country to name is lit in coral, and a gold ring goes round it when it's too small
    to see. Under it, the cat to find and the answer, given the way the player picks: four names (Pick), typing with
@@ -35,10 +35,6 @@
 .map .grid{position:absolute;inset:0}
 .map canvas{display:block;width:100%;height:100%;cursor:grab}
 .map canvas:active{cursor:grabbing}
-.recentre{position:absolute;right:8px;bottom:8px;width:40px;height:40px;padding:0;border-radius:50%;display:grid;place-items:center;background:var(--panel)}
-.zoombtns{position:absolute;right:8px;bottom:56px;display:flex;flex-direction:column;gap:8px}
-.zoombtns button{width:40px;height:40px;padding:0;border-radius:50%;background:var(--panel);font-size:24px;line-height:1;font-weight:800}
-.recentre svg{width:22px;height:22px;fill:none;stroke:var(--ink);stroke-width:2.2;stroke-linecap:round}
 .key{position:absolute;left:8px;bottom:8px;display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--ink);background:color-mix(in srgb,var(--panel) 88%,transparent);border-radius:999px;padding:2px 10px 2px 4px;pointer-events:none}
 .key i{width:18px;height:14px;border-radius:4px;border:1.5px dashed var(--ink-soft);background:repeating-linear-gradient(135deg,var(--land) 0 3px,rgba(42,37,48,.42) 3px 4.6px)}
 .loading{position:absolute;inset:0;display:grid;place-items:center;color:var(--ink-soft);font-weight:600}
@@ -113,8 +109,6 @@ body.typing .list{max-height:var(--list-h,108px)}
     <div class="grid" id="grid"><canvas id="canvas" tabindex="0" role="img" aria-label="World map with one country lit up. Drag to move, pinch or scroll to zoom."></canvas></div>
     <div class="key" aria-hidden="true"><i></i>Disputed</div>
     <div class="loading" id="loading">Unrolling the map…</div>
-    <div class="zoombtns"><button id="zoomInBtn" aria-label="Zoom in" title="Zoom in">+</button><button id="zoomOutBtn" aria-label="Zoom out" title="Zoom out">−</button></div>
-    <button class="recentre" id="recentreBtn" aria-label="Back to the lit country" title="Back to the lit country"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
   </div>
   <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
 
@@ -148,7 +142,7 @@ body.typing .list{max-height:var(--list-h,108px)}
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-07.14"></script>
+<script src="../games.js?v=2026-11-07.15"></script>
 <script>
 /* ---------- countries and their cats ---------- */
 // The 200 countries a trip can ask: the 193 UN members plus Vatican City, Palestine, Taiwan, Kosovo,
@@ -416,7 +410,7 @@ function buildWorld(raw, disputedRaw, dzRaw) {
 
 const canvas = G.$("canvas"), ctx = canvas.getContext("2d");
 const view = {x: 0, y: 0, s: 0.5};      // the map point at the middle of the board, and pixels per map unit
-let size = {w: 1, h: 1, dpr: 1}, flash = null, drawQueued = false, tween = null, glow = null, glowQueued = false;   // glow: the finished trip whose countries are all lit
+let size = {w: 1, h: 1, dpr: 1}, flash = null, drawQueued = false, tween = null, glow = null, glowQueued = false, zoomer = null;   // glow: the finished trip whose countries are all lit
 function resize() {
   const r = canvas.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 2);
   size = {w: r.width || 1, h: r.height || 1, dpr};
@@ -534,17 +528,16 @@ function flyTo(t, instant) {
   canvas.addEventListener("keydown", e => {
     const k = {ArrowLeft: [-40, 0], ArrowRight: [40, 0], ArrowUp: [0, -40], ArrowDown: [0, 40]}[e.key];
     if (k) { view.x += k[0] / view.s; view.y += k[1] / view.s; }
-    else if (e.key === "+" || e.key === "=") zoomAt({x: size.w / 2, y: size.h / 2}, 1.4);
-    else if (e.key === "-") zoomAt({x: size.w / 2, y: size.h / 2}, 1 / 1.4);
     else return;
     e.preventDefault(); clampView(); redraw();
   });
   new ResizeObserver(resize).observe(canvas);
   const zoomBy = f => { if (tween) { cancelAnimationFrame(tween.raf); tween = null; } flyTo({x: view.x, y: view.y, s: view.s * f}); };
-  G.$("zoomInBtn").onclick = () => zoomBy(2);
-  G.$("zoomOutBtn").onclick = () => zoomBy(1 / 2);
+  // + and − (and the keys) in the map's corner (G.zoom), with the way back to the lit country under them
+  zoomer = G.zoom({at: G.$("board"), zoomIn: () => zoomBy(2), zoomOut: () => zoomBy(1 / 2),
+    more: {name: "Back to the lit country", label: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>',
+      fn: () => { if (game && world) flyTo(frameFor(current())); }}});
 }
-G.$("recentreBtn").onclick = () => { if (game && world) flyTo(frameFor(current())); };
 
 /* ---------- a trip ---------- */
 const KEY = "catdoku.catlas.v1", TRIP = 10, TRIES = 2;
@@ -881,7 +874,7 @@ function walkthrough() {
     {say: style() === "pick" ? "Tap the country's name." : style() === "list" ? "Type its name, or pick it from the list." : "Type its name, then Go.",
      lit: [], els: [style() === "pick" ? $("choices") : $("typebox")]},
     {say: "Two tries each", lit: [], els: [style() === "pick" ? $("choices") : $("typebox")]},
-    {say: "Drag or pinch to look around", lit: [[0, 0]], els: [document.querySelector(".zoombtns"), $("recentreBtn")]},
+    {say: "Drag or pinch to look around", lit: [[0, 0]], els: [zoomer.el]},
     {say: "Pick how you answer", lit: [], els: [$("styleSel")]},
     {say: "Stuck? Hint (costs the gold paw)", lit: [], els: [$("hintBtn")]}];
   G.spotlight({grid: $("grid"), w: 1, h: 1, steps, done: () => { settings.seenHelp = true; save(); }});

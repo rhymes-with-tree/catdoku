@@ -100,7 +100,10 @@ with ⌫ or Erase among them, and Patches' Marker is among its fabrics.) Then th
 visitors (`whatsNew`). Then `G.switch` for every on/off setting (21 pages), and the names: Notes, Auto grade, Junk
 Drawer's Dim used-up magnets, Yarn's Numbers (was Show numbers), Knit Pick's Guess button (`wordBtn`, so it's no longer taken for Bookmark) and Slower in
 Wind Up. Then Toydoku and Fair Play moved onto `G.guesser`, and Catlas and Cat Burglar onto `G.hinter` (their hint's words go
-beside Hint and stay until the card or painting moves on; what the hint showed is still kept by the page). Still to do: the other shared helpers below. When it's done, the README's "Across every game" (Layout, Gold paw, Bookmark, Keys) and
+beside Hint and stay until the card or painting moves on; what the hint showed is still kept by the page). Then
+`G.zoom`: one set of round buttons in the board's corner (full screen, +, −, and Twirl's Fit or Catlas's way back to
+the lit country), with the + and − keys, in Twirl (under the mat's corner, as the mat at Fit can't be moved from under
+them), Cat Burglar and Catlas; each keeps its own pinch and drag. Still to do: the other shared helpers below. When it's done, the README's "Across every game" (Layout, Gold paw, Bookmark, Keys) and
 `HIG.md` need rewriting to match.
 
 ### The page, top to bottom
@@ -114,7 +117,7 @@ beside Hint and stay until the card or painting moves on; what the hint showed i
 2. The rainbow line, the full width.
 3. The game's cat beside its blurb (the tagline). These scroll away.
 4. **Status line:** level on the left; time, lives or both on the right.
-5. **Board**, with zoom and full screen in its corner (as Cat Burglar's + and − already are).
+5. **Board**, with zoom and full screen in its corner (`G.zoom`, done 2026-11-07).
 6. **Pieces**, the most used: digits, letters, toys, fabrics, paints, a tray of shapes, with ⌫ or Erase, and the
    game's marking tool among them (Mark, Dot, Keep, Patches' Marker), as Marker already sits with Patches' fabrics.
 7. **Free tools:** Undo, Notes, Bookmark, Return to Bookmark, Complete. Shown only where the game has them, in this
@@ -180,8 +183,6 @@ Built 2026-11-07 (`whatsNew` in `games.js`), ahead of the shared helpers, which 
 - **Admire:** after a win, a toggle that clears the marks to show the finished picture. Today it's Open the Door!'s
   Show/Hide numbers button and Cat Burglar's Show/Hide the rings on its gallery card; it goes with the win card's
   Admire my board (`G.winCard`), and other games can use it (pencil marks, Hide & Seek's doodles).
-- **Zoom and full screen:** Twirl (Fit, Zoom In, Zoom Out), Cat Burglar (+ −) and Catlas (+ −, Recentre) each zoom
-  their own way. One helper beside `G.fullScreen`, in the board's corner.
 - **Helpers:** the icon badge is shared; the uses left and the gold-paw cost become shared too. Shake is in Toy Box,
   Bubbles, Wind Up and Pawlinko; Shuffle or Mix in Toy Box, Pick of the Pile, Mew Hue and Keyboard Cat.
 - **Hints by other names** go in the red group as hints: Keyboard Cat's Words left, Starts and Clues (switches today),

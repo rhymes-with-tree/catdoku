@@ -1064,8 +1064,8 @@ const G = (() => {
     scratchthat: ["Arrow keys: move round the room", "Space or Enter: tap", "P: a post", "X or .: a dot", "Backspace: clear"],
     magnets: ["Arrow keys: pick a square", "Letters: put one up", "Backspace: take a letter down", "Space: turn to the other word"],
     purrfect: ["Arrow keys: pick a square", "Digits: type a number (two quickly for 10 and up)", "Backspace: take it out"],
-    atlas: ["Arrow keys: move round the map", "+ and −: zoom", "Type your answer and press Enter"],
-    catburglar: ["Arrow keys: move the crosshair", "Space or Enter: tap there", "+ and −: zoom"],
+    atlas: ["Arrow keys: move round the map", "Type your answer and press Enter"],
+    catburglar: ["Arrow keys: move the crosshair", "Space or Enter: tap there"],
     catpile: ["1 to 3: pick a clump", "Arrow keys: move it", "R: turn it", "Space: put it down"],
     fishbones: ["Arrow keys: go from bone to bone", "Space or Enter: pick one up, then put it down on another", "Escape: let go"],
     stash: ["1 to 8: put in a toy (Shift: mark it nope)", "Left and right: pick a box", "Backspace: take a toy out", "Enter: check"],
@@ -1088,6 +1088,7 @@ const G = (() => {
   function keysCard() {
     const list = [...(KEYS[CURRENT] || [])];
     if ($("undoBtn")) list.push("⌘Z or Ctrl+Z: undo");
+    if (document.querySelector(".zoombox")) list.push("+ and −: zoom");
     if (document.querySelector(".fsBtn")) list.push("F: full screen");
     list.push("?: these keys");
     const ul = document.createElement("ul"); ul.className = "keysList";
@@ -1935,6 +1936,39 @@ const G = (() => {
     return {on: isOn, set};
   }
 
+  /* ---------- zoom and full screen ---------- */
+  // One set of round buttons in the board's bottom-right corner, the same in every game that zooms: full screen
+  // (through fullScreen above), +, − and one more where the game has it (Twirl's Fit, Catlas's back to the lit
+  // country). + and − on the keyboard press them too. Each game keeps its own pinch, drag and scroll. o: {at (the
+  // board's box; it's given position:relative if it has none), below (the buttons go under the board's corner, for a
+  // board that can't be moved about at its full size, so they'd hide part of it), zoomIn, zoomOut, more: {label
+  // (a word or SVG), name, fn}, full: {name, change} (as fullScreen's)}. Returns {el, fs, can(zoomIn, zoomOut, more)}.
+  function zoomer(o) {
+    const el = document.createElement("div");
+    el.className = "zoombox" + (o.below ? " below" : "");
+    el.setAttribute("role", "group"); el.setAttribute("aria-label", "Zoom");
+    const btn = (html, name, fn) => {
+      const b = document.createElement("button"); b.type = "button"; b.innerHTML = html;
+      if (name) { b.setAttribute("aria-label", name); b.title = name; }
+      if (fn) b.addEventListener("click", fn);
+      el.append(b); return b;
+    };
+    let fs = null;
+    if (o.full) fs = fullScreen({btn: btn(""), name: o.full.name, change: o.full.change});
+    const zin = btn("+", "Zoom in (+)", o.zoomIn), zout = btn("−", "Zoom out (−)", o.zoomOut);
+    const more = o.more ? btn(o.more.label, o.more.name, o.more.fn) : null;
+    if (more && !/</.test(o.more.label)) more.classList.add("word");
+    if (!o.below && getComputedStyle(o.at).position === "static") o.at.style.position = "relative";
+    o.at.append(el);
+    document.addEventListener("keydown", e => {
+      if (e.ctrlKey || e.metaKey || e.altKey || document.querySelector(".spot") || $("overlay").classList.contains("show") || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+      const b = e.key === "+" || e.key === "=" ? zin : e.key === "-" || e.key === "_" ? zout : null;
+      if (b && !b.disabled) { e.preventDefault(); b.click(); }
+    });
+    const can = (i, out, m) => { zin.disabled = !i; zout.disabled = !out; if (more && m !== undefined) more.disabled = !m; };
+    return {el, fs, can};
+  }
+
   // If something breaks, say what on the page and count it on the dashboard, so it can be fixed.
   function reportError(msg, where) {
     track(`Error: ${msg}${where ? ` (${where})` : ""}`);
@@ -1961,6 +1995,6 @@ const G = (() => {
     }
   }
 
-  return {MAGNET, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, meaning, plainText,
+  return {MAGNET, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();

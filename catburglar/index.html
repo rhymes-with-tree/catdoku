@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.14";
+  var BUILD = "2026-11-07.15";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.14">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.15">
 <style>
 /* Night at the museum: a painting in a gilt frame on a dark gallery wall, lit by a brass picture light.
    A cat has sneaked into the painting; pinch or use + and − to look closer, and tap it to catch it. */
@@ -52,10 +52,6 @@
 .found{fill:none;stroke:#6AA673;stroke-width:5px;vector-effect:non-scaling-stroke}
 .found.away{stroke:#C8392B}
 .view.zoomed{cursor:grab}
-/* zoom buttons in the frame's corner */
-.zoom{position:absolute;right:6px;bottom:6px;display:flex;flex-direction:column;gap:6px;z-index:2}
-.zoom button{width:38px;height:38px;padding:0;border-radius:50%;font-size:24px;line-height:1;font-weight:800;
-  background:rgba(247,248,243,.9);display:flex;align-items:center;justify-content:center}
 /* the museum's label beside the painting */
 .placard{margin-top:12px;max-width:100%;background:#F7F8F3;border:2px solid #2A2530;border-radius:4px;padding:3px 12px;
   font-size:14px;line-height:1.3;text-align:center;color:var(--ink)}
@@ -74,9 +70,7 @@
    notes, Hint and Give up kept on show. */
 body.full{background:#2A2530}
 body.full main{justify-content:center;background:color-mix(in srgb,#4E577D 70%,#2A2530);color:#F7F8F3}
-body.full .bar > :not(#giveUpBtn),body.full .actions > :not(#hintBtn,#zoom){display:none}
-/* the zoom buttons come off the painting, into the row with Hint and Give up */
-body.full .zoom{position:static;flex-direction:row;align-items:center}
+body.full .bar > :not(#giveUpBtn),body.full .actions > :not(#hintBtn){display:none}
 body.full .status,body.full .actions{width:100%;max-width:900px}
 body.full .wall{width:100%}
 /* On a phone, the painting edge to edge: no lamp, label or wall round it, and only a thin gilt edge. Held upright,
@@ -88,8 +82,6 @@ body.full .wall{width:100%}
   body.full .wall{flex:1 1 0;min-height:0;justify-content:center;padding:0;background:none;border-radius:0}
   body.full .lamp,body.full .placard{display:none}
   body.full .frame{padding:3px;border-radius:2px}
-  body.full .zoom{gap:4px}
-  body.full .zoom button{width:32px;height:32px;padding:0;font-size:22px}
 }
 @media (max-width:600px) and (orientation:landscape),(max-height:500px) and (orientation:landscape){
   body.full main{display:grid;grid-template-columns:minmax(0,1fr) 116px;grid-template-rows:auto minmax(0,1fr);gap:8px 4px}
@@ -99,7 +91,6 @@ body.full .wall{width:100%}
   body.full .msg{flex:none;text-align:left;font-size:14px}
   body.full .actions{grid-column:2;grid-row:2;flex-direction:column;align-self:end;padding:0 8px 8px 0}
   body.full .actions button{padding:6px 8px}
-  body.full .zoom{order:-1;justify-content:space-between}
 }
 body.full .card{color:var(--ink)}   /* the card keeps its dark text on the dark wall's light text */
 body.full .msg{color:rgba(247,248,243,.8)}
@@ -145,7 +136,6 @@ body.full .hearts .lost{color:rgba(247,248,243,.3)}
       <div class="view" id="board" role="img" aria-label="A painting with a cat hidden in it">
         <div class="layer" id="layer"><canvas id="art"></canvas><svg id="marks" aria-hidden="true"></svg></div>
         <div class="loading" id="loading">Hanging the painting…</div>
-        <div class="zoom" id="zoom"><button id="fullBtn"></button><button id="zoomIn" aria-label="Zoom in">+</button><button id="zoomOut" aria-label="Zoom out">−</button></div>
       </div>
     </div>
     <div class="placard" id="placard"></div>
@@ -166,8 +156,8 @@ body.full .hearts .lost{color:rgba(247,248,243,.3)}
 
 </main>
 
-<script src="../games.js?v=2026-11-07.14"></script>
-<script src="paintings.js?v=2026-11-07.14"></script>
+<script src="../games.js?v=2026-11-07.15"></script>
+<script src="paintings.js?v=2026-11-07.15"></script>
 <script>
 /* ---------- levels ---------- */
 // How big the cat is (the side of a square of the same area, as a share of the painting's), and how far it takes on
@@ -645,7 +635,7 @@ function hint() {
 
 /* ---------- looking closer: pinch, drag, the mouse wheel, + and − ---------- */
 const view = {z: 1, tx: 0, ty: 0}, MAXZ = 8;
-let VW = 0, VH = 0, kb = null;   // kb: the keyboard crosshair, in painting pixels
+let VW = 0, VH = 0, kb = null, zoomer = null;   // kb: the keyboard crosshair, in painting pixels; zoomer: the zoom buttons (G.zoom)
 // Size the painting to fit the page: the full width, or less when a tall painting would run off the screen. In full
 // screen, as big as fits on the screen with the lives above and the buttons below.
 function layout() {
@@ -675,7 +665,7 @@ function applyView() {
   view.tx = Math.min(0, Math.max(VW - VW * view.z, view.tx)); view.ty = Math.min(0, Math.max(VH - VH * view.z, view.ty));
   $("layer").style.transform = `translate(${view.tx}px, ${view.ty}px) scale(${view.z})`;
   $("board").classList.toggle("zoomed", view.z > 1);
-  $("zoomOut").disabled = view.z <= 1; $("zoomIn").disabled = view.z >= MAXZ;
+  if (zoomer) zoomer.can(view.z < MAXZ, view.z > 1);
   if (scene) drawMarks();
 }
 // Zoom by a factor, keeping the point (ax, ay) in the view where it is.
@@ -687,7 +677,7 @@ const pts = new Map(); let gesture = null;
 const local = e => { const b = $("board").getBoundingClientRect(); return [e.clientX - b.left, e.clientY - b.top]; };
 const spread = () => { const [a, b] = [...pts.values()]; return [Math.hypot(a[0] - b[0], a[1] - b[1]), (a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; };
 $("board").addEventListener("pointerdown", e => {
-  if (e.target.closest(".zoom")) return;
+  if (e.target.closest(".zoombox")) return;
   // the first finger down starts afresh: a finger still held from before is one whose lift never came (a phone
   // can lose it at the end of a pinch), and keeping it would make every tap after look like a second finger
   if (e.isPrimary) { pts.clear(); gesture = null; }
@@ -721,24 +711,18 @@ $("board").addEventListener("pointerup", lift);
 $("board").addEventListener("pointercancel", lift);
 $("board").addEventListener("lostpointercapture", lift);   // a finger the page lost hold of without a lift
 $("board").addEventListener("wheel", e => { e.preventDefault(); const [x, y] = local(e); zoomBy(Math.exp(-e.deltaY * 0.0025), x, y); }, {passive: false});
-$("zoomIn").onclick = () => zoomBy(1.6);
-$("zoomOut").onclick = () => zoomBy(1 / 1.6);
-addEventListener("keydown", e => {
-  if (document.querySelector(".spot") || $("overlay").classList.contains("show") || e.target.closest("input,select")) return;
-  if (e.key === "+" || e.key === "=") zoomBy(1.6); else if (e.key === "-" || e.key === "_") zoomBy(1 / 1.6);
-});
 addEventListener("resize", layout);
 
 /* ---------- full screen ---------- */
 const isFull = () => document.body.classList.contains("full");
 const SMALL = matchMedia("(max-width:600px),(max-height:500px)");   // a phone: edge to edge (as in the style above)
-G.fullScreen({btn: $("fullBtn"), name: "Cat Burglar", change: (on, toggled) => {
-  // in full screen the zoom buttons sit with Hint and Give up, off the painting; otherwise in the frame's corner
-  (on ? document.querySelector(".actions") : $("board")).append($("zoom"));
+// zoom and full screen in the painting's corner (G.zoom); + and − on the keyboard too
+zoomer = G.zoom({at: $("board"), zoomIn: () => zoomBy(1.6), zoomOut: () => zoomBy(1 / 1.6), full: {name: "Cat Burglar", change: (on, toggled) => {
   layout();
   // a wide painting on a phone held upright is much bigger sideways
   if (on && toggled && scene && SMALL.matches && innerHeight > innerWidth && scene.PW > scene.PH * 1.15) G.note("Turn your phone sideways for a bigger painting.", 5000);
-}});
+}}});
+zoomer.can(view.z < MAXZ, view.z > 1);
 // Keys: the arrows move a crosshair over the painting, in steps that get finer as you zoom in (and the view follows
 // it), and Space or Enter taps where it is. + and − zoom.
 const keys = G.gridKeys({on: () => playing() && ready(),
@@ -828,7 +812,7 @@ function helpOnFirstVisit(tries = 0) {
     {say: "A cat sneaked into this painting!", lit: [[0, 0]]},
     {say: "Tap the cat", lit: [[0, 0]], tone: "ok"},
     {say: "Catch all you can in 5 paintings", els: [$("count")]},
-    {say: "Pinch or + to look closer", els: [$("zoom")]},
+    {say: "Pinch or + to look closer", els: [zoomer.el]},
     {say: "A wrong tap costs a life", els: [$("hearts")]},
     {say: "Give up shows it and moves on", els: [$("giveUpBtn")]},
     {say: "Stuck? Hint greys out part", els: [$("hintBtn")]},
