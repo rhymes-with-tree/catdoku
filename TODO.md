@@ -126,4 +126,10 @@ will recheck this list, and add games 43–52, before any of it is built.
 - Patches: colourways (long term).
 
 ### Questions still to answer
-- Laser Pointer: does any target need a tap again after the laser has passed it once?
+- Answered 2026-11-08 (build .20), for the owner to look over: Laser Pointer's cats never need the dot again once
+  it's passed them, as a cat stays awake and only its first sighting counts for the order. Mirrors do, but only on
+  the moving levels, 11–15, and there by design: every moving room has a mirror the dot meets twice that must be
+  tipped between the two visits (the walkthrough says "It comes back to some mirrors… Tip them again after it
+  bounces", and Hint says when to wait). In levels 1–10 a mirror is set once; the dot sometimes bounces off both
+  its faces, with the same slant both times. Checked by making 12 rooms a level through the page's own
+  `makeRoom`: every moving room had such a mirror, and no still room did. README now says so for levels 1–10.
