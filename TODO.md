@@ -103,10 +103,8 @@ will recheck this list, and add games 43–52, before any of it is built.
 - Spelling String: New Round is in an odd spot (it already has Give up).
 - Undo far down the page: Knock It Off. Junk Drawer's row
   underneath is unevenly spaced.
-- Twirl: Hint up onto the zoom line, centred, to take less room.
-- **Zoom and full screen like Twirl's** (owner likes it): `G.zoom` with `below: true`, under the board's corner. Cat
-  Burglar and Catlas use the in-corner version today (plan step 5 said "in its corner"); Fish Bones and Hide & Seek
-  have Full screen on its own (`G.fullScreen`) in yet another spot. One place for all.
+- Zoom and full screen: done for Twirl, Cat Burglar, Catlas, Fish Bones and Hide & Seek (`G.zoom` with `below`). Still
+  beside New: Wind-Up's and Pawlinko's full screen (action games, not on the 2026-11-08 list). Move them too?
 
 ### Things in the way of the board
 - Yarn: cats below Restart / New Puzzle, the puzzle's name ("Tropical") between them; smaller cats if it still

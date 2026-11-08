@@ -2208,35 +2208,39 @@ const G = (() => {
   }
 
   /* ---------- zoom and full screen ---------- */
-  // One set of round buttons in the board's bottom-right corner, the same in every game that zooms: full screen
-  // (through fullScreen above), +, − and one more where the game has it (Twirl's Fit, Catlas's back to the lit
-  // country). + and − on the keyboard press them too. Each game keeps its own pinch, drag and scroll. o: {at (the
-  // board's box; it's given position:relative if it has none), below (the buttons go under the board's corner, for a
-  // board that can't be moved about at its full size, so they'd hide part of it), zoomIn, zoomOut, more: {label
-  // (a word or SVG), name, fn}, full: {name, change} (as fullScreen's)}. Returns {el, fs, can(zoomIn, zoomOut, more)}.
+  // One set of round buttons, the same in every game that zooms or goes full screen: full screen (through fullScreen
+  // above), +, − and one more where the game has it (Twirl's Fit, Catlas's back to the lit country). + and − on the
+  // keyboard press them too. Each game keeps its own pinch, drag and scroll. In every game they sit on a line of their
+  // own under the board's right-hand corner (decided 2026-11-08, after Twirl's), so they never hide part of the board.
+  // o: {at (the board's box: the line goes in it, at the end, or with below: an element, just after that element),
+  // below, mid (a button for the middle of the line, as Twirl's Hint), zoomIn, zoomOut (leave both out for full screen
+  // alone), more: {label (a word or SVG), name, fn}, full: {name, change} (as fullScreen's)}. Without below, the
+  // buttons go in the board's bottom-right corner (no game uses that now). Returns {el, fs, can(zoomIn, zoomOut, more)}.
   function zoomer(o) {
-    const el = document.createElement("div");
-    el.className = "zoombox" + (o.below ? " below" : "");
-    el.setAttribute("role", "group"); el.setAttribute("aria-label", "Zoom");
+    const el = document.createElement("div"), end = document.createElement("span");
+    el.className = "zoombox" + (o.below ? " below" : ""); end.className = "zend";
+    el.setAttribute("role", "group"); el.setAttribute("aria-label", o.zoomIn ? "Zoom" : "Full screen");
+    if (o.mid) { const m = document.createElement("span"); m.className = "zmid tools"; m.append(o.mid); el.append(m); }
+    el.append(end);
     const btn = (html, name, fn) => {
-      const b = document.createElement("button"); b.type = "button"; b.innerHTML = html;
+      const b = document.createElement("button"); b.type = "button"; b.className = "zb"; b.innerHTML = html;
       if (name) { b.setAttribute("aria-label", name); b.title = name; }
       if (fn) b.addEventListener("click", fn);
-      el.append(b); return b;
+      end.append(b); return b;
     };
     let fs = null;
     if (o.full) fs = fullScreen({btn: btn(""), name: o.full.name, change: o.full.change});
-    const zin = btn("+", "Zoom in (+)", o.zoomIn), zout = btn("−", "Zoom out (−)", o.zoomOut);
+    const zin = o.zoomIn ? btn("+", "Zoom in (+)", o.zoomIn) : null, zout = o.zoomOut ? btn("−", "Zoom out (−)", o.zoomOut) : null;
     const more = o.more ? btn(o.more.label, o.more.name, o.more.fn) : null;
     if (more && !/</.test(o.more.label)) more.classList.add("word");
-    if (!o.below && getComputedStyle(o.at).position === "static") o.at.style.position = "relative";
-    o.at.append(el);
-    document.addEventListener("keydown", e => {
+    if (o.below && o.below !== true) o.below.after(el);
+    else { if (!o.below && getComputedStyle(o.at).position === "static") o.at.style.position = "relative"; o.at.append(el); }
+    if (zin) document.addEventListener("keydown", e => {
       if (e.ctrlKey || e.metaKey || e.altKey || document.querySelector(".spot") || $("overlay").classList.contains("show") || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
       const b = e.key === "+" || e.key === "=" ? zin : e.key === "-" || e.key === "_" ? zout : null;
       if (b && !b.disabled) { e.preventDefault(); b.click(); }
     });
-    const can = (i, out, m) => { zin.disabled = !i; zout.disabled = !out; if (more && m !== undefined) more.disabled = !m; };
+    const can = (i, out, m) => { if (zin) zin.disabled = !i; if (zout) zout.disabled = !out; if (more && m !== undefined) more.disabled = !m; };
     return {el, fs, can};
   }
 
