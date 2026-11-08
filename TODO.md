@@ -175,14 +175,12 @@ Built 2026-11-07 (`whatsNew` in `games.js`), ahead of the shared helpers, which 
   `game.history`), so old saves load and undo; `back(step)` puts one back; `take` makes snapshots (and lets Restart be
   undone; or `restart(reset, step)` pushes a step of its own, as `{mark}`); `cap` keeps the newest (moving bookmarks'
   places with them); `list` points it at another list (Unravel's path); `started` greys Restart where that isn't the
-  same as having steps; `G.guesser({history})` takes its Undo from it. Moved so far: Night Light, Pawlette, Treat Time, Up a Tree, Unravel, Cat Mat, Sunbeams, Yarn, Patches, Catwalk, Mewstermind, Pick of the Pile, Mew Hue, Shelf Life, Fair Play and Purrfect Square.
+  same as having steps; `G.guesser({history})` takes its Undo from it. Moved so far: Night Light, Pawlette, Treat Time, Up a Tree, Unravel, Cat Mat, Sunbeams, Yarn, Patches, Catwalk, Mewstermind, Pick of the Pile, Mew Hue, Shelf Life, Fair Play, Purrfect Square and Scratch That.
   Still writing their own (33 at the start; how each keeps its steps, from the survey):
   - Cross Stitch: grid strings, 400 kept, drops a step that changed nothing; Restart pushes one
   - High Perch, Open the Door!, Toydoku, Window Ledges: `{grid, notes}` snapshots, Restart pushes one, with
     `G.guesser`; Toydoku drops a step that changed nothing
   - Fridge Magnets: `{...put}` snapshots, Restart pushes one, with `G.guesser`
-  - Scratch That: `game.moves`, each a group of `[i, was]` (a drag is one step); Restart empties it; `G.guesser` with
-    `moves`
   - Catdoku: JSON of the cells, 500 kept (bookmarks move with it); Restart empties the list; `G.guesser`
   - Purrmutation: a slide's moves as one step, and Restart pushes `{pos}`
   - Meowbile: `[sel, was]`, and Restart pushes `{got}`
