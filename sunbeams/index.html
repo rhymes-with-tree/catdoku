@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.22";
+  var BUILD = "2026-11-07.23";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.22">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.23">
 <style>
 /* A wooden floor in the shade; sunbeams are patches of window light, each with a cat stretched out in it. */
 .board{border-color:#5C3A22;border-radius:12px;position:relative;z-index:2}
@@ -67,7 +67,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-07.22"></script>
+<script src="../games.js?v=2026-11-07.23"></script>
 <script>
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 // Split the grid into random rectangles, scanning for the first uncovered cell each time.
@@ -264,9 +264,12 @@ function valid(R) {
   return nums.length === 1 && nums[0] === R.w * R.h;
 }
 
-function snapshot() { game.history.push(JSON.stringify(game.rects)); if (game.history.length > 300) game.history.shift(); }
-function undo() { if (!game.history.length || game.won) return; game.rects = JSON.parse(game.history.pop()); render(); save(); }
-function clearAll() { if (game.won || !game.rects.length) return; game.restarted = true; snapshot(); game.rects = []; render(); save(); }
+// Undo (G.history): each step is the sunbeams as they were (JSON, the newest 300 kept in game.history). Clear can be
+// undone too, and works on a shared floor, which comes with sunbeams but no steps.
+const undo = G.history({game: () => game, take: () => JSON.stringify(game.rects), back: (h, g) => { g.rects = JSON.parse(h); }, cap: 300,
+  after: () => { render(); save(); }, restart: true, started: () => game.rects.length > 0});
+const snapshot = () => undo.push();
+function clearAll() { undo.restart(g => { g.rects = []; }); }
 
 // Hint: the floor has one answer. A sunbeam that isn't part of it is tinted red; otherwise the squares of a
 // sunbeam still to place glow gold (the one with the fewest ways to fit). The player drags it out.
@@ -365,8 +368,7 @@ function render() {
   const bad = unchecked ? 0 : game.rects.filter(R => !valid(R)).length;
   if (bad) G.note(bad === 1 ? "One sunbeam doesn't fit its cat." : `${bad} sunbeams don't fit their cats.`, 0);
   else if ($("msg").textContent.includes("fit")) G.note("");
-  $("undoBtn").disabled = !game.history.length || game.won; $("hintBtn").disabled = game.won;
-  $("restartBtn").disabled = !game.rects.length || game.won;
+  undo.sync(); $("hintBtn").disabled = game.won;
 }
 
 /* ---------- input ---------- */
@@ -415,11 +417,9 @@ $("newBtn").onclick = newPuzzle;
 $("size").onchange = e => { settings.size = +e.target.value; save(); newPuzzle(); };
 G.switch({id: "checkTgl", label: "Auto check", line: "Rule breaks turn red as you play", key: "autoCheck", of: () => settings, save,
   change: () => { if (game) render(); }});
-$("undoBtn").onclick = undo;
 $("restartBtn").onclick = clearAll;
 $("helpBtn").onclick = showHelp;
 $("hintBtn").onclick = hint;
-document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); } });
 
 /* ---------- how to play ---------- */
 // How to play plays the walkthrough on the board (there's no rules card).
