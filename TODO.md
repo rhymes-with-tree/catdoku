@@ -109,16 +109,22 @@ will recheck this list, and add games 43–52, before any of it is built.
 ### Menu and Settings (every game)
 
 ### Win card and sharing
-- Toy Box's Admire Laya shows `laya-9` on the rug, awake: no Laya picture has her asleep. A sleeping Laya picture?
+- Toy Box's Admire Laya shows `laya-9` on the rug. She isn't asleep, she's relaxing: the Admire line says so now
+  (2026-11-08), so no new picture is needed.
 
 ### More to play
-- Tunnel Run: many more turning-only levels, up to a full page of small tunnels with a full-page view.
-- If It Fits: more cat shapes. Patches: colourways (long term).
-- Up a Tree: ⌫ back down to a lower level of the tree; if it's scored against par, allow extra levels?
-- Fridge Magnets: Auto-Audit; a helper that fills in one square.
-- Keyboard Cat: take a word start off the page once it's fully found; a keyboard walkthrough (its Keyboard Shortcuts now show in the menu). (A Full Pounce uses
-  all 7 keys at least once; a Perfect Pounce uses each just once.)
-- Spelling String: a way to look up a word.
+- Done 2026-11-08: Keyboard Cat's fully found starts come off the Starts strip, and its walkthrough teaches the real
+  keyboard on a computer; Spelling String's cards look the word up; Fridge Magnets' Auto-Audit switch and Fill one
+  helper (three a fridge, costing the gold paw); Up a Tree's ⌫ steps back down a perch (extra perches already grow
+  past par, which only decides the gold paw, so nothing else was needed); If It Fits' Bugsy can lie on his back
+  (`bugsy-1`), and every picture gets a turn; Tunnel Run's levels 11–16, turning only, 8 × 8 up to 13 × 13, with full
+  screen from 9 × 9.
+- Tunnel Run, still to do: a rug the shape of the page rather than square (say 10 × 18 on a phone held upright), for
+  a true full page of small tunnels. The game assumes N × N throughout (about 150 places, in the worker too), so it
+  wants a W × H rewrite of its own; the rug maker is quick enough (13 × 13 in a few milliseconds).
+- If It Fits: more cat shapes still welcome: Bowtie has only `bowtie-2` lying down (`bowtie-1` is cropped, and
+  `bugsy-7` is two pieces, not a whole cat), so a whole lying-down Bowtie picture or two would help.
+- Patches: colourways (long term).
 
 ### Questions still to answer
 - Laser Pointer: does any target need a tap again after the laser has passed it once?

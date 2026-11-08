@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-08.16"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-08.17"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-08.16">
+<link rel="stylesheet" href="../games.css?v=2026-11-08.17">
 <style>
 /* A rug covered in pieces of cat tunnel, with the cat's bed in the middle. Turn the pieces until they all join
    into one network; pieces joined to the bed turn purple and crinkly, and when every one is joined the cat runs
@@ -70,6 +70,18 @@
 .slider{cursor:pointer}
 .slider path{fill:var(--edge);opacity:.4;transition:opacity .15s}
 .slider:hover path{opacity:.8}
+/* Full screen (the button under the rug's corner, or F): the rug as big as the screen allows, Bugsy put away, with
+   just Hint and Undo under it; shown from 9 × 9 up */
+body.full main{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+body.full .rugbox{--board:min(calc(100vw - 16px),calc(100dvh - 180px));padding-top:0}
+body.full .bugsy,body.full .actions > :not(#hintBtn,#undoBtn),body.full .bar{display:none}
+@media (orientation:landscape) and (max-height:500px){
+  body.full main{display:grid;grid-template-columns:auto 116px;grid-template-rows:auto minmax(0,1fr) auto;gap:4px 8px;align-items:start}
+  body.full .rugbox{--board:calc(100dvh - 16px);grid-column:1;grid-row:1 / 4}
+  body.full .status{grid-column:2;grid-row:1;flex-direction:column;align-items:flex-start;width:116px}
+  body.full .actions{grid-column:2;grid-row:2;width:116px;justify-content:flex-start;flex-wrap:wrap}
+  body.full .zoombox{grid-column:2;grid-row:3;width:auto}
+}
 @media (prefers-reduced-motion:reduce){.piece,.spin,.tube,.hub,.ring{transition:none}.hintbox,.lost .tube{animation:none}.lost .tube{stroke:#E16A4A}}
 </style>
 </head>
@@ -101,19 +113,22 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-08.16"></script>
+<script src="../games.js?v=2026-11-08.17"></script>
 <script>
 /* ---------- tunnel networks (plain functions, also run in a background worker) ---------- */
 // A piece's tunnels are a 4-bit mask of the sides they open onto: 1 up, 2 right, 4 down, 8 left.
 // Every network is a tree grown from the bed in the middle, so it joins every piece with no loops.
 // Levels: the rug's size, and its sliding tracks. Pieces on a track already lie the right way and can't be
 // turned, but the whole row or column slides round (what slides off one end comes back on the other). Levels
-// 1–3 have no tracks, 4–8 a few (never through the bed), and on 9 and 10 every row and column slides and
-// nothing turns, after S slides.
+// 1–3 have no tracks, 4–8 a few (never through the bed), on 9 and 10 every row and column slides and
+// nothing turns, after S slides, and 11–16 are turning only again, 8 × 8 up to 13 × 13.
 function levelSpec(n) {
   return [null, {N: 5, rows: 0, cols: 0}, {N: 6, rows: 0, cols: 0}, {N: 7, rows: 0, cols: 0}, {N: 6, rows: 1, cols: 0},
     {N: 6, rows: 1, cols: 1}, {N: 7, rows: 2, cols: 1}, {N: 8, rows: 2, cols: 2}, {N: 8, rows: 3, cols: 2},
-    {N: 6, all: true, S: 4}, {N: 7, all: true, S: 6}][n];
+    {N: 6, all: true, S: 4}, {N: 7, all: true, S: 6},
+    // 11 to 16: turning only again, on bigger and bigger rugs of smaller tunnels, up to 13 × 13 (full screen helps)
+    {N: 8, rows: 0, cols: 0}, {N: 9, rows: 0, cols: 0}, {N: 10, rows: 0, cols: 0}, {N: 11, rows: 0, cols: 0},
+    {N: 12, rows: 0, cols: 0}, {N: 13, rows: 0, cols: 0}][n];
 }
 function rot(m) { return ((m << 1) | (m >> 3)) & 15; }   // a quarter turn clockwise
 function opp(d) { return ((d << 2) | (d >> 2)) & 15; }   // the side facing it
@@ -329,7 +344,7 @@ function makeRug(n) {
 // game: {level, N, sol (the answer), rows and cols (the tracks), turns (quarter turns clockwise each piece lies
 //        from its answer, by the piece's square in the answer), trail (the slides from the answer to now),
 //        pos (which piece is on each square, worked out from trail), start {turns, trail}, history, won…}
-const STORE = "catdoku.tunnelrun.v1", MAX_LEVEL = 10;
+const STORE = "catdoku.tunnelrun.v1", MAX_LEVEL = 16;
 const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1}, state.settings);
@@ -465,6 +480,7 @@ function update() {
   const left = all - count;
   $("count").textContent = game.won ? "Every tunnel joined!" : lost ? "These tunnels go round in a loop" : left <= 3 ? `Almost! ${left} grey piece${left === 1 ? "" : "s"} to join` : `${count} of ${all} joined`;
   $("hintBtn").disabled = game.won || hinting;
+  zoom.el.hidden = N < 9 && !zoom.fs.on();   // full screen only for the big rugs
   undo.sync();
   paintHint();
   return count === all;
@@ -816,6 +832,8 @@ function helpOnFirstVisit() {
   G.spotlight({grid: $("grid"), w: N, h: N, steps, map, done});
 }
 
+// Full screen, for the big rugs (9 × 9 up): the shared button on a line under the rug's corner, or F.
+const zoom = G.zoom({at: $("board"), below: document.querySelector(".rugbox"), full: {name: "Tunnel Run", change: () => { if (game) update(); }}});
 for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", ""), n));
 $("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
 $("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };

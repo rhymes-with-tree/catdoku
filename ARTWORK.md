@@ -87,7 +87,7 @@ each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the 
   tunnel (for Tunnel Run); `bowtie-7` is the same tunnel with a second Bowtie rolling over beside
   it. The pictures of the two together are `bugsy-bowtie-window`, `bugsy-bowtie-rug` and
   `bugsy-bowtie-boxes`. Bugsy is the star of If It Fits too, with Bowtie as guest star: `bugsy-1` rolls on his back beside
-  the title, Bugsy hops into each finished box curled up (`bugsy-6`) or stretched out (`bugsy-3`), about one box in
+  the title, Bugsy hops into each finished box curled up (`bugsy-6`), stretched out (`bugsy-3`) or on his back (`bugsy-1`), about one box in
   four Bowtie drops in instead, curled up (`bowtie-2`), and `bugsy-bowtie-boxes` is on the gold-paw card. Bugsy and Bowtie are the stars of
   Bird Watch: `bowtie-3` stands up on his back legs beside the title, and `bugsy-bowtie-window` is on the gold-paw card. Bowtie is the star of
   Fish Bones: `bowtie-5` peeks up beside the title, and `bowtie-1` lies on his back, full of fish, on the gold-paw card.
