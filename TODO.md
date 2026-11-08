@@ -121,8 +121,6 @@ will recheck this list, and add games 43–52, before any of it is built.
 - Bubbles: less beige under the shooter.
 
 ### Too much talking
-- Instruction lines during play, wanted once and then quiet: Hide & Seek's "Mark is on, tap…" (the `say` of its
-  `G.pieces`), Unravel's wrong-move lines.
 - Knock It Off: the legend of every icon goes off the page, into How to play or a lexicon; trial and error is part of
   the fun.
 - Fish Bones: don't show "The Words" ahead; add each to the dictionary as it's found. Its level names have numbers

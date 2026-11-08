@@ -1862,7 +1862,9 @@ const G = (() => {
     function toggle() {
       if (o.can && !o.can()) return;
       set(!on); if (o.save) o.save();
-      if (o.say) note(on ? o.say : "", on ? 3500 : 0);
+      // what the marking tool does is said the first time it's turned on in a game, then not again
+      if (o.say && on) { const said = load("catdoku.said.v1"); if (!said[SLUG]) { said[SLUG] = true; save("catdoku.said.v1", said); note(o.say, 3500); } }
+      else if (o.say) note("", 0);
       if (o.change) o.change(on);
     }
     set(on);
