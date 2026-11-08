@@ -99,17 +99,12 @@ will recheck this list, and add games 43–52, before any of it is built.
 - **Restart · New [Noun]** on the last line, a line of their own, kept apart so they aren't pressed by accident
   (Restart beside New is as the plan has it).
 - **Hint stays where the plan has it** (decided 2026-11-08): in the gold-paw group, not on Undo's line.
-- **Short lines:** where two lines of buttons have only one or two icons each, consider joining them into one line
-  (Bird Watch's Wipe and Pause are the case that raised it). Restart · New [Noun] stays a line of its own at the
-  bottom, apart from the rest, so it isn't pressed by accident.
 - New [Noun] centred (Toe Beans).
 - Spelling String: New Round is in an odd spot (it already has Give up).
-- Undo far down the page: Knock It Off. Bird Watch's Wipe and Pause each alone on a line. Junk Drawer's row
+- Undo far down the page: Knock It Off. Junk Drawer's row
   underneath is unevenly spaced.
-- Twirl: Hint up onto the zoom line, centred, to take less room.
-- **Zoom and full screen like Twirl's** (owner likes it): `G.zoom` with `below: true`, under the board's corner. Cat
-  Burglar and Catlas use the in-corner version today (plan step 5 said "in its corner"); Fish Bones and Hide & Seek
-  have Full screen on its own (`G.fullScreen`) in yet another spot. One place for all.
+- Zoom and full screen: done for Twirl, Cat Burglar, Catlas, Fish Bones and Hide & Seek (`G.zoom` with `below`). Still
+  beside New: Wind-Up's and Pawlinko's full screen (action games, not on the 2026-11-08 list). Move them too?
 
 ### Things in the way of the board
 - Yarn: cats below Restart / New Puzzle, the puzzle's name ("Tropical") between them; smaller cats if it still
@@ -142,12 +137,24 @@ will recheck this list, and add games 43–52, before any of it is built.
 - Toy Box: a better way to show the toys on the track.
 - Up a Tree: a new picture of Dottie for the win card.
 
-### Comfort settings, one place for every game
-- Hide timers: it already exists and is site-wide (tap the clock, `hideTimer` in `games.js`), but nobody will find it.
-- Slower: per game today (`G.slower(slug)`); offer it for every game too.
-- Auto check and the other autos as defaults for every game.
-- Hide extra things to look at: Junk Drawer's junk (add more junk, grey once you start, and a switch to take it
-  away) and Shelf Life's shelves (it has this switch already).
+### Comfort settings, one place for every game (a Settings page; decided 2026-11-08)
+- **A Settings page** for the whole site, reached from every game's ☰ Menu and the front page, with every game's
+  settings on it, a section per game. The game's ☰ Menu keeps its own settings as a shortcut (the same saved values)
+  and links to the page.
+- **At the top, five settings with a three-way row** (all on · by game · all off; wording to settle): Timers (Show ·
+  By game · Hide), Action games (Regular speed · By game · Slower), Decorations (Show all · By game · Reduce clutter),
+  Auto check and Auto Notes (Off · By game · On). By game opens the list of games that have it, a switch each.
+  Changing one game while a row is on all-on or all-off (on the page, or in the game) moves the row to By game; the
+  other games keep their values. Every other setting is per game only.
+- Hide timers today is site-wide only (tap the clock, `hideTimer` in `games.js`): it needs a value per game, and a
+  tap on a game's clock changes that game's.
+- Slower is per game today (`G.slower(slug)`).
+- Decorations (visual clutter): Shelf Life's shelf (it has a switch), Junk Drawer's junk (add more junk, grey once
+  you start, and a switch), Patches' patterns, Cat Pile's cats.
+- A setting that costs lives or the gold paw (Auto grade), changed on the page while a puzzle's in progress, says
+  "Takes effect in the next game" and does.
+- The page doesn't run the games' scripts, so `games.js` needs a list of where each game keeps each setting (its
+  storage key and field, label, line, default).
 
 ### Menu and Settings (every game)
 

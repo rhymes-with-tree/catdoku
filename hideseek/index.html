@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-08.3";
+  var BUILD = "2026-11-08.8";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&family=Permanent+Marker&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-08.3">
+<link rel="stylesheet" href="../games.css?v=2026-11-08.8">
 <style>
 /* A wooden floor covered in cardboard boxes. Checked boxes get a number written on them in marker, like a
    labelled box; marked ones get a cat doodled on; a startled cat's box gets HISS scrawled across it. */
@@ -64,25 +64,27 @@
 /* Full screen (G.fullScreen): the floor as big as the screen takes, laid sideways when that makes the boxes bigger
    (Minesweeper's expert board is 30 across), with the lives above it and Hint and Mark below. A floor too big to
    fit with boxes big enough to tap scrolls inside its frame. */
-body.full main{display:grid;grid-template-columns:minmax(0,1fr) auto auto minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;align-items:stretch;gap:6px 8px}
-body.full .status{grid-column:1 / -1;width:100%}
-body.full .wrap{grid-column:1 / -1;width:100%;height:auto;min-height:0;display:flex;overflow:auto}
+body.full main{display:grid;grid-template-columns:minmax(0,1fr) auto auto minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto auto auto auto;align-items:stretch;gap:6px 8px}
+body.full .status{grid-column:1 / -1;grid-row:3;width:100%}
+body.full .wrap{grid-column:1 / -1;grid-row:1;width:100%;height:auto;min-height:0;display:flex;overflow:auto}
+body.full .zoombox{grid-column:1 / -1;grid-row:2;width:100%;margin:0}
+body.full .hintLine{grid-column:1 / -1;grid-row:5}
 body.full .floor{margin:auto}
-body.full .actions{width:auto;grid-column:2;grid-row:3;align-self:center;flex-wrap:nowrap;gap:8px}
-body.full .actions > :not(#hintBtn,#markBtn),body.full .bar > :not(#fullBtn){display:none}
-body.full .bar{width:auto;grid-column:3;grid-row:3;align-self:center}
-.bar .fsBtn{padding:4px 10px}
+body.full .actions{width:auto;grid-column:2;grid-row:4;align-self:center;flex-wrap:nowrap;gap:8px}
+body.full .actions.tools:not(.pieces){grid-column:3}
+body.full .actions > :not(#hintBtn,#markBtn),body.full .bar{display:none}
 /* on a phone held sideways, the lives and buttons go in a narrow column beside the floor */
 @media (max-width:600px) and (orientation:landscape),(max-height:500px) and (orientation:landscape){
-  body.full main{grid-template-columns:minmax(0,1fr) 116px;grid-template-rows:auto minmax(0,1fr) auto auto;gap:4px 8px}
+  body.full main{grid-template-columns:minmax(0,1fr) 116px;grid-template-rows:auto minmax(0,1fr) auto auto auto;gap:4px 8px}
   body.full .status{grid-column:2;grid-row:1;flex-direction:column;align-items:flex-start;gap:2px}
   body.full .status .left{flex-direction:column;align-items:flex-start;gap:0;font-size:15px}
   body.full .msg{flex:none;text-align:left;font-size:14px}
-  body.full .wrap{grid-column:1;grid-row:1 / 5}
+  body.full .wrap{grid-column:1;grid-row:1 / 6}
   body.full .actions{grid-column:2;grid-row:3;flex-direction:column;align-items:stretch;justify-self:stretch}
-  body.full .bar{grid-column:2;grid-row:4;justify-self:stretch}
-  body.full .bar .fsBtn{width:100%}
-  body.full .fsBtn svg{margin:0 auto}
+  body.full .actions.pieces{align-self:end;grid-row:2}
+  body.full .actions.tools:not(.pieces){grid-column:2}
+  body.full .zoombox{grid-column:2;grid-row:4}
+  body.full .hintLine{grid-column:2;grid-row:5}
 }
 .card img.janpic{display:block;width:56%;max-width:200px;height:auto;margin:0 auto 14px}
 </style>
@@ -108,12 +110,11 @@ body.full .bar{width:auto;grid-column:3;grid-row:3;align-self:center}
   <div class="bar">
     <label>Size <select id="size" aria-label="Floor size"></select></label>
     <button id="newBtn" class="primary">New floor</button>
-    <button id="fullBtn"></button>
   </div>
 
 </main>
 
-<script src="../games.js?v=2026-11-08.3"></script>
+<script src="../games.js?v=2026-11-08.8"></script>
 <script>
 /* ---------- sizes ---------- */
 // Width, height and cats, from Minesweeper's beginner board up to its expert one stood on end (16 across, 30 down),
@@ -404,11 +405,12 @@ function draw() {
 }
 addEventListener("resize", () => { if (game) layout(); });
 const SMALL = matchMedia("(max-width:600px),(max-height:500px)");   // a phone
-G.fullScreen({btn: $("fullBtn"), name: "Hide & Seek", change: (on, toggled) => {
+// full screen on a line under the floor's corner (G.zoom), where every game has it
+G.zoom({at: $("board"), below: $("board").parentElement, full: {name: "Hide & Seek", change: (on, toggled) => {
   if (game) layout();
   // a tall floor on a phone held upright fits much better sideways
   if (on && toggled && game && SMALL.matches && innerHeight > innerWidth && H > W * 1.2) G.note("Turn your phone sideways to see the whole floor.", 5000);
-}});
+}}});
 
 /* ---------- input: tap, press and hold, Mark mode ---------- */
 let hold = null;

@@ -708,7 +708,7 @@ const G = (() => {
     .bests{width:100%;border-collapse:collapse;margin:0 0 14px;font-variant-numeric:tabular-nums;color:var(--ink)}
     .bests th,.bests td{padding:4px 6px;text-align:left;border-bottom:1px solid var(--line)}
     .bests th{font-size:calc(13px*var(--ts));color:var(--ink-soft);font-weight:600}
-    .bests td.num,.bests th.num{text-align:right}
+    .bests .bestnum{text-align:right}
     .bests tr.now td{font-weight:800}
     .card h3{margin:4px 0 6px;font-size:calc(18px*var(--ts))}
     .spot{position:fixed;inset:0;z-index:9;overflow:hidden;cursor:pointer;animation:spotIn .35s ease-out;-webkit-tap-highlight-color:transparent;touch-action:none}
@@ -821,20 +821,20 @@ const G = (() => {
     } else {
       const t = document.createElement("table"); t.className = "bests";
       const golds = sizes.some(n => goldAt(CURRENT, n));   // a gold paws column once there's one at any level
-      t.innerHTML = `<tr><th>${noun()[0].toUpperCase() + noun().slice(1)}</th><th class="num">Best</th><th class="num">Solved</th>${golds ? '<th class="num">Gold paws</th>' : ""}</tr>`;
+      t.innerHTML = `<tr><th>${noun()[0].toUpperCase() + noun().slice(1)}</th><th class="bestnum">Best</th><th class="bestnum">Solved</th>${golds ? '<th class="bestnum">Gold paws</th>' : ""}</tr>`;
       for (const n of sizes) {
         const r = t.insertRow(); if (n === N) r.className = "now";
         r.insertCell().textContent = label(n);
-        const b = r.insertCell(); b.className = "num"; b.textContent = mine[n].times.length ? clock(mine[n].times[0].ms) : "–";
-        const c = r.insertCell(); c.className = "num"; c.textContent = mine[n].solves;
-        if (golds) { const g = r.insertCell(); g.className = "num"; g.textContent = goldAt(CURRENT, n) ? `🐾 ${goldAt(CURRENT, n)}` : "–"; }
+        const b = r.insertCell(); b.className = "bestnum"; b.textContent = mine[n].times.length ? clock(mine[n].times[0].ms) : "–";
+        const c = r.insertCell(); c.className = "bestnum"; c.textContent = mine[n].solves;
+        if (golds) { const g = r.insertCell(); g.className = "bestnum"; g.textContent = goldAt(CURRENT, n) ? `🐾 ${goldAt(CURRENT, n)}` : "–"; }
       }
       media.append(t);
       const top = (mine[N] || {times: []}).times;
       if (top.length) {
         const h = document.createElement("h3"); h.textContent = `Fastest at ${label(N)}`; media.append(h);
         const t2 = document.createElement("table"); t2.className = "bests";
-        top.forEach((x, i) => { const r = t2.insertRow(); r.insertCell().textContent = `${i + 1}.`; const c = r.insertCell(); c.className = "num"; c.textContent = clock(x.ms); r.insertCell().textContent = x.d; });
+        top.forEach((x, i) => { const r = t2.insertRow(); r.insertCell().textContent = `${i + 1}.`; const c = r.insertCell(); c.className = "bestnum"; c.textContent = clock(x.ms); r.insertCell().textContent = x.d; });
         media.append(t2);
       }
       const p = document.createElement("p"); p.textContent = "Times are kept on this device only."; media.append(p);
@@ -1809,8 +1809,26 @@ const G = (() => {
       b.classList.add("moved"); if (id !== "giveUpBtn") slot.before(b); else slot.after(b);
     }
   }
+  // Short lines joined (decided 2026-11-08): a helpers line beside the tools line, each with one or two buttons (hidden
+  // ones counted, so a line that grows as helpers unlock, like Wind-Up's, stays its own), become one line: the tools
+  // first, then the helpers, so the gold-paw group stays together at the end (Bird Watch: Pause · Wipe). Restart and New
+  // are on the bar below, apart from it (arrange has already moved them there).
+  function joinShort() {
+    const own = row => [...row.children].filter(b => b.tagName === "BUTTON" && !PAGE_TOOLS.includes(b.id) && !["restartBtn", "resetBtn", "giveUpBtn"].includes(b.id));
+    for (const help of document.querySelectorAll("main .actions.helpers")) {
+      if (help.closest(".card,.overlay")) continue;
+      let tools = help.nextElementSibling; if (tools && tools.id === "hintLine") tools = tools.nextElementSibling;
+      if (!tools || !tools.matches(".actions:not(.helpers,.pieces)")) continue;
+      const a = own(help), b = own(tools);
+      if (!a.length || !b.length || a.length > 2 || b.length > 2) continue;
+      help.prepend(...b); help.classList.add("joined");
+      const line = $("hintLine"); if (line && line.nextElementSibling === tools) help.before(line);
+      if (!tools.children.length) tools.hidden = true;
+    }
+  }
   toolify();
   arrange();
+  joinShort();
   // The status line (the goal and the time) goes under the board, above the buttons, in every game (decided
   // 2026-11-08): the goal at the left, the time at the right, and a note on a line of its own under them. It's
   // written above the board in each page, so it's moved here, past the board (or the box the board is in).
@@ -2190,35 +2208,39 @@ const G = (() => {
   }
 
   /* ---------- zoom and full screen ---------- */
-  // One set of round buttons in the board's bottom-right corner, the same in every game that zooms: full screen
-  // (through fullScreen above), +, − and one more where the game has it (Twirl's Fit, Catlas's back to the lit
-  // country). + and − on the keyboard press them too. Each game keeps its own pinch, drag and scroll. o: {at (the
-  // board's box; it's given position:relative if it has none), below (the buttons go under the board's corner, for a
-  // board that can't be moved about at its full size, so they'd hide part of it), zoomIn, zoomOut, more: {label
-  // (a word or SVG), name, fn}, full: {name, change} (as fullScreen's)}. Returns {el, fs, can(zoomIn, zoomOut, more)}.
+  // One set of round buttons, the same in every game that zooms or goes full screen: full screen (through fullScreen
+  // above), +, − and one more where the game has it (Twirl's Fit, Catlas's back to the lit country). + and − on the
+  // keyboard press them too. Each game keeps its own pinch, drag and scroll. In every game they sit on a line of their
+  // own under the board's right-hand corner (decided 2026-11-08, after Twirl's), so they never hide part of the board.
+  // o: {at (the board's box: the line goes in it, at the end, or with below: an element, just after that element),
+  // below, mid (a button for the middle of the line, as Twirl's Hint), zoomIn, zoomOut (leave both out for full screen
+  // alone), more: {label (a word or SVG), name, fn}, full: {name, change} (as fullScreen's)}. Without below, the
+  // buttons go in the board's bottom-right corner (no game uses that now). Returns {el, fs, can(zoomIn, zoomOut, more)}.
   function zoomer(o) {
-    const el = document.createElement("div");
-    el.className = "zoombox" + (o.below ? " below" : "");
-    el.setAttribute("role", "group"); el.setAttribute("aria-label", "Zoom");
+    const el = document.createElement("div"), end = document.createElement("span");
+    el.className = "zoombox" + (o.below ? " below" : ""); end.className = "zend";
+    el.setAttribute("role", "group"); el.setAttribute("aria-label", o.zoomIn ? "Zoom" : "Full screen");
+    if (o.mid) { const m = document.createElement("span"); m.className = "zmid tools"; m.append(o.mid); el.append(m); }
+    el.append(end);
     const btn = (html, name, fn) => {
-      const b = document.createElement("button"); b.type = "button"; b.innerHTML = html;
+      const b = document.createElement("button"); b.type = "button"; b.className = "zb"; b.innerHTML = html;
       if (name) { b.setAttribute("aria-label", name); b.title = name; }
       if (fn) b.addEventListener("click", fn);
-      el.append(b); return b;
+      end.append(b); return b;
     };
     let fs = null;
     if (o.full) fs = fullScreen({btn: btn(""), name: o.full.name, change: o.full.change});
-    const zin = btn("+", "Zoom in (+)", o.zoomIn), zout = btn("−", "Zoom out (−)", o.zoomOut);
+    const zin = o.zoomIn ? btn("+", "Zoom in (+)", o.zoomIn) : null, zout = o.zoomOut ? btn("−", "Zoom out (−)", o.zoomOut) : null;
     const more = o.more ? btn(o.more.label, o.more.name, o.more.fn) : null;
     if (more && !/</.test(o.more.label)) more.classList.add("word");
-    if (!o.below && getComputedStyle(o.at).position === "static") o.at.style.position = "relative";
-    o.at.append(el);
-    document.addEventListener("keydown", e => {
+    if (o.below && o.below !== true) o.below.after(el);
+    else { if (!o.below && getComputedStyle(o.at).position === "static") o.at.style.position = "relative"; o.at.append(el); }
+    if (zin) document.addEventListener("keydown", e => {
       if (e.ctrlKey || e.metaKey || e.altKey || document.querySelector(".spot") || $("overlay").classList.contains("show") || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
       const b = e.key === "+" || e.key === "=" ? zin : e.key === "-" || e.key === "_" ? zout : null;
       if (b && !b.disabled) { e.preventDefault(); b.click(); }
     });
-    const can = (i, out, m) => { zin.disabled = !i; zout.disabled = !out; if (more && m !== undefined) more.disabled = !m; };
+    const can = (i, out, m) => { if (zin) zin.disabled = !i; if (zout) zout.disabled = !out; if (more && m !== undefined) more.disabled = !m; };
     return {el, fs, can};
   }
 
