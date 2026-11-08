@@ -138,11 +138,8 @@ will recheck this list, and add games 43–52, before any of it is built.
 - Up a Tree: a new picture of Dottie for the win card.
 
 ### Comfort settings, one place for every game
-- Hide timers: it already exists and is site-wide (tap the clock, `hideTimer` in `games.js`), but nobody will find it.
-- Slower: per game today (`G.slower(slug)`); offer it for every game too.
-- Auto check and the other autos as defaults for every game.
-- Hide extra things to look at: Junk Drawer's junk (add more junk, grey once you start, and a switch to take it
-  away) and Shelf Life's shelves (it has this switch already).
+- Done 2026-11-08: Hide timers, Slower and Autos on in every game's Settings (site-wide), with Shelf Life's Shelf and
+  Junk Drawer's new Junk switch. Still open for Junk Drawer: more junk, and greying it once you start.
 
 ### Menu and Settings (every game)
 

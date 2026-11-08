@@ -298,6 +298,7 @@ const G = (() => {
     for (const bar of document.querySelectorAll("main .bar.toggles")) if (!bar.children.length) bar.remove();
     menu.append(setList);
     head.append(menu);
+    comfortGroup(setList);
 
     function sync() {
       const done = dailyDoneToday(), k = dailyStreak();
@@ -754,7 +755,7 @@ const G = (() => {
     board.addEventListener("pointerdown", start, true);
     board.addEventListener("keydown", start, true);
     const btn = $("timer");
-    btn.onclick = () => { const p = load(PREFS); p.hideTimer = !p.hideTimer; save(PREFS, p); showTime(); };
+    btn.onclick = () => { const p = load(PREFS); p.hideTimer = !p.hideTimer; save(PREFS, p); showTime(); if ($("hideTimeTgl")) $("hideTimeTgl").sync(); };
     let last = Date.now();
     setInterval(() => {
       const now = Date.now(), g = T.game(), dt = Math.min(now - last, 1500); last = now;
@@ -1393,27 +1394,72 @@ const G = (() => {
       if (o.can && !o.can()) { box.sync(); return; }
       of()[o.key] = box.checked; if (o.save) o.save();
       if (o.change) o.change(box.checked);
+      if (auto) { const p = load(PREFS); (p.autoTouched = p.autoTouched || {})[`${SLUG}:${o.id}`] = 1; if (p.autoSet) delete p.autoSet[`${SLUG}:${o.id}`]; save(PREFS, p); }
     });
     if (o.tip) SWITCH_TIPS[o.id] = o.tip;
+    // an auto that costs nothing (Auto check, Auto Notes; not Auto grade, which brings lives) follows Comfort's Autos on
+    const auto = !o.comfort && /^Auto/.test(o.label) && !o.warn;
+    if (auto) { AUTOS.push({o, of, box}); setTimeout(applyAutos); }
+    if (o.comfort) { opt.dataset.comfort = "1"; const site = document.querySelector("#comfort .comfortSite");
+      if (site) { if (o.id === "hideTimeTgl" || o.id === "slowTgl" || o.id === "autosTgl") $("comfort").append(opt); else site.before(opt); return box; } }
     let list = $("menuSettings");
     if (!list) {
       list = document.querySelector("main .bar.toggles.switches");
       if (!list) { list = document.createElement("div"); list.className = "bar toggles switches"; (document.querySelector("main") || document.body).append(list); }
     }
-    list.append(opt);
+    if ($("comfort") && $("comfort").parentElement === list) list.insertBefore(opt, $("comfort")); else list.append(opt);
     return box;
   }
 
-  // Slower (Apple asks games to offer difficulty accommodations, such as more time to react): a switch, #slowTgl, in an
-  // action game's settings, kept on this device for each game; while it's on the game runs at two-thirds speed.
-  // Returns a function giving the factor to stretch the game's times by (1, or 1.5 with Slower on).
-  const SLOWER = "catdoku.slower.v1";
-  function slower(slug) {
-    const d = {[slug]: !!load(SLOWER)[slug]};
-    makeSwitch({id: "slowTgl", label: "Slower", line: "Everything moves at two-thirds speed", key: slug, of: d,
-      save: () => { const all = load(SLOWER); all[slug] = d[slug]; save(SLOWER, all); }});
-    return () => d[slug] ? 1.5 : 1;
+  // Comfort (decided 2026-11-08): the same few settings at the foot of every game's Settings, kept for the whole site:
+  // Hide timers, Slower (the action games at two-thirds speed) and Autos on (each game's Auto check and Auto Notes start
+  // on, until they're changed in that game). A game's own comfort switch (Shelf Life's Shelf, Junk Drawer's Junk) is
+  // made with comfort: true and joins them.
+  const AUTOS = [];
+  function applyAutos() {
+    const p = load(PREFS), set = p.autoSet || {}, touched = p.autoTouched || {};
+    for (const {o, of, box} of AUTOS) {
+      const k = `${SLUG}:${o.id}`;
+      if (touched[k] || !document.body.contains(box)) continue;
+      const want = p.autos ? true : set[k] ? false : null;   // on with Autos on; off again only where Autos on turned it on
+      if (want === null || !!of()[o.key] === want || (o.can && !o.can())) { if (!p.autos) delete set[k]; continue; }
+      try { of()[o.key] = want; if (o.save) o.save(); if (o.change) o.change(want); } catch (e) { continue; }   // the game may not be set up yet
+      box.sync(); if (want) set[k] = 1; else delete set[k];
+    }
+    p.autoSet = set; save(PREFS, p);
   }
+  const comfort = {
+    get hideTimer() { return !!load(PREFS).hideTimer; },
+    set hideTimer(v) { const p = load(PREFS); p.hideTimer = v; save(PREFS, p); },
+    get slower() { return slowOn(); },
+    set slower(v) { const p = load(PREFS); p.slower = v; save(PREFS, p); save(SLOWER, {}); slowNow = v; },
+    get autos() { return !!load(PREFS).autos; },
+    set autos(v) { const p = load(PREFS); p.autos = v; save(PREFS, p); },
+  };
+  function comfortGroup(list) {
+    const box = document.createElement("div"); box.className = "comfort"; box.id = "comfort";
+    const h = document.createElement("p"); h.className = "comfortHead"; h.textContent = "Comfort"; box.append(h);
+    const site = document.createElement("p"); site.className = "comfortSite"; site.textContent = "Hide timers, Slower and Autos on are for every game:";
+    box.append(site); list.append(box);
+    for (const opt of [...list.querySelectorAll(":scope > .opt[data-comfort]")]) site.before(opt);   // the game's own first
+    makeSwitch({id: "hideTimeTgl", comfort: true, label: "Hide timers", line: "Clocks show –:–– (tap one to peek); best times are still kept", key: "hideTimer", of: comfort,
+      change: () => showTime()});
+    makeSwitch({id: "slowTgl", comfort: true, label: "Slower", line: "Bird Watch, Tail Chase, Wind-Up and LMNOPom move at two-thirds speed", key: "slower", of: comfort});
+    makeSwitch({id: "autosTgl", comfort: true, label: "Autos on", line: "Auto check and Auto Notes start on, until you change them in a game", key: "autos", of: comfort,
+      change: () => applyAutos()});
+  }
+
+  // Slower (Apple asks games to offer difficulty accommodations, such as more time to react): one switch for the whole
+  // site, in every game's Comfort settings (comfortGroup); while it's on the action games run at two-thirds speed. It
+  // was kept for each game until 2026-11-08: a game that had it on turns it on everywhere until it's changed.
+  // slower(slug) gives a function giving the factor to stretch the game's times by (1, or 1.5 with Slower on).
+  const SLOWER = "catdoku.slower.v1";
+  let slowNow = null;
+  function slowOn() {
+    if (slowNow === null) { const p = load(PREFS); slowNow = p.slower != null ? !!p.slower : Object.values(load(SLOWER)).some(Boolean); }
+    return slowNow;
+  }
+  function slower(slug) { return () => slowOn() ? 1.5 : 1; }
 
   /* ---------- boards in words ---------- */
   // A board drawn as one picture (SVG or canvas) can't be explored square by square with VoiceOver, so it's described
