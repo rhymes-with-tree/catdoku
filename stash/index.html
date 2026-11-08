@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.26"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.27"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.26">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.27">
 <style>
 /* A row of shut boxes, each with a toy the cat has stashed inside. Every guess is a row of toys on cushions,
    with paw prints beside it: a dark paw for a toy in the right box, a light paw for a right toy in another box. */
@@ -119,8 +119,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-07.26"></script>
-<script src="../boxes.js?v=2026-11-07.26"></script>
+<script src="../games.js?v=2026-11-07.27"></script>
+<script src="../boxes.js?v=2026-11-07.27"></script>
 <script>
 /* ---------- levels ---------- */
 // [boxes, kinds of toy, whether a toy can be in more than one box, par]. There's no limit on guesses; par is the most
@@ -278,15 +278,18 @@ function draw() {
   $("checkBtn").disabled = done || cur.includes(null);
   const g = rows.length + (done ? 0 : 1);
   $("count").textContent = game.won ? `Found in ${rows.length} guess${rows.length === 1 ? "" : "es"}!` : `Guess ${g}`;
-  $("hintBtn").disabled = done; $("undoBtn").disabled = done || !game.undo.length;
-  $("restartBtn").disabled = done || (!rows.length && !game.undo.length && !cur.some(t => t !== null));
+  $("hintBtn").disabled = done; undo.sync();
 }
 addEventListener("resize", () => { if (game) size(); });
 
 /* ---------- playing ---------- */
+// Undo (G.history): each step is the row being put together, as it was ({cur, sel}, the newest 60 kept in game.undo).
+// A checked guess can't be taken back, so checking empties the list.
+const undo = G.history({game: () => game, list: g => g.undo, take: () => ({cur: game.cur.slice(), sel: game.sel}), cap: 60, can: playing,
+  back: (u, g) => { g.cur = u.cur; g.sel = u.sel; }, after: () => { draw(); save(); }, restart: true,
+  started: () => !!(game.rows.length || game.undo.length || game.cur.some(t => t !== null))});
 function change(fn) {
-  game.undo.push({cur: game.cur.slice(), sel: game.sel});
-  if (game.undo.length > 60) game.undo.shift();
+  undo.push();
   fn(); game.started = true; draw(); save();
 }
 const nextEmpty = from => { for (let k = 0; k < game.P; k++) { const i = (from + k) % game.P; if (game.cur[i] === null) return i; } return from; };
@@ -342,15 +345,9 @@ $("tray").addEventListener("click", e => {
   else if (heldFired) heldFired = false;
   else put(+b.dataset.t);
 });
-function undo() {
-  if (!playing() || !game.undo.length) return;
-  const u = game.undo.pop(); game.cur = u.cur; game.sel = u.sel; draw(); save();
-}
-$("undoBtn").onclick = undo;
 // Keys: 1 to 9 put a toy in (with Shift, mark it "nope"), the arrows pick a box, Backspace takes a toy out, Enter checks.
 document.addEventListener("keydown", e => {
   if (!playing() || document.querySelector(".spot") || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
-  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); return; }
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const d = /^Digit[1-9]$/.test(e.code) ? +e.code[5] : /^[1-9]$/.test(e.key) ? +e.key : 0;
   if (d && d <= game.K && e.shiftKey) { e.preventDefault(); nope(d - 1); }
@@ -359,13 +356,10 @@ document.addEventListener("keydown", e => {
   else if (e.key === "Backspace" || e.key === "Delete") { e.preventDefault(); takeOut(); }
   else if (e.key === "Enter" && e.target.tagName !== "BUTTON") { e.preventDefault(); check(); }
 });
-// Restart: the same stash, with every guess taken back. It costs the gold paw.
+// Restart: the same stash, with every guess taken back (for good: checked guesses can't be undone). It costs the gold paw.
 $("restartBtn").onclick = () => {
-  if (!game || game.won) return;
-  const g = deal(game.level, game.toys, game.code);
-  game = Object.assign(g, {hinted: game.hinted, restarted: true, ms: game.ms, started: game.started, timed: game.timed});
-  draw(); save();
-  G.note("Back to the first guess, with the same stash.", 3000);
+  if (undo.restart(g => Object.assign(g, deal(g.level, g.toys, g.code), {hinted: g.hinted, restarted: true, ms: g.ms, started: g.started, timed: g.timed})))
+    G.note("Back to the first guess, with the same stash.", 3000);
 };
 
 /* ---------- hints ---------- */
