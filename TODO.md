@@ -89,10 +89,11 @@ Items marked **Changes the 2026-11-07 plan** say where it differs; each says whe
 will recheck this list, and add games 43–52, before any of it is built.
 
 ### Status line (every game)
-- Goals as a fraction with a small icon: done for Tangle ("4/6 ○") and Pounce ("🐾 12/15") through `G.tally`. Still
-  to choose, game by game, which others change and with what icon. Those already counting "N of M" are the likeliest:
-  Copycat (pairs), Cross Stitch, High Perch, If It Fits, Junk Drawer and Knit Pick (words), Kitten Caboodle, Laser
-  Pointer, Open the Door!, Tail Chase, Toydoku, Treat Time, Tunnel Run, Window Ledges, Mew Hue's lines, Bird Watch.
+- Goals as a fraction with a small icon: done through `G.tally` for Tangle ("4/6 ○"), Pounce ("🐾 12/15"), and on
+  2026-11-08 Copycat (pairs, two boxes), Tunnel Run (pieces joined, a purple tunnel piece), Treat Time (cats fed, a
+  green bowl) and Window Ledges (windows lit, a lit window). Still to choose, game by game, which others change and
+  with what icon; those already counting "N of M": Cross Stitch, High Perch, If It Fits, Junk Drawer and Knit Pick
+  (words), Kitten Caboodle, Laser Pointer, Open the Door!, Tail Chase, Toydoku, Mew Hue's lines, Bird Watch.
 - Tall boards: checked on 390 × 844 and 375 × 667. Tunnel Run's and Catdoku's biggest boards leave the status line well
   on screen; Bubbles' note line dips just under on a 390 × 844 phone, with its goal and time still showing.
 
@@ -119,9 +120,8 @@ will recheck this list, and add games 43–52, before any of it is built.
   past par, which only decides the gold paw, so nothing else was needed); If It Fits' Bugsy can lie on his back
   (`bugsy-1`), and every picture gets a turn; Tunnel Run's levels 11–16, turning only, 8 × 8 up to 13 × 13, with full
   screen from 9 × 9.
-- Tunnel Run, still to do: a rug the shape of the page rather than square (say 10 × 18 on a phone held upright), for
-  a true full page of small tunnels. The game assumes N × N throughout (about 150 places, in the worker too), so it
-  wants a W × H rewrite of its own; the rug maker is quick enough (13 × 13 in a few milliseconds).
+- Done 2026-11-08: Tunnel Run's page-shaped rugs, levels 17 (8 × 14) and 18 (10 × 18), on their side on a screen
+  wider than tall; the game is W × H throughout, and share links and saves carry the shape.
 - If It Fits: more cat shapes still welcome: Bowtie has only `bowtie-2` lying down (`bowtie-1` is cropped, and
   `bugsy-7` is two pieces, not a whole cat), so a whole lying-down Bowtie picture or two would help.
 - Patches: colourways (long term).
