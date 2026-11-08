@@ -470,7 +470,7 @@ const G = (() => {
     const card = $("card"); card.innerHTML = "";
     const h = document.createElement("h2"); h.textContent = title; card.append(h);
     const s = document.createElement("div"); s.className = "stripe"; card.append(s);
-    if (text) { const p = document.createElement("p"); p.textContent = text; card.append(p); }
+    if (text) { const p = document.createElement("p"); emoText(p, text); card.append(p); }
     if (media) card.append(media);
     const row = document.createElement("div"); row.className = "btns";
     for (const [label, fn, primary] of btns) {
@@ -1415,10 +1415,10 @@ const G = (() => {
     const opt = document.createElement("div"); opt.className = "opt";
     opt.innerHTML = '<label class="toggle"><input type="checkbox"><span class="sw"></span><span class="swName"></span></label>';
     const box = opt.querySelector("input"); box.id = o.id;
-    opt.querySelector(".swName").textContent = o.label;
+    emoText(opt.querySelector(".swName"), o.label);
     // the line shows only on a switch that can cost a life or the gold paw (o.warn); on the rest it's read out, not shown
     if (o.line) {
-      const s = document.createElement("span"); s.className = o.warn ? "hint" : "hint quiet"; s.id = o.id + "Line"; s.textContent = o.line;
+      const s = document.createElement("span"); s.className = o.warn ? "hint" : "hint quiet"; s.id = o.id + "Line"; emoText(s, o.line);
       opt.append(s); box.setAttribute("aria-describedby", s.id);
     }
     box.sync = () => { box.checked = !!of()[o.key]; };
@@ -2363,6 +2363,19 @@ const G = (() => {
     return {left, used, say, show, lose, refill, canRevive, revive, reviveBtn, outCard};
   }
 
+  /* ---------- dark emoji ---------- */
+  // Text with a dark emoji (🐾, black on most phones) that would vanish on the dark page: each one goes in a small light
+  // round backing in dark mode (.darkemo in games.css), as the walkthrough does with its emoji. Used for switches'
+  // names and lines and the cards' words.
+  function emoText(el, text) {
+    if (!/🐾/.test(text)) { el.textContent = text; return; }
+    el.textContent = "";
+    for (const bit of text.split(/(🐾)/)) {
+      if (bit === "🐾") { const e = document.createElement("span"); e.className = "darkemo"; e.textContent = bit; el.append(e); }
+      else if (bit) el.append(bit);
+    }
+  }
+
   /* ---------- a goal as a fraction ---------- */
   // The status line's goal as a fraction with a small icon for what's counted (decided 2026-11-08): Tangle's
   // "56/59 ○" (crossings left of those dealt, the white dot the board draws), Pounce's "🐾 12/20" (moves left). VoiceOver
@@ -2436,6 +2449,6 @@ const G = (() => {
     }
   }
 
-  return {MAGNET, tally, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText,
+  return {MAGNET, tally, emoText, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();

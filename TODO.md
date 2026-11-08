@@ -96,11 +96,6 @@ will recheck this list, and add games 43–52, before any of it is built.
 - Tall boards: checked on 390 × 844 and 375 × 667. Tunnel Run's and Catdoku's biggest boards leave the status line well
   on screen; Bubbles' note line dips just under on a 390 × 844 phone, with its goal and time still showing.
 
-### Tools and gestures the same everywhere
-- Auto Notes: Catdoku's 🐾 is hard to see in dark mode (not urgent).
-- Toydoku: its icons are in an odd order.
-- Scratch That's Post first / Dot first: look for other games it would help (Fair Play?).
-
 ### Symbols that read wrong
 - Cat Mat's key numbers read as pots of paint.
 - Toy Box: a better way to show the toys on the track.
