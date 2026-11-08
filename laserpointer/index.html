@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.42"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.43"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.42">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.43">
 <style>
 /* A room seen from above: a wooden floor inside a wall, with a laser pointer poking in at one edge. Cats sit on
    some squares and mirrors stand on others; tap a mirror to tip it the other way. The red dot runs straight and
@@ -102,7 +102,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-07.42"></script>
+<script src="../games.js?v=2026-11-07.43"></script>
 <script>
 /* ---------- laser puzzles (plain functions, also run in a background worker) ---------- */
 // The room is N × N squares. The laser pointer sits just off one edge and shines in along a row or column.
@@ -487,8 +487,7 @@ function update() {
 }
 function buttons(seen) {
   $("count").textContent = game.won ? `All ${catAt.length} cats` : `${seen} of ${catAt.length} cats`;
-  $("undoBtn").disabled = !game.history.length || game.won;
-  $("restartBtn").disabled = !(game.history.length || (live && live.on)) || game.won;
+  undo.sync();
   $("hintBtn").disabled = game.won;
   paintHint();
 }
@@ -621,7 +620,7 @@ function tip(i) {
   if (!playing()) return;
   if (isLive() && !live.on) { liveStart(); return; }
   if (game.tilt[i] < 0) return;
-  game.tilt[i] ^= 1; game.history.push(i); game.started = true;
+  game.tilt[i] ^= 1; undo.push(i); game.started = true;
   setTilt(i);
   if (update()) win(); else save();
 }
@@ -644,35 +643,19 @@ $("svg").addEventListener("keydown", e => {
   e.preventDefault(); showCursor();
 });
 $("svg").addEventListener("blur", () => { cursor = -1; showCursor(); });
-document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
 
 // Undo takes back a tap, or a Restart.
-function undo() {
-  if (!playing() || !game.history.length) return;
-  const h = game.history.pop();
-  if (typeof h === "number") { game.tilt[h] ^= 1; setTilt(h); }
-  else { game.tilt = h.tilt; for (const i in mirrors) setTilt(+i); }
-  update(); save();
-}
-$("undoBtn").onclick = undo;
+const undo = G.history({game: () => game, can: playing, restart: true, started: () => game.history.length || (live && live.on),
+  back: h => {
+    if (typeof h === "number") { game.tilt[h] ^= 1; setTilt(h); }
+    else { game.tilt = h.tilt; for (const i in mirrors) setTilt(+i); }
+  },
+  after: () => { update(); save(); }});
+// Restart: on a moving level the laser goes off and the mirrors go back, ready for another run (the list is emptied).
 $("restartBtn").onclick = () => {
-  if (!playing()) return;
-  if (isLive()) {   // the laser goes off and the mirrors go back, ready for another run
-    if (!game.history.length && !live.on) return;
-    game.restarted = true; game.history = []; game.tilt = game.first.slice();
-    for (const i in mirrors) setTilt(+i);
-    liveReset();
-    update(); save();
-    G.note("Back to how the mirrors started. Tap the room to switch the laser on.", 0);
-    return;
-  }
-  if (!game.history.length) return;
-  game.restarted = true;
-  game.history.push({tilt: game.tilt.slice()});
-  game.tilt = game.first.slice();
-  for (const i in mirrors) setTilt(+i);
-  update(); save();
-  G.note("Back to how the mirrors started. Undo brings your moves back.", 4000);
+  const live1 = isLive(), reset = g => { g.tilt = g.first.slice(); for (const i in mirrors) setTilt(+i); if (live1) liveReset(); };
+  if (live1 ? undo.restart(reset) : undo.restart(reset, {tilt: game.tilt.slice()}))
+    G.note(live1 ? "Back to how the mirrors started. Tap the room to switch the laser on." : "Back to how the mirrors started. Undo brings your moves back.", live1 ? 0 : 4000);
 };
 // Hint: a gold box round the first mirror along the answer's run that's tipped the wrong way. (That's also the
 // first wrong one the dot meets now: up to it, the dot is on the answer's run.) On a moving level it goes by the
