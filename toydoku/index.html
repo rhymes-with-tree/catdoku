@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.15"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.16"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.15">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.16">
 <style>
 /* Sudoku with toys: every row, column and box holds one of each toy. The Numbers switch shows 1 to N instead. */
 .gridwrap{background:var(--panel);border:3px solid var(--ink);border-radius:10px;overflow:hidden;
@@ -79,8 +79,7 @@
 @media (prefers-reduced-motion:reduce){.won .toy,.won .num{animation:none}}
 /* three switches: two to a row on a phone */
 /* lives, as in Catdoku, while Auto grade is on */
-.hearts{font-size:20px;letter-spacing:1px;color:var(--fuchsia-plum);margin-right:8px}
-.hearts .lost{color:var(--line)}
+.hearts{margin-right:8px}
 /* Laya beside the title, and on the gold-paw card */
 .title{display:flex;align-items:flex-end;gap:8px}
 .laya{display:block;height:64px;width:auto;margin-bottom:-6px}
@@ -122,7 +121,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-07.15"></script>
+<script src="../games.js?v=2026-11-07.16"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N grid in boxes of bw × bh squares: every row, column and box holds each of the N toys once. Toys are
@@ -367,7 +366,9 @@ const HOW = [null, "", "", "", "a head start", "", "", "tricky", "fiendish", "di
 const levelName = n => { const {N} = levelOf(n); return `Level ${n} · ${N} × ${N}${HOW[n] ? ", " + HOW[n] : ""}`; };
 const build = G.builder([levelOf, units, randomFull, countSols, reason, trials, makeGrid], "makeGrid");
 const isGiven = i => !!game.givens[i];
-const livesLeft = h => `${h} ${h === 1 ? "life" : "lives"} left.`;
+// Lives (G.lives), shown while Auto grade is on
+const lives = G.lives({el: $("hearts"), of: () => game, per: HEARTS, max: MAX_LIVES, on: "puzzle", revived: () => { draw(); save(); }});
+const livesLeft = h => lives.say(h) + ".";
 const toyName = v => settings.numbers ? String(v) : nameOf(game.toys[v - 1]);
 const unitsNow = () => units(game.N, game.bw, game.bh);
 
@@ -437,8 +438,7 @@ function draw() {
   $("pad").classList.toggle("noting", noting);
   $("board").classList.toggle("painting", !!(armed && armed.sticky && armed.v && noting));
   $("hearts").hidden = !settings.autoGrade;
-  $("hearts").innerHTML = Array.from({length: Math.max(HEARTS, game.livesUsed)}, (_, k) => k < game.hearts ? "♥" : '<span class="lost">♥</span>').join("");
-  $("hearts").setAttribute("aria-label", `${game.hearts} ${game.hearts === 1 ? "life" : "lives"} left`);
+  lives.show();
   guesses.sync();
   const left = v => N - g.filter(x => x === v).length;
   [...$("pad").children].forEach(b => { const v = +b.dataset.v; b.classList.toggle("done", v > 0 && left(v) <= 0); });
@@ -678,9 +678,9 @@ function miss(i, v) {
   if (h > 0) G.note(`${settings.numbers ? "No " + v : "Not the " + toyName(v)} there. ${livesLeft(h)}`, 4000);
 }
 function loseLives(n) {
-  game.hearts = Math.max(0, game.hearts - n);
-  if (game.hearts <= 0) { save(); setTimeout(showLost, 600); }
-  return game.hearts;
+  const h = lives.lose(n);
+  if (h <= 0) { save(); setTimeout(showLost, 600); }
+  return h;
 }
 // Switching Auto grade on mid-puzzle grades the board as it stands: each wrong toy gets a red ring and costs a life.
 function autoGrade() {
@@ -697,25 +697,13 @@ function showLost() {
   if (!game || game.won || game.hearts > 0) return;
   G.breakStreak();   // losing ends the win streak
   game.helped = true; settings.level = game.level; $("levelSel").value = game.level; save();
-  const btns = [["Restart", () => { G.closeCard(); restartFresh(); }, true], ["New puzzle", () => { G.closeCard(); newPuzzle(); }]];
-  let text = "Pick how you want to keep going.";
-  if (game.livesUsed < MAX_LIVES) btns.push(["Wait, I'm only mostly dead! Mostly dead is slightly alive, folks!", revive]);
-  else text = `All ${MAX_LIVES} lives on this puzzle are used up.`;
-  btns.push(G.homeBtn());
-  G.openCard("Out of lives", text, btns, null, G.otherSize($("levelSel"), game.level, startLevel, "Or play a different level:"));
-}
-function revive() {
-  const added = Math.min(HEARTS, MAX_LIVES - game.livesUsed);
-  game.livesUsed += added; game.hearts = added;
-  G.closeCard(); draw(); save();
-  const more = Math.ceil((MAX_LIVES - game.livesUsed) / HEARTS);
-  G.openCard("Slightly alive!", `Back with ${added} more ${added === 1 ? "life" : "lives"}. ${more ? `${more} ${more === 1 ? "revive" : "revives"} left on this puzzle.` : "No revives left on this puzzle."}`,
-    [["Keep playing", G.closeCard, true]]);
+  lives.outCard({btns: [["Restart", () => { G.closeCard(); restartFresh(); }, true], ["New puzzle", () => { G.closeCard(); newPuzzle(); }]],
+    after: G.otherSize($("levelSel"), game.level, startLevel, "Or play a different level:")});
 }
 function restartFresh() {
   snapshot();
   game.grid = game.givens.slice(); game.notes = game.notes.map(() => 0); guesses.clear(); game.wrong = [];
-  game.hearts = HEARTS; game.livesUsed = HEARTS;
+  lives.refill();
   draw(); save();
 }
 

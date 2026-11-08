@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.15";
+  var BUILD = "2026-11-07.16";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -26,7 +26,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.15">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.16">
 <style>
 /* Catdoku's own looks; the rest is games.css. */
 html,body{height:100%}
@@ -37,8 +37,6 @@ main{padding-top:18px}
 .higgins{display:block;height:60px;width:auto;margin-bottom:-6px}
 /* A gold-paw win shows Higgins in place of the random cat photo */
 .card img.higginspic{display:block;width:70%;max-width:250px;height:auto;margin:0 auto 6px}
-.hearts{font-size:20px;letter-spacing:1px;color:var(--fuchsia-plum)}
-.hearts .lost{color:var(--line)}
 .msg:empty{display:none}
 @media (max-height:760px){
   main{padding-top:6px}
@@ -109,7 +107,7 @@ main{padding-top:18px}
 
 </main>
 
-<script src="../games.js?v=2026-11-07.15"></script>
+<script src="../games.js?v=2026-11-07.16"></script>
 <script>G.nav("catdoku");</script>
 <script>
 const PALETTE = ["#BD5538","#73A7AE","#ECA818","#6AA673","#B94588","#B3B94B",
@@ -309,12 +307,16 @@ function peers(i) {
 function keepCatMarks(except) { game.wrong = game.wrong.filter(k => k !== except && game.cells[k].cat); }
 function catsOnBoard() { return game.cells.map((c, k) => c.cat ? k : -1).filter(k => k >= 0); }
 function isSolution(k) { return game.sol[Math.floor(k / game.N)] === k % game.N; }
+// Lives (G.lives): three at a time, up to nine on one puzzle.
+const lives = G.lives({el: $("hearts"), of: () => game, per: HEARTS, max: MAX_LIVES, on: "puzzle",
+  revived: () => { game.status = "playing"; setNextSize(game.N); render(); save(); },
+  reviveMedia: words => catImg("https://cataas.com/cat/says/" + encodeURIComponent(words) + "?fontSize=48&fontColor=white&" + bust(), `A cat saying ${words}`, "https://cataas.com/cat?width=500&" + bust())});
 function loseLives(n) {
-  game.hearts = Math.max(0, game.hearts - n);
-  if (game.hearts <= 0) showLost();
-  return game.hearts;
+  const h = lives.lose(n);
+  if (h <= 0) showLost();
+  return h;
 }
-const livesLeft = h => `${h} ${h === 1 ? "life" : "lives"} left.`;
+const livesLeft = h => lives.say(h) + ".";
 
 function snapshot() {
   game.history.push(JSON.stringify(game.cells));
@@ -336,10 +338,9 @@ function tap(i) {
 function placeCat(i) {
   const N = game.N, cell = game.cells[i];
   if (settings.autoGrade && game.sol[Math.floor(i / N)] !== i % N) {
-    game.hearts--;
     flashBad(i);
-    if (game.hearts <= 0) showLost();
-    else note(game.hearts === 1 ? "Not there. 1 life left." : `Not there. ${game.hearts} lives left.`);
+    const h = loseLives(1);
+    if (h > 0) note(`Not there. ${livesLeft(h)}`);
     return;
   }
   guesses.before(i);
@@ -381,7 +382,7 @@ function undo() {
 // size), so it isn't a way round them, as in Twirl. It costs the gold paw (Undo doesn't).
 function restart() {
   if (game.history.length || game.status === "lost") game.restarted = true;
-  if (game.status === "lost") { breakStreak(); game.hearts = HEARTS; game.livesUsed = HEARTS; }
+  if (game.status === "lost") { breakStreak(); lives.refill(); }
   setNextSize(game.N);
   game.cells = blankCells(game.N); game.history = []; game.wrong = []; guesses.clear();
   game.status = "playing";
@@ -452,27 +453,8 @@ function showLost() {
   note("");
   setNextSize(game.N);
   save();
-  const btns = [["Restart", restart, true], [`New puzzle (${settings.size} × ${settings.size})`, newPuzzle]];
-  let text = "Pick how you want to keep going.";
-  if (game.livesUsed < MAX_LIVES) btns.push(["Wait, I'm only mostly dead! Mostly dead is slightly alive, folks!", revive]);
-  else text = `All ${MAX_LIVES} lives on this puzzle are used up.`;
-  btns.push(G.homeBtn());
-  openCard("Out of lives", text, btns,
-    catImg("https://cataas.com/cat/gif?" + bust(), "A cat GIF", "https://cataas.com/cat?width=500&" + bust()));
-  $("card").append(otherSize());
-}
-
-function revive() {
-  if (game.livesUsed >= MAX_LIVES) return;
-  const added = Math.min(HEARTS, MAX_LIVES - game.livesUsed);
-  game.livesUsed += added; game.hearts = added; game.status = "playing";
-  setNextSize(game.N);
-  render(); save();
-  const left = Math.ceil((MAX_LIVES - game.livesUsed) / HEARTS);
-  const words = left ? `${left} ${left === 1 ? "revive" : "revives"} left` : "Last lives";
-  const says = "https://cataas.com/cat/says/" + encodeURIComponent(words) + "?fontSize=48&fontColor=white&" + bust();
-  openCard("Slightly alive!", `Back with ${added} more ${added === 1 ? "life" : "lives"}. ${left ? words + " on this puzzle." : "No revives left on this puzzle."}`,
-    [["Keep playing", closeCard, true]], catImg(says, `A cat saying ${words}`, "https://cataas.com/cat?width=500&" + bust()));
+  lives.outCard({btns: [["Restart", restart, true], [`New puzzle (${settings.size} × ${settings.size})`, newPuzzle]],
+    media: catImg("https://cataas.com/cat/gif?" + bust(), "A cat GIF", "https://cataas.com/cat?width=500&" + bust()), after: otherSize()});
 }
 
 function complete() {
@@ -646,9 +628,7 @@ function render() {
     el.classList.toggle("hint", !!(mark && mark.cells.includes(i))); el.classList.toggle("bad", !!(mark && mark.bad && mark.cells.includes(i)));
     el.setAttribute("aria-label", `Row ${Math.floor(i / N) + 1}, column ${i % N + 1}: ${s === "empty" ? "blank" : s}`);
   });
-  $("hearts").innerHTML = Array.from({length: Math.max(HEARTS, game.livesUsed)},
-    (_, k) => k < game.hearts ? "♥" : '<span class="lost">♥</span>').join("");
-  $("hearts").setAttribute("aria-label", `${game.hearts} ${game.hearts === 1 ? "life" : "lives"} left`);
+  lives.show();
   $("found").replaceChildren(higginsPic("Cats placed:"), ` ${game.cells.filter(c => c.cat).length} / ${game.N}`);
   $("completeBtn").style.display = settings.autoGrade ? "none" : "";
   $("auditBtn").style.display = settings.autoGrade ? "none" : "";

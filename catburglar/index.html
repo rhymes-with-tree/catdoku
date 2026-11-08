@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.15";
+  var BUILD = "2026-11-07.16";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.15">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.16">
 <style>
 /* Night at the museum: a painting in a gilt frame on a dark gallery wall, lit by a brass picture light.
    A cat has sneaked into the painting; pinch or use + and − to look closer, and tap it to catch it. */
@@ -59,8 +59,6 @@
 .placard small{display:block;color:var(--ink-soft);font-size:13px}
 .loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#F7F8F3;font-weight:600}
 .loading[hidden]{display:none}
-.hearts{font-size:20px;letter-spacing:1px;color:var(--fuchsia-plum)}
-.hearts .lost{color:var(--line)}
 .left{display:flex;gap:10px;align-items:center}
 /* a cat peeking round the edge of the title, as if sneaking in */
 .title{display:flex;align-items:flex-end;gap:6px}
@@ -156,8 +154,8 @@ body.full .hearts .lost{color:rgba(247,248,243,.3)}
 
 </main>
 
-<script src="../games.js?v=2026-11-07.15"></script>
-<script src="paintings.js?v=2026-11-07.15"></script>
+<script src="../games.js?v=2026-11-07.16"></script>
+<script src="paintings.js?v=2026-11-07.16"></script>
 <script>
 /* ---------- levels ---------- */
 // How big the cat is (the side of a square of the same area, as a share of the painting's), and how far it takes on
@@ -404,7 +402,9 @@ const STORE = "catdoku.catburglar.v1", ROUND = 5;
 const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1, recent: []}, state.settings);
-const MAX_LIVES = 9, livesUsed = () => game.livesUsed || 3;   // lives given out on this painting: 3, and 3 more a revive
+// Lives (G.lives): 3 on a painting, and 3 more a revive, up to 9 (livesUsed, taken as 3 in a save without it)
+const lives = G.lives({el: $("hearts"), of: () => game, key: "lives", on: "painting", keep: "Keep looking", revived: () => { game.revived = true; save(); draw(); }});
+const livesUsed = lives.used;
 let game = state.game || null, round = state.round || null, scene = null;   // scene: the painting drawn with the cat in it, for this game
 // The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
 G.pawLost(() => !game || !round || round.hinted || round.revived || game.hinted || game.revived || game.lives < 3 || round.results.some(r => !r.caught || r.lives < 3));
@@ -461,7 +461,7 @@ function tapAt(px, py) {
   if (!playing() || !ready()) { if (game && (game.won || game.lost)) paintingCard(); return; }
   if (game.lives <= 0) { outOfLives(); return; }   // the out-of-lives card was put away (or the page reloaded)
   if (onCat(px, py)) { win(); return; }
-  game.misses.push([Math.round(px), Math.round(py)]); game.lives--; save(); draw();
+  game.misses.push([Math.round(px), Math.round(py)]); lives.lose(); save(); draw();
   if (!game.lives) { outOfLives(); return; }
   G.note(game.lives === 1 ? "Not there! One life left." : "Not there!", 2500);
 }
@@ -495,17 +495,9 @@ function win() {
 // Out of lives, as in Catdoku: let the cat go, or come back with three more lives (up to nine on one painting),
 // which keeps the round from moving you up.
 function outOfLives() {
-  if (livesUsed() >= MAX_LIVES) { lose(); return; }
+  if (!lives.canRevive()) { lose(); return; }
   G.openCard("Out of lives", "Three wrong taps. The cat's about to slip away.",
-    [["Wait, I'm only mostly dead! Mostly dead is slightly alive, folks!", revive, true], ["Let it go", () => { G.closeCard(); lose(); }], G.homeBtn()]);
-}
-function revive() {
-  const added = Math.min(3, MAX_LIVES - livesUsed());
-  Object.assign(game, {livesUsed: livesUsed() + added, lives: added, revived: true});
-  save(); draw();
-  const more = Math.ceil((MAX_LIVES - game.livesUsed) / 3);
-  G.openCard("Slightly alive!", `Back with ${added} more ${added === 1 ? "life" : "lives"}. ${more ? `${more} ${more === 1 ? "revive" : "revives"} left on this painting.` : "No revives left on this painting."}`,
-    [["Keep looking", G.closeCard, true]]);
+    [lives.reviveBtn(true), ["Let it go", () => { G.closeCard(); lose(); }], G.homeBtn()]);
 }
 // Out of lives, or given up: the cat is ringed in red where it was hiding.
 function lose(gaveUp) {
@@ -776,8 +768,7 @@ function draw() {
   const n = Math.min(ROUND, round.results.length + (playing() || !game ? 1 : 0));
   $("count").textContent = `${levelLabel(round.level)} · ${n} of ${ROUND}`;
   if (!game) return;
-  $("hearts").innerHTML = "♥".repeat(game.lives) + '<span class="lost">♥</span>'.repeat(Math.max(3, livesUsed()) - game.lives);
-  $("hearts").setAttribute("aria-label", `${game.lives} lives left`);
+  lives.show();
   drawMarks();
 }
 

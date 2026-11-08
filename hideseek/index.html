@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.15";
+  var BUILD = "2026-11-07.16";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&family=Permanent+Marker&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.15">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.16">
 <style>
 /* A wooden floor covered in cardboard boxes. Checked boxes get a number written on them in marker, like a
    labelled box; marked ones get a cat doodled on; a startled cat's box gets HISS scrawled across it. */
@@ -56,8 +56,6 @@
 .sq.hintme.bad{box-shadow:0 0 0 4px #C8392B,0 0 16px 4px rgba(200,57,43,.55)}
 @keyframes glow{to{filter:brightness(1.25);box-shadow:0 0 0 5px #FFD45E,0 0 24px 8px rgba(236,168,24,.8)}}
 .bighiss{position:fixed;left:0;top:0;z-index:20;pointer-events:none;font-family:var(--marker);color:#B23A28;font-size:min(30vw,170px);line-height:1;white-space:nowrap;text-shadow:3px 3px 0 #fff}
-.hearts{font-size:20px;letter-spacing:1px;color:var(--fuchsia-plum)}
-.hearts .lost{color:var(--line)}
 .left{display:flex;gap:10px;align-items:center}
 /* Jan Brady, Hide & Seek's mascot: his big tail gives him away beside the title */
 .title{display:flex;align-items:flex-end;gap:8px}
@@ -114,7 +112,7 @@ body.full .bar{width:auto;grid-column:3;grid-row:3;align-self:center}
 
 </main>
 
-<script src="../games.js?v=2026-11-07.15"></script>
+<script src="../games.js?v=2026-11-07.16"></script>
 <script>
 /* ---------- sizes ---------- */
 // Width, height and cats, from Minesweeper's beginner board up to its expert one stood on end (16 across, 30 down),
@@ -216,7 +214,8 @@ const hints = G.hinter({game: () => game, key: () => game && open ? [...open].jo
 const save = () => G.save(STORE, {settings, game});
 const setOf = a => new Set(a || []);
 let open, mark, caught;
-const MAX_LIVES = 9, livesUsed = () => game.livesUsed || 3;   // lives given out on this floor: 3, and 3 more a revive
+// Lives (G.lives): 3 on a floor, and 3 more a revive, up to 9 (livesUsed, taken as 3 in a save without it)
+const lives = G.lives({el: $("hearts"), of: () => game, key: "lives", on: "floor", revived: () => { Object.assign(game, {lost: false, hinted: true}); store(); draw(); }});
 const label = i => nbrs(i).reduce((s, j) => s + cat[j], 0);
 
 function load() {   // the working copies of the saved game
@@ -249,7 +248,7 @@ function check(i) {
     game.cats = cats; game.first = i; game.started = true; load();
   }
   if (cat[i]) {   // a startled cat: it costs a life, and that box is known from now on
-    caught.add(i); game.lives--; store();
+    caught.add(i); lives.lose(); store();
     const sq = $("board").children[i];
     G.note(game.lives ? "Hiss! A cat was in there." : "", 0);
     draw(); sq.style.visibility = "hidden";
@@ -314,25 +313,16 @@ function outOfLives() {
 // Out of lives, as in Catdoku: try the floor again, a new one, or come back with three more lives (up to nine on
 // one floor). Any of these keeps you at this size.
 function livesCard() {
-  const btns = [["Try this floor again", tryAgain, true], ["New floor", () => { G.closeCard(); newFloor(); }]];
-  let text = "Three cats were startled awake. Pick how you want to keep going.";
-  if (livesUsed() < MAX_LIVES) btns.push(["Wait, I'm only mostly dead! Mostly dead is slightly alive, folks!", revive]);
-  else text = `All ${MAX_LIVES} lives on this floor are used up.`;
-  btns.push(["Look at the floor", () => { G.closeCard(); G.note("Tap the floor when you're ready to go again.", 0); }], G.homeBtn());
-  G.openCard("Out of lives", text, btns, null, G.otherSize($("size"), game.N, startLevel));
-}
-function revive() {
-  const added = Math.min(3, MAX_LIVES - livesUsed());
-  Object.assign(game, {livesUsed: livesUsed() + added, lives: added, lost: false, hinted: true});
-  store(); draw();
-  const more = Math.ceil((MAX_LIVES - game.livesUsed) / 3);
-  G.openCard("Slightly alive!", `Back with ${added} more ${added === 1 ? "life" : "lives"}. ${more ? `${more} ${more === 1 ? "revive" : "revives"} left on this floor.` : "No revives left on this floor."}`,
-    [["Keep playing", G.closeCard, true]]);
+  lives.outCard({text: "Three cats were startled awake. Pick how you want to keep going.",
+    btns: [["Try this floor again", tryAgain, true], ["New floor", () => { G.closeCard(); newFloor(); }]],
+    more: [["Look at the floor", () => { G.closeCard(); G.note("Tap the floor when you're ready to go again.", 0); }]],
+    after: G.otherSize($("size"), game.N, startLevel)});
 }
 // The same cats, back to the first box checked, with three new lives.
 function tryAgain() {
   G.closeCard();
-  Object.assign(game, {open: [], mark: [], caught: [], lives: 3, livesUsed: 3, lost: false, hinted: true, ...G.freshClock()});
+  lives.refill();
+  Object.assign(game, {open: [], mark: [], caught: [], lost: false, hinted: true, ...G.freshClock()});
   load(); spread(game.first); store(); draw(); G.note("Same floor, three new lives.", 3000);
 }
 
@@ -389,8 +379,7 @@ function draw() {
   const kids = $("board").children, reveal = game.won || game.lost, hm = hints.current();
   for (let i = 0; i < kids.length; i++) { kids[i].classList.toggle("hintme", !!(hm && hm.i === i)); kids[i].classList.toggle("bad", !!(hm && hm.i === i && hm.bad)); }
   $("count").textContent = game.won ? `🐱 all ${game.C} found` : `🐱 ${game.C - mark.size - caught.size} left`;
-  $("hearts").innerHTML = "♥".repeat(game.lives) + '<span class="lost">♥</span>'.repeat(Math.max(3, livesUsed()) - game.lives);
-  $("hearts").setAttribute("aria-label", `${game.lives} lives left`);
+  lives.show();
   for (let i = 0; i < W * H; i++) {
     const sq = kids[i], n = open.has(i) ? label(i) : 0;
     const want = open.has(i) ? "n" + n : caught.has(i) ? "hiss" : reveal && cat[i] ? "cat" : mark.has(i) ? "mark" : "box";

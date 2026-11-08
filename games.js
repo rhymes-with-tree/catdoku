@@ -1936,6 +1936,47 @@ const G = (() => {
     return {on: isOn, set};
   }
 
+  /* ---------- lives ---------- */
+  // Lives as hearts, the same in every game that has them: three to start (per), lost hearts left hollow, and running
+  // out offers "Wait, I'm only mostly dead!", three more at a time up to nine on one puzzle (max). The game keeps them
+  // in its own saved object, so saved games carry on: o: {el (the hearts), of: () => that object, key (its field for
+  // lives left, "hearts" by default; the lives given out are in livesUsed, taken as per where a save has none), on
+  // (what they're for, in the cards' words: "puzzle", "floor", "level", "painting"), revived() (after a revive: the
+  // game's flags, draw and save), keep (the revive card's button), reviveMedia(words) (a picture for that card)}.
+  // A game with no revive (max = per) can use show(left, used) alone, with unit: [one, many] if they aren't lives.
+  function lives(o) {
+    const per = o.per || 3, max = o.max || 9, key = o.key || "hearts";
+    const left = () => o.of()[key], used = () => o.of().livesUsed || per;
+    const [one, many] = o.unit || ["life", "lives"];   // what a heart is, for VoiceOver and the game's notes
+    const say = h => `${h} ${h === 1 ? one : many} left`;
+    function show(h = left(), u = used()) {
+      o.el.innerHTML = Array.from({length: Math.max(per, u)}, (_, k) => k < h ? "♥" : '<span class="lost">♥</span>').join("");
+      o.el.setAttribute("aria-label", say(h));
+    }
+    function lose(n = 1) { const g = o.of(); g[key] = Math.max(0, g[key] - n); return g[key]; }
+    function refill() { const g = o.of(); g[key] = per; g.livesUsed = per; }   // back to the first three, as a restart after running out does
+    const canRevive = () => used() < max;
+    function revive() {
+      if (!canRevive()) return;
+      const g = o.of(), added = Math.min(per, max - used());
+      g.livesUsed = used() + added; g[key] = added;
+      if (o.revived) o.revived();
+      const more = Math.ceil((max - g.livesUsed) / per), words = more ? `${more} ${more === 1 ? "revive" : "revives"} left` : "Last lives";
+      openCard("Slightly alive!", `Back with ${added} more ${added === 1 ? "life" : "lives"}. ${more ? words : "No revives left"} on this ${o.on}.`,
+        [[o.keep || "Keep playing", closeCard, true]], o.reviveMedia ? o.reviveMedia(words) : null);
+    }
+    const reviveBtn = primary => ["Wait, I'm only mostly dead! Mostly dead is slightly alive, folks!", revive, !!primary];
+    // Out of lives: the game's own ways on (btns, the first the main one), the revive while there are lives to give
+    // (or a line saying they're used up), then more, and Home.
+    function outCard({text = "Pick how you want to keep going.", btns = [], more = [], media = null, after = null} = {}) {
+      const all = [...btns];
+      if (canRevive()) all.push(reviveBtn());
+      else text = `All ${max} lives on this ${o.on} are used up.`;
+      openCard("Out of lives", text, [...all, ...more, homeBtn()], media, after);
+    }
+    return {left, used, say, show, lose, refill, canRevive, revive, reviveBtn, outCard};
+  }
+
   /* ---------- zoom and full screen ---------- */
   // One set of round buttons in the board's bottom-right corner, the same in every game that zooms: full screen
   // (through fullScreen above), +, − and one more where the game has it (Twirl's Fit, Catlas's back to the lit
@@ -1995,6 +2036,6 @@ const G = (() => {
     }
   }
 
-  return {MAGNET, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, meaning, plainText,
+  return {MAGNET, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();

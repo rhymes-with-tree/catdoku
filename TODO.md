@@ -103,7 +103,9 @@ Wind Up. Then Toydoku and Fair Play moved onto `G.guesser`, and Catlas and Cat B
 beside Hint and stay until the card or painting moves on; what the hint showed is still kept by the page). Then
 `G.zoom`: one set of round buttons in the board's corner (full screen, +, −, and Twirl's Fit or Catlas's way back to
 the lit country), with the + and − keys, in Twirl (under the mat's corner, as the mat at Fit can't be moved from under
-them), Cat Burglar and Catlas; each keeps its own pinch and drag. Still to do: the other shared helpers below. When it's done, the README's "Across every game" (Layout, Gold paw, Bookmark, Keys) and
+them), Cat Burglar and Catlas; each keeps its own pinch and drag. Then `G.lives`: the hearts, the Out of lives card and
+"Wait, I'm only mostly dead!" written once for Catdoku, Toydoku, Hide & Seek, Twirl and Cat Burglar (each keeps its
+lives in its own saved game, as before), and Catlas's tries on each place shown as hearts with it. Still to do: the other shared helpers below. When it's done, the README's "Across every game" (Layout, Gold paw, Bookmark, Keys) and
 `HIG.md` need rewriting to match.
 
 ### The page, top to bottom
@@ -178,8 +180,6 @@ Built 2026-11-07 (`whatsNew` in `games.js`), ahead of the shared helpers, which 
 - **Marking tools:** Hide & Seek's Mark, Fair Play's Mark (×), Cross Stitch's Dot, Treat Time's Keep, Patches'
   Marker, Catdoku's Erase and Scratch That's Dot first switch all change what a tap does. One helper; Scratch That's
   becomes a piece like the rest.
-- **Lives and revives:** "Wait, I'm only mostly dead!" is written out in Catdoku, Toydoku, Hide & Seek, Twirl and Cat
-  Burglar, and Catlas has lives of its own. One `G.lives`.
 - **Admire:** after a win, a toggle that clears the marks to show the finished picture. Today it's Open the Door!'s
   Show/Hide numbers button and Cat Burglar's Show/Hide the rings on its gallery card; it goes with the win card's
   Admire my board (`G.winCard`), and other games can use it (pencil marks, Hide & Seek's doodles).

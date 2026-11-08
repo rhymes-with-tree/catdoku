@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.15"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.16"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -24,7 +24,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.15">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.16">
 <style>
 /* A play mat covered in satin ribbons; each one slides off the way its pointed end points, along its own path.
    Big mats zoom, and scroll inside their frame. */
@@ -33,8 +33,6 @@
   user-select:none;-webkit-user-select:none;overscroll-behavior:contain}
 .scroller canvas{display:block;margin:0 auto;cursor:pointer}
 .status .info{display:flex;align-items:center;gap:10px}
-.hearts{font-size:20px;letter-spacing:1px;color:var(--fuchsia-plum)}
-.hearts .lost{color:var(--line)}
 .toggle{display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;user-select:none;white-space:nowrap}
 .toggle input{position:absolute;opacity:0;width:1px;height:1px}
 .sw{flex:none;width:42px;height:24px;border-radius:12px;background:var(--line);position:relative;transition:background .15s}
@@ -120,8 +118,8 @@ body.full .peek{display:none}   /* Bugsy's corner of the mat moves about in full
 
 </main>
 
-<script src="../games.js?v=2026-11-07.15"></script>
-<script src="../colorways.js?v=2026-11-07.15"></script>
+<script src="../games.js?v=2026-11-07.16"></script>
+<script src="../colorways.js?v=2026-11-07.16"></script>
 <script>
 const $ = G.$;
 G.nav("twirl");
@@ -283,6 +281,8 @@ function dress(d) {
 
 /* ---------- playing ---------- */
 const STORE = "catdoku.twirl.v2", MAX_LEVEL = 20, HEARTS = 3, MAX_LIVES = 9;
+// Lives (G.lives): three at a time, up to nine on one mat
+const lives = G.lives({el: $("hearts"), of: () => S.d, per: HEARTS, max: MAX_LIVES, on: "level", revived: () => { S.over = false; hud(); save(); }});
 // Turning off Twisty ribbons draws every ribbon flat, on every level. It's kept on this device.
 const PREFS = "catdoku.twirl.prefs.v1", prefs = Object.assign({twisty: true}, G.load(PREFS));
 G.switch({id: "twistTgl", label: "Twisty ribbons", line: "Off, every ribbon is drawn flat", key: "twisty", of: prefs, save: () => G.save(PREFS, prefs),
@@ -354,8 +354,7 @@ function openShared(d) {
 const left = () => S.d.ribbons.length - S.d.gone.length;
 function hud() {
   const d = S.d;
-  $("hearts").innerHTML = Array.from({length: Math.max(HEARTS, d.livesUsed)}, (_, k) => k < d.hearts ? "♥" : '<span class="lost">♥</span>').join("");
-  $("hearts").setAttribute("aria-label", `${d.hearts} ${d.hearts === 1 ? "life" : "lives"} left`);
+  lives.show();
   $("count").textContent = `🎀 ${left()} left`;
 }
 
@@ -379,9 +378,9 @@ function tap(k) {
   // blocked: it tugs forward to whatever's in the way and springs back, and a life is lost
   tugs.push({k, t0: now, dist: Math.max(0.15, run - 0.3), blocker});
   unpaint(k);
-  d.hearts--; hud(); save();
-  if (d.hearts <= 0) { S.over = true; setTimeout(lost, 450); }
-  else G.note(d.hearts === 1 ? "Blocked. 1 life left." : `Blocked. ${d.hearts} lives left.`, 2500);
+  const hearts = lives.lose(); hud(); save();
+  if (hearts <= 0) { S.over = true; setTimeout(lost, 450); }
+  else G.note(`Blocked. ${lives.say(hearts)}.`, 2500);
 }
 // Hint: a ribbon that's free to go now glows gold. The player taps it. A hint keeps you on this level and
 // costs the gold paw.
@@ -415,19 +414,8 @@ function win() {
 function lost() {
   G.breakStreak();   // losing ends the win streak
   S.over = true; S.d.helped = true; save();
-  const btns = [["Restart", () => { G.closeCard(); restart(); }, true], ["New ribbons", () => { G.closeCard(); startLevel(S.level); }]];
-  let text = "Pick how you want to keep going.";
-  if (S.d.livesUsed < MAX_LIVES) btns.push(["Wait, I'm only mostly dead! Mostly dead is slightly alive, folks!", revive]);
-  else text = `All ${MAX_LIVES} lives on this level are used up.`;
-  btns.push(G.homeBtn());
-  G.openCard("Out of lives", text, btns, null, G.otherSize($("levelSel"), S.level, startLevel, "Or play a different level:"));
-}
-function revive() {
-  const d = S.d, added = Math.min(HEARTS, MAX_LIVES - d.livesUsed);
-  d.livesUsed += added; d.hearts = added; S.over = false; hud(); save();
-  const more = Math.ceil((MAX_LIVES - d.livesUsed) / HEARTS);
-  G.openCard("Slightly alive!", `Back with ${added} more ${added === 1 ? "life" : "lives"}. ${more ? `${more} ${more === 1 ? "revive" : "revives"} left on this level.` : "No revives left on this level."}`,
-    [["Keep playing", G.closeCard, true]]);
+  lives.outCard({btns: [["Restart", () => { G.closeCard(); restart(); }, true], ["New ribbons", () => { G.closeCard(); startLevel(S.level); }]],
+    after: G.otherSize($("levelSel"), S.level, startLevel, "Or play a different level:")});
 }
 
 /* ---------- drawing ---------- */
