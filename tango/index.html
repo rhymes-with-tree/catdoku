@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-08.10"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-08.11"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-08.10">
+<link rel="stylesheet" href="../games.css?v=2026-11-08.11">
 <style>
 /* Two toys share out a grid in the toy box: every line holds as many of one as the other, no three alike in a row,
    and = / × signs between squares say whether neighbours match. */
@@ -60,6 +60,7 @@
 .won .sq img{animation:hop .5s ease-out}
 @keyframes hop{40%{transform:translateY(-8px) scale(1.1)}}
 @media (prefers-reduced-motion:reduce){.sq img,.won .sq img{animation:none}}
+.pieces img.ic{object-fit:contain}   /* a toy's picture on its piece */
 </style>
 </head>
 <body>
@@ -92,7 +93,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-08.10"></script>
+<script src="../games.js?v=2026-11-08.11"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // A grid of N × N squares, each 0 or 1 (the two toys). Every row and column has N/2 of each, no three the same
@@ -242,7 +243,12 @@ let settings = Object.assign({level: 1, autoCheck: true}, state.settings);
 let game = state.game || null, busy = false;
 // The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
 G.pawLost(() => !game || game.won || game.hinted || game.restarted);
-const markTool = G.pieces({plain: "Toy", plainIcon: "toys", mark: "markBtn", can: () => game && !game.won,
+// Toy | Toy | Mark: a piece for each of the puzzle's two toys, then Mark. A tap puts the toy picked in a square (and
+// takes it out again if it's there), so there's no tapping through one toy to get to the other.
+const toyFace = k => game ? `<img class="ic" src="${toySrc(game.toys[k])}" alt="${nameOf(game.toys[k])}"><span class="lbl" aria-hidden="true">Toy</span>`
+  : G.icon("toys") + '<span class="lbl">Toy</span>';
+let facesFor = "";
+const markTool = G.pieces({plain: "Toy", plainIcon: "toys", many: 2, face: toyFace, mark: "markBtn", can: () => game && !game.won, pick: () => { guesses.disarm(); draw(); },
   change: on => { guesses.disarm(); draw(); if (on && !settings.seenMarks) { settings.seenMarks = true; save(); G.note("Your teal = and × are just notes for you.", 6000); } }});   // the plain tap beside Mark, in a row of their own under the board
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !busy && !$("overlay").classList.contains("show");
@@ -288,10 +294,11 @@ function draw() {
     d.style.left = ((A.left + A.right + B.left + B.right) / 4 - box.left - bl) + "px"; d.style.top = ((A.top + A.bottom + B.top + B.bottom) / 4 - box.top - bt) + "px";
     $("board").append(d);
   }
+  if (game.toys.join() !== facesFor) { facesFor = game.toys.join(); markTool.refresh(); }
   $("board").classList.toggle("marking", markTool.on());
   $("key").innerHTML = markTool.on() ? `<span>Tap between two squares: = then × then off</span>`
     : guesses.armed() ? `<span>Bookmarked: the next square you fill glows</span>`
-    : `<span>Tap once: ${img(game.toys[0])}</span><span>Twice: ${img(game.toys[1])}</span>`;
+    : `<span>Tap a square: ${img(game.toys[markTool.pick()])}</span><span>Again to empty it</span>`;
   const empty = game.grid.filter(v => v === -1).length;
   $("count").textContent = game.won ? "Solved!" : empty ? `${empty} square${empty === 1 ? "" : "s"} to fill` : found.bad.size ? "Something's not right" : "";
   undo.sync();
@@ -332,7 +339,7 @@ $("squares").addEventListener("click", e => {
 });
 function tap(i) {
   if (!playing() || game.givens[i] !== -1) return;
-  const v = game.grid[i] === -1 ? 0 : game.grid[i] === 0 ? 1 : -1;
+  const k = markTool.pick(), v = game.grid[i] === k ? -1 : k;
   if (v !== -1) guesses.before(i);
   snapshot();
   game.grid[i] = v;
@@ -495,10 +502,10 @@ function helpOnFirstVisit() {
   // one short step per tap, so tapping along shows each one in turn
   if (empty >= 0) {
     const at = [xy(empty)];
-    // Your turn: tap the square through both toys and back to empty, on the real board (G.yourTurn puts it back)
-    const turn = G.yourTurn(() => game, g => { game = g; }, draw);
-    steps.push({say: "Tap once for this one", lit: at, els: [() => $("key").children[0] || $("key")], try: {done: () => game.grid[empty] === 0}, ...turn.from},
-               {say: "Again for this one", lit: at, els: [() => $("key").children[1] || $("key")], try: {done: () => game.grid[empty] === 1}, ...turn.from},
+    // Your turn: pick a toy, put it in the square, and take it out again, on the real board (G.yourTurn puts it back)
+    const turn = G.yourTurn(() => game, g => { game = g; }, () => { markTool.choose(0); markTool.set(false); draw(); });
+    steps.push({say: "Pick this toy", els: [$("plainBtn2")], try: {done: () => markTool.pick() === 1 && !markTool.on()}, ...turn.from},
+               {say: "Tap a square", lit: at, try: {done: () => game.grid[empty] === 1}, ...turn.from},
                {say: "Again to empty it", lit: at, try: {done: () => game.grid[empty] === -1}, ...turn.upTo});
   }
   steps.push({say: "Rows: equal of each", lit: row(Math.floor(N / 2))},

@@ -106,11 +106,6 @@ will recheck this list, and add games 43–52, before any of it is built.
   beside New: Wind-Up's and Pawlinko's full screen (action games, not on the 2026-11-08 list). Move them too?
 
 ### Tools and gestures the same everywhere
-- One meaning for a double tap / long press across the marking games: after Catdoku a double tap should leave a cat
-  mark in Hide & Seek, not a hiss. Open the Door!: long press as in Toydoku; an eraser in place of ⌫.
-- Catdoku: a cat mark beside the paw mark and Erase.
-- Fair Play: with Auto check on, Toy | Toy | Mark as pieces in place of tap once / tap twice. (Done: the Toy piece
-  shows a toy, and Mark shows × = with "Mark" under it.)
 - Auto Notes: Catdoku's 🐾 is hard to see in dark mode (not urgent).
 - Toydoku: its icons are in an odd order.
 - Scratch That's Post first / Dot first: look for other games it would help (Fair Play?).

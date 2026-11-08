@@ -1999,7 +1999,9 @@ const G = (() => {
   // either piece: draw), of and key (where to keep it, with save: Scratch That keeps Dot first in its settings; off
   // on every page load if not given), save}. Returns {on(), set(on) (quietly: a new puzzle or a win turns it off),
   // toggle()}.
-  // o.plainIcon: the plain tap's icon, if not a tapping paw (Treat Time's Put back, Fair Play's Toy)
+  // o.plainIcon: the plain tap's icon, if not a tapping paw (Treat Time's Put back). o.many and o.face(k): several plain
+  // pieces in place of one, piece k drawn by face(k) (HTML, called again by refresh(): Fair Play's two toys, which
+  // change with the puzzle); pick() says which is chosen, and o.pick(k) runs when one's tapped.
   function pieces(o) {
     const m = $(o.mark), first = document.querySelector("main .actions");
     let on = !!(o.of && o.of()[o.key]);
@@ -2014,15 +2016,21 @@ const G = (() => {
     }
     set(on);
     if (m) m.onclick = toggle;
+    let pick = 0, ps = [];
+    const sync = () => ps.forEach((p, k) => p.setAttribute("aria-pressed", String(m.getAttribute("aria-pressed") !== "true" && k === pick)));
+    const refresh = () => { if (o.face) ps.forEach((p, k) => { p.innerHTML = o.face(k); }); };
     if (m && first) {
       const row = document.createElement("div"); row.className = "actions pieces"; row.setAttribute("role", "group"); row.setAttribute("aria-label", "What a tap does");
-      const p = document.createElement("button"); p.id = "plainBtn"; p.className = "tool"; p.innerHTML = iconSVG(o.plainIcon || "tap") + `<span class="lbl">${o.plain}</span>`;
-      p.onclick = () => { if (on) toggle(); };
-      row.append(p, m); first.before(row);
-      const sync = () => p.setAttribute("aria-pressed", String(m.getAttribute("aria-pressed") !== "true"));
+      ps = [...Array(o.many || 1)].map((_, k) => {
+        const p = document.createElement("button"); p.id = k ? "plainBtn" + (k + 1) : "plainBtn"; p.className = "tool";
+        p.innerHTML = iconSVG(o.plainIcon || "tap") + `<span class="lbl">${o.plain}</span>`;
+        p.onclick = () => { pick = k; if (on) toggle(); else sync(); if (o.pick) o.pick(k); };
+        return p;
+      });
+      refresh(); row.append(...ps, m); first.before(row);
       new MutationObserver(sync).observe(m, {attributes: true, attributeFilter: ["aria-pressed"]}); sync();
     }
-    return {on: () => on, set, toggle};
+    return {on: () => on, set, toggle, pick: () => pick, choose: k => { pick = k; sync(); }, refresh};
   }
 
   /* ---------- undo ---------- */
@@ -2165,8 +2173,10 @@ const G = (() => {
   //   after(changed) (after a pad button or key: when changed, the page checks for a win, draws and saves), draw, save,
   //   noteKeys (the letters that turn Notes on and off: ["n"] if not given)}.
   // put(v) returns true when it changed the board. Shift with a digit jots it as a note, whether Notes is on or not.
+  // Holding a pad button down makes its digit stick, as Toydoku's toys do: while it's stuck, each square tapped takes it
+  // (the page's tap calls tap(i) first, which says whether it did); holding it again, or another, lets it go.
   function digitPad(o) {
-    let noting = false;
+    let noting = false, stuck = null;
     const g = () => o.game(), cell = i => !o.cell || o.cell(i), keys = o.noteKeys || ["n"];
     const fill = () => { const gm = g(); gm.notes = gm.notes.map((m, i) => cell(i) && !gm.grid[i] ? o.open(i) : m); };
     // digit v has just come out of square i: with Auto Notes on, it goes back on the notes of the empty squares
@@ -2196,10 +2206,25 @@ const G = (() => {
     }
     function make() {
       const pad = $("pad"); pad.innerHTML = ""; pad.classList.add("digitPad");
-      for (let v = 1; v <= o.max(); v++) { const b = document.createElement("button"); b.textContent = v; b.onclick = () => o.after(put(v)); pad.append(b); }
-      const er = document.createElement("button"); er.className = "erase"; er.textContent = "⌫"; er.setAttribute("aria-label", "Erase"); er.onclick = () => o.after(put(0)); pad.append(er);
+      const hold = (b, v) => {
+        let t = null, long = false; b.dataset.v = v;
+        const stop = () => { clearTimeout(t); t = null; };
+        b.addEventListener("pointerdown", () => { long = false; stop(); t = setTimeout(() => { long = true; if (!o.playing()) return; stuck = stuck === v ? null : v; o.draw(); }, 450); });
+        for (const ev of ["pointerup", "pointerleave", "pointercancel"]) b.addEventListener(ev, stop);
+        b.addEventListener("contextmenu", e => e.preventDefault());
+        b.onclick = () => { if (long) { long = false; return; } if (stuck !== null && stuck !== v) { stuck = null; o.draw(); } o.after(put(v)); };
+        pad.append(b);
+      };
+      for (let v = 1; v <= o.max(); v++) { const b = document.createElement("button"); b.textContent = v; hold(b, v); }
+      // the eraser, as Toydoku's (not ⌫)
+      const er = document.createElement("button"); er.className = "erase"; er.innerHTML = iconSVG("erase"); er.setAttribute("aria-label", "Erase"); hold(er, 0);
     }
-    const sync = () => { $("pad").classList.toggle("noting", noting); $("notesBtn").setAttribute("aria-pressed", String(noting)); };
+    const sync = () => { $("pad").classList.toggle("noting", noting); $("notesBtn").setAttribute("aria-pressed", String(noting));
+      for (const b of $("pad").children) b.classList.toggle("sticky", stuck !== null && +b.dataset.v === stuck); };
+    function tap(i) {
+      if (stuck === null || !o.playing() || !cell(i) || (o.editable && !o.editable(i))) return false;
+      o.select(i); o.after(put(stuck)); return true;
+    }
     const toggle = () => { const gm = g(); if (!gm || gm.won) return; noting = !noting; o.draw(); };
     $("notesBtn").onclick = toggle;
     // Auto Notes turned on fills in every maybe; turned off, takes every note off. Undo puts them back.
@@ -2223,7 +2248,7 @@ const G = (() => {
       if (keys.includes(k.toLowerCase())) { toggle(); return true; }
       return false;
     }
-    return {put, make, sync, toggle, key, fill, autoNotes, noting: () => noting, off() { noting = false; }};
+    return {put, make, sync, toggle, key, fill, autoNotes, tap, noting: () => noting, off() { noting = false; stuck = null; }};
   }
 
   /* ---------- sideways ---------- */
