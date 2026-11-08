@@ -1808,6 +1808,7 @@ const G = (() => {
     toys: '<circle cx="16" cy="16" r="10"/><path d="M7 12c6 2.5 12 2.5 18 0M7.5 21c5-2.5 12-2.5 17 0M16 6c-3 6-3 14 0 20"/>',
     best: '<path d="M10 5h12v6a6 6 0 0 1-12 0z"/><path d="M10 8H6v1.5a4 4 0 0 0 4 4M22 8h4v1.5a4 4 0 0 1-4 4"/><path d="M16 17v5"/><path d="M11 27h10M13 22h6v5h-6z"/>',
     help: '<circle cx="16" cy="16" r="11"/><path d="M12.5 12.5a3.5 3.5 0 1 1 5 3.2c-1 .5-1.5 1.3-1.5 2.3V19"/><path d="M16 23v.2"/>',
+    lift: '<path d="M6 6h20"/><path d="M16 27V11"/><path d="M10 17l6-6 6 6"/>',
     zoomin: '<circle cx="14" cy="14" r="9"/><path d="M21 21l6 6"/><path d="M14 10v8M10 14h8"/>',
     zoomout: '<circle cx="14" cy="14" r="9"/><path d="M21 21l6 6"/><path d="M10 14h8"/>',
     fit: '<path d="M5 11h6V5M27 11h-6V5M5 21h6v6M27 21h-6v6"/>',
@@ -1843,7 +1844,7 @@ const G = (() => {
     allNotesBtn: "pencils", clearNotesBtn: "erase", eraseBtn: "erase", pauseBtn: "pause", guessBtn: "guess", giveUpBtn: "giveup",
     keepBtn: "keep", markerBtn: "marks", shuffleBtn: "shuffle", flipBtn: "flip", finishBtn: "near", completeBtn: "check", skipBtn: "skip",
     colBtn: "palette", dotBtn: "dot", linkBtn: "share", toysBtn: "toys", bestBtn: "best", helpBtn: "help", zoomIn: "zoomin", zoomOut: "zoomout", zoomFit: "fit",
-    sightBtn: "sight", nipBtn: "catnip", shakeBtn: "bubbleshake", fluffBtn: "defluff", swatBtn: "swat", netBtn: "net", rainbowBtn: "losecolor", basketBtn: "basketadd", wipeBtn: "wipe",
+    sightBtn: "sight", liftBtn: "lift", nipBtn: "catnip", shakeBtn: "bubbleshake", fluffBtn: "defluff", swatBtn: "swat", netBtn: "net", rainbowBtn: "losecolor", basketBtn: "basketadd", wipeBtn: "wipe",
     chooseBtn: "keyboard", revealBtn: "giveup", peekBtn: "peek", perchBtn: "perch", wakeBtn: "cat", reelBtn: "reel", mopBtn: "sponge"};
   // buttons that keep their own look with an icon in front of the word: every New (a +) and Catlas's Go (an arrow)
   const LEAD = {newBtn: "plus", sNewBtn: "plus", goBtn: "go", settingsSum: "sliders"};
@@ -1911,7 +1912,7 @@ const G = (() => {
   const PAW_COST = {
     hintFree: "hideseek",
     hints: {junkdrawer: "leftBtn"},   // hints by another name: in the red group beside Hint
-    helpers: {toybox: "shakeBtn shuffleBtn rainbowBtn basketBtn", bubbles: "sightBtn nipBtn shakeBtn", pickpile: "shuffleBtn", mewhue: "shuffleBtn",
+    helpers: {toybox: "shakeBtn shuffleBtn rainbowBtn basketBtn", bubbles: "sightBtn nipBtn shakeBtn liftBtn", pickpile: "shuffleBtn", mewhue: "shuffleBtn",
       windup: "shakeBtn fluffBtn netBtn", lmnopom: "swatBtn", birdwatch: "wipeBtn"},
   };
   const has = (list, slug) => (list || "").split(" ").includes(slug);

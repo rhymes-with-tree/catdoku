@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-08.13"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-08.14"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -24,7 +24,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-08.13">
+<link rel="stylesheet" href="../games.css?v=2026-11-08.14">
 <style>
 /* Toys in soap bubbles, clinging under a shelf, and a cat at the bottom batting more up. */
 .wrap{height:auto}
@@ -67,6 +67,7 @@
     <button id="sightBtn" title="The aim line shows the whole way, and where the bubble will stick">🎯 Long sight</button>
     <button id="nipBtn" title="Your bubble becomes catnip, which matches whatever it touches">🌿 Catnip</button>
     <button id="shakeBtn" title="Your bubble and the next one change to toys that can pop">🫧 Shake</button>
+    <button id="liftBtn" title="Push the shelf back up two rows">Push up</button>
   </div>
 
   <div class="actions">
@@ -83,7 +84,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-08.13"></script>
+<script src="../games.js?v=2026-11-08.14"></script>
 <script>
 const $ = G.$;
 G.nav("bubbles");
@@ -454,6 +455,7 @@ function hud(rebuild) {
       : `${n} ${n === 1 ? "bubble" : "bubbles"} left to pop`);
   });
   for (const [id, key] of [["sightBtn", "sight"], ["nipBtn", "nip"], ["shakeBtn", "shake"]]) G.uses(id, d.used[key] ? 0 : 1);   // one of each a level
+  G.uses("liftBtn", d.extra >= 1 ? 0 : 1); $("liftBtn").disabled = !d.B.drops;   // Push up: once a level, once the shelf has come down
 }
 function goalChip([type, k]) {
   const el = document.createElement("span"); el.className = "goal";
@@ -529,12 +531,7 @@ function lost() {
   G.breakStreak();   // losing ends the win streak
   S.over = true;
   const btns = [];
-  if (S.d.extra < 1) btns.push(["Push the shelf back up", () => {
-    G.closeCard(); const B = S.d.B; S.d.extra++; S.d.helped = true; shelfFrom = shelf; shelfT0 = now;
-    B.drops = Math.max(0, B.drops - 2);
-    for (const [r, c, k] of cellsOf(B)) if (r + B.drops >= ROWS - 1) { effects.push({type: "pop", k, x: cellX(B, r, c), y: cellY(B, r), t0: now, dur: 0.3}); B.rows[r][c] = EMPTY; }
-    S.d.since = 0; S.over = false; hud(); save();
-  }, true]);
+  if (S.d.extra < 1) btns.push(["Push the shelf back up", () => { G.closeCard(); S.over = false; pushUp(); }, true]);
   btns.push(["Try again", () => { G.closeCard(); start(S.level, dealt(Object.assign(deal(S.level), {helped: S.d.helped}))); }, !btns.length]);
   const d = S.d, still = d.goal === "kittens" ? `${d.kits.need - d.kits.got} kittens still to free.` : d.goal === "clear" ? `${bubblesLeft(d)} bubbles still to pop.`
     : `Still to catch: ${d.goals.filter(gl => gl.got < gl.need).map(gl => toyName(gl.need - gl.got, gl.k)).join(" and ")}.`;
@@ -543,6 +540,17 @@ function lost() {
 }
 
 /* ---------- helpers ---------- */
+// Push up (a helper since 2026-11-08, once a level like the others): the shelf goes back up two rows, and any bubble
+// still on the cat's line pops. Until it's used, the card when the bubbles reach the cat offers it too.
+function pushUp() {
+  if (!S || S.over || busy || S.d.extra >= 1 || !S.d.B.drops) return;
+  const B = S.d.B; S.d.extra++; S.d.helped = true; shelfFrom = shelf; shelfT0 = now;
+  B.drops = Math.max(0, B.drops - 2);
+  for (const [r, c, k] of cellsOf(B)) if (r + B.drops >= ROWS - 1) { effects.push({type: "pop", k, x: cellX(B, r, c), y: cellY(B, r), t0: now, dur: 0.3}); B.rows[r][c] = EMPTY; }
+  S.d.since = 0; hud(); save();
+  G.note("Pushed up: the shelf is two rows higher.", 3000);
+}
+$("liftBtn").onclick = pushUp;
 function helper(key, fn) {
   if (!S || S.over || busy || S.d.used[key]) return;
   S.d.used[key] = true; if (S.level) S.d.helped = true;
@@ -955,7 +963,7 @@ function walkthrough(again) {
   steps.push({say: "The shelf creeps down", els: [$("moves")], shapes: () => [band([[0, TOP + B.drops * RH * 0.5], [COLS, TOP + B.drops * RH * 0.5]], TOP + B.drops * RH + 0.4)]},
              {say: "Keep bubbles off the cat's line!", shapes: () => [band([[0.1, LINE], [COLS - 0.1, LINE]], 0.45)]},
              {later: true, say: "Tap the next bubble to swap", shapes: () => [ring(1.25, SY + 0.2, 0.5)]});
-  if (S.level) steps.push({say: "Helpers: one of each a level", els: [[$("sightBtn"), $("nipBtn"), $("shakeBtn")]]},
+  if (S.level) steps.push({say: "Helpers: one of each a level", els: [[$("sightBtn"), $("nipBtn"), $("shakeBtn"), $("liftBtn")]]},
                           {say: "Or play zen mode, from New board", els: [$("newBtn")]});
   G.spotlight({grid: canvas, w: turned ? Math.ceil(HT) : COLS, h: turned ? COLS : Math.ceil(HT), steps,
     map: () => { const r = rect(), s = unit(); return {ox: r.left, oy: r.top, cw: s, ch: s}; },

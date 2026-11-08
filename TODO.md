@@ -116,13 +116,6 @@ will recheck this list, and add games 43–52, before any of it is built.
 ### Win card and sharing
 - Toy Box's Admire Laya shows `laya-9` on the rug, awake: no Laya picture has her asleep. A sleeping Laya picture?
 
-### Bugs
-- Mewstermind: Enter moves to the next toy and changes it.
-- Scratch That: why it isn't complete isn't clear, and the note goes too fast.
-- Fair Play's hints: only three rules (no three in a row, no sandwich, a line already has all of one toy); when none
-  applies it shows the first empty square's answer with no reason. Add rules, or say it's a plain answer.
-- Bubbles: when Raise the Ceiling is allowed isn't predictable after a loss; offer it as a helper.
-
 ### Choices as radio buttons
 - Catlas: Answer type → Pick from 4 names / Type with autocomplete / Type in a blank box, no help.
 - Knit Pick: Cat theme words / Everyday words.
