@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.37"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.38"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.37">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.38">
 <style>
 /* A fridge door with a crossword of squares on it, and the alphabet magnets Crunch knocked off it on the floor
    below. Every letter goes back on once, and every line of squares spells a word. */
@@ -149,7 +149,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-07.37"></script>
+<script src="../games.js?v=2026-11-07.38"></script>
 <script>
 /* ---------- fridges ---------- */
 // A fridge is a 10 × 10 crossword with 26 empty squares, and the 26 letters a–z on the floor to fill them, each
@@ -482,9 +482,7 @@ function drawFloor() {
 function update() {
   const left = empties().length;
   $("count").textContent = game.won ? "Every letter's back up!" : `${left} letter${left === 1 ? "" : "s"} to put back`;
-  $("undoBtn").disabled = !game.history.length || game.won;
-  guesses.sync();
-  $("restartBtn").disabled = !Object.keys(game.put).length || game.won;
+  undo.sync(); guesses.sync();
   $("hintBtn").disabled = game.won;
   $("auditBtn").disabled = game.won;
 }
@@ -505,7 +503,7 @@ function place(ch, k) {
   if (!playing() || !F.open.has(k)) return;
   if (game.put[k] === ch) { sel = k; held = null; draw(); return; }
   guesses.before(k);
-  game.history.push({...game.put});
+  undo.push();
   for (const q in game.put) if (game.put[q] === ch) delete game.put[q];
   game.put[k] = ch; game.started = true; held = null;
   sel = nextEmpty(k);
@@ -514,7 +512,7 @@ function place(ch, k) {
 }
 function takeDown(k) {
   if (!playing() || !game.put[k]) return;
-  game.history.push({...game.put});
+  undo.push();
   delete game.put[k]; game.started = true; sel = k;
   afterMove();
 }
@@ -612,7 +610,7 @@ window.addEventListener("pointercancel", () => { if (drag && drag.ghost) drag.gh
 // Keys: a letter goes on the picked square (or the first empty one), Backspace takes one down, arrows move
 // between squares, Space turns to the other word.
 document.addEventListener("keydown", e => {
-  if (e.ctrlKey || e.metaKey || e.altKey) { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } return; }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (!playing() || document.querySelector(".spot") || /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
   const k = e.key;
   if (/^[a-z]$/i.test(k)) {
@@ -642,24 +640,19 @@ document.addEventListener("keydown", e => {
   } else if (k === "Escape") { sel = -1; held = null; draw(); }
 });
 
-// Undo takes back the last letter put up, taken down or moved (or a Restart).
-function undo() {
-  if (!playing() || !game.history.length) return;
-  game.put = game.history.pop(); held = null;
-  draw(); save();
-}
-$("undoBtn").onclick = undo;
+// Undo (G.history) takes back the last letter put up, taken down or moved, or a Restart: each step is your letters as
+// they were ({...put}, in game.history).
+const undo = G.history({game: () => game, take: () => ({...game.put}), back: (p, g) => { g.put = p; held = null; }, can: playing,
+  after: () => { draw(); save(); }, restart: true, started: () => Object.keys(game.put).length > 0});
 $("restartBtn").onclick = () => {
-  if (!playing() || !Object.keys(game.put).length) return;
-  game.restarted = true; game.history.push({...game.put}); game.put = {}; sel = -1; held = null; guesses.clear();
-  draw(); save();
+  if (!undo.restart(g => { g.put = {}; sel = -1; held = null; guesses.clear(); })) return;
   G.note("All your letters are back on the floor. Undo puts them back up.", 4000);
 };
 // Hint: a letter in the wrong square gets a red box, to take down; otherwise a gold box goes on the empty square
 // the easiest step next (or the square in the most-filled word), saying why the first time, and asked again which
 // letter goes there, with that letter on the floor lit up too.
 const hints = G.hinter({game: () => game, key: () => game ? JSON.stringify(game.put) : "", draw: () => draw()});   // marks {sq: [[square, bad]…], letter}
-const guesses = G.guesser({game: () => game, undo, draw: () => { draw(); save(); }, board: $("board"), what: "letter"});
+const guesses = G.guesser({game: () => game, history: undo, draw: () => { draw(); save(); }, board: $("board"), what: "letter"});
 $("hintBtn").onclick = () => {
   if (!playing()) return;
   game.hinted = true; game.started = true; save();
