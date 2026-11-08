@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.50"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.51"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.50">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.51">
 <style>
 /* Kakuro on a block of flats, at night. The brick is wall; the stone squares in it hold the totals (across at the top
    right, down at the bottom left of the slash); the windows take the numbers 1 to 9, none twice in a run of windows.
@@ -99,7 +99,6 @@
 .pad{width:var(--board);display:flex;gap:4px;justify-content:center}
 .pad button{flex:1 1 0;min-height:44px;max-width:46px;min-width:0;padding:6px 0;font-size:20px;font-weight:800;line-height:1.1}
 .pad button.erase{font-size:17px}
-.pad.noting button:not(.erase){border-style:dashed;color:#3C8681}
 .key{width:var(--board);text-align:center;font-weight:600;font-size:15px;color:var(--ink-soft);margin-top:-6px}
 /* the sets panel: which digits can make each total */
 .sets{width:var(--board);min-height:86px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 10px;display:flex;flex-direction:column;gap:6px;font-size:15px}
@@ -158,7 +157,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-07.50"></script>
+<script src="../games.js?v=2026-11-07.51"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // A block of flats on an R × C plan: walls (the top row and left column are always walls, holding the totals) and
@@ -399,7 +398,7 @@ const STORE = "catdoku.windowledges.v1", MAX_LEVEL = 5;
 const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1, sets: true, autoNotes: false}, state.settings);
-let game = state.game || null, busy = false, sel = -1, noting = false, running = false;
+let game = state.game || null, busy = false, sel = -1, running = false;
 // The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
 G.pawLost(() => !game || game.won || game.hinted || game.restarted);
 const save = () => G.save(STORE, {settings, game});
@@ -462,11 +461,10 @@ function draw() {
     html += `<div class="${cls}" data-i="${i}" role="button" aria-label="${say}">${g[i] ? `<span class="v">${g[i]}</span>` : notes}${cat}</div>`;
   }
   el.innerHTML = html;
-  $("pad").classList.toggle("noting", noting);
-  $("notesBtn").setAttribute("aria-pressed", String(noting));
+  pad.sync();
   const lights = [...Array(R * C).keys()].filter(i => w[i] && plan.at[i].every(k => right[k])).length, windows = w.reduce((a, b) => a + b, 0);
   $("count").textContent = game.won ? "Every window is lit!" : `${lights} of ${windows} windows lit`;
-  $("key").textContent = noting ? "Notes: tap numbers to jot them down as maybes" : sel < 0 && !game.won ? "Tap a window, then a number" : "";
+  $("key").textContent = pad.noting() ? "Notes: tap numbers to jot them down as maybes" : sel < 0 && !game.won ? "Tap a window, then a number" : "";
   $("hintBtn").disabled = game.won;
   undo.sync();
   drawSets(right);
@@ -508,39 +506,8 @@ function drawSets(right) {
 }
 
 /* ---------- playing ---------- */
-const snapshot = () => undo.push();
-function put(v) {
-  if (!playing() || sel < 0 || !game.w[sel]) return;
-  game.started = true;
-  if (!(noting && v) && v && game.grid[sel] !== v) guesses.before(sel);
-  snapshot();
-  const was = game.grid[sel];
-  if (noting && v) {
-    if (game.grid[sel]) game.grid[sel] = 0;
-    game.notes[sel] ^= 1 << v;
-  } else {
-    game.grid[sel] = v && game.grid[sel] !== v ? v : 0;
-    // a digit put down comes off the notes in its runs
-    if (game.grid[sel]) for (const k of plan.at[sel]) for (const j of plan.runs[k].cells) game.notes[j] &= ~(1 << v);
-    else if (!v) game.notes[sel] = 0;
-    if (was && game.grid[sel] !== was) autoBack(sel, was);
-  }
-  const after = check();
-  if (after.right.every(Boolean)) { win(); return; }
-  draw(); save();
-}
-$("cells").addEventListener("click", e => {
-  if (!playing()) return;
-  const c = e.target.closest(".cell.win"); if (!c) return;
-  const i = +c.dataset.i, m = hints.current();
-  sel = i === sel && !(m && m.i === i) ? -1 : i; draw();
-});
-function makePad() {
-  const pad = $("pad"); pad.innerHTML = "";
-  for (let v = 1; v <= 9; v++) { const b = document.createElement("button"); b.textContent = v; b.onclick = () => put(v); pad.append(b); }
-  const er = document.createElement("button"); er.className = "erase"; er.textContent = "⌫"; er.setAttribute("aria-label", "Erase"); er.onclick = () => put(0); pad.append(er);
-}
-$("notesBtn").onclick = () => { if (!game || game.won) return; noting = !noting; draw(); };
+// The pad, Notes and Auto Notes (G.pad): digits 1 to 9; a digit put in comes off the notes in its runs, and with
+// Auto Notes on, every empty window has a note for each digit its totals' sets still allow.
 // What a window can still be: the digits its runs' sets allow, less the ones already in those runs.
 function candidates(i) {
   const table = comboTable(), g = game.grid;
@@ -553,38 +520,21 @@ function candidates(i) {
   }
   return can;
 }
-// Auto Notes (a switch, kept with the settings, off at first): on, every empty window gets a note for each digit its
-// totals' sets still allow, at once and on every new puzzle; a digit put down comes off the notes in its runs, as
-// always, and one taken away goes back on them. Off takes every note away. Undo puts either back.
-const fillNotes = () => { game.notes = game.notes.map((m, i) => game.w[i] && !game.grid[i] ? candidates(i) : m); };
-// digit v has just come out of window i: with Auto Notes on, it goes back on the notes of the empty windows in its
-// runs that could take it, and window i gets all of its own
-function autoBack(i, v) {
-  if (!settings.autoNotes) return;
-  for (const k of plan.at[i]) for (const p of plan.runs[k].cells) if (!game.grid[p] && candidates(p) >> v & 1) game.notes[p] |= 1 << v;
-  if (!game.grid[i]) game.notes[i] = candidates(i);
-}
-// Auto Notes turned on fills in every maybe; turned off, takes every note off. Undo puts them back.
-function autoNotes() {
+const pad = G.pad({game: () => game, max: () => 9, sel: () => sel, select: i => { sel = i; }, first: () => firstWindow(),
+  cell: i => !!game.w[i], peers: i => plan.at[i].flatMap(k => plan.runs[k].cells), open: candidates, auto: () => settings.autoNotes, playing,
+  push: () => undo.push(), before: i => guesses.before(i), draw, save, noteKeys: ["n", "p"],
+  after: changed => { if (!changed) return; if (check().right.every(Boolean)) { win(); return; } draw(); save(); }});
+$("cells").addEventListener("click", e => {
   if (!playing()) return;
-  const before = game.notes.slice();
-  if (settings.autoNotes) fillNotes(); else game.notes = game.notes.map(() => 0);
-  if (game.notes.some((m, i) => m !== before[i])) { const now = game.notes; game.notes = before; snapshot(); game.notes = now; game.started = true; }
-  draw(); save();
-}
+  const c = e.target.closest(".cell.win"); if (!c) return;
+  const i = +c.dataset.i, m = hints.current();
+  sel = i === sel && !(m && m.i === i) ? -1 : i; draw();
+});
 document.addEventListener("keydown", e => {
   if (!playing() || document.querySelector(".spot") || e.target.tagName === "SELECT" || e.ctrlKey || e.metaKey || e.altKey) return;
   const {R, C} = game, k = e.key;
   if (k === "Escape") { sel = -1; draw(); return; }
-  const dm = /^(Digit|Numpad)([1-9])$/.exec(e.code);
-  if (dm) {
-    if (sel < 0) sel = firstWindow();
-    // Shift + a digit jots a note, whatever mode it's in
-    if (e.shiftKey) { const was = noting; noting = true; put(+dm[2]); noting = was; draw(); } else put(+dm[2]);
-    e.preventDefault(); return;
-  }
-  if (k === "Backspace" || k === "Delete" || k === "0") { put(0); e.preventDefault(); return; }
-  if (k === "n" || k === "N" || k === "p" || k === "P") { noting = !noting; draw(); return; }
+  if (pad.key(e)) return;   // 1 to 9 (Shift: a note), Backspace or 0, N or P for Notes
   const d = {ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0]}[k];
   if (d) {
     e.preventDefault();
@@ -644,7 +594,7 @@ function whyDigit(i) {
 }
 $("hintBtn").onclick = hint;
 $("restartBtn").onclick = () => {
-  if (undo.restart(g => { guesses.clear(); g.grid = g.grid.map(() => 0); g.notes = g.notes.map(() => 0); if (settings.autoNotes) fillNotes(); }))
+  if (undo.restart(g => { guesses.clear(); g.grid = g.grid.map(() => 0); g.notes = g.notes.map(() => 0); if (settings.autoNotes) pad.fill(); }))
     G.note("Every window's dark again. Undo brings your numbers back.", 3500);
 };
 addEventListener("resize", () => { if (game && plan) draw(); });
@@ -652,7 +602,7 @@ addEventListener("resize", () => { if (game && plan) draw(); });
 /* ---------- endings ---------- */
 // Every window is lit, so a few cats sit in the windows, then the finishing card.
 function win() {
-  game.won = true; G.finishClock(game); sel = -1; noting = false;
+  game.won = true; G.finishClock(game); sel = -1; pad.off();
   const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
   settings.level = next; $("levelSel").value = next; save();
   pickCats(); $("facade").classList.add("won"); draw();
@@ -691,8 +641,8 @@ function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); ne
 function begin(p, level) {
   const n = p.R * p.C;
   game = {level, R: p.R, C: p.C, w: Array.from(p.w, Number), sums: p.sums || p.runs.map(r => r.sum), grid: new Array(n).fill(0), notes: new Array(n).fill(0), history: [], won: false, cats: {}, ...G.freshClock()};
-  sel = -1; noting = false; forceLit = new Set(); $("facade").classList.remove("won"); makePlan(); makePad();
-  if (settings.autoNotes) fillNotes();
+  sel = -1; pad.off(); forceLit = new Set(); $("facade").classList.remove("won"); makePlan(); pad.make();
+  if (settings.autoNotes) pad.fill();
 }
 async function newPuzzle() {
   if (busy) return;
@@ -725,7 +675,7 @@ function openShared(d) {
   if (!good) { G.note("That share link didn't work.", 5000); return; }
   begin({R: d.r, C: d.c, w: d.w, sums: d.s}, d.N);
   const n = d.r * d.c;
-  if (d.p && Array.isArray(d.p.grid) && d.p.grid.length === n) { game.grid = d.p.grid.map(v => (+v >= 1 && +v <= 9) ? +v : 0); if (settings.autoNotes) fillNotes(); if (Array.isArray(d.p.notes) && d.p.notes.length === n) game.notes = d.p.notes.map(v => (+v | 0) & 0x3FE); game.timed = false; }
+  if (d.p && Array.isArray(d.p.grid) && d.p.grid.length === n) { game.grid = d.p.grid.map(v => (+v >= 1 && +v <= 9) ? +v : 0); if (settings.autoNotes) pad.fill(); if (Array.isArray(d.p.notes) && d.p.notes.length === n) game.notes = d.p.notes.map(v => (+v | 0) & 0x3FE); game.timed = false; }
   settings.level = d.N; $("levelSel").value = d.N;
   draw(); save(); build.prefetch(d.N);
   if (d.p && check().right.every(Boolean)) win();
@@ -772,7 +722,7 @@ $("helpBtn").onclick = showHelp;
 G.switch({id: "setsTgl", label: "Show sets", line: "The digits that can make each ledge's total", key: "sets", of: () => settings, save,
   tip: "Show sets: digits for each total", change: () => { if (game) draw(); }});
 G.switch({id: "autoTgl", label: "🔢 Auto\u00a0Notes", line: "Every maybe filled in for you", key: "autoNotes", of: () => settings, save,
-  tip: "Auto Notes fills in every maybe for you", change: autoNotes});
+  tip: "Auto Notes fills in every maybe for you", change: () => pad.autoNotes()});
 $("sitter").src = catSrc("willow-1");
 $("roofcat").src = catSrc("willow-4");
 
@@ -790,7 +740,7 @@ if (hadSave) G.reopen(() => {
     if (!lv || game.grid.length !== game.R * game.C || game.w.length !== game.grid.length) throw new Error("the saved puzzle doesn't fit its level");
     if (!Array.isArray(game.notes)) game.notes = new Array(game.R * game.C).fill(0);
     if (!game.cats) game.cats = {};
-    makePlan(); makePad(); draw();
+    makePlan(); pad.make(); draw();
     if (game.won) { $("facade").classList.add("won"); finishCard(); }
     build.prefetch(settings.level); helpOnFirstVisit();
   }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });

@@ -108,7 +108,10 @@ them), Cat Burglar and Catlas; each keeps its own pinch and drag. Then `G.lives`
 lives in its own saved game, as before), and Catlas's tries on each place shown as hearts with it. Then `G.history` (Undo, its ⌘Z, Restart greying out
 with it, and Restart itself; see "Undo" below), with every page moved onto it by 2026-11-08, and the README's "Across every game" (Layout, Gold paw, Bookmark, Keys,
 Undo) and `HIG.md` rewritten to match. Then the checking names made one each (Auto check, Audit, Auto grade), and Catdoku's Complete
-and Mewstermind's Check made one button: Check, with the same tick icon (2026-11-08). Still to do: the other shared helpers below.
+and Mewstermind's Check made one button: Check, with the same tick icon (2026-11-08). Then `G.pad`: the digit pad,
+Notes and Auto Notes written once for High Perch, Open the Door! and Window Ledges (Shift with a digit jots a note in
+all three now), and Toydoku's Notes erasing every note when held down, as Erase notes does (Erase notes stays in the
+row below: beside Notes, the top row runs off a small phone once Return to Bookmark shows). Still to do: the other shared helpers below.
 
 ### The page, top to bottom
 
@@ -171,9 +174,6 @@ Built 2026-11-07 (`whatsNew` in `games.js`), ahead of the shared helpers, which 
 
 ### Shared helpers, so each is written once
 
-- **Notes:** one name since 2026-11-07 (Toydoku's Pencil and Erase pencil are Notes and Erase notes). The three
-  digit-pad games share one pad helper (digits, ⌫, Notes, Auto Notes). Toydoku's Erase notes sits beside Notes or is a
-  long press on it.
 - **Marking tools:** Hide & Seek's Mark, Fair Play's Mark (×), Cross Stitch's Dot, Treat Time's Keep, Patches'
   Marker, Catdoku's Erase and Scratch That's Dot first switch all change what a tap does. One helper; Scratch That's
   becomes a piece like the rest.

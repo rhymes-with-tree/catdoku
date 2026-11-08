@@ -1045,7 +1045,7 @@ const G = (() => {
     tangle: ["Arrow keys: pick a ball", "Space or Enter: pick it up; the arrows move it (Shift for big steps)", "Space, Enter or Escape: put it down"],
     catwalk: ["Arrow keys: pick a perch", "Space or Enter: tap it"],
     bubbles: ["Left and right: aim", "Space: bat", "Down: swap in the next bubble"],
-    opendoor: ["Arrow keys: pick a square", "1 to 9: put in a number", "Backspace or 0: take it out", "N: notes on or off", "Escape: let go of the square"],
+    opendoor: ["Arrow keys: pick a square", "1 to 9: put in a number (Shift: a note)", "Backspace or 0: take it out", "N: notes on or off", "Escape: let go of the square"],
     tunnelrun: ["Arrow keys: pick a piece", "Space or Enter: turn it (Shift turns it back)", "Shift with an arrow: slide its track"],
     copycat: ["Arrow keys: pick a box", "Space or Enter: open it"],
     nightlight: ["Arrow keys: pick a cat", "Space or Enter: tap it"],
@@ -1053,7 +1053,7 @@ const G = (() => {
     tailchase: ["Arrow keys or WASD: steer", "Space: pause"],
     keyboardcat: ["Letters: type a word", "Enter: try it", "Backspace: take a letter off", "Space: mix the keys"],
     iffits: ["Tab: pick a piece", "Arrow keys: move it", "R or Space: turn it (Shift turns it back)", "F: flip it"],
-    highperch: ["Arrow keys: pick a square", "1 to 9: put in a height", "Backspace or 0: take it out", "N: notes on or off", "Escape: let go of the square"],
+    highperch: ["Arrow keys: pick a square", "1 to 9: put in a height (Shift: a note)", "Backspace or 0: take it out", "N: notes on or off", "Escape: let go of the square"],
     fuzzyspelling: ["Left and right: pick a toy", "Up and down: slide it"],
     catastrophe: ["1 to 9: knock over that pot"],
     laserpointer: ["Arrow keys: pick a mirror", "Space or Enter: tip it"],
@@ -1939,6 +1939,81 @@ const G = (() => {
     };
   }
 
+  /* ---------- digit pad ---------- */
+  // The number pad of the logic games you fill in with digits (High Perch, Open the Door!, Window Ledges), written
+  // once (G.pad): 1 to max and ⌫ in #pad, Notes (#notesBtn, dashed digits on the pad while it's on), putting a digit
+  // in or jotting it as a note, and Auto Notes. Notes are a bitmask per square in game.notes (bit v for digit v).
+  // o: {game: () => game, max (() => the highest digit), sel (() => the square picked, -1 for none), select(i),
+  //   first (() => the square the keys pick when none is: 0 if not given), editable(i) (a square that takes digits;
+  //   others are left alone), cell(i) (a square at all: Window Ledges' walls aren't; true if not given),
+  //   peers(i) (the squares a digit put in square i comes off the notes of: its row and column, or its runs),
+  //   open(i) (the digits square i can still take, as a mask, for Auto Notes), auto (() => true while Auto Notes is
+  //   on), playing (() => true while the puzzle's on), push (put a step on Undo), before(i) (just before a digit goes
+  //   in: the bookmark's glow), changing() (just before the board changes, for a page that compares before and after),
+  //   after(changed) (after a pad button or key: when changed, the page checks for a win, draws and saves), draw, save,
+  //   noteKeys (the letters that turn Notes on and off: ["n"] if not given)}.
+  // put(v) returns true when it changed the board. Shift with a digit jots it as a note, whether Notes is on or not.
+  function digitPad(o) {
+    let noting = false;
+    const g = () => o.game(), cell = i => !o.cell || o.cell(i), keys = o.noteKeys || ["n"];
+    const fill = () => { const gm = g(); gm.notes = gm.notes.map((m, i) => cell(i) && !gm.grid[i] ? o.open(i) : m); };
+    // digit v has just come out of square i: with Auto Notes on, it goes back on the notes of the empty squares
+    // round it that could take it, and square i gets all of its own
+    function back(i, v) {
+      if (!o.auto()) return;
+      const gm = g();
+      for (const p of o.peers(i)) if (!gm.grid[p] && o.open(p) >> v & 1) gm.notes[p] |= 1 << v;
+      if (!gm.grid[i]) gm.notes[i] = o.open(i);
+    }
+    function put(v) {
+      const gm = g(), i = o.sel();
+      if (!o.playing() || i < 0 || !cell(i) || (o.editable && !o.editable(i))) return false;
+      gm.started = true;
+      if (!(noting && v) && v && gm.grid[i] !== v && o.before) o.before(i);
+      if (o.changing) o.changing();
+      o.push();
+      const was = gm.grid[i];
+      if (noting && v) { if (gm.grid[i]) gm.grid[i] = 0; gm.notes[i] ^= 1 << v; }
+      else {
+        gm.grid[i] = v && gm.grid[i] !== v ? v : 0;
+        if (gm.grid[i]) for (const p of [i, ...o.peers(i)]) gm.notes[p] &= ~(1 << v);   // a digit put in comes off the notes round it
+        else if (!v) gm.notes[i] = 0;
+        if (was && gm.grid[i] !== was) back(i, was);
+      }
+      return true;
+    }
+    function make() {
+      const pad = $("pad"); pad.innerHTML = ""; pad.classList.add("digitPad");
+      for (let v = 1; v <= o.max(); v++) { const b = document.createElement("button"); b.textContent = v; b.onclick = () => o.after(put(v)); pad.append(b); }
+      const er = document.createElement("button"); er.className = "erase"; er.textContent = "⌫"; er.setAttribute("aria-label", "Erase"); er.onclick = () => o.after(put(0)); pad.append(er);
+    }
+    const sync = () => { $("pad").classList.toggle("noting", noting); $("notesBtn").setAttribute("aria-pressed", String(noting)); };
+    const toggle = () => { const gm = g(); if (!gm || gm.won) return; noting = !noting; o.draw(); };
+    $("notesBtn").onclick = toggle;
+    // Auto Notes turned on fills in every maybe; turned off, takes every note off. Undo puts them back.
+    function autoNotes() {
+      if (!o.playing()) return;
+      const gm = g(), before = gm.notes.slice();
+      if (o.auto()) fill(); else gm.notes = gm.notes.map(() => 0);
+      if (gm.notes.some((m, i) => m !== before[i])) { const now = gm.notes; gm.notes = before; o.push(); gm.notes = now; gm.started = true; }
+      o.draw(); o.save();
+    }
+    // the pad's keys: 1 to max put a digit in (with Shift, jot it as a note), Backspace, Delete or 0 take it out,
+    // and noteKeys turn Notes on and off. True when the key was the pad's.
+    function key(e) {
+      const d = /^(Digit|Numpad)([1-9])$/.exec(e.code || ""), k = e.key;
+      if (d && +d[2] <= o.max()) {
+        if (o.sel() < 0) o.select(o.first ? o.first() : 0);
+        const was = noting; if (e.shiftKey) noting = true;
+        const did = put(+d[2]); noting = was; o.after(did); e.preventDefault(); return true;
+      }
+      if (k === "Backspace" || k === "Delete" || k === "0") { o.after(put(0)); e.preventDefault(); return true; }
+      if (keys.includes(k.toLowerCase())) { toggle(); return true; }
+      return false;
+    }
+    return {put, make, sync, toggle, key, fill, autoNotes, noting: () => noting, off() { noting = false; }};
+  }
+
   /* ---------- sideways ---------- */
   // True while a phone held sideways has the board on the left and the rest beside it (games.css, main > .stage),
   // for a page that sizes its board in script.
@@ -2089,6 +2164,6 @@ const G = (() => {
     }
   }
 
-  return {MAGNET, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, meaning, plainText,
+  return {MAGNET, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();

@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.50"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.51"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.50">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.51">
 <style>
 /* A cattery floor of cat trees, 1 to N perches tall: one of each height in every row and column. Arrows between
    trees point down to the shorter one, and lookout cats round the walls count the trees they can see. When
@@ -56,7 +56,6 @@
 .pad{width:var(--board);display:flex;gap:6px;justify-content:center}
 .pad button{flex:1 1 0;min-height:44px;max-width:58px;padding:6px 0;font-size:22px;font-weight:800;line-height:1.1}
 .pad button.erase{font-size:18px}
-.pad.noting button:not(.erase){border-style:dashed;color:#3C8681}
 .key{width:var(--board);text-align:center;font-weight:600;font-size:15px;color:var(--ink-soft);margin-top:-6px;min-height:1.4em}
 @keyframes curl{from{opacity:0;transform:translateY(-12px)}}
 .sleeper{animation:curl .4s ease-out backwards}
@@ -92,8 +91,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-07.50"></script>
-<script src="../cattower.js?v=2026-11-07.50"></script>
+<script src="../games.js?v=2026-11-07.51"></script>
+<script src="../cattower.js?v=2026-11-07.51"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N floor of cat trees, 1 to N perches tall: every row and column has one tree of each height.
@@ -227,7 +226,7 @@ const STORE = "catdoku.highperch.v1", MAX_LEVEL = 10;
 const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1, autoCheck: true, autoNotes: false}, state.settings);
-let game = state.game || null, busy = false, running = false, sel = -1, noting = false;
+let game = state.game || null, busy = false, running = false, sel = -1;
 // The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
 G.pawLost(() => !game || game.won || game.hinted || game.restarted);
 const save = () => G.save(STORE, {settings, game});
@@ -329,37 +328,23 @@ function draw() {
     out += `<image class="sleeper" href="${TOWER.catSrc(TOWER.NAPPERS[i % TOWER.NAPPERS.length], CAT_SRC)}" x="${x + 34}" y="${y + top - 32}" width="48" height="36" preserveAspectRatio="xMidYMid meet" style="animation-delay:${(running ? i * 40 : 0)}ms"/>`;
   });
   svg.innerHTML = out;
-  $("pad").classList.toggle("noting", noting);
-  $("notesBtn").setAttribute("aria-pressed", String(noting));
+  pad.sync();
   const filled = g.filter(Boolean).length;
   $("count").textContent = game.won ? "Every tree is up!" : filled === N * N ? "Something's not right" : `${filled} of ${N * N} trees`;
-  $("key").textContent = game.won ? "" : noting ? "Notes: tap heights to jot them down as maybes" : sel < 0 ? "Tap a square, then a height" : isGiven(sel) ? "That tree was already standing" : "";
+  $("key").textContent = game.won ? "" : pad.noting() ? "Notes: tap heights to jot them down as maybes" : sel < 0 ? "Tap a square, then a height" : isGiven(sel) ? "That tree was already standing" : "";
   $("hintBtn").disabled = game.won;
   undo.sync();
   guesses.sync();
 }
 
 /* ---------- playing ---------- */
-const snapshot = () => undo.push();
-function put(v) {
-  if (!playing() || sel < 0 || isGiven(sel)) return;
-  game.started = true;
-  if (!(noting && v) && v && game.grid[sel] !== v) guesses.before(sel);
-  snapshot();
-  const was = game.grid[sel];
-  if (noting && v) {
-    if (game.grid[sel]) game.grid[sel] = 0;
-    game.notes[sel] ^= 1 << v;
-  } else {
-    game.grid[sel] = v && game.grid[sel] !== v ? v : 0;
-    // a height put down comes off the notes in its row and column
-    if (game.grid[sel]) { const N = game.N, r = Math.floor(sel / N), c = sel % N; for (let j = 0; j < N; j++) { game.notes[r * N + j] &= ~(1 << v); game.notes[j * N + c] &= ~(1 << v); } }
-    else if (!v) game.notes[sel] = 0;
-    if (was && game.grid[sel] !== was) autoBack(sel, was);
-  }
-  if (game.grid.every((h, i) => h === game.sol[i])) { win(); return; }
-  draw(); save();
-}
+// The pad, Notes and Auto Notes (G.pad): heights 1 to N; a height put in comes off the notes in its row and column,
+// and with Auto Notes on, every empty square has a note for each height its row and column still leave open.
+const openFor = i => { const N = game.N, r = Math.floor(i / N), c = i % N; let m = (1 << (N + 1)) - 2; for (let j = 0; j < N; j++) { m &= ~(1 << game.grid[r * N + j]); m &= ~(1 << game.grid[j * N + c]); } return m; };
+const pad = G.pad({game: () => game, max: () => game.N, sel: () => sel, select: i => { sel = i; }, editable: i => !isGiven(i),
+  peers: i => { const N = game.N, r = Math.floor(i / N), c = i % N, ps = []; for (let j = 0; j < N; j++) ps.push(r * N + j, j * N + c); return ps; }, open: openFor, auto: () => settings.autoNotes, playing,
+  push: () => undo.push(), before: i => guesses.before(i), draw, save,
+  after: changed => { if (!changed) return; if (game.grid.every((h, i) => h === game.sol[i])) { win(); return; } draw(); save(); }});
 $("svg").addEventListener("click", e => {
   if (!playing()) return;
   const r = e.target.closest(".sq"); if (!r) return;
@@ -367,40 +352,11 @@ $("svg").addEventListener("click", e => {
   const i = +r.dataset.i, m = hints.current();
   sel = i === sel && !(m && m.i === i) ? -1 : i; draw();
 });
-function makePad() {
-  const pad = $("pad"); pad.innerHTML = "";
-  for (let v = 1; v <= game.N; v++) { const b = document.createElement("button"); b.textContent = v; b.onclick = () => put(v); pad.append(b); }
-  const er = document.createElement("button"); er.className = "erase"; er.textContent = "⌫"; er.setAttribute("aria-label", "Erase"); er.onclick = () => put(0); pad.append(er);
-}
-$("notesBtn").onclick = () => { if (!game || game.won) return; noting = !noting; draw(); };
-// Auto Notes (a switch, kept with the settings, off at first): on, every empty square gets a note for each height
-// its row and column still leave open, at once and on every new puzzle; a height put down comes off the notes in its
-// row and column, as always, and one taken away goes back on them. Off takes every note away. Undo puts either back.
-const openFor = i => { const N = game.N, r = Math.floor(i / N), c = i % N; let m = (1 << (N + 1)) - 2; for (let j = 0; j < N; j++) { m &= ~(1 << game.grid[r * N + j]); m &= ~(1 << game.grid[j * N + c]); } return m; };
-const fillNotes = () => { game.notes = game.grid.map((v, i) => v ? game.notes[i] : openFor(i)); };
-// height v has just come out of square i: with Auto Notes on, it goes back on the notes of the empty squares in its
-// row and column that could take it, and square i gets all of its own
-function autoBack(i, v) {
-  if (!settings.autoNotes) return;
-  const N = game.N, r = Math.floor(i / N), c = i % N;
-  for (let j = 0; j < N; j++) for (const p of [r * N + j, j * N + c]) if (!game.grid[p] && openFor(p) >> v & 1) game.notes[p] |= 1 << v;
-  if (!game.grid[i]) game.notes[i] = openFor(i);
-}
-// Auto Notes turned on fills in every maybe; turned off, takes every note off. Undo puts them back.
-function autoNotes() {
-  if (!playing()) return;
-  const before = game.notes.slice();
-  if (settings.autoNotes) fillNotes(); else game.notes = game.notes.map(() => 0);
-  if (game.notes.some((m, i) => m !== before[i])) { const now = game.notes; game.notes = before; snapshot(); game.notes = now; game.started = true; }
-  draw(); save();
-}
 document.addEventListener("keydown", e => {
   if (!playing() || document.querySelector(".spot") || e.target.tagName === "SELECT" || e.ctrlKey || e.metaKey || e.altKey) return;
   const N = game.N, k = e.key;
   if (k === "Escape") { sel = -1; draw(); return; }   // as in Toydoku: let go of the square picked
-  if (/^[1-9]$/.test(k) && +k <= N) { if (sel < 0) sel = 0; put(+k); e.preventDefault(); return; }
-  if (k === "Backspace" || k === "Delete" || k === "0") { put(0); e.preventDefault(); return; }
-  if (k === "n" || k === "N") { noting = !noting; draw(); return; }
+  if (pad.key(e)) return;   // 1 to N (Shift: a note), Backspace or 0, N for Notes
   const mv = {ArrowUp: -N, ArrowDown: N, ArrowLeft: -1, ArrowRight: 1}[k];
   if (mv !== undefined) {
     e.preventDefault();
@@ -412,7 +368,7 @@ document.addEventListener("keydown", e => {
 $("restartBtn").onclick = () => {
   if (!undo.restart(g => {
     guesses.clear(); g.grid = g.grid.map((v, i) => isGiven(i) ? v : 0); g.notes = g.notes.map(() => 0);
-    if (settings.autoNotes) fillNotes();
+    if (settings.autoNotes) pad.fill();
   })) return;
   G.note("Back to the bare floor. Undo brings your trees back.", 3500);
 };
@@ -443,7 +399,7 @@ $("hintBtn").onclick = hint;
 /* ---------- endings ---------- */
 // Every tree right: a napping cat curls up on each top platform, one after another, then the finishing card.
 function win() {
-  game.won = true; G.finishClock(game); sel = -1; noting = false; hints.clear(false);
+  game.won = true; G.finishClock(game); sel = -1; pad.off(); hints.clear(false);
   const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
   settings.level = next; $("levelSel").value = next; save();
   G.track(`High Perch solved level ${game.level}`);
@@ -466,8 +422,8 @@ function begin(p, level) {
   const grid = new Array(p.N * p.N).fill(0);
   for (const [i, h] of p.givens) grid[i] = h;
   game = {level, N: p.N, sol: p.sol, givens: p.givens, signs: p.signs, looks: p.looks, grid, notes: new Array(p.N * p.N).fill(0), history: [], won: false, ...G.freshClock()};
-  sel = -1; noting = false; hints.clear(false); makePad();
-  if (settings.autoNotes) fillNotes();
+  sel = -1; pad.off(); hints.clear(false); pad.make();
+  if (settings.autoNotes) pad.fill();
 }
 async function newPuzzle() {
   if (busy) return;
@@ -499,7 +455,7 @@ function openShared(d) {
   begin({N, sol, givens: d.gv, signs: d.sg, looks: d.lk}, d.N);
   if (d.p && Array.isArray(d.p.grid) && d.p.grid.length === N * N) {
     game.grid = d.p.grid.map((v, i) => isGiven(i) ? game.grid[i] : int(+v, 0, N) ? +v : 0);
-    if (settings.autoNotes) fillNotes();
+    if (settings.autoNotes) pad.fill();
     if (Array.isArray(d.p.notes) && d.p.notes.length === N * N) game.notes = d.p.notes.map(v => +v || 0);
     game.timed = false;
   }
@@ -571,12 +527,12 @@ $("levelSel").value = settings.level;
 G.switch({id: "checkTgl", label: "Auto check", line: "Rule breaks turn red as you play", key: "autoCheck", of: () => settings, save,
   change: () => { if (game) draw(); }});
 G.switch({id: "autoTgl", label: "🔢 Auto\u00a0Notes", line: "Every maybe filled in for you", key: "autoNotes", of: () => settings, save,
-  tip: "Auto Notes fills in every maybe for you", change: autoNotes});
+  tip: "Auto Notes fills in every maybe for you", change: () => pad.autoNotes()});
 const shared = G.readShare("highperch");
 const hadSave = !!(game && Array.isArray(game.grid));
 if (hadSave) G.reopen(() => {
     if (!levelOf(game.level) || game.grid.length !== game.N * game.N || game.sol.length !== game.N * game.N) throw new Error("the saved floor doesn't fit its level");
-    makePad(); draw();
+    pad.make(); draw();
     if (game.won) finishCard();
     build.prefetch(settings.level); helpOnFirstVisit();
   }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
