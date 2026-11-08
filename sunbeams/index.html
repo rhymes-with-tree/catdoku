@@ -179,12 +179,21 @@ const catOf = name => name.startsWith("c16-") ? "fluffy tuxedo" : name;
 // matches it, stretched a little to fill it, passing over cats already on the floor. Cats are stored lying lengthwise, so a tall
 // sunbeam gets its cat turned on its side.
 const sizeFor = area => area <= 3 ? 1 : area <= 7 ? 2 : 3;
+// A sunbeam keeps the cat it first got (napping, keyed by the puzzle and the sunbeam's place and size), so a new sunbeam
+// drawn elsewhere never swaps the cats already asleep; drawScene counts those first, so new cats steer round them.
+const napping = new Map();
+const napKey = (seed, x, y, w, h) => `${seed}|${x},${y},${w},${h}`;
 function sleepingCat(g, x, y, w, h, k, seed, used) {
   const size = sizeFor(Math.round(w * h / (U * U))), pad = Math.min(w, h) * .06, L = Math.max(w, h) - 2 * pad, T = Math.min(w, h) - 2 * pad, want = L / T;
-  const fit = SLEEPERS.map(c => [.45 * Math.abs(c[2] - size) + Math.abs(Math.log(c[1] / want)) + .25 * (used.get(catOf(c[0])) || 0), c]).sort((p, q) => p[0] - q[0]);
-  const near = fit.filter(p => p[0] <= fit[0][0] + .15).slice(0, 5), r = hash(k * 131 + seed);
-  const [name, ratio] = near[r % near.length][1];
-  used.set(catOf(name), (used.get(catOf(name)) || 0) + 1);
+  const r = hash(k * 131 + seed), key = napKey(seed, x, y, w, h);
+  let cat = napping.get(key);
+  if (!cat) {
+    const fit = SLEEPERS.map(c => [.45 * Math.abs(c[2] - size) + Math.abs(Math.log(c[1] / want)) + .25 * (used.get(catOf(c[0])) || 0), c]).sort((p, q) => p[0] - q[0]);
+    const near = fit.filter(p => p[0] <= fit[0][0] + .15).slice(0, 5);
+    cat = near[r % near.length][1]; napping.set(key, cat);
+    used.set(catOf(cat[0]), (used.get(catOf(cat[0])) || 0) + 1);
+  }
+  const [name, ratio] = cat;
   const rr = Math.min(Math.max(want, ratio / 1.12), ratio * 1.12);   // stretch at most 12%
   const cw = Math.min(L, T * rr), ch = cw / rr;
   catImage(g, name, cw, ch, `translate(${x + w / 2} ${y + h / 2}) rotate(${h > w ? 90 : 0}) scale(${r & 2 ? -1 : 1} ${r & 4 ? -1 : 1})`);
@@ -216,6 +225,10 @@ function sunbeam(g, x, y, w, h) {
 function drawScene(g, N, clue, rects, isValid, draft, seed, unchecked) {
   g.innerHTML = "";
   const housed = new Set(), used = new Map();
+  for (const R of rects) {   // the cats already asleep count first
+    const cat = !unchecked && napping.get(napKey(seed, R.c * U, R.r * U, R.w * U, R.h * U));
+    if (cat && isValid(R)) used.set(catOf(cat[0]), (used.get(catOf(cat[0])) || 0) + 1);
+  }
   for (const R of rects) {
     const x = R.c * U, y = R.r * U, w = R.w * U, h = R.h * U;
     if (unchecked) sunbeam(g, x, y, w, h);

@@ -287,8 +287,8 @@ const G = (() => {
     // the page's own buttons, pressed from here (and kept in step with them: hidden or not, ready or not)
     const page = [["linkBtn", "share", "Share"], ["bestBtn", "best", "Best times"], ["helpBtn", "help", "How to play"]]
       .map(([id, icon, text]) => [id, item(icon, $(id) ? ($(id).querySelector(".lbl") || $(id)).textContent.trim() || text : text, () => $(id) && $(id).click())]);
-    const keys = item("keyboard", "Keys", () => keysCard(), "Press ? for these");
-    const setRow = item("sliders", "Settings", () => {});
+    const keys = item("keyboard", "Keyboard Shortcuts", () => keysCard(), "Press ? for these");
+    const setRow = item("sliders", `${name} Settings`, () => {});
     setRow.onclick = e => { e.stopPropagation(); const open = setList.hidden; setList.hidden = !open; setRow.setAttribute("aria-expanded", String(open)); if (open) setList.scrollIntoView({block: "nearest"}); };
     setRow.setAttribute("aria-expanded", "false"); setRow.classList.add("more");
     const setList = document.createElement("div"); setList.className = "toggles menuSettings"; setList.id = "menuSettings"; setList.hidden = true;
@@ -315,7 +315,7 @@ const G = (() => {
       menu.hidden = !open; btn.setAttribute("aria-expanded", String(open)); head.classList.toggle("menuOpen", open);
       if (open) (menu.querySelector(".menuItem:not([hidden])") || menu).focus({preventScroll: true});
     }
-    btn.onclick = e => { e.stopPropagation(); show(menu.hidden); };
+    btn.onclick = e => { e.stopPropagation(); if (o.shut && o.shut()) return; show(menu.hidden); };   // with All games open, ☰ closes it
     document.addEventListener("click", e => { if (!menu.hidden && !menu.contains(e.target) && !btn.contains(e.target)) show(false); });
     document.addEventListener("keydown", e => {
       if (menu.hidden) return;
@@ -375,7 +375,11 @@ const G = (() => {
     const dslug = daily(), dgame = GAMES.find(g => g[1] === dslug);
     const todays = section(dailyDoneToday() ? "Today's challenge: done" : "Today's challenge", [dgame]);
     if (dailyDoneToday()) todays.querySelector(".gameTile").classList.add("gold", "done");   // gold once it's solved, as on the front page
-    panel.append(home, todays, search, favs, ...shelves, none);
+    // a way out at the top, as the panel can fill the screen and leave nothing outside it to tap
+    const shut = document.createElement("button");
+    shut.type = "button"; shut.className = "gamesClose"; shut.textContent = "Close"; shut.setAttribute("aria-label", "Close all games");
+    shut.onclick = e => { e.stopPropagation(); show(false); };
+    panel.append(shut, home, todays, search, favs, ...shelves, none);
     drawFavs();
     search.oninput = () => {
       const q = search.value.trim();
@@ -398,7 +402,7 @@ const G = (() => {
     const row = document.createElement("div"); row.className = "gamesRow";
     const head = current && document.querySelector("main header");
     if (head) {
-      gameMenu(head, current, base, {open: () => { show(true); el.scrollIntoView({block: "nearest"}); search.focus({preventScroll: true}); }, drawFavs, dslug, dgame});
+      gameMenu(head, current, base, {shut: () => { const was = !panel.hidden; show(false); return was; }, open: () => { show(true); el.scrollIntoView({block: "nearest"}); search.focus({preventScroll: true}); }, drawFavs, dslug, dgame});
       // a long name gets a little smaller rather than going onto two lines, unless even that won't do
       const h1 = head.querySelector("h1"), fit = () => {
         h1.style.fontSize = ""; let fs = parseFloat(getComputedStyle(h1).fontSize);
@@ -1093,7 +1097,7 @@ const G = (() => {
     list.push("?: these keys");
     const ul = document.createElement("ul"); ul.className = "keysList";
     for (const k of list) { const li = document.createElement("li"), i = k.indexOf(": "); const b = document.createElement("b"); b.textContent = k.slice(0, i); li.append(b, k.slice(i)); ul.append(li); }
-    openCard("Keys", "", [["Close", closeCard, true]], ul);
+    openCard("Keyboard Shortcuts", "", [["Close", closeCard, true]], ul);
   }
   document.addEventListener("keydown", e => {
     if (e.key !== "?" || e.ctrlKey || e.metaKey || e.altKey || !CURRENT || !KEYS[CURRENT] || document.querySelector(".spot") || $("overlay").classList.contains("show")) return;
@@ -1359,7 +1363,7 @@ const G = (() => {
 
   /* ---------- switches ---------- */
   // A setting that's on or off (Auto check, Numbers, Slower…), written once. G.switch({id, label, line, key, of, save,
-  // change, can, tip}) draws it in the menu's Settings (or, before the menu is made, in a row of switches in the page,
+  // change, can, tip, warn}) draws it in the menu's Settings (or, before the menu is made, in a row of switches in the page,
   // which the menu then takes), its name with its line under it. key names the setting in of (the page's settings, or
   // a function giving them), kept with save(); change(on) runs after. can() false leaves it as it was (Toe Beans,
   // mid-move). tip is shown once, pointing at the switch, the first time it's turned on. Gives back the box, whose
@@ -1371,8 +1375,9 @@ const G = (() => {
     opt.innerHTML = '<label class="toggle"><input type="checkbox"><span class="sw"></span><span class="swName"></span></label>';
     const box = opt.querySelector("input"); box.id = o.id;
     opt.querySelector(".swName").textContent = o.label;
+    // the line shows only on a switch that can cost a life or the gold paw (o.warn); on the rest it's read out, not shown
     if (o.line) {
-      const s = document.createElement("span"); s.className = "hint"; s.id = o.id + "Line"; s.textContent = o.line;
+      const s = document.createElement("span"); s.className = o.warn ? "hint" : "hint quiet"; s.id = o.id + "Line"; s.textContent = o.line;
       opt.append(s); box.setAttribute("aria-describedby", s.id);
     }
     box.sync = () => { box.checked = !!of()[o.key]; };

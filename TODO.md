@@ -124,8 +124,6 @@ will recheck this list, and add games 43–52, before any of it is built.
 - Bubbles: less beige under the shooter.
 
 ### Too much talking
-- Settings: no explanation under a switch unless it can cost a life or the gold paw (#236 took most lines off; check
-  what's left).
 - Instruction lines during play, wanted once and then quiet: Hide & Seek's "Mark is on, tap…" (the `say` of its
   `G.pieces`), Unravel's wrong-move lines, Toe Beans' "Now tap another number of the pad".
 - Knock It Off: the legend of every icon goes off the page, into How to play or a lexicon; trial and error is part of
@@ -141,9 +139,7 @@ will recheck this list, and add games 43–52, before any of it is built.
   "Toy" and Mark today); the Toy piece shows a toy, not a paw; Mark shows its × / = with "Mark" under it.
 - **Changes the 2026-11-07 plan** (pieces put Patches' Marker among the fabrics). **Decided 2026-11-08:** Marker is a
   notes tool, so it comes out of the colours and sits where the other games' notes tools do.
-- Auto Notes keeps a **different icon in each game** (🐾 Catdoku, ✏️ Toydoku, 🔢 the digit-pad games), but the icon goes
-  after the words, not before (Catdoku, High Perch, Toydoku; draw both for the owner first). Toydoku: the owner asked
-  for 🔢 in place of the pencil. Catdoku's 🐾 is hard to see in dark mode (not urgent).
+- Auto Notes: Catdoku's 🐾 is hard to see in dark mode (not urgent).
 - Toydoku: its icons are in an odd order. Treat Time: Put Back shouldn't be a paw; Keep a green outline with a clear
   middle.
 - Scratch That's Post first / Dot first: look for other games it would help (Fair Play?).
@@ -162,9 +158,6 @@ will recheck this list, and add games 43–52, before any of it is built.
   away) and Shelf Life's shelves (it has this switch already).
 
 ### Menu and Settings (every game)
-- "Keys" → "Keyboard Shortcuts". "Settings" → "CATDOKU Settings" (the game's name).
-- Settings switches left-justified; a line above Settings and under Keyboard Shortcuts.
-- Choosing All Games again closes it. All Games isn't greyed out while a how-to spotlight is up.
 - **Toy Chest shows the same thing everywhere.** Today the menu's Toy chest opens the game's own picker in the 12
   games with a `toysBtn` (Bubbles, Cat Pile, Copycat, Laser Pointer, Meowbile, Pick of the Pile, Pounce, the stash
   page, Tail Chase, Fair Play, Toy Box, Toydoku) and the shared library (`CHEST`) everywhere else. The plan said "one
@@ -180,16 +173,11 @@ will recheck this list, and add games 43–52, before any of it is built.
 - Pawlette reopened on its last win card: #237 left Pawlette out of "no old win card when you come back".
 
 ### Bugs
-- Sunbeams: a cat already asleep can turn into a different cat when a new sunbeam is made. Every redraw picks every
-  cat again, steering away from cats already on the floor (`used` in `sunbeams/index.html`); a new sunbeam changes
-  that count. Remember a sunbeam's cat once it's chosen.
 - Mewstermind: Enter moves to the next toy and changes it.
 - Scratch That: why it isn't complete isn't clear, and the note goes too fast.
 - Fair Play's hints: only three rules (no three in a row, no sandwich, a line already has all of one toy); when none
   applies it shows the first empty square's answer with no reason. Add rules, or say it's a plain answer.
   "Mice go in the glowing square" → "A mouse goes in…" (check other games' hint wording too).
-- Front page: the shelf (subject) tiles are shorter than the game tiles: `.shelfLabel`'s top margin sits inside the
-  grid row (`index.html`).
 - Bubbles: when Raise the Ceiling is allowed isn't predictable after a loss; offer it as a helper.
 
 ### Choices as radio buttons
