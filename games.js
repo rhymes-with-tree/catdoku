@@ -1957,6 +1957,18 @@ const G = (() => {
     };
   }
 
+  /* ---------- helpers' uses ---------- */
+  // A helper's uses left (G.uses), written once for Toy Box, Bubbles, Bird Watch and Mew Hue: a badge on the icon's
+  // corner (the <b> a button carries, made if it has none), "n left" for VoiceOver, and the button put away once
+  // they're used up. What a helper costs is in PAW_COST, with the rest.
+  function uses(id, n) {
+    const b = $(id); if (!b) return;
+    let c = b.querySelector("b"); if (!c) { c = document.createElement("b"); c.className = "count"; b.append(c); }
+    c.textContent = n; b.hidden = !(n > 0);
+    const copy = b.cloneNode(true); copy.querySelectorAll("b, svg").forEach(x => x.remove());
+    b.setAttribute("aria-label", `${copy.textContent.replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF\uFE0F]/gu, "").trim()}, ${n} left`);
+  }
+
   /* ---------- admire ---------- */
   // Admire (G.admire): once a puzzle's won, a button that takes the marks off the board to show the finished picture,
   // and puts them back (Open the Door!'s numbers, Catdoku's paws); the win card's Admire button turns it on. o: {btn
@@ -2203,6 +2215,6 @@ const G = (() => {
     }
   }
 
-  return {MAGNET, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, meaning, plainText,
+  return {MAGNET, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();

@@ -116,7 +116,9 @@ on and off kept by `G.pieces` too, for Catdoku's Erase, Hide & Seek's Mark, Fair
 Treat Time's Keep and Scratch That's Dot first (kept in its settings, as before); Patches' Marker stays one of its
 fabrics. Then `G.admire`: after a win, a button that takes the marks off to show the finished picture, turned
 on by the win card's Admire button too, for Open the Door!'s numbers and Catdoku's paws (Cat Burglar's Show/Hide the
-rings stays on its gallery card, which isn't the board; in the other games the marks are gone once the puzzle's won). Still to do: the other shared helpers below.
+rings stays on its gallery card, which isn't the board; other games whose marks stay after a win can use it too). Then
+`G.uses` for a helper's uses left (the badge, "n left" for VoiceOver, put away at none) in Toy Box, Bubbles, Bird Watch
+and Mew Hue; what helpers cost was already shared (`PAW_COST`). Pawlinko keeps its one count shared by its five helpers. Still to do: the other shared helpers below.
 
 ### The page, top to bottom
 
@@ -179,7 +181,5 @@ Built 2026-11-07 (`whatsNew` in `games.js`), ahead of the shared helpers, which 
 
 ### Shared helpers, so each is written once
 
-- **Helpers:** the icon badge is shared; the uses left and the gold-paw cost become shared too. Shake is in Toy Box,
-  Bubbles, Wind Up and Pawlinko; Shuffle or Mix in Toy Box, Pick of the Pile, Mew Hue and Keyboard Cat.
 - **Hints by other names** go in the red group as hints: Keyboard Cat's Words left, Starts and Clues (switches today),
   and Junk Drawer's Words left.
