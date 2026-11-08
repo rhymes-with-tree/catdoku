@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.47"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.48"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -24,7 +24,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.47">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.48">
 <style>
 /* A quilted blanket in nine cushions. Clumps of napping cats are dragged onto it from the tray below; a full
    row, column or cushion wakes its cats and they wander off, taking any toys they were lying on. */
@@ -110,7 +110,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-07.47"></script>
+<script src="../games.js?v=2026-11-07.48"></script>
 <script>
 const $ = G.$;
 G.nav("catpile");
@@ -501,7 +501,7 @@ const lookOf = k => KINDS[k].looks[(S && S.d.look && S.d.look[k]) || 0] || KINDS
 const lookIdx = k => { const ok = KINDS[k].looks.map((_, j) => j).filter(j => !offToys.has(KINDS[k].looks[j][0])); return ok.length ? ok : KINDS[k].looks.map((_, j) => j); };
 const kindsOn = () => { const on = KINDS.map((_, k) => k).filter(k => KINDS[k].looks.some(([f]) => !offToys.has(f))); return on.length >= MIN_COLOURS ? on : KINDS.map((_, k) => k); };
 const hints = G.hinter({game: () => S, key: () => S ? JSON.stringify([S.d.cats.map(c => c.id), S.d.tray]) : "", draw: () => { drawTray(); drawMarks(); }});
-function save() { if (S) G.save(STORE, {level: S.level, d: S.d, ms: S.ms, started: S.started, timed: S.timed, climb, zenBest, over: S.over}); }
+function save() { if (S) G.save(STORE, {level: S.level, d: S.d, ms: S.ms, started: S.started, timed: S.timed, climb, zenBest, over: S.over, history: S.history}); }
 // A blanket, dealt from its level, seed and the toy kinds in play; its moves so far are played again on it.
 function deal(level, seed, kinds) {
   const d = makeLevel(level, seed, kinds);
@@ -512,7 +512,7 @@ function deal(level, seed, kinds) {
 }
 const colourOf = (d, t) => (d.seed + d.deals * 5 + t * 3) % COLOURS.length;
 function start(level, d, o = {}) {
-  S = {level, N: level, ...G.freshClock(), d, over: !!o.over, history: []};
+  S = {level, N: level, ...G.freshClock(), d, over: !!o.over, history: Array.isArray(o.history) ? o.history.filter(x => typeof x === "string") : []};
   if (o.ms) { S.ms = o.ms; S.started = !!o.started; }
   if (o.timed === false || !level) S.timed = false;   // zen isn't timed
   if (level) climb = level;
@@ -537,35 +537,38 @@ $("levelSel").append(new Option("Zen (no goals)", 0));
 $("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
 // A new blanket at this level; help already used on it still counts.
 $("newBtn").onclick = () => { if (!S) return; G.closeCard(); startLevel(S.level, S.level && !S.over ? {hinted: S.d.hinted, restarted: S.d.restarted} : null); };
+// Undo (G.history): the steps are JSON of the blanket before each move, in S.history (saved with it since 2026-11),
+// the newest 60 kept. Undo is free, but a hint or a turn made since still counts. Once a board's won, it's done; one
+// with no room left can still be undone.
+const undo = G.history({game: () => S, cap: 60, restart: true,
+  over: () => !!S && S.over && !!S.level && won(S.d),
+  started: () => !!S.level && (S.d.moves.length > 0 || S.over),
+  back(step) {
+    G.closeCard();
+    const d = JSON.parse(step);
+    d.hinted = S.d.hinted; d.turned = S.d.turned || d.turned; d.restarted = S.d.restarted || d.restarted;
+    S.d = d; S.over = false; picked = -1;
+    layers.cats.innerHTML = ""; catEls.clear();
+    draw(true);
+  },
+  after: () => save()});
 // The same blanket again as it was dealt: the same toys and, played the same way, the same cats in the tray.
 function restart() {
   if (!S || !S.level) return;
-  G.closeCard();
-  const d = deal(S.level, S.d.seed, S.d.kinds);
-  Object.assign(d, {hinted: S.d.hinted, restarted: S.d.moves.length > 0 || S.d.restarted, look: S.d.look});
-  start(S.level, d, {timed: S.timed});
+  undo.restart(() => {
+    G.closeCard();
+    const d = deal(S.level, S.d.seed, S.d.kinds);
+    Object.assign(d, {hinted: S.d.hinted, restarted: S.d.moves.length > 0 || S.d.restarted, look: S.d.look});
+    start(S.level, d, {timed: S.timed});
+  });
 }
 $("restartBtn").onclick = restart;
-function undo() {
-  if (!S || S.over && S.level && won(S.d) || !S.history.length) return;
-  G.closeCard();
-  const d = JSON.parse(S.history.pop());
-  // Undo is free, but a hint or a turn made since still counts
-  d.hinted = S.d.hinted; d.turned = S.d.turned || d.turned; d.restarted = S.d.restarted || d.restarted;
-  S.d = d; S.over = false; picked = -1;
-  layers.cats.innerHTML = ""; catEls.clear();
-  draw(true); save();
-}
-$("undoBtn").onclick = undo;
-document.addEventListener("keydown", e => {
-  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && !/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) { e.preventDefault(); undo(); }
-});
 
 // Turn tray clump t a quarter turn clockwise (with Turning on, or when a shared blanket's moves are played again).
 // A turn can be undone, and costs the gold paw.
 function turn(t, replay) {
   if (!S || S.over || !S.d.tray[t] || !(turnsOn || replay)) return false;
-  S.history.push(JSON.stringify(S.d)); if (S.history.length > 60) S.history.shift();
+  undo.push(JSON.stringify(S.d));
   S.d.tray[t] = turnCells(S.d.tray[t]); S.d.turned = true; S.d.moves.push([t, -1]);
   if (S.timed && !S.started) S.started = true;
   if (ghost && ghost.t === t) drawGhost();
@@ -579,7 +582,7 @@ function drop(t, at) {
   const colour = colourOf(S.d, t), was = new Map(S.d.cats.map(c => [c.id, c]));
   const res = place(S.d, t, at, colour);
   if (!res) return false;
-  S.history.push(before); if (S.history.length > 60) S.history.shift();
+  undo.push(before);
   S.d.moves.push([t, at]);
   if (S.timed && !S.started) S.started = true;
   picked = -1; ghost = null;
@@ -629,7 +632,7 @@ function noRoom() {
   const still = S.d.goals.filter(g => g.got < g.need).map(g => toyName(g.need - g.got, g.k));
   const list = still.length > 1 ? still.slice(0, -1).join(", ") + " and " + still[still.length - 1] : still[0];
   const btns = [];
-  if (S.history.length) btns.push(["Undo the last move", () => { G.closeCard(); undo(); }, true]);
+  if (S.history.length) btns.push(["Undo the last move", () => undo.undo(), true]);
   btns.push(["Restart", restart, !btns.length], ["New blanket", () => { G.closeCard(); startLevel(S.level); }], G.homeBtn());
   G.openCard("No room!", `None of the cats in the tray fit on the blanket. Still to collect: ${list}.`, btns, null,
     G.otherSize($("levelSel"), S.level, startLevel, "Or play a different level:"));
@@ -668,7 +671,7 @@ function draw(rebuild) {
   const filled = filledOf(d);
   for (const i in d.toys) drawToy(filled[i] ? layers.under : layers.toys, +i, d.toys[i], filled[i]);
   drawTray(); drawGhost(); drawMarks(); hud(rebuild);
-  $("undoBtn").disabled = !S.history.length || (S.over && won(d));
+  undo.sync();
   $("hintBtn").disabled = S.over;
 }
 function hud(rebuild) {
@@ -896,7 +899,7 @@ if (!openedShare) G.reopen(() => {
   const d = saved.d;
   if (!Array.isArray(d.cats) || !Array.isArray(d.tray) || d.tray.length !== 3 || !(saved.level >= 0 && saved.level <= MAX_LEVEL)) throw new Error("the saved blanket is from another version of the game");
   if (saved.over && (!saved.level || won(d))) return startLevel(saved.level ? climb : 0);
-  start(saved.level, d, {ms: saved.ms, started: saved.started, timed: saved.timed, over: false});
+  start(saved.level, d, {ms: saved.ms, started: saved.started, timed: saved.timed, over: false, history: saved.history});
 }, why => { startLevel(climb); G.note(why, 0); });
 intro();
 </script>

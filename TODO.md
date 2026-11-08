@@ -176,10 +176,9 @@ Built 2026-11-07 (`whatsNew` in `games.js`), ahead of the shared helpers, which 
   undone; or `restart(reset, step)` pushes a step of its own, as `{mark}`); `cap` keeps the newest (moving bookmarks'
   places with them); `list` points it at another list (Unravel's path); `started` greys Restart where that isn't the
   same as having steps; `shelf` is what Undo takes back once the list is empty (Fish Bones' Restarts, put away so
-  their swaps don't count); `G.guesser({history})` takes its Undo from it. Moved so far: Night Light, Pawlette, Treat Time, Up a Tree, Unravel, Cat Mat, Sunbeams, Yarn, Patches, Catwalk, Mewstermind, Pick of the Pile, Mew Hue, Shelf Life, Fair Play, Purrfect Square, Scratch That, High Perch, Cross Stitch, Window Ledges, Open the Door!, Fridge Magnets, Toe Beans, Meowbile, Purrmutation, Tunnel Run, Laser Pointer, If It Fits, Toydoku, Fish Bones and Knock It Off.
+  their swaps don't count); `G.guesser({history})` takes its Undo from it. Moved so far: Night Light, Pawlette, Treat Time, Up a Tree, Unravel, Cat Mat, Sunbeams, Yarn, Patches, Catwalk, Mewstermind, Pick of the Pile, Mew Hue, Shelf Life, Fair Play, Purrfect Square, Scratch That, High Perch, Cross Stitch, Window Ledges, Open the Door!, Fridge Magnets, Toe Beans, Meowbile, Purrmutation, Tunnel Run, Laser Pointer, If It Fits, Toydoku, Fish Bones, Knock It Off and Cat Pile (which now saves its steps too, so Undo works after a reload).
   Still writing their own (33 at the start; how each keeps its steps, from the survey):
   - Catdoku: JSON of the cells, 500 kept (bookmarks move with it); Restart empties the list; `G.guesser`
-  - Cat Pile: `S.history` (not in `game`), JSON of the board, 60 kept; the moves count in `S.d.moves`
 - **Checking:** the names are one each now (2026-11-07): Auto check (rule breaks turn red as you play), Audit (a
   one-off check) and Auto grade (a wrong answer costs a life; Catdoku's was Audit as-you-go). Still to weigh: Complete
   (Catdoku) and Check (Mewstermind) are one button.
