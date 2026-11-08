@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.51";
+  var BUILD = "2026-11-07.52";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -26,7 +26,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.51">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.52">
 <style>
 /* Catdoku's own looks; the rest is games.css. */
 html,body{height:100%}
@@ -107,7 +107,7 @@ main{padding-top:18px}
 
 </main>
 
-<script src="../games.js?v=2026-11-07.51"></script>
+<script src="../games.js?v=2026-11-07.52"></script>
 <script>G.nav("catdoku");</script>
 <script>
 const PALETTE = ["#BD5538","#73A7AE","#ECA818","#6AA673","#B94588","#B3B94B",
@@ -275,10 +275,10 @@ const $ = id => document.getElementById(id);
 // autoGrade is the Auto grade switch, and autoExclude the Auto Notes one (its old name, kept so saved settings
 // carry over). Auto Notes starts off, so a first board isn't covered in paws.
 let settings = {autoGrade: false, autoExclude: false, size: 8};
-let game = null, busy = false, msgTimer = null, erasing = false;
+let game = null, busy = false, msgTimer = null;
 // The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
 G.pawLost(() => !game || game.status !== "playing" || game.helped || game.restarted || game.hearts < HEARTS || game.livesUsed > HEARTS);
-G.pieces({plain: "Mark", mark: "eraseBtn"});   // the plain tap beside Erase, in a row of their own under the board
+const markTool = G.pieces({plain: "Mark", mark: "eraseBtn", change: () => { if (game) render(); }});   // the plain tap beside Erase, in a row of their own under the board
 
 function blankCells(N) { return Array.from({length: N * N}, () => ({cat: false, manual: false, src: []})); }
 function show(c) { return c.cat ? "cat" : (c.manual || c.src.length) ? "paw" : "empty"; }
@@ -325,7 +325,7 @@ function tap(i) {
   const cell = game.cells[i];
   keepCatMarks(i);
   const s = show(cell);
-  if (erasing) { if (s === "paw") { snapshot(); erasePaw(i); } render(); save(); return; }
+  if (markTool.on()) { if (s === "paw") { snapshot(); erasePaw(i); } render(); save(); return; }
   if (s === "empty") { snapshot(); cell.manual = true; }
   else if (s === "paw") placeCat(i);
   else { snapshot(); removeCat(i); }
@@ -357,7 +357,7 @@ function removeCat(i) {
 
 function erasePaw(i) { const c = game.cells[i]; c.manual = false; c.src = []; }
 function paintPaw(i, press) {
-  if (erasing) {
+  if (markTool.on()) {
     if (show(game.cells[i]) !== "paw") return;
     if (!press.snap) { snapshot(); press.snap = true; }
     erasePaw(i); return;
@@ -628,7 +628,6 @@ function render() {
   $("completeBtn").style.display = settings.autoGrade ? "none" : "";
   $("auditBtn").style.display = settings.autoGrade ? "none" : "";
   $("auditBtn").disabled = $("hintBtn").disabled = game.status !== "playing";
-  $("eraseBtn").setAttribute("aria-pressed", erasing);
   undo.sync();
   if (game.status === "lost") $("restartBtn").disabled = false;   // out of lives, Restart is the way on
   guesses.sync();
@@ -680,7 +679,6 @@ $("restartBtn").onclick = () => { if (!busy) restart(); };
 $("completeBtn").onclick = complete;
 $("auditBtn").onclick = audit;
 $("hintBtn").onclick = hint;
-$("eraseBtn").onclick = () => { erasing = !erasing; if (game) render(); };
 G.switch({id: "gradeTgl", label: "Auto grade", line: "A wrong 🐱 turns red and costs a life", key: "autoGrade", of: () => settings, save,
   tip: "Auto grade: a wrong 🐱 costs a life",
   change: () => { if (game) { game.wrong = []; note(""); if (settings.autoGrade) gradeNow(); render(); save(); } }});
@@ -704,7 +702,7 @@ let tryWas = null;   // the game as it was before the walkthrough's Your turn st
 // put the board back as it was before them (and Erase off), with nothing given away or lost
 function putBack() {
   if (tryWas && JSON.stringify(game) !== tryWas) { game = JSON.parse(tryWas); note(""); save(); }
-  tryWas = null; erasing = false; if (game) render();
+  tryWas = null; markTool.set(false); if (game) render();
 }
 function spotlightSteps() {
   const N = game.N, r = Math.floor(N / 2), c = Math.floor(N / 2), g = game.reg[r * N + c];
@@ -725,7 +723,7 @@ function spotlightSteps() {
     {say: "Tap twice for a 🐱", lit: [[c, r]], try: {done: () => !!(game.cells[r * N + c] || {}).cat,
       yes: settings.autoExclude ? "🐾 means no cat here" : "Once is a 🐾: no cat here"}, ...upTo},
     {say: "Drag for lots of 🐾", lit: drag, try: {done: () => drag.every(([x, y]) => show(game.cells[y * N + x]) === "paw"), yes: "Nice!"}, ...from},
-    {say: "Tap Erase", els: [$("eraseBtn")], try: {done: () => erasing}, ...from},
+    {say: "Tap Erase", els: [$("eraseBtn")], try: {done: () => markTool.on()}, ...from},
     {say: "Drag the 🐾 away", lit: drag, try: {done: () => drag.every(([x, y]) => show(game.cells[y * N + x]) !== "paw"), yes: "Erased!"}, ...upTo},
     // kept back as tips on a first visit (G.spotlight)
     {say: "Not sure? Bookmark, then try a 🐱. Return to Bookmark undoes it", els: [$("guessBtn")]},

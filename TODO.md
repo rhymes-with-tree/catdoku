@@ -111,7 +111,10 @@ Undo) and `HIG.md` rewritten to match. Then the checking names made one each (Au
 and Mewstermind's Check made one button: Check, with the same tick icon (2026-11-08). Then `G.pad`: the digit pad,
 Notes and Auto Notes written once for High Perch, Open the Door! and Window Ledges (Shift with a digit jots a note in
 all three now), and Toydoku's Notes erasing every note when held down, as Erase notes does (Erase notes stays in the
-row below: beside Notes, the top row runs off a small phone once Return to Bookmark shows). Still to do: the other shared helpers below.
+row below: beside Notes, the top row runs off a small phone once Return to Bookmark shows). Then the marking tools'
+on and off kept by `G.pieces` too, for Catdoku's Erase, Hide & Seek's Mark, Fair Play's Mark, Cross Stitch's Dot,
+Treat Time's Keep and Scratch That's Dot first (kept in its settings, as before); Patches' Marker stays one of its
+fabrics. Still to do: the other shared helpers below.
 
 ### The page, top to bottom
 
@@ -174,9 +177,6 @@ Built 2026-11-07 (`whatsNew` in `games.js`), ahead of the shared helpers, which 
 
 ### Shared helpers, so each is written once
 
-- **Marking tools:** Hide & Seek's Mark, Fair Play's Mark (×), Cross Stitch's Dot, Treat Time's Keep, Patches'
-  Marker, Catdoku's Erase and Scratch That's Dot first switch all change what a tap does. One helper; Scratch That's
-  becomes a piece like the rest.
 - **Admire:** after a win, a toggle that clears the marks to show the finished picture. Today it's Open the Door!'s
   Show/Hide numbers button and Cat Burglar's Show/Hide the rings on its gallery card; it goes with the win card's
   Admire my board (`G.winCard`), and other games can use it (pencil marks, Hide & Seek's doodles).

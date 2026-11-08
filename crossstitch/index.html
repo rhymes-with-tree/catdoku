@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.51"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.52"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.51">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.52">
 <style>
 /* A cross-stitch sampler: aida cloth held in a wooden embroidery hoop, with a chart's grid on it (a darker line every
    five squares), and the counts for each row down the left and each column along the top. Stitches are crosses in one
@@ -114,7 +114,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-07.51"></script>
+<script src="../games.js?v=2026-11-07.52"></script>
 <script>
 /* ---------- the patterns ---------- */
 // Each pattern is a picture square by square: "." is bare cloth, a letter a stitch in that thread. The bigger ones are
@@ -269,10 +269,11 @@ const SITTERS = "c14-63 c18-6 c18-7 c18-17 c18-19 c18-21 c18-26 c18-27 c18-32 c1
 const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1, seen: {}}, state.settings);
-let game = state.game || null, dotting = false, running = false, cursor = -1;
+let game = state.game || null, running = false, cursor = -1;
 // The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
 G.pawLost(() => !game || game.won || game.hinted || game.restarted);
-G.pieces({plain: "Stitch", mark: "dotBtn"});   // the plain tap beside Dot, in a row of their own under the board
+const markTool = G.pieces({plain: "Stitch", mark: "dotBtn", can: () => game && !game.won, change: () => draw(),
+  say: "Dot is on: a tap marks a square that stays bare"});   // the plain tap beside Dot, in a row of their own under the board
 let plan = null, cellEls = [];   // what doesn't change while playing: the pattern's letters, the answer and the counts
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !running && !$("overlay").classList.contains("show");
@@ -351,7 +352,6 @@ function draw() {
   for (let x = 0; x < N; x++) kids[x].setAttribute("aria-label", kids[x].getAttribute("aria-label") + `. Column ${x + 1} counts ${plan.cols[x].join(" ") || "0"}`);
   const done = g.filter(v => v === 1).length, total = plan.sol.filter(Boolean).length;
   $("count").textContent = won ? `Finished: ${plan.name}!` : `🧵 ${done} of ${total} stitches`;
-  $("dotBtn").setAttribute("aria-pressed", String(dotting));
   $("hintBtn").disabled = won; $("dotBtn").disabled = won;
   undo.sync();
 }
@@ -359,7 +359,7 @@ function draw() {
 /* ---------- playing ---------- */
 // A tap stitches a square (or takes its stitch out); with Dot on, it puts a dot in (or takes it out) instead.
 // Dragging along a row or column carries the same change to every square passed that was like the first.
-const goal = from => dotting ? (from === 2 ? 0 : 2) : (from === 1 ? 0 : 1);
+const goal = from => markTool.on() ? (from === 2 ? 0 : 2) : (from === 1 ? 0 : 1);
 // Undo (G.history): each step is the grid as it was, as a string (the newest 400 kept in game.history). Restart can be
 // undone too.
 const undo = G.history({game: () => game, take: () => game.grid.join(""), back: (h, g) => { g.grid = h.split("").map(Number); }, cap: 400,
@@ -421,7 +421,6 @@ $("restartBtn").onclick = () => {
   if (!undo.restart(g => { g.grid = g.grid.map(() => 0); })) return;
   G.note("Every stitch is out. Undo puts them back.", 3500);
 };
-$("dotBtn").onclick = () => { if (!game || game.won) return; dotting = !dotting; draw(); G.note(dotting ? "Dot is on: a tap marks a square that stays bare" : "", dotting ? 3500 : 0); };
 
 /* ---------- hints ---------- */
 // A hint shows; it never stitches. First a mistake if there is one (a stitch where the picture has bare cloth, or a
@@ -465,7 +464,7 @@ $("hintBtn").onclick = hint;
 /* ---------- endings ---------- */
 // The last stitch: the chart's grid and the dots go, each stitch takes its colour, then the card.
 function win() {
-  game.won = true; G.finishClock(game); cursor = -1; dotting = false; keys.hide();
+  game.won = true; G.finishClock(game); cursor = -1; markTool.set(false); keys.hide();
   const done = settings.seen[game.level] || [];
   if (!done.includes(key(game))) done.push(key(game));
   settings.seen[game.level] = done;
@@ -510,7 +509,7 @@ function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); ne
 function begin(level, k, flip) {
   const N = PATTERNS[k][2];
   game = {level, k, flip: flip ? 1 : 0, N, grid: new Array(N * N).fill(0), history: [], won: false, ...G.freshClock()};
-  cursor = -1; dotting = false; makePlan(); buildBoard();
+  cursor = -1; markTool.set(false); makePlan(); buildBoard();
 }
 function newPuzzle() {
   const n = settings.level, all = levelPatterns(n), done = settings.seen[n] || [];

@@ -1834,16 +1834,34 @@ const G = (() => {
   if (!RETURNING) save(NEWS, {seen: Date.now(), firstVisit: true});
   setTimeout(whatsNew, 1500);
   // Pieces for a game you tap to fill, with no pad or tray of its own: the plain tap (o.plain, its word) and the game's
-  // marking tool (o.mark, its button's id) side by side in a row of their own under the board, one lit at a time. The
-  // marking button keeps its own handler and aria-pressed; the plain piece only presses it off.
+  // marking tool (o.mark, its button's id) side by side in a row of their own under the board, one lit at a time.
+  // The marking tool's on/off is kept here too, written once for Catdoku's Erase, Hide & Seek's Mark, Fair Play's
+  // Mark, Cross Stitch's Dot, Treat Time's Keep and Scratch That's Dot first. o: {plain, mark, can (() => true while
+  // it may be switched; always if not given), say (the line shown when it's turned on), change(on) (after a tap on
+  // either piece: draw), of and key (where to keep it, with save: Scratch That keeps Dot first in its settings; off
+  // on every page load if not given), save}. Returns {on(), set(on) (quietly: a new puzzle or a win turns it off),
+  // toggle()}.
   function pieces(o) {
-    const m = $(o.mark), first = document.querySelector("main .actions"); if (!m || !first) return;
-    const row = document.createElement("div"); row.className = "actions pieces"; row.setAttribute("role", "group"); row.setAttribute("aria-label", "What a tap does");
-    const p = document.createElement("button"); p.id = "plainBtn"; p.className = "tool"; p.innerHTML = iconSVG("tap") + `<span class="lbl">${o.plain}</span>`;
-    p.onclick = () => { if (m.getAttribute("aria-pressed") === "true") m.click(); };
-    row.append(p, m); first.before(row);
-    const sync = () => p.setAttribute("aria-pressed", String(m.getAttribute("aria-pressed") !== "true"));
-    new MutationObserver(sync).observe(m, {attributes: true, attributeFilter: ["aria-pressed"]}); sync();
+    const m = $(o.mark), first = document.querySelector("main .actions");
+    let on = !!(o.of && o.of()[o.key]);
+    const set = v => { on = !!v; if (m) m.setAttribute("aria-pressed", String(on)); if (o.of) o.of()[o.key] = on; };
+    function toggle() {
+      if (o.can && !o.can()) return;
+      set(!on); if (o.save) o.save();
+      if (o.say) note(on ? o.say : "", on ? 3500 : 0);
+      if (o.change) o.change(on);
+    }
+    set(on);
+    if (m) m.onclick = toggle;
+    if (m && first) {
+      const row = document.createElement("div"); row.className = "actions pieces"; row.setAttribute("role", "group"); row.setAttribute("aria-label", "What a tap does");
+      const p = document.createElement("button"); p.id = "plainBtn"; p.className = "tool"; p.innerHTML = iconSVG("tap") + `<span class="lbl">${o.plain}</span>`;
+      p.onclick = () => { if (on) toggle(); };
+      row.append(p, m); first.before(row);
+      const sync = () => p.setAttribute("aria-pressed", String(m.getAttribute("aria-pressed") !== "true"));
+      new MutationObserver(sync).observe(m, {attributes: true, attributeFilter: ["aria-pressed"]}); sync();
+    }
+    return {on: () => on, set, toggle};
   }
 
   /* ---------- undo ---------- */
