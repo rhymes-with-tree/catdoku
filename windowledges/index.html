@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.35"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.36"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.35">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.36">
 <style>
 /* Kakuro on a block of flats, at night. The brick is wall; the stone squares in it hold the totals (across at the top
    right, down at the bottom left of the slash); the windows take the numbers 1 to 9, none twice in a run of windows.
@@ -158,7 +158,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-07.35"></script>
+<script src="../games.js?v=2026-11-07.36"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // A block of flats on an R × C plan: walls (the top row and left column are always walls, holding the totals) and
@@ -468,14 +468,17 @@ function draw() {
   $("count").textContent = game.won ? "Every window is lit!" : `${lights} of ${windows} windows lit`;
   $("key").textContent = noting ? "Notes: tap numbers to jot them down as maybes" : sel < 0 && !game.won ? "Tap a window, then a number" : "";
   $("hintBtn").disabled = game.won;
-  $("undoBtn").disabled = !game.history.length || game.won; $("restartBtn").disabled = !game.history.length || game.won;
+  undo.sync();
   drawSets(right);
   guesses.sync();
   return {clash, right, wrong};
 }
 let forceLit = new Set();
 const hints = G.hinter({game: () => game, key: () => game ? game.grid.join() : "", draw: () => draw()});   // marks {i, bad}: a window to look at
-const guesses = G.guesser({game: () => game, undo, draw: () => { draw(); save(); }, board: $("board"), what: "number"});
+// Undo (G.history): each step is {grid, notes} as they were (game.history). Restart can be undone too.
+const undo = G.history({game: () => game, take: () => ({grid: game.grid.slice(), notes: game.notes.slice()}), can: playing,
+  back: (h, g) => { g.grid = h.grid; g.notes = h.notes; }, after: () => { draw(); save(); }, restart: true});
+const guesses = G.guesser({game: () => game, history: undo, draw: () => { draw(); save(); }, board: $("board"), what: "number"});
 
 // The sets panel: for each run through the selected window, the sets of digits that make its total (struck out when
 // a digit already in the run rules a set out), and the digits this window can still be.
@@ -505,7 +508,7 @@ function drawSets(right) {
 }
 
 /* ---------- playing ---------- */
-const snapshot = () => game.history.push({grid: game.grid.slice(), notes: game.notes.slice()});
+const snapshot = () => undo.push();
 function put(v) {
   if (!playing() || sel < 0 || !game.w[sel]) return;
   game.started = true;
@@ -597,9 +600,6 @@ document.addEventListener("keydown", e => {
   }
 });
 const firstWindow = () => game.w.findIndex(Boolean);
-document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
-function undo() { if (playing() && game.history.length) { const h = game.history.pop(); game.grid = h.grid; game.notes = h.notes; draw(); save(); } }
-$("undoBtn").onclick = undo;
 
 // Hint: first points out a digit that's wrong, if there is one. Otherwise it works out, from the digits down and the sets
 // each total allows, a window that has only one digit left, and glows it: the first time the message says why;
@@ -643,7 +643,10 @@ function whyDigit(i) {
   return "Only one digit fits in the glowing window, from the sets of its two totals and the digits already in its runs.";
 }
 $("hintBtn").onclick = hint;
-$("restartBtn").onclick = () => { if (playing() && game.history.length) { game.restarted = true; snapshot(); guesses.clear(); game.grid = game.grid.map(() => 0); game.notes = game.notes.map(() => 0); if (settings.autoNotes) fillNotes(); draw(); save(); G.note("Every window's dark again. Undo brings your numbers back.", 3500); } };
+$("restartBtn").onclick = () => {
+  if (undo.restart(g => { guesses.clear(); g.grid = g.grid.map(() => 0); g.notes = g.notes.map(() => 0); if (settings.autoNotes) fillNotes(); }))
+    G.note("Every window's dark again. Undo brings your numbers back.", 3500);
+};
 addEventListener("resize", () => { if (game && plan) draw(); });
 
 /* ---------- endings ---------- */
