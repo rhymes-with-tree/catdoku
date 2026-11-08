@@ -708,7 +708,7 @@ const G = (() => {
     .bests{width:100%;border-collapse:collapse;margin:0 0 14px;font-variant-numeric:tabular-nums;color:var(--ink)}
     .bests th,.bests td{padding:4px 6px;text-align:left;border-bottom:1px solid var(--line)}
     .bests th{font-size:calc(13px*var(--ts));color:var(--ink-soft);font-weight:600}
-    .bests td.num,.bests th.num{text-align:right}
+    .bests .bestnum{text-align:right}
     .bests tr.now td{font-weight:800}
     .card h3{margin:4px 0 6px;font-size:calc(18px*var(--ts))}
     .spot{position:fixed;inset:0;z-index:9;overflow:hidden;cursor:pointer;animation:spotIn .35s ease-out;-webkit-tap-highlight-color:transparent;touch-action:none}
@@ -821,20 +821,20 @@ const G = (() => {
     } else {
       const t = document.createElement("table"); t.className = "bests";
       const golds = sizes.some(n => goldAt(CURRENT, n));   // a gold paws column once there's one at any level
-      t.innerHTML = `<tr><th>${noun()[0].toUpperCase() + noun().slice(1)}</th><th class="num">Best</th><th class="num">Solved</th>${golds ? '<th class="num">Gold paws</th>' : ""}</tr>`;
+      t.innerHTML = `<tr><th>${noun()[0].toUpperCase() + noun().slice(1)}</th><th class="bestnum">Best</th><th class="bestnum">Solved</th>${golds ? '<th class="bestnum">Gold paws</th>' : ""}</tr>`;
       for (const n of sizes) {
         const r = t.insertRow(); if (n === N) r.className = "now";
         r.insertCell().textContent = label(n);
-        const b = r.insertCell(); b.className = "num"; b.textContent = mine[n].times.length ? clock(mine[n].times[0].ms) : "–";
-        const c = r.insertCell(); c.className = "num"; c.textContent = mine[n].solves;
-        if (golds) { const g = r.insertCell(); g.className = "num"; g.textContent = goldAt(CURRENT, n) ? `🐾 ${goldAt(CURRENT, n)}` : "–"; }
+        const b = r.insertCell(); b.className = "bestnum"; b.textContent = mine[n].times.length ? clock(mine[n].times[0].ms) : "–";
+        const c = r.insertCell(); c.className = "bestnum"; c.textContent = mine[n].solves;
+        if (golds) { const g = r.insertCell(); g.className = "bestnum"; g.textContent = goldAt(CURRENT, n) ? `🐾 ${goldAt(CURRENT, n)}` : "–"; }
       }
       media.append(t);
       const top = (mine[N] || {times: []}).times;
       if (top.length) {
         const h = document.createElement("h3"); h.textContent = `Fastest at ${label(N)}`; media.append(h);
         const t2 = document.createElement("table"); t2.className = "bests";
-        top.forEach((x, i) => { const r = t2.insertRow(); r.insertCell().textContent = `${i + 1}.`; const c = r.insertCell(); c.className = "num"; c.textContent = clock(x.ms); r.insertCell().textContent = x.d; });
+        top.forEach((x, i) => { const r = t2.insertRow(); r.insertCell().textContent = `${i + 1}.`; const c = r.insertCell(); c.className = "bestnum"; c.textContent = clock(x.ms); r.insertCell().textContent = x.d; });
         media.append(t2);
       }
       const p = document.createElement("p"); p.textContent = "Times are kept on this device only."; media.append(p);
