@@ -664,7 +664,7 @@ const G = (() => {
     if (o.gold && o.goldPic) pic.append(...o.goldPic); else if (o.pic) pic.append(...o.pic); else pic.append(catPhoto(), name);
     media.append(pic);
     const btns = [[o.next || "New puzzle", onNext, true]];
-    if (admire !== null) btns.push([admire, () => { closeCard(); if (o.onAdmire) o.onAdmire(); else note(admireNote(), 0); }]);
+    if (admire !== null) btns.push([admire, () => { closeCard(); if (o.onAdmire) o.onAdmire(); else note(admireNote(), 0); if (admiring) admiring.set(true); }]);
     btns.push(["Share my result", e => shareResult(result, o.gold, e.currentTarget)],
       homeBtn());
     openCard(o.gold ? o.goldTitle || "Gold paw!" : o.title || "Solved!", "", btns, media, o.after);
@@ -1957,6 +1957,27 @@ const G = (() => {
     };
   }
 
+  /* ---------- admire ---------- */
+  // Admire (G.admire): once a puzzle's won, a button that takes the marks off the board to show the finished picture,
+  // and puts them back (Open the Door!'s numbers, Catdoku's paws); the win card's Admire button turns it on. o: {btn
+  // (its id), board (the element given .bare: the page's CSS says what goes), won (() => true once the puzzle's won),
+  // hide, show (the button's words each way), of, key and save (where to keep it, if it's kept: Open the Door!
+  // keeps it in its settings)}. Returns {set(on), sync()}: call sync() after every draw.
+  let admiring = null;
+  function admire(o) {
+    const b = $(o.btn);
+    let bare = !!(o.of && o.of()[o.key]);
+    function sync() {
+      const won = !!o.won(), on = won && bare;
+      o.board.classList.toggle("bare", on); b.hidden = !won;
+      b.setAttribute("aria-pressed", String(on)); relabel(b, on ? o.show : o.hide);
+    }
+    function set(v) { bare = !!v; if (o.of) { o.of()[o.key] = bare; if (o.save) o.save(); } sync(); }
+    b.onclick = () => { if (o.won()) set(!bare); };
+    admiring = {set, sync};
+    return admiring;
+  }
+
   /* ---------- digit pad ---------- */
   // The number pad of the logic games you fill in with digits (High Perch, Open the Door!, Window Ledges), written
   // once (G.pad): 1 to max and ⌫ in #pad, Notes (#notesBtn, dashed digits on the pad while it's on), putting a digit
@@ -2182,6 +2203,6 @@ const G = (() => {
     }
   }
 
-  return {MAGNET, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, meaning, plainText,
+  return {MAGNET, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();
