@@ -80,3 +80,130 @@ for a phone, and sounds that follow the thing's kind (a bell rings, a mug clunks
 Cross Stitch (2026-11-06) went on the site with general cats for now (one of Purrfect Square's sitting cats beside the
 title). Its samplers are mostly Gus, Peanut, Marmalade and Willow. Once the owner picks a star (or draws one), put
 them beside the title and in `ARTWORK.md`, and perhaps on the gold-paw card.
+
+## Play-testing notes, 2026-11-08: themes across the games
+
+The owner's notes on games 1–42 (43–52 not yet looked at), grouped by theme. Checked against the plan approved on
+2026-11-07 and the PRs that built it (rhymes-with-tree/catdoku#236 to #240), so nothing here quietly undoes them.
+Items marked **Changes the 2026-11-07 plan** need the owner's yes before building.
+
+### Status line (every game)
+- Goal on the left, time on the right, never both on the left. Goals as a fraction with a small icon for what's
+  counted: Tangle's "56 crossings left" becomes "56/59 ○" (the white dot); Pounce's moves become a fraction.
+- **Changes the 2026-11-07 plan** (step 4 put the status line above the board): the owner is weighing moving it
+  under the board, above the buttons. Pounce and Bubbles (goal, time, "shelf down in x bats") are the strongest case.
+  Trade-off: under the board it's where the eye goes on the way to the buttons; on tall boards (Tunnel Run, big
+  Catdoku) it can be pushed below the fold. Decide once, for every game.
+
+### Button rows (every game)
+- New order, from the owner: **Undo · Hint** on one line; **Restart · New [Noun]** on the last line of their own, kept
+  apart so they aren't pressed by accident. Restart beside New is as the plan has it.
+- **Changes the 2026-11-07 plan** (step 8 groups the gold-paw tools, Hint with Audit and helpers, apart from the free
+  tools): Hint moves onto Undo's line. It keeps its dark red and slashed paw. Where do Audit and helpers go: with
+  Hint, or a line of their own?
+- New [Noun] everywhere (Keyboard Cat's plain "New"), centred (Toe Beans).
+- Missing Restart: Toe Beans (no Restart at all), Hide & Seek, Tangle. Missing Give up: Pick of the Pile (two blocks
+  stacked, no moves left), Spelling String (New Round is in an odd spot).
+- Undo far down the page: Knock It Off. Bird Watch's Wipe and Pause each alone on a line. Junk Drawer's row
+  underneath is unevenly spaced.
+- Twirl: Hint up onto the zoom line, centred, to take less room.
+- **Zoom and full screen like Twirl's** (owner likes it): `G.zoom` with `below: true`, under the board's corner. Cat
+  Burglar and Catlas use the in-corner version today (plan step 5 said "in its corner"); Fish Bones and Hide & Seek
+  have Full screen on its own (`G.fullScreen`) in yet another spot. One place for all.
+- **Gold paw exception:** Restart costs the paw in every game (#238). Toe Beans is a game of going back to the start,
+  so its Restart should not cost it.
+
+### Things in the way of the board
+- Yarn: cats below Restart / New Puzzle, the puzzle's name ("Tropical") between them; smaller cats if it still
+  doesn't fit one screen.
+- Patches: the cat under the colours goes below Restart / New Puzzle (or to the side), so Undo, Hint, Restart and New
+  can be found.
+- Pawlette: Empty the cup and Dye it go below the board, not in it.
+- Bubbles: less beige under the shooter.
+
+### Too much talking
+- Settings: no explanation under a switch unless it can cost a life or the gold paw (#236 took most lines off; check
+  what's left).
+- Instruction lines during play, wanted once and then quiet: Hide & Seek's "Mark is on, tap…" (the `say` of its
+  `G.pieces`), Unravel's wrong-move lines, Toe Beans' "Now tap another number of the pad".
+- Knock It Off: the legend of every icon goes off the page, into How to play or a lexicon; trial and error is part of
+  the fun.
+- Fish Bones: don't show "The Words" ahead; add each to the dictionary as it's found. Its level names have numbers
+  after the fish names that need explaining or dropping.
+
+### Tools and gestures the same everywhere
+- One meaning for a double tap / long press across the marking games: after Catdoku a double tap should leave a cat
+  mark in Hide & Seek, not a hiss. Open the Door!: long press as in Toydoku; an eraser in place of ⌫.
+- Catdoku: Mark's icon centred over the word; a cat mark beside the paw mark and Erase.
+- Fair Play: with Auto check on, Toy | Toy | Mark as pieces in place of tap once / tap twice (its `G.pieces` row is
+  "Toy" and Mark today); the Toy piece shows a toy, not a paw; Mark shows its × / = with "Mark" under it.
+- **Changes the 2026-11-07 plan** (pieces put Patches' Marker among the fabrics): the owner wants Marker apart from
+  the colours, treated like other notes tools.
+- Auto Notes keeps a **different icon in each game** (🐾 Catdoku, ✏️ Toydoku, 🔢 the digit-pad games), but the icon goes
+  after the words, not before (Catdoku, High Perch, Toydoku; draw both for the owner first). Toydoku: the owner asked
+  for 🔢 in place of the pencil. Catdoku's 🐾 is hard to see in dark mode (not urgent).
+- Toydoku: its icons are in an odd order. Treat Time: Put Back shouldn't be a paw; Keep a green outline with a clear
+  middle.
+- Scratch That's Post first / Dot first: look for other games it would help (Fair Play?).
+
+### Symbols that read wrong
+- Toe Beans' ÷ looks like + (Open the Door! had this and fixed it; use the same glyph).
+- Cat Mat's key numbers read as pots of paint.
+- Toy Box: a better way to show the toys on the track.
+- Up a Tree: a new picture of Dottie for the win card.
+
+### Comfort settings, one place for every game
+- Hide timers: it already exists and is site-wide (tap the clock, `hideTimer` in `games.js`), but nobody will find it.
+- Slower: per game today (`G.slower(slug)`); offer it for every game too.
+- Auto check and the other autos as defaults for every game.
+- Hide extra things to look at: Junk Drawer's junk (add more junk, grey once you start, and a switch to take it
+  away) and Shelf Life's shelves (it has this switch already).
+
+### Menu and Settings (every game)
+- "Keys" → "Keyboard Shortcuts". "Settings" → "CATDOKU Settings" (the game's name).
+- Settings switches left-justified; a line above Settings and under Keyboard Shortcuts.
+- Choosing All Games again closes it. All Games isn't greyed out while a how-to spotlight is up.
+- **Toy Chest shows the same thing everywhere.** Today the menu's Toy chest opens the game's own picker in the 12
+  games with a `toysBtn` (Bubbles, Cat Pile, Copycat, Laser Pointer, Meowbile, Pick of the Pile, Pounce, the stash
+  page, Tail Chase, Fair Play, Toy Box, Toydoku) and the shared library (`CHEST`) everywhere else. The plan said "one
+  choice for every game"; make it so.
+- "New [Noun]" on a started, unsolved puzzle ends the win streak (`freshClock`) with no warning; say so first.
+
+### Win card and sharing
+- Next / Admire / Share / Back to the front page / other size: one big Next, small icon buttons for the rest, the
+  other sizes as a small link (New already holds the levels, #236).
+- Share My Result: drop the long level names; game, one-line result (fraction, time, 🔥 streak, 🐾 gold paw), link.
+- Admire: Toy Box has none; Catwalk's could hide the numbers (`G.admire`); Treat Time's Admire My Tray shows only the
+  put-back treats when it should take just those away.
+- Pawlette reopened on its last win card: #237 left Pawlette out of "no old win card when you come back".
+
+### Bugs
+- Sunbeams: a cat already asleep can turn into a different cat when a new sunbeam is made. Every redraw picks every
+  cat again, steering away from cats already on the floor (`used` in `sunbeams/index.html`); a new sunbeam changes
+  that count. Remember a sunbeam's cat once it's chosen.
+- Mewstermind: Enter moves to the next toy and changes it.
+- Scratch That: why it isn't complete isn't clear, and the note goes too fast.
+- Fair Play's hints: only three rules (no three in a row, no sandwich, a line already has all of one toy); when none
+  applies it shows the first empty square's answer with no reason. Add rules, or say it's a plain answer.
+  "Mice go in the glowing square" → "A mouse goes in…" (check other games' hint wording too).
+- Front page: the shelf (subject) tiles are shorter than the game tiles: `.shelfLabel`'s top margin sits inside the
+  grid row (`index.html`).
+- Bubbles: when Raise the Ceiling is allowed isn't predictable after a loss; offer it as a helper.
+
+### Choices as radio buttons
+- Catlas: Answer type → Pick from 4 names / Type with autocomplete / Type in a blank box, no help.
+- Knit Pick: Cat theme words / Everyday words. Keyboard Cat's New: Random / Choose keys.
+- Catwalk: show only the key that applies (Up to 9×9 or From 10×10), not both.
+
+### More to play
+- Tunnel Run: many more turning-only levels, up to a full page of small tunnels with a full-page view.
+- If It Fits: more cat shapes. Patches: colourways (long term).
+- Up a Tree: ⌫ back down to a lower level of the tree; if it's scored against par, allow extra levels?
+- Fridge Magnets: Auto-Audit; a helper that fills in one square.
+- Keyboard Cat: take a word start off the page once it's fully found; a keyboard walkthrough. (A Full Pounce uses
+  all 7 keys at least once; a Perfect Pounce uses each just once.)
+- Spelling String: a way to look up a word.
+- Tangle: Restart (above).
+
+### Questions still to answer
+- Laser Pointer: does any target need a tap again after the laser has passed it once?
