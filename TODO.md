@@ -155,7 +155,7 @@ will recheck this list, and add games 43–52, before any of it is built.
 - Next / Admire / Share / Back to the front page / other size: one big Next, small icon buttons for the rest, the
   other sizes as a small link (New already holds the levels, #236).
 - Share My Result: drop the long level names; game, one-line result (fraction, time, 🔥 streak, 🐾 gold paw), link.
-- Admire: Toy Box has none; Catwalk's could hide the numbers (`G.admire`).
+- Admire: Toy Box has none.
 
 ### Bugs
 - Mewstermind: Enter moves to the next toy and changes it.
