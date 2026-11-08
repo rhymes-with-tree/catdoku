@@ -107,13 +107,14 @@ them), Cat Burglar and Catlas; each keeps its own pinch and drag. Then `G.lives`
 "Wait, I'm only mostly dead!" written once for Catdoku, Toydoku, Hide & Seek, Twirl and Cat Burglar (each keeps its
 lives in its own saved game, as before), and Catlas's tries on each place shown as hearts with it. Then `G.history` (Undo, its ⌘Z, Restart greying out
 with it, and Restart itself; see "Undo" below), with every page moved onto it by 2026-11-08, and the README's "Across every game" (Layout, Gold paw, Bookmark, Keys,
-Undo) and `HIG.md` rewritten to match. Still to do: the other shared helpers below.
+Undo) and `HIG.md` rewritten to match. Then the checking names made one each (Auto check, Audit, Auto grade), and Catdoku's Complete
+and Mewstermind's Check made one button: Check, with the same tick icon (2026-11-08). Still to do: the other shared helpers below.
 
 ### The page, top to bottom
 
 1. **Title row, pinned** (it stays at the top while everything else scrolls, so you always see which game you're
    playing): ☰ Menu at the left (where an iPhone app's Back is; its first row is Home), the game's name centred, the
-   win-streak flame at the right (every game counts streaks with `G.streak`; today only Catdoku shows the flame).
+   win-streak flame at the right (every game counts streaks with `G.streak` and shows the flame from the first win).
    Tapping the flame shows the best streak and today's challenge; on the challenge game it says whether today's is
    done (in place of the badge under Games). On a phone held sideways the title row is pinned at the top of the
    column beside the board instead.
@@ -123,7 +124,7 @@ Undo) and `HIG.md` rewritten to match. Still to do: the other shared helpers bel
 5. **Board**, with zoom and full screen in its corner (`G.zoom`, done 2026-11-07).
 6. **Pieces**, the most used: digits, letters, toys, fabrics, paints, a tray of shapes, with ⌫ or Erase, and the
    game's marking tool among them (Mark, Dot, Keep, Patches' Marker), as Marker already sits with Patches' fabrics.
-7. **Free tools:** Undo, Notes, Bookmark, Return to Bookmark, Complete. Shown only where the game has them, in this
+7. **Free tools:** Undo, Notes, Bookmark, Return to Bookmark, Check. Shown only where the game has them, in this
    order, closing up the gaps.
 8. **Tools that cost the gold paw, grouped and in a dark brick red:** Hint, Audit, and the game's helpers. Not the
    red that marks mistakes on the boards; at least 3 to 1 in light and dark; and a small slashed paw on the icon's
@@ -170,9 +171,6 @@ Built 2026-11-07 (`whatsNew` in `games.js`), ahead of the shared helpers, which 
 
 ### Shared helpers, so each is written once
 
-- **Checking:** the names are one each now (2026-11-07): Auto check (rule breaks turn red as you play), Audit (a
-  one-off check) and Auto grade (a wrong answer costs a life; Catdoku's was Audit as-you-go). Still to weigh: Complete
-  (Catdoku) and Check (Mewstermind) are one button.
 - **Notes:** one name since 2026-11-07 (Toydoku's Pencil and Erase pencil are Notes and Erase notes). The three
   digit-pad games share one pad helper (digits, ⌫, Notes, Auto Notes). Toydoku's Erase notes sits beside Notes or is a
   long press on it.
