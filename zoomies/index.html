@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Zoomies</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-11-08.24"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<meta name="theme-color" content="#ECEEE7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1F1C24" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-11-08.24">
+<style>
+/* The house at 3 a.m.: a night-blue floor plan, each square a piece of furniture (a pale periwinkle tile with its
+   silhouette) and an arrow pointing the way the cat jumped next. Joined squares take their run's colour: sage for the
+   run that's numbered, its own colour for each loose run (lettered a, b…). */
+.house{--night:#4E577D;background:var(--night);border:3px solid var(--ink);border-radius:12px;overflow:hidden;
+  touch-action:none;user-select:none;-webkit-user-select:none}
+.house svg{display:block;width:100%;height:100%;outline:none}
+.tile{fill:#E2E5F1}
+.furn{fill:#B6BCD9;opacity:.7}
+.furn .soft{fill:#D3D7EA}
+/* the way out: a small chevron on the tile's edge or corner, pointing where the cat jumped next */
+.arrow{fill:none;stroke:#2A2530;stroke-width:7;stroke-linecap:round;stroke-linejoin:round}
+/* the number in the middle: a given one big and ink, one worked out from your jumps smaller, in its run's colour */
+.num{font-family:var(--font);font-weight:700;font-size:30px;fill:#2A2530;text-anchor:middle;dominant-baseline:central}
+/* a number given with the puzzle sits on an ink badge; one worked out from your jumps is plain */
+.num.loose{font-style:italic}
+.num.clash{fill:#C8392B}
+.num.given{font-weight:800;font-size:44px}
+.leap{fill:none;stroke-width:5;stroke-linecap:round;opacity:.9}
+.ray{fill:#fff;opacity:.5;pointer-events:none}
+.sel{fill:none;stroke:#2A2530;stroke-width:6;pointer-events:none}
+.drag{stroke:#2A2530;stroke-width:5;stroke-dasharray:10 9;stroke-linecap:round;opacity:.7;pointer-events:none}
+.zoomed .tile{fill:#FAE5BA}
+.runner{pointer-events:none}
+.sitter{display:block;height:58px;width:auto;margin-bottom:-2px}
+@media (max-height:760px){.sitter{height:42px;margin-bottom:-2px}}
+.card img.zoompic{display:block;width:62%;max-width:240px;height:auto;margin:0 auto 14px}
+</style>
+</head>
+<body>
+<main>
+  <header><div class="title"><h1>Zoomies</h1><img class="sitter" id="sitter" src="../cats/c19-31.webp" alt="A tabby cat running flat out"></div><div class="stripe"></div><p class="tagline">Retrace the cat's 3 a.m. zoomies around the house</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap house stage" id="board"><svg id="svg" tabindex="0" role="application" aria-label="The house"></svg>
+    <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+  </div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="guessBtn" aria-pressed="false">Bookmark</button>
+    <button id="backBtn" hidden>Return to Bookmark</button>
+    <button id="linkBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New night</button>
+  </div>
+
+</main>
+
+<script src="../games.js?v=2026-11-08.24"></script>
+<script>
+/* ---------- the run (plain functions, also run in a background worker) ---------- */
+// Zoomies puzzle maker (Signpost): a path through every square, each square's arrow pointing (any distance,
+// along a row, column or diagonal) to the next, with a few numbers given so the answer can be worked out.
+function zoomRays(N, dir) {
+  const D = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]], M = N * N, ray = [];
+  for (let i = 0; i < M; i++) {
+    const r = [];
+    if (dir[i] >= 0) { const [dx, dy] = D[dir[i]]; let x = i % N + dx, y = Math.floor(i / N) + dy;
+      while (x >= 0 && y >= 0 && x < N && y < N) { r.push(y * N + x); x += dx; y += dy; } }
+    ray.push(r);
+  }
+  return ray;
+}
+function zoomDir(N, a, b) {
+  const D = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]];
+  const dx = b % N - a % N, dy = Math.floor(b / N) - Math.floor(a / N);
+  if (dx && dy && Math.abs(dx) !== Math.abs(dy)) return -1;
+  return D.findIndex(([x, y]) => x === Math.sign(dx) && y === Math.sign(dy));
+}
+// A random path through every square, each step a queen's move: depth first, trying the squares with the fewest
+// ways on first (Warnsdorff), ties broken at random.
+function zoomPath(N) {
+  const M = N * N, D = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]];
+  const moves = i => { const o = []; for (const [dx, dy] of D) { let x = i % N + dx, y = Math.floor(i / N) + dy;
+    while (x >= 0 && y >= 0 && x < N && y < N) { o.push(y * N + x); x += dx; y += dy; } } return o; };
+  const mv = []; for (let i = 0; i < M; i++) mv.push(moves(i));
+  for (let tries = 0; tries < 50; tries++) {
+    const seen = new Uint8Array(M), p = [Math.floor(Math.random() * M)]; seen[p[0]] = 1;
+    while (p.length < M) {
+      const h = p[p.length - 1], c = mv[h].filter(j => !seen[j]);
+      if (!c.length) break;
+      // prefer fewer onward moves, but not always: a little randomness keeps the jumps varied
+      const score = j => mv[j].reduce((s, k) => s + (seen[k] ? 0 : 1), 0) + Math.random() * 2.5;
+      let best = c[0], bs = Infinity; for (const j of c) { const s = score(j); if (s < bs) { bs = s; best = j; } }
+      seen[best] = 1; p.push(best);
+    }
+    if (p.length === M) return p;
+  }
+  return null;
+}
+// Works out the links by plain logic (no guessing): a square with only one square it can jump to, or only one that can
+// jump to it, gets that link. A link can't close a loop, and the numbers a link would give must fit: a chain joined to a
+// numbered one takes numbers on from it, and those can't be numbers some other square already has.
+// Returns {succ, solved, broken, steps}; steps lists each link made with why ("to": only place i can go; "from": only
+// square that can reach j). from: links already made (succ array) to start from. order: see below.
+function zoomSolve(N, dir, clue, from, maxSteps, order) {
+  const M = N * N, ray = zoomRays(N, dir), succ = from ? from.slice() : new Array(M).fill(-1), pred = new Array(M).fill(-1);
+  for (let i = 0; i < M; i++) if (succ[i] >= 0) pred[succ[i]] = i;
+  const first = clue.indexOf(1), last = clue.indexOf(M);
+  const reach = Array.from({length: M}, () => []);
+  for (let i = 0; i < M; i++) for (const j of ray[i]) reach[j].push(i);
+  const steps = [];
+  const head = new Int32Array(M), off = new Int32Array(M), len = new Int32Array(M), base = new Array(M);
+  let gaps = [], used = new Uint8Array(M + 2);
+  function chains() {
+    base.fill(null); used.fill(0);
+    for (let h = 0; h < M; h++) if (pred[h] < 0) {
+      let k = h, o = 0, b = null;
+      while (k >= 0) { head[k] = h; off[k] = o; if (clue[k]) b = clue[k] - o; k = succ[k]; o++; }
+      len[h] = o; base[h] = b;
+      if (b != null) for (let n = b; n < b + o; n++) if (n >= 1 && n <= M) used[n] = 1;
+    }
+    gaps = []; let run = 0; for (let n = 1; n <= M + 1; n++) { if (n <= M && !used[n]) run++; else { if (run) gaps.push(run); run = 0; } }
+  }
+  const free = (a, b) => { if (a < 1 || b > M) return false; for (let n = a; n <= b; n++) if (used[n]) return false; return true; };
+  function ok(i, j) {
+    if (i === last || j === first || succ[i] >= 0 || pred[j] >= 0) return false;
+    const X = head[i], Y = head[j]; if (X === Y) return false;
+    const bx = base[X], by = base[Y], lx = len[X], ly = len[Y];
+    if (bx != null && by != null) return by === bx + lx;
+    if (bx != null) return free(bx + lx, bx + lx + ly - 1);
+    if (by != null) return free(by - lx, by - 1);
+    return gaps.some(g => g >= lx + ly);
+  }
+  const link = (i, j, why) => { succ[i] = j; pred[j] = i; steps.push({i, j, why}); };
+  let broken = false;
+  // order: squares to look at first (a hint wants the jump nearest where the player is); each square is checked both
+  // ways, where it can go and what can reach it
+  const seq = order ? [...order, ...Array.from({length: M}, (_, i) => i)] : Array.from({length: M}, (_, i) => i);
+  outer: while (!maxSteps || steps.length < maxSteps) {
+    chains();
+    for (const i of seq) {
+      if (i !== last && succ[i] < 0) {
+        let c = -1, n = 0; for (const j of ray[i]) if (ok(i, j)) { c = j; n++; if (n > 1) break; }
+        if (!n) { broken = true; break outer; }
+        if (n === 1) { link(i, c, "to"); continue outer; }
+      }
+      if (i !== first && pred[i] < 0) {
+        let c = -1, n = 0; for (const k of reach[i]) if (ok(k, i)) { c = k; n++; if (n > 1) break; }
+        if (!n) { broken = true; break outer; }
+        if (n === 1) { link(c, i, "from"); continue outer; }
+      }
+    }
+    break;
+  }
+  let solved = !broken; for (let i = 0; i < M; i++) if (i !== last && succ[i] < 0) solved = false;
+  return {succ, solved, broken, steps};
+}
+// A puzzle for level n (its size from the level): reveal numbers from the path until logic alone finds the whole
+// path, then take back any that turn out not to be needed. Easier levels keep a few extra.
+function makeZoom(n) {
+  const SIZE = [4, 4, 5, 6, 7, 8], EXTRA = [3, 0, 1, 0, 0, 0];
+  const N = SIZE[n - 1] || 5, M = N * N;
+  const sh = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const path = zoomPath(N); if (!path) return null;
+  const dir = new Array(M).fill(-1); for (let k = 0; k < M - 1; k++) dir[path[k]] = zoomDir(N, path[k], path[k + 1]);
+  const at = new Array(M); path.forEach((s, k) => at[s] = k + 1);
+  const clue = new Array(M).fill(0); clue[path[0]] = 1; clue[path[M - 1]] = M;
+  for (let guard = 0; guard < M; guard++) {
+    const r = zoomSolve(N, dir, clue);
+    if (r.broken) return null;
+    if (r.solved) break;
+    // reveal a square that logic hasn't placed yet
+    const pred = new Array(M).fill(-1); r.succ.forEach((j, i) => { if (j >= 0) pred[j] = i; });
+    const open = []; for (let s = 0; s < M; s++) if (!clue[s] && (r.succ[s] < 0 || pred[s] < 0)) open.push(s);
+    if (!open.length) return null;
+    const s = open[Math.floor(Math.random() * open.length)]; clue[s] = at[s];
+  }
+  for (const s of sh([...clue.keys()].filter(s => clue[s] && clue[s] !== 1 && clue[s] !== M))) {
+    const v = clue[s]; clue[s] = 0;
+    if (!zoomSolve(N, dir, clue).solved) clue[s] = v;
+  }
+  const extra = EXTRA[n - 1] || 0;
+  if (extra) { const blanks = sh([...clue.keys()].filter(s => !clue[s])); for (const s of blanks.slice(0, extra)) clue[s] = at[s]; }
+  return {N, n, path, dir, clue};
+}
+
+/* ---------- game state ---------- */
+// game: {level, N, path (the answer: every square in the order the cat jumped), clue (the number given on each square,
+//        0 for none), succ (the player's jumps: the square each one jumps to, -1 for none), history, won, hinted…}
+const STORE = "catdoku.zoomies.v1", LEVELS = 6, SIZE = [4, 4, 5, 6, 7, 8];
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1}, state.settings);
+let game = state.game || null, busy = false, running = false, sel = -1;
+// The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
+G.pawLost(() => !game || game.won || game.hinted || game.restarted);
+const save = () => G.save(STORE, {settings, game});
+const build = G.builder([zoomRays, zoomDir, zoomPath, zoomSolve, makeZoom], "makeZoom");
+const levelName = n => `Level ${n} · ${SIZE[n - 1]} × ${SIZE[n - 1]}${n === 1 ? ", extra numbers" : ""}`;
+const playing = () => game && !game.won && !busy && !running;
+const M = () => game.N * game.N;
+const first = () => game.path[0], last = () => game.path[M() - 1];
+let dir = [], ray = [];
+function derive() {
+  const N = game.N; dir = new Array(M()).fill(-1);
+  for (let k = 0; k < M() - 1; k++) dir[game.path[k]] = zoomDir(N, game.path[k], game.path[k + 1]);
+  ray = zoomRays(N, dir);
+}
+const onRay = (a, b) => ray[a].includes(b);
+
+/* ---------- runs and their numbers ---------- */
+// Each run of joined squares, from its first square: its squares in order, and its numbers, from a given number on it
+// (base: the number of its first square), or none, when it's a loose run (lettered). clash: two given numbers on it
+// that can't both be right.
+function runs() {
+  const n = M(), pred = new Array(n).fill(-1), out = [], of = new Array(n);
+  game.succ.forEach((j, i) => { if (j >= 0) pred[j] = i; });
+  for (let h = 0; h < n; h++) if (pred[h] < 0) {
+    const sq = []; let k = h, base = null, clash = false;
+    while (k >= 0) { if (game.clue[k]) { const b = game.clue[k] - sq.length; if (base == null) base = b; else if (b !== base) clash = true; } sq.push(k); k = game.succ[k]; }
+    const r = {sq, base, clash}; out.push(r); sq.forEach((s, o) => of[s] = [r, o]);
+  }
+  // loose runs of two or more squares get letters, in reading order of their first squares
+  let letter = 0; for (const r of out) if (r.base == null && r.sq.length > 1) r.letter = "abcdefghijklmnopqrstuvwxyz"[letter++ % 26];
+  return {list: out, of, pred};
+}
+// The colours of loose runs (tints of the palette) and of the numbered run (sage), and darker for their leaps.
+const LOOSE = ["#E16A4A", "#73A7AE", "#B94588", "#B3B94B", "#9874CA", "#5FA0C8", "#BD5538", "#ECA818"];
+const tint = (hex, t) => "#" + [1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) + (255 - parseInt(hex.slice(i, i + 2), 16)) * t).toString(16).padStart(2, "0")).join("");
+const shade = (hex, t) => "#" + [1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * (1 - t) + 0x2A * t).toString(16).padStart(2, "0")).join("");
+const runColour = r => r.base != null ? "#6AA673" : LOOSE[("abcdefghijklmnopqrstuvwxyz".indexOf(r.letter)) % LOOSE.length];
+
+/* ---------- drawing ---------- */
+// The furniture, drawn in a 100 × 100 square: each square of the house gets one, picked from the puzzle itself so it
+// stays the same on reload and in a shared link. The cat's bed is the first square and your bed the last.
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+const R = (x, y, w, h, r = 3) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}"/>`;
+const FURNITURE = {
+  sofa: R(20, 36, 60, 22, 7) + R(14, 52, 72, 20, 6) + R(9, 44, 15, 30, 7) + R(76, 44, 15, 30, 7) + R(17, 72, 6, 9, 2) + R(77, 72, 6, 9, 2),
+  armchair: R(28, 26, 44, 34, 9) + R(24, 52, 52, 20, 6) + R(17, 42, 15, 32, 7) + R(68, 42, 15, 32, 7) + R(24, 72, 6, 10, 2) + R(70, 72, 6, 10, 2),
+  table: R(12, 40, 76, 10, 3) + R(18, 50, 7, 34, 2) + R(75, 50, 7, 34, 2) + '<ellipse cx="38" cy="33" rx="9" ry="7"/>' + R(56, 28, 12, 12, 2),
+  chair: R(30, 14, 34, 8, 3) + R(30, 14, 8, 50, 3) + R(56, 14, 8, 30, 3) + R(28, 54, 42, 9, 3) + R(30, 62, 7, 24, 2) + R(62, 62, 7, 24, 2),
+  lamp: '<polygon points="35,16 65,16 76,44 24,44"/>' + R(47, 44, 6, 36, 2) + '<ellipse cx="50" cy="83" rx="18" ry="5"/>',
+  bookcase: R(20, 12, 60, 5, 2) + R(20, 36, 60, 4, 1) + R(20, 60, 60, 4, 1) + R(20, 84, 60, 5, 2) + R(18, 12, 5, 77, 2) + R(77, 12, 5, 77, 2) +
+    R(27, 19, 7, 17, 1) + R(36, 22, 6, 14, 1) + R(44, 19, 8, 17, 1) + R(58, 24, 6, 12, 1) + R(66, 20, 7, 16, 1) +
+    R(27, 46, 9, 14, 1) + R(39, 43, 6, 17, 1) + R(48, 45, 7, 15, 1) + R(62, 43, 8, 17, 1) + R(27, 67, 7, 17, 1) + R(37, 70, 14, 14, 1) + R(56, 66, 7, 18, 1) + R(66, 69, 8, 15, 1),
+  plant: '<polygon points="35,60 65,60 60,86 40,86"/>' + '<ellipse cx="50" cy="36" rx="9" ry="22"/><ellipse cx="34" cy="44" rx="7" ry="17" transform="rotate(-32 34 44)"/><ellipse cx="66" cy="44" rx="7" ry="17" transform="rotate(32 66 44)"/>',
+  cattree: R(30, 28, 8, 56, 2) + R(62, 48, 8, 36, 2) + R(16, 22, 36, 8, 4) + R(48, 42, 36, 8, 4) + R(14, 82, 72, 7, 3) + '<ellipse cx="34" cy="16" rx="12" ry="7"/>',
+  tv: R(16, 22, 68, 42, 5) + R(44, 64, 12, 10, 2) + R(28, 74, 44, 7, 3),
+  fridge: R(28, 10, 44, 80, 6) + '<g class="soft">' + R(32, 14, 36, 24, 3) + R(32, 42, 36, 44, 3) + '</g>' + R(60, 20, 4, 12, 2) + R(60, 48, 4, 16, 2),
+  // the start and the end
+  catbed: '<ellipse cx="50" cy="62" rx="38" ry="20"/><ellipse class="soft" cx="50" cy="58" rx="27" ry="11"/>',
+  bed: R(10, 30, 9, 54, 3) + R(81, 46, 9, 38, 3) + R(14, 54, 72, 18, 4) + '<ellipse class="soft" cx="32" cy="50" rx="12" ry="7"/>' + R(46, 46, 38, 24, 5),
+};
+const PLAIN = ["sofa", "armchair", "table", "chair", "lamp", "bookcase", "plant", "cattree", "tv", "fridge"];
+function furnitureOf(i) {
+  if (i === first()) return "catbed";
+  if (i === last()) return "bed";
+  let s = (game.path[0] * 31 + game.path[1] * 7 + i * 2654435761) >>> 0; s ^= s >>> 13; s = Math.imul(s, 0x5bd1e995) >>> 0; s ^= s >>> 15;
+  return PLAIN[s % PLAIN.length];
+}
+// An arrow pointing in direction d (0 up, then clockwise by eighths), at the middle of the square.
+const ARROW = "M0,-30 L17,-8 L6,-8 L6,26 L-6,26 L-6,-8 L-17,-8 Z";
+let svgRoot = null;
+const xyOf = i => [i % game.N, Math.floor(i / game.N)];
+const mid = i => { const [x, y] = xyOf(i); return [x * 100 + 50, y * 100 + 50]; };
+// The house in words, for VoiceOver (G.describe): where each square points and its number, and the jumps made.
+const WAY = ["up", "up and right", "right", "down and right", "down", "down and left", "left", "up and left"];
+function say() {
+  if (!game) return;
+  const {of} = runs(), N = game.N;
+  const sq = i => { const [r, o] = of[i], n = r.base != null ? r.base + o : r.letter ? `${r.letter}${o ? "+" + o : ""}` : "";
+    return `${G.at(i, N)}: ${i === first() ? "the cat's bed, " : i === last() ? "your bed, the end" : ""}${i === last() ? "" : "points " + WAY[dir[i]]}${n !== "" ? `, ${r.base != null ? "number " : "run "}${n}` : ""}${game.succ[i] >= 0 ? `, jumps to ${G.at(game.succ[i], N)}` : ""}`; };
+  G.describe($("svg"), `The house, ${N} by ${N}. ${G.listed([...Array(M()).keys()].map(sq), "; ")}.${sel >= 0 ? ` Picked: ${G.at(sel, N)}.` : ""} Arrow keys pick a square; Space picks it, then Space on another square joins them.`);
+}
+function draw() {
+  queueMicrotask(say);
+  const svg = $("svg"), N = game.N, S = N * 100, {list, of} = runs(), hint = hints.current();
+  svg.innerHTML = ""; svg.setAttribute("viewBox", `0 0 ${S} ${S}`);
+  const tiles = el("g", {}, svg);
+  for (let i = 0; i < M(); i++) {
+    const [x, y] = xyOf(i), [r] = of[i], joined = r.sq.length > 1;
+    const g = el("g", {class: "sq", "data-i": i, transform: `translate(${x * 100} ${y * 100})`}, tiles);
+    const t = el("rect", {x: 4, y: 4, width: 92, height: 92, rx: 12, class: "tile"}, g);
+    const c = joined ? runColour(r) : null;
+    if (joined && !game.won) t.style.fill = tint(c, .62);
+    // only the two beds are drawn: the cat's (the start) and yours (the end)
+    if (i === first() || i === last()) { const f = el("g", {class: "furn"}, g); f.innerHTML = FURNITURE[furnitureOf(i)];
+      if (joined && !game.won) { f.style.fill = tint(c, .3); f.querySelectorAll(".soft").forEach(s => s.style.fill = tint(c, .5)); } }
+  }
+  // targets: the squares the picked one can jump to
+  if (sel >= 0 && playing()) for (const j of ray[sel]) { const [x, y] = xyOf(j); el("rect", {x: x * 100 + 4, y: y * 100 + 4, width: 92, height: 92, rx: 12, class: "ray"}, svg); }
+  // the leaps: an arc from each square to the one it jumps to, in its run's colour
+  const leaps = el("g", {}, svg);
+  for (const r of list) for (let o = 0; o + 1 < r.sq.length; o++) {
+    const a = r.sq[o], b = r.sq[o + 1], [ax, ay] = mid(a), [bx, by] = mid(b), d = Math.hypot(bx - ax, by - ay);
+    const bend = Math.min(30, d * .22), mx = (ax + bx) / 2 + (by - ay) / d * bend, my = (ay + by) / 2 - (bx - ax) / d * bend;
+    // stop short of the middles so the arrows still show
+    const t0 = Math.min(.42, 30 / d), t1 = 1 - Math.min(.42, 34 / d), q = t => [(1 - t) ** 2 * ax + 2 * (1 - t) * t * mx + t * t * bx, (1 - t) ** 2 * ay + 2 * (1 - t) * t * my + t * t * by];
+    const [sx, sy] = q(t0), [ex, ey] = q(t1), [cx, cy] = q((t0 + t1) / 2);
+    const k = shade(runColour(r), .35);
+    el("path", {d: `M${sx},${sy} Q${2 * cx - (sx + ex) / 2},${2 * cy - (sy + ey) / 2} ${ex},${ey}`, class: "leap", stroke: game.won ? "#C98A0E" : k}, leaps);
+    // a little paw-dot where it lands
+    el("circle", {cx: ex, cy: ey, r: 7, fill: game.won ? "#C98A0E" : k}, leaps);
+  }
+  const marks = el("g", {}, svg);
+  for (let i = 0; i < M(); i++) {
+    const [x, y] = xyOf(i), [r, o] = of[i];
+    const g = el("g", {transform: `translate(${x * 100} ${y * 100})`}, marks);
+    if (dir[i] >= 0) { const [dx, dy] = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]][dir[i]], d = dx && dy ? 33 : 38;
+      el("path", {d: "M-9,4 L0,-5 L9,4", class: "arrow", transform: `translate(${50 + dx * d} ${50 + dy * d}) rotate(${dir[i] * 45})`}, g); }
+    let label = "", cls = "num";
+    if (r.base != null) { label = r.base + o; if (r.clash) cls += " clash"; }
+    else if (r.letter) { label = o ? `${r.letter}+${o}` : r.letter; cls += " loose"; }
+    if (game.clue[i]) {
+      label = String(game.clue[i]); cls = "num given" + (r.clash ? " clash" : "");
+      el("text", {x: 50, y: 52, class: cls}, g).textContent = label;
+    } else if (label !== "") {
+      const tx = el("text", {x: 50, y: 52, class: cls, fill: r.clash ? "#C8392B" : shade(runColour(r), .45)}, g); tx.textContent = label;
+      if (String(label).length > 3) tx.setAttribute("font-size", 24);
+    }
+  }
+  for (const i of guesses.list()) { const [x, y] = xyOf(i); el("rect", {x: x * 100 + 6, y: y * 100 + 6, width: 88, height: 88, rx: 12, class: "guess"}, svg); }
+  if (sel >= 0 && playing()) { const [x, y] = xyOf(sel); el("rect", {x: x * 100 + 5, y: y * 100 + 5, width: 90, height: 90, rx: 12, class: "sel"}, svg); }
+  // the hint: gold (or red) boxes, and a line for a jump
+  if (hint) {
+    for (const i of hint.sq || []) { const [x, y] = xyOf(i); el("rect", {x: x * 100 + 6, y: y * 100 + 6, width: 88, height: 88, rx: 12, class: "hintsq" + (hint.bad ? " bad" : "")}, svg); }
+    if (hint.line) { const [ax, ay] = mid(hint.line[0]), [bx, by] = mid(hint.line[1]); el("line", {x1: ax, y1: ay, x2: bx, y2: by, class: "hintline" + (hint.bad ? " bad" : "")}, svg); }
+  }
+  el("line", {class: "drag", id: "dragline", x1: -99, y1: -99, x2: -99, y2: -99}, svg);
+  el("rect", {class: "kbring", id: "kbring", x: -200, y: -200, width: 84, height: 84, rx: 12}, svg);
+  showCursor();
+  // the status: jumps made of all of them
+  const made = game.succ.filter(j => j >= 0).length;
+  if (game.won) $("count").textContent = "Every jump retraced!";
+  else G.tally($("count"), made, M() - 1, '<path d="M2 12Q8 1 14 9" fill="none" stroke="#6AA673" stroke-width="2.4" stroke-linecap="round"/><circle cx="14" cy="10" r="2.4" fill="#6AA673"/>', `${made} of ${M() - 1} jumps`);
+  $("hintBtn").disabled = !game || game.won;
+  undo.sync(); guesses.sync();
+}
+
+/* ---------- playing ---------- */
+// Join a to b (a jumps to b): b must be along a's arrow, nothing jumps into the cat's bed or out of yours, and no loops.
+// It takes the place of any jump a made before and any jump into b.
+function link(a, b) {
+  if (a === last()) { G.note("Your bed is where the run ends: no more jumps from there.", 3500); return false; }
+  if (b === first()) { G.note("The run starts in the cat's bed: nothing jumps into it.", 3500); return false; }
+  for (let k = b; k >= 0; k = game.succ[k]) if (k === a) { G.note("That would send the cat round in a loop.", 3500); return false; }
+  guesses.before(a); undo.push();
+  const pred = game.succ.indexOf(b);
+  if (pred >= 0) game.succ[pred] = -1;
+  game.succ[a] = b;
+  return true;
+}
+function cut(a) { guesses.before(a); undo.push(); game.succ[a] = -1; }
+// What a tap on b does with a picked: cut the jump between them if there is one, join them if one points at the
+// other, or pick b instead.
+function act(a, b) {
+  game.started = true;
+  if (game.succ[a] === b) { cut(a); sel = a; }
+  else if (game.succ[b] === a) { cut(b); sel = a; }
+  else if (onRay(a, b)) { if (link(a, b)) sel = b; }
+  else if (onRay(b, a)) { if (link(b, a)) sel = b; }
+  else sel = b;
+  after();
+}
+function tap(i) {
+  if (!playing()) return;
+  if (sel < 0) sel = i; else if (sel === i) sel = -1; else return act(sel, i);
+  draw();
+}
+function after() {
+  draw();
+  if (solved()) { win(); return; }
+  save();
+}
+// Solved: every square but your bed jumps on, in one run from the cat's bed, and every given number in its place.
+function solved() {
+  if (game.succ.some((j, i) => i !== last() && j < 0)) return false;
+  let k = first(), n = 1;
+  while (k >= 0) { if (game.clue[k] && game.clue[k] !== n) return false; k = game.succ[k]; n++; }
+  return n - 1 === M();
+}
+// Tap a square to pick it, then a square it points at (or one pointing at it) to join them; or drag from one to the other.
+let press = null;
+const svgPoint = e => { const p = $("svg").createSVGPoint(); p.x = e.clientX; p.y = e.clientY; return p.matrixTransform($("svg").getScreenCTM().inverse()); };
+const cellOf = e => { const pt = svgPoint(e), x = Math.floor(pt.x / 100), y = Math.floor(pt.y / 100); return x < 0 || y < 0 || x >= game.N || y >= game.N ? -1 : y * game.N + x; };
+$("svg").addEventListener("pointerdown", e => {
+  if (!playing()) return;
+  const i = cellOf(e); if (i < 0) return;
+  e.preventDefault();
+  try { $("svg").setPointerCapture(e.pointerId); } catch (_) {}
+  press = {i, moved: false};
+});
+$("svg").addEventListener("pointermove", e => {
+  if (!press || !playing()) return;
+  const j = cellOf(e), line = $("dragline");
+  if (j !== press.i && j >= 0) press.moved = true;
+  if (press.moved && line) { const [ax, ay] = mid(press.i), pt = svgPoint(e); line.setAttribute("x1", ax); line.setAttribute("y1", ay); line.setAttribute("x2", pt.x); line.setAttribute("y2", pt.y); }
+});
+$("svg").addEventListener("pointerup", e => {
+  if (!press) return;
+  const p = press; press = null;
+  const j = cellOf(e);
+  if (!playing()) return;
+  if (p.moved) { if (j >= 0 && j !== p.i) act(p.i, j); else draw(); }
+  else if (j === p.i) tap(j);
+});
+$("svg").addEventListener("pointercancel", () => { press = null; if (game) draw(); });
+// Keys: the arrows move a cursor, Space or Enter taps there, Escape lets go of the square picked.
+function showCursor() {
+  const c = $("kbring"); if (!c) return;
+  const at = keys ? keys.at() : -1;
+  if (at < 0) { c.setAttribute("x", -200); return; }
+  const [x, y] = xyOf(at); c.setAttribute("x", x * 100 + 8); c.setAttribute("y", y * 100 + 8);
+}
+let keys = null;
+keys = G.gridKeys({on: playing, size: () => [game.N, game.N], start: () => sel >= 0 ? sel : first(), show: showCursor,
+  act: i => tap(i), escape: () => { if (sel >= 0) { sel = -1; draw(); } }});
+// Undo takes back a jump made or cut, or a Restart.
+const undo = G.history({game: () => game, take: () => game.succ.slice(), back: (s, g) => { g.succ = s; }, cap: 400, restart: true,
+  can: playing, started: () => game.succ.some(j => j >= 0), after: () => { sel = -1; draw(); save(); }});
+// Bookmark: the next jump made or cut glows, and Return to Bookmark undoes back to just before it (free, as Undo is).
+const guesses = G.guesser({game: () => game, history: undo, draw: () => { sel = -1; draw(); save(); }, board: $("board"), what: "jump"});
+$("restartBtn").onclick = () => {
+  if (undo.restart(g => { g.succ = new Array(g.N * g.N).fill(-1); guesses.clear(); })) { sel = -1; G.note("Back to the start of the night. Undo brings your jumps back.", 4000); }
+};
+
+/* ---------- hints ---------- */
+// A wrong jump first, in red. Otherwise the next jump logic finds from the jumps made so far: the first time, the square
+// that settles it and why; asked again, the jump itself. A hint keeps you on the same level and costs the gold paw.
+const hints = G.hinter({game: () => game, key: () => game ? game.succ.join() : "", draw: () => draw()});   // marks {sq: [squares], line: [a, b], bad}
+function hint() {
+  if (!playing()) return;
+  const want = new Array(M()).fill(-1); for (let k = 0; k < M() - 1; k++) want[game.path[k]] = game.path[k + 1];
+  guesses.disarm();
+  const wrong = [...Array(M()).keys()].filter(i => game.succ[i] >= 0 && game.succ[i] !== want[i]);
+  if (wrong.length) {
+    const i = wrong[0]; game.hinted = true; save();
+    return hints.show({sq: [i, game.succ[i]], line: [i, game.succ[i]], bad: true}, "That jump is wrong: the cat went somewhere else from the red square." + G.andMore(wrong.length - 1));
+  }
+  // look first where the player is: the end of the run from the cat's bed and the squares it could jump to, then the
+  // ends of the other runs, then anywhere
+  const {list} = runs(), order = [];
+  const mine = list.find(r => r.sq[0] === first()), tail = mine.sq[mine.sq.length - 1];
+  order.push(tail, ...ray[tail]);
+  for (const r of list) if (r !== mine && r.base != null) order.push(r.sq[r.sq.length - 1], r.sq[0]);
+  for (const r of list) if (r.base == null && r.sq.length > 1) order.push(r.sq[r.sq.length - 1], r.sq[0]);
+  const r = zoomSolve(game.N, dir, game.clue, game.succ, 1, order), st = r.steps[0];
+  // logic always finds one from right jumps; if not, fall back on the answer
+  const step = st || {i: tail, j: want[tail], why: "to"};
+  game.hinted = true; save();
+  const {of} = runs(), numOf = i => { const [q, o] = of[i]; return q.base != null ? q.base + o : null; };
+  if (hints.level() >= 1 || !st) return hints.show({sq: [step.i, step.j], line: [step.i, step.j]}, "Join the gold squares: the first jumps to the second.");
+  const n = numOf(step.why === "to" ? step.i : step.j);
+  return hints.show({sq: [step.why === "to" ? step.i : step.j]}, step.why === "to"
+    ? (n != null ? `Only one square along the gold square's way out can be ${n + 1}. Which?` : "There's only one square the gold square can jump to. Which?")
+    : (n != null ? `Only one square can jump to the gold square, so it's ${n - 1}. Which?` : "Only one square can jump to the gold square. Which?"));
+}
+$("hintBtn").onclick = hint;
+
+/* ---------- endings ---------- */
+// The last jump: the cat zooms the whole run from its bed to yours, each square turning gold as it lands.
+const runner = () => { const im = el("image", {href: "../cats/c19-31.webp", width: 120, height: 70, class: "runner"}); return im; };
+function win() {
+  game.won = true; sel = -1; G.finishClock(game);
+  const next = game.hinted ? game.level : Math.min(LEVELS, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save();
+  G.track(`Zoomies solved level ${game.level}`);
+  build.prefetch(next);
+  draw();
+  const g = game, done = () => { running = false; if (game === g) finishCard(); };
+  running = true;
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) { setTimeout(done, 900); return; }
+  const svg = $("svg"), cat = runner(), hop = Math.max(70, Math.min(260, 5200 / M())), t0 = performance.now(), tiles = [...svg.querySelectorAll(".sq")];
+  tiles.forEach(t => t.querySelector(".tile").style.fill = "");
+  svg.append(cat);
+  let k = 0;
+  (function frame(now) {
+    if (game !== g) return;
+    const pos = (now - t0) / hop, a = Math.min(Math.floor(pos), M() - 1), b = Math.min(a + 1, M() - 1), f = Math.min(1, pos - a);
+    while (k <= a) tiles[game.path[k++]].classList.add("zoomed");
+    const [ax, ay] = mid(game.path[a]), [bx, by] = mid(game.path[b]);
+    const x = ax + (bx - ax) * f, y = ay + (by - ay) * f - Math.sin(Math.PI * f) * Math.min(60, 20 + Math.hypot(bx - ax, by - ay) * .15);
+    const left = bx < ax || (bx === ax && a > 0 && mid(game.path[a - 1])[0] > ax);
+    cat.setAttribute("transform", `translate(${x} ${y - 10})${left ? " scale(-1 1)" : ""} translate(-60 -40)`);
+    if (a < M() - 1) requestAnimationFrame(frame); else setTimeout(done, 700);
+  })(t0);
+}
+function finishCard() {
+  const next = settings.level, gold = !game.restarted && !game.hinted;
+  let text = `Every jump of the cat's 3 a.m. zoomies, retraced across all ${M()} squares of the house.`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === LEVELS ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  const pic = new Image(); pic.className = "zoompic"; pic.src = "../cats/c20-6.webp"; pic.alt = "A tabby cat in mid-leap";
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the run", game.result,
+    {title: "Zoomies!", gold, goldWhy: "No hints or restarts!", goldPic: [pic],
+     next: next > game.level ? `Next: level ${next}` : "Next night", after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- new nights ---------- */
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
+function begin(p, level) {
+  game = {level, N: p.N, path: p.path.slice(), clue: p.clue.slice(), succ: new Array(p.N * p.N).fill(-1), history: [], won: false, ...G.freshClock()};
+  sel = -1; derive(); hints.clear(false);
+}
+async function newPuzzle() {
+  if (busy) return;
+  busy = true;
+  const n = settings.level;
+  G.openCard("Waiting for 3 a.m.…", "", []);
+  const p = await build.take(n);
+  begin(p, n);
+  busy = false; G.closeCard(); G.note("");
+  draw(); save();
+  build.prefetch(n);
+  G.track(`Zoomies new puzzle level ${n}`);
+  helpOnFirstVisit();
+}
+
+/* ---------- sharing ---------- */
+// The run as two hex digits a square, and which squares have their number given; with progress, the jumps made.
+const hex2 = a => a.map(v => (v < 0 ? 255 : v).toString(16).padStart(2, "0")).join("");
+const unhex2 = s => typeof s === "string" && s.length % 2 === 0 && /^[0-9a-f]*$/.test(s) ? (s.match(/../g) || []).map(h => parseInt(h, 16)) : null;
+$("linkBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Zoomies", won: game.won,
+  puzzle: () => ({g: "zoomies", N: game.level, s: hex2(game.path), c: hex2(game.path.map((s, k) => game.clue[s] ? k : -1).filter(k => k >= 0))}),
+  progress: () => ({s: hex2(game.succ)})}); };
+function openShared(d) {
+  const fail = () => G.note("That share link didn't work.", 5000);
+  const n = d.N, N = SIZE[n - 1], sq = N * N, path = N && unhex2(d.s), ks = N && unhex2(d.c);
+  if (!N || !path || path.length !== sq || new Set(path).size !== sq || path.some(v => v >= sq) || !ks || ks.some(k => k >= sq)) { fail(); return; }
+  if (path.some((s, k) => k && zoomDir(N, path[k - 1], s) < 0) || !ks.includes(0) || !ks.includes(sq - 1)) { fail(); return; }
+  const clue = new Array(sq).fill(0); ks.forEach(k => clue[path[k]] = k + 1);
+  begin({N, path, clue}, n);
+  if (d.p) { const s = unhex2(d.p.s); if (s && s.length === sq && s.every(v => v === 255 || v < sq)) {
+    const succ = s.map(v => v === 255 ? -1 : v);
+    // only jumps along an arrow, none into the cat's bed or out of yours, each square jumped into once
+    const into = succ.filter(v => v >= 0);
+    if (succ.every((j, i) => j < 0 || onRay(i, j)) && !into.includes(path[0]) && succ[path[sq - 1]] < 0 && new Set(into).size === into.length) { game.succ = succ; game.timed = false; }
+  } }
+  settings.level = n; $("levelSel").value = n;
+  draw(); save(); build.prefetch(n);
+  if (solved()) win();
+}
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  settings.seenHelp = false; helpOnFirstVisit();
+  if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
+}
+function helpOnFirstVisit() {
+  if (settings.seenHelp || !game || !playing() || document.querySelector(".spot")) return;
+  const N = game.N, all = [...Array(M()).keys()].map(xyOf), s = first(), givens = [...Array(M()).keys()].filter(i => game.clue[i] && i !== s && i !== last()).map(xyOf);
+  const turn = G.yourTurn(() => game, g => { game = g; derive(); }, () => { sel = -1; draw(); });
+  let was = null;
+  const steps = [
+    {say: "The cat starts in its bed", lit: [xyOf(s)]},
+    {say: "Its notch points to the next jump", lit: [s, ...ray[s]].map(xyOf)},
+    // Your turn: join the bed to a square along its arrow (G.yourTurn puts the house back afterwards)
+    {say: "Tap the bed, then a lit square", lit: [s, ...ray[s]].map(xyOf), try: {done: () => game.succ[s] !== was, yes: "Zoom!"}, ...turn.upTo,
+     enter() { turn.from.enter(); sel = -1; was = game.succ[s]; draw(); }},
+    {say: "Every square once, ending on your bed", lit: all, outline: [[xyOf(last())]], tone: "ok"},
+    {say: "Join jumps anywhere, in any order", lit: all},
+    ...(givens.length ? [{say: "Big numbers: when the cat got there", lit: givens}] : []),
+    {say: "Tap a jump's two ends to cut it", lit: all, later: true},
+    {say: "Small coloured numbers come from your jumps", lit: all, later: true},
+    {say: "Loose runs get letters: a, a+1…", lit: all, later: true},
+    {say: "Not sure? Bookmark, then try a jump. Return to Bookmark undoes it", els: [$("guessBtn")]},
+    {say: "Stuck? Hint shows the next jump", els: [$("hintBtn")]},
+  ];
+  G.spotlight({grid: $("svg"), w: N, h: N, steps, done: () => { settings.seenHelp = true; save(); }});
+}
+$("helpBtn").onclick = () => { if (!busy) showHelp(); };
+
+for (let n = 1; n <= LEVELS; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", ""), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
+G.nav("zoomies");
+G.checkClock(game);
+G.setupTimer({name: "zoomies", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+if (!(settings.level >= 1 && settings.level <= LEVELS)) settings.level = 1;
+$("levelSel").value = settings.level;
+const shared = G.readShare("zoomies");
+const hadSave = !!(game && game.path);
+if (hadSave) G.reopen(() => {
+    const N = SIZE[game.level - 1];
+    if (game.N !== N || game.path.length !== N * N || game.succ.length !== N * N || game.clue.length !== N * N) throw new Error("the saved night doesn't fit its level");
+    derive(); draw();
+    if (game.won) finishCard();
+    build.prefetch(settings.level); helpOnFirstVisit();
+  }, why => { game = null; busy = false; newPuzzle().then(() => G.note(why, 0)); });
+else if (!shared) newPuzzle();
+const shareOpts = () => ({name: "Zoomies", inProgress: !!(game && !game.won && game.history.length), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, {...shareOpts(), fresh: hadSave ? null : why => Promise.resolve(newPuzzle()).then(() => { G.note(why, 6000); })});
+window.addEventListener("hashchange", () => { const d = G.readShare("zoomies"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>

@@ -60,6 +60,7 @@ const G = (() => {
     ["Mew Hue", "mewhue", "Slide paint together and line up the colours", "#B94588", "quick", "colour color mixing paint swipe slide merge lines rows columns 2048 hue pawlette", "2026-11-01"],
     ["Pawlinko", "pawlinko", "Take turns with Gus and Peanut knocking toys down the climbing wall into the cat beds", "#7885BA", "quick", "plinko pachinko pegs pegboard galton board drop balls bounce plinko physics yarn toys cat climbing wall tree beds springs action", "2026-11-02"],
     ["Cross Stitch", "crossstitch", "Stitch the sampler by the counts to see the picture", "#BD5538", "logic", "nonogram nonograms picross griddlers paint by numbers hanjie pattern pic-a-pix logic pictures cross stitch sampler embroidery", "2026-11-06"],
+    ["Zoomies", "zoomies", "Retrace the cat's 3 a.m. zoomies around the house", "#4E577D", "lines", "signpost arrows path numbers jumps queen chain link zoomies", "2026-11-08"],
   ];
   // The shelves the front page and the games menu sort the games onto, in order: key (also a plain name for it,
   // for search), heading, one line.
@@ -1113,6 +1114,7 @@ const G = (() => {
     windowledges: ["Arrow keys: pick a window", "1 to 9: put in a digit (Shift: a note)", "Backspace or 0: take it out", "N or P: notes on or off", "Escape: let go"],
     catshuffle: ["Arrow keys: pick a square", "Space: slide the piece there, or turn the knob (Shift turns it back)", "Shift with an arrow: shift its row or column"],
     mewhue: ["Arrow keys: pick a square", "Shift with an arrow: slide its row or column that way"],
+    zoomies: ["Arrow keys: pick a square", "Space or Enter: pick it, then a square along its arrow (or pointing at it) to join them; again to cut the jump", "Escape: let go"],
     crossstitch: ["Arrow keys: pick a square", "Space or Enter: stitch it, or take the stitch out", "X or .: a dot, for a square that stays empty", "Backspace: clear the square", "Shift with an arrow: carry what you put down along the row or column"],
     tango: ["Arrow keys: pick a square", "Space or Enter: tap it (one toy, then the other, then empty)"],
     pawlinko: ["Setting up: arrows move the next piece, Enter places it, R flips a perch, Space throws", "Left and right: aim (Shift for big steps)", "Down, Space or Enter: knock it off", "X: swap in the next thing", "Placing a perch: arrows move it, R flips it, Enter puts it there", "Winding a strand: arrows pick one, Enter winds it", "Escape: put a helper away"],
