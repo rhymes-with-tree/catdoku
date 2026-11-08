@@ -106,7 +106,11 @@ will recheck this list, and add games 43–52, before any of it is built.
 ### Comfort settings, one place for every game (a Settings page; decided 2026-11-08)
 - Done: `settings/`, with the five three-way rows, a section per game, All settings in every ☰ Menu and a link on the
   front page; timers hidden per game; Junk Drawer's Junk switch (more junk, grey once you start); Auto grade changed
-  mid-puzzle waits for the next game. Wording of the rows still to settle with the owner.
+  mid-puzzle waits for the next game. Wording of the rows settled (build .23): no line under a row; Timer (Show · By
+  game · Hide), Action game speed (Regular · By game · Slower), Reduce visual clutter, Auto check and Auto Notes (On ·
+  By game · Off), On or Show first; Timer's own switch lost its line too. Saved choices carried over
+  (`catdoku.comfort.v2`). Still open: whether the games' other switches (Slower, Fabric patterns, Numbers…) should
+  lose their lines too where the name says it all; the owner's rule was given for the rows.
 
 ### Menu and Settings (every game)
 
@@ -127,7 +131,15 @@ will recheck this list, and add games 43–52, before any of it is built.
   Bowtie. `bowtie-6` is whole but lies facing you (Tunnel Run's), the rolling Bowtie in `bowtie-7` shares one picture
   with the tunnel, and `bowtie-4` is cut off at the right; `bowtie-8` and `bowtie-9` are faces. So Bowtie keeps
   `bowtie-2` until the owner adds a new picture or picks one of these.
-- Patches: colourways (long term).
+- Patches: colourways (long term). What it would take: Patches has one set of four fabrics (`FABRICS`: red gingham,
+  blue polka dot, mustard stripe, green zigzag) and their plain colours (`SOLIDS`) for Reduce visual clutter. A
+  colourway is another set of four, each pair differing in pattern as well as colour, so it still reads without
+  colour; the fabrics are stored as numbers 0–3, so saves and share links don't change. Each set needs checking
+  against the white-and-gold hint flash, the red clash stripes, the gold paw, dark mode and colour-blind views, with a
+  matching plain set. Then a Fabrics picker in Patches' Settings (and on the Settings page, through `SET_LIST`), the
+  swatches under the quilt following it. About one session for three or four colourways. For the owner: how many,
+  whether all are open from the start or earned (gold paws, or the Toy chest), and whether a colourway may borrow
+  `colorways.js`' names (Berry, Moss, Ocean…) for a family feel.
 
 ### Questions still to answer
 - Answered 2026-11-08 (build .20), for the owner to look over: Laser Pointer's cats never need the dot again once
