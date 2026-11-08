@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.33"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.34"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.33">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.34">
 <style>
 /* A cattery floor of cat trees, 1 to N perches tall: one of each height in every row and column. Arrows between
    trees point down to the shorter one, and lookout cats round the walls count the trees they can see. When
@@ -92,8 +92,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-07.33"></script>
-<script src="../cattower.js?v=2026-11-07.33"></script>
+<script src="../games.js?v=2026-11-07.34"></script>
+<script src="../cattower.js?v=2026-11-07.34"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N floor of cat trees, 1 to N perches tall: every row and column has one tree of each height.
@@ -270,7 +270,11 @@ function check() {
   return {clash, badSign, lookState};
 }
 const hints = G.hinter({game: () => game, key: () => game ? game.grid.join() : "", draw: () => draw()});   // marks {i, bad}: a square to look at
-const guesses = G.guesser({game: () => game, undo, draw: () => { draw(); save(); }, board: $("board"), what: "tree"});
+// Undo (G.history): each step is {grid, notes} as they were, in game.history. Restart can be undone too. Return to
+// Bookmark is Undo over and over (G.guesser).
+const undo = G.history({game: () => game, can: () => playing(), take: () => ({grid: game.grid.slice(), notes: game.notes.slice()}),
+  back: (h, g) => { g.grid = h.grid; g.notes = h.notes; }, after: () => { draw(); save(); }, restart: true});
+const guesses = G.guesser({game: () => game, history: undo, draw: () => { draw(); save(); }, board: $("board"), what: "tree"});
 // The floor in words, for VoiceOver (G.describe): the square picked, then each row's heights, then the clues.
 function say() {
   const N = game.N, h = i => game.grid[i] ? String(game.grid[i]) : "empty";
@@ -332,12 +336,12 @@ function draw() {
   $("count").textContent = game.won ? "Every tree is up!" : filled === N * N ? "Something's not right" : `${filled} of ${N * N} trees`;
   $("key").textContent = game.won ? "" : noting ? "Notes: tap heights to jot them down as maybes" : sel < 0 ? "Tap a square, then a height" : isGiven(sel) ? "That tree was already standing" : "";
   $("hintBtn").disabled = game.won;
-  $("undoBtn").disabled = !game.history.length || game.won; $("restartBtn").disabled = !game.history.length || game.won;
+  undo.sync();
   guesses.sync();
 }
 
 /* ---------- playing ---------- */
-const snapshot = () => game.history.push({grid: game.grid.slice(), notes: game.notes.slice()});
+const snapshot = () => undo.push();
 function put(v) {
   if (!playing() || sel < 0 || isGiven(sel)) return;
   game.started = true;
@@ -406,15 +410,11 @@ document.addEventListener("keydown", e => {
     draw();
   }
 });
-document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
-function undo() { if (playing() && game.history.length) { const h = game.history.pop(); game.grid = h.grid; game.notes = h.notes; draw(); save(); } }
-$("undoBtn").onclick = undo;
 $("restartBtn").onclick = () => {
-  if (!playing() || !game.history.length) return;
-  game.restarted = true; snapshot(); guesses.clear();
-  game.grid = game.grid.map((v, i) => isGiven(i) ? v : 0); game.notes = game.notes.map(() => 0);
-  if (settings.autoNotes) fillNotes();
-  draw(); save(); G.note("Back to the bare floor. Undo brings your trees back.", 3500);
+  if (undo.restart(g => {
+    guesses.clear(); g.grid = g.grid.map((v, i) => isGiven(i) ? v : 0); g.notes = g.notes.map(() => 0);
+    if (settings.autoNotes) fillNotes();
+  })) G.note("Back to the bare floor. Undo brings your trees back.", 3500);
 };
 // Hint: first a tree that's the wrong height, in red. Otherwise a gold box round an empty square (one with the
 // fewest heights its row and column leave open). The first time, the message says how many heights are left
