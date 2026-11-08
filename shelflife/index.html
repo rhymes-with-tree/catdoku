@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.29"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.30"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.29">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.30">
 <style>
 /* A pale painted shelf of cubbies in the yarn shop, each holding a skein of yarn. The balls shade smoothly from
    corner to corner, until Fred knocks them about; the balls with a tag stay put. */
@@ -76,8 +76,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-07.29"></script>
-<script src="../colorways.js?v=2026-11-07.29"></script>
+<script src="../games.js?v=2026-11-07.30"></script>
+<script src="../colorways.js?v=2026-11-07.30"></script>
 <script>
 /* ---------- shelves (plain functions, also run in a background worker) ---------- */
 // Levels: [columns, rows, which cubbies have a cat napping in them, how close the colours may get (the least
@@ -321,14 +321,14 @@ function draw() {
   const f = fewest(), s = swaps();
   $("count").textContent = game.won ? "All in order!" : `${s} swap${s === 1 ? "" : "s"}`;
   $("par").textContent = game.won ? `${s} swap${s === 1 ? "" : "s"} · fewest ${f}` : `fewest ${f}`;
-  $("undoBtn").disabled = !game.history.length || game.won; $("restartBtn").disabled = !game.history.length || game.won;
+  undo.sync();
   $("hintBtn").disabled = game.won;
 }
 
 /* ---------- playing ---------- */
 function doMove(h) {
   game.started = true;
-  game.history.push(h); apply(game.balls, game.spun, h);
+  undo.push(h); apply(game.balls, game.spun, h);
   pick = -1; spin = null; G.note(""); save(); draw();
   if (done()) win();
 }
@@ -393,21 +393,13 @@ $("board").addEventListener("touchstart", e => {
 $("board").addEventListener("pointercancel", () => { const moved = drag && drag.moved; drag = null; if (moved) { pick = -1; draw(); } });
 const keys = G.gridKeys({on: () => playing(), size: () => [game.W, game.H], show: () => draw(), act: i => tap(i),
   escape: () => { pick = -1; spin = null; G.note(""); draw(); }});
-document.addEventListener("keydown", e => {
-  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && !$("undoBtn").disabled) { e.preventDefault(); $("undoBtn").click(); }
-});
 
-function undo() {
-  if (!game || game.won || !game.history.length) return;
-  G.closeCard();
-  game.history.pop(); pick = -1; spin = null; replay(); draw(); save();
-}
-$("undoBtn").onclick = () => { if (playing() || $("overlay").classList.contains("show")) undo(); };
+// Undo (G.history): the moves are kept in game.history and the shelf is replayed from the start, so taking one back is
+// dropping it and replaying. Restart empties the list.
+const undo = G.history({game: () => game, can: () => !!game && !game.won && !busy, back: () => { pick = -1; spin = null; replay(); },
+  after: () => { G.closeCard(); draw(); save(); }, restart: true});
 function restart() {
-  if (!game || game.won || !game.history.length) return;
-  G.closeCard();
-  game.history = []; game.restarted = true; pick = -1; spin = null; replay(); draw(); save();
-  G.note("Back to the start.", 3000);
+  if (undo.restart(() => { pick = -1; spin = null; replay(); })) G.note("Back to the start.", 3000);
 }
 $("restartBtn").onclick = restart;
 
