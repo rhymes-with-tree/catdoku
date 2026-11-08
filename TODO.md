@@ -103,7 +103,7 @@ will recheck this list, and add games 43–52, before any of it is built.
   (Bird Watch's Wipe and Pause are the case that raised it). Restart · New [Noun] stays a line of its own at the
   bottom, apart from the rest, so it isn't pressed by accident.
 - New [Noun] everywhere (Keyboard Cat's plain "New"), centred (Toe Beans).
-- Missing Restart: Hide & Seek, Tangle. Toe Beans has none; it gets Reset (below). Missing Give up: Pick of the Pile (two blocks
+- Missing Restart: Hide & Seek, Tangle. Missing Give up: Pick of the Pile (two blocks
   stacked, no moves left), Spelling String (New Round is in an odd spot).
 - Undo far down the page: Knock It Off. Bird Watch's Wipe and Pause each alone on a line. Junk Drawer's row
   underneath is unevenly spaced.
@@ -111,9 +111,6 @@ will recheck this list, and add games 43–52, before any of it is built.
 - **Zoom and full screen like Twirl's** (owner likes it): `G.zoom` with `below: true`, under the board's corner. Cat
   Burglar and Catlas use the in-corner version today (plan step 5 said "in its corner"); Fish Bones and Hide & Seek
   have Full screen on its own (`G.fullScreen`) in yet another spot. One place for all.
-- **Gold paw exception, decided 2026-11-08:** Restart costs the paw in every game (#238), except Toe Beans, a game of
-  going back to the start, where it shouldn't. So it isn't confused with Restart, Toe Beans' button is called
-  **Reset**, and it isn't red. Its win card's gold-paw line and the README's Gold paw list change too.
 
 ### Things in the way of the board
 - Yarn: cats below Restart / New Puzzle, the puzzle's name ("Tropical") between them; smaller cats if it still
@@ -125,7 +122,7 @@ will recheck this list, and add games 43–52, before any of it is built.
 
 ### Too much talking
 - Instruction lines during play, wanted once and then quiet: Hide & Seek's "Mark is on, tap…" (the `say` of its
-  `G.pieces`), Unravel's wrong-move lines, Toe Beans' "Now tap another number of the pad".
+  `G.pieces`), Unravel's wrong-move lines.
 - Knock It Off: the legend of every icon goes off the page, into How to play or a lexicon; trial and error is part of
   the fun.
 - Fish Bones: don't show "The Words" ahead; add each to the dictionary as it's found. Its level names have numbers
@@ -145,7 +142,6 @@ will recheck this list, and add games 43–52, before any of it is built.
 - Scratch That's Post first / Dot first: look for other games it would help (Fair Play?).
 
 ### Symbols that read wrong
-- Toe Beans' ÷ looks like + (Open the Door! had this and fixed it; use the same glyph).
 - Cat Mat's key numbers read as pots of paint.
 - Toy Box: a better way to show the toys on the track.
 - Up a Tree: a new picture of Dottie for the win card.
@@ -170,14 +166,12 @@ will recheck this list, and add games 43–52, before any of it is built.
 - Share My Result: drop the long level names; game, one-line result (fraction, time, 🔥 streak, 🐾 gold paw), link.
 - Admire: Toy Box has none; Catwalk's could hide the numbers (`G.admire`); Treat Time's Admire My Tray shows only the
   put-back treats when it should take just those away.
-- Pawlette reopened on its last win card: #237 left Pawlette out of "no old win card when you come back".
 
 ### Bugs
 - Mewstermind: Enter moves to the next toy and changes it.
 - Scratch That: why it isn't complete isn't clear, and the note goes too fast.
 - Fair Play's hints: only three rules (no three in a row, no sandwich, a line already has all of one toy); when none
   applies it shows the first empty square's answer with no reason. Add rules, or say it's a plain answer.
-  "Mice go in the glowing square" → "A mouse goes in…" (check other games' hint wording too).
 - Bubbles: when Raise the Ceiling is allowed isn't predictable after a loss; offer it as a helper.
 
 ### Choices as radio buttons

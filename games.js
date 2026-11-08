@@ -1701,7 +1701,7 @@ const G = (() => {
     digits: '<path d="M4 11l3-2v14M11 12a3 3 0 1 1 5 2.5L11 23h6M21 9h6l-3.5 5a4.2 4.2 0 1 1-3.5 7"/>',
     palette: '<path d="M16 5C9.5 5 5 9.5 5 15.5S9.5 27 15 27c2 0 2.5-1.2 2-2.6-.6-1.6.4-3.4 2.4-3.4H23c2.5 0 4-1.8 4-4.4C27 9.8 22.5 5 16 5z"/><circle cx="11" cy="14" r="1.3"/><circle cx="15" cy="10" r="1.3"/><circle cx="20.5" cy="11" r="1.3"/>',
   };
-  const ICON_OF = {hintBtn: "hint", undoBtn: "undo", backBtn: "undoguess", restartBtn: "restart", auditBtn: "audit", notesBtn: "pencil",
+  const ICON_OF = {hintBtn: "hint", undoBtn: "undo", backBtn: "undoguess", restartBtn: "restart", resetBtn: "restart", auditBtn: "audit", notesBtn: "pencil",
     allNotesBtn: "pencils", clearNotesBtn: "erase", eraseBtn: "erase", pauseBtn: "pause", guessBtn: "guess", giveUpBtn: "giveup",
     keepBtn: "keep", shuffleBtn: "shuffle", flipBtn: "flip", finishBtn: "near", completeBtn: "check", skipBtn: "skip",
     colBtn: "palette", dotBtn: "dot", linkBtn: "share", toysBtn: "toys", bestBtn: "best", helpBtn: "help", zoomIn: "zoomin", zoomOut: "zoomout", zoomFit: "fit",
@@ -1796,9 +1796,9 @@ const G = (() => {
     const nb = $("newBtn"), bar = nb && nb.closest("main .bar");
     if (!bar) return;
     const slot = nb.closest(".newpick") || nb;
-    for (const id of ["restartBtn", "giveUpBtn"]) {
+    for (const id of ["restartBtn", "resetBtn", "giveUpBtn"]) {   // resetBtn: Toe Beans' Restart that's free
       const b = $(id); if (!b || !b.closest("main .actions") || b.closest(".card,.overlay")) continue;
-      b.classList.add("moved"); if (id === "restartBtn") slot.before(b); else slot.after(b);
+      b.classList.add("moved"); if (id !== "giveUpBtn") slot.before(b); else slot.after(b);
     }
   }
   toolify();
