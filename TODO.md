@@ -103,8 +103,7 @@ will recheck this list, and add games 43–52, before any of it is built.
   (Bird Watch's Wipe and Pause are the case that raised it). Restart · New [Noun] stays a line of its own at the
   bottom, apart from the rest, so it isn't pressed by accident.
 - New [Noun] everywhere (Keyboard Cat's plain "New"), centred (Toe Beans).
-- Missing Give up: Pick of the Pile (two blocks
-  stacked, no moves left), Spelling String (New Round is in an odd spot).
+- Spelling String: New Round is in an odd spot (it already has Give up).
 - Undo far down the page: Knock It Off. Bird Watch's Wipe and Pause each alone on a line. Junk Drawer's row
   underneath is unevenly spaced.
 - Twirl: Hint up onto the zoom line, centred, to take less room.
