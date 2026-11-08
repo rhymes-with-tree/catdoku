@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.36"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.37"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.36">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.37">
 <style>
 /* A KenKen house: every row and column holds 1 to N once, and walls split the floor into rooms whose numbers
    must make the room's sign. Each room has a door that opens when the room is right; with every door open,
@@ -109,7 +109,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-07.36"></script>
+<script src="../games.js?v=2026-11-07.37"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N grid where every row and column holds 1 to N once, cut into rooms (cages). Each room has a sign:
@@ -376,14 +376,17 @@ function draw() {
   $("count").textContent = game.won ? "Every door is open!" : `${open} of ${rooms} doors open`;
   $("key").textContent = noting ? "Notes: tap numbers to jot them down as maybes" : sel < 0 && !game.won ? "Tap a square, then a number" : "";
   $("hintBtn").disabled = game.won;
-  $("undoBtn").disabled = !game.history.length || game.won; $("restartBtn").disabled = !game.history.length || game.won;
+  undo.sync();
   guesses.sync();
   return {clash, right, wrong};
 }
 // The walls between rooms (thin seams inside a room), with each room's door hung in one of them.
 let forceOpen = -1, rattle = new Set(), wasOpen = [];
 const hints = G.hinter({game: () => game, key: () => game ? game.grid.join() : "", draw: () => draw()});   // marks {i, kind}: a square to look at
-const guesses = G.guesser({game: () => game, undo, draw: () => { draw(); save(); }, board: $("board"), what: "number"});
+// Undo (G.history): each step is {grid, notes} as they were (game.history). Restart can be undone too.
+const undo = G.history({game: () => game, take: () => ({grid: game.grid.slice(), notes: game.notes.slice()}), can: playing,
+  back: (h, g) => { g.grid = h.grid; g.notes = h.notes; }, after: () => { draw(); save(); }, restart: true});
+const guesses = G.guesser({game: () => game, history: undo, draw: () => { draw(); save(); }, board: $("board"), what: "number"});
 function drawWalls(right) {
   const N = game.N, svg = $("walls"), at = plan.at;
   svg.setAttribute("viewBox", `0 0 ${N} ${N}`);
@@ -428,7 +431,7 @@ function drawWalls(right) {
 }
 
 /* ---------- playing ---------- */
-const snapshot = () => game.history.push({grid: game.grid.slice(), notes: game.notes.slice()});
+const snapshot = () => undo.push();
 function put(v) {
   if (!playing() || sel < 0) return;
   game.started = true;
@@ -501,9 +504,6 @@ document.addEventListener("keydown", e => {
     draw();
   }
 });
-document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
-function undo() { if (playing() && game.history.length) { const h = game.history.pop(); game.grid = h.grid; game.notes = h.notes; draw(); save(); } }
-$("undoBtn").onclick = undo;
 // Hint: first points out a number that's wrong, if there is one; otherwise picks a square in a room that's nearly
 // full (so a door is close to opening) and glows it: the first time, the message says why it can be worked out;
 // asked again, its number. It never fills it in for you. Any hint keeps you on the same level and costs the gold paw.
@@ -539,7 +539,10 @@ function whyNumber(i) {
   return [`The glowing square's room is the nearest to full. Its row and column leave ${free.length} numbers.`, ""];
 }
 $("hintBtn").onclick = hint;
-$("restartBtn").onclick = () => { if (playing() && game.history.length) { game.restarted = true; snapshot(); guesses.clear(); game.grid = game.grid.map(() => 0); game.notes = game.notes.map(() => 0); if (settings.autoNotes) fillNotes(); draw(); save(); G.note("Every door's shut again. Undo brings your numbers back.", 3500); } };
+$("restartBtn").onclick = () => {
+  if (undo.restart(g => { guesses.clear(); g.grid = g.grid.map(() => 0); g.notes = g.notes.map(() => 0); if (settings.autoNotes) fillNotes(); }))
+    G.note("Every door's shut again. Undo brings your numbers back.", 3500);
+};
 addEventListener("resize", () => { if (game && plan) draw(); });
 
 /* ---------- endings ---------- */
