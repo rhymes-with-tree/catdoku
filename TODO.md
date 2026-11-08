@@ -103,7 +103,7 @@ will recheck this list, and add games 43–52, before any of it is built.
   (Bird Watch's Wipe and Pause are the case that raised it). Restart · New [Noun] stays a line of its own at the
   bottom, apart from the rest, so it isn't pressed by accident.
 - New [Noun] everywhere (Keyboard Cat's plain "New"), centred (Toe Beans).
-- Missing Restart: Hide & Seek, Tangle. Missing Give up: Pick of the Pile (two blocks
+- Missing Give up: Pick of the Pile (two blocks
   stacked, no moves left), Spelling String (New Round is in an odd spot).
 - Undo far down the page: Knock It Off. Bird Watch's Wipe and Pause each alone on a line. Junk Drawer's row
   underneath is unevenly spaced.
@@ -180,7 +180,6 @@ will recheck this list, and add games 43–52, before any of it is built.
 - Keyboard Cat: take a word start off the page once it's fully found; a keyboard walkthrough. (A Full Pounce uses
   all 7 keys at least once; a Perfect Pounce uses each just once.)
 - Spelling String: a way to look up a word.
-- Tangle: Restart (above).
 
 ### Questions still to answer
 - Laser Pointer: does any target need a tap again after the laser has passed it once?
