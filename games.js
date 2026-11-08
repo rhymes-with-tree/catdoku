@@ -2363,6 +2363,29 @@ const G = (() => {
     return {left, used, say, show, lose, refill, canRevive, revive, reviveBtn, outCard};
   }
 
+  /* ---------- a few choices as radio buttons ---------- */
+  // A setting with a few choices shows them all as a row of radio pills, as on the Settings page (decided 2026-11-08:
+  // Catlas's Answer, Knit Pick's Words), in place of a picker that hides them. The page's own select stays, hidden,
+  // for its bookkeeping: a pill sets it and sends its change, and setting it from script moves the pill too.
+  // names: {value: words} in place of the options' own words.
+  function radios(sel, name, names = {}) {
+    const label = sel.closest("label"), f = document.createElement("fieldset"), n = sel.id + "Pills";
+    f.className = "seg"; f.id = n;
+    const leg = document.createElement("legend"); leg.className = "segName"; leg.textContent = name || sel.getAttribute("aria-label") || ""; f.append(leg);
+    const ins = [...sel.options].map(o => {
+      const l = document.createElement("label"), i = document.createElement("input"); i.type = "radio"; i.name = n; i.value = o.value;
+      const w = document.createElement("span"); w.textContent = names[o.value] || o.textContent; l.append(i, w); f.append(l);
+      i.onchange = () => { if (i.checked && sel.value !== o.value) { sel.value = o.value; sel.dispatchEvent(new Event("change", {bubbles: true})); } };
+      return i;
+    });
+    const sync = () => { const v = sel.value; ins.forEach(i => { i.checked = i.value === v; }); };
+    const d = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value");
+    Object.defineProperty(sel, "value", {configurable: true, get() { return d.get.call(this); }, set(v) { d.set.call(this, v); sync(); }});
+    sel.addEventListener("change", sync);
+    (label || sel).after(f); (label || sel).hidden = true; (label || sel).style.display = "none"; sync();
+    return f;
+  }
+
   /* ---------- dark emoji ---------- */
   // Text with a dark emoji (🐾, black on most phones) that would vanish on the dark page: each one goes in a small light
   // round backing in dark mode (.darkemo in games.css), as the walkthrough does with its emoji. Used for switches'
@@ -2449,6 +2472,6 @@ const G = (() => {
     }
   }
 
-  return {MAGNET, tally, emoText, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText,
+  return {MAGNET, tally, emoText, radios, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();

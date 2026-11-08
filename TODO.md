@@ -97,8 +97,8 @@ will recheck this list, and add games 43–52, before any of it is built.
   on screen; Bubbles' note line dips just under on a 390 × 844 phone, with its goal and time still showing.
 
 ### Symbols that read wrong
-- Cat Mat's key numbers read as pots of paint.
-- Toy Box: a better way to show the toys on the track.
+- Toy Box: a better way to show the toys on the track. Asked the owner on 2026-11-08 what reads wrong (the toys looked
+  clear in a screenshot), before changing anything.
 - Up a Tree: a new picture of Dottie for the win card.
 
 ### Comfort settings, one place for every game (a Settings page; decided 2026-11-08)
@@ -110,10 +110,6 @@ will recheck this list, and add games 43–52, before any of it is built.
 
 ### Win card and sharing
 - Toy Box's Admire Laya shows `laya-9` on the rug, awake: no Laya picture has her asleep. A sleeping Laya picture?
-
-### Choices as radio buttons
-- Catlas: Answer type → Pick from 4 names / Type with autocomplete / Type in a blank box, no help.
-- Knit Pick: Cat theme words / Everyday words.
 
 ### More to play
 - Tunnel Run: many more turning-only levels, up to a full page of small tunnels with a full-page view.
