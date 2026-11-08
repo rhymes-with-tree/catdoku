@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.43"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.44"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.43">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.44">
 <style>
 /* A floor with the outline of an odd-shaped box pencilled on it, and seven pieces of cardboard (the tangram
    pieces) to build it from. When it's built, Bugsy (or now and then Bowtie, the guest star) hops in and sits in it. */
@@ -80,7 +80,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-07.43"></script>
+<script src="../games.js?v=2026-11-07.44"></script>
 <script>
 /* ---------- shapes (plain functions, also run in a background worker) ---------- */
 // The seven cats are the seven tangram pieces: two big triangles (L), a middle one (M), two small ones (S),
@@ -350,8 +350,7 @@ function update() {
   parts.forEach((g, i) => { g.classList.toggle("in", ok[i]); g.classList.toggle("sel", i === sel); });
   $("count").textContent = game.won ? "The box is built!" : n === 6 ? "One more piece to go" : `${n} of 7 pieces fit`;
   $("hintBtn").disabled = game.won;
-  $("undoBtn").disabled = !game.history.length || game.won;
-  $("restartBtn").disabled = !game.history.length || game.won;
+  undo.sync();
   $("flipBtn").disabled = game.won || sel < 0;
   return n === 7;
 }
@@ -395,13 +394,13 @@ function changed() {
 /* ---------- playing ---------- */
 // Drag a piece to move it; tap it to turn it an eighth of a turn; hold it (or right-click) to turn it back.
 function turn(i, dir, record = true) {
-  if (record) game.history.push(snapshot());
+  if (record) undo.push();
   const p = game.pcs[i], [cx, cy] = mid(polyOf(i));
   Object.assign(p, poseAt(i, p.k + dir, p.f, cx, cy)); p.k = ((p.k % 8) + 8) % 8;
   snap(i); keepOn(i);
 }
 function flip(i) {
-  game.history.push(snapshot());
+  undo.push();
   const p = game.pcs[i], [cx, cy] = mid(polyOf(i));
   Object.assign(p, poseAt(i, p.k, p.f ^ 1, cx, cy));
   snap(i); keepOn(i);
@@ -415,7 +414,7 @@ $("svg").addEventListener("pointerdown", e => {
   sel = i; toFront(i); game.started = true; update();
   $("svg").setPointerCapture(e.pointerId);
   drag = {i, id: e.pointerId, x, y, px: game.pcs[i].x, py: game.pcs[i].y, moved: false, before, held: false,
-    t: setTimeout(() => { if (drag && !drag.moved) { drag.held = true; game.history.push(before); turn(i, -1, false); changed(); } }, 450)};
+    t: setTimeout(() => { if (drag && !drag.moved) { drag.held = true; undo.push(before); turn(i, -1, false); changed(); } }, 450)};
 });
 $("svg").addEventListener("pointermove", e => {
   if (!drag || e.pointerId !== drag.id || drag.held) return;
@@ -429,7 +428,7 @@ function endDrag(e) {
   if (!drag || e.pointerId !== drag.id) return;
   const d = drag; drag = null; clearTimeout(d.t); parts[d.i].classList.remove("lift");
   if (d.held) return;
-  if (d.moved) { game.history.push(d.before); snap(d.i); keepOn(d.i); changed(); }
+  if (d.moved) { undo.push(d.before); snap(d.i); keepOn(d.i); changed(); }
   else if (e.type === "pointerup") { turn(d.i, 1); changed(); }
 }
 $("svg").addEventListener("pointerup", endDrag);
@@ -453,24 +452,17 @@ $("svg").addEventListener("keydown", e => {
   if (sel < 0) sel = 0;
   const step = e.shiftKey ? 0.5 : 0.25, mv = {arrowup: [0, -step], arrowdown: [0, step], arrowleft: [-step, 0], arrowright: [step, 0]}[k];
   game.started = true;
-  if (mv) { game.history.push(snapshot()); game.pcs[sel].x += mv[0]; game.pcs[sel].y += mv[1]; snap(sel); keepOn(sel); }
+  if (mv) { undo.push(); game.pcs[sel].x += mv[0]; game.pcs[sel].y += mv[1]; snap(sel); keepOn(sel); }
   else if (k === "r" || k === " ") turn(sel, e.shiftKey ? -1 : 1);
   else if (k === "f") flip(sel);
   else return;
   e.preventDefault(); changed();
 });
-document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
-
-function undo() {
-  if (!playing() || !game.history.length) return;
-  game.pcs = game.history.pop(); changed();
-}
-$("undoBtn").onclick = undo;
+const undo = G.history({game: () => game, take: snapshot, can: playing, restart: true,
+  back: h => { game.pcs = h; }, after: changed});
 $("restartBtn").onclick = () => {
-  if (!playing() || !game.history.length) return;
-  game.restarted = true; game.history.push(snapshot());
-  game.pcs = game.start.map(p => ({...p})); sel = -1; changed();
-  G.note("Every piece is back where it started. Undo brings your moves back.", 4000);
+  if (undo.restart(g => { g.pcs = g.start.map(p => ({...p})); sel = -1; }))
+    G.note("Every piece is back where it started. Undo brings your moves back.", 4000);
 };
 // Hint: a gold outline shows where one piece goes, and that piece is outlined in gold too; you move it there.
 // A hint keeps you on the same level and costs the gold paw.
