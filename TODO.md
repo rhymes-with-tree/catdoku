@@ -175,7 +175,7 @@ Built 2026-11-07 (`whatsNew` in `games.js`), ahead of the shared helpers, which 
   `game.history`), so old saves load and undo; `back(step)` puts one back; `take` makes snapshots (and lets Restart be
   undone; or `restart(reset, step)` pushes a step of its own, as `{mark}`); `cap` keeps the newest (moving bookmarks'
   places with them); `list` points it at another list (Unravel's path); `started` greys Restart where that isn't the
-  same as having steps; `G.guesser({history})` takes its Undo from it. Moved so far: Night Light, Pawlette, Treat Time, Up a Tree, Unravel, Cat Mat, Sunbeams, Yarn, Patches, Catwalk, Mewstermind, Pick of the Pile, Mew Hue, Shelf Life, Fair Play, Purrfect Square, Scratch That, High Perch, Cross Stitch, Window Ledges, Open the Door! and Fridge Magnets.
+  same as having steps; `G.guesser({history})` takes its Undo from it. Moved so far: Night Light, Pawlette, Treat Time, Up a Tree, Unravel, Cat Mat, Sunbeams, Yarn, Patches, Catwalk, Mewstermind, Pick of the Pile, Mew Hue, Shelf Life, Fair Play, Purrfect Square, Scratch That, High Perch, Cross Stitch, Window Ledges, Open the Door!, Fridge Magnets and Toe Beans.
   Still writing their own (33 at the start; how each keeps its steps, from the survey):
   - Toydoku: `{grid, notes}` snapshots, Restart pushes one, with `G.guesser`; drops a step that changed nothing
   - Catdoku: JSON of the cells, 500 kept (bookmarks move with it); Restart empties the list; `G.guesser`
@@ -188,7 +188,6 @@ Built 2026-11-07 (`whatsNew` in `games.js`), ahead of the shared helpers, which 
   - Knock It Off: JSON of the room, 400 kept; Undo gives the move back; Restart pushes one; old saves' `"k":"L"` read
     as `"l"`
   - If It Fits: piece snapshots (a hold or a drag pushes the one from before it); Restart pushes one
-  - Toe Beans: snapshots; no Restart flag
   - Cat Pile: `S.history` (not in `game`), JSON of the board, 60 kept; the moves count in `S.d.moves`
 - **Checking:** the names are one each now (2026-11-07): Auto check (rule breaks turn red as you play), Audit (a
   one-off check) and Auto grade (a wrong answer costs a life; Catdoku's was Audit as-you-go). Still to weigh: Complete
