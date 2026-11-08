@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.19"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.20"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.19">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.20">
 <style>
 /* A cat tree: the start word on the bottom perch, the goal word on the top one, and empty perches between. Each
    word changes one letter of the word below it. Type a word and it goes on the next perch up, and the cat climbs
@@ -103,8 +103,8 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-07.19"></script>
-<script src="../cattower.js?v=2026-11-07.19"></script>
+<script src="../games.js?v=2026-11-07.20"></script>
+<script src="../cattower.js?v=2026-11-07.20"></script>
 <script>
 /* ---------- ladders ---------- */
 // Words come from the shared list (words/words.json): starts and goals are familiar words, par is the shortest
@@ -253,8 +253,7 @@ function placeCat(animate = true, k = catPerch()) {
 }
 function update() {
   $("count").textContent = game.won ? `Climbed in ${game.rungs.length + 1} · par ${game.par}` : `Par ${game.par} · ${game.rungs.length} so far`;
-  $("undoBtn").disabled = !game.history.length || game.won;
-  $("restartBtn").disabled = !game.history.length || game.won;
+  undo.sync();
   $("hintBtn").disabled = game.won;
   paintHint();
 }
@@ -273,7 +272,7 @@ for (const r of ROWS) {
   $("keys").append(row);
 }
 document.addEventListener("keydown", e => {
-  if (e.ctrlKey || e.metaKey || e.altKey) { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } return; }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;   // ⌘Z is Undo's (G.history)
   if (!playing() || document.querySelector(".spot") || /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
   if (/^[a-z]$/i.test(e.key)) { type(e.key.toLowerCase()); e.preventDefault(); }
   else if (e.key === "Backspace") { back(); e.preventDefault(); }
@@ -324,7 +323,7 @@ function enter() {
   if (!oneOff(w, below)) return shake(w === below ? "Change one letter." : `Change just one letter of ${below.toUpperCase()}.`);
   if (!isWord(w)) return shake(`${w.toUpperCase()} isn't in the word list.`);
   if (w === game.start || game.rungs.includes(w)) return shake(`You've climbed past ${w.toUpperCase()} already.`);
-  game.history.push(game.rungs.slice());
+  undo.push();
   game.rungs.push(w); game.typing = ""; game.started = true; sel = -1;
   if (w === game.goal) { game.rungs.pop(); win(); return true; }
   if (oneOff(w, game.goal)) { win(); return true; }   // one letter from the top: the goal word goes up by itself
@@ -333,18 +332,12 @@ function enter() {
   return true;
 }
 
-// Undo takes back the last word (or a Restart).
-function undo() {
-  if (!playing() || !game.history.length) return;
-  game.rungs = game.history.pop(); game.typing = ""; sel = -1;
-  draw(); save();
-}
-$("undoBtn").onclick = undo;
+// Undo takes back the last word (or a Restart): each step is the words as they were, in game.history (G.history).
+// The words are the steps counted, so Undo gives the step back.
+const undo = G.history({game: () => game, take: () => game.rungs.slice(), back: (h, g) => { g.rungs = h; g.typing = ""; sel = -1; },
+  can: playing, after: () => { draw(); save(); }, restart: true});
 $("restartBtn").onclick = () => {
-  if (!playing() || !game.history.length) return;
-  game.restarted = true; game.history.push(game.rungs.slice()); game.rungs = []; game.typing = ""; sel = -1;
-  draw(); save();
-  G.note("Back to the bottom perch. Undo brings your words back.", 4000);
+  if (undo.restart(g => { g.rungs = []; g.typing = ""; sel = -1; })) G.note("Back to the bottom perch. Undo brings your words back.", 4000);
 };
 // Hint, on the highest word so far: if that word didn't get you any closer to the top (or there's no way up from
 // it at all), its changed letter goes red, to Undo; otherwise a gold box goes on the letter to change next, for the
