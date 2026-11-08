@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Catdoku settings</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-11-08.12"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<meta name="theme-color" content="#ECEEE7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1F1C24" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-11-08.12">
+<style>
+/* Every game's settings on one page. At the top, five rows that set a thing for every game at once (all one way · By
+   game · all the other way); By game shows the games that have it, a switch each. Under them, a section per game
+   with all of that game's settings. Everything is kept where the games keep it (games.js lists where), so a change
+   here is the same as one in the game's ☰ Menu. */
+main{max-width:760px;align-items:stretch;gap:18px}
+header{align-items:flex-start}
+.tagline{text-align:left;max-width:62ch}
+.back{position:relative;font-weight:600;color:var(--ink);align-self:flex-start}
+.back::after{content:"";position:absolute;left:0;right:0;top:50%;height:44px;transform:translateY(-50%)}
+h2{margin:8px 0 0;font-size:calc(22px*var(--ts));font-weight:800}
+.box{background:var(--panel);border:2px solid var(--line);border-radius:16px;padding:12px 16px;display:flex;flex-direction:column;gap:12px;scroll-margin-top:12px}
+.box:target{border-color:var(--ink)}
+.box h3{margin:0;font-size:calc(19px*var(--ts));font-weight:800;display:flex;align-items:center;gap:8px}
+.box h3 a{color:var(--ink)} .box h3 i{width:12px;height:12px;border-radius:50%;background:var(--c);flex:none}
+.set{display:flex;flex-direction:column;gap:4px}
+.set .hint{font-size:calc(14px*var(--ts));line-height:1.25;color:var(--ink-soft)}
+.set .toggle + .hint{padding-left:50px}
+.set .wait{font-size:calc(14px*var(--ts));font-weight:700;color:var(--ink)}
+.set .wait[hidden]{display:none}
+.rowName{font-weight:800}
+/* three ways (or a game's choice of several): one pill each, the chosen one filled */
+.seg{display:flex;flex-wrap:wrap;gap:6px;border:0;margin:0;padding:0}
+.seg label{position:relative;display:inline-flex;align-items:center;min-height:40px;padding:0 14px;border:2px solid var(--ink);border-radius:999px;font-weight:600;cursor:pointer;background:var(--paper)}
+.seg input{position:absolute;opacity:0;width:1px;height:1px}
+.seg label:has(input:checked){background:var(--ink);color:var(--paper)}
+.seg label:has(input:focus-visible){outline:3px solid var(--pacific-blue);outline-offset:2px}
+.games{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px 16px;padding:4px 0 0 4px}
+.games[hidden]{display:none}
+.games .toggle{white-space:normal;min-height:36px}
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="../">← All the games</a>
+  <header><h1>Settings</h1><div class="stripe"></div><p class="tagline">Every game's settings in one place. Each game's ☰ Menu has its own too: they're the same settings.</p></header>
+  <h2>Every game</h2>
+  <div class="box" id="rows"></div>
+  <h2>Game by game</h2>
+  <div id="each" style="display:contents"></div>
+</main>
+
+<script src="../games.js?v=2026-11-08.12"></script>
+<script>
+const $ = G.$, WAIT = "Takes effect in the next game";
+const syncs = [], syncAll = () => syncs.forEach(f => f());
+let uid = 0;
+// a switch for one game's setting e (named name), its line under it
+function switchFor(e, name, quiet) {
+  const d = document.createElement("div"); d.className = "set";
+  d.innerHTML = '<label class="toggle"><input type="checkbox"><span class="sw"></span><span class="swName"></span></label><span class="hint"></span><span class="wait" hidden></span>';
+  const box = d.querySelector("input"), line = d.querySelector(".hint"), wait = d.querySelector(".wait");
+  d.querySelector(".swName").textContent = name; line.textContent = e.line; line.id = "l" + ++uid; wait.id = "w" + uid; box.setAttribute("aria-describedby", line.id + " " + wait.id);
+  if (quiet) { line.remove(); box.setAttribute("aria-describedby", wait.id); }
+  wait.textContent = WAIT;
+  box.onchange = () => { G.writeSetting(e, box.checked); syncAll(); };   // mid-puzzle, a warn setting's wait line shows
+  syncs.push(() => { const p = G.pendingOf(e); box.checked = !!(p === undefined ? G.readSetting(e) : p); wait.hidden = p === undefined; });
+  return d;
+}
+// radio pills: opts [[value, name]], now() the chosen value, pick(value) when one's chosen
+function pills(label, opts, now, pick) {
+  const f = document.createElement("fieldset"); f.className = "seg"; const n = "r" + ++uid;
+  const leg = document.createElement("legend"); leg.className = "hint quiet"; leg.textContent = label; f.append(leg);
+  const ins = opts.map(([v, name]) => {
+    const l = document.createElement("label"), i = document.createElement("input"); i.type = "radio"; i.name = n; i.value = v;
+    l.append(i, name); f.append(l); i.onchange = () => { if (i.checked) { pick(v); syncAll(); } }; return i;
+  });
+  syncs.push(() => { const v = String(now()); ins.forEach(i => { i.checked = i.value === v; }); });
+  return f;
+}
+const gameName = slug => G.GAMES.find(g => g[1] === slug)[0];
+
+// the five rows
+for (const r of G.ROWS) {
+  const d = document.createElement("div"); d.className = "set";
+  const head = document.createElement("span"); head.className = "rowName"; head.textContent = r.name;
+  const line = document.createElement("span"); line.className = "hint"; line.textContent = r.line;
+  const list = document.createElement("div"); list.className = "games"; list.id = "by-" + r.id;
+  for (const e of G.rowGames(r.id)) list.append(switchFor(e, gameName(e.slug), true));
+  d.append(head, line, pills(r.name, r.words.map((w, i) => [i, w]), () => G.rowMode(r.id), m => G.setRow(r.id, +m)), list);
+  syncs.push(() => { list.hidden = G.rowMode(r.id) !== 1; });
+  $("rows").append(d);
+}
+// a section for each game with a setting of its own (a game with only a timer has it in Timers, above)
+for (const [name, slug, , colour] of G.GAMES) {
+  const list = G.SETTINGS[slug].filter(e => e.key !== "timer"); if (!list.length) continue;
+  const s = document.createElement("section"); s.className = "box"; s.id = slug; s.style.setProperty("--c", colour);
+  s.innerHTML = `<h3><i></i><a href="../${slug}/"></a></h3>`; s.querySelector("a").textContent = name;
+  for (const e of list) {
+    if (e.opts) {
+      const d = document.createElement("div"); d.className = "set";
+      const h = document.createElement("span"); h.className = "rowName"; h.textContent = e.name;
+      d.append(h, pills(e.name, e.opts, () => G.readSetting(e), v => G.writeSetting(e, v)));
+      s.append(d);
+    } else s.append(switchFor(e, e.name));
+  }
+  $("each").append(s);
+}
+syncAll();
+// back from a game (or another tab), the settings may have changed there
+addEventListener("pageshow", syncAll); addEventListener("focus", syncAll);
+if (location.hash) { const t = document.getElementById(location.hash.slice(1)); if (t) t.scrollIntoView(); }
+</script>
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>

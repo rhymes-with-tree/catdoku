@@ -101,33 +101,11 @@ will recheck this list, and add games 43–52, before any of it is built.
 - **Hint stays where the plan has it** (decided 2026-11-08): in the gold-paw group, not on Undo's line.
 - New [Noun] centred (Toe Beans).
 - Spelling String: New Round is in an odd spot (it already has Give up).
-- Undo far down the page: Knock It Off. Junk Drawer's row
-  underneath is unevenly spaced.
+- Junk Drawer's row underneath is unevenly spaced.
 - Zoom and full screen: done for Twirl, Cat Burglar, Catlas, Fish Bones and Hide & Seek (`G.zoom` with `below`). Still
   beside New: Wind-Up's and Pawlinko's full screen (action games, not on the 2026-11-08 list). Move them too?
 
-### Things in the way of the board
-- Yarn: cats below Restart / New Puzzle, the puzzle's name ("Tropical") between them; smaller cats if it still
-  doesn't fit one screen.
-- Patches: the cat under the colours goes below Restart / New Puzzle (or to the side), so Undo, Hint, Restart and New
-  can be found.
-- Pawlette: Empty the cup and Dye it go below the board, not in it.
-- Bubbles: less beige under the shooter.
-
-### Too much talking
-- Knock It Off: the legend of every icon goes off the page, into How to play or a lexicon; trial and error is part of
-  the fun.
-- Fish Bones: don't show "The Words" ahead; add each to the dictionary as it's found. Its level names have numbers
-  after the fish names that need explaining or dropping.
-
 ### Tools and gestures the same everywhere
-- One meaning for a double tap / long press across the marking games: after Catdoku a double tap should leave a cat
-  mark in Hide & Seek, not a hiss. Open the Door!: long press as in Toydoku; an eraser in place of ⌫.
-- Catdoku: a cat mark beside the paw mark and Erase.
-- Fair Play: with Auto check on, Toy | Toy | Mark as pieces in place of tap once / tap twice. (Done: the Toy piece
-  shows a toy, and Mark shows × = with "Mark" under it.)
-- **Changes the 2026-11-07 plan** (pieces put Patches' Marker among the fabrics). **Decided 2026-11-08:** Marker is a
-  notes tool, so it comes out of the colours and sits where the other games' notes tools do.
 - Auto Notes: Catdoku's 🐾 is hard to see in dark mode (not urgent).
 - Toydoku: its icons are in an odd order.
 - Scratch That's Post first / Dot first: look for other games it would help (Fair Play?).
@@ -138,23 +116,9 @@ will recheck this list, and add games 43–52, before any of it is built.
 - Up a Tree: a new picture of Dottie for the win card.
 
 ### Comfort settings, one place for every game (a Settings page; decided 2026-11-08)
-- **A Settings page** for the whole site, reached from every game's ☰ Menu and the front page, with every game's
-  settings on it, a section per game. The game's ☰ Menu keeps its own settings as a shortcut (the same saved values)
-  and links to the page.
-- **At the top, five settings with a three-way row** (all on · by game · all off; wording to settle): Timers (Show ·
-  By game · Hide), Action games (Regular speed · By game · Slower), Decorations (Show all · By game · Reduce clutter),
-  Auto check and Auto Notes (Off · By game · On). By game opens the list of games that have it, a switch each.
-  Changing one game while a row is on all-on or all-off (on the page, or in the game) moves the row to By game; the
-  other games keep their values. Every other setting is per game only.
-- Hide timers today is site-wide only (tap the clock, `hideTimer` in `games.js`): it needs a value per game, and a
-  tap on a game's clock changes that game's.
-- Slower is per game today (`G.slower(slug)`).
-- Decorations (visual clutter): Shelf Life's shelf (it has a switch), Junk Drawer's junk (add more junk, grey once
-  you start, and a switch), Patches' patterns, Cat Pile's cats.
-- A setting that costs lives or the gold paw (Auto grade), changed on the page while a puzzle's in progress, says
-  "Takes effect in the next game" and does.
-- The page doesn't run the games' scripts, so `games.js` needs a list of where each game keeps each setting (its
-  storage key and field, label, line, default).
+- Done: `settings/`, with the five three-way rows, a section per game, All settings in every ☰ Menu and a link on the
+  front page; timers hidden per game; Junk Drawer's Junk switch (more junk, grey once you start); Auto grade changed
+  mid-puzzle waits for the next game. Wording of the rows still to settle with the owner.
 
 ### Menu and Settings (every game)
 

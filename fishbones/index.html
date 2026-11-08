@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-08.8"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-08.12"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-08.8">
+<link rel="stylesheet" href="../games.css?v=2026-11-08.12">
 <style>
 /* A fish skeleton: a spine word across and rib words down through it, with the letters on the bones muddled.
    Swap bones until every line spells a word. Green: in the right place. Gold: in that word, somewhere else.
@@ -54,7 +54,7 @@
 .swaps{font-variant-numeric:tabular-nums}
 .swaps.over{color:var(--bad-text)}
 /* The fish's words, under everything: each one, once its bones are all green, links to Wiktionary with what it means */
-.wordlist{width:var(--board)}
+.wordlist{width:var(--board)} .wordlist[hidden]{display:none}
 .wordlist h2{margin:0 0 4px;font-size:18px;font-weight:800}
 .wordlist ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
 .wordlist li{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 8px;line-height:1.3}
@@ -107,11 +107,11 @@ body.full .actions > :not(#hintBtn,#undoBtn),body.full .bar,body.full .wordlist{
     <label>Level <select id="levelSel" aria-label="Level"></select></label>
     <button id="newBtn" class="primary">New fish</button>
   </div>
-  <section class="wordlist" aria-label="The fish's words"><h2>The words</h2><ol id="wordlist"></ol></section>
+  <section class="wordlist" id="wordbox" aria-label="Words found" hidden><h2 id="wordsHead">Words found</h2><ol id="wordlist"></ol></section>
 
 </main>
 
-<script src="../games.js?v=2026-11-08.8"></script>
+<script src="../games.js?v=2026-11-08.12"></script>
 <script>
 /* ---------- fish (plain functions, also run in a background worker) ---------- */
 // A fish is a spine word read across, with rib words read down through it. `ribs` gives each spine bone's rib
@@ -241,8 +241,8 @@ G.pawLost(() => !game || game.won || game.hinted || game.restarted);
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
 const SPARE = 5;   // swaps on top of the fewest
-// Each level is named for its fish and how hard it is, from 1 to 5 paws (Minnow-1 … Swordfish-5).
-const levelName = n => `${levelSpec(n).fish}-${levelSpec(n).paws}`;
+// Each level is named for its fish (Minnow … Swordfish); the level picker numbers them, the last marked hardest.
+const levelName = n => levelSpec(n).fish;
 const el = (t, a, parent) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (parent) parent.append(e); return e; };
 const left = () => game.budget - game.history.length;
 let FISH = null;   // the fish being played: {cells, words}
@@ -417,22 +417,23 @@ function update() {
   undo.sync();
   paintHint(); wordList();
 }
-// The fish's words: the spine, the words down and the words across. One whose bones are all green (or every word,
-// once the fish is solved) shows, linked to Wiktionary, with its first meaning from there; the rest show as a
-// blank for each letter.
+// The fish's words, as they're found: one whose bones are all green (or every word, once the fish is solved) goes in
+// the list under the board, linked to Wiktionary, with its first meaning from there. Words still to find aren't
+// shown at all (not even as blanks), and the list is hidden until the first one's found.
 const said = {};   // meanings already looked up: a list, or false when there wasn't one
 function wordList() {
   const {words, across} = shape(), ol = $("wordlist"), out = [];
   words.forEach((sq, k) => {
     const w = sq.map(i => game.cur[i]).join(""), known = game.won || sq.every(i => game.cur[i] === game.sol[i]);
     const where = k === 0 ? "Spine" : k < across ? "Down" : "Across";
-    if (!known) { out.push(`<li><span class="where">${where}</span><span class="blank" aria-label="${sq.length} letters">${"_".repeat(sq.length)}</span></li>`); return; }
+    if (!known) return;
     const m = said[w], link = `<a href="https://en.wiktionary.org/wiki/${w}" target="_blank" rel="noopener" title="What does ${w} mean? (Wiktionary)">${w}</a>`;
     const means = m ? `<i>${m[0].pos.toLowerCase()}</i> ${esc(m[0].text)}` : m === false ? "Tap the word to look it up on Wiktionary." : "Looking it up…";
     out.push(`<li><span class="where">${where}</span>${link}<span class="means">${means}</span></li>`);
     if (m === undefined) { said[w] = null; G.meaning(w).then(r => { said[w] = r; }, () => { said[w] = false; }).then(() => { if (game && $("wordlist")) wordList(); }); }
   });
   ol.innerHTML = out.join("");
+  $("wordbox").hidden = !out.length; $("wordsHead").textContent = game.won ? "The words" : "Words found";
 }
 const esc = t => t.replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
 
@@ -657,7 +658,7 @@ function helpOnFirstVisit() {
   G.spotlight({grid: $("grid"), w: L, h, steps, map, done: () => { settings.seenHelp = true; save(); }});
 }
 
-for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n), n));
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(`${n}: ${levelName(n)}${n === MAX_LEVEL ? " (hardest)" : ""}`, n));
 $("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
 $("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
 $("helpBtn").onclick = showHelp;
