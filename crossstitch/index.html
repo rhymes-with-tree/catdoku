@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.34"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.35"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.34">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.35">
 <style>
 /* A cross-stitch sampler: aida cloth held in a wooden embroidery hoop, with a chart's grid on it (a darker line every
    five squares), and the counts for each row down the left and each column along the top. Stitches are crosses in one
@@ -114,7 +114,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-07.34"></script>
+<script src="../games.js?v=2026-11-07.35"></script>
 <script>
 /* ---------- the patterns ---------- */
 // Each pattern is a picture square by square: "." is bare cloth, a letter a stitch in that thread. The bigger ones are
@@ -353,14 +353,18 @@ function draw() {
   $("count").textContent = won ? `Finished: ${plan.name}!` : `🧵 ${done} of ${total} stitches`;
   $("dotBtn").setAttribute("aria-pressed", String(dotting));
   $("hintBtn").disabled = won; $("dotBtn").disabled = won;
-  $("undoBtn").disabled = !game.history.length || won; $("restartBtn").disabled = !g.some(Boolean) || won;
+  undo.sync();
 }
 
 /* ---------- playing ---------- */
 // A tap stitches a square (or takes its stitch out); with Dot on, it puts a dot in (or takes it out) instead.
 // Dragging along a row or column carries the same change to every square passed that was like the first.
 const goal = from => dotting ? (from === 2 ? 0 : 2) : (from === 1 ? 0 : 1);
-const snapshot = () => { game.history.push(game.grid.join("")); if (game.history.length > 400) game.history.shift(); };
+// Undo (G.history): each step is the grid as it was, as a string (the newest 400 kept in game.history). Restart can be
+// undone too.
+const undo = G.history({game: () => game, take: () => game.grid.join(""), back: (h, g) => { g.grid = h.split("").map(Number); }, cap: 400,
+  can: playing, after: () => { draw(); save(); }, restart: true, started: () => game.grid.some(Boolean)});
+const snapshot = () => undo.push();
 let stroke = null;
 const board = $("board");
 board.addEventListener("pointerdown", e => {
@@ -413,12 +417,8 @@ const keys = G.gridKeys({on: playing, size: () => [game.N, game.N], keys: ["x", 
     else setCell(i, 0);
   },
   escape: () => { cursor = -1; draw(); }});
-function undo() { if (playing() && game.history.length) { game.grid = game.history.pop().split("").map(Number); draw(); save(); } }
-$("undoBtn").onclick = undo;
-document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); } });
 $("restartBtn").onclick = () => {
-  if (!playing() || !game.grid.some(Boolean)) return;
-  game.restarted = true; snapshot(); game.grid = game.grid.map(() => 0); draw(); save();
+  if (!undo.restart(g => { g.grid = g.grid.map(() => 0); })) return;
   G.note("Every stitch is out. Undo puts them back.", 3500);
 };
 $("dotBtn").onclick = () => { if (!game || game.won) return; dotting = !dotting; draw(); G.note(dotting ? "Dot is on: a tap marks a square that stays bare" : "", dotting ? 3500 : 0); };
