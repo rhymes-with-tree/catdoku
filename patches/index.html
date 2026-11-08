@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-08.9";
+  var BUILD = "2026-11-08.10";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-08.9">
+<link rel="stylesheet" href="../games.css?v=2026-11-08.10">
 <style>
 /* The board is a quilt: a stitched binding round the edge, dashed seams between patches. */
 .board{background:#F3EEDF;border:8px solid #853C68;border-radius:12px;outline:2px dashed rgba(255,244,230,.85);outline-offset:-5px}
@@ -61,17 +61,16 @@ main > .stage{margin-top:calc(var(--nw) * .56 - 14px)}
 .cell.hintcell:not(.bad){box-shadow:inset 0 0 0 100vmax rgba(255,255,255,.8)!important;animation:patchHint .7s ease-in-out infinite alternate}
 @keyframes patchHint{to{box-shadow:inset 0 0 0 100vmax rgba(236,168,24,.75)}}
 @media (prefers-reduced-motion:reduce){.cell.hintcell:not(.bad){animation:none}}
-.under{position:relative;width:var(--board);margin-bottom:calc(var(--sw) * .5)}
+.under{position:relative;width:var(--board)}
 @media (max-width:480px){.paints{gap:4px 6px}.paint{font-size:11px;padding:2px 0}.paint .swatch{width:38px;height:38px;font-size:17px}}
 @media (max-width:400px){.paints{gap:4px 3px}.paint{font-size:11px;padding:0}.paint .swatch{width:34px;height:34px}}
 .cat{position:absolute;height:auto;pointer-events:none;user-select:none;z-index:3}
 .cat.nap{width:var(--nw);right:-2%;bottom:calc(100% - var(--nw) * .22)}
-.cat.stretch{width:var(--sw);transform:scaleX(-1);left:max(-16%, calc((var(--board) - 100vw) / 2));top:calc(100% - var(--sw) * .08)}
+.cat.stretch{position:static;width:min(var(--sw),45%);transform:scaleX(-1);align-self:center}   /* below Restart and New, out of the buttons' way */
 /* On a phone held sideways (games.css) the quilt fills the height, with no room round it for the cats */
 @media (orientation:landscape) and (max-height:500px){
   body:not(.full) main:has(> .stage) .cat{display:none}
   body:not(.full) main:has(> .stage) .status{padding-right:0;min-height:0}
-  body:not(.full) main:has(> .stage) .under{margin-bottom:8px}
 }
 /* How to play card */
 .toggle{display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;user-select:none;white-space:nowrap}
@@ -98,12 +97,12 @@ main > .stage{margin-top:calc(var(--nw) * .56 - 14px)}
 
   <div class="under">
     <div class="paints" id="paints" role="group" aria-label="Fabrics"></div>
-    <img class="cat stretch" src="cat-stretch.png" alt="" aria-hidden="true">
   </div>
 
   <div class="actions">
     <button id="hintBtn">Hint</button>
     <button id="undoBtn">Undo</button>
+    <button id="markerBtn" aria-pressed="false">Marker</button>
     <button id="restartBtn">Restart</button>
     <button id="linkBtn">Share</button>
     <button id="bestBtn">Best times</button>
@@ -119,10 +118,11 @@ main > .stage{margin-top:calc(var(--nw) * .56 - 14px)}
     </label>
     <button id="newBtn" class="primary">New puzzle</button>
   </div>
+  <img class="cat stretch" src="cat-stretch.png" alt="" aria-hidden="true">
 
 </main>
 
-<script src="../games.js?v=2026-11-08.9"></script>
+<script src="../games.js?v=2026-11-08.10"></script>
 <script>
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 function nbrs(i,N){const r=Math.floor(i/N),c=i%N,o=[];if(r>0)o.push(i-N);if(r<N-1)o.push(i+N);if(c>0)o.push(i-1);if(c<N-1)o.push(i+1);return o;}
@@ -376,7 +376,8 @@ function render() {
   $("count").textContent = `🧵 ${done} / ${game.R} patches`;
   if (bad.size) G.note(`${bad.size} patches match a neighbor.`, 0); else if ($("msg").textContent.includes("match a neighbor")) G.note("");
   undo.sync(); $("hintBtn").disabled = game.won;
-  [...$("paints").children].forEach((b, k) => b.setAttribute("aria-pressed", k === brush || (brush === MINE && k === look().length)));
+  [...$("paints").children].forEach((b, k) => b.setAttribute("aria-pressed", String(k === brush)));
+  $("markerBtn").setAttribute("aria-pressed", String(brush === MINE));
 }
 
 /* ---------- input ---------- */
@@ -390,12 +391,16 @@ function swatchButton(label, dress, onPick) {
 function buildSwatches() {
   $("paints").innerHTML = "";
   look().forEach((f, k) => swatchButton(f.name, sw => fabricOn(sw, f), () => { brush = k; }));
-  swatchButton("Marker", sw => sw.classList.add("mine"), () => {
-    brush = MINE;
-    // the first time, say what it's for
-    if (!settings.seenMine) { settings.seenMine = true; save(); G.note("Marker: tap a patch to put your own button on it as a reminder, and tap again to take it off. It doesn't sew the patch.", 7000); }
-  });
 }
+// Marker is a notes tool, so it sits with Undo and Hint, as the other games' notes tools do, not among the fabrics.
+// On, a tap buttons a patch; off (or a fabric picked), taps sew again with the fabric last picked.
+let lastFabric = 0;
+$("markerBtn").onclick = () => {
+  if (brush === MINE) brush = lastFabric; else { if (brush >= 0) lastFabric = brush; brush = MINE; }
+  // the first time, say what it's for
+  if (brush === MINE && !settings.seenMine) { settings.seenMine = true; save(); G.note("Marker: tap a patch to put your own button on it as a reminder, and tap again to take it off. It doesn't sew the patch.", 7000); }
+  if (game) render();
+};
 buildSwatches();
 G.switch({id: "fabricTgl", label: "Fabric patterns", line: "Each fabric has a pattern as well as a color", key: "fabric", of: () => settings, save,
   change: () => { buildSwatches(); if (game) render(); }});
@@ -505,7 +510,7 @@ function spotlightSteps() {
   const turn = G.yourTurn(() => game, g => { game = g; }, () => { brush = 0; render(); });
   steps.push({say: "Pick this fabric", els: [sw[1]], try: {done: () => brush === 1}, ...turn.from},
              {say: "Tap this patch", lit: cellsOf(a), try: {done: () => game.col[a] === 1, yes: "Sewn! Tap again to unpick"}, ...turn.upTo},
-             {say: "Not sure? Pick Marker to button a patch", els: [sw[4]], later: true},
+             {say: "Not sure? Marker buttons a patch", els: [$("markerBtn")], later: true},
              {say: "Stuck? Hint shows a patch", els: [$("hintBtn")]});
   return steps;
 }

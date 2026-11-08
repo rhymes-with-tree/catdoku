@@ -286,7 +286,7 @@ const G = (() => {
       o.drawFavs(); note(on ? `${name} is in your favorites, at the top of the front page.` : `${name} is out of your favorites.`, 3500);
     });
     // the page's own buttons, pressed from here (and kept in step with them: hidden or not, ready or not)
-    const page = [["linkBtn", "share", "Share"], ["bestBtn", "best", "Best times"], ["helpBtn", "help", "How to play"]]
+    const page = [["linkBtn", "share", "Share"], ["bestBtn", "best", "Best times"], ["helpBtn", "help", "How to play"], ["lexBtn", "book", "What's what"]]
       .map(([id, icon, text]) => [id, item(icon, $(id) ? ($(id).querySelector(".lbl") || $(id)).textContent.trim() || text : text, () => $(id) && $(id).click())]);
     const keys = item("keyboard", "Keyboard Shortcuts", () => keysCard(), "Press ? for these");
     const setRow = item("sliders", `${name} Settings`, () => {});
@@ -1813,6 +1813,7 @@ const G = (() => {
     left: '<path d="M11 9h15M11 16h15M11 23h15"/><path d="M5.5 9h.2M5.5 16h.2M5.5 23h.2"/>',
     pairs: '<path d="M4 25l5-15 5 15M6 20h6"/><path d="M19 10v15"/><circle cx="23" cy="20.5" r="4.5"/>',
     marks: '<path d="M9 21l4-4 9-9 4 4-9 9-4 4h-4z"/><path d="M5 28h22"/>',
+    book: '<path d="M5 8c4-1.5 7.5-.5 11 2 3.5-2.5 7-3.5 11-2v17c-4-1.5-7.5-.5-11 2-3.5-2.5-7-3.5-11-2z"/><path d="M16 10v17"/>',
     sliders: '<path d="M5 9h22M5 16h22M5 23h22"/><circle cx="11" cy="9" r="2.6"/><circle cx="21" cy="16" r="2.6"/><circle cx="14" cy="23" r="2.6"/>',
     games: '<rect x="6" y="6" width="8" height="8" rx="2"/><rect x="18" y="6" width="8" height="8" rx="2"/><rect x="6" y="18" width="8" height="8" rx="2"/><rect x="18" y="18" width="8" height="8" rx="2"/>',
     digits: '<path d="M4 11l3-2v14M11 12a3 3 0 1 1 5 2.5L11 23h6M21 9h6l-3.5 5a4.2 4.2 0 1 1-3.5 7"/>',
@@ -1820,7 +1821,7 @@ const G = (() => {
   };
   const ICON_OF = {hintBtn: "hint", undoBtn: "undo", backBtn: "undoguess", restartBtn: "restart", resetBtn: "restart", auditBtn: "audit", notesBtn: "pencil",
     allNotesBtn: "pencils", clearNotesBtn: "erase", eraseBtn: "erase", pauseBtn: "pause", guessBtn: "guess", giveUpBtn: "giveup",
-    keepBtn: "keep", shuffleBtn: "shuffle", flipBtn: "flip", finishBtn: "near", completeBtn: "check", skipBtn: "skip",
+    keepBtn: "keep", markerBtn: "marks", shuffleBtn: "shuffle", flipBtn: "flip", finishBtn: "near", completeBtn: "check", skipBtn: "skip",
     colBtn: "palette", dotBtn: "dot", linkBtn: "share", toysBtn: "toys", bestBtn: "best", helpBtn: "help", zoomIn: "zoomin", zoomOut: "zoomout", zoomFit: "fit",
     sightBtn: "sight", nipBtn: "catnip", shakeBtn: "bubbleshake", fluffBtn: "defluff", swatBtn: "swat", netBtn: "net", rainbowBtn: "losecolor", basketBtn: "basketadd", wipeBtn: "wipe",
     chooseBtn: "keyboard", revealBtn: "giveup", peekBtn: "peek", perchBtn: "perch", wakeBtn: "cat", reelBtn: "reel", mopBtn: "sponge"};
@@ -1836,7 +1837,7 @@ const G = (() => {
   // Buttons not used while playing (Share, Best times, How to play, Toys) are pressed from the game's menu (gameMenu):
   // each page keeps them in its markup, and they're put out of sight here, with Keys (shown in the menu on a computer).
   // The play tools stay under the board, with a line above them for a hint's words.
-  const PAGE_TOOLS = ["toysBtn", "linkBtn", "bestBtn", "helpBtn"];
+  const PAGE_TOOLS = ["toysBtn", "linkBtn", "bestBtn", "helpBtn", "lexBtn"];
   function pageTools() {
     const main = document.querySelector("main"), head = main && main.querySelector("header");
     if (!head || $("pageTools")) return;
