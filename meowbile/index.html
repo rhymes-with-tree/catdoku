@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.39"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.40"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.39">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.40">
 <style>
 /* A cat's mobile: rods hang from their middles, with a string of toys or another rod at each end. Every rod
    balances. Tap a toy (or its button in the key) and then a number to say what that kind of toy weighs; a rod
@@ -116,7 +116,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-07.39"></script>
+<script src="../games.js?v=2026-11-07.40"></script>
 <script>
 /* ---------- mobiles (plain functions, also run in a background worker) ---------- */
 // A mobile is a tree: a rod {l, r} hangs from its middle with a branch at each end (both ends the same distance
@@ -425,8 +425,7 @@ function update() {
   const off = of && sum !== game.clue.total ? `, not ${game.clue.total}` : "";
   $("count").textContent = game.won ? `Every rod balances! It weighs ${sum}` : left ? `So far: ${sum}${of} · ${left} toy${left > 1 ? "s" : ""} to weigh` : `It weighs ${sum}${off}`;
   $("hintBtn").disabled = game.won;
-  $("undoBtn").disabled = !game.history.length || game.won;
-  $("restartBtn").disabled = !game.history.length || game.won;
+  undo.sync();
   paintHint();
 }
 
@@ -442,7 +441,7 @@ function put(v) {
   const was = game.got[sel], now = v || null;
   if (was === now) return;
   game.started = true;
-  game.history.push([sel, was]);
+  undo.push([sel, was]);
   game.got[sel] = now;
   update();
   if (checkWin()) return;
@@ -479,23 +478,14 @@ document.addEventListener("keydown", e => {
   else return;
   e.preventDefault();
 });
-document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
 
 // Undo takes back a weight, or a Restart.
-function undo() {
-  if (!playing() || !game.history.length) return;
-  const h = game.history.pop();
-  if (h.got) game.got = h.got; else { game.got[h[0]] = h[1]; sel = h[0]; }
-  update(); save();
-}
-$("undoBtn").onclick = undo;
+const undo = G.history({game: () => game, can: playing, restart: true,
+  back: h => { if (h.got) game.got = h.got; else { game.got[h[0]] = h[1]; sel = h[0]; } },
+  after: () => { update(); save(); }});
 $("restartBtn").onclick = () => {
-  if (!playing() || !game.history.length) return;
-  game.restarted = true;
-  game.history.push({got: game.got.slice()});
-  game.got = game.got.map(() => null);
-  update(); save();
-  G.note("Back to how the mobile started. Undo brings your weights back.", 4000);
+  if (undo.restart(g => { g.got = g.got.map(() => null); }, {got: game.got.slice()}))
+    G.note("Back to how the mobile started. Undo brings your weights back.", 4000);
 };
 
 /* ---------- hints ---------- */
