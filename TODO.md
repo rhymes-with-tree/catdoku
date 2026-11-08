@@ -99,12 +99,9 @@ will recheck this list, and add games 43–52, before any of it is built.
 - **Restart · New [Noun]** on the last line, a line of their own, kept apart so they aren't pressed by accident
   (Restart beside New is as the plan has it).
 - **Hint stays where the plan has it** (decided 2026-11-08): in the gold-paw group, not on Undo's line.
-- **Short lines:** where two lines of buttons have only one or two icons each, consider joining them into one line
-  (Bird Watch's Wipe and Pause are the case that raised it). Restart · New [Noun] stays a line of its own at the
-  bottom, apart from the rest, so it isn't pressed by accident.
 - New [Noun] centred (Toe Beans).
 - Spelling String: New Round is in an odd spot (it already has Give up).
-- Undo far down the page: Knock It Off. Bird Watch's Wipe and Pause each alone on a line. Junk Drawer's row
+- Undo far down the page: Knock It Off. Junk Drawer's row
   underneath is unevenly spaced.
 - Twirl: Hint up onto the zoom line, centred, to take less room.
 - **Zoom and full screen like Twirl's** (owner likes it): `G.zoom` with `below: true`, under the board's corner. Cat

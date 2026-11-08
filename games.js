@@ -1809,8 +1809,26 @@ const G = (() => {
       b.classList.add("moved"); if (id !== "giveUpBtn") slot.before(b); else slot.after(b);
     }
   }
+  // Short lines joined (decided 2026-11-08): a helpers line beside the tools line, each with one or two buttons (hidden
+  // ones counted, so a line that grows as helpers unlock, like Wind-Up's, stays its own), become one line: the tools
+  // first, then the helpers, so the gold-paw group stays together at the end (Bird Watch: Pause · Wipe). Restart and New
+  // are on the bar below, apart from it (arrange has already moved them there).
+  function joinShort() {
+    const own = row => [...row.children].filter(b => b.tagName === "BUTTON" && !PAGE_TOOLS.includes(b.id) && !["restartBtn", "resetBtn", "giveUpBtn"].includes(b.id));
+    for (const help of document.querySelectorAll("main .actions.helpers")) {
+      if (help.closest(".card,.overlay")) continue;
+      let tools = help.nextElementSibling; if (tools && tools.id === "hintLine") tools = tools.nextElementSibling;
+      if (!tools || !tools.matches(".actions:not(.helpers,.pieces)")) continue;
+      const a = own(help), b = own(tools);
+      if (!a.length || !b.length || a.length > 2 || b.length > 2) continue;
+      help.prepend(...b); help.classList.add("joined");
+      const line = $("hintLine"); if (line && line.nextElementSibling === tools) help.before(line);
+      if (!tools.children.length) tools.hidden = true;
+    }
+  }
   toolify();
   arrange();
+  joinShort();
   // The status line (the goal and the time) goes under the board, above the buttons, in every game (decided
   // 2026-11-08): the goal at the left, the time at the right, and a note on a line of its own under them. It's
   // written above the board in each page, so it's moved here, past the board (or the box the board is in).
