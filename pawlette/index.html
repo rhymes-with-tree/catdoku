@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.17";
+  var BUILD = "2026-11-07.18";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.17">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.18">
 <style>
 /* Pawlette: Mix to order. A skein of yarn waits to be dyed in one of Yarn's colourways, a colour at a time. Tap the
    pots to drip paint into the cup, mixing like real paint, until it matches the colour for the next stretch; a
@@ -121,8 +121,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-07.17"></script>
-<script src="../colorways.js?v=2026-11-07.17"></script>
+<script src="../games.js?v=2026-11-07.18"></script>
+<script src="../colorways.js?v=2026-11-07.18"></script>
 <script>
 /* ---------- paint (plain functions) ---------- */
 // A mix is drops of each pot: [red, yellow, blue, white, black]. Its colour: the red-yellow-blue part blended
@@ -286,8 +286,7 @@ function draw() {
   $("count").textContent = game.won ? "Dyed!" : `Level ${game.level} · colour ${game.at + 1} of ${game.targets.length}`;
   $("dyeBtn").disabled = !playing() || !drops(game.cup);
   $("emptyBtn").disabled = !playing() || !drops(game.cup);
-  $("undoBtn").disabled = !playing() || !game.history.length;
-  $("restartBtn").disabled = !playing() || !game.history.length;
+  undo.sync();
   $("hintBtn").disabled = !playing();
   paintHint();
   G.describe($("board"), `Match ${game.way}, colour ${game.at + 1} of ${game.targets.length}. Your mix: ${game.cup.map((n, i) => n ? `${n} ${POTS[i].name}` : "").filter(Boolean).join(", ") || "empty"}.`);
@@ -307,9 +306,13 @@ $("napper").onclick = purr;
 
 /* ---------- playing ---------- */
 const snap = () => JSON.stringify({at: game.at, cup: game.cup, dyed: game.dyed});
+// Undo (G.history): each step is the strand as it was (snap), kept in game.history; Restart can be undone too. Not
+// while a dyed colour is held up to look at.
+const undo = G.history({game: () => game, take: snap, back: (h, g) => Object.assign(g, JSON.parse(h)), can: () => game && !game.won && !held,
+  over: () => !playing(), after: () => { draw(); save(); }, restart: true});
 function addDrop(i) {
   if (!playing() || !levelSpec(game.level).pots[i]) return;
-  game.started = true; game.history.push(snap());
+  game.started = true; undo.push();
   game.cup[i]++; hints.clear(false);
   // even a perfect mix waits for Dye it, so you see it first
   draw(); save();
@@ -351,14 +354,13 @@ function advice(p) {
   return p >= 75 ? `A little ${what}` : what[0].toUpperCase() + what.slice(1);
 }
 $("pots").addEventListener("click", e => { const b = e.target.closest(".pot"); if (b) addDrop(+b.dataset.i); });
-$("dyeBtn").onclick = () => { if (!playing() || !drops(game.cup)) return; game.history.push(snap()); dye(closeness() < PERFECT); };
-$("emptyBtn").onclick = () => { if (!playing() || !drops(game.cup)) return; game.history.push(snap()); game.cup = [0, 0, 0, 0, 0]; draw(); save(); };
-function undo() { if (!playing() || !game.history.length) return; Object.assign(game, JSON.parse(game.history.pop())); draw(); save(); }
-$("undoBtn").onclick = undo;
-document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
+$("dyeBtn").onclick = () => { if (!playing() || !drops(game.cup)) return; undo.push(); dye(closeness() < PERFECT); };
+$("emptyBtn").onclick = () => { if (!playing() || !drops(game.cup)) return; undo.push(); game.cup = [0, 0, 0, 0, 0]; draw(); save(); };
 // Restart starts the whole strand again (and costs the gold paw), so once anything's dyed it asks first, and offers
 // Empty the cup (free) for just this colour.
-function restartStrand() { game.history.push(snap()); Object.assign(game, {at: 0, cup: [0, 0, 0, 0, 0], dyed: []}); game.restarted = true; G.closeCard(); draw(); save(); G.note("Back to the start of the strand. Undo brings it back.", 3500); }
+function restartStrand() {
+  if (undo.restart(g => { Object.assign(g, {at: 0, cup: [0, 0, 0, 0, 0], dyed: []}); G.closeCard(); })) G.note("Back to the start of the strand. Undo brings it back.", 3500);
+}
 $("restartBtn").onclick = () => {
   if (!playing() || !game.history.length) return;
   if (!game.dyed.length) { $("emptyBtn").onclick(); return; }

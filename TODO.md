@@ -174,9 +174,8 @@ Built 2026-11-07 (`whatsNew` in `games.js`), ahead of the shared helpers, which 
   (and Restart, with `restart: true`). Each page keeps its steps where and as it did (in its saved game, usually
   `game.history`), so old saves load and undo; `back(step)` puts one back; `take` makes snapshots (and lets Restart be
   undone); `cap` keeps the newest (moving bookmarks' places with them); `G.guesser({history})` takes its Undo from it.
-  Moved so far: Night Light. Still writing their own (33 at the start; how each keeps its steps, from the survey):
+  Moved so far: Night Light and Pawlette. Still writing their own (33 at the start; how each keeps its steps, from the survey):
   - Cat Mat: pots in order, the mat replayed from the start; Restart empties the list; a share link keeps the steps
-  - Pawlette: JSON snapshots of the strand; Restart pushes one
   - Treat Time: `[i, mark]` moves, and Restart pushes `{mark}`
   - Up a Tree: rung snapshots, Restart pushes one; the steps are the rungs, so Undo gives the step back
   - Unravel: no list, the path itself (Undo takes its last step off)
