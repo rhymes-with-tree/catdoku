@@ -109,8 +109,8 @@ will recheck this list, and add games 43–52, before any of it is built.
   mid-puzzle waits for the next game. Wording of the rows settled (build .23): no line under a row; Timer (Show · By
   game · Hide), Action game speed (Regular · By game · Slower), Reduce visual clutter, Auto check and Auto Notes (On ·
   By game · Off), On or Show first; Timer's own switch lost its line too. Saved choices carried over
-  (`catdoku.comfort.v2`). Still open: whether the games' other switches (Slower, Fabric patterns, Numbers…) should
-  lose their lines too where the name says it all; the owner's rule was given for the rows.
+  (`catdoku.comfort.v2`). Next (owner, 2026-11-08): "Lose any words you can lose anywhere": the
+  lines under switches and settings, walkthrough and card text, notes and labels, site-wide.
 
 ### Menu and Settings (every game)
 
@@ -138,8 +138,8 @@ will recheck this list, and add games 43–52, before any of it is built.
   against the white-and-gold hint flash, the red clash stripes, the gold paw, dark mode and colour-blind views, with a
   matching plain set. Then a Fabrics picker in Patches' Settings (and on the Settings page, through `SET_LIST`), the
   swatches under the quilt following it. About one session for three or four colourways. For the owner: how many,
-  whether all are open from the start or earned (gold paws, or the Toy chest), and whether a colourway may borrow
-  `colorways.js`' names (Berry, Moss, Ocean…) for a family feel.
+  whether all are open from the start or earned (gold paws, or the Toy chest), and the owner said (2026-11-08) to borrow from
+  Yarn's colourways in `colorways.js` (Berry, Moss, Ocean…).
 
 ### Questions still to answer
 - Answered 2026-11-08 (build .20), for the owner to look over: Laser Pointer's cats never need the dot again once
