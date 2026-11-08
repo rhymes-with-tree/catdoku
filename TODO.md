@@ -128,7 +128,7 @@ will recheck this list, and add games 43–52, before any of it is built.
 ### Tools and gestures the same everywhere
 - One meaning for a double tap / long press across the marking games: after Catdoku a double tap should leave a cat
   mark in Hide & Seek, not a hiss. Open the Door!: long press as in Toydoku; an eraser in place of ⌫.
-- Catdoku: Mark's icon centred over the word; a cat mark beside the paw mark and Erase.
+- Catdoku: a cat mark beside the paw mark and Erase.
 - Fair Play: with Auto check on, Toy | Toy | Mark as pieces in place of tap once / tap twice (its `G.pieces` row is
   "Toy" and Mark today); the Toy piece shows a toy, not a paw; Mark shows its × / = with "Mark" under it.
 - **Changes the 2026-11-07 plan** (pieces put Patches' Marker among the fabrics). **Decided 2026-11-08:** Marker is a
