@@ -129,13 +129,12 @@ will recheck this list, and add games 43–52, before any of it is built.
 - One meaning for a double tap / long press across the marking games: after Catdoku a double tap should leave a cat
   mark in Hide & Seek, not a hiss. Open the Door!: long press as in Toydoku; an eraser in place of ⌫.
 - Catdoku: a cat mark beside the paw mark and Erase.
-- Fair Play: with Auto check on, Toy | Toy | Mark as pieces in place of tap once / tap twice (its `G.pieces` row is
-  "Toy" and Mark today); the Toy piece shows a toy, not a paw; Mark shows its × / = with "Mark" under it.
+- Fair Play: with Auto check on, Toy | Toy | Mark as pieces in place of tap once / tap twice. (Done: the Toy piece
+  shows a toy, and Mark shows × = with "Mark" under it.)
 - **Changes the 2026-11-07 plan** (pieces put Patches' Marker among the fabrics). **Decided 2026-11-08:** Marker is a
   notes tool, so it comes out of the colours and sits where the other games' notes tools do.
 - Auto Notes: Catdoku's 🐾 is hard to see in dark mode (not urgent).
-- Toydoku: its icons are in an odd order. Treat Time: Put Back shouldn't be a paw; Keep a green outline with a clear
-  middle.
+- Toydoku: its icons are in an odd order.
 - Scratch That's Post first / Dot first: look for other games it would help (Fair Play?).
 
 ### Symbols that read wrong

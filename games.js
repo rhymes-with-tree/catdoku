@@ -1666,8 +1666,9 @@ const G = (() => {
     giveup: '<path d="M8 6h15l-3 5 3 5H8z" class="white"/><path d="M8 28V5"/>',
     cat: '<path d="M7 13L8 4l6 5h4l6-5 1 9c2 4 1 9-3 11-3 2-11 2-14 0-4-2-5-7-2-11z"/><path d="M12.5 17v.5M19.5 17v.5M14.5 21.5h3"/>',
     tap: '<ellipse cx="16" cy="20" rx="6" ry="5"/><circle cx="8" cy="13" r="2.4"/><circle cx="13" cy="8.5" r="2.4"/><circle cx="19" cy="8.5" r="2.4"/><circle cx="24" cy="13" r="2.4"/>',
-    marks: '<path d="M5 10l8 8M13 10l-8 8"/><path d="M18 11h9M18 17h9"/>',
-    keep: '<circle cx="16" cy="16" r="10" class="green"/>',
+    xeq: '<path d="M5 10l8 8M13 10l-8 8"/><path d="M18 11h9M18 17h9"/>',
+    keep: '<circle cx="16" cy="16" r="10" style="stroke:var(--sage-green);stroke-width:3.5"/>',   // a green ring, clear in the middle
+    putback: '<path d="M5 21h22v6H5z"/><path d="M16 4v12"/><path d="M11 11l5 5 5-5"/>',   // Treat Time's Put back: into the tray
     shuffle: '<path d="M4 10h5c7 0 8 12 15 12h4"/><path d="M24 18l4 4-4 4"/><path d="M4 22h5c2 0 3.5-1.5 5-3.5M18 12.5c1.5-1.5 3-2.5 6-2.5h4"/><path d="M24 6l4 4-4 4"/>',
     flip: '<path d="M16 4v24"/><path d="M12 8L4 22h8z"/><path d="M20 8l8 14h-8z"/>',
     dot: '<rect x="6" y="6" width="20" height="20" rx="3"/><circle cx="16" cy="16" r="2.6" fill="currentColor"/>',   // mark a square to stay empty (Cross Stitch)
@@ -1855,6 +1856,7 @@ const G = (() => {
   // either piece: draw), of and key (where to keep it, with save: Scratch That keeps Dot first in its settings; off
   // on every page load if not given), save}. Returns {on(), set(on) (quietly: a new puzzle or a win turns it off),
   // toggle()}.
+  // o.plainIcon: the plain tap's icon, if not a tapping paw (Treat Time's Put back, Fair Play's Toy)
   function pieces(o) {
     const m = $(o.mark), first = document.querySelector("main .actions");
     let on = !!(o.of && o.of()[o.key]);
@@ -1871,7 +1873,7 @@ const G = (() => {
     if (m) m.onclick = toggle;
     if (m && first) {
       const row = document.createElement("div"); row.className = "actions pieces"; row.setAttribute("role", "group"); row.setAttribute("aria-label", "What a tap does");
-      const p = document.createElement("button"); p.id = "plainBtn"; p.className = "tool"; p.innerHTML = iconSVG("tap") + `<span class="lbl">${o.plain}</span>`;
+      const p = document.createElement("button"); p.id = "plainBtn"; p.className = "tool"; p.innerHTML = iconSVG(o.plainIcon || "tap") + `<span class="lbl">${o.plain}</span>`;
       p.onclick = () => { if (on) toggle(); };
       row.append(p, m); first.before(row);
       const sync = () => p.setAttribute("aria-pressed", String(m.getAttribute("aria-pressed") !== "true"));
