@@ -293,10 +293,12 @@ const G = (() => {
     setRow.onclick = e => { e.stopPropagation(); const open = setList.hidden; setList.hidden = !open; setRow.setAttribute("aria-expanded", String(open)); if (open) setList.scrollIntoView({block: "nearest"}); };
     setRow.setAttribute("aria-expanded", "false"); setRow.classList.add("more");
     const setList = document.createElement("div"); setList.className = "toggles menuSettings"; setList.id = "menuSettings"; setList.hidden = true;
+    const allSet = document.createElement("a"); allSet.className = "menuItem allSettings"; allSet.setAttribute("role", "menuitem"); allSet.href = `${base || "../"}settings/#${current}`;
+    allSet.innerHTML = iconSVG("sliders") + '<span class="mtext"><span class="mname">All settings</span><small>Every game\'s, on one page</small></span>';
     setRow.setAttribute("aria-controls", "menuSettings");
     for (const opt of document.querySelectorAll("main .bar .opt")) if (!opt.closest(".card,.overlay")) setList.append(opt);
     for (const bar of document.querySelectorAll("main .bar.toggles")) if (!bar.children.length) bar.remove();
-    menu.append(setList);
+    menu.append(setList, allSet);
     head.append(menu);
 
     function sync() {
@@ -754,7 +756,7 @@ const G = (() => {
     board.addEventListener("pointerdown", start, true);
     board.addEventListener("keydown", start, true);
     const btn = $("timer");
-    btn.onclick = () => { const p = load(PREFS); p.hideTimer = !p.hideTimer; save(PREFS, p); showTime(); };
+    btn.onclick = () => { const all = load(TIMERS); all[T.name] = !timerHidden(T.name); save(TIMERS, all); byGame(T.name, "timer"); showTime(); };   // this game's, as on the Settings page
     let last = Date.now();
     setInterval(() => {
       const now = Date.now(), g = T.game(), dt = Math.min(now - last, 1500); last = now;
@@ -768,12 +770,12 @@ const G = (() => {
     const g = T && T.game(), btn = $("timer"); if (!btn) return;
     if (!g || !g.timed) { btn.textContent = ""; btn.hidden = true; return; }
     btn.hidden = false;
-    const hide = load(PREFS).hideTimer;
+    const hide = timerHidden(T.name);
     btn.textContent = hide ? "⏱ –:––" : "⏱ " + clock(g.ms || 0);
     btn.setAttribute("aria-label", hide ? "Timer hidden. Tap to show the time." : `Time ${clock(g.ms || 0)}. Tap to hide the time.`);
   }
   // Fields a new puzzle starts with. Leaving a puzzle you'd started (and not solved) for a new one ends your win streak.
-  const freshClock = () => { const g = T && T.game(); if (g && g.started && !g.result) breakStreak(); return {ms: 0, timed: true, started: false}; };
+  const freshClock = () => { takePending(); const g = T && T.game(); if (g && g.started && !g.result) breakStreak(); return {ms: 0, timed: true, started: false}; };
   // Win streaks, per game: puzzles won in a row, kept on this device. A win (finishClock) adds one, and the win card
   // says so from two on. Leaving a started puzzle for a new one ends it (freshClock), and so does losing: a game
   // calls breakStreak when you run out of lives, moves or toys, give up, or get tangled.
@@ -907,7 +909,7 @@ const G = (() => {
   function shareResult(r, gold, btn) {
     const name = document.querySelector("header h1").textContent, bits = [name];
     if (r && r.n != null && T) bits.push(label(r.n));
-    if (r && r.ms != null && !load(PREFS).hideTimer) bits.push("⏱ " + clock(r.ms));
+    if (r && r.ms != null && !timerHidden(T && T.name)) bits.push("⏱ " + clock(r.ms));
     if (gold) bits.push("Gold paw 🐾");
     track(`${name} result shared`);
     sendLink(name, bits.join(" · "), location.origin + location.pathname, {btn});
@@ -1375,7 +1377,19 @@ const G = (() => {
   // a function giving them), kept with save(); change(on) runs after. can() false leaves it as it was (Toe Beans,
   // mid-move). tip is shown once, pointing at the switch, the first time it's turned on. Gives back the box, whose
   // .sync() shows the setting again when the page changed it itself.
-  const SWITCH_TIPS = {};
+  const SWITCH_TIPS = {}, SWITCHES = [];
+  // A setting changed on the Settings page mid-puzzle (one that can cost a life or the gold paw) waits for the next
+  // game: freshClock calls this as a new one starts, and it's put in then, once the new puzzle is set up.
+  function takePending() {
+    const all = load(PENDING), mine = CURRENT && all[CURRENT]; if (!mine || !Object.keys(mine).length) return;
+    setTimeout(() => {
+      for (const {o, box, of} of SWITCHES) if (o.key in mine) {
+        const v = !!mine[o.key]; delete mine[o.key];
+        if (!!of()[o.key] !== v) { of()[o.key] = v; if (o.save) o.save(); box.sync(); if (o.change) o.change(v); }
+      }
+      save(PENDING, all);
+    });
+  }
   function makeSwitch(o) {
     const of = () => typeof o.of === "function" ? o.of() : o.of;
     const opt = document.createElement("div"); opt.className = "opt";
@@ -1389,9 +1403,11 @@ const G = (() => {
     }
     box.sync = () => { box.checked = !!of()[o.key]; };
     box.sync();
+    SWITCHES.push({o, box, of});
     box.addEventListener("change", () => {
       if (o.can && !o.can()) { box.sync(); return; }
       of()[o.key] = box.checked; if (o.save) o.save();
+      if (CURRENT) { byGame(CURRENT, o.key); const all = load(PENDING); if (all[CURRENT] && o.key in all[CURRENT]) { delete all[CURRENT][o.key]; save(PENDING, all); } }
       if (o.change) o.change(box.checked);
     });
     if (o.tip) SWITCH_TIPS[o.id] = o.tip;
@@ -1411,8 +1427,101 @@ const G = (() => {
   function slower(slug) {
     const d = {[slug]: !!load(SLOWER)[slug]};
     makeSwitch({id: "slowTgl", label: "Slower", line: "Everything moves at two-thirds speed", key: slug, of: d,
-      save: () => { const all = load(SLOWER); all[slug] = d[slug]; save(SLOWER, all); }});
+      save: () => { const all = load(SLOWER); all[slug] = d[slug]; save(SLOWER, all); byGame(slug, "slower"); }});
     return () => d[slug] ? 1.5 : 1;
+  }
+
+  /* ---------- every game's settings, for the Settings page ---------- */
+  // The Settings page (settings/) doesn't run the games' scripts, so this says where each game keeps each setting:
+  // SETTINGS[slug] is a list of {key, name, line, def (its value when nothing's saved), row (one of ROWS, for a setting
+  // the page's top rows set for every game at once), warn (it can cost a life or the gold paw, so changed on the page
+  // mid-puzzle it waits for the next game), at ([storage key, field]; else the game's own store, field settings.key),
+  // opts ([value, name] for a choice of several), get/set (where games.js keeps it itself: Timer, Slower)}.
+  const TIMERS = "catdoku.timers.v1", COMFORT = "catdoku.comfort.v1", PENDING = "catdoku.pending.v1";
+  // Rows at the top of the page, three ways each: words[0] · By game · words[2]; on is the end that turns every switch on.
+  const ROWS = [
+    {id: "timers", name: "Timers", line: "The clock above the board", words: ["Show", "By game", "Hide"], on: 0},
+    {id: "speed", name: "Action game speed", line: "Slower: everything moves at two-thirds speed", words: ["Regular speed", "By game", "Slower"], on: 2},
+    {id: "decor", name: "Decorations", line: "Things drawn round the board just for looks", words: ["Show all", "By game", "Reduce clutter"], on: 0},
+    {id: "check", name: "Auto check", line: "Rule breaks turn red as you play", words: ["Off", "By game", "On"], on: 2},
+    {id: "notes", name: "Auto Notes", line: "Notes filled in for you", words: ["Off", "By game", "On"], on: 2},
+  ];
+  const STORES = {catdoku: "catdoku.v1", atlas: "catdoku.catlas.v1"};
+  const storeOf = slug => STORES[slug] || `catdoku.${slug}.v1`;
+  const CHECK = ["autoCheck", "Auto check", "Rule breaks turn red as you play", true, {row: "check"}];
+  const NOTES = ["autoNotes", "Auto Notes 🔢", "Every maybe filled in for you", false, {row: "notes"}];
+  const NUMBERS = line => ["numbers", "Numbers", line, false];
+  const SET_LIST = {
+    catdoku: [["autoGrade", "Auto grade", "A wrong 🐱 turns red and costs a life", false, {warn: true}],
+      ["autoExclude", "Auto Notes 🐾", "🐾 go round each 🐱 for you", false, {row: "notes"}]],
+    yarn: [["shades", "Colors", "How alike the balls' colors are", "wide", {opts: [["wide", "Wide range"], ["medium", "Medium"], ["veryclose", "Very close"]]}],
+      NUMBERS("Each ball shows its place in the run")],
+    patches: [["fabric", "Fabric patterns", "Each fabric has a pattern as well as a color", true, {row: "decor"}], CHECK],
+    sunbeams: [CHECK], tango: [CHECK],
+    scratchthat: [CHECK, ["dotFirst", "Dot first", "A tap puts a dot down first, then a post", false]],
+    highperch: [CHECK, NOTES], opendoor: [NOTES], windowledges: [["sets", "Show sets", "The digits that can make each ledge's total", true], NOTES],
+    toydoku: [["autoGrade", "Auto grade", "A wrong toy turns red and costs a life", false, {warn: true}], CHECK, NUMBERS("Digits in place of toys"), NOTES],
+    junkdrawer: [["junk", "Junk", "Batteries, keys and coins in the drawer", true, {row: "decor"}],
+      ["autoNotes", "Dim used-up magnets", "Magnets no word left to find needs fade", false, {row: "notes"}]],
+    shelflife: [["shelf", "Shelf", "The pots stand on a shelf", true, {row: "decor"}]],
+    catpile: [["cats", "Cats", "Cats nap on the blanket", true, {row: "decor", at: ["catdoku.catpile.prefs.v1", "cats"]}],
+      ["turns", "Turning", "Toys can be turned as well as moved", false, {at: ["catdoku.catpile.prefs.v1", "turns"]}]],
+    catshuffle: [NUMBERS("Each piece shows where it goes")], windup: [NUMBERS("Each toy shows a number too")],
+    pickpile: [["dim", "Dim stuck blocks", "Blocks that can't come off yet are dimmed", true]],
+    toebeans: [["rev", "Reverse", "Count back down from the total to the start", false]],
+    twirl: [["twisty", "Twisty ribbons", "Off, every ribbon is drawn flat", true, {at: ["catdoku.twirl.prefs.v1", "twisty"]}]],
+    atlas: [["style", "Answer", "How you answer", "list", {opts: [["pick", "Pick from 4 names"], ["list", "Type, with a list to choose from"], ["type", "Type it, no help"]]}]],
+    knitpick: [["mode", "Words", "Which words are hidden", "themes", {opts: [["themes", "Cat themes"], ["everyday", "Everyday words"]]}]],
+  };
+  const SLOWS = ["birdwatch", "tailchase", "windup", "lmnopom"], UNTIMED = ["keyboardcat"];
+  const timerHidden = slug => { const t = load(TIMERS)[slug]; return t === undefined ? !!load(PREFS).hideTimer : !!t; };
+  const SETTINGS = {};
+  for (const [, slug] of GAMES) {
+    const list = (SET_LIST[slug] || []).map(([key, name, line, def, more]) => Object.assign({slug, key, name, line, def}, more));
+    if (SLOWS.includes(slug)) list.unshift({slug, key: "slower", name: "Slower", line: "Everything moves at two-thirds speed", def: false, row: "speed",
+      get: () => !!load(SLOWER)[slug], set: v => { const all = load(SLOWER); all[slug] = v; save(SLOWER, all); }});
+    if (!UNTIMED.includes(slug)) list.unshift({slug, key: "timer", name: "Timer", line: "The clock above the board", def: true, row: "timers",
+      get: () => !timerHidden(slug), set: v => { const all = load(TIMERS); all[slug] = !v; save(TIMERS, all); }});
+    SETTINGS[slug] = list;
+  }
+  const whereOf = e => e.at || [storeOf(e.slug), "settings." + e.key];
+  function readSetting(e) {
+    if (e.get) return e.get();
+    const [k, path] = whereOf(e); let d = load(k);
+    for (const p of path.split(".")) d = d == null ? undefined : d[p];
+    return d === undefined ? e.def : d;
+  }
+  // true when it's waiting for the next game (see warn)
+  function writeSetting(e, v) {
+    if (e.set) { e.set(v); return false; }
+    const [k, path] = whereOf(e), d = load(k), ps = path.split(".");
+    if (e.warn && d.game && d.game.started && !d.game.won && !d.game.result && (d.game.status || "playing") === "playing") {
+      const all = load(PENDING); (all[e.slug] = all[e.slug] || {})[e.key] = v; save(PENDING, all); return true;
+    }
+    let o = d; for (const p of ps.slice(0, -1)) o = (o[p] = o[p] && typeof o[p] === "object" ? o[p] : {});
+    o[ps[ps.length - 1]] = v; save(k, d);
+    const all = load(PENDING); if (all[e.slug]) { delete all[e.slug][e.key]; save(PENDING, all); }
+    return false;
+  }
+  const pendingOf = e => { const p = load(PENDING)[e.slug]; return p && e.key in p ? p[e.key] : undefined; };
+  // A row's games, and which of its three it's on: what was chosen, unless a game's been changed since (By game).
+  const rowGames = id => GAMES.map(g => (SETTINGS[g[1]] || []).find(e => e.row === id)).filter(Boolean);
+  function rowMode(id) {
+    const r = ROWS.find(x => x.id === id), vals = rowGames(id).map(e => { const p = pendingOf(e); return p === undefined ? !!readSetting(e) : !!p; });
+    const all = vals.every(v => v), none = !vals.some(v => v), m = load(COMFORT)[id];
+    const end = on => on ? r.on : 2 - r.on;
+    if (m === 1) return 1;
+    if (m === 0 || m === 2) return (all && end(true) === m) || (none && end(false) === m) ? m : 1;
+    return all ? end(true) : none ? end(false) : 1;
+  }
+  function setRow(id, m) {
+    const r = ROWS.find(x => x.id === id), all = load(COMFORT); all[id] = m; save(COMFORT, all);
+    if (m !== 1) for (const e of rowGames(id)) writeSetting(e, m === r.on);
+  }
+  // a game's own switch changed one of a row's settings: the row goes to By game (the other games keep theirs)
+  function byGame(slug, key) {
+    const e = (SETTINGS[slug] || []).find(x => x.key === key && x.row); if (!e) return;
+    const all = load(COMFORT); if (all[e.row] !== 1) { all[e.row] = 1; save(COMFORT, all); }
   }
 
   /* ---------- boards in words ---------- */
@@ -2270,6 +2379,6 @@ const G = (() => {
     }
   }
 
-  return {MAGNET, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, meaning, plainText,
+  return {MAGNET, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();
