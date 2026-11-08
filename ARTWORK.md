@@ -91,6 +91,8 @@ each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the 
   four Bowtie drops in instead, curled up (`bowtie-2`), and `bugsy-bowtie-boxes` is on the gold-paw card. Bugsy and Bowtie are the stars of
   Bird Watch: `bowtie-3` stands up on his back legs beside the title, and `bugsy-bowtie-window` is on the gold-paw card. Bowtie is the star of
   Fish Bones: `bowtie-5` peeks up beside the title, and `bowtie-1` lies on his back, full of fish, on the gold-paw card.
+  Not used yet: `bowtie-4` (lying down with a string, cut off at the right), `bowtie-8` (his face, close up) and
+  `bowtie-9` (his face upside down, close up). None is a whole lying-down Bowtie for If It Fits (checked 2026-11-08).
 - **Crunch** (`crunch-…`, grey tabby with green eyes) is the star of Pounce: `crunch-3` sits beside
   the title, `crunch-1` creeps up from the corner of the mat to cheer a chain of matches, and
   `crunch-6` rolls about on the gold-paw card. Crunch is the star of Cat Mat too: `crunch-7`

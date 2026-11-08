@@ -97,8 +97,9 @@ will recheck this list, and add games 43–52, before any of it is built.
   on screen; Bubbles' note line dips just under on a 390 × 844 phone, with its goal and time still showing.
 
 ### Symbols that read wrong
-- Toy Box: a better way to show the toys on the track. Asked the owner on 2026-11-08 what reads wrong (the toys looked
-  clear in a screenshot); still unclear, so saved for a later change once the owner says.
+- Toy Box: done (build .22): what read wrong was the win screen, which showed empty baskets: the baskets a level
+  empties along the way stayed on the floor behind the win card and Admire Laya. Now, once every toy is put away,
+  they're carried off too, and Laya has the rug to herself.
 - Up a Tree: done (build .21): the owner chose `dottie-14` (stretched out, tongue poking out) for the gold-paw card,
   in place of `dottie-12`; the plain win card keeps the random cat photo.
 
@@ -122,8 +123,10 @@ will recheck this list, and add games 43–52, before any of it is built.
   screen from 9 × 9.
 - Done 2026-11-08: Tunnel Run's page-shaped rugs, levels 17 (8 × 14) and 18 (10 × 18), on their side on a screen
   wider than tall; the game is W × H throughout, and share links and saves carry the shape.
-- If It Fits: more cat shapes still welcome: Bowtie has only `bowtie-2` lying down (`bowtie-1` is cropped, and
-  `bugsy-7` is two pieces, not a whole cat), so a whole lying-down Bowtie picture or two would help.
+- If It Fits: more cat shapes still welcome. Checked `cats/` on 2026-11-08 (build .22): no other whole lying-down
+  Bowtie. `bowtie-6` is whole but lies facing you (Tunnel Run's), the rolling Bowtie in `bowtie-7` shares one picture
+  with the tunnel, and `bowtie-4` is cut off at the right; `bowtie-8` and `bowtie-9` are faces. So Bowtie keeps
+  `bowtie-2` until the owner adds a new picture or picks one of these.
 - Patches: colourways (long term).
 
 ### Questions still to answer
