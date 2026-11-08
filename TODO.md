@@ -96,13 +96,14 @@ will recheck this list, and add games 43–52, before any of it is built.
   bats") were the clearest cases. Watch tall boards (Tunnel Run, big Catdoku), where it could fall below the fold.
 
 ### Button rows (every game)
-- New order, from the owner: **Undo · Hint** on one line; **Restart · New [Noun]** on the last line of their own, kept
-  apart so they aren't pressed by accident. Restart beside New is as the plan has it.
-- **Changes the 2026-11-07 plan** (step 8 groups the gold-paw tools, Hint with Audit and helpers, apart from the free
-  tools). **Undecided:** Hint onto Undo's line, keeping its dark red and slashed paw? And if so, do Audit and helpers
-  go with it, or on a line of their own?
+- **Restart · New [Noun]** on the last line, a line of their own, kept apart so they aren't pressed by accident
+  (Restart beside New is as the plan has it).
+- **Hint stays where the plan has it** (decided 2026-11-08): in the gold-paw group, not on Undo's line.
+- **Short lines:** where two lines of buttons have only one or two icons each, consider joining them into one line
+  (Bird Watch's Wipe and Pause are the case that raised it). Restart · New [Noun] stays a line of its own at the
+  bottom, apart from the rest, so it isn't pressed by accident.
 - New [Noun] everywhere (Keyboard Cat's plain "New"), centred (Toe Beans).
-- Missing Restart: Toe Beans (no Restart at all), Hide & Seek, Tangle. Missing Give up: Pick of the Pile (two blocks
+- Missing Restart: Hide & Seek, Tangle. Toe Beans has none; it gets Reset (below). Missing Give up: Pick of the Pile (two blocks
   stacked, no moves left), Spelling String (New Round is in an odd spot).
 - Undo far down the page: Knock It Off. Bird Watch's Wipe and Pause each alone on a line. Junk Drawer's row
   underneath is unevenly spaced.
@@ -111,7 +112,8 @@ will recheck this list, and add games 43–52, before any of it is built.
   Burglar and Catlas use the in-corner version today (plan step 5 said "in its corner"); Fish Bones and Hide & Seek
   have Full screen on its own (`G.fullScreen`) in yet another spot. One place for all.
 - **Gold paw exception, decided 2026-11-08:** Restart costs the paw in every game (#238), except Toe Beans, a game of
-  going back to the start, where it shouldn't. Its win card's gold-paw line and the README's Gold paw list change too.
+  going back to the start, where it shouldn't. So it isn't confused with Restart, Toe Beans' button is called
+  **Reset**, and it isn't red. Its win card's gold-paw line and the README's Gold paw list change too.
 
 ### Things in the way of the board
 - Yarn: cats below Restart / New Puzzle, the puzzle's name ("Tropical") between them; smaller cats if it still
