@@ -1857,7 +1857,9 @@ const G = (() => {
   //   game.history), cap (most steps kept; the oldest go), over (() => true once the puzzle's done: Undo greys out;
   //   game.won if not given), can (() => true while Undo may act; !over() if not given), after (draw and save, after
   //   Undo or Restart), restart (true: Restart greys out with Undo, or with started), started (() => true once
-  //   there's something for Restart to clear, where that isn't the same as having steps: Sunbeams' shared floors)}.
+  //   there's something for Restart to clear, where that isn't the same as having steps: Sunbeams' shared floors),
+  //   shelf ({has(game), undo(game)}: what Undo takes back once the list is empty, kept outside it: Fish Bones' Restarts,
+  //   put away so the swaps they cleared don't count)}.
   // Returns {push(step), undo(), restart(reset, step), size(), list(game), sync()}. ⌘Z or Ctrl+Z is Undo, but not in a text box.
   function undoList(o) {
     const gm = () => o.game(), list = g => o.list ? o.list(g) : (g.history || (g.history = []));
@@ -1868,7 +1870,12 @@ const G = (() => {
       const g = gm(), l = list(g); l.push(step);
       if (o.cap && l.length > o.cap) { const n = l.length - o.cap; l.splice(0, n); for (const x of g.guesses || []) x.at -= n; }   // bookmarks count from the list's start
     }
-    function undo() { if (!can() || !size()) return false; const g = gm(); o.back(list(g).pop(), g); if (o.after) o.after(); return true; }
+    const shelved = () => !!o.shelf && !!gm() && o.shelf.has(gm());
+    function undo() {
+      if (!can() || !(size() || shelved())) return false;
+      const g = gm(); if (size()) o.back(list(g).pop(), g); else o.shelf.undo(g);
+      if (o.after) o.after(); return true;
+    }
     // Restart: back to the start, with reset(game) doing the page's part. Costs the gold paw. With step (or take), the
     // board as it was goes on the list first, so Undo brings it back; with neither, the list is emptied.
     const started = () => o.started ? !!gm() && o.started() : size() > 0;
@@ -1880,7 +1887,7 @@ const G = (() => {
     }
     function sync() {
       const b = $("undoBtn"), r = o.restart && $("restartBtn");
-      if (b) b.disabled = over() || !size(); if (r) r.disabled = over() || !started();
+      if (b) b.disabled = over() || !(size() || shelved()); if (r) r.disabled = over() || !started();
     }
     if ($("undoBtn")) $("undoBtn").onclick = () => undo();
     document.addEventListener("keydown", e => {
