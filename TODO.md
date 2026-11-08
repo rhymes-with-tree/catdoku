@@ -175,7 +175,7 @@ Built 2026-11-07 (`whatsNew` in `games.js`), ahead of the shared helpers, which 
   `game.history`), so old saves load and undo; `back(step)` puts one back; `take` makes snapshots (and lets Restart be
   undone; or `restart(reset, step)` pushes a step of its own, as `{mark}`); `cap` keeps the newest (moving bookmarks'
   places with them); `list` points it at another list (Unravel's path); `started` greys Restart where that isn't the
-  same as having steps; `G.guesser({history})` takes its Undo from it. Moved so far: Night Light, Pawlette, Treat Time, Up a Tree, Unravel, Cat Mat, Sunbeams, Yarn, Patches, Catwalk, Mewstermind and Pick of the Pile.
+  same as having steps; `G.guesser({history})` takes its Undo from it. Moved so far: Night Light, Pawlette, Treat Time, Up a Tree, Unravel, Cat Mat, Sunbeams, Yarn, Patches, Catwalk, Mewstermind, Pick of the Pile and Mew Hue.
   Still writing their own (33 at the start; how each keeps its steps, from the survey):
   - Cross Stitch: grid strings, 400 kept, drops a step that changed nothing; Restart pushes one
   - Shelf Life: moves, replayed from the start; Restart empties the list; a share link keeps the steps
@@ -193,7 +193,6 @@ Built 2026-11-07 (`whatsNew` in `games.js`), ahead of the shared helpers, which 
     the steps
   - Knock It Off: JSON of the room, 400 kept; Undo gives the move back; Restart pushes one; old saves' `"k":"L"` read
     as `"l"`
-  - Mew Hue: JSON snapshots, 50 kept; Undo can take back a lost board; Restart pushes one
   - If It Fits: piece snapshots (a hold or a drag pushes the one from before it); Restart pushes one
   - Toe Beans: snapshots; no Restart flag
   - Cat Pile: `S.history` (not in `game`), JSON of the board, 60 kept; the moves count in `S.d.moves`
