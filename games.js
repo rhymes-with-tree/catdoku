@@ -488,7 +488,7 @@ const G = (() => {
   // Escape cancels on Apple's platforms; a card that needs a choice (out of lives) stays.
   document.addEventListener("keydown", e => {
     const ov = $("overlay"); if (e.key !== "Escape" || !ov || !ov.classList.contains("show") || document.querySelector(".spot")) return;
-    const out = [...ov.querySelectorAll(".btns button")].find(b => /^(Close|Cancel|Keep playing|Done|Admire|Look at)/.test(b.textContent.trim()));
+    const out = [...ov.querySelectorAll(".btns button, .smallbtns button")].find(b => /^(Close|Cancel|Keep playing|Done|Admire|Look at)/.test(b.textContent.trim()));
     if (out) { e.preventDefault(); out.click(); }
   });
 
@@ -678,6 +678,17 @@ const G = (() => {
     btns.push(["Share my result", e => shareResult(result, o.gold, e.currentTarget)],
       homeBtn());
     openCard(o.gold ? o.goldTitle || "Gold paw!" : o.title || "Solved!", "", btns, media, o.after);
+    // one big Next, and the rest as small icon buttons in a row under it, each with its word small underneath
+    // (decided 2026-11-08); the other sizes (o.after, G.otherSize) show as a small link under them (games.css)
+    const row = $("card").querySelector(".btns"), small = document.createElement("div");
+    small.className = "smallbtns";
+    for (const b of [...row.children].slice(1)) {
+      const w = b.textContent, home = w === HOME_LABEL, share = w === "Share my result";
+      b.setAttribute("aria-label", w); b.title = w; b.classList.add("tool");
+      b.innerHTML = iconSVG(home ? "home" : share ? "share" : /^Keep/.test(w) ? "play" : "peek") + `<span class="lbl">${home ? "Front page" : share ? "Share" : w}</span>`;
+      small.append(b);
+    }
+    if (small.children.length) row.after(small);
   }
 
   // Count a moment in the game (a puzzle started or solved) on the GoatCounter dashboard.
@@ -884,12 +895,13 @@ const G = (() => {
   // o.btn: the button that was pressed, which says what happened ("Copied!") and keeps the card that's up
   // (the win card) open; without it, the card closes and the note line says so.
   async function sendLink(title, text, url, o = {}) {
-    const all = text + " " + url;
+    const all = text + (/\n/.test(text) ? "\n" : " ") + url;
     const done = msg => {
       if (!o.btn) { closeCard(); if (msg) note(msg, 5000); return; }
       if (!msg) return;
-      const was = o.btn.dataset.label || o.btn.textContent; o.btn.dataset.label = was;
-      o.btn.textContent = msg; setTimeout(() => { o.btn.textContent = was; }, 2500);
+      const w = o.btn.querySelector(".lbl") || o.btn;   // an icon button (the win card's Share) keeps its icon
+      const was = o.btn.dataset.label || w.textContent; o.btn.dataset.label = was;
+      w.textContent = msg; setTimeout(() => { w.textContent = was; }, 2500);
     };
     if (navigator.share) {
       // One piece of text with the link at the end: given text and a link separately, Messages on an
@@ -901,18 +913,26 @@ const G = (() => {
     // No share sheet and no clipboard: a box to copy from, under the button (or on a card of its own)
     const box = document.createElement("textarea"); box.value = all; box.readOnly = true; box.rows = 3;
     box.style.cssText = "width:100%;font:inherit;font-size:calc(13px*var(--ts));margin:0;border:2px solid var(--line);border-radius:8px;padding:6px";
-    if (o.btn) { if (!o.btn.nextElementSibling || o.btn.nextElementSibling.tagName !== "TEXTAREA") o.btn.after(box); else o.btn.nextElementSibling.select(); }
+    const at = o.btn && (o.btn.closest(".smallbtns") || o.btn);   // under the win card's row of small buttons, not inside it
+    if (at) { if (!at.nextElementSibling || at.nextElementSibling.tagName !== "TEXTAREA") at.after(box); else { at.nextElementSibling.select(); return; } }
     else openCard("Copy this", "Select it and copy it into a message.", [["Done", closeCard, true]], box);
     box.focus(); box.select();
   }
   // A finished puzzle's result to share: the game, level or size, time, and gold paw, with a link to the game.
+  // Share my result, kept short (decided 2026-11-08): the game, then one line (the level as a fraction of the levels,
+  // or the size, the time, the win streak and the gold paw), then the link. Long level names are left out.
   function shareResult(r, gold, btn) {
-    const name = document.querySelector("header h1").textContent, bits = [name];
-    if (r && r.n != null && T) bits.push(label(r.n));
+    const name = document.querySelector("header h1").textContent, bits = [];
+    if (r && r.n != null && T) {
+      const sel = $("levelSel") || $("size"), l = label(r.n), vals = sel ? [...sel.options].map(o => o.value) : [], i = vals.indexOf(String(r.n));
+      bits.push(/^\d+ × \d+$/.test(l) ? l.replace(/ /g, "") : i >= 0 && vals.length > 1 ? `Level ${i + 1}/${vals.length}` : l.split(" · ")[0]);
+    }
     if (r && r.ms != null && !timerHidden(T && T.name)) bits.push("⏱ " + clock(r.ms));
-    if (gold) bits.push("Gold paw 🐾");
+    const st = T ? streak(T.name).streak : 0;
+    if (st > 1) bits.push(`🔥 ${st}`);
+    if (gold) bits.push("🐾 Gold paw");
     track(`${name} result shared`);
-    sendLink(name, bits.join(" · "), location.origin + location.pathname, {btn});
+    sendLink(name, bits.length ? `${name}\n${bits.join(" · ")}` : name, location.origin + location.pathname, {btn});
   }
   // The Share card: a fresh copy of the puzzle, or the puzzle with the moves so far (when o.progress is given;
   // a game played against the clock, like Pounce, shares only the fresh level).
@@ -2342,6 +2362,16 @@ const G = (() => {
     return {left, used, say, show, lose, refill, canRevive, revive, reviveBtn, outCard};
   }
 
+  /* ---------- a goal as a fraction ---------- */
+  // The status line's goal as a fraction with a small icon for what's counted (decided 2026-11-08): Tangle's
+  // "56/59 ○" (crossings left of those dealt, the white dot the board draws), Pounce's "🐾 12/20" (moves left). VoiceOver
+  // hears it in words (say). icon: an SVG's inside on a 16 × 16 view, or a short text (an emoji); before: icon first.
+  function tally(el, n, of, icon, say, before) {
+    const ic = /</.test(icon) ? `<svg class="tic" viewBox="0 0 16 16" aria-hidden="true">${icon}</svg>` : `<span class="tic" aria-hidden="true">${icon}</span>`;
+    const num = `<span aria-hidden="true">${n}/${of}</span>`;
+    el.innerHTML = `<span class="tally" role="text" aria-label="${say}">${before ? ic + num : num + ic}</span>`;
+  }
+
   /* ---------- zoom and full screen ---------- */
   // One set of round buttons, the same in every game that zooms or goes full screen: full screen (through fullScreen
   // above), +, − and one more where the game has it (Twirl's Fit, Catlas's back to the lit country). + and − on the
@@ -2405,6 +2435,6 @@ const G = (() => {
     }
   }
 
-  return {MAGNET, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText,
+  return {MAGNET, tally, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();
