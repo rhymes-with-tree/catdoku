@@ -137,9 +137,24 @@ will recheck this list, and add games 43–52, before any of it is built.
 - Toy Box: a better way to show the toys on the track.
 - Up a Tree: a new picture of Dottie for the win card.
 
-### Comfort settings, one place for every game
-- Done 2026-11-08: Hide timers, Slower and Autos on in every game's Settings (site-wide), with Shelf Life's Shelf and
-  Junk Drawer's new Junk switch. Still open for Junk Drawer: more junk, and greying it once you start.
+### Comfort settings, one place for every game (a Settings page; decided 2026-11-08)
+- **A Settings page** for the whole site, reached from every game's ☰ Menu and the front page, with every game's
+  settings on it, a section per game. The game's ☰ Menu keeps its own settings as a shortcut (the same saved values)
+  and links to the page.
+- **At the top, five settings with a three-way row** (all on · by game · all off; wording to settle): Timers (Show ·
+  By game · Hide), Action games (Regular speed · By game · Slower), Decorations (Show all · By game · Reduce clutter),
+  Auto check and Auto Notes (Off · By game · On). By game opens the list of games that have it, a switch each.
+  Changing one game while a row is on all-on or all-off (on the page, or in the game) moves the row to By game; the
+  other games keep their values. Every other setting is per game only.
+- Hide timers today is site-wide only (tap the clock, `hideTimer` in `games.js`): it needs a value per game, and a
+  tap on a game's clock changes that game's.
+- Slower is per game today (`G.slower(slug)`).
+- Decorations (visual clutter): Shelf Life's shelf (it has a switch), Junk Drawer's junk (add more junk, grey once
+  you start, and a switch), Patches' patterns, Cat Pile's cats.
+- A setting that costs lives or the gold paw (Auto grade), changed on the page while a puzzle's in progress, says
+  "Takes effect in the next game" and does.
+- The page doesn't run the games' scripts, so `games.js` needs a list of where each game keeps each setting (its
+  storage key and field, label, line, default).
 
 ### Menu and Settings (every game)
 
