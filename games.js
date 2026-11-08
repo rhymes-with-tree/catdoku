@@ -524,6 +524,9 @@ const G = (() => {
       menu.innerHTML = "";
       const name = ((btn.querySelector(".lbl") || btn).textContent || "New").trim();
       const tip = document.createElement("p"); tip.className = "menutip"; tip.textContent = `Double-tap ${name} for the same ${word.toLowerCase()}`; menu.append(tip);
+      // leaving a started, unsolved puzzle ends the win streak (freshClock), so say so before it's dealt
+      const g = T && T.game(), st = T ? streak(T.name).streak : 0;
+      if (g && g.started && !g.result && st) { const w = document.createElement("p"); w.className = "menutip warn"; w.textContent = `A new one ends your ${st}-win streak`; menu.append(w); }
       for (const op of sel.options) {
         const b = document.createElement("button"), on = op.value === sel.value, text = op.textContent.trim();
         b.type = "button"; b.setAttribute("role", "menuitemradio"); b.setAttribute("aria-checked", String(on)); b.disabled = op.disabled;

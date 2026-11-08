@@ -154,7 +154,6 @@ will recheck this list, and add games 43–52, before any of it is built.
   away) and Shelf Life's shelves (it has this switch already).
 
 ### Menu and Settings (every game)
-- "New [Noun]" on a started, unsolved puzzle ends the win streak (`freshClock`) with no warning; say so first.
 
 ### Win card and sharing
 - Next / Admire / Share / Back to the front page / other size: one big Next, small icon buttons for the rest, the
