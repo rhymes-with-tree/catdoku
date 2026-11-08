@@ -308,7 +308,7 @@ const G = (() => {
       set(fav, on ? "In your favorites" : "Add to favorites", on ? "Tap to take it off" : "");
       fav.querySelector(".ic").classList.toggle("on", on);
       for (const [id, row] of page) { const b = $(id); row.hidden = !b || b.hidden; row.disabled = !!(b && b.disabled); }
-      keys.hidden = !(KEYS[current] && keyboardish() && !$("chooseBtn"));
+      keys.hidden = !(KEYS[current] && keyboardish());
       setRow.hidden = ![...setList.children].some(x => !x.hidden);
     }
     function show(open) {
@@ -523,7 +523,7 @@ const G = (() => {
     const open = focus => {
       menu.innerHTML = "";
       const name = ((btn.querySelector(".lbl") || btn).textContent || "New").trim();
-      const tip = document.createElement("p"); tip.className = "menutip"; tip.textContent = `Double-tap ${name} for the same ${word.toLowerCase()}`; menu.append(tip);
+      const tip = document.createElement("p"); tip.className = "menutip"; tip.textContent = sel.id === "newSel" ? `Double-tap ${name} for random keys` : `Double-tap ${name} for the same ${word.toLowerCase()}`; menu.append(tip);
       // leaving a started, unsolved puzzle ends the win streak (freshClock), so say so before it's dealt
       const g = T && T.game(), st = T ? streak(T.name).streak : 0;
       if (g && g.started && !g.result && st) { const w = document.createElement("p"); w.className = "menutip warn"; w.textContent = `A new one ends your ${st}-win streak`; menu.append(w); }
@@ -1746,7 +1746,7 @@ const G = (() => {
     // the Level (or Size, or Round) picker: a step icon in place of its word; the menu keeps the word as its name
     // Where New sits beside it, the picker goes inside New (levelMenu): a tap on New opens the levels, a double tap deals
     // again at the same level, and the picker itself is hidden (kept for the page's own bookkeeping and otherSize).
-    for (const sel of document.querySelectorAll("main .bar label > select#levelSel, main .bar label > select#size")) {
+    for (const sel of document.querySelectorAll("main .bar label > select#levelSel, main .bar label > select#size, main .bar label > select#newSel")) {
       const label = sel.parentElement, nb = label.parentElement.querySelector(":scope > #newBtn");
       const word = [...label.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent.trim()).join(" ").trim() || "Level";
       for (const n of [...label.childNodes]) if (n.nodeType === 3) n.remove();

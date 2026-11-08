@@ -102,7 +102,7 @@ will recheck this list, and add games 43–52, before any of it is built.
 - **Short lines:** where two lines of buttons have only one or two icons each, consider joining them into one line
   (Bird Watch's Wipe and Pause are the case that raised it). Restart · New [Noun] stays a line of its own at the
   bottom, apart from the rest, so it isn't pressed by accident.
-- New [Noun] everywhere (Keyboard Cat's plain "New"), centred (Toe Beans).
+- New [Noun] centred (Toe Beans).
 - Spelling String: New Round is in an odd spot (it already has Give up).
 - Undo far down the page: Knock It Off. Bird Watch's Wipe and Pause each alone on a line. Junk Drawer's row
   underneath is unevenly spaced.
@@ -168,7 +168,7 @@ will recheck this list, and add games 43–52, before any of it is built.
 
 ### Choices as radio buttons
 - Catlas: Answer type → Pick from 4 names / Type with autocomplete / Type in a blank box, no help.
-- Knit Pick: Cat theme words / Everyday words. Keyboard Cat's New: Random / Choose keys.
+- Knit Pick: Cat theme words / Everyday words.
 - Catwalk: show only the key that applies (Up to 9×9 or From 10×10), not both.
 
 ### More to play
@@ -176,7 +176,7 @@ will recheck this list, and add games 43–52, before any of it is built.
 - If It Fits: more cat shapes. Patches: colourways (long term).
 - Up a Tree: ⌫ back down to a lower level of the tree; if it's scored against par, allow extra levels?
 - Fridge Magnets: Auto-Audit; a helper that fills in one square.
-- Keyboard Cat: take a word start off the page once it's fully found; a keyboard walkthrough. (A Full Pounce uses
+- Keyboard Cat: take a word start off the page once it's fully found; a keyboard walkthrough (its Keyboard Shortcuts now show in the menu). (A Full Pounce uses
   all 7 keys at least once; a Perfect Pounce uses each just once.)
 - Spelling String: a way to look up a word.
 
