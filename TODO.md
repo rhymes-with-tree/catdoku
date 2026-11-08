@@ -154,10 +154,6 @@ will recheck this list, and add games 43–52, before any of it is built.
   away) and Shelf Life's shelves (it has this switch already).
 
 ### Menu and Settings (every game)
-- **Toy Chest shows the same thing everywhere.** Today the menu's Toy chest opens the game's own picker in the 12
-  games with a `toysBtn` (Bubbles, Cat Pile, Copycat, Laser Pointer, Meowbile, Pick of the Pile, Pounce, the stash
-  page, Tail Chase, Fair Play, Toy Box, Toydoku) and the shared library (`CHEST`) everywhere else. The plan said "one
-  choice for every game"; make it so.
 - "New [Noun]" on a started, unsolved puzzle ends the win streak (`freshClock`) with no warning; say so first.
 
 ### Win card and sharing

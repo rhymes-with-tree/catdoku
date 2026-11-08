@@ -200,19 +200,20 @@ const G = (() => {
     return q.toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter(Boolean).every(w => hay.includes(w));
   };
 
-  // The toy library as the toy chest shows it from a game with no toys of its own (the choice is one for every game):
-  // the toy games' colours, each with the toys that can stand for it.
+  // The toy library as the menu's Toy chest shows it, the same from every game (the choice is one for every game): every
+  // toy any game uses (Pick of the Pile uses them all), by colour. A game with fewer toys uses the ones it has.
   const CHEST = [
     {c: "#BD5538", looks: [["wiffle-red", "red wiffle balls"], ["swirl-red", "red swirl balls"], ["crochet-stars", "star balls"], ["tinsel", "tinsel balls"]]},
-    {c: "#ECA818", looks: [["wiffle-yellow", "yellow wiffle balls"]]},
-    {c: "#73A7AE", looks: [["wiffle-teal", "teal wiffle balls"], ["fish", "fish"]]},
+    {c: "#ECA818", looks: [["wiffle-yellow", "yellow wiffle balls"], ["tennis", "tennis balls"]]},
+    {c: "#73A7AE", looks: [["wiffle-teal", "teal wiffle balls"], ["fish", "fish"], ["cage-blue", "teal cage balls"], ["crochet-stripe", "striped crochet balls"]]},
     {c: "#6AA673", looks: [["lattice", "lattice balls"]]},
     {c: "#B3B94B", looks: [["spiky-lime", "spiky pom-poms"]]},
-    {c: "#B94588", looks: [["swirl-purple", "plum swirl balls"], ["bell-purple", "bell balls"]]},
+    {c: "#B94588", looks: [["swirl-purple", "plum swirl balls"], ["bell-purple", "bell balls"], ["nubby-pink", "pink nubby balls"], ["polka-dot", "polka-dot balls"]]},
     {c: "#7885BA", looks: [["spring", "springs"], ["rope-blue", "rope balls"]]},
-    {c: "#825840", looks: [["cork-paw", "cork paw balls"], ["burlap-paws", "burlap balls"], ["rattan", "rattan balls"]]},
+    {c: "#825840", looks: [["cork-paw", "cork paw balls"], ["burlap-paws", "burlap balls"], ["rattan", "rattan balls"], ["fluffy-bell", "fluffy bell balls"]]},
     {c: "#5E5866", looks: [["mouse", "mice"]]},
-    {c: "#E16A4A", looks: [["felt-rainbow", "rainbow balls"], ["ribbon-tail", "ribbon balls"], ["spiky-rainbow", "spiky balls"]]},
+    {c: "#E16A4A", looks: [["felt-rainbow", "rainbow balls"], ["ribbon-tail", "ribbon balls"], ["spiky-rainbow", "spiky balls"], ["feather-orange", "orange feather balls"],
+      ["feather-rainbow", "rainbow feather balls"], ["nubby-orange", "orange nubby balls"], ["sisal-stripe", "striped sisal balls"], ["sisal-rainbow", "rainbow sisal balls"], ["wave-stripe", "wavy striped balls"]]},
   ];
   // The win streak's flame at the right of a game's title, with the count in it, from the first win on. A tap shows the
   // streak and the best, and today's challenge. (Catdoku had it first, beside its title.)
@@ -274,7 +275,7 @@ const G = (() => {
     item("games", "All games", () => o.open());
     const daily = o.dslug === current ? item("today", "Today's challenge", () => {}) : item("today", "Today's challenge", `${base}${o.dslug}/`);
     const toys = item("toys", "Toy chest", () => {
-      if ($("toysBtn")) $("toysBtn").click();
+      if ($("toysBtn")) $("toysBtn").click();   // the game's own picker: the same toys (toyPicker always shows CHEST), and its save swaps them in now
       else toyPicker({kinds: CHEST, off: toysOff(), min: 1, src: f => `${HOME}toys/${f}.webp`,
         save: off => { saveToys(off); note("Saved. The toy games use them from their next board.", 3500); }});
     }, "The toys every game uses");
@@ -934,7 +935,9 @@ const G = (() => {
     const off = new Set(o.off), media = document.createElement("div"), grid = document.createElement("div");
     const tip = document.createElement("p"); tip.className = "tip"; tip.textContent = o.why || "Tap a toy to leave it out.";
     grid.className = "toypick";
-    for (const k of o.kinds) for (const [f, name] of k.looks) {
+    // every picker shows the whole library (CHEST), so the Toy chest looks the same from every game; a game counts its
+    // colours from its own kinds (o.kinds), and leaves out the toys it doesn't have
+    for (const k of CHEST) for (const [f, name] of k.looks) {
       const b = document.createElement("button"), img = document.createElement("img");
       img.src = o.src(f); img.alt = "";
       b.append(img); b.title = name[0].toUpperCase() + name.slice(1);
@@ -948,8 +951,9 @@ const G = (() => {
     const save = $("card").querySelector(".btns button");
     function check() {
       const n = o.kinds.filter(k => k.looks.some(([f]) => !off.has(f))).length, short = n < o.min;
+      const all = CHEST.filter(k => k.looks.some(([f]) => !off.has(f))).length;
       save.disabled = short; count.classList.toggle("bad", short);
-      count.textContent = short ? `Keep toys in at least ${o.min} colours (${n} now).` : `${n} of ${o.kinds.length} colours in play.`;
+      count.textContent = short ? `Keep toys in at least ${o.min} colours (${n} now).` : `${all} of ${CHEST.length} colours in play.`;
     }
     check();
   }
