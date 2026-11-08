@@ -105,7 +105,7 @@ each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the 
   under a red blanket (`dottie-1`), hanging from a green toothbrush (`dottie-9`), hugging a blue blanket
   (`dottie-22`) and sitting on a cat-tree perch (`dottie-24`). Dottie is the star of Up a Tree too (its icon climbs CAT, COT,
   DOT): `dottie-24` sits on her perch beside the title, `dottie-18` sits up on each word as she climbs the cat tree, and
-  `dottie-12` reaches up on her back legs on the gold-paw card. Dottie is the star of Scratch That too: `dottie-6`
+  `dottie-14` stretches out, her tongue poking out, on the gold-paw card. Dottie is the star of Scratch That too: `dottie-6`
   (reaching up to scratch) is beside its title and scratches a post once the room is solved, the `dottie-face-…` pictures peek
   over a sofa she can still get at, and `dottie-5` rolls on her back on the gold-paw card. Dottie is the star of Junk Drawer too: `dottie-face-2` peeks over the back of the
   drawer, `dottie-21` (curled up, purple collar) curls up in the drawer once every word is found, and `dottie-28` (lying down,

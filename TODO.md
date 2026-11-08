@@ -98,8 +98,9 @@ will recheck this list, and add games 43–52, before any of it is built.
 
 ### Symbols that read wrong
 - Toy Box: a better way to show the toys on the track. Asked the owner on 2026-11-08 what reads wrong (the toys looked
-  clear in a screenshot), before changing anything.
-- Up a Tree: a new picture of Dottie for the win card.
+  clear in a screenshot); still unclear, so saved for a later change once the owner says.
+- Up a Tree: done (build .21): the owner chose `dottie-14` (stretched out, tongue poking out) for the gold-paw card,
+  in place of `dottie-12`; the plain win card keeps the random cat photo.
 
 ### Comfort settings, one place for every game (a Settings page; decided 2026-11-08)
 - Done: `settings/`, with the five three-way rows, a section per game, All settings in every ☰ Menu and a link on the
