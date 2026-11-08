@@ -1767,11 +1767,12 @@ const G = (() => {
   // are free everywhere.
   const PAW_COST = {
     hintFree: "hideseek",
+    hints: {junkdrawer: "leftBtn"},   // hints by another name: in the red group beside Hint
     helpers: {toybox: "shakeBtn shuffleBtn rainbowBtn basketBtn", bubbles: "sightBtn nipBtn shakeBtn", pickpile: "shuffleBtn", mewhue: "shuffleBtn",
-      junkdrawer: "leftBtn", windup: "shakeBtn fluffBtn netBtn", lmnopom: "swatBtn", birdwatch: "wipeBtn"},
+      windup: "shakeBtn fluffBtn netBtn", lmnopom: "swatBtn", birdwatch: "wipeBtn"},
   };
   const has = (list, slug) => (list || "").split(" ").includes(slug);
-  const costsPaw = (id, slug = SLUG) => id === "hintBtn" ? !has(PAW_COST.hintFree, slug) : id === "auditBtn" || id === "restartBtn" ||
+  const costsPaw = (id, slug = SLUG) => id === "hintBtn" ? !has(PAW_COST.hintFree, slug) : id === "auditBtn" || id === "restartBtn" || has(PAW_COST.hints[slug], id) ||
     has(PAW_COST.helpers[slug], id);
   // The play tools in one order everywhere: the free ones (Undo, Pencil, Bookmark…), then the game's own, then those
   // that cost the gold paw (Hint, Audit, helpers), grouped. Restart goes down beside New, and Give up after New.
@@ -1783,7 +1784,7 @@ const G = (() => {
     for (const row of document.querySelectorAll("main .actions:not(.helpers)")) {
       if (row.closest(".card,.overlay")) continue;
       const bs = [...row.children].filter(b => b.tagName === "BUTTON");
-      const rank = b => b.classList.contains("costsPaw") ? 200 + (b.id === "hintBtn" ? 0 : b.id === "auditBtn" ? 1 : 2) :
+      const rank = b => b.classList.contains("costsPaw") ? 200 + (b.id === "hintBtn" ? 0 : has(PAW_COST.hints[SLUG], b.id) ? .5 : b.id === "auditBtn" ? 1 : 2) :
         FREE_ORDER.includes(b.id) ? FREE_ORDER.indexOf(b.id) : 100;
       bs.map((b, i) => [b, rank(b), i]).sort((x, y) => x[1] - y[1] || x[2] - y[2]).forEach(([b]) => row.append(b));
     }

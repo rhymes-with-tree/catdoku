@@ -118,7 +118,7 @@ fabrics. Then `G.admire`: after a win, a button that takes the marks off to show
 on by the win card's Admire button too, for Open the Door!'s numbers and Catdoku's paws (Cat Burglar's Show/Hide the
 rings stays on its gallery card, which isn't the board; other games whose marks stay after a win can use it too). Then
 `G.uses` for a helper's uses left (the badge, "n left" for VoiceOver, put away at none) in Toy Box, Bubbles, Bird Watch
-and Mew Hue; what helpers cost was already shared (`PAW_COST`). Pawlinko keeps its one count shared by its five helpers. Still to do: the other shared helpers below.
+and Mew Hue; what helpers cost was already shared (`PAW_COST`). Pawlinko keeps its one count shared by its five helpers. Still to do: one question about Keyboard Cat's hints, below.
 
 ### The page, top to bottom
 
@@ -181,5 +181,7 @@ Built 2026-11-07 (`whatsNew` in `games.js`), ahead of the shared helpers, which 
 
 ### Shared helpers, so each is written once
 
-- **Hints by other names** go in the red group as hints: Keyboard Cat's Words left, Starts and Clues (switches today),
-  and Junk Drawer's Words left.
+- **Hints by other names:** Junk Drawer's Words left is listed as a hint now (`PAW_COST.hints`), so it sits beside Hint
+  in the red group (2026-11-08). Still to decide: Keyboard Cat's Words left, Starts and Clues (switches) were to go in
+  the red group as hints too, but its gold paw is reaching Genius Cat, hints allowed, so they don't cost it; red would
+  say they do. Either they stay as they are, or hints start costing Keyboard Cat's paw.
