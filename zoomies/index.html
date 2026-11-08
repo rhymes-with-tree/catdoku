@@ -30,22 +30,20 @@
 /* The house at 3 a.m.: a night-blue floor plan, each square a piece of furniture (a pale periwinkle tile with its
    silhouette) and an arrow pointing the way the cat jumped next. Joined squares take their run's colour: sage for the
    run that's numbered, its own colour for each loose run (lettered a, b…). */
-.house{--night:#4E577D;background:var(--night);border:3px solid var(--ink);border-radius:12px;overflow:hidden;
+/* A plain floor plan, light like the other boards: each square has a small grey arrow, the way the cat jumped next,
+   and, once it's known, its number above it (a given one bold ink; one worked out from your joins in its run's colour).
+   Joined squares are tinted: sage for the run that's numbered, a soft colour of its own for each loose run. */
+.house{background:#F7F8F3;border:3px solid var(--ink);border-radius:12px;overflow:hidden;
   touch-action:none;user-select:none;-webkit-user-select:none}
 .house svg{display:block;width:100%;height:100%;outline:none}
-.tile{fill:#E2E5F1}
-.furn{fill:#B6BCD9;opacity:.7}
-.furn .soft{fill:#D3D7EA}
-/* the way out: a small chevron on the tile's edge or corner, pointing where the cat jumped next */
-.arrow{fill:none;stroke:#2A2530;stroke-width:7;stroke-linecap:round;stroke-linejoin:round}
-/* the number in the middle: a given one big and ink, one worked out from your jumps smaller, in its run's colour */
-.num{font-family:var(--font);font-weight:700;font-size:30px;fill:#2A2530;text-anchor:middle;dominant-baseline:central}
-/* a number given with the puzzle sits on an ink badge; one worked out from your jumps is plain */
+.tile{fill:transparent}
+.grid{stroke:rgba(42,37,48,.22);stroke-width:2;vector-effect:non-scaling-stroke}
+.arrow{fill:#5E5866}
+.num{font-family:var(--font);font-weight:600;font-size:34px;text-anchor:middle;dominant-baseline:central}
+.num.given{font-weight:800;font-size:40px;fill:#2A2530}
 .num.loose{font-style:italic}
 .num.clash{fill:#C8392B}
-.num.given{font-weight:800;font-size:44px}
-.leap{fill:none;stroke-width:5;stroke-linecap:round;opacity:.9}
-.ray{fill:#fff;opacity:.5;pointer-events:none}
+.mate{fill:#73A7AE;opacity:.22;pointer-events:none}
 .sel{fill:none;stroke:#2A2530;stroke-width:6;pointer-events:none}
 .drag{stroke:#2A2530;stroke-width:5;stroke-dasharray:10 9;stroke-linecap:round;opacity:.7;pointer-events:none}
 .zoomed .tile{fill:#FAE5BA}
@@ -310,47 +308,31 @@ function draw() {
   for (let i = 0; i < M(); i++) {
     const [x, y] = xyOf(i), [r] = of[i], joined = r.sq.length > 1;
     const g = el("g", {class: "sq", "data-i": i, transform: `translate(${x * 100} ${y * 100})`}, tiles);
-    const t = el("rect", {x: 4, y: 4, width: 92, height: 92, rx: 12, class: "tile"}, g);
-    const c = joined ? runColour(r) : null;
-    if (joined && !game.won) t.style.fill = tint(c, .62);
-    // only the two beds are drawn: the cat's (the start) and yours (the end)
-    if (i === first() || i === last()) { const f = el("g", {class: "furn"}, g); f.innerHTML = FURNITURE[furnitureOf(i)];
-      if (joined && !game.won) { f.style.fill = tint(c, .3); f.querySelectorAll(".soft").forEach(s => s.style.fill = tint(c, .5)); } }
+    const t = el("rect", {x: 0, y: 0, width: 100, height: 100, class: "tile"}, g);
+    if (joined && !game.won) t.style.fill = tint(runColour(r), .72);
   }
-  // targets: the squares the picked one can jump to
-  if (sel >= 0 && playing()) for (const j of ray[sel]) { const [x, y] = xyOf(j); el("rect", {x: x * 100 + 4, y: y * 100 + 4, width: 92, height: 92, rx: 12, class: "ray"}, svg); }
-  // the leaps: an arc from each square to the one it jumps to, in its run's colour
-  const leaps = el("g", {}, svg);
-  for (const r of list) for (let o = 0; o + 1 < r.sq.length; o++) {
-    const a = r.sq[o], b = r.sq[o + 1], [ax, ay] = mid(a), [bx, by] = mid(b), d = Math.hypot(bx - ax, by - ay);
-    const bend = Math.min(30, d * .22), mx = (ax + bx) / 2 + (by - ay) / d * bend, my = (ay + by) / 2 - (bx - ax) / d * bend;
-    // stop short of the middles so the arrows still show
-    const t0 = Math.min(.42, 30 / d), t1 = 1 - Math.min(.42, 34 / d), q = t => [(1 - t) ** 2 * ax + 2 * (1 - t) * t * mx + t * t * bx, (1 - t) ** 2 * ay + 2 * (1 - t) * t * my + t * t * by];
-    const [sx, sy] = q(t0), [ex, ey] = q(t1), [cx, cy] = q((t0 + t1) / 2);
-    const k = shade(runColour(r), .35);
-    el("path", {d: `M${sx},${sy} Q${2 * cx - (sx + ex) / 2},${2 * cy - (sy + ey) / 2} ${ex},${ey}`, class: "leap", stroke: game.won ? "#C98A0E" : k}, leaps);
-    // a little paw-dot where it lands
-    el("circle", {cx: ex, cy: ey, r: 7, fill: game.won ? "#C98A0E" : k}, leaps);
-  }
+  // the picked square's possible partners: the squares along its arrow, and the squares whose arrows point at it
+  if (sel >= 0 && playing()) for (let j = 0; j < M(); j++) if (onRay(sel, j) || onRay(j, sel)) { const [x, y] = xyOf(j); el("rect", {x: x * 100, y: y * 100, width: 100, height: 100, class: "mate"}, svg); }
+  const lines = []; for (let k = 1; k < N; k++) lines.push(`M${k * 100},0V${S}M0,${k * 100}H${S}`);
+  el("path", {d: lines.join(""), class: "grid"}, svg);
   const marks = el("g", {}, svg);
   for (let i = 0; i < M(); i++) {
     const [x, y] = xyOf(i), [r, o] = of[i];
     const g = el("g", {transform: `translate(${x * 100} ${y * 100})`}, marks);
-    if (dir[i] >= 0) { const [dx, dy] = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]][dir[i]], d = dx && dy ? 33 : 38;
-      el("path", {d: "M-9,4 L0,-5 L9,4", class: "arrow", transform: `translate(${50 + dx * d} ${50 + dy * d}) rotate(${dir[i] * 45})`}, g); }
-    let label = "", cls = "num";
-    if (r.base != null) { label = r.base + o; if (r.clash) cls += " clash"; }
-    else if (r.letter) { label = o ? `${r.letter}+${o}` : r.letter; cls += " loose"; }
-    if (game.clue[i]) {
-      label = String(game.clue[i]); cls = "num given" + (r.clash ? " clash" : "");
-      el("text", {x: 50, y: 52, class: cls}, g).textContent = label;
-    } else if (label !== "") {
-      const tx = el("text", {x: 50, y: 52, class: cls, fill: r.clash ? "#C8392B" : shade(runColour(r), .45)}, g); tx.textContent = label;
-      if (String(label).length > 3) tx.setAttribute("font-size", 24);
-    }
+    let label = "", cls = "num", fill = "";
+    if (game.clue[i]) { label = String(game.clue[i]); cls = "num given"; }
+    else if (r.base != null) { label = String(r.base + o); fill = shade(runColour(r), .5); }
+    else if (r.letter) { label = o ? `${r.letter}+${o}` : r.letter; cls += " loose"; fill = shade(runColour(r), .5); }
+    if (r.clash && label) cls += " clash";
+    // with a number: the number above, a small arrow under it; without, the arrow alone in the middle
+    const arrowAt = label ? [50, 76, .48] : [50, 50, .7];
+    if (dir[i] >= 0) el("path", {d: ARROW, class: "arrow", transform: `translate(${arrowAt[0]} ${arrowAt[1]}) rotate(${dir[i] * 45}) scale(${arrowAt[2]})`}, g);
+    else if (!label) el("path", {d: "M50,36 L54,46 L65,46 L56,53 L60,64 L50,57 L40,64 L44,53 L35,46 L46,46 Z", fill: "#5E5866"}, g);
+    if (label) { const tx = el("text", {x: 50, y: dir[i] >= 0 ? 38 : 50, class: cls}, g); tx.textContent = label; if (fill && !r.clash) tx.setAttribute("fill", fill);
+      if (label.length > 3) tx.setAttribute("font-size", 26); }
   }
-  for (const i of guesses.list()) { const [x, y] = xyOf(i); el("rect", {x: x * 100 + 6, y: y * 100 + 6, width: 88, height: 88, rx: 12, class: "guess"}, svg); }
-  if (sel >= 0 && playing()) { const [x, y] = xyOf(sel); el("rect", {x: x * 100 + 5, y: y * 100 + 5, width: 90, height: 90, rx: 12, class: "sel"}, svg); }
+  for (const i of guesses.list()) { const [x, y] = xyOf(i); el("rect", {x: x * 100 + 5, y: y * 100 + 5, width: 90, height: 90, rx: 8, class: "guess"}, svg); }
+  if (sel >= 0 && playing()) { const [x, y] = xyOf(sel); el("rect", {x: x * 100 + 4, y: y * 100 + 4, width: 92, height: 92, rx: 8, class: "sel"}, svg); }
   // the hint: gold (or red) boxes, and a line for a jump
   if (hint) {
     for (const i of hint.sq || []) { const [x, y] = xyOf(i); el("rect", {x: x * 100 + 6, y: y * 100 + 6, width: 88, height: 88, rx: 12, class: "hintsq" + (hint.bad ? " bad" : "")}, svg); }
@@ -381,14 +363,29 @@ function link(a, b) {
   return true;
 }
 function cut(a) { guesses.before(a); undo.push(); game.succ[a] = -1; }
-// What a tap on b does with a picked: cut the jump between them if there is one, join them if one points at the
-// other, or pick b instead.
+// Two squares tapped (or dragged between, either way) make a pair: if they're joined, they come apart; if one's arrow
+// points at the other, they're joined that way round (where each points at the other, see below).
+// Nothing stays picked afterwards. A square that can't pair with the picked one is picked instead.
+function clashes(a, b) {
+  const was = game.succ.slice(), p = game.succ.indexOf(b); if (p >= 0) game.succ[p] = -1; game.succ[a] = b;
+  const bad = runs().list.some(r => r.clash); game.succ = was; return bad;
+}
 function act(a, b) {
   game.started = true;
-  if (game.succ[a] === b) { cut(a); sel = a; }
-  else if (game.succ[b] === a) { cut(b); sel = a; }
-  else if (onRay(a, b)) { if (link(a, b)) sel = b; }
-  else if (onRay(b, a)) { if (link(b, a)) sel = b; }
+  if (game.succ[a] === b) { cut(a); sel = -1; }
+  else if (game.succ[b] === a) { cut(b); sel = -1; }
+  else if (onRay(a, b) || onRay(b, a)) {
+    // each way the arrows allow: one that can be made at all, fits the numbers, and keeps the joins already made wins;
+    // in a true tie, the pair is taken as the player means it, two squares the cat went between, so the way it went
+    const ways = [[a, b], [b, a]].filter(([x, y]) => onRay(x, y));
+    const loops = (x, y) => { for (let k = y; k >= 0; k = game.succ[k]) if (k === x) return true; return false; };
+    const can = ([x, y]) => x !== last() && y !== first() && !loops(x, y);
+    const k = game.path.indexOf(a), right = game.path[k + 1] === b ? [a, b] : game.path[k - 1] === b ? [b, a] : null;
+    const cost = ([x, y]) => (clashes(x, y) ? 2 : 0) + (game.succ[x] >= 0 || game.succ.indexOf(y) >= 0 ? 1 : 0) + (right && right[0] !== x ? .5 : 0);
+    const ok = ways.filter(can).sort((u, v) => cost(u) - cost(v));
+    const [x, y] = ok[0] || ways[0];
+    sel = link(x, y) ? -1 : sel;
+  }
   else sel = b;
   after();
 }
@@ -479,10 +476,10 @@ function hint() {
   const step = st || {i: tail, j: want[tail], why: "to"};
   game.hinted = true; save();
   const {of} = runs(), numOf = i => { const [q, o] = of[i]; return q.base != null ? q.base + o : null; };
-  if (hints.level() >= 1 || !st) return hints.show({sq: [step.i, step.j], line: [step.i, step.j]}, "Join the gold squares: the first jumps to the second.");
+  if (hints.level() >= 1 || !st) return hints.show({sq: [step.i, step.j], line: [step.i, step.j]}, "Join the two gold squares.");
   const n = numOf(step.why === "to" ? step.i : step.j);
   return hints.show({sq: [step.why === "to" ? step.i : step.j]}, step.why === "to"
-    ? (n != null ? `Only one square along the gold square's way out can be ${n + 1}. Which?` : "There's only one square the gold square can jump to. Which?")
+    ? (n != null ? `Only one square along the gold square's arrow can be ${n + 1}. Which?` : "There's only one square the gold square can jump to. Which?")
     : (n != null ? `Only one square can jump to the gold square, so it's ${n - 1}. Which?` : "Only one square can jump to the gold square. Which?"));
 }
 $("hintBtn").onclick = hint;
@@ -582,15 +579,15 @@ function helpOnFirstVisit() {
   let was = null;
   const steps = [
     {say: "The cat starts in its bed", lit: [xyOf(s)]},
-    {say: "Its notch points to the next jump", lit: [s, ...ray[s]].map(xyOf)},
+    {say: "Its arrow points to the next jump", lit: [s, ...ray[s]].map(xyOf)},
     // Your turn: join the bed to a square along its arrow (G.yourTurn puts the house back afterwards)
-    {say: "Tap the bed, then a lit square", lit: [s, ...ray[s]].map(xyOf), try: {done: () => game.succ[s] !== was, yes: "Zoom!"}, ...turn.upTo,
+    {say: "Tap the bed and a lit square", lit: [s, ...ray[s]].map(xyOf), try: {done: () => game.succ[s] !== was, yes: "Zoom!"}, ...turn.upTo,
      enter() { turn.from.enter(); sel = -1; was = game.succ[s]; draw(); }},
     {say: "Every square once, ending on your bed", lit: all, outline: [[xyOf(last())]], tone: "ok"},
     {say: "Join jumps anywhere, in any order", lit: all},
-    ...(givens.length ? [{say: "Big numbers: when the cat got there", lit: givens}] : []),
-    {say: "Tap a jump's two ends to cut it", lit: all, later: true},
-    {say: "Small coloured numbers come from your jumps", lit: all, later: true},
+    ...(givens.length ? [{say: "Bold numbers: when the cat got there", lit: givens}] : []),
+    {say: "Tap a joined pair again to part them", lit: all, later: true},
+    {say: "Coloured numbers come from your joins", lit: all, later: true},
     {say: "Loose runs get letters: a, a+1…", lit: all, later: true},
     {say: "Not sure? Bookmark, then try a jump. Return to Bookmark undoes it", els: [$("guessBtn")]},
     {say: "Stuck? Hint shows the next jump", els: [$("hintBtn")]},
