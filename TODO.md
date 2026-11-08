@@ -169,7 +169,6 @@ will recheck this list, and add games 43–52, before any of it is built.
 ### Choices as radio buttons
 - Catlas: Answer type → Pick from 4 names / Type with autocomplete / Type in a blank box, no help.
 - Knit Pick: Cat theme words / Everyday words.
-- Catwalk: show only the key that applies (Up to 9×9 or From 10×10), not both.
 
 ### More to play
 - Tunnel Run: many more turning-only levels, up to a full page of small tunnels with a full-page view.
