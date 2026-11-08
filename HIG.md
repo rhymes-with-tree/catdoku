@@ -13,7 +13,8 @@ the reason they don't apply.
 - ✅ **Purpose, simplicity, delight:** one game per page, the board first, cats and gold paws for delight.
 - ✅ **Agency: help people recover from mistakes:** Undo (and Ctrl/⌘Z), Restart, Return to Bookmark (once called Undo guess), revives.
   Undo, Bookmark and Return to Bookmark never cost the gold paw (since 2026-11-07), so taking back a slip is never
-  held against you; Restart, starting the whole puzzle over, does.
+  held against you; Restart, starting the whole puzzle over, does. Since 2026-11-08 every game's Undo, ⌘Z and Restart
+  are one helper (`G.history`), so they work and grey out the same way everywhere.
 - ✅ **Familiarity: provide clear feedback:** message line, red/green marks, win cards.
 - ✅ **Flexibility: preserve a person's context:** every game saves progress and reopens it.
 - ✅ **Flexibility: a variety of input methods:** touch, mouse and keyboard in every game.
@@ -95,7 +96,9 @@ the reason they don't apply.
 - ⚠️ **Custom font legibility:** Baloo 2 is a custom font, which Apple allows for branding; it scales with Dynamic Type.
 
 ### Layout
-- ✅ **Order content by importance:** title, status, board, tools, settings.
+- ✅ **Order content by importance:** the pinned title row (☰ Menu, name, streak), the game's cat and line, status, board,
+  pieces, the free tools (Undo, Notes, Bookmark), the red tools that cost the gold paw, then Restart beside New; settings
+  are in ☰ Menu.
 - ✅ **Group related items; progressive disclosure:** settings in their own row with a line each; Pawlette's menu.
 - ✅ **Adapt to sizes, orientations and text size;** ✅ safe areas.
 
@@ -153,7 +156,8 @@ the reason they don't apply.
 - ✅ **Respect system settings** (appearance, text size, motion, contrast) rather than repeating them.
 
 ### Undo and redo
-- ✅ **Undo many times; show the result;** ✅ ⌘Z / Ctrl+Z. ⚠️ No redo (Apple: only provide when necessary).
+- ✅ **Undo many times; show the result;** ✅ ⌘Z / Ctrl+Z, the same in every game (`G.history`); Undo greys out when
+  there's nothing to take back. ⚠️ No redo (Apple: only provide when necessary).
   ⚠️ Shake and three-finger swipe to undo are system gestures a web page can't receive.
 
 ### Searching / search fields

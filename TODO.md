@@ -106,8 +106,8 @@ the lit country), with the + and − keys, in Twirl (under the mat's corner, as 
 them), Cat Burglar and Catlas; each keeps its own pinch and drag. Then `G.lives`: the hearts, the Out of lives card and
 "Wait, I'm only mostly dead!" written once for Catdoku, Toydoku, Hide & Seek, Twirl and Cat Burglar (each keeps its
 lives in its own saved game, as before), and Catlas's tries on each place shown as hearts with it. Then `G.history` (Undo, its ⌘Z, Restart greying out
-with it, and Restart itself; see "Undo" below), with the first pages moved onto it. Still to do: the other shared helpers below. When it's done, the README's "Across every game" (Layout, Gold paw, Bookmark, Keys) and
-`HIG.md` need rewriting to match.
+with it, and Restart itself; see "Undo" below), with every page moved onto it by 2026-11-08, and the README's "Across every game" (Layout, Gold paw, Bookmark, Keys,
+Undo) and `HIG.md` rewritten to match. Still to do: the other shared helpers below.
 
 ### The page, top to bottom
 
@@ -170,15 +170,6 @@ Built 2026-11-07 (`whatsNew` in `games.js`), ahead of the shared helpers, which 
 
 ### Shared helpers, so each is written once
 
-- **Undo:** `G.history` in `games.js` (built 2026-11-07): push, undo, restart, ⌘Z or Ctrl+Z, and greying out Undo
-  (and Restart, with `restart: true`). Each page keeps its steps where and as it did (in its saved game, usually
-  `game.history`), so old saves load and undo; `back(step)` puts one back; `take` makes snapshots (and lets Restart be
-  undone; or `restart(reset, step)` pushes a step of its own, as `{mark}`); `cap` keeps the newest (moving bookmarks'
-  places with them); `list` points it at another list (Unravel's path); `started` greys Restart where that isn't the
-  same as having steps; `shelf` is what Undo takes back once the list is empty (Fish Bones' Restarts, put away so
-  their swaps don't count); `G.guesser({history})` takes its Undo from it. Moved so far: Night Light, Pawlette, Treat Time, Up a Tree, Unravel, Cat Mat, Sunbeams, Yarn, Patches, Catwalk, Mewstermind, Pick of the Pile, Mew Hue, Shelf Life, Fair Play, Purrfect Square, Scratch That, High Perch, Cross Stitch, Window Ledges, Open the Door!, Fridge Magnets, Toe Beans, Meowbile, Purrmutation, Tunnel Run, Laser Pointer, If It Fits, Toydoku, Fish Bones, Knock It Off and Cat Pile (which now saves its steps too, so Undo works after a reload).
-  Still writing their own (33 at the start; how each keeps its steps, from the survey):
-  - Catdoku: JSON of the cells, 500 kept (bookmarks move with it); Restart empties the list; `G.guesser`
 - **Checking:** the names are one each now (2026-11-07): Auto check (rule breaks turn red as you play), Audit (a
   one-off check) and Auto grade (a wrong answer costs a life; Catdoku's was Audit as-you-go). Still to weigh: Complete
   (Catdoku) and Check (Mewstermind) are one button.
