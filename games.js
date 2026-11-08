@@ -200,19 +200,20 @@ const G = (() => {
     return q.toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter(Boolean).every(w => hay.includes(w));
   };
 
-  // The toy library as the toy chest shows it from a game with no toys of its own (the choice is one for every game):
-  // the toy games' colours, each with the toys that can stand for it.
+  // The toy library as the menu's Toy chest shows it, the same from every game (the choice is one for every game): every
+  // toy any game uses (Pick of the Pile uses them all), by colour. A game with fewer toys uses the ones it has.
   const CHEST = [
     {c: "#BD5538", looks: [["wiffle-red", "red wiffle balls"], ["swirl-red", "red swirl balls"], ["crochet-stars", "star balls"], ["tinsel", "tinsel balls"]]},
-    {c: "#ECA818", looks: [["wiffle-yellow", "yellow wiffle balls"]]},
-    {c: "#73A7AE", looks: [["wiffle-teal", "teal wiffle balls"], ["fish", "fish"]]},
+    {c: "#ECA818", looks: [["wiffle-yellow", "yellow wiffle balls"], ["tennis", "tennis balls"]]},
+    {c: "#73A7AE", looks: [["wiffle-teal", "teal wiffle balls"], ["fish", "fish"], ["cage-blue", "teal cage balls"], ["crochet-stripe", "striped crochet balls"]]},
     {c: "#6AA673", looks: [["lattice", "lattice balls"]]},
     {c: "#B3B94B", looks: [["spiky-lime", "spiky pom-poms"]]},
-    {c: "#B94588", looks: [["swirl-purple", "plum swirl balls"], ["bell-purple", "bell balls"]]},
+    {c: "#B94588", looks: [["swirl-purple", "plum swirl balls"], ["bell-purple", "bell balls"], ["nubby-pink", "pink nubby balls"], ["polka-dot", "polka-dot balls"]]},
     {c: "#7885BA", looks: [["spring", "springs"], ["rope-blue", "rope balls"]]},
-    {c: "#825840", looks: [["cork-paw", "cork paw balls"], ["burlap-paws", "burlap balls"], ["rattan", "rattan balls"]]},
+    {c: "#825840", looks: [["cork-paw", "cork paw balls"], ["burlap-paws", "burlap balls"], ["rattan", "rattan balls"], ["fluffy-bell", "fluffy bell balls"]]},
     {c: "#5E5866", looks: [["mouse", "mice"]]},
-    {c: "#E16A4A", looks: [["felt-rainbow", "rainbow balls"], ["ribbon-tail", "ribbon balls"], ["spiky-rainbow", "spiky balls"]]},
+    {c: "#E16A4A", looks: [["felt-rainbow", "rainbow balls"], ["ribbon-tail", "ribbon balls"], ["spiky-rainbow", "spiky balls"], ["feather-orange", "orange feather balls"],
+      ["feather-rainbow", "rainbow feather balls"], ["nubby-orange", "orange nubby balls"], ["sisal-stripe", "striped sisal balls"], ["sisal-rainbow", "rainbow sisal balls"], ["wave-stripe", "wavy striped balls"]]},
   ];
   // The win streak's flame at the right of a game's title, with the count in it, from the first win on. A tap shows the
   // streak and the best, and today's challenge. (Catdoku had it first, beside its title.)
@@ -274,7 +275,7 @@ const G = (() => {
     item("games", "All games", () => o.open());
     const daily = o.dslug === current ? item("today", "Today's challenge", () => {}) : item("today", "Today's challenge", `${base}${o.dslug}/`);
     const toys = item("toys", "Toy chest", () => {
-      if ($("toysBtn")) $("toysBtn").click();
+      if ($("toysBtn")) $("toysBtn").click();   // the game's own picker: the same toys (toyPicker always shows CHEST), and its save swaps them in now
       else toyPicker({kinds: CHEST, off: toysOff(), min: 1, src: f => `${HOME}toys/${f}.webp`,
         save: off => { saveToys(off); note("Saved. The toy games use them from their next board.", 3500); }});
     }, "The toys every game uses");
@@ -287,8 +288,8 @@ const G = (() => {
     // the page's own buttons, pressed from here (and kept in step with them: hidden or not, ready or not)
     const page = [["linkBtn", "share", "Share"], ["bestBtn", "best", "Best times"], ["helpBtn", "help", "How to play"]]
       .map(([id, icon, text]) => [id, item(icon, $(id) ? ($(id).querySelector(".lbl") || $(id)).textContent.trim() || text : text, () => $(id) && $(id).click())]);
-    const keys = item("keyboard", "Keys", () => keysCard(), "Press ? for these");
-    const setRow = item("sliders", "Settings", () => {});
+    const keys = item("keyboard", "Keyboard Shortcuts", () => keysCard(), "Press ? for these");
+    const setRow = item("sliders", `${name} Settings`, () => {});
     setRow.onclick = e => { e.stopPropagation(); const open = setList.hidden; setList.hidden = !open; setRow.setAttribute("aria-expanded", String(open)); if (open) setList.scrollIntoView({block: "nearest"}); };
     setRow.setAttribute("aria-expanded", "false"); setRow.classList.add("more");
     const setList = document.createElement("div"); setList.className = "toggles menuSettings"; setList.id = "menuSettings"; setList.hidden = true;
@@ -307,7 +308,7 @@ const G = (() => {
       set(fav, on ? "In your favorites" : "Add to favorites", on ? "Tap to take it off" : "");
       fav.querySelector(".ic").classList.toggle("on", on);
       for (const [id, row] of page) { const b = $(id); row.hidden = !b || b.hidden; row.disabled = !!(b && b.disabled); }
-      keys.hidden = !(KEYS[current] && keyboardish() && !$("chooseBtn"));
+      keys.hidden = !(KEYS[current] && keyboardish());
       setRow.hidden = ![...setList.children].some(x => !x.hidden);
     }
     function show(open) {
@@ -315,7 +316,7 @@ const G = (() => {
       menu.hidden = !open; btn.setAttribute("aria-expanded", String(open)); head.classList.toggle("menuOpen", open);
       if (open) (menu.querySelector(".menuItem:not([hidden])") || menu).focus({preventScroll: true});
     }
-    btn.onclick = e => { e.stopPropagation(); show(menu.hidden); };
+    btn.onclick = e => { e.stopPropagation(); if (o.shut && o.shut()) return; show(menu.hidden); };   // with All games open, ☰ closes it
     document.addEventListener("click", e => { if (!menu.hidden && !menu.contains(e.target) && !btn.contains(e.target)) show(false); });
     document.addEventListener("keydown", e => {
       if (menu.hidden) return;
@@ -375,7 +376,11 @@ const G = (() => {
     const dslug = daily(), dgame = GAMES.find(g => g[1] === dslug);
     const todays = section(dailyDoneToday() ? "Today's challenge: done" : "Today's challenge", [dgame]);
     if (dailyDoneToday()) todays.querySelector(".gameTile").classList.add("gold", "done");   // gold once it's solved, as on the front page
-    panel.append(home, todays, search, favs, ...shelves, none);
+    // a way out at the top, as the panel can fill the screen and leave nothing outside it to tap
+    const shut = document.createElement("button");
+    shut.type = "button"; shut.className = "gamesClose"; shut.textContent = "Close"; shut.setAttribute("aria-label", "Close all games");
+    shut.onclick = e => { e.stopPropagation(); show(false); };
+    panel.append(shut, home, todays, search, favs, ...shelves, none);
     drawFavs();
     search.oninput = () => {
       const q = search.value.trim();
@@ -398,7 +403,7 @@ const G = (() => {
     const row = document.createElement("div"); row.className = "gamesRow";
     const head = current && document.querySelector("main header");
     if (head) {
-      gameMenu(head, current, base, {open: () => { show(true); el.scrollIntoView({block: "nearest"}); search.focus({preventScroll: true}); }, drawFavs, dslug, dgame});
+      gameMenu(head, current, base, {shut: () => { const was = !panel.hidden; show(false); return was; }, open: () => { show(true); el.scrollIntoView({block: "nearest"}); search.focus({preventScroll: true}); }, drawFavs, dslug, dgame});
       // a long name gets a little smaller rather than going onto two lines, unless even that won't do
       const h1 = head.querySelector("h1"), fit = () => {
         h1.style.fontSize = ""; let fs = parseFloat(getComputedStyle(h1).fontSize);
@@ -518,7 +523,10 @@ const G = (() => {
     const open = focus => {
       menu.innerHTML = "";
       const name = ((btn.querySelector(".lbl") || btn).textContent || "New").trim();
-      const tip = document.createElement("p"); tip.className = "menutip"; tip.textContent = `Double-tap ${name} for the same ${word.toLowerCase()}`; menu.append(tip);
+      const tip = document.createElement("p"); tip.className = "menutip"; tip.textContent = sel.id === "newSel" ? `Double-tap ${name} for random keys` : `Double-tap ${name} for the same ${word.toLowerCase()}`; menu.append(tip);
+      // leaving a started, unsolved puzzle ends the win streak (freshClock), so say so before it's dealt
+      const g = T && T.game(), st = T ? streak(T.name).streak : 0;
+      if (g && g.started && !g.result && st) { const w = document.createElement("p"); w.className = "menutip warn"; w.textContent = `A new one ends your ${st}-win streak`; menu.append(w); }
       for (const op of sel.options) {
         const b = document.createElement("button"), on = op.value === sel.value, text = op.textContent.trim();
         b.type = "button"; b.setAttribute("role", "menuitemradio"); b.setAttribute("aria-checked", String(on)); b.disabled = op.disabled;
@@ -930,7 +938,9 @@ const G = (() => {
     const off = new Set(o.off), media = document.createElement("div"), grid = document.createElement("div");
     const tip = document.createElement("p"); tip.className = "tip"; tip.textContent = o.why || "Tap a toy to leave it out.";
     grid.className = "toypick";
-    for (const k of o.kinds) for (const [f, name] of k.looks) {
+    // every picker shows the whole library (CHEST), so the Toy chest looks the same from every game; a game counts its
+    // colours from its own kinds (o.kinds), and leaves out the toys it doesn't have
+    for (const k of CHEST) for (const [f, name] of k.looks) {
       const b = document.createElement("button"), img = document.createElement("img");
       img.src = o.src(f); img.alt = "";
       b.append(img); b.title = name[0].toUpperCase() + name.slice(1);
@@ -944,8 +954,9 @@ const G = (() => {
     const save = $("card").querySelector(".btns button");
     function check() {
       const n = o.kinds.filter(k => k.looks.some(([f]) => !off.has(f))).length, short = n < o.min;
+      const all = CHEST.filter(k => k.looks.some(([f]) => !off.has(f))).length;
       save.disabled = short; count.classList.toggle("bad", short);
-      count.textContent = short ? `Keep toys in at least ${o.min} colours (${n} now).` : `${n} of ${o.kinds.length} colours in play.`;
+      count.textContent = short ? `Keep toys in at least ${o.min} colours (${n} now).` : `${all} of ${CHEST.length} colours in play.`;
     }
     check();
   }
@@ -1093,7 +1104,7 @@ const G = (() => {
     list.push("?: these keys");
     const ul = document.createElement("ul"); ul.className = "keysList";
     for (const k of list) { const li = document.createElement("li"), i = k.indexOf(": "); const b = document.createElement("b"); b.textContent = k.slice(0, i); li.append(b, k.slice(i)); ul.append(li); }
-    openCard("Keys", "", [["Close", closeCard, true]], ul);
+    openCard("Keyboard Shortcuts", "", [["Close", closeCard, true]], ul);
   }
   document.addEventListener("keydown", e => {
     if (e.key !== "?" || e.ctrlKey || e.metaKey || e.altKey || !CURRENT || !KEYS[CURRENT] || document.querySelector(".spot") || $("overlay").classList.contains("show")) return;
@@ -1359,7 +1370,7 @@ const G = (() => {
 
   /* ---------- switches ---------- */
   // A setting that's on or off (Auto check, Numbers, Slower…), written once. G.switch({id, label, line, key, of, save,
-  // change, can, tip}) draws it in the menu's Settings (or, before the menu is made, in a row of switches in the page,
+  // change, can, tip, warn}) draws it in the menu's Settings (or, before the menu is made, in a row of switches in the page,
   // which the menu then takes), its name with its line under it. key names the setting in of (the page's settings, or
   // a function giving them), kept with save(); change(on) runs after. can() false leaves it as it was (Toe Beans,
   // mid-move). tip is shown once, pointing at the switch, the first time it's turned on. Gives back the box, whose
@@ -1371,8 +1382,9 @@ const G = (() => {
     opt.innerHTML = '<label class="toggle"><input type="checkbox"><span class="sw"></span><span class="swName"></span></label>';
     const box = opt.querySelector("input"); box.id = o.id;
     opt.querySelector(".swName").textContent = o.label;
+    // the line shows only on a switch that can cost a life or the gold paw (o.warn); on the rest it's read out, not shown
     if (o.line) {
-      const s = document.createElement("span"); s.className = "hint"; s.id = o.id + "Line"; s.textContent = o.line;
+      const s = document.createElement("span"); s.className = o.warn ? "hint" : "hint quiet"; s.id = o.id + "Line"; s.textContent = o.line;
       opt.append(s); box.setAttribute("aria-describedby", s.id);
     }
     box.sync = () => { box.checked = !!of()[o.key]; };
@@ -1654,8 +1666,9 @@ const G = (() => {
     giveup: '<path d="M8 6h15l-3 5 3 5H8z" class="white"/><path d="M8 28V5"/>',
     cat: '<path d="M7 13L8 4l6 5h4l6-5 1 9c2 4 1 9-3 11-3 2-11 2-14 0-4-2-5-7-2-11z"/><path d="M12.5 17v.5M19.5 17v.5M14.5 21.5h3"/>',
     tap: '<ellipse cx="16" cy="20" rx="6" ry="5"/><circle cx="8" cy="13" r="2.4"/><circle cx="13" cy="8.5" r="2.4"/><circle cx="19" cy="8.5" r="2.4"/><circle cx="24" cy="13" r="2.4"/>',
-    marks: '<path d="M5 10l8 8M13 10l-8 8"/><path d="M18 11h9M18 17h9"/>',
-    keep: '<circle cx="16" cy="16" r="10" class="green"/>',
+    xeq: '<path d="M5 10l8 8M13 10l-8 8"/><path d="M18 11h9M18 17h9"/>',
+    keep: '<circle cx="16" cy="16" r="10" style="stroke:var(--sage-green);stroke-width:3.5"/>',   // a green ring, clear in the middle
+    putback: '<path d="M5 21h22v6H5z"/><path d="M16 4v12"/><path d="M11 11l5 5 5-5"/>',   // Treat Time's Put back: into the tray
     shuffle: '<path d="M4 10h5c7 0 8 12 15 12h4"/><path d="M24 18l4 4-4 4"/><path d="M4 22h5c2 0 3.5-1.5 5-3.5M18 12.5c1.5-1.5 3-2.5 6-2.5h4"/><path d="M24 6l4 4-4 4"/>',
     flip: '<path d="M16 4v24"/><path d="M12 8L4 22h8z"/><path d="M20 8l8 14h-8z"/>',
     dot: '<rect x="6" y="6" width="20" height="20" rx="3"/><circle cx="16" cy="16" r="2.6" fill="currentColor"/>',   // mark a square to stay empty (Cross Stitch)
@@ -1696,7 +1709,7 @@ const G = (() => {
     digits: '<path d="M4 11l3-2v14M11 12a3 3 0 1 1 5 2.5L11 23h6M21 9h6l-3.5 5a4.2 4.2 0 1 1-3.5 7"/>',
     palette: '<path d="M16 5C9.5 5 5 9.5 5 15.5S9.5 27 15 27c2 0 2.5-1.2 2-2.6-.6-1.6.4-3.4 2.4-3.4H23c2.5 0 4-1.8 4-4.4C27 9.8 22.5 5 16 5z"/><circle cx="11" cy="14" r="1.3"/><circle cx="15" cy="10" r="1.3"/><circle cx="20.5" cy="11" r="1.3"/>',
   };
-  const ICON_OF = {hintBtn: "hint", undoBtn: "undo", backBtn: "undoguess", restartBtn: "restart", auditBtn: "audit", notesBtn: "pencil",
+  const ICON_OF = {hintBtn: "hint", undoBtn: "undo", backBtn: "undoguess", restartBtn: "restart", resetBtn: "restart", auditBtn: "audit", notesBtn: "pencil",
     allNotesBtn: "pencils", clearNotesBtn: "erase", eraseBtn: "erase", pauseBtn: "pause", guessBtn: "guess", giveUpBtn: "giveup",
     keepBtn: "keep", shuffleBtn: "shuffle", flipBtn: "flip", finishBtn: "near", completeBtn: "check", skipBtn: "skip",
     colBtn: "palette", dotBtn: "dot", linkBtn: "share", toysBtn: "toys", bestBtn: "best", helpBtn: "help", zoomIn: "zoomin", zoomOut: "zoomout", zoomFit: "fit",
@@ -1734,7 +1747,7 @@ const G = (() => {
     // the Level (or Size, or Round) picker: a step icon in place of its word; the menu keeps the word as its name
     // Where New sits beside it, the picker goes inside New (levelMenu): a tap on New opens the levels, a double tap deals
     // again at the same level, and the picker itself is hidden (kept for the page's own bookkeeping and otherSize).
-    for (const sel of document.querySelectorAll("main .bar label > select#levelSel, main .bar label > select#size")) {
+    for (const sel of document.querySelectorAll("main .bar label > select#levelSel, main .bar label > select#size, main .bar label > select#newSel")) {
       const label = sel.parentElement, nb = label.parentElement.querySelector(":scope > #newBtn");
       const word = [...label.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent.trim()).join(" ").trim() || "Level";
       for (const n of [...label.childNodes]) if (n.nodeType === 3) n.remove();
@@ -1791,13 +1804,28 @@ const G = (() => {
     const nb = $("newBtn"), bar = nb && nb.closest("main .bar");
     if (!bar) return;
     const slot = nb.closest(".newpick") || nb;
-    for (const id of ["restartBtn", "giveUpBtn"]) {
+    for (const id of ["restartBtn", "resetBtn", "giveUpBtn"]) {   // resetBtn: Toe Beans' Restart that's free
       const b = $(id); if (!b || !b.closest("main .actions") || b.closest(".card,.overlay")) continue;
-      b.classList.add("moved"); if (id === "restartBtn") slot.before(b); else slot.after(b);
+      b.classList.add("moved"); if (id !== "giveUpBtn") slot.before(b); else slot.after(b);
     }
   }
   toolify();
   arrange();
+  // The status line (the goal and the time) goes under the board, above the buttons, in every game (decided
+  // 2026-11-08): the goal at the left, the time at the right, and a note on a line of its own under them. It's
+  // written above the board in each page, so it's moved here, past the board (or the box the board is in).
+  (function statusBelow() {
+    const st = document.querySelector("main > .status");
+    if (!st) return;
+    st.classList.add("below");
+    const board = [...st.parentElement.children].find(el => el !== st && (el.matches("#board,.stage") || el.querySelector("#board")));
+    if (!board) return;
+    // the action games' goals row (Pounce, Bubbles, Cat Pile) comes down with it, just above the status line
+    const goals = st.parentElement.querySelector(":scope > .goals");
+    board.after(st); if (goals) st.before(goals);
+    // a time kept in a group with the moves or score moves out to the right
+    const t = st.querySelector(".info > .timer"); if (t) st.querySelector(".info").after(t);
+  })();
   // Once the gold paw is lost for this puzzle (a hint taken, a restart, a life lost…), or there's none to win (zen), the
   // tools that cost it go back to the usual colour, with no crossed-out paw: there's nothing left to lose. Each page
   // says when with G.pawLost(() => true or false), looked at on every save and every second or so.
@@ -1843,6 +1871,7 @@ const G = (() => {
   // either piece: draw), of and key (where to keep it, with save: Scratch That keeps Dot first in its settings; off
   // on every page load if not given), save}. Returns {on(), set(on) (quietly: a new puzzle or a win turns it off),
   // toggle()}.
+  // o.plainIcon: the plain tap's icon, if not a tapping paw (Treat Time's Put back, Fair Play's Toy)
   function pieces(o) {
     const m = $(o.mark), first = document.querySelector("main .actions");
     let on = !!(o.of && o.of()[o.key]);
@@ -1850,14 +1879,16 @@ const G = (() => {
     function toggle() {
       if (o.can && !o.can()) return;
       set(!on); if (o.save) o.save();
-      if (o.say) note(on ? o.say : "", on ? 3500 : 0);
+      // what the marking tool does is said the first time it's turned on in a game, then not again
+      if (o.say && on) { const said = load("catdoku.said.v1"); if (!said[SLUG]) { said[SLUG] = true; save("catdoku.said.v1", said); note(o.say, 3500); } }
+      else if (o.say) note("", 0);
       if (o.change) o.change(on);
     }
     set(on);
     if (m) m.onclick = toggle;
     if (m && first) {
       const row = document.createElement("div"); row.className = "actions pieces"; row.setAttribute("role", "group"); row.setAttribute("aria-label", "What a tap does");
-      const p = document.createElement("button"); p.id = "plainBtn"; p.className = "tool"; p.innerHTML = iconSVG("tap") + `<span class="lbl">${o.plain}</span>`;
+      const p = document.createElement("button"); p.id = "plainBtn"; p.className = "tool"; p.innerHTML = iconSVG(o.plainIcon || "tap") + `<span class="lbl">${o.plain}</span>`;
       p.onclick = () => { if (on) toggle(); };
       row.append(p, m); first.before(row);
       const sync = () => p.setAttribute("aria-pressed", String(m.getAttribute("aria-pressed") !== "true"));
