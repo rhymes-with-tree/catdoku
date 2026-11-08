@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.44"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.45"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.44">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.45">
 <style>
 /* Sudoku with toys: every row, column and box holds one of each toy. The Numbers switch shows 1 to N instead. */
 .gridwrap{background:var(--panel);border:3px solid var(--ink);border-radius:10px;overflow:hidden;
@@ -121,7 +121,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-07.44"></script>
+<script src="../games.js?v=2026-11-07.45"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N grid in boxes of bw × bh squares: every row, column and box holds each of the N toys once. Toys are
@@ -451,7 +451,7 @@ function draw() {
   $("key").textContent = game.won ? "" : guesses.armed() ? `Bookmarked: the next ${what} you put out glows, and Return to Bookmark returns here` : armed ? (armed.sticky ? `${it[0].toUpperCase() + it.slice(1)} sticks: tap squares${noting && armed.v ? " (or drag) to jot it down" : ""} (tap it for ${noting ? "pen" : "notes"}, hold to let go)` : `Tap a square for ${it}${noting && armed.v ? " (as a note)" : ""}`)
     : sel >= 0 && isGiven(sel) ? "That one was already out" : "";
   $("hintBtn").disabled = game.won; $("clearNotesBtn").disabled = game.won || !game.notes.some(Boolean);
-  $("undoBtn").disabled = !game.history.length || game.won; $("restartBtn").disabled = !game.history.length || game.won;
+  undo.sync();
 }
 // The row under the tools: a toy (or number) each. Erase is with the tools.
 function makePad() {
@@ -491,11 +491,13 @@ function padButton(b, v) {
 }
 
 /* ---------- playing ---------- */
-const snapshot = () => game.history.push({grid: game.grid.slice(), notes: game.notes.slice()});
 function restore(h) { game.grid = h.grid; game.notes = h.notes; }
+const undo = G.history({game: () => game, take: () => ({grid: game.grid.slice(), notes: game.notes.slice()}), can: playing, restart: true,
+  back: restore, after: () => { draw(); save(); }});
+const snapshot = () => undo.push();
 // Bookmark: the next toy put out glows until it's undone; Return to Bookmark takes everything back to just before the
 // latest bookmark in one go, notes and all (G.guesser).
-const guesses = G.guesser({game: () => game, undo, draw: () => { draw(); save(); }, board: $("board"), what: "toy"});
+const guesses = G.guesser({game: () => game, history: undo, draw: () => { draw(); save(); }, board: $("board"), what: "toy"});
 // Put toy v in square i (0 erases; the same toy again takes it off). In pencil, v is jotted down or crossed off.
 // o.quiet: no undo step of its own (a drag makes one for all its squares). o.mode, in a drag: "add" only puts
 // the toy (or mark) in a square without one, "remove" only takes it off one that has it. Returns whether it did anything.
@@ -555,7 +557,7 @@ $("svg").addEventListener("pointermove", e => {
 for (const ev of ["pointerup", "pointercancel"]) $("svg").addEventListener(ev, e => {
   if (!drag || e.pointerId !== drag.id) return;
   if (!drag.changed && game && !game.won) {
-    game.history.pop();   // nothing changed, so no undo step
+    undo.list().pop();   // nothing changed, so no undo step
     if (drag.seen.size === 1 && isGiven([...drag.seen][0])) G.note("That one was already out", 2000);
   }
   drag = null; skipClick = true; setTimeout(() => { skipClick = false; }, 400);
@@ -618,15 +620,9 @@ document.addEventListener("keydown", e => {
     draw();
   }
 });
-document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
-function undo() { if (playing() && game.history.length) { restore(game.history.pop()); draw(); save(); } }
-$("undoBtn").onclick = undo;
 $("restartBtn").onclick = () => {
-  if (!playing() || !game.history.length) return;
-  snapshot(); game.restarted = true;
-  game.grid = game.givens.slice(); game.notes = game.notes.map(() => 0); guesses.clear(); game.wrong = [];
-  if (settings.autoNotes) fillNotes();
-  draw(); save(); G.note("Back to the start. Undo brings your toys back.", 3500);
+  if (undo.restart(g => { g.grid = g.givens.slice(); g.notes = g.notes.map(() => 0); guesses.clear(); g.wrong = []; if (settings.autoNotes) fillNotes(); }))
+    G.note("Back to the start. Undo brings your toys back.", 3500);
 };
 
 // Hint: first a toy that's wrong, in red. Otherwise a gold box round a square the board already settles: one
