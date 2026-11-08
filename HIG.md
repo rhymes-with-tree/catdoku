@@ -13,7 +13,8 @@ the reason they don't apply.
 - ✅ **Purpose, simplicity, delight:** one game per page, the board first, cats and gold paws for delight.
 - ✅ **Agency: help people recover from mistakes:** Undo (and Ctrl/⌘Z), Restart, Return to Bookmark (once called Undo guess), revives.
   Undo, Bookmark and Return to Bookmark never cost the gold paw (since 2026-11-07), so taking back a slip is never
-  held against you; Restart, starting the whole puzzle over, does.
+  held against you; Restart, starting the whole puzzle over, does. Since 2026-11-08 every game's Undo, ⌘Z and Restart
+  are one helper (`G.history`), so they work and grey out the same way everywhere.
 - ✅ **Familiarity: provide clear feedback:** message line, red/green marks, win cards.
 - ✅ **Flexibility: preserve a person's context:** every game saves progress and reopens it.
 - ✅ **Flexibility: a variety of input methods:** touch, mouse and keyboard in every game.
@@ -61,7 +62,7 @@ the reason they don't apply.
 - 🔧 **Minimize time-boxed elements:** hints no longer vanish after five seconds; they stay until the board changes.
   ⚠️ Short notes in the message line still clear after a few seconds (they repeat what the board already shows).
 - ✅ **Difficulty accommodations:** every game has levels; hints, Undo and revives.
-  🔧 Tail Chase, Bird Watch and L-M-N-O-Pom have a Slower switch (two-thirds speed). Wind Up has no clock to beat.
+  🔧 Tail Chase, Bird Watch, L-M-N-O-Pom and Wind Up have a Slower switch (two-thirds speed).
 - ✅ **Be cautious with fast-moving and blinking animations / Reduce Motion:** animations turn off, hint marks stay.
 - ⚠️ **Assistive Access, Switch Control, Voice Control:** not tested.
 
@@ -95,7 +96,9 @@ the reason they don't apply.
 - ⚠️ **Custom font legibility:** Baloo 2 is a custom font, which Apple allows for branding; it scales with Dynamic Type.
 
 ### Layout
-- ✅ **Order content by importance:** title, status, board, tools, settings.
+- ✅ **Order content by importance:** the pinned title row (☰ Menu, name, streak), the game's cat and line, status, board,
+  pieces, the free tools (Undo, Notes, Bookmark), the red tools that cost the gold paw, then Restart beside New; settings
+  are in ☰ Menu.
 - ✅ **Group related items; progressive disclosure:** settings in their own row with a line each; Pawlette's menu.
 - ✅ **Adapt to sizes, orientations and text size;** ✅ safe areas.
 
@@ -121,7 +124,7 @@ the reason they don't apply.
 - 🔧 **Teach through interactivity:** a walkthrough step can now wait for the player to do it on the real board
   (`try` in `G.spotlight`). Catdoku has the first two: tap twice for a cat, then drag for paws; the board goes back as it was.
   🔧 Now every game but the action games, Cat Burglar and Catlas has one (README, How to play).
-- 🔧 **Switches are taught when they're used:** Audit as-you-go, Auto check, Auto Notes and the like aren't in the walkthrough; each says what it does, once, the first time it's turned on.
+- 🔧 **Switches are taught when they're used:** Auto grade, Auto check, Auto Notes and the like aren't in the walkthrough; each says what it does, once, the first time it's turned on.
 - 🔧 **Use concepts that people know** (Design principles: familiarity): Guess is now Bookmark, and Undo guess is Return to Bookmark.
 - 🔧 **Context-specific tips instead of one flow:** on a first visit, steps that only point at a tool or a setting are
   kept back and come later as one-off tips: the Hint tip after 45 seconds without a move, the others a few seconds after
@@ -153,7 +156,8 @@ the reason they don't apply.
 - ✅ **Respect system settings** (appearance, text size, motion, contrast) rather than repeating them.
 
 ### Undo and redo
-- ✅ **Undo many times; show the result;** ✅ ⌘Z / Ctrl+Z. ⚠️ No redo (Apple: only provide when necessary).
+- ✅ **Undo many times; show the result;** ✅ ⌘Z / Ctrl+Z, the same in every game (`G.history`); Undo greys out when
+  there's nothing to take back. ⚠️ No redo (Apple: only provide when necessary).
   ⚠️ Shake and three-finger swipe to undo are system gestures a web page can't receive.
 
 ### Searching / search fields

@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.4"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.55"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.4">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.55">
 <style>
 /* A rug, and a cat sitting at its top corner beside a pot of dye. Each square of the rug is a tuft of pile in
    its colour, with a woven texture laid over the whole rug; fringe hangs off both ends. Knock a pot over and
@@ -93,7 +93,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-07.4"></script>
+<script src="../games.js?v=2026-11-07.55"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // Levels: [columns, rows, colours, spare pots on top of the ones a plain way of playing needs].
@@ -326,7 +326,7 @@ function draw(ripple) {
     : left === 0 ? "No pots left" : `${-left} pot${left === -1 ? "" : "s"} over`;
   $("count").classList.toggle("over", left < 0 && !game.won);
   $("par").textContent = `${used()} used · best ${game.par}`;
-  $("undoBtn").disabled = !used() || game.won; $("restartBtn").disabled = !used() || game.won;
+  undo.sync();
   $("hintBtn").disabled = game.won;
 }
 
@@ -342,7 +342,7 @@ function knock(c) {
   paw.classList.add("swat"); pot.classList.add("tipped"); spill.classList.add("on");
   clearTimeout(tipTimer);
   tipTimer = setTimeout(() => { paw.classList.remove("swat"); pot.classList.remove("tipped"); spill.classList.remove("on"); }, 650);
-  game.history.push(c); game.cells = dye(game.cells, c);
+  undo.push(c); game.cells = dye(game.cells, c);
   draw(true); save();
   if (done(game.cells)) win();
   else if (potsLeft() === 0) G.note("That was the last pot. Keep going, but there's no gold paw this time.", 6000);
@@ -351,23 +351,13 @@ $("pots").addEventListener("click", e => { const b = e.target.closest("button");
 // Tapping a square knocks over its colour.
 $("board").addEventListener("click", e => { const g = e.target.closest(".sq"); if (g && game) knock(game.cells[+g.dataset.i]); });
 document.addEventListener("keydown", e => {
-  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && !$("undoBtn").disabled) { e.preventDefault(); $("undoBtn").click(); return; }
   if (game && /^[1-9]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey && +e.key <= game.K && !document.querySelector(".spot")) knock(+e.key - 1);
 });
 
-function undo() {
-  if (!game || game.won || !used()) return;
-  G.closeCard();
-  game.history.pop(); game.cells = replay(); draw(); save();
-}
-$("undoBtn").onclick = () => { if (playing() || $("overlay").classList.contains("show")) undo(); };
-function restart() {
-  if (!game || game.won || !used()) return;
-  G.closeCard();
-  game.history = []; game.restarted = true; game.cells = game.start.slice(); draw(); save();
-  G.note("Back to the start.", 3000);
-}
-$("restartBtn").onclick = restart;
+// Undo (G.history): the steps are the pots knocked over, in game.history, and the mat is dyed again from the start
+// without the last. Undo gives the pot back. Restart empties the list.
+const undo = G.history({game: () => game, back: (c, g) => { G.closeCard(); g.cells = replay(); }, after: () => { draw(); save(); }, restart: true});
+$("restartBtn").onclick = () => { if (undo.restart(g => { G.closeCard(); g.cells = g.start.slice(); })) G.note("Back to the start.", 3000); };
 
 // Hint: work out a short way from here, and mark the next pot and the squares it would soak into, for the
 // player to knock over.

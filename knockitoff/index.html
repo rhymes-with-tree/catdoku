@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.4";
+  var BUILD = "2026-11-07.55";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.4">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.55">
 <style>
 /* Fred, Knock It Off's mascot, beside the title */
 .title{display:flex;align-items:flex-end;gap:8px}
@@ -87,9 +87,9 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-07.4"></script>
-<script src="../tablethings.js?v=2026-11-07.4"></script>
-<script src="engine.js?v=2026-11-07.4"></script>
+<script src="../games.js?v=2026-11-07.55"></script>
+<script src="../tablethings.js?v=2026-11-07.55"></script>
+<script src="engine.js?v=2026-11-07.55"></script>
 <script>
 /* ---------- pictures (each drawn in a 100 × 100 square) ---------- */
 const {INK, SHADOW, ART, rollArt, KINDS} = TABLE;   // the things on the table (tablethings.js)
@@ -143,7 +143,7 @@ const build = G.builder([...fns, makeKnockItOff], "makeKnockItOff");
 // can't be loaded, a table is dealt here instead.
 const packs = new Map();
 function loadPack(n) {
-  if (!packs.has(n)) packs.set(n, fetch(`tables/${String(n).padStart(2, "0")}.json?v=2026-11-07.4`)
+  if (!packs.has(n)) packs.set(n, fetch(`tables/${String(n).padStart(2, "0")}.json?v=2026-11-07.55`)
     .then(r => r.ok ? r.json() : null).then(j => j && Array.isArray(j.tables) && j.tables.length ? j.tables : null).catch(() => null));
   return packs.get(n);
 }
@@ -289,8 +289,7 @@ function drawFire() {
 }
 function status() {
   $("count").textContent = `Moves ${game.cur.moves} · fewest ${game.best}` + (game.cur.fire > 0 ? ` · 🔥 ${game.cur.fire} left` : "");
-  $("undoBtn").disabled = !game.history.length || game.won;
-  $("restartBtn").disabled = !game.history.length || game.won;
+  undo.sync();
   $("hintBtn").disabled = game.won || game.broke;
 }
 
@@ -302,8 +301,7 @@ function move(d) {
   if (!r) { game.cur.face = d; face.style.transform = `rotate(${ANGLE[d]}deg)`; return -1; }
   document.querySelectorAll(".hintArrow").forEach(a => a.remove());   // a hint is for the table as it was
   if (game.timed && !game.started) game.started = true;
-  game.history.push(JSON.stringify(game.cur));
-  if (game.history.length > 400) game.history.shift();
+  undo.push();
   const fireAt = game.cur.fireAt;
   const was = game.cur.paper || [], wasTail = game.cur.tail || 0, unrolling = r.kind === "p" && (r.paper || []).length > was.length;
   // joined paper that didn't all wind back up has torn off
@@ -398,16 +396,13 @@ function afterMove() {
     else if (!game.cur.fire && /stuck|water left/.test($("msg").textContent)) G.note("");
   });
 }
-function undo() {
-  if (!game || busy || !game.history.length || game.won) return;
-  ask++; game.cur = JSON.parse(game.history.pop()); game.broke = false;
-  G.closeCard(); sync(true); save(); G.note("");
-}
+// Undo puts the table back as it was before the last step, moves count and all, so the move is given back.
+const undo = G.history({game: () => game, take: () => JSON.stringify(game.cur), cap: 400, can: () => !!game && !busy && !game.won, restart: true,
+  back: s => { ask++; game.cur = JSON.parse(s); game.broke = false; G.note(""); },
+  after: () => { G.closeCard(); sync(true); save(); }});
 function restart() {
-  if (!game || busy || game.won || !game.history.length) return;
-  ask++; game.history.push(JSON.stringify(game.cur)); game.restarted = true;
-  game.cur = {cat: game.cat, items: game.items, face: 0, moves: 0, fire: 0, paper: [], tail: 0}; game.broke = false;
-  G.closeCard(); sync(true); save(); G.note("Back to the start. Undo brings your moves back.", 4000);
+  if (undo.restart(g => { ask++; g.cur = {cat: g.cat, items: g.items, face: 0, moves: 0, fire: 0, paper: [], tail: 0}; g.broke = false; }))
+    G.note("Back to the start. Undo brings your moves back.", 4000);
 }
 const hints = G.hinter({game: () => game, key: () => game ? JSON.stringify(game.cur) : "", draw: () => paintArrow()});   // marks {d}: the way to step
 function paintArrow() {
@@ -455,7 +450,7 @@ function brokeCard() {
   const [title, text] = game.broke === "books" ? ["Fire!", "The candle got too close to the books. Undo to save them, or start the table again."]
     : game.broke === "fire" ? ["The fire spread!", `Knock off a glass of water or a vase within ${kioFireMoves()} moves of the candle falling. Undo, or start the table again.`]
     : ["Not that one!", "That was your dinner! Undo to catch it, or start the table again."];
-  G.openCard(title, text, [["Undo", undo, true], ["Restart", restart], G.homeBtn()]);
+  G.openCard(title, text, [["Undo", () => undo.undo(), true], ["Restart", restart], G.homeBtn()]);
 }
 
 /* ---------- new tables ---------- */
@@ -477,7 +472,6 @@ async function newTable() {
 /* ---------- input ---------- */
 const KEYS = {ArrowUp: 0, ArrowDown: 1, ArrowLeft: 2, ArrowRight: 3, w: 0, s: 1, a: 2, d: 3};
 document.addEventListener("keydown", e => {
-  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); return; }
   if (e.ctrlKey || e.metaKey || e.altKey || /SELECT|INPUT|TEXTAREA/.test(e.target.tagName)) return;
   const d = KEYS[e.key]; if (d !== undefined && game) { e.preventDefault(); tryStep(d); }
 });
@@ -514,7 +508,6 @@ $("board").addEventListener("pointerup", e => {
 for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(n === MAX_LEVEL ? `${n} (hardest)` : String(n), n));
 $("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
 $("newBtn").onclick = newTable;
-$("undoBtn").onclick = undo;
 $("restartBtn").onclick = restart;
 $("hintBtn").onclick = hint;
 $("helpBtn").onclick = showHelp;

@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.4"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.55"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.4">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.55">
 <style>
 /* Blocks of paint, each with a mark: red a bar down, yellow a bar across, blue a ring. Drag a row
    or column and its blocks slide to that end. Two different marks mix, and the mix carries both (orange is a
@@ -101,7 +101,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-07.4"></script>
+<script src="../games.js?v=2026-11-07.55"></script>
 <script>
 /* ---------- marks, colours and rules (plain functions) ---------- */
 // Colours by number: 0 red (a bar down), 1 orange (bar down and across), 2 yellow (a bar across), 3 green (across
@@ -301,10 +301,8 @@ function update() {
   const spec = levelSpec(game.level);
   $("count").innerHTML = spec.task ? `Level ${game.level} · ${taskText(game)}` : `Level ${game.level} · ${Math.min(game.lines, spec.goal)} of ${spec.goal} ${spec.stone ? "stone " : ""}line${spec.goal === 1 ? "" : "s"} <span class="goalbar"><i style="width:${Math.min(100, game.lines / spec.goal * 100)}%"></i></span>`;
   $("hintBtn").disabled = !playing();
-  $("undoBtn").disabled = !game.history.length || game.won;
-  $("restartBtn").disabled = !game.history.length || game.won;
-  G.relabel($("shuffleBtn"), `Mix it up (${game.mixes})`, "shuffle");
-  $("shuffleBtn").hidden = !game.mixes; $("shuffleBtn").disabled = !playing();
+  undo.sync();
+  G.uses("shuffleBtn", game.mixes); $("shuffleBtn").disabled = !playing();
   paintHint(); showCursor();
 }
 function say() {
@@ -319,7 +317,7 @@ function slideMove(ax, l, back) {
   const after = game.grid.slice(), r = slideLine(after, lineOf(ax, l, back));
   if (!r.moves.length) { G.note("Nothing in that line can move that way.", 1800); return; }
   game.started = true;
-  game.history.push(snap()); if (game.history.length > 50) game.history.shift();
+  undo.push();
   clearGhost(); hints.clear(false);
   for (const m of r.moves) { const el = blocks[m.from]; if (el) place(el, m.to); }
   busy = true;
@@ -392,19 +390,18 @@ const keys = G.gridKeys({
   },
   act: () => false,
 });
-document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
-function undo() { if (!game || busy || !game.history.length || game.won) return; game.lost = false; Object.assign(game, JSON.parse(game.history.pop())); G.closeCard(); draw(); save(); }
-$("undoBtn").onclick = undo;
+// Undo (G.history): each step is a snapshot of the board (JSON, the newest 50 kept in game.history). It can take back a
+// lost board (from the Stuck! card), and Restart can be undone too.
+const undo = G.history({game: () => game, take: snap, cap: 50, can: () => !!game && !busy && !game.won,
+  back: (h, g) => { g.lost = false; Object.assign(g, JSON.parse(h)); }, after: () => { G.closeCard(); draw(); save(); }, restart: true});
 $("restartBtn").onclick = () => {
-  if (!game || busy || !game.history.length || game.won) return;
-  game.restarted = true; game.history.push(snap());
-  Object.assign(game, JSON.parse(game.start), {lines: 0, got: [], moves: 0, mixes: MIXES, lost: false});
-  G.closeCard(); draw(); save(); G.note("Back to the start of the level. Undo brings it back.", 3500);
+  if (undo.restart(g => Object.assign(g, JSON.parse(g.start), {lines: 0, got: [], moves: 0, mixes: MIXES, lost: false})))
+    G.note("Back to the start of the level. Undo brings it back.", 3500);
 };
 // Mix it up: the cat bats the board and every block that isn't stone lands somewhere new. Two a level.
 $("shuffleBtn").onclick = () => {
   if (!playing() || !game.mixes) return;
-  game.history.push(snap()); game.mixes--; game.mixed = true;
+  undo.push(); game.mixes--; game.mixed = true;
   const r = seeded(game.seed * 31 + game.moves * 7 + game.mixes), free = game.grid.map((c, i) => c === 6 ? -1 : i).filter(i => i >= 0);
   const vals = free.map(i => game.grid[i]);
   for (let k = vals.length - 1; k > 0; k--) { const j = Math.floor(r() * (k + 1)); [vals[k], vals[j]] = [vals[j], vals[k]]; }
@@ -463,7 +460,7 @@ function goldPic() { const im = new Image(); im.className = "goldpic"; im.src = 
 function lose() {
   game.lost = true; G.breakStreak(); save();
   G.track(`Mew Hue stuck level ${game.level}`);
-  const btns = [["Undo", undo, true]];
+  const btns = [["Undo", undo.undo, true]];
   // (the button under the board only works mid-game, so clear the stuck card and state first)
   if (game.mixes) btns.push([`Mix it up (${game.mixes} left)`, () => { G.closeCard(); game.lost = false; $("shuffleBtn").onclick(); }]);
   btns.push(["Restart", () => $("restartBtn").onclick()], ["New board", () => { G.closeCard(); newGame(); }], G.homeBtn());

@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.4";
+  var BUILD = "2026-11-07.55";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -26,7 +26,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.4">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.55">
 <style>
 /* Catdoku's own looks; the rest is games.css. */
 html,body{height:100%}
@@ -37,8 +37,6 @@ main{padding-top:18px}
 .higgins{display:block;height:60px;width:auto;margin-bottom:-6px}
 /* A gold-paw win shows Higgins in place of the random cat photo */
 .card img.higginspic{display:block;width:70%;max-width:250px;height:auto;margin:0 auto 6px}
-.hearts{font-size:20px;letter-spacing:1px;color:var(--fuchsia-plum)}
-.hearts .lost{color:var(--line)}
 .msg:empty{display:none}
 @media (max-height:760px){
   main{padding-top:6px}
@@ -55,6 +53,8 @@ main{padding-top:18px}
 .cell.bt{border-top:3px solid var(--ink)} .cell.bl{border-left:3px solid var(--ink)}
 .cell.r0{border-top:none} .cell.c0{border-left:none}
 .cell .paw{font-size:.62em;opacity:.8}
+/* a solved board can be looked at without its paws (Hide paws, G.admire) */
+#board.bare .paw{visibility:hidden}
 .inlineface{display:inline-block;width:1.3em;height:1.3em;vertical-align:-.3em}   /* Higgins in a line of text */
 .cell .higginsface{display:block;width:1.3em;height:1.3em}   /* each cat on the board is Higgins */
 .cell.bad{animation:shake .35s}
@@ -91,7 +91,8 @@ main{padding-top:18px}
     <button id="backBtn" hidden>Return to Bookmark</button>
     <button id="auditBtn">Audit</button>
     <button id="eraseBtn" aria-pressed="false">Erase 🐾</button>
-    <button id="completeBtn" class="primary">Complete</button>
+    <button id="bareBtn" data-icon="peek" aria-pressed="false" hidden>Hide paws</button>
+    <button id="completeBtn" class="primary">Check</button>
     <button id="linkBtn">Share</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
@@ -106,14 +107,10 @@ main{padding-top:18px}
     </label>
     <button id="newBtn" class="primary">New puzzle</button>
   </div>
-  <div class="bar toggles">
-    <div class="opt"><label class="toggle"><input type="checkbox" id="gradeTgl"><span class="sw"></span>Audit as-you-go</label></div>
-    <div class="opt"><label class="toggle"><input type="checkbox" id="exclTgl"><span class="sw"></span>🐾 Auto&nbsp;Notes</label></div>
-  </div>
 
 </main>
 
-<script src="../games.js?v=2026-11-07.4"></script>
+<script src="../games.js?v=2026-11-07.55"></script>
 <script>G.nav("catdoku");</script>
 <script>
 const PALETTE = ["#BD5538","#73A7AE","#ECA818","#6AA673","#B94588","#B3B94B",
@@ -278,13 +275,15 @@ function assignColors(reg, N) {
 
 /* ---------- state ---------- */
 const $ = id => document.getElementById(id);
-// autoGrade is the Audit as-you-go switch and autoExclude the Auto Notes one (their old names, kept so saved settings
+// autoGrade is the Auto grade switch, and autoExclude the Auto Notes one (its old name, kept so saved settings
 // carry over). Auto Notes starts off, so a first board isn't covered in paws.
 let settings = {autoGrade: false, autoExclude: false, size: 8};
-let game = null, busy = false, msgTimer = null, erasing = false;
+let game = null, busy = false, msgTimer = null;
 // The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
 G.pawLost(() => !game || game.status !== "playing" || game.helped || game.restarted || game.hearts < HEARTS || game.livesUsed > HEARTS);
-G.pieces({plain: "Mark", mark: "eraseBtn"});   // the plain tap beside Erase, in a row of their own under the board
+// Solved: Hide paws (G.admire, turned on by the win card's Admire button too) takes the paws off, leaving the cats.
+const admire = G.admire({btn: "bareBtn", board: $("board"), won: () => game && game.status === "won", hide: "Hide paws", show: "Show paws"});
+const markTool = G.pieces({plain: "Mark", mark: "eraseBtn", change: () => { if (game) render(); }});   // the plain tap beside Erase, in a row of their own under the board
 
 function blankCells(N) { return Array.from({length: N * N}, () => ({cat: false, manual: false, src: []})); }
 function show(c) { return c.cat ? "cat" : (c.manual || c.src.length) ? "paw" : "empty"; }
@@ -313,24 +312,25 @@ function peers(i) {
 function keepCatMarks(except) { game.wrong = game.wrong.filter(k => k !== except && game.cells[k].cat); }
 function catsOnBoard() { return game.cells.map((c, k) => c.cat ? k : -1).filter(k => k >= 0); }
 function isSolution(k) { return game.sol[Math.floor(k / game.N)] === k % game.N; }
+// Lives (G.lives): three at a time, up to nine on one puzzle.
+const lives = G.lives({el: $("hearts"), of: () => game, per: HEARTS, max: MAX_LIVES, on: "puzzle",
+  revived: () => { game.status = "playing"; setNextSize(game.N); render(); save(); },
+  reviveMedia: words => catImg("https://cataas.com/cat/says/" + encodeURIComponent(words) + "?fontSize=48&fontColor=white&" + bust(), `A cat saying ${words}`, "https://cataas.com/cat?width=500&" + bust())});
 function loseLives(n) {
-  game.hearts = Math.max(0, game.hearts - n);
-  if (game.hearts <= 0) showLost();
-  return game.hearts;
+  const h = lives.lose(n);
+  if (h <= 0) showLost();
+  return h;
 }
-const livesLeft = h => `${h} ${h === 1 ? "life" : "lives"} left.`;
+const livesLeft = h => lives.say(h) + ".";
 
-function snapshot() {
-  game.history.push(JSON.stringify(game.cells));
-  if (game.history.length > 500) { game.history.shift(); for (const x of game.guesses || []) x.at--; }
-}
+function snapshot() { undo.push(JSON.stringify(game.cells)); }
 
 /* ---------- actions ---------- */
 function tap(i) {
   const cell = game.cells[i];
   keepCatMarks(i);
   const s = show(cell);
-  if (erasing) { if (s === "paw") { snapshot(); erasePaw(i); } render(); save(); return; }
+  if (markTool.on()) { if (s === "paw") { snapshot(); erasePaw(i); } render(); save(); return; }
   if (s === "empty") { snapshot(); cell.manual = true; }
   else if (s === "paw") placeCat(i);
   else { snapshot(); removeCat(i); }
@@ -340,10 +340,9 @@ function tap(i) {
 function placeCat(i) {
   const N = game.N, cell = game.cells[i];
   if (settings.autoGrade && game.sol[Math.floor(i / N)] !== i % N) {
-    game.hearts--;
     flashBad(i);
-    if (game.hearts <= 0) showLost();
-    else note(game.hearts === 1 ? "Not there. 1 life left." : `Not there. ${game.hearts} lives left.`);
+    const h = loseLives(1);
+    if (h > 0) note(`Not there. ${livesLeft(h)}`);
     return;
   }
   guesses.before(i);
@@ -363,7 +362,7 @@ function removeCat(i) {
 
 function erasePaw(i) { const c = game.cells[i]; c.manual = false; c.src = []; }
 function paintPaw(i, press) {
-  if (erasing) {
+  if (markTool.on()) {
     if (show(game.cells[i]) !== "paw") return;
     if (!press.snap) { snapshot(); press.snap = true; }
     erasePaw(i); return;
@@ -374,22 +373,20 @@ function paintPaw(i, press) {
   c.manual = true;
 }
 
-function undo() {
-  if (!game.history.length || game.status !== "playing") return;
-  game.cells = JSON.parse(game.history.pop());
-  game.wrong = [];
-  render(); save();
-}
+// Undo (G.history): the steps are JSON of the cells before each change, in game.history, the newest 500 kept
+// (bookmarks move with them). Restart empties the list.
+const undo = G.history({game: () => game, cap: 500, restart: true, over: () => game.status !== "playing",
+  back(step, g) { g.cells = JSON.parse(step); g.wrong = []; },
+  after: () => { render(); save(); }});
 
 // Restarting clears the board. It only refills lives after running out (which already keeps you at this
 // size), so it isn't a way round them, as in Twirl. It costs the gold paw (Undo doesn't).
 function restart() {
-  if (game.history.length || game.status === "lost") game.restarted = true;
-  if (game.status === "lost") { breakStreak(); game.hearts = HEARTS; game.livesUsed = HEARTS; }
-  setNextSize(game.N);
-  game.cells = blankCells(game.N); game.history = []; game.wrong = []; guesses.clear();
-  game.status = "playing";
-  closeCard(); render(); save(); note("");
+  const lost = game.status === "lost";
+  if (lost) { breakStreak(); lives.refill(); game.status = "playing"; game.restarted = true; }
+  const reset = g => { setNextSize(g.N); g.cells = blankCells(g.N); g.wrong = []; guesses.clear(); };
+  if (!undo.restart(reset) && lost) { game.history = []; reset(game); render(); save(); }
+  closeCard(); note("");
 }
 
 function audit() {
@@ -410,7 +407,7 @@ function audit() {
 // so; asked again, the square itself. Failing that, the row, column or region with the fewest spots left, then a
 // square in it from the answer. You place the cat. Like Audit, a hint keeps you on this size and costs the gold paw.
 const hints = G.hinter({game: () => game, key: () => game ? game.cells.map(show).join("") : "", draw: () => render()});
-const guesses = G.guesser({game: () => game, undo, draw: () => { render(); save(); }, board: $("board"), what: "cat", over: () => game.status !== "playing"});
+const guesses = G.guesser({game: () => game, history: undo, draw: () => { render(); save(); }, board: $("board"), what: "cat", over: () => game.status !== "playing"});
 function hint() {
   if (!game || game.status !== "playing" || busy) return;
   const N = game.N, isSol = k => game.sol[Math.floor(k / N)] === k % N;
@@ -429,7 +426,7 @@ function hint() {
   for (let c = 0; c < N; c++) units.push(["column", [...Array(N).keys()].map(r => r * N + c)]);
   for (let g = 0; g < N; g++) units.push(["color", game.reg.map((v, k) => v === g ? k : -1).filter(k => k >= 0)]);
   const todo = units.filter(([, u]) => !u.some(k => game.cells[k].cat)).map(([name, u]) => [name, u, u.filter(open)]);
-  if (!todo.length) { note("Every cat's in place: press Complete.", 4000); return; }
+  if (!todo.length) { note("Every cat's in place: press Check.", 4000); return; }
   todo.sort((a, b) => a[2].length - b[2].length);
   const [name, u, spots] = todo[0], at = spots.find(isSol) ?? u.find(isSol), level = hints.level();
   const where = name === "color" ? "this color" : `this ${name}`;
@@ -456,27 +453,8 @@ function showLost() {
   note("");
   setNextSize(game.N);
   save();
-  const btns = [["Restart", restart, true], [`New puzzle (${settings.size} × ${settings.size})`, newPuzzle]];
-  let text = "Pick how you want to keep going.";
-  if (game.livesUsed < MAX_LIVES) btns.push(["Wait, I'm only mostly dead! Mostly dead is slightly alive, folks!", revive]);
-  else text = `All ${MAX_LIVES} lives on this puzzle are used up.`;
-  btns.push(G.homeBtn());
-  openCard("Out of lives", text, btns,
-    catImg("https://cataas.com/cat/gif?" + bust(), "A cat GIF", "https://cataas.com/cat?width=500&" + bust()));
-  $("card").append(otherSize());
-}
-
-function revive() {
-  if (game.livesUsed >= MAX_LIVES) return;
-  const added = Math.min(HEARTS, MAX_LIVES - game.livesUsed);
-  game.livesUsed += added; game.hearts = added; game.status = "playing";
-  setNextSize(game.N);
-  render(); save();
-  const left = Math.ceil((MAX_LIVES - game.livesUsed) / HEARTS);
-  const words = left ? `${left} ${left === 1 ? "revive" : "revives"} left` : "Last lives";
-  const says = "https://cataas.com/cat/says/" + encodeURIComponent(words) + "?fontSize=48&fontColor=white&" + bust();
-  openCard("Slightly alive!", `Back with ${added} more ${added === 1 ? "life" : "lives"}. ${left ? words + " on this puzzle." : "No revives left on this puzzle."}`,
-    [["Keep playing", closeCard, true]], catImg(says, `A cat saying ${words}`, "https://cataas.com/cat?width=500&" + bust()));
+  lives.outCard({btns: [["Restart", restart, true], [`New puzzle (${settings.size} × ${settings.size})`, newPuzzle]],
+    media: catImg("https://cataas.com/cat/gif?" + bust(), "A cat GIF", "https://cataas.com/cat?width=500&" + bust()), after: otherSize()});
 }
 
 function complete() {
@@ -489,7 +467,7 @@ function complete() {
   render(); save();
 }
 
-// Turning Audit as-you-go on mid-game grades the board as it stands: each wrong cat is marked and costs a life.
+// Turning Auto grade on mid-game grades the board as it stands: each wrong cat is marked and costs a life.
 function gradeNow() {
   if (!game || game.status !== "playing") return;
   const cats = catsOnBoard(), wrong = cats.filter(k => !isSolution(k));
@@ -561,7 +539,7 @@ function track(name) {
 }
 function note(t, ms) {
   clearTimeout(msgTimer);
-  $("msg").textContent = t || (settings.autoGrade ? "" : "Press Complete to check your board.");
+  $("msg").textContent = t || (settings.autoGrade ? "" : "Press Check once every cat's in place.");
   if (t && ms !== 0) msgTimer = setTimeout(() => note(""), ms || 3500);
 }
 /* ---------- cat APIs (no key; everything falls back quietly) ---------- */
@@ -650,18 +628,14 @@ function render() {
     el.classList.toggle("hint", !!(mark && mark.cells.includes(i))); el.classList.toggle("bad", !!(mark && mark.bad && mark.cells.includes(i)));
     el.setAttribute("aria-label", `Row ${Math.floor(i / N) + 1}, column ${i % N + 1}: ${s === "empty" ? "blank" : s}`);
   });
-  $("hearts").innerHTML = Array.from({length: Math.max(HEARTS, game.livesUsed)},
-    (_, k) => k < game.hearts ? "♥" : '<span class="lost">♥</span>').join("");
-  $("hearts").setAttribute("aria-label", `${game.hearts} ${game.hearts === 1 ? "life" : "lives"} left`);
+  lives.show();
   $("found").replaceChildren(higginsPic("Cats placed:"), ` ${game.cells.filter(c => c.cat).length} / ${game.N}`);
   $("completeBtn").style.display = settings.autoGrade ? "none" : "";
   $("auditBtn").style.display = settings.autoGrade ? "none" : "";
   $("auditBtn").disabled = $("hintBtn").disabled = game.status !== "playing";
-  $("eraseBtn").setAttribute("aria-pressed", erasing);
-  $("undoBtn").disabled = !game.history.length || game.status !== "playing";
+  undo.sync(); admire.sync();
+  if (game.status === "lost") $("restartBtn").disabled = false;   // out of lives, Restart is the way on
   guesses.sync();
-  $("gradeTgl").checked = settings.autoGrade;
-  $("exclTgl").checked = settings.autoExclude;
 }
 
 /* ---------- input ---------- */
@@ -706,30 +680,24 @@ const keys = G.gridKeys({on: () => game && game.status === "playing" && !busy, s
 
 $("newBtn").onclick = newPuzzle;
 $("size").onchange = e => { settings.size = +e.target.value; save(); newPuzzle(); };
-$("undoBtn").onclick = undo;
 $("restartBtn").onclick = () => { if (!busy) restart(); };
 $("completeBtn").onclick = complete;
 $("auditBtn").onclick = audit;
 $("hintBtn").onclick = hint;
-$("eraseBtn").onclick = () => { erasing = !erasing; if (game) render(); };
-$("gradeTgl").onchange = e => {
-  settings.autoGrade = e.target.checked;
-  if (game) { game.wrong = []; note(""); if (settings.autoGrade) gradeNow(); render(); }
-  save();
-};
+G.switch({id: "gradeTgl", label: "Auto grade", line: "A wrong 🐱 turns red and costs a life", key: "autoGrade", of: () => settings, save,
+  tip: "Auto grade: a wrong 🐱 costs a life",
+  change: () => { if (game) { game.wrong = []; note(""); if (settings.autoGrade) gradeNow(); render(); save(); } }});
 // Auto Notes: while it's on, every cat put down gets paws round it, and they go with it. Turned on, the cats already
 // down get theirs too; turned off, the paws it put down go (your own stay). Either way Undo puts it back.
-$("exclTgl").onchange = e => {
-  settings.autoExclude = e.target.checked; save();
+G.switch({id: "exclTgl", label: "🐾 Auto\u00a0Notes", line: "🐾 go round each 🐱 for you", key: "autoExclude", of: () => settings, save,
+  tip: "Auto Notes: 🐾 go round each 🐱 for you", change: autoNotes});
+function autoNotes() {
   if (!game || game.status !== "playing") return;
   const had = JSON.stringify(game.cells);
   for (const c of game.cells) c.src = [];
   if (settings.autoExclude) game.cells.forEach((c, k) => { if (c.cat) for (const j of peers(k)) game.cells[j].src.push(k); });
-  if (JSON.stringify(game.cells) !== had) { game.history.push(had); render(); save(); }
-};
-document.addEventListener("keydown", e => {
-  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); }
-});
+  if (JSON.stringify(game.cells) !== had) { undo.push(had); render(); save(); }
+}
 
 /* ---------- how to play ---------- */
 // First visit only: once the first puzzle is on the board, walk through the rules on it. Nothing is
@@ -739,7 +707,7 @@ let tryWas = null;   // the game as it was before the walkthrough's Your turn st
 // put the board back as it was before them (and Erase off), with nothing given away or lost
 function putBack() {
   if (tryWas && JSON.stringify(game) !== tryWas) { game = JSON.parse(tryWas); note(""); save(); }
-  tryWas = null; erasing = false; if (game) render();
+  tryWas = null; markTool.set(false); if (game) render();
 }
 function spotlightSteps() {
   const N = game.N, r = Math.floor(N / 2), c = Math.floor(N / 2), g = game.reg[r * N + c];
@@ -760,13 +728,11 @@ function spotlightSteps() {
     {say: "Tap twice for a 🐱", lit: [[c, r]], try: {done: () => !!(game.cells[r * N + c] || {}).cat,
       yes: settings.autoExclude ? "🐾 means no cat here" : "Once is a 🐾: no cat here"}, ...upTo},
     {say: "Drag for lots of 🐾", lit: drag, try: {done: () => drag.every(([x, y]) => show(game.cells[y * N + x]) === "paw"), yes: "Nice!"}, ...from},
-    {say: "Tap Erase", els: [$("eraseBtn")], try: {done: () => erasing}, ...from},
+    {say: "Tap Erase", els: [$("eraseBtn")], try: {done: () => markTool.on()}, ...from},
     {say: "Drag the 🐾 away", lit: drag, try: {done: () => drag.every(([x, y]) => show(game.cells[y * N + x]) !== "paw"), yes: "Erased!"}, ...upTo},
     // kept back as tips on a first visit (G.spotlight)
     {say: "Not sure? Bookmark, then try a 🐱. Return to Bookmark undoes it", els: [$("guessBtn")]},
     {say: "Stuck? Hint shows where to look", els: [$("hintBtn")]},
-    {say: "Auto Notes: 🐾 go round each 🐱 for you", els: [$("exclTgl").closest(".opt")]},
-    {say: "Audit as-you-go: a wrong 🐱 costs a life", els: [$("gradeTgl").closest(".opt")]},
   ];
 }
 function helpOnFirstVisit() {
@@ -781,7 +747,7 @@ function showHelp() {
 $("helpBtn").onclick = () => { if (!busy) showHelp(); };
 
 /* ---------- start ---------- */
-load();
+load(); $("gradeTgl").sync(); $("exclTgl").sync();   // the switches show what was kept
 G.checkClock(game);
 G.setupTimer({name: "catdoku", game: () => game, playing: g => g.status === "playing", save});
 $("bestBtn").onclick = () => G.showBests("Best times", game ? game.N : settings.size);

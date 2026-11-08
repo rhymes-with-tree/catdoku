@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.4"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.55"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.4">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.55">
 <style>
 /* A dark room full of cats. Awake cats' eyes glow; tap a cat and it and the cats beside it blink, so open
    eyes shut and shut eyes open. When every cat's asleep, the room goes dark. */
@@ -78,7 +78,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-07.4"></script>
+<script src="../games.js?v=2026-11-07.55"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // Every cat has arrows, and a tap blinks the cat and the cats its arrows point at. Levels 1 to 9 are plain
@@ -232,13 +232,13 @@ function draw() {
   const n = awakeCount();
   $("count").textContent = game.won ? "Lights out!" : `${n} cat${n === 1 ? "" : "s"} awake`;
   $("taps").textContent = `${game.taps} tap${game.taps === 1 ? "" : "s"} · fewest ${game.par}`;
-  $("undoBtn").disabled = !game.history.length || game.won; $("restartBtn").disabled = !game.history.length || game.won;
+  undo.sync();
   $("hintBtn").disabled = game.won;
 }
 function flip(i) { for (const j of around(i)) game.awake[j] ^= 1; }
 function tap(i) {
   if (!playing()) return;
-  game.history.push(i); game.taps++;
+  undo.push(i); game.taps++;
   for (const c of $("board").querySelectorAll(".hintme")) c.classList.remove("hintme");
   flip(i); draw(); save();
   if (!awakeCount()) win();
@@ -247,14 +247,11 @@ $("board").addEventListener("click", e => { const c = e.target.closest(".cat"); 
 // Keys: the arrows move a cursor, and Space or Enter taps the cat under it.
 const keys = G.gridKeys({on: () => playing(), size: () => [game.W, game.H],
   show: i => [...$("board").children].forEach((c, k) => c.classList.toggle("kbcursor", k === i)), act: i => tap(i)});
-// Undo flips the last tap back (a tap undoes itself). Taps still count, so Undo is free but doesn't win back the
-// taps; Restart costs the gold paw.
-$("undoBtn").onclick = () => { if (playing() && game.history.length) { flip(game.history.pop()); draw(); save(); } };
-document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && !$("undoBtn").disabled) { e.preventDefault(); $("undoBtn").click(); } });
+// Undo flips the last tap back (a tap undoes itself; G.history, steps in game.history as the cats tapped). Taps still
+// count, so Undo is free but doesn't win back the taps; Restart costs the gold paw.
+const undo = G.history({game: () => game, back: i => flip(i), can: playing, after: () => { draw(); save(); }, restart: true});
 $("restartBtn").onclick = () => {
-  if (!playing() || !game.history.length) return;
-  game.awake = game.start.slice(); game.history = []; game.restarted = true; draw(); save();
-  G.note("Back to the start. Your taps still count.", 3500);
+  if (undo.restart(g => { g.awake = g.start.slice(); })) G.note("Back to the start. Your taps still count.", 3500);
 };
 // Hint: glow a cat that's part of the shortest way from here (the player taps it). A hint keeps you on the same level.
 function hint() {

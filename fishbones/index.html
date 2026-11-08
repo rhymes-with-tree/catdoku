@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.4"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.55"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.4">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.55">
 <style>
 /* A fish skeleton: a spine word across and rib words down through it, with the letters on the bones muddled.
    Swap bones until every line spells a word. Green: in the right place. Gold: in that word, somewhere else.
@@ -111,7 +111,7 @@ body.full .actions > :not(#hintBtn,#undoBtn),body.full .bar,body.full .wordlist{
 
 </main>
 
-<script src="../games.js?v=2026-11-07.4"></script>
+<script src="../games.js?v=2026-11-07.55"></script>
 <script>
 /* ---------- fish (plain functions, also run in a background worker) ---------- */
 // A fish is a spine word read across, with rib words read down through it. `ribs` gives each spine bone's rib
@@ -414,8 +414,7 @@ function update() {
     : n === 0 ? "No swaps left" : `${-n} swap${n === -1 ? "" : "s"} over`;
   $("count").classList.toggle("over", n < 0 && !game.won);
   $("hintBtn").disabled = game.won;
-  $("undoBtn").disabled = !(game.history.length || (game.back || []).length) || game.won;
-  $("restartBtn").disabled = !game.history.length || game.won;
+  undo.sync();
   paintHint(); wordList();
 }
 // The fish's words: the spine, the words down and the words across. One whose bones are all green (or every word,
@@ -443,7 +442,7 @@ const fixed = i => game.cur[i] === game.sol[i];
 function swap(i, j, record = true) {
   const c = game.cur.split(""); [c[i], c[j]] = [c[j], c[i]]; game.cur = c.join("");
   [at[i], at[j]] = [at[j], at[i]];
-  if (record) game.history.push([i, j]);
+  if (record) undo.push([i, j]);
   sel = -1; place(); hints.clear(false);
   if (record && solved()) { update(); win(); return; }
   update();
@@ -501,27 +500,19 @@ const keys = G.gridKeys({
   act: i => pick(i),
   escape: () => { if (sel >= 0) { sel = -1; update(); } },
 });
-document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
 
 // Undo takes back a swap (and gives it back to spend again), or a Restart. `back` keeps what each Restart
 // put away.
-function undo() {
-  if (!playing()) return;
-  if (game.history.length) { const [i, j] = game.history.pop(); swap(i, j, false); save(); return; }
-  const b = (game.back || []).pop(); if (!b) return;
-  game.history = b.history; game.cur = b.cur;
-  draw(); save();
-}
-$("undoBtn").onclick = undo;
-$("restartBtn").onclick = () => restart();
-function restart() {
-  if (!game || busy || running || game.won || !game.history.length) return;
-  G.closeCard();
-  game.back = (game.back || []).concat([{history: game.history, cur: game.cur}]).slice(-5);
-  game.restarted = true; game.cur = game.start; game.history = [];
-  sel = -1; draw(); save();
-  G.note("Back to how the fish was dealt. Undo brings your swaps back.", 3500);
-}
+const undo = G.history({game: () => game, can: playing, restart: true,
+  back: ([i, j]) => swap(i, j, false),
+  shelf: {has: g => !!(g.back || []).length, undo: g => { const b = g.back.pop(); g.history = b.history; g.cur = b.cur; draw(); }},
+  after: save});
+// Restart empties the list (the swaps used are its length) and puts it away in `back`, so Undo can bring it back.
+$("restartBtn").onclick = () => {
+  const was = {history: game ? game.history.slice() : [], cur: game && game.cur};
+  if (undo.restart(g => { g.back = (g.back || []).concat([was]).slice(-5); g.cur = g.start; sel = -1; draw(); }))
+    G.note("Back to how the fish was dealt. Undo brings your swaps back.", 3500);
+};
 
 /* ---------- hints ---------- */
 // The first hint rings a bone that's wrong and says which letter that square wants; asked again, it also rings

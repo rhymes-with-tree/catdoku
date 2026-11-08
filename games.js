@@ -664,7 +664,7 @@ const G = (() => {
     if (o.gold && o.goldPic) pic.append(...o.goldPic); else if (o.pic) pic.append(...o.pic); else pic.append(catPhoto(), name);
     media.append(pic);
     const btns = [[o.next || "New puzzle", onNext, true]];
-    if (admire !== null) btns.push([admire, () => { closeCard(); if (o.onAdmire) o.onAdmire(); else note(admireNote(), 0); }]);
+    if (admire !== null) btns.push([admire, () => { closeCard(); if (o.onAdmire) o.onAdmire(); else note(admireNote(), 0); if (admiring) admiring.set(true); }]);
     btns.push(["Share my result", e => shareResult(result, o.gold, e.currentTarget)],
       homeBtn());
     openCard(o.gold ? o.goldTitle || "Gold paw!" : o.title || "Solved!", "", btns, media, o.after);
@@ -1045,7 +1045,7 @@ const G = (() => {
     tangle: ["Arrow keys: pick a ball", "Space or Enter: pick it up; the arrows move it (Shift for big steps)", "Space, Enter or Escape: put it down"],
     catwalk: ["Arrow keys: pick a perch", "Space or Enter: tap it"],
     bubbles: ["Left and right: aim", "Space: bat", "Down: swap in the next bubble"],
-    opendoor: ["Arrow keys: pick a square", "1 to 9: put in a number", "Backspace or 0: take it out", "N: notes on or off", "Escape: let go of the square"],
+    opendoor: ["Arrow keys: pick a square", "1 to 9: put in a number (Shift: a note)", "Backspace or 0: take it out", "N: notes on or off", "Escape: let go of the square"],
     tunnelrun: ["Arrow keys: pick a piece", "Space or Enter: turn it (Shift turns it back)", "Shift with an arrow: slide its track"],
     copycat: ["Arrow keys: pick a box", "Space or Enter: open it"],
     nightlight: ["Arrow keys: pick a cat", "Space or Enter: tap it"],
@@ -1053,7 +1053,7 @@ const G = (() => {
     tailchase: ["Arrow keys or WASD: steer", "Space: pause"],
     keyboardcat: ["Letters: type a word", "Enter: try it", "Backspace: take a letter off", "Space: mix the keys"],
     iffits: ["Tab: pick a piece", "Arrow keys: move it", "R or Space: turn it (Shift turns it back)", "F: flip it"],
-    highperch: ["Arrow keys: pick a square", "1 to 9: put in a height", "Backspace or 0: take it out", "N: notes on or off", "Escape: let go of the square"],
+    highperch: ["Arrow keys: pick a square", "1 to 9: put in a height (Shift: a note)", "Backspace or 0: take it out", "N: notes on or off", "Escape: let go of the square"],
     fuzzyspelling: ["Left and right: pick a toy", "Up and down: slide it"],
     catastrophe: ["1 to 9: knock over that pot"],
     laserpointer: ["Arrow keys: pick a mirror", "Space or Enter: tip it"],
@@ -1064,8 +1064,8 @@ const G = (() => {
     scratchthat: ["Arrow keys: move round the room", "Space or Enter: tap", "P: a post", "X or .: a dot", "Backspace: clear"],
     magnets: ["Arrow keys: pick a square", "Letters: put one up", "Backspace: take a letter down", "Space: turn to the other word"],
     purrfect: ["Arrow keys: pick a square", "Digits: type a number (two quickly for 10 and up)", "Backspace: take it out"],
-    atlas: ["Arrow keys: move round the map", "+ and −: zoom", "Type your answer and press Enter"],
-    catburglar: ["Arrow keys: move the crosshair", "Space or Enter: tap there", "+ and −: zoom"],
+    atlas: ["Arrow keys: move round the map", "Type your answer and press Enter"],
+    catburglar: ["Arrow keys: move the crosshair", "Space or Enter: tap there"],
     catpile: ["1 to 3: pick a clump", "Arrow keys: move it", "R: turn it", "Space: put it down"],
     fishbones: ["Arrow keys: go from bone to bone", "Space or Enter: pick one up, then put it down on another", "Escape: let go"],
     stash: ["1 to 8: put in a toy (Shift: mark it nope)", "Left and right: pick a box", "Backspace: take a toy out", "Enter: check"],
@@ -1088,6 +1088,7 @@ const G = (() => {
   function keysCard() {
     const list = [...(KEYS[CURRENT] || [])];
     if ($("undoBtn")) list.push("⌘Z or Ctrl+Z: undo");
+    if (document.querySelector(".zoombox")) list.push("+ and −: zoom");
     if (document.querySelector(".fsBtn")) list.push("F: full screen");
     list.push("?: these keys");
     const ul = document.createElement("ul"); ul.className = "keysList";
@@ -1356,15 +1357,50 @@ const G = (() => {
     next(); layer.focus({preventScroll: true});
   }
 
-  /* ---------- slower ---------- */
+  /* ---------- switches ---------- */
+  // A setting that's on or off (Auto check, Numbers, Slower…), written once. G.switch({id, label, line, key, of, save,
+  // change, can, tip}) draws it in the menu's Settings (or, before the menu is made, in a row of switches in the page,
+  // which the menu then takes), its name with its line under it. key names the setting in of (the page's settings, or
+  // a function giving them), kept with save(); change(on) runs after. can() false leaves it as it was (Toe Beans,
+  // mid-move). tip is shown once, pointing at the switch, the first time it's turned on. Gives back the box, whose
+  // .sync() shows the setting again when the page changed it itself.
+  const SWITCH_TIPS = {};
+  function makeSwitch(o) {
+    const of = () => typeof o.of === "function" ? o.of() : o.of;
+    const opt = document.createElement("div"); opt.className = "opt";
+    opt.innerHTML = '<label class="toggle"><input type="checkbox"><span class="sw"></span><span class="swName"></span></label>';
+    const box = opt.querySelector("input"); box.id = o.id;
+    opt.querySelector(".swName").textContent = o.label;
+    if (o.line) {
+      const s = document.createElement("span"); s.className = "hint"; s.id = o.id + "Line"; s.textContent = o.line;
+      opt.append(s); box.setAttribute("aria-describedby", s.id);
+    }
+    box.sync = () => { box.checked = !!of()[o.key]; };
+    box.sync();
+    box.addEventListener("change", () => {
+      if (o.can && !o.can()) { box.sync(); return; }
+      of()[o.key] = box.checked; if (o.save) o.save();
+      if (o.change) o.change(box.checked);
+    });
+    if (o.tip) SWITCH_TIPS[o.id] = o.tip;
+    let list = $("menuSettings");
+    if (!list) {
+      list = document.querySelector("main .bar.toggles.switches");
+      if (!list) { list = document.createElement("div"); list.className = "bar toggles switches"; (document.querySelector("main") || document.body).append(list); }
+    }
+    list.append(opt);
+    return box;
+  }
+
   // Slower (Apple asks games to offer difficulty accommodations, such as more time to react): a switch, #slowTgl, in an
   // action game's settings, kept on this device for each game; while it's on the game runs at two-thirds speed.
   // Returns a function giving the factor to stretch the game's times by (1, or 1.5 with Slower on).
   const SLOWER = "catdoku.slower.v1";
   function slower(slug) {
-    const box = $("slowTgl");
-    if (box) { box.checked = !!load(SLOWER)[slug]; box.addEventListener("change", () => { const d = load(SLOWER); d[slug] = box.checked; save(SLOWER, d); }); }
-    return () => (box ? box.checked : !!load(SLOWER)[slug]) ? 1.5 : 1;
+    const d = {[slug]: !!load(SLOWER)[slug]};
+    makeSwitch({id: "slowTgl", label: "Slower", line: "Everything moves at two-thirds speed", key: slug, of: d,
+      save: () => { const all = load(SLOWER); all[slug] = d[slug]; save(SLOWER, all); }});
+    return () => d[slug] ? 1.5 : 1;
   }
 
   /* ---------- boards in words ---------- */
@@ -1426,9 +1462,11 @@ const G = (() => {
     // the first time a switch is turned on, its tip, pointing at the switch
     document.addEventListener("change", e => {
       const box = e.target; if (!box.matches || !box.matches("input[type=checkbox]") || !box.checked || !box.id) return;
-      const key = SLUG + ":on", d = load(TIPS), t = (d[key] || []).find(x => x.els.some(f => f && (f.id === box.id || !!document.getElementById(f.id)?.contains(box))));
+      const key = SLUG + ":on", d = load(TIPS), shown = d[SLUG + ":shown"] || [];
+      let t = SWITCH_TIPS[box.id] && !shown.includes(SWITCH_TIPS[box.id]) ? {say: SWITCH_TIPS[box.id], els: [{id: box.id, up: ".opt"}]} : null;
+      if (!t) t = (d[key] || []).find(x => x.els.some(f => f && (f.id === box.id || !!document.getElementById(f.id)?.contains(box))));   // kept by an older walkthrough
       if (!t) return;
-      d[key] = d[key].filter(x => x !== t); if (!d[key].length) delete d[key];
+      if (d[key]) { d[key] = d[key].filter(x => x.say !== t.say); if (!d[key].length) delete d[key]; }
       d[SLUG + ":shown"] = [...(d[SLUG + ":shown"] || []), t.say]; save(TIPS, d);
       setTimeout(() => { if (free() && $("board")) spotlight({grid: $("board"), w: 1, h: 1, steps: [{say: t.say, els: t.els.map(f => f && findEl(f)).filter(Boolean)}], finish: false}); }, 250);
     });
@@ -1729,11 +1767,12 @@ const G = (() => {
   // are free everywhere.
   const PAW_COST = {
     hintFree: "hideseek",
+    hints: {junkdrawer: "leftBtn"},   // hints by another name: in the red group beside Hint
     helpers: {toybox: "shakeBtn shuffleBtn rainbowBtn basketBtn", bubbles: "sightBtn nipBtn shakeBtn", pickpile: "shuffleBtn", mewhue: "shuffleBtn",
-      junkdrawer: "leftBtn", windup: "shakeBtn fluffBtn netBtn", lmnopom: "swatBtn", birdwatch: "wipeBtn"},
+      windup: "shakeBtn fluffBtn netBtn", lmnopom: "swatBtn", birdwatch: "wipeBtn"},
   };
   const has = (list, slug) => (list || "").split(" ").includes(slug);
-  const costsPaw = (id, slug = SLUG) => id === "hintBtn" ? !has(PAW_COST.hintFree, slug) : id === "auditBtn" || id === "restartBtn" ||
+  const costsPaw = (id, slug = SLUG) => id === "hintBtn" ? !has(PAW_COST.hintFree, slug) : id === "auditBtn" || id === "restartBtn" || has(PAW_COST.hints[slug], id) ||
     has(PAW_COST.helpers[slug], id);
   // The play tools in one order everywhere: the free ones (Undo, Pencil, Bookmark…), then the game's own, then those
   // that cost the gold paw (Hint, Audit, helpers), grouped. Restart goes down beside New, and Give up after New.
@@ -1745,7 +1784,7 @@ const G = (() => {
     for (const row of document.querySelectorAll("main .actions:not(.helpers)")) {
       if (row.closest(".card,.overlay")) continue;
       const bs = [...row.children].filter(b => b.tagName === "BUTTON");
-      const rank = b => b.classList.contains("costsPaw") ? 200 + (b.id === "hintBtn" ? 0 : b.id === "auditBtn" ? 1 : 2) :
+      const rank = b => b.classList.contains("costsPaw") ? 200 + (b.id === "hintBtn" ? 0 : has(PAW_COST.hints[SLUG], b.id) ? .5 : b.id === "auditBtn" ? 1 : 2) :
         FREE_ORDER.includes(b.id) ? FREE_ORDER.indexOf(b.id) : 100;
       bs.map((b, i) => [b, rank(b), i]).sort((x, y) => x[1] - y[1] || x[2] - y[2]).forEach(([b]) => row.append(b));
     }
@@ -1796,16 +1835,86 @@ const G = (() => {
   if (!RETURNING) save(NEWS, {seen: Date.now(), firstVisit: true});
   setTimeout(whatsNew, 1500);
   // Pieces for a game you tap to fill, with no pad or tray of its own: the plain tap (o.plain, its word) and the game's
-  // marking tool (o.mark, its button's id) side by side in a row of their own under the board, one lit at a time. The
-  // marking button keeps its own handler and aria-pressed; the plain piece only presses it off.
+  // marking tool (o.mark, its button's id) side by side in a row of their own under the board, one lit at a time.
+  // The marking tool's on/off is kept here too, written once for Catdoku's Erase, Hide & Seek's Mark, Fair Play's
+  // Mark, Cross Stitch's Dot, Treat Time's Keep and Scratch That's Dot first. o: {plain, mark, can (() => true while
+  // it may be switched; always if not given), say (the line shown when it's turned on), change(on) (after a tap on
+  // either piece: draw), of and key (where to keep it, with save: Scratch That keeps Dot first in its settings; off
+  // on every page load if not given), save}. Returns {on(), set(on) (quietly: a new puzzle or a win turns it off),
+  // toggle()}.
   function pieces(o) {
-    const m = $(o.mark), first = document.querySelector("main .actions"); if (!m || !first) return;
-    const row = document.createElement("div"); row.className = "actions pieces"; row.setAttribute("role", "group"); row.setAttribute("aria-label", "What a tap does");
-    const p = document.createElement("button"); p.id = "plainBtn"; p.className = "tool"; p.innerHTML = iconSVG("tap") + `<span class="lbl">${o.plain}</span>`;
-    p.onclick = () => { if (m.getAttribute("aria-pressed") === "true") m.click(); };
-    row.append(p, m); first.before(row);
-    const sync = () => p.setAttribute("aria-pressed", String(m.getAttribute("aria-pressed") !== "true"));
-    new MutationObserver(sync).observe(m, {attributes: true, attributeFilter: ["aria-pressed"]}); sync();
+    const m = $(o.mark), first = document.querySelector("main .actions");
+    let on = !!(o.of && o.of()[o.key]);
+    const set = v => { on = !!v; if (m) m.setAttribute("aria-pressed", String(on)); if (o.of) o.of()[o.key] = on; };
+    function toggle() {
+      if (o.can && !o.can()) return;
+      set(!on); if (o.save) o.save();
+      if (o.say) note(on ? o.say : "", on ? 3500 : 0);
+      if (o.change) o.change(on);
+    }
+    set(on);
+    if (m) m.onclick = toggle;
+    if (m && first) {
+      const row = document.createElement("div"); row.className = "actions pieces"; row.setAttribute("role", "group"); row.setAttribute("aria-label", "What a tap does");
+      const p = document.createElement("button"); p.id = "plainBtn"; p.className = "tool"; p.innerHTML = iconSVG("tap") + `<span class="lbl">${o.plain}</span>`;
+      p.onclick = () => { if (on) toggle(); };
+      row.append(p, m); first.before(row);
+      const sync = () => p.setAttribute("aria-pressed", String(m.getAttribute("aria-pressed") !== "true"));
+      new MutationObserver(sync).observe(m, {attributes: true, attributeFilter: ["aria-pressed"]}); sync();
+    }
+    return {on: () => on, set, toggle};
+  }
+
+  /* ---------- undo ---------- */
+  // Undo, written once (G.history). The steps stay where each page has always kept them, in its saved game
+  // (game.history unless o.list says otherwise) and in the page's own form, a snapshot to go back to or a move to take
+  // back, so saved games still load and undo. Undo is free; Restart costs the gold paw (game.restarted); Return to
+  // Bookmark (G.guesser, given history) is Undo over and over. In the games that count moves, back() gives the move
+  // back or not, as the game has it (Night Light's taps still count).
+  // o: {game: () => game, back(step, game) (put one step back; it's already off the list), take() (the step push() puts
+  //   on when given none, usually a snapshot; with it, Restart can be undone too), list(game) (the steps, if not
+  //   game.history), cap (most steps kept; the oldest go), over (() => true once the puzzle's done: Undo greys out;
+  //   game.won if not given), can (() => true while Undo may act; !over() if not given), after (draw and save, after
+  //   Undo or Restart), restart (true: Restart greys out with Undo, or with started), started (() => true once
+  //   there's something for Restart to clear, where that isn't the same as having steps: Sunbeams' shared floors),
+  //   shelf ({has(game), undo(game)}: what Undo takes back once the list is empty, kept outside it: Fish Bones' Restarts,
+  //   put away so the swaps they cleared don't count)}.
+  // Returns {push(step), undo(), restart(reset, step), size(), list(game), sync()}. ⌘Z or Ctrl+Z is Undo, but not in a text box.
+  function undoList(o) {
+    const gm = () => o.game(), list = g => o.list ? o.list(g) : (g.history || (g.history = []));
+    const over = () => { const g = gm(); return !g || (o.over ? o.over() : !!g.won); };
+    const can = () => !!gm() && (o.can ? o.can() : !over());
+    const size = () => { const g = gm(); return g ? list(g).length : 0; };
+    function push(step = o.take()) {
+      const g = gm(), l = list(g); l.push(step);
+      if (o.cap && l.length > o.cap) { const n = l.length - o.cap; l.splice(0, n); for (const x of g.guesses || []) x.at -= n; }   // bookmarks count from the list's start
+    }
+    const shelved = () => !!o.shelf && !!gm() && o.shelf.has(gm());
+    function undo() {
+      if (!can() || !(size() || shelved())) return false;
+      const g = gm(); if (size()) o.back(list(g).pop(), g); else o.shelf.undo(g);
+      if (o.after) o.after(); return true;
+    }
+    // Restart: back to the start, with reset(game) doing the page's part. Costs the gold paw. With step (or take), the
+    // board as it was goes on the list first, so Undo brings it back; with neither, the list is emptied.
+    const started = () => o.started ? !!gm() && o.started() : size() > 0;
+    function restart(reset, step) {
+      if (!can() || !started()) return false;
+      const g = gm();
+      if (step !== undefined) push(step); else if (o.take) push(); else list(g).length = 0;
+      g.restarted = true; reset(g); if (o.after) o.after(); return true;
+    }
+    function sync() {
+      const b = $("undoBtn"), r = o.restart && $("restartBtn");
+      if (b) b.disabled = over() || !(size() || shelved()); if (r) r.disabled = over() || !started();
+    }
+    if ($("undoBtn")) $("undoBtn").onclick = () => undo();
+    document.addEventListener("keydown", e => {
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== "z") return;
+      if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) || e.target.isContentEditable || $("overlay").classList.contains("show")) return;
+      e.preventDefault(); undo();
+    });
+    return {push, undo, restart, size, list: g => list(g || gm()), sync};
   }
 
   /* ---------- bookmarks (guesses) ---------- */
@@ -1815,9 +1924,10 @@ const G = (() => {
   // and how long the Undo list was before it, so plain Undo past it, or the square being emptied, ends it.
   // o: {game: () => game, undo (one step), draw (after a change), board (the element that shows it's armed), what
   // ("toy", "number"…: for the note line), over (() => true once the puzzle's finished; game.won if not given),
-  // moves (the Undo list, if it isn't game.history)}. Call before(i) just before the move that fills square i goes on the Undo
+  // moves (the Undo list, if it isn't game.history), history (a G.history: its undo and list stand in for undo and moves)}. Call before(i) just before the move that fills square i goes on the Undo
   // list; draw the glow on each of list(); clear() on Restart; sync() wherever the buttons are brought up to date.
   function guesser(o) {
+    if (o.history) { o.undo = o.undo || o.history.undo; o.moves = o.moves || (gm => o.history.list(gm)); }
     let armed = false;
     const g = () => o.game(), btn = $("guessBtn"), back = $("backBtn"), hist = gm => o.moves ? o.moves(gm) : gm.history;
     const list = () => { const gm = g(); if (!gm) return []; gm.guesses = (gm.guesses || []).filter(x => x.at < hist(gm).length); return gm.guesses; };
@@ -1846,6 +1956,114 @@ const G = (() => {
       clear() { const gm = g(); if (gm) gm.guesses = []; armed = false; },
       sync,
     };
+  }
+
+  /* ---------- helpers' uses ---------- */
+  // A helper's uses left (G.uses), written once for Toy Box, Bubbles, Bird Watch and Mew Hue: a badge on the icon's
+  // corner (the <b> a button carries, made if it has none), "n left" for VoiceOver, and the button put away once
+  // they're used up. What a helper costs is in PAW_COST, with the rest.
+  function uses(id, n) {
+    const b = $(id); if (!b) return;
+    let c = b.querySelector("b"); if (!c) { c = document.createElement("b"); c.className = "count"; b.append(c); }
+    c.textContent = n; b.hidden = !(n > 0);
+    const copy = b.cloneNode(true); copy.querySelectorAll("b, svg").forEach(x => x.remove());
+    b.setAttribute("aria-label", `${copy.textContent.replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF\uFE0F]/gu, "").trim()}, ${n} left`);
+  }
+
+  /* ---------- admire ---------- */
+  // Admire (G.admire): once a puzzle's won, a button that takes the marks off the board to show the finished picture,
+  // and puts them back (Open the Door!'s numbers, Catdoku's paws); the win card's Admire button turns it on. o: {btn
+  // (its id), board (the element given .bare: the page's CSS says what goes), won (() => true once the puzzle's won),
+  // hide, show (the button's words each way), of, key and save (where to keep it, if it's kept: Open the Door!
+  // keeps it in its settings)}. Returns {set(on), sync()}: call sync() after every draw.
+  let admiring = null;
+  function admire(o) {
+    const b = $(o.btn);
+    let bare = !!(o.of && o.of()[o.key]);
+    function sync() {
+      const won = !!o.won(), on = won && bare;
+      o.board.classList.toggle("bare", on); b.hidden = !won;
+      b.setAttribute("aria-pressed", String(on)); relabel(b, on ? o.show : o.hide);
+    }
+    function set(v) { bare = !!v; if (o.of) { o.of()[o.key] = bare; if (o.save) o.save(); } sync(); }
+    b.onclick = () => { if (o.won()) set(!bare); };
+    admiring = {set, sync};
+    return admiring;
+  }
+
+  /* ---------- digit pad ---------- */
+  // The number pad of the logic games you fill in with digits (High Perch, Open the Door!, Window Ledges), written
+  // once (G.pad): 1 to max and ⌫ in #pad, Notes (#notesBtn, dashed digits on the pad while it's on), putting a digit
+  // in or jotting it as a note, and Auto Notes. Notes are a bitmask per square in game.notes (bit v for digit v).
+  // o: {game: () => game, max (() => the highest digit), sel (() => the square picked, -1 for none), select(i),
+  //   first (() => the square the keys pick when none is: 0 if not given), editable(i) (a square that takes digits;
+  //   others are left alone), cell(i) (a square at all: Window Ledges' walls aren't; true if not given),
+  //   peers(i) (the squares a digit put in square i comes off the notes of: its row and column, or its runs),
+  //   open(i) (the digits square i can still take, as a mask, for Auto Notes), auto (() => true while Auto Notes is
+  //   on), playing (() => true while the puzzle's on), push (put a step on Undo), before(i) (just before a digit goes
+  //   in: the bookmark's glow), changing() (just before the board changes, for a page that compares before and after),
+  //   after(changed) (after a pad button or key: when changed, the page checks for a win, draws and saves), draw, save,
+  //   noteKeys (the letters that turn Notes on and off: ["n"] if not given)}.
+  // put(v) returns true when it changed the board. Shift with a digit jots it as a note, whether Notes is on or not.
+  function digitPad(o) {
+    let noting = false;
+    const g = () => o.game(), cell = i => !o.cell || o.cell(i), keys = o.noteKeys || ["n"];
+    const fill = () => { const gm = g(); gm.notes = gm.notes.map((m, i) => cell(i) && !gm.grid[i] ? o.open(i) : m); };
+    // digit v has just come out of square i: with Auto Notes on, it goes back on the notes of the empty squares
+    // round it that could take it, and square i gets all of its own
+    function back(i, v) {
+      if (!o.auto()) return;
+      const gm = g();
+      for (const p of o.peers(i)) if (!gm.grid[p] && o.open(p) >> v & 1) gm.notes[p] |= 1 << v;
+      if (!gm.grid[i]) gm.notes[i] = o.open(i);
+    }
+    function put(v) {
+      const gm = g(), i = o.sel();
+      if (!o.playing() || i < 0 || !cell(i) || (o.editable && !o.editable(i))) return false;
+      gm.started = true;
+      if (!(noting && v) && v && gm.grid[i] !== v && o.before) o.before(i);
+      if (o.changing) o.changing();
+      o.push();
+      const was = gm.grid[i];
+      if (noting && v) { if (gm.grid[i]) gm.grid[i] = 0; gm.notes[i] ^= 1 << v; }
+      else {
+        gm.grid[i] = v && gm.grid[i] !== v ? v : 0;
+        if (gm.grid[i]) for (const p of [i, ...o.peers(i)]) gm.notes[p] &= ~(1 << v);   // a digit put in comes off the notes round it
+        else if (!v) gm.notes[i] = 0;
+        if (was && gm.grid[i] !== was) back(i, was);
+      }
+      return true;
+    }
+    function make() {
+      const pad = $("pad"); pad.innerHTML = ""; pad.classList.add("digitPad");
+      for (let v = 1; v <= o.max(); v++) { const b = document.createElement("button"); b.textContent = v; b.onclick = () => o.after(put(v)); pad.append(b); }
+      const er = document.createElement("button"); er.className = "erase"; er.textContent = "⌫"; er.setAttribute("aria-label", "Erase"); er.onclick = () => o.after(put(0)); pad.append(er);
+    }
+    const sync = () => { $("pad").classList.toggle("noting", noting); $("notesBtn").setAttribute("aria-pressed", String(noting)); };
+    const toggle = () => { const gm = g(); if (!gm || gm.won) return; noting = !noting; o.draw(); };
+    $("notesBtn").onclick = toggle;
+    // Auto Notes turned on fills in every maybe; turned off, takes every note off. Undo puts them back.
+    function autoNotes() {
+      if (!o.playing()) return;
+      const gm = g(), before = gm.notes.slice();
+      if (o.auto()) fill(); else gm.notes = gm.notes.map(() => 0);
+      if (gm.notes.some((m, i) => m !== before[i])) { const now = gm.notes; gm.notes = before; o.push(); gm.notes = now; gm.started = true; }
+      o.draw(); o.save();
+    }
+    // the pad's keys: 1 to max put a digit in (with Shift, jot it as a note), Backspace, Delete or 0 take it out,
+    // and noteKeys turn Notes on and off. True when the key was the pad's.
+    function key(e) {
+      const d = /^(Digit|Numpad)([1-9])$/.exec(e.code || ""), k = e.key;
+      if (d && +d[2] <= o.max()) {
+        if (o.sel() < 0) o.select(o.first ? o.first() : 0);
+        const was = noting; if (e.shiftKey) noting = true;
+        const did = put(+d[2]); noting = was; o.after(did); e.preventDefault(); return true;
+      }
+      if (k === "Backspace" || k === "Delete" || k === "0") { o.after(put(0)); e.preventDefault(); return true; }
+      if (keys.includes(k.toLowerCase())) { toggle(); return true; }
+      return false;
+    }
+    return {put, make, sync, toggle, key, fill, autoNotes, noting: () => noting, off() { noting = false; }};
   }
 
   /* ---------- sideways ---------- */
@@ -1898,6 +2116,80 @@ const G = (() => {
     return {on: isOn, set};
   }
 
+  /* ---------- lives ---------- */
+  // Lives as hearts, the same in every game that has them: three to start (per), lost hearts left hollow, and running
+  // out offers "Wait, I'm only mostly dead!", three more at a time up to nine on one puzzle (max). The game keeps them
+  // in its own saved object, so saved games carry on: o: {el (the hearts), of: () => that object, key (its field for
+  // lives left, "hearts" by default; the lives given out are in livesUsed, taken as per where a save has none), on
+  // (what they're for, in the cards' words: "puzzle", "floor", "level", "painting"), revived() (after a revive: the
+  // game's flags, draw and save), keep (the revive card's button), reviveMedia(words) (a picture for that card)}.
+  // A game with no revive (max = per) can use show(left, used) alone, with unit: [one, many] if they aren't lives.
+  function lives(o) {
+    const per = o.per || 3, max = o.max || 9, key = o.key || "hearts";
+    const left = () => o.of()[key], used = () => o.of().livesUsed || per;
+    const [one, many] = o.unit || ["life", "lives"];   // what a heart is, for VoiceOver and the game's notes
+    const say = h => `${h} ${h === 1 ? one : many} left`;
+    function show(h = left(), u = used()) {
+      o.el.innerHTML = Array.from({length: Math.max(per, u)}, (_, k) => k < h ? "♥" : '<span class="lost">♥</span>').join("");
+      o.el.setAttribute("aria-label", say(h));
+    }
+    function lose(n = 1) { const g = o.of(); g[key] = Math.max(0, g[key] - n); return g[key]; }
+    function refill() { const g = o.of(); g[key] = per; g.livesUsed = per; }   // back to the first three, as a restart after running out does
+    const canRevive = () => used() < max;
+    function revive() {
+      if (!canRevive()) return;
+      const g = o.of(), added = Math.min(per, max - used());
+      g.livesUsed = used() + added; g[key] = added;
+      if (o.revived) o.revived();
+      const more = Math.ceil((max - g.livesUsed) / per), words = more ? `${more} ${more === 1 ? "revive" : "revives"} left` : "Last lives";
+      openCard("Slightly alive!", `Back with ${added} more ${added === 1 ? "life" : "lives"}. ${more ? words : "No revives left"} on this ${o.on}.`,
+        [[o.keep || "Keep playing", closeCard, true]], o.reviveMedia ? o.reviveMedia(words) : null);
+    }
+    const reviveBtn = primary => ["Wait, I'm only mostly dead! Mostly dead is slightly alive, folks!", revive, !!primary];
+    // Out of lives: the game's own ways on (btns, the first the main one), the revive while there are lives to give
+    // (or a line saying they're used up), then more, and Home.
+    function outCard({text = "Pick how you want to keep going.", btns = [], more = [], media = null, after = null} = {}) {
+      const all = [...btns];
+      if (canRevive()) all.push(reviveBtn());
+      else text = `All ${max} lives on this ${o.on} are used up.`;
+      openCard("Out of lives", text, [...all, ...more, homeBtn()], media, after);
+    }
+    return {left, used, say, show, lose, refill, canRevive, revive, reviveBtn, outCard};
+  }
+
+  /* ---------- zoom and full screen ---------- */
+  // One set of round buttons in the board's bottom-right corner, the same in every game that zooms: full screen
+  // (through fullScreen above), +, − and one more where the game has it (Twirl's Fit, Catlas's back to the lit
+  // country). + and − on the keyboard press them too. Each game keeps its own pinch, drag and scroll. o: {at (the
+  // board's box; it's given position:relative if it has none), below (the buttons go under the board's corner, for a
+  // board that can't be moved about at its full size, so they'd hide part of it), zoomIn, zoomOut, more: {label
+  // (a word or SVG), name, fn}, full: {name, change} (as fullScreen's)}. Returns {el, fs, can(zoomIn, zoomOut, more)}.
+  function zoomer(o) {
+    const el = document.createElement("div");
+    el.className = "zoombox" + (o.below ? " below" : "");
+    el.setAttribute("role", "group"); el.setAttribute("aria-label", "Zoom");
+    const btn = (html, name, fn) => {
+      const b = document.createElement("button"); b.type = "button"; b.innerHTML = html;
+      if (name) { b.setAttribute("aria-label", name); b.title = name; }
+      if (fn) b.addEventListener("click", fn);
+      el.append(b); return b;
+    };
+    let fs = null;
+    if (o.full) fs = fullScreen({btn: btn(""), name: o.full.name, change: o.full.change});
+    const zin = btn("+", "Zoom in (+)", o.zoomIn), zout = btn("−", "Zoom out (−)", o.zoomOut);
+    const more = o.more ? btn(o.more.label, o.more.name, o.more.fn) : null;
+    if (more && !/</.test(o.more.label)) more.classList.add("word");
+    if (!o.below && getComputedStyle(o.at).position === "static") o.at.style.position = "relative";
+    o.at.append(el);
+    document.addEventListener("keydown", e => {
+      if (e.ctrlKey || e.metaKey || e.altKey || document.querySelector(".spot") || $("overlay").classList.contains("show") || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+      const b = e.key === "+" || e.key === "=" ? zin : e.key === "-" || e.key === "_" ? zout : null;
+      if (b && !b.disabled) { e.preventDefault(); b.click(); }
+    });
+    const can = (i, out, m) => { zin.disabled = !i; zout.disabled = !out; if (more && m !== undefined) more.disabled = !m; };
+    return {el, fs, can};
+  }
+
   // If something breaks, say what on the page and count it on the dashboard, so it can be fixed.
   function reportError(msg, where) {
     track(`Error: ${msg}${where ? ` (${where})` : ""}`);
@@ -1924,6 +2216,6 @@ const G = (() => {
     }
   }
 
-  return {MAGNET, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, meaning, plainText,
+  return {MAGNET, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();

@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.4"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.55"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.4">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.55">
 <style>
 /* A KenKen house: every row and column holds 1 to N once, and walls split the floor into rooms whose numbers
    must make the room's sign. Each room has a door that opens when the room is right; with every door open,
@@ -70,7 +70,6 @@
 .pad{width:var(--board);display:flex;gap:6px;justify-content:center}
 .pad button{flex:1 1 0;min-height:44px;max-width:58px;padding:6px 0;font-size:22px;font-weight:800;line-height:1.1}
 .pad button.erase{font-size:18px}
-.pad.noting button:not(.erase){border-style:dashed;color:#3C8681}
 .key{width:var(--board);text-align:center;font-weight:600;font-size:15px;color:var(--ink-soft);margin-top:-6px}
 @media (prefers-reduced-motion:reduce){.door{transition:none}.sleeper{animation:none}}
 </style>
@@ -106,13 +105,10 @@
     <label>Level <select id="levelSel" aria-label="Level"></select></label>
     <button id="newBtn" class="primary">New puzzle</button>
   </div>
-  <div class="bar toggles">
-    <div class="opt" id="autoOpt"><label class="toggle"><input type="checkbox" id="autoTgl"><span class="sw"></span>🔢 Auto&nbsp;Notes</label></div>
-  </div>
 
 </main>
 
-<script src="../games.js?v=2026-11-07.4"></script>
+<script src="../games.js?v=2026-11-07.55"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N grid where every row and column holds 1 to N once, cut into rooms (cages). Each room has a sign:
@@ -289,7 +285,7 @@ const STORE = "catdoku.opendoor.v1", MAX_LEVEL = 7;
 const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1, autoNotes: false}, state.settings);
-let game = state.game || null, busy = false, sel = -1, noting = false, running = false;
+let game = state.game || null, busy = false, sel = -1, running = false;
 // The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
 G.pawLost(() => !game || game.won || game.hinted || game.restarted);
 const save = () => G.save(STORE, {settings, game});
@@ -373,20 +369,22 @@ function draw() {
   el.innerHTML = html;
   drawWalls(right);
   showNums();
-  $("pad").classList.toggle("noting", noting);
-  $("notesBtn").setAttribute("aria-pressed", String(noting));
+  pad.sync();
   const open = right.filter(Boolean).length, rooms = plan.rooms.length;
   $("count").textContent = game.won ? "Every door is open!" : `${open} of ${rooms} doors open`;
-  $("key").textContent = noting ? "Notes: tap numbers to jot them down as maybes" : sel < 0 && !game.won ? "Tap a square, then a number" : "";
+  $("key").textContent = pad.noting() ? "Notes: tap numbers to jot them down as maybes" : sel < 0 && !game.won ? "Tap a square, then a number" : "";
   $("hintBtn").disabled = game.won;
-  $("undoBtn").disabled = !game.history.length || game.won; $("restartBtn").disabled = !game.history.length || game.won;
+  undo.sync();
   guesses.sync();
   return {clash, right, wrong};
 }
 // The walls between rooms (thin seams inside a room), with each room's door hung in one of them.
 let forceOpen = -1, rattle = new Set(), wasOpen = [];
 const hints = G.hinter({game: () => game, key: () => game ? game.grid.join() : "", draw: () => draw()});   // marks {i, kind}: a square to look at
-const guesses = G.guesser({game: () => game, undo, draw: () => { draw(); save(); }, board: $("board"), what: "number"});
+// Undo (G.history): each step is {grid, notes} as they were (game.history). Restart can be undone too.
+const undo = G.history({game: () => game, take: () => ({grid: game.grid.slice(), notes: game.notes.slice()}), can: playing,
+  back: (h, g) => { g.grid = h.grid; g.notes = h.notes; }, after: () => { draw(); save(); }, restart: true});
+const guesses = G.guesser({game: () => game, history: undo, draw: () => { draw(); save(); }, board: $("board"), what: "number"});
 function drawWalls(right) {
   const N = game.N, svg = $("walls"), at = plan.at;
   svg.setAttribute("viewBox", `0 0 ${N} ${N}`);
@@ -431,30 +429,21 @@ function drawWalls(right) {
 }
 
 /* ---------- playing ---------- */
-const snapshot = () => game.history.push({grid: game.grid.slice(), notes: game.notes.slice()});
-function put(v) {
-  if (!playing() || sel < 0) return;
-  game.started = true;
-  const before = check();
-  if (!(noting && v) && v && game.grid[sel] !== v) guesses.before(sel);
-  snapshot();
-  const was = game.grid[sel];
-  if (noting && v) {
-    if (game.grid[sel]) game.grid[sel] = 0;
-    game.notes[sel] ^= 1 << v;
-  } else {
-    game.grid[sel] = v && game.grid[sel] !== v ? v : 0;
-    // a number put down comes off the notes in its row and column
-    if (game.grid[sel]) { const N = game.N, r = Math.floor(sel / N), c = sel % N; for (let j = 0; j < N; j++) { game.notes[r * N + j] &= ~(1 << v); game.notes[j * N + c] &= ~(1 << v); } }
-    else if (!v) game.notes[sel] = 0;
-    if (was && game.grid[sel] !== was) autoBack(sel, was);
-  }
-  // a room that's just been filled in wrong rattles its door
-  const after = check(), k = plan.at[sel];
-  if (after.wrong[k] && !before.wrong[k]) { rattle.add(k); setTimeout(() => { rattle.delete(k); }, 500); }
-  if (after.right.every(Boolean)) { win(); return; }
-  draw(); save();
-}
+// The pad, Notes and Auto Notes (G.pad): numbers 1 to N; a number put in comes off the notes in its row and column,
+// and with Auto Notes on, every empty square has a note for each number its row and column still leave open.
+// A room that's just been filled in wrong rattles its door.
+const openFor = i => { const N = game.N, r = Math.floor(i / N), c = i % N; let m = (1 << (N + 1)) - 2; for (let j = 0; j < N; j++) { m &= ~(1 << game.grid[r * N + j]); m &= ~(1 << game.grid[j * N + c]); } return m; };
+let wasWrong = null;
+const pad = G.pad({game: () => game, max: () => game.N, sel: () => sel, select: i => { sel = i; },
+  peers: i => { const N = game.N, r = Math.floor(i / N), c = i % N, ps = []; for (let j = 0; j < N; j++) ps.push(r * N + j, j * N + c); return ps; }, open: openFor, auto: () => settings.autoNotes, playing,
+  push: () => undo.push(), before: i => guesses.before(i), changing: () => { wasWrong = check().wrong; }, draw, save,
+  after: changed => {
+    if (!changed) return;
+    const after = check(), k = plan.at[sel];
+    if (after.wrong[k] && !wasWrong[k]) { rattle.add(k); setTimeout(() => { rattle.delete(k); }, 500); }
+    if (after.right.every(Boolean)) { win(); return; }
+    draw(); save();
+  }});
 $("cells").addEventListener("click", e => {
   if (!playing()) return;
   const c = e.target.closest(".cell"); if (!c) return;
@@ -462,40 +451,11 @@ $("cells").addEventListener("click", e => {
   const i = +c.dataset.i, m = hints.current();
   sel = i === sel && !(m && m.i === i) ? -1 : i; draw();
 });
-function makePad() {
-  const pad = $("pad"); pad.innerHTML = "";
-  for (let v = 1; v <= game.N; v++) { const b = document.createElement("button"); b.textContent = v; b.onclick = () => put(v); pad.append(b); }
-  const er = document.createElement("button"); er.className = "erase"; er.textContent = "⌫"; er.setAttribute("aria-label", "Erase"); er.onclick = () => put(0); pad.append(er);
-}
-$("notesBtn").onclick = () => { if (!game || game.won) return; noting = !noting; draw(); };
-// Auto Notes (a switch, kept with the settings, off at first): on, every empty square gets a note for each number
-// its row and column still leave open, at once and on every new puzzle; a number put down comes off the notes in its
-// row and column, as always, and one taken away goes back on them. Off takes every note away. Undo puts either back.
-const openFor = i => { const N = game.N, r = Math.floor(i / N), c = i % N; let m = (1 << (N + 1)) - 2; for (let j = 0; j < N; j++) { m &= ~(1 << game.grid[r * N + j]); m &= ~(1 << game.grid[j * N + c]); } return m; };
-const fillNotes = () => { game.notes = game.grid.map((v, i) => v ? game.notes[i] : openFor(i)); };
-// number v has just come out of square i: with Auto Notes on, it goes back on the notes of the empty squares in its
-// row and column that could take it, and square i gets all of its own
-function autoBack(i, v) {
-  if (!settings.autoNotes) return;
-  const N = game.N, r = Math.floor(i / N), c = i % N;
-  for (let j = 0; j < N; j++) for (const p of [r * N + j, j * N + c]) if (!game.grid[p] && openFor(p) >> v & 1) game.notes[p] |= 1 << v;
-  if (!game.grid[i]) game.notes[i] = openFor(i);
-}
-$("autoTgl").onchange = e => {
-  settings.autoNotes = e.target.checked; save();
-  if (!playing()) return;
-  const before = game.notes.slice();
-  if (settings.autoNotes) fillNotes(); else game.notes = game.notes.map(() => 0);
-  if (game.notes.some((m, i) => m !== before[i])) { const now = game.notes; game.notes = before; snapshot(); game.notes = now; game.started = true; }
-  draw(); save();
-};
 document.addEventListener("keydown", e => {
   if (!playing() || document.querySelector(".spot") || e.target.tagName === "SELECT" || e.ctrlKey || e.metaKey || e.altKey) return;
   const N = game.N, k = e.key;
   if (k === "Escape") { sel = -1; draw(); return; }   // as in Toydoku: let go of the square picked
-  if (/^[1-9]$/.test(k) && +k <= N) { if (sel < 0) sel = 0; put(+k); e.preventDefault(); return; }
-  if (k === "Backspace" || k === "Delete" || k === "0") { put(0); e.preventDefault(); return; }
-  if (k === "n" || k === "N") { noting = !noting; draw(); return; }
+  if (pad.key(e)) return;   // 1 to N (Shift: a note), Backspace or 0, N for Notes
   const mv = {ArrowUp: -N, ArrowDown: N, ArrowLeft: -1, ArrowRight: 1}[k];
   if (mv !== undefined) {
     e.preventDefault();
@@ -504,9 +464,6 @@ document.addEventListener("keydown", e => {
     draw();
   }
 });
-document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
-function undo() { if (playing() && game.history.length) { const h = game.history.pop(); game.grid = h.grid; game.notes = h.notes; draw(); save(); } }
-$("undoBtn").onclick = undo;
 // Hint: first points out a number that's wrong, if there is one; otherwise picks a square in a room that's nearly
 // full (so a door is close to opening) and glows it: the first time, the message says why it can be worked out;
 // asked again, its number. It never fills it in for you. Any hint keeps you on the same level and costs the gold paw.
@@ -542,13 +499,16 @@ function whyNumber(i) {
   return [`The glowing square's room is the nearest to full. Its row and column leave ${free.length} numbers.`, ""];
 }
 $("hintBtn").onclick = hint;
-$("restartBtn").onclick = () => { if (playing() && game.history.length) { game.restarted = true; snapshot(); guesses.clear(); game.grid = game.grid.map(() => 0); game.notes = game.notes.map(() => 0); if (settings.autoNotes) fillNotes(); draw(); save(); G.note("Every door's shut again. Undo brings your numbers back.", 3500); } };
+$("restartBtn").onclick = () => {
+  if (undo.restart(g => { guesses.clear(); g.grid = g.grid.map(() => 0); g.notes = g.notes.map(() => 0); if (settings.autoNotes) pad.fill(); }))
+    G.note("Every door's shut again. Undo brings your numbers back.", 3500);
+};
 addEventListener("resize", () => { if (game && plan) draw(); });
 
 /* ---------- endings ---------- */
 // Every door is open, so a cat curls up asleep in every doorway, then the finishing card.
 function win() {
-  game.won = true; G.finishClock(game); sel = -1; noting = false;
+  game.won = true; G.finishClock(game); sel = -1; pad.off();
   const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
   settings.level = next; $("levelSel").value = next; save();
   draw();
@@ -567,14 +527,11 @@ function sleeperAt(k, d) {
   const len = Math.min(.62, .46 * ratio), w = len / ratio, cx = (x1 + x2) / 2, cy = (y1 + y2) / 2;
   return `<image class="sleeper" href="../cats/${file}.webp" x="${-len / 2}" y="${-w / 2}" width="${len}" height="${w}" preserveAspectRatio="none" transform="translate(${cx} ${cy}) rotate(${horiz ? 0 : 90})" aria-hidden="true"/>`;
 }
-// Finished: Hide numbers takes the numbers off the board, leaving the cats asleep in the open doors. (Not a redraw,
-// which would settle the cats in again.)
-function showNums() {
-  const bare = game.won && !!settings.hideNums;
-  $("board").classList.toggle("bare", bare);
-  $("numsBtn").hidden = !game.won; $("numsBtn").setAttribute("aria-pressed", String(bare)); G.relabel($("numsBtn"), bare ? "Show numbers" : "Hide numbers");
-}
-$("numsBtn").onclick = () => { if (!game || !game.won) return; settings.hideNums = !settings.hideNums; save(); showNums(); };
+// Finished: Hide numbers (G.admire, turned on by Admire my house too) takes the numbers off the board, leaving the
+// cats asleep in the open doors. (Not a redraw, which would settle the cats in again.)
+const admire = G.admire({btn: "numsBtn", board: $("board"), won: () => game && game.won, hide: "Hide numbers", show: "Show numbers",
+  of: () => settings, key: "hideNums", save});
+const showNums = () => admire.sync();
 function finishCard() {
   const next = settings.level, N = game.N;
   let text = `Every door in the ${N} × ${N} house is open, and a cat's fast asleep in every doorway.`;
@@ -587,8 +544,8 @@ function finishCard() {
 function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
 function begin(p, level) {
   game = {level, N: p.N, cages: p.cages, grid: new Array(p.N * p.N).fill(0), notes: new Array(p.N * p.N).fill(0), history: [], won: false, ...G.freshClock()};
-  sel = -1; noting = false; makePlan(); makePad();
-  if (settings.autoNotes) fillNotes();
+  sel = -1; pad.off(); makePlan(); pad.make();
+  if (settings.autoNotes) pad.fill();
 }
 async function newPuzzle() {
   if (busy) return;
@@ -614,7 +571,7 @@ function openShared(d) {
     && d.c.flatMap(c => c[0]).sort((a, b) => a - b).every((i, k) => i === k) && d.c.flatMap(c => c[0]).length === N * N;
   if (!lv || !okCages) { G.note("That share link didn't work.", 5000); return; }
   begin({N, cages: d.c}, d.N);
-  if (d.p && Array.isArray(d.p.grid) && d.p.grid.length === N * N) { game.grid = d.p.grid.map(v => +v || 0); if (settings.autoNotes) fillNotes(); if (Array.isArray(d.p.notes) && d.p.notes.length === N * N) game.notes = d.p.notes.map(v => +v || 0); game.timed = false; }
+  if (d.p && Array.isArray(d.p.grid) && d.p.grid.length === N * N) { game.grid = d.p.grid.map(v => +v || 0); if (settings.autoNotes) pad.fill(); if (Array.isArray(d.p.notes) && d.p.notes.length === N * N) game.notes = d.p.notes.map(v => +v || 0); game.timed = false; }
   settings.level = d.N; $("levelSel").value = d.N;
   draw(); save(); build.prefetch(d.N);
   if (d.p && check().right.every(Boolean)) win();
@@ -654,7 +611,6 @@ function helpOnFirstVisit() {
       {say: "Tap this square", lit: [xy(e)], try: {done: () => sel === e}, ...turn.from},
       {say: "Now pick a number", els: [$("pad")], try: {done: () => game.grid[e] > 0, yes: "In it goes!"}, ...turn.upTo}]),
     {say: "Notes for maybes", els: [$("notesBtn")]},
-    {say: "Auto Notes fills in every maybe for you", els: [$("autoOpt")]},
     {say: "Not sure? Bookmark, then try an idea. Return to Bookmark undoes it", els: [$("guessBtn")]},
     {say: "Stuck? Hint fixes or gives a number", els: [$("hintBtn")]},
   ];
@@ -675,13 +631,14 @@ $("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : setti
 
 if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
 $("levelSel").value = settings.level;
-$("autoTgl").checked = !!settings.autoNotes;
+G.switch({id: "autoTgl", label: "🔢 Auto\u00a0Notes", line: "Every maybe filled in for you", key: "autoNotes", of: () => settings, save,
+  tip: "Auto Notes fills in every maybe for you", change: () => pad.autoNotes()});
 const shared = G.readShare("opendoor");
 const hadSave = !!(game && Array.isArray(game.grid) && Array.isArray(game.cages));
 if (hadSave) G.reopen(() => {
     if (!levelOf(game.level) || game.grid.length !== game.N * game.N) throw new Error("the saved puzzle doesn't fit its level");
     if (!Array.isArray(game.notes)) game.notes = new Array(game.N * game.N).fill(0);
-    makePlan(); makePad(); draw();
+    makePlan(); pad.make(); draw();
     if (game.won) finishCard();
     build.prefetch(settings.level); helpOnFirstVisit();
   }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });

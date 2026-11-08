@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.4"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.55"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.4">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.55">
 <style>
 /* A tray of treat piles, each with a number. A tabby from Higgins's gang sits at the end of every row and column
    with a bowl showing how many treats it wants. Tap a pile to put it back in the jar; the piles left in a cat's
@@ -96,7 +96,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-07.4"></script>
+<script src="../games.js?v=2026-11-07.55"></script>
 <script>
 /* ---------- treat puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N tray of treat piles, each with a number. Some piles go back in the jar; the rest stay. The cat at the
@@ -187,10 +187,10 @@ const STORE = "catdoku.treattime.v1", MAX_LEVEL = 10;
 const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1}, state.settings);
-let game = state.game || null, busy = false, running = false, keepMode = false, cursor = -1;
+let game = state.game || null, busy = false, running = false, cursor = -1;
 // The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
 G.pawLost(() => !game || game.won || game.hinted || game.restarted);
-G.pieces({plain: "Put back", mark: "keepBtn"});   // the plain tap beside Keep, in a row of their own under the board
+const markTool = G.pieces({plain: "Put back", mark: "keepBtn"});   // the plain tap beside Keep, in a row of their own under the board
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
 const levelName = n => { const s = levelSpec(n); return `Level ${n} · ${s.N} × ${s.N}, piles up to ${s.top}`; };
@@ -247,10 +247,8 @@ function update() {
     if (have === want) fed++;
   }
   $("count").textContent = `${fed} of ${2 * N} cats fed`;
-  $("undoBtn").disabled = !game.history.length || game.won;
-  $("restartBtn").disabled = !game.history.length || game.won;
+  undo.sync();
   $("hintBtn").disabled = game.won;
-  $("keepBtn").setAttribute("aria-pressed", keepMode);
   showCursor();
   return fed === 2 * N;
 }
@@ -260,7 +258,7 @@ function update() {
 // marks the pile to stay instead.
 function setMark(i, m) {
   if (!playing() || game.mark[i] === m) return;
-  game.history.push([i, game.mark[i]]); game.mark[i] = m; game.started = true;
+  undo.push([i, game.mark[i]]); game.mark[i] = m; game.started = true;
   if (update()) win(); else save();
 }
 const tapPile = (i, keep) => setMark(i, keep ? (game.mark[i] === 2 ? 0 : 2) : (game.mark[i] === 1 ? 0 : 1));
@@ -271,13 +269,12 @@ $("board").addEventListener("pointerdown", e => {
   const i = +d.dataset.i;
   press = {i, t: setTimeout(() => { if (press) { tapPile(i, true); press = null; } }, 450)};
 });
-$("board").addEventListener("pointerup", () => { if (!press) return; clearTimeout(press.t); tapPile(press.i, keepMode); press = null; });
+$("board").addEventListener("pointerup", () => { if (!press) return; clearTimeout(press.t); tapPile(press.i, markTool.on()); press = null; });
 for (const ev of ["pointercancel", "pointerleave"]) $("board").addEventListener(ev, () => { if (press) { clearTimeout(press.t); press = null; } });
 $("board").addEventListener("contextmenu", e => {
   e.preventDefault(); if (press) { clearTimeout(press.t); press = null; }
   const d = e.target.closest(".cell"); if (d) tapPile(+d.dataset.i, true);
 });
-$("keepBtn").onclick = () => { keepMode = !keepMode; $("keepBtn").setAttribute("aria-pressed", keepMode); };
 // Keys: arrows move a cursor, Space puts a pile back (or takes it out), K or Enter marks it to stay.
 function showCursor() { cells.forEach((d, i) => d.classList.toggle("cursor", i === cursor)); }
 $("board").addEventListener("keydown", e => {
@@ -288,29 +285,18 @@ $("board").addEventListener("keydown", e => {
   else if (e.key === "ArrowDown") to(x, y + 1);
   else if (e.key === "ArrowLeft") to(x - 1, y);
   else if (e.key === "ArrowRight") to(x + 1, y);
-  else if (e.key === " ") tapPile(cursor, keepMode);
+  else if (e.key === " ") tapPile(cursor, markTool.on());
   else if (e.key === "Enter" || e.key.toLowerCase() === "k") tapPile(cursor, true);
   else return;
   e.preventDefault(); showCursor();
 });
 $("board").addEventListener("blur", () => { cursor = -1; showCursor(); });
-document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
 
-// Undo takes back a tap, or a Restart.
-function undo() {
-  if (!playing() || !game.history.length) return;
-  const h = game.history.pop();
-  if (Array.isArray(h)) game.mark[h[0]] = h[1]; else game.mark = h.mark;
-  update(); save();
-}
-$("undoBtn").onclick = undo;
+// Undo takes back a tap ([i, mark before]) or a Restart ({mark}), kept in game.history (G.history).
+const undo = G.history({game: () => game, back: (h, g) => { if (Array.isArray(h)) g.mark[h[0]] = h[1]; else g.mark = h.mark; },
+  can: playing, after: () => { update(); save(); }, restart: true});
 $("restartBtn").onclick = () => {
-  if (!playing() || !game.history.length) return;
-  game.restarted = true;
-  game.history.push({mark: game.mark.slice()});
-  game.mark = new Array(game.N * game.N).fill(0);
-  update(); save();
-  G.note("Every pile's back on the tray. Undo brings your moves back.", 4000);
+  if (undo.restart(g => { g.mark = new Array(g.N * g.N).fill(0); }, {mark: game.mark.slice()})) G.note("Every pile's back on the tray. Undo brings your moves back.", 4000);
 };
 // Hint: first a mistake, in red (a pile put back that should stay, or marked to stay that should go back);
 // otherwise, in gold, the row or column with the fewest piles left to put back, and asked again, one of its piles.

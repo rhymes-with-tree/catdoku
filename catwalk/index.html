@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.4";
+  var BUILD = "2026-11-07.55";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.4">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.55">
 <style>
 /* A gigantic cat tower: sisal posts up from a carpeted base, numbered carpeted perches on them, linked by rope catwalks. */
 .wall{width:var(--board);aspect-ratio:1;background:#EBDDCB;border:3px solid #A98663;border-radius:16px;overflow:hidden;touch-action:manipulation;user-select:none;-webkit-user-select:none}
@@ -69,8 +69,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-07.4"></script>
-<script src="../cattower.js?v=2026-11-07.4"></script>
+<script src="../games.js?v=2026-11-07.55"></script>
+<script src="../cattower.js?v=2026-11-07.55"></script>
 <script>
 /* ---------- the puzzle ---------- */
 // A perch: {x, y, n}. Catwalks run from a perch to the nearest perch straight across or up and down (and on the
@@ -228,6 +228,8 @@ let game = state.game || null, lanes = [], sel = -1, kbAt = -1;   // kbAt: the p
 G.pawLost(() => !game || game.won || game.hinted || game.restarted);
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !$("overlay").classList.contains("show");
+const undo = G.history({game: () => game, take: () => game.val.slice(), back: (v, g) => { g.val = v; sel = -1; }, can: playing,
+  after: () => { draw(); save(); }, restart: true});
 const sizeLabel = N => `${SIZES[N][0]} × ${SIZES[N][0]} · ${SIZES[N][1]} perches`;
 
 function totals() { const have = game.isles.map(() => 0); lanes.forEach((l, k) => { have[l.a] += game.val[k]; have[l.b] += game.val[k]; }); return have; }
@@ -275,7 +277,7 @@ function draw(flash) {
   svg.innerHTML = s;
   const left = isles.filter((p, i) => have[i] !== p.n).length;
   $("count").textContent = game.won ? "Tower built!" : `${left} perch${left === 1 ? "" : "es"} to go`;
-  $("undoBtn").disabled = !game.history.length || game.won; $("restartBtn").disabled = !game.history.length || game.won;
+  undo.sync();
   $("hintBtn").disabled = game.won;
 }
 // Built: every perch has its number of catwalks, none cross, and they all join into one tower.
@@ -311,7 +313,7 @@ function tapIsle(i) {
   }
   const next = (game.val[k] + 1) % 3;
   if (next && lanes[k].cross.some(q => game.val[q])) { G.note("Catwalks can't cross.", 2500); sel = -1; draw(k); return; }
-  game.history.push(game.val.slice()); game.val[k] = next; sel = -1; G.note("");
+  undo.push(); game.val[k] = next; sel = -1; G.note("");
   if (solved()) { win(); return; }
   draw(); save();
   const have = totals();
@@ -320,9 +322,8 @@ function tapIsle(i) {
 // Keys: the arrows move a cursor to the nearest perch that way, and Space or Enter taps the perch under it.
 const keys = G.gridKeys({on: () => playing(), start: () => 0, move: (i, dx, dy) => i < game.isles.length ? G.nearestThatWay(game.isles.map(p => [p.x, p.y]), i, dx, dy) : 0,
   show: i => { kbAt = i; draw(); }, act: i => tapIsle(i)});
-$("undoBtn").onclick = () => { if (playing() && game.history.length) { game.val = game.history.pop(); sel = -1; draw(); save(); } };
-document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && !$("undoBtn").disabled) { e.preventDefault(); $("undoBtn").click(); } });
-$("restartBtn").onclick = () => { if (playing() && game.history.length) { game.restarted = true; game.history.push(game.val.slice()); game.val = game.val.map(() => 0); sel = -1; draw(); save(); G.note("Back to bare perches. Undo brings your catwalks back.", 3500); } };
+// Undo (G.history): each step is the catwalks as they were (game.history). Restart can be undone too.
+$("restartBtn").onclick = () => { if (undo.restart(g => { g.val = g.val.map(() => 0); sel = -1; })) G.note("Back to bare perches. Undo brings your catwalks back.", 3500); };
 
 // Hint: the tower has one answer. A catwalk that shouldn't be there (or one too many) shows in red; otherwise a
 // perch that needs a catwalk glows gold, and asked again, the catwalk to build between its two perches. The

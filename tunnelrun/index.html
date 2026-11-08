@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.4"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.55"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.4">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.55">
 <style>
 /* A rug covered in pieces of cat tunnel, with the cat's bed in the middle. Turn the pieces until they all join
    into one network; pieces joined to the bed turn purple and crinkly, and when every one is joined the cat runs
@@ -101,7 +101,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-07.4"></script>
+<script src="../games.js?v=2026-11-07.55"></script>
 <script>
 /* ---------- tunnel networks (plain functions, also run in a background worker) ---------- */
 // A piece's tunnels are a 4-bit mask of the sides they open onto: 1 up, 2 right, 4 down, 8 left.
@@ -465,8 +465,7 @@ function update() {
   const left = all - count;
   $("count").textContent = game.won ? "Every tunnel joined!" : lost ? "These tunnels go round in a loop" : left <= 3 ? `Almost! ${left} grey piece${left === 1 ? "" : "s"} to join` : `${count} of ${all} joined`;
   $("hintBtn").disabled = game.won || hinting;
-  $("undoBtn").disabled = !game.history.length || game.won;
-  $("restartBtn").disabled = !game.history.length || game.won;
+  undo.sync();
   paintHint();
   return count === all;
 }
@@ -489,7 +488,7 @@ function turn(i, dir) {
   const p = game.pos[i];
   game.turns[p] = (game.turns[p] + dir + 4) % 4;
   angle[p] += dir * 90; spins[p].style.transform = `rotate(${angle[p]}deg)`;
-  game.history.push([i, dir]);
+  undo.push([i, dir]);
   if (update()) { win(); return; }
   save();
 }
@@ -503,7 +502,7 @@ function slide(m, glide = true) {
   game.started = true;
   game.pos = applySlide(N, game.pos, m);
   game.trail = addSlide(N, game.trail, m);
-  game.history.push(m);
+  undo.push(m);
   if (cursor >= 0) { const x = cursor % N, y = Math.floor(cursor / N);
     if (m[0] === 0 && y === m[1]) cursor = y * N + (x + m[2]) % N;
     if (m[0] === 1 && x === m[1]) cursor = ((y + m[2]) % N) * N + x;
@@ -598,25 +597,20 @@ $("svg").addEventListener("keydown", e => {
   e.preventDefault(); showCursor();
 });
 $("svg").addEventListener("blur", () => { cursor = -1; showCursor(); });
-document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && playing()) { e.preventDefault(); undo(); } });
 
 // Undo takes back a turn or slide, or a Restart.
-function undo() {
-  if (!playing() || !game.history.length) return;
-  const h = game.history.pop(), N = game.N;
-  if (!Array.isArray(h)) { game.turns = h.turns; game.trail = h.trail || game.trail; game.pos = posOf(N, game.trail); }
-  else if (h.length === 3) { const back = [h[0], h[1], N - h[2]]; game.pos = applySlide(N, game.pos, back); game.trail = addSlide(N, game.trail, back); }
-  else { const p = game.pos[h[0]]; game.turns[p] = (game.turns[p] - h[1] + 4) % 4; }
-  lineUp(); update(); save();
-}
-$("undoBtn").onclick = undo;
+const undo = G.history({game: () => game, can: playing, restart: true,
+  back: h => {
+    const N = game.N;
+    if (!Array.isArray(h)) { game.turns = h.turns; game.trail = h.trail || game.trail; game.pos = posOf(N, game.trail); }
+    else if (h.length === 3) { const back = [h[0], h[1], N - h[2]]; game.pos = applySlide(N, game.pos, back); game.trail = addSlide(N, game.trail, back); }
+    else { const p = game.pos[h[0]]; game.turns[p] = (game.turns[p] - h[1] + 4) % 4; }
+  },
+  after: () => { lineUp(); update(); save(); }});
 $("restartBtn").onclick = () => {
-  if (!playing() || !game.history.length) return;
-  game.restarted = true;
-  game.history.push({turns: game.turns.slice(), trail: game.trail});
-  game.turns = game.start.turns.slice(); game.trail = game.start.trail.slice(); game.pos = posOf(game.N, game.trail);
-  lineUp(); update(); save();
-  G.note("Back to how the tunnels started. Undo brings your moves back.", 4000);
+  if (undo.restart(g => { g.turns = g.start.turns.slice(); g.trail = g.start.trail.slice(); g.pos = posOf(g.N, g.trail); },
+    {turns: game.turns.slice(), trail: game.trail}))
+    G.note("Back to how the tunnels started. Undo brings your moves back.", 4000);
 };
 // Hint: while a track is out of place, a gold box goes round a track to slide and the message says which way.
 // Then a gold box shows a piece that's the wrong way round (next to the joined part where it can). The player
