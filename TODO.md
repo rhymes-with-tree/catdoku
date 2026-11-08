@@ -85,22 +85,22 @@ them beside the title and in `ARTWORK.md`, and perhaps on the gold-paw card.
 
 The owner's notes on games 1–42 (43–52 not yet looked at), grouped by theme. Checked against the plan approved on
 2026-11-07 and the PRs that built it (rhymes-with-tree/catdoku#236 to #240), so nothing here quietly undoes them.
-Items marked **Changes the 2026-11-07 plan** need the owner's yes before building.
+Items marked **Changes the 2026-11-07 plan** say where it differs; each says whether the owner has decided. The owner
+will recheck this list, and add games 43–52, before any of it is built.
 
 ### Status line (every game)
 - Goal on the left, time on the right, never both on the left. Goals as a fraction with a small icon for what's
   counted: Tangle's "56 crossings left" becomes "56/59 ○" (the white dot); Pounce's moves become a fraction.
-- **Changes the 2026-11-07 plan** (step 4 put the status line above the board): the owner is weighing moving it
-  under the board, above the buttons. Pounce and Bubbles (goal, time, "shelf down in x bats") are the strongest case.
-  Trade-off: under the board it's where the eye goes on the way to the buttons; on tall boards (Tunnel Run, big
-  Catdoku) it can be pushed below the fold. Decide once, for every game.
+- **Changes the 2026-11-07 plan** (step 4 put the status line above the board). **Decided 2026-11-08: under the
+  board, above the buttons, in every game.** Pounce (moves, time, goal) and Bubbles (goal, time, "shelf down in x
+  bats") were the clearest cases. Watch tall boards (Tunnel Run, big Catdoku), where it could fall below the fold.
 
 ### Button rows (every game)
 - New order, from the owner: **Undo · Hint** on one line; **Restart · New [Noun]** on the last line of their own, kept
   apart so they aren't pressed by accident. Restart beside New is as the plan has it.
 - **Changes the 2026-11-07 plan** (step 8 groups the gold-paw tools, Hint with Audit and helpers, apart from the free
-  tools): Hint moves onto Undo's line. It keeps its dark red and slashed paw. Where do Audit and helpers go: with
-  Hint, or a line of their own?
+  tools). **Undecided:** Hint onto Undo's line, keeping its dark red and slashed paw? And if so, do Audit and helpers
+  go with it, or on a line of their own?
 - New [Noun] everywhere (Keyboard Cat's plain "New"), centred (Toe Beans).
 - Missing Restart: Toe Beans (no Restart at all), Hide & Seek, Tangle. Missing Give up: Pick of the Pile (two blocks
   stacked, no moves left), Spelling String (New Round is in an odd spot).
@@ -110,8 +110,8 @@ Items marked **Changes the 2026-11-07 plan** need the owner's yes before buildin
 - **Zoom and full screen like Twirl's** (owner likes it): `G.zoom` with `below: true`, under the board's corner. Cat
   Burglar and Catlas use the in-corner version today (plan step 5 said "in its corner"); Fish Bones and Hide & Seek
   have Full screen on its own (`G.fullScreen`) in yet another spot. One place for all.
-- **Gold paw exception:** Restart costs the paw in every game (#238). Toe Beans is a game of going back to the start,
-  so its Restart should not cost it.
+- **Gold paw exception, decided 2026-11-08:** Restart costs the paw in every game (#238), except Toe Beans, a game of
+  going back to the start, where it shouldn't. Its win card's gold-paw line and the README's Gold paw list change too.
 
 ### Things in the way of the board
 - Yarn: cats below Restart / New Puzzle, the puzzle's name ("Tropical") between them; smaller cats if it still
@@ -137,8 +137,8 @@ Items marked **Changes the 2026-11-07 plan** need the owner's yes before buildin
 - Catdoku: Mark's icon centred over the word; a cat mark beside the paw mark and Erase.
 - Fair Play: with Auto check on, Toy | Toy | Mark as pieces in place of tap once / tap twice (its `G.pieces` row is
   "Toy" and Mark today); the Toy piece shows a toy, not a paw; Mark shows its × / = with "Mark" under it.
-- **Changes the 2026-11-07 plan** (pieces put Patches' Marker among the fabrics): the owner wants Marker apart from
-  the colours, treated like other notes tools.
+- **Changes the 2026-11-07 plan** (pieces put Patches' Marker among the fabrics). **Decided 2026-11-08:** Marker is a
+  notes tool, so it comes out of the colours and sits where the other games' notes tools do.
 - Auto Notes keeps a **different icon in each game** (🐾 Catdoku, ✏️ Toydoku, 🔢 the digit-pad games), but the icon goes
   after the words, not before (Catdoku, High Perch, Toydoku; draw both for the owner first). Toydoku: the owner asked
   for 🔢 in place of the pencil. Catdoku's 🐾 is hard to see in dark mode (not urgent).
