@@ -1458,14 +1458,22 @@ const G = (() => {
   // the page's top rows set for every game at once), warn (it can cost a life or the gold paw, so changed on the page
   // mid-puzzle it waits for the next game), at ([storage key, field]; else the game's own store, field settings.key),
   // opts ([value, name] for a choice of several), get/set (where games.js keeps it itself: Timer, Slower)}.
-  const TIMERS = "catdoku.timers.v1", COMFORT = "catdoku.comfort.v1", PENDING = "catdoku.pending.v1";
+  const TIMERS = "catdoku.timers.v1", COMFORT = "catdoku.comfort.v2", PENDING = "catdoku.pending.v1";
   // Rows at the top of the page, three ways each: words[0] · By game · words[2]; on is the end that turns every switch on.
-  const ROWS = [
-    {id: "timers", name: "Timers", line: "The clock above the board", words: ["Show", "By game", "Hide"], on: 0},
-    {id: "speed", name: "Action game speed", line: "Slower: everything moves at two-thirds speed", words: ["Regular speed", "By game", "Slower"], on: 2},
-    {id: "decor", name: "Decorations", line: "Things drawn round the board just for looks", words: ["Show all", "By game", "Reduce clutter"], on: 0},
-    {id: "check", name: "Auto check", line: "Rule breaks turn red as you play", words: ["Off", "By game", "On"], on: 2},
-    {id: "notes", name: "Auto Notes", line: "Notes filled in for you", words: ["Off", "By game", "On"], on: 2},
+  // v1 (until build .23) had Decorations' Show all, and Auto check's and Auto Notes' Off, first: v2 turns those three round.
+  try {
+    const v1 = load("catdoku.comfort.v1");
+    if (Object.keys(v1).length && !Object.keys(load(COMFORT)).length) {
+      for (const id of ["decor", "check", "notes"]) if (id in v1 && v1[id] !== 1) v1[id] = 2 - v1[id];
+      save(COMFORT, v1);
+    }
+  } catch (e) {}
+  const ROWS = [   // no line under a row: its name and three words say it all; On (or Show) comes first
+    {id: "timers", name: "Timer", words: ["Show", "By game", "Hide"], on: 0},
+    {id: "speed", name: "Action game speed", words: ["Regular", "By game", "Slower"], on: 2},
+    {id: "decor", name: "Reduce visual clutter", words: ["On", "By game", "Off"], on: 2},   // on: the games' own switches (Fabric patterns, Junk…) off
+    {id: "check", name: "Auto check", words: ["On", "By game", "Off"], on: 0},
+    {id: "notes", name: "Auto Notes", words: ["On", "By game", "Off"], on: 0},
   ];
   const STORES = {catdoku: "catdoku.v1", atlas: "catdoku.catlas.v1"};
   const storeOf = slug => STORES[slug] || `catdoku.${slug}.v1`;
@@ -1502,7 +1510,7 @@ const G = (() => {
     const list = (SET_LIST[slug] || []).map(([key, name, line, def, more]) => Object.assign({slug, key, name, line, def}, more));
     if (SLOWS.includes(slug)) list.unshift({slug, key: "slower", name: "Slower", line: "Everything moves at two-thirds speed", def: false, row: "speed",
       get: () => !!load(SLOWER)[slug], set: v => { const all = load(SLOWER); all[slug] = v; save(SLOWER, all); }});
-    if (!UNTIMED.includes(slug)) list.unshift({slug, key: "timer", name: "Timer", line: "The clock above the board", def: true, row: "timers",
+    if (!UNTIMED.includes(slug)) list.unshift({slug, key: "timer", name: "Timer", line: "", def: true, row: "timers",
       get: () => !timerHidden(slug), set: v => { const all = load(TIMERS); all[slug] = !v; save(TIMERS, all); }});
     SETTINGS[slug] = list;
   }
