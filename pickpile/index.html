@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.27"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.28"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.27">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.28">
 <style>
 /* Fred, the star, beside the title */
 .title{display:flex;align-items:flex-end;gap:8px}
@@ -90,7 +90,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-07.27"></script>
+<script src="../games.js?v=2026-11-07.28"></script>
 <script>
 /* ---------- piles ---------- */
 // The pile for each level: blocks [x, y, z] in half-block steps, from rectangles [z, x, y, w, h] (x and y in
@@ -301,8 +301,8 @@ function draw() {
   if (game.won) { const im = new Image(); im.className = "nap"; im.src = catSrc("fred-11"); im.alt = "Fred curled up asleep on the rug"; el.append(im); }
   const n = leftCount();
   $("count").textContent = game.won ? "Pile cleared!" : `${n} block${n === 1 ? "" : "s"} left`;
-  $("hintBtn").disabled = game.won; $("undoBtn").disabled = game.won || !game.moves.length;
-  $("restartBtn").disabled = game.won || !game.moves.length; $("shuffleBtn").disabled = game.won;
+  $("hintBtn").disabled = game.won; undo.sync();
+  $("shuffleBtn").disabled = game.won;
 }
 const blockEl = i => $("board").querySelector(`.blk[data-i="${i}"]`);
 const stateKey = () => game.left.map(Number).join("") + game.f.join(",");
@@ -320,7 +320,7 @@ function tap(i) {
   if (game.sel === i) { game.sel = -1; draw(); save(); return; }
   if (game.sel < 0 || game.f[game.sel] !== game.f[i]) { game.sel = i; draw(); save(); return; }
   const a = game.sel, b = i;
-  game.sel = -1; game.left[a] = game.left[b] = false; game.moves.push([a, b]);
+  game.sel = -1; game.left[a] = game.left[b] = false; undo.push([a, b]);
   save();
   for (const k of [a, b]) blockEl(k).classList.add("gone");
   const g = game;
@@ -340,21 +340,17 @@ function afterMove() {
   if (new Set(free).size === free.length) G.note("No free pairs left. Undo, or Shuffle the toys that are left.", 0);
 }
 
-function undo() {
-  if (!playing() || !game.moves.length) return;
-  const m = game.moves.pop();
-  if (m.shuffle) { game.f = m.shuffle; game.sol = m.sol; }
-  else for (const k of m) game.left[k] = true;
-  game.sel = -1;
-  draw(); save(); G.note("");
+// Undo (G.history): the steps are game.moves, each a pair taken off (put back) or a shuffle ({shuffle, sol}: the toys
+// before it). Restart takes them all back and empties the list.
+function takeBack(m, g) {
+  if (m.shuffle) { g.f = m.shuffle; g.sol = m.sol; } else for (const k of m) g.left[k] = true;
+  g.sel = -1;
 }
-$("undoBtn").onclick = undo;
-addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); undo(); } });
+const undo = G.history({game: () => game, list: g => g.moves, can: playing, back: (m, g) => { takeBack(m, g); G.note(""); },
+  after: () => { draw(); save(); }, restart: true});
 $("restartBtn").onclick = () => {
-  if (!playing() || !game.moves.length) return;
-  while (game.moves.length) { const m = game.moves.pop(); if (m.shuffle) { game.f = m.shuffle; game.sol = m.sol; } else for (const k of m) game.left[k] = true; }
-  game.sel = -1; game.restarted = true;
-  draw(); save(); G.note("Back to the whole pile.", 3000);
+  const ms = game ? game.moves.slice() : [];
+  if (undo.restart(g => { for (const m of ms.reverse()) takeBack(m, g); g.sel = -1; })) G.note("Back to the whole pile.", 3000);
 };
 // Shuffle: deal the toys left onto the blocks left again, so that there's a way to clear them.
 $("shuffleBtn").onclick = () => {
@@ -364,7 +360,7 @@ $("shuffleBtn").onclick = () => {
   if (!order) { G.note("These blocks can't all come off however the toys lie. Undo a few moves instead.", 5000); return; }
   const toys = shuffle(game.f.filter((_, i) => game.left[i]).sort((a, b) => a - b).filter((_, k) => k % 2 === 0)), f = game.f.slice();
   order.forEach(([a, b], k) => f[a] = f[b] = toys[k]);
-  game.moves.push({shuffle: game.f, sol: game.sol});
+  undo.push({shuffle: game.f, sol: game.sol});
   game.f = f; game.sol = order; game.sel = -1; game.shuffled = true;
   draw(); save(); G.note("Shuffled. There's a way to clear the pile again.", 3500);
 };
