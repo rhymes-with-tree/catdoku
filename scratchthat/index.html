@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-08.12"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-08.16"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-08.12">
+<link rel="stylesheet" href="../games.css?v=2026-11-08.16">
 <style>
 /* Dottie, the star, beside the title */
 .title{display:flex;align-items:flex-end;gap:8px}
@@ -56,7 +56,7 @@
 .num.back-top{padding-top:26%}
 .num.back-left{padding-left:26%}
 .num.done{opacity:.4}
-.num.over{color:#C8392B}
+.num.over,.num.short{color:#C8392B}   /* short: too few posts, shown once the floor is full */
 .dot{position:absolute;left:50%;top:50%;width:16%;height:16%;border-radius:50%;background:#5E5866;transform:translate(-50%,-50%);opacity:.6}
 .sq.bad svg .ring{display:block}
 .ring{display:none}
@@ -102,8 +102,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-08.12"></script>
-<script src="../cattower.js?v=2026-11-08.12"></script>
+<script src="../games.js?v=2026-11-08.16"></script>
+<script src="../cattower.js?v=2026-11-08.16"></script>
 <script>
 /* ---------- rooms ---------- */
 // A room is N × N squares, each floor (-1), furniture (-2) or furniture with a number (0 to 4).
@@ -309,7 +309,7 @@ const dottieAt = () => { const {N, s} = game, c = (N - 1) / 2; let best = -1, d 
   s.forEach((v, i) => { const e = Math.hypot(i % N - c, Math.floor(i / N) - c); if (v === 1 && e < d) { d = e; best = i; } }); return best; };
 
 function draw() {
-  const el = $("board"), {N, g, s} = game, l = look(), chk = settings.autoCheck || game.won, sofas = furniture(), live = hints.current(), guessed = new Set(guesses.list());
+  const el = $("board"), {N, g, s} = game, l = look(), full = !floorLeft(l), chk = settings.autoCheck || game.won || full, sofas = furniture(), live = hints.current(), guessed = new Set(guesses.list());
   el.style.gridTemplateColumns = el.style.gridTemplateRows = `repeat(${N}, 1fr)`;
   if (el.children.length !== N * N) {
     el.innerHTML = "";
@@ -327,7 +327,7 @@ function draw() {
       else d.innerHTML = s[i] === 0 ? `<span class="dot"></span>` : "";
     }
     d.classList.toggle("dottiehere", game.won && i === dottieAt());
-    if (g[i] >= 0) { const nm = d.querySelector(".num"); nm.classList.toggle("done", chk && l.num[i] === g[i]); nm.classList.toggle("over", chk && l.num[i] > g[i]); }
+    if (g[i] >= 0) { const nm = d.querySelector(".num"); nm.classList.toggle("done", chk && l.num[i] === g[i]); nm.classList.toggle("over", chk && l.num[i] > g[i]); nm.classList.toggle("short", full && !game.won && l.num[i] < g[i]); }
     d.setAttribute("role", "gridcell");
     d.setAttribute("aria-label", g[i] === -2 ? "Furniture" : g[i] >= 0 ? `Furniture wanting ${g[i]} post${g[i] === 1 ? "" : "s"} beside it`
       : s[i] === 1 ? "Scratching post" : s[i] === 0 ? "No post here" : l.lit[i] ? "Floor with a post in sight" : "Floor with no post in sight");
@@ -370,8 +370,15 @@ function after() {
   draw(); save();
   const l = look();
   if (!floorLeft(l) && !l.bad.some(Boolean) && game.g.every((v, i) => v < 0 || l.num[i] === v)) win();
-  else if (!floorLeft(l) && l.bad.some(Boolean)) G.note("There's a post in sight everywhere, but two posts can see each other.", 4000);
-  else if (!floorLeft(l)) G.note("There's a post in sight everywhere, but a number isn't right yet.", 4000);
+  // a full floor that isn't right says why, and stays until the next move; the squares at fault turn red even with
+  // Auto check off (draw)
+  else if (!floorLeft(l)) {
+    const pairs = l.bad.filter(Boolean).length / 2, wrong = game.g.filter((v, i) => v >= 0 && l.num[i] !== v).length;
+    const why = [pairs ? `${pairs === 1 ? "two posts see" : `${Math.round(pairs)} pairs of posts see`} each other (ringed in red)` : "",
+      wrong ? `${wrong === 1 ? "a number has" : `${wrong} numbers have`} the wrong count of posts beside ${wrong === 1 ? "it" : "them"} (in red)` : ""].filter(Boolean);
+    G.note(`Dottie can see a post from everywhere, but ${why.join(", and ")}.`, 0);
+  }
+  else if (/^Dottie can see a post/.test($("msg").textContent)) G.note("");
 }
 // Drag across the floor to put dots on every empty square passed (or, starting on a dot, to take dots off).
 // A press that stays on one square is a tap.

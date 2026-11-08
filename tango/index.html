@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-08.12"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-08.16"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-08.12">
+<link rel="stylesheet" href="../games.css?v=2026-11-08.16">
 <style>
 /* Two toys share out a grid in the toy box: every line holds as many of one as the other, no three alike in a row,
    and = / × signs between squares say whether neighbours match. */
@@ -93,7 +93,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-08.12"></script>
+<script src="../games.js?v=2026-11-08.16"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // A grid of N × N squares, each 0 or 1 (the two toys). Every row and column has N/2 of each, no three the same
@@ -378,6 +378,35 @@ function forcedSquare() {
       if (i !== undefined) return {i, v: 1 - v, why: `this ${word} already has all its ${toy(v)}`};
     }
   }
+  // the next rules (added 2026-11-08) use the signs and the counts together
+  const sign = new Map(game.signs.map(x => [Math.min(x.a, x.b) + "," + Math.max(x.a, x.b), x.same]));
+  const signOf = (x, y) => sign.get(Math.min(x, y) + "," + Math.max(x, y));
+  for (const L of lines(N)) {
+    const word = L[1] - L[0] === 1 ? "row" : "column";
+    // an = joining two empty squares beside a toy: both the same as it would make three in a row
+    for (let k = 0; k + 2 < N; k++) {
+      const p = L[k], q = L[k + 1], r = L[k + 2];
+      if (g[p] !== -1 && g[q] === -1 && g[r] === -1 && signOf(q, r) === true)
+        return {i: q, v: 1 - g[p], why: `the = beside it means two more ${toy(g[p])}, which would make three in a row`};
+      if (g[r] !== -1 && g[p] === -1 && g[q] === -1 && signOf(p, q) === true)
+        return {i: q, v: 1 - g[r], why: `the = beside it means two more ${toy(g[r])}, which would make three in a row`};
+    }
+    // signs between empty squares of the line, against what the line still needs
+    const pairs = [];
+    for (let k = 0; k + 1 < N; k++) {
+      const x = L[k], y = L[k + 1], sm = signOf(x, y);
+      if (g[x] === -1 && g[y] === -1 && sm !== undefined && !pairs.some(([a, b]) => b === x)) pairs.push([x, y, sm]);
+    }
+    for (const v of [0, 1]) {
+      const c = L.filter(i => g[i] === v).length;
+      const eq = pairs.find(([, , sm]) => sm && c + 2 > half);
+      if (eq) return {i: eq[0], v: 1 - v, why: `an = pair of ${toy(v)} would be too many ${toy(v)} for this ${word}`};
+      const xs = pairs.filter(([, , sm]) => !sm), inX = new Set(xs.flatMap(([a, b]) => [a, b]));
+      const i = L.find(i => g[i] === -1 && !inX.has(i));
+      if (xs.length && c + xs.length === half && i !== undefined)
+        return {i, v: 1 - v, why: `the × pair${xs.length > 1 ? "s" : ""} in this ${word} take${xs.length > 1 ? "" : "s"} one ${oneOf(game.toys[v]).replace(/^an? /, "")} each, which makes all its ${toy(v)}`};
+    }
+  }
   return null;
 }
 function hint() {
@@ -394,8 +423,9 @@ function hint() {
     if (!f || f.v !== sol[f.i]) { const i = g.findIndex(v => v === -1); f = {i, v: sol[i], why: ""}; }
     // show the square and why it's settled; asked again, what goes there. The player puts it down.
     const a = oneOf(game.toys[f.v]), A = a[0].toUpperCase() + a.slice(1);
-    hints.show({i: f.i, kind: "hinted"}, !hints.level() ? (f.why ? `The glowing square can be worked out: ${f.why}.` : "Look at the glowing square: ask again for what goes there.")
-      : f.why ? `${A} goes in the glowing square: ${f.why}.` : `${A} goes in the glowing square.`);
+    // with no rule to give, it says so: the toy comes straight from the answer
+    hints.show({i: f.i, kind: "hinted"}, !hints.level() ? (f.why ? `The glowing square can be worked out: ${f.why}.` : "No simple rule settles a square just now, so this one comes from the answer: ask again for what goes there.")
+      : f.why ? `${A} goes in the glowing square: ${f.why}.` : `${A} goes in the glowing square. That's straight from the answer: no simple rule settles a square here yet.`);
   }
 }
 $("hintBtn").onclick = hint;

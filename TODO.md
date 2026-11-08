@@ -89,30 +89,16 @@ Items marked **Changes the 2026-11-07 plan** say where it differs; each says whe
 will recheck this list, and add games 43–52, before any of it is built.
 
 ### Status line (every game)
-- Goals as a fraction with a small icon for what's
-  counted: Tangle's "56 crossings left" becomes "56/59 ○" (the white dot); Pounce's moves become a fraction.
-- Status line under the board: done (decided 2026-11-08, changing the 2026-11-07 plan's step 4). Keyboard Cat and
-  Meowbile keep their own layouts. Still to check on tall boards (Tunnel Run, big Catdoku), where it could fall below
-  the fold.
-
-### Button rows (every game)
-- **Restart · New [Noun]** on the last line, a line of their own, kept apart so they aren't pressed by accident
-  (Restart beside New is as the plan has it).
-- **Hint stays where the plan has it** (decided 2026-11-08): in the gold-paw group, not on Undo's line.
-- New [Noun] centred (Toe Beans).
-- Spelling String: New Round is in an odd spot (it already has Give up).
-- Junk Drawer's row underneath is unevenly spaced.
-- Zoom and full screen: done for Twirl, Cat Burglar, Catlas, Fish Bones and Hide & Seek (`G.zoom` with `below`). Still
-  beside New: Wind-Up's and Pawlinko's full screen (action games, not on the 2026-11-08 list). Move them too?
-
-### Tools and gestures the same everywhere
-- Auto Notes: Catdoku's 🐾 is hard to see in dark mode (not urgent).
-- Toydoku: its icons are in an odd order.
-- Scratch That's Post first / Dot first: look for other games it would help (Fair Play?).
+- Goals as a fraction with a small icon: done for Tangle ("4/6 ○") and Pounce ("🐾 12/15") through `G.tally`. Still
+  to choose, game by game, which others change and with what icon. Those already counting "N of M" are the likeliest:
+  Copycat (pairs), Cross Stitch, High Perch, If It Fits, Junk Drawer and Knit Pick (words), Kitten Caboodle, Laser
+  Pointer, Open the Door!, Tail Chase, Toydoku, Treat Time, Tunnel Run, Window Ledges, Mew Hue's lines, Bird Watch.
+- Tall boards: checked on 390 × 844 and 375 × 667. Tunnel Run's and Catdoku's biggest boards leave the status line well
+  on screen; Bubbles' note line dips just under on a 390 × 844 phone, with its goal and time still showing.
 
 ### Symbols that read wrong
-- Cat Mat's key numbers read as pots of paint.
-- Toy Box: a better way to show the toys on the track.
+- Toy Box: a better way to show the toys on the track. Asked the owner on 2026-11-08 what reads wrong (the toys looked
+  clear in a screenshot), before changing anything.
 - Up a Tree: a new picture of Dottie for the win card.
 
 ### Comfort settings, one place for every game (a Settings page; decided 2026-11-08)
@@ -123,21 +109,7 @@ will recheck this list, and add games 43–52, before any of it is built.
 ### Menu and Settings (every game)
 
 ### Win card and sharing
-- Next / Admire / Share / Back to the front page / other size: one big Next, small icon buttons for the rest, the
-  other sizes as a small link (New already holds the levels, #236).
-- Share My Result: drop the long level names; game, one-line result (fraction, time, 🔥 streak, 🐾 gold paw), link.
 - Toy Box's Admire Laya shows `laya-9` on the rug, awake: no Laya picture has her asleep. A sleeping Laya picture?
-
-### Bugs
-- Mewstermind: Enter moves to the next toy and changes it.
-- Scratch That: why it isn't complete isn't clear, and the note goes too fast.
-- Fair Play's hints: only three rules (no three in a row, no sandwich, a line already has all of one toy); when none
-  applies it shows the first empty square's answer with no reason. Add rules, or say it's a plain answer.
-- Bubbles: when Raise the Ceiling is allowed isn't predictable after a loss; offer it as a helper.
-
-### Choices as radio buttons
-- Catlas: Answer type → Pick from 4 names / Type with autocomplete / Type in a blank box, no help.
-- Knit Pick: Cat theme words / Everyday words.
 
 ### More to play
 - Tunnel Run: many more turning-only levels, up to a full page of small tunnels with a full-page view.

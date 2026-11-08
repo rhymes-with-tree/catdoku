@@ -470,7 +470,7 @@ const G = (() => {
     const card = $("card"); card.innerHTML = "";
     const h = document.createElement("h2"); h.textContent = title; card.append(h);
     const s = document.createElement("div"); s.className = "stripe"; card.append(s);
-    if (text) { const p = document.createElement("p"); p.textContent = text; card.append(p); }
+    if (text) { const p = document.createElement("p"); emoText(p, text); card.append(p); }
     if (media) card.append(media);
     const row = document.createElement("div"); row.className = "btns";
     for (const [label, fn, primary] of btns) {
@@ -488,7 +488,7 @@ const G = (() => {
   // Escape cancels on Apple's platforms; a card that needs a choice (out of lives) stays.
   document.addEventListener("keydown", e => {
     const ov = $("overlay"); if (e.key !== "Escape" || !ov || !ov.classList.contains("show") || document.querySelector(".spot")) return;
-    const out = [...ov.querySelectorAll(".btns button")].find(b => /^(Close|Cancel|Keep playing|Done|Admire|Look at)/.test(b.textContent.trim()));
+    const out = [...ov.querySelectorAll(".btns button, .smallbtns button")].find(b => /^(Close|Cancel|Keep playing|Done|Admire|Look at)/.test(b.textContent.trim()));
     if (out) { e.preventDefault(); out.click(); }
   });
 
@@ -678,6 +678,17 @@ const G = (() => {
     btns.push(["Share my result", e => shareResult(result, o.gold, e.currentTarget)],
       homeBtn());
     openCard(o.gold ? o.goldTitle || "Gold paw!" : o.title || "Solved!", "", btns, media, o.after);
+    // one big Next, and the rest as small icon buttons in a row under it, each with its word small underneath
+    // (decided 2026-11-08); the other sizes (o.after, G.otherSize) show as a small link under them (games.css)
+    const row = $("card").querySelector(".btns"), small = document.createElement("div");
+    small.className = "smallbtns";
+    for (const b of [...row.children].slice(1)) {
+      const w = b.textContent, home = w === HOME_LABEL, share = w === "Share my result";
+      b.setAttribute("aria-label", w); b.title = w; b.classList.add("tool");
+      b.innerHTML = iconSVG(home ? "home" : share ? "share" : /^Keep/.test(w) ? "play" : "peek") + `<span class="lbl">${home ? "Front page" : share ? "Share" : w}</span>`;
+      small.append(b);
+    }
+    if (small.children.length) row.after(small);
   }
 
   // Count a moment in the game (a puzzle started or solved) on the GoatCounter dashboard.
@@ -884,12 +895,13 @@ const G = (() => {
   // o.btn: the button that was pressed, which says what happened ("Copied!") and keeps the card that's up
   // (the win card) open; without it, the card closes and the note line says so.
   async function sendLink(title, text, url, o = {}) {
-    const all = text + " " + url;
+    const all = text + (/\n/.test(text) ? "\n" : " ") + url;
     const done = msg => {
       if (!o.btn) { closeCard(); if (msg) note(msg, 5000); return; }
       if (!msg) return;
-      const was = o.btn.dataset.label || o.btn.textContent; o.btn.dataset.label = was;
-      o.btn.textContent = msg; setTimeout(() => { o.btn.textContent = was; }, 2500);
+      const w = o.btn.querySelector(".lbl") || o.btn;   // an icon button (the win card's Share) keeps its icon
+      const was = o.btn.dataset.label || w.textContent; o.btn.dataset.label = was;
+      w.textContent = msg; setTimeout(() => { w.textContent = was; }, 2500);
     };
     if (navigator.share) {
       // One piece of text with the link at the end: given text and a link separately, Messages on an
@@ -901,18 +913,26 @@ const G = (() => {
     // No share sheet and no clipboard: a box to copy from, under the button (or on a card of its own)
     const box = document.createElement("textarea"); box.value = all; box.readOnly = true; box.rows = 3;
     box.style.cssText = "width:100%;font:inherit;font-size:calc(13px*var(--ts));margin:0;border:2px solid var(--line);border-radius:8px;padding:6px";
-    if (o.btn) { if (!o.btn.nextElementSibling || o.btn.nextElementSibling.tagName !== "TEXTAREA") o.btn.after(box); else o.btn.nextElementSibling.select(); }
+    const at = o.btn && (o.btn.closest(".smallbtns") || o.btn);   // under the win card's row of small buttons, not inside it
+    if (at) { if (!at.nextElementSibling || at.nextElementSibling.tagName !== "TEXTAREA") at.after(box); else { at.nextElementSibling.select(); return; } }
     else openCard("Copy this", "Select it and copy it into a message.", [["Done", closeCard, true]], box);
     box.focus(); box.select();
   }
   // A finished puzzle's result to share: the game, level or size, time, and gold paw, with a link to the game.
+  // Share my result, kept short (decided 2026-11-08): the game, then one line (the level as a fraction of the levels,
+  // or the size, the time, the win streak and the gold paw), then the link. Long level names are left out.
   function shareResult(r, gold, btn) {
-    const name = document.querySelector("header h1").textContent, bits = [name];
-    if (r && r.n != null && T) bits.push(label(r.n));
+    const name = document.querySelector("header h1").textContent, bits = [];
+    if (r && r.n != null && T) {
+      const sel = $("levelSel") || $("size"), l = label(r.n), vals = sel ? [...sel.options].map(o => o.value) : [], i = vals.indexOf(String(r.n));
+      bits.push(/^\d+ × \d+$/.test(l) ? l.replace(/ /g, "") : i >= 0 && vals.length > 1 ? `Level ${i + 1}/${vals.length}` : l.split(" · ")[0]);
+    }
     if (r && r.ms != null && !timerHidden(T && T.name)) bits.push("⏱ " + clock(r.ms));
-    if (gold) bits.push("Gold paw 🐾");
+    const st = T ? streak(T.name).streak : 0;
+    if (st > 1) bits.push(`🔥 ${st}`);
+    if (gold) bits.push("🐾 Gold paw");
     track(`${name} result shared`);
-    sendLink(name, bits.join(" · "), location.origin + location.pathname, {btn});
+    sendLink(name, bits.length ? `${name}\n${bits.join(" · ")}` : name, location.origin + location.pathname, {btn});
   }
   // The Share card: a fresh copy of the puzzle, or the puzzle with the moves so far (when o.progress is given;
   // a game played against the clock, like Pounce, shares only the fresh level).
@@ -1395,10 +1415,10 @@ const G = (() => {
     const opt = document.createElement("div"); opt.className = "opt";
     opt.innerHTML = '<label class="toggle"><input type="checkbox"><span class="sw"></span><span class="swName"></span></label>';
     const box = opt.querySelector("input"); box.id = o.id;
-    opt.querySelector(".swName").textContent = o.label;
+    emoText(opt.querySelector(".swName"), o.label);
     // the line shows only on a switch that can cost a life or the gold paw (o.warn); on the rest it's read out, not shown
     if (o.line) {
-      const s = document.createElement("span"); s.className = o.warn ? "hint" : "hint quiet"; s.id = o.id + "Line"; s.textContent = o.line;
+      const s = document.createElement("span"); s.className = o.warn ? "hint" : "hint quiet"; s.id = o.id + "Line"; emoText(s, o.line);
       opt.append(s); box.setAttribute("aria-describedby", s.id);
     }
     box.sync = () => { box.checked = !!of()[o.key]; };
@@ -1788,6 +1808,7 @@ const G = (() => {
     toys: '<circle cx="16" cy="16" r="10"/><path d="M7 12c6 2.5 12 2.5 18 0M7.5 21c5-2.5 12-2.5 17 0M16 6c-3 6-3 14 0 20"/>',
     best: '<path d="M10 5h12v6a6 6 0 0 1-12 0z"/><path d="M10 8H6v1.5a4 4 0 0 0 4 4M22 8h4v1.5a4 4 0 0 1-4 4"/><path d="M16 17v5"/><path d="M11 27h10M13 22h6v5h-6z"/>',
     help: '<circle cx="16" cy="16" r="11"/><path d="M12.5 12.5a3.5 3.5 0 1 1 5 3.2c-1 .5-1.5 1.3-1.5 2.3V19"/><path d="M16 23v.2"/>',
+    lift: '<path d="M6 6h20"/><path d="M16 27V11"/><path d="M10 17l6-6 6 6"/>',
     zoomin: '<circle cx="14" cy="14" r="9"/><path d="M21 21l6 6"/><path d="M14 10v8M10 14h8"/>',
     zoomout: '<circle cx="14" cy="14" r="9"/><path d="M21 21l6 6"/><path d="M10 14h8"/>',
     fit: '<path d="M5 11h6V5M27 11h-6V5M5 21h6v6M27 21h-6v6"/>',
@@ -1823,7 +1844,7 @@ const G = (() => {
     allNotesBtn: "pencils", clearNotesBtn: "erase", eraseBtn: "erase", pauseBtn: "pause", guessBtn: "guess", giveUpBtn: "giveup",
     keepBtn: "keep", markerBtn: "marks", shuffleBtn: "shuffle", flipBtn: "flip", finishBtn: "near", completeBtn: "check", skipBtn: "skip",
     colBtn: "palette", dotBtn: "dot", linkBtn: "share", toysBtn: "toys", bestBtn: "best", helpBtn: "help", zoomIn: "zoomin", zoomOut: "zoomout", zoomFit: "fit",
-    sightBtn: "sight", nipBtn: "catnip", shakeBtn: "bubbleshake", fluffBtn: "defluff", swatBtn: "swat", netBtn: "net", rainbowBtn: "losecolor", basketBtn: "basketadd", wipeBtn: "wipe",
+    sightBtn: "sight", liftBtn: "lift", nipBtn: "catnip", shakeBtn: "bubbleshake", fluffBtn: "defluff", swatBtn: "swat", netBtn: "net", rainbowBtn: "losecolor", basketBtn: "basketadd", wipeBtn: "wipe",
     chooseBtn: "keyboard", revealBtn: "giveup", peekBtn: "peek", perchBtn: "perch", wakeBtn: "cat", reelBtn: "reel", mopBtn: "sponge"};
   // buttons that keep their own look with an icon in front of the word: every New (a +) and Catlas's Go (an arrow)
   const LEAD = {newBtn: "plus", sNewBtn: "plus", goBtn: "go", settingsSum: "sliders"};
@@ -1891,7 +1912,7 @@ const G = (() => {
   const PAW_COST = {
     hintFree: "hideseek",
     hints: {junkdrawer: "leftBtn"},   // hints by another name: in the red group beside Hint
-    helpers: {toybox: "shakeBtn shuffleBtn rainbowBtn basketBtn", bubbles: "sightBtn nipBtn shakeBtn", pickpile: "shuffleBtn", mewhue: "shuffleBtn",
+    helpers: {toybox: "shakeBtn shuffleBtn rainbowBtn basketBtn", bubbles: "sightBtn nipBtn shakeBtn liftBtn", pickpile: "shuffleBtn", mewhue: "shuffleBtn",
       windup: "shakeBtn fluffBtn netBtn", lmnopom: "swatBtn", birdwatch: "wipeBtn"},
   };
   const has = (list, slug) => (list || "").split(" ").includes(slug);
@@ -2342,6 +2363,52 @@ const G = (() => {
     return {left, used, say, show, lose, refill, canRevive, revive, reviveBtn, outCard};
   }
 
+  /* ---------- a few choices as radio buttons ---------- */
+  // A setting with a few choices shows them all as a row of radio pills, as on the Settings page (decided 2026-11-08:
+  // Catlas's Answer, Knit Pick's Words), in place of a picker that hides them. The page's own select stays, hidden,
+  // for its bookkeeping: a pill sets it and sends its change, and setting it from script moves the pill too.
+  // names: {value: words} in place of the options' own words.
+  function radios(sel, name, names = {}) {
+    const label = sel.closest("label"), f = document.createElement("fieldset"), n = sel.id + "Pills";
+    f.className = "seg"; f.id = n;
+    const leg = document.createElement("legend"); leg.className = "segName"; leg.textContent = name || sel.getAttribute("aria-label") || ""; f.append(leg);
+    const ins = [...sel.options].map(o => {
+      const l = document.createElement("label"), i = document.createElement("input"); i.type = "radio"; i.name = n; i.value = o.value;
+      const w = document.createElement("span"); w.textContent = names[o.value] || o.textContent; l.append(i, w); f.append(l);
+      i.onchange = () => { if (i.checked && sel.value !== o.value) { sel.value = o.value; sel.dispatchEvent(new Event("change", {bubbles: true})); } };
+      return i;
+    });
+    const sync = () => { const v = sel.value; ins.forEach(i => { i.checked = i.value === v; }); };
+    const d = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value");
+    Object.defineProperty(sel, "value", {configurable: true, get() { return d.get.call(this); }, set(v) { d.set.call(this, v); sync(); }});
+    sel.addEventListener("change", sync);
+    (label || sel).after(f); (label || sel).hidden = true; (label || sel).style.display = "none"; sync();
+    return f;
+  }
+
+  /* ---------- dark emoji ---------- */
+  // Text with a dark emoji (🐾, black on most phones) that would vanish on the dark page: each one goes in a small light
+  // round backing in dark mode (.darkemo in games.css), as the walkthrough does with its emoji. Used for switches'
+  // names and lines and the cards' words.
+  function emoText(el, text) {
+    if (!/🐾/.test(text)) { el.textContent = text; return; }
+    el.textContent = "";
+    for (const bit of text.split(/(🐾)/)) {
+      if (bit === "🐾") { const e = document.createElement("span"); e.className = "darkemo"; e.textContent = bit; el.append(e); }
+      else if (bit) el.append(bit);
+    }
+  }
+
+  /* ---------- a goal as a fraction ---------- */
+  // The status line's goal as a fraction with a small icon for what's counted (decided 2026-11-08): Tangle's
+  // "56/59 ○" (crossings left of those dealt, the white dot the board draws), Pounce's "🐾 12/20" (moves left). VoiceOver
+  // hears it in words (say). icon: an SVG's inside on a 16 × 16 view, or a short text (an emoji); before: icon first.
+  function tally(el, n, of, icon, say, before) {
+    const ic = /</.test(icon) ? `<svg class="tic" viewBox="0 0 16 16" aria-hidden="true">${icon}</svg>` : `<span class="tic" aria-hidden="true">${icon}</span>`;
+    const num = `<span aria-hidden="true">${n}/${of}</span>`;
+    el.innerHTML = `<span class="tally" role="text" aria-label="${say}">${before ? ic + num : num + ic}</span>`;
+  }
+
   /* ---------- zoom and full screen ---------- */
   // One set of round buttons, the same in every game that zooms or goes full screen: full screen (through fullScreen
   // above), +, − and one more where the game has it (Twirl's Fit, Catlas's back to the lit country). + and − on the
@@ -2405,6 +2472,6 @@ const G = (() => {
     }
   }
 
-  return {MAGNET, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText,
+  return {MAGNET, tally, emoText, radios, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();
