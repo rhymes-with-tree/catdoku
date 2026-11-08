@@ -105,7 +105,8 @@ beside Hint and stay until the card or painting moves on; what the hint showed i
 the lit country), with the + and − keys, in Twirl (under the mat's corner, as the mat at Fit can't be moved from under
 them), Cat Burglar and Catlas; each keeps its own pinch and drag. Then `G.lives`: the hearts, the Out of lives card and
 "Wait, I'm only mostly dead!" written once for Catdoku, Toydoku, Hide & Seek, Twirl and Cat Burglar (each keeps its
-lives in its own saved game, as before), and Catlas's tries on each place shown as hearts with it. Still to do: the other shared helpers below. When it's done, the README's "Across every game" (Layout, Gold paw, Bookmark, Keys) and
+lives in its own saved game, as before), and Catlas's tries on each place shown as hearts with it. Then `G.history` (Undo, its ⌘Z, Restart greying out
+with it, and Restart itself; see "Undo" below), with the first pages moved onto it. Still to do: the other shared helpers below. When it's done, the README's "Across every game" (Layout, Gold paw, Bookmark, Keys) and
 `HIG.md` need rewriting to match.
 
 ### The page, top to bottom
@@ -169,8 +170,40 @@ Built 2026-11-07 (`whatsNew` in `games.js`), ahead of the shared helpers, which 
 
 ### Shared helpers, so each is written once
 
-- **Undo:** 33 pages write their own history. One `G.history` (push, undo, restart, ⌘Z), which Return to Bookmark
-  and Restart use too.
+- **Undo:** `G.history` in `games.js` (built 2026-11-07): push, undo, restart, ⌘Z or Ctrl+Z, and greying out Undo
+  (and Restart, with `restart: true`). Each page keeps its steps where and as it did (in its saved game, usually
+  `game.history`), so old saves load and undo; `back(step)` puts one back; `take` makes snapshots (and lets Restart be
+  undone); `cap` keeps the newest (moving bookmarks' places with them); `G.guesser({history})` takes its Undo from it.
+  Moved so far: Night Light. Still writing their own (33 at the start; how each keeps its steps, from the survey):
+  - Cat Mat: pots in order, the mat replayed from the start; Restart empties the list; a share link keeps the steps
+  - Pawlette: JSON snapshots of the strand; Restart pushes one
+  - Treat Time: `[i, mark]` moves, and Restart pushes `{mark}`
+  - Up a Tree: rung snapshots, Restart pushes one; the steps are the rungs, so Undo gives the step back
+  - Unravel: no list, the path itself (Undo takes its last step off)
+  - Sunbeams, Yarn, Patches: snapshots, 300 kept; Clear pushes one; Yarn drops a step that changed nothing
+  - Cross Stitch: grid strings, 400 kept, drops a step that changed nothing; Restart pushes one
+  - Catwalk: lane snapshots; Restart pushes one
+  - Shelf Life: moves, replayed from the start; Restart empties the list; a share link keeps the steps
+  - Fair Play, High Perch, Open the Door!, Toydoku, Window Ledges: `{grid, notes}` snapshots, Restart pushes one, with
+    `G.guesser`; Toydoku drops a step that changed nothing
+  - Purrfect Square, Fridge Magnets: `{...put}` snapshots, Restart pushes one, with `G.guesser`
+  - Scratch That: `game.moves`, each a group of `[i, was]` (a drag is one step); Restart empties it; `G.guesser` with
+    `moves`
+  - Catdoku: JSON of the cells, 500 kept (bookmarks move with it); Restart empties the list; `G.guesser`
+  - Mewstermind: `game.undo` of `{cur, sel}`, 60 kept; no Restart
+  - Pick of the Pile: `game.moves`, pairs and `{shuffle, sol}`; Restart takes them all back
+  - Purrmutation: a slide's moves as one step, and Restart pushes `{pos}`
+  - Meowbile: `[sel, was]`, and Restart pushes `{got}`
+  - Tunnel Run: turns and steps, and Restart pushes `{turns, trail}`
+  - Laser Pointer: the mirrors tilted, and Restart pushes `{tilt}`; a new run empties the list
+  - Fish Bones: `[i, j]` swaps, Undo swaps back and gives the swap back; Restart empties the list; a share link keeps
+    the steps
+  - Knock It Off: JSON of the room, 400 kept; Undo gives the move back; Restart pushes one; old saves' `"k":"L"` read
+    as `"l"`
+  - Mew Hue: JSON snapshots, 50 kept; Undo can take back a lost board; Restart pushes one
+  - If It Fits: piece snapshots (a hold or a drag pushes the one from before it); Restart pushes one
+  - Toe Beans: snapshots; no Restart flag
+  - Cat Pile: `S.history` (not in `game`), JSON of the board, 60 kept; the moves count in `S.d.moves`
 - **Checking:** the names are one each now (2026-11-07): Auto check (rule breaks turn red as you play), Audit (a
   one-off check) and Auto grade (a wrong answer costs a life; Catdoku's was Audit as-you-go). Still to weigh: Complete
   (Catdoku) and Check (Mewstermind) are one button.

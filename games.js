@@ -1846,6 +1846,49 @@ const G = (() => {
     new MutationObserver(sync).observe(m, {attributes: true, attributeFilter: ["aria-pressed"]}); sync();
   }
 
+  /* ---------- undo ---------- */
+  // Undo, written once (G.history). The steps stay where each page has always kept them, in its saved game
+  // (game.history unless o.list says otherwise) and in the page's own form, a snapshot to go back to or a move to take
+  // back, so saved games still load and undo. Undo is free; Restart costs the gold paw (game.restarted); Return to
+  // Bookmark (G.guesser, given history) is Undo over and over. In the games that count moves, back() gives the move
+  // back or not, as the game has it (Night Light's taps still count).
+  // o: {game: () => game, back(step, game) (put one step back; it's already off the list), take() (the step push() puts
+  //   on when given none, usually a snapshot; with it, Restart can be undone too), list(game) (the steps, if not
+  //   game.history), cap (most steps kept; the oldest go), over (() => true once the puzzle's done: Undo greys out;
+  //   game.won if not given), can (() => true while Undo may act; !over() if not given), after (draw and save, after
+  //   Undo or Restart), restart (true: Restart greys out with Undo)}.
+  // Returns {push(step), undo(), restart(reset, step), size(), list(game), sync()}. ⌘Z or Ctrl+Z is Undo, but not in a text box.
+  function undoList(o) {
+    const gm = () => o.game(), list = g => o.list ? o.list(g) : (g.history || (g.history = []));
+    const over = () => { const g = gm(); return !g || (o.over ? o.over() : !!g.won); };
+    const can = () => !!gm() && (o.can ? o.can() : !over());
+    const size = () => { const g = gm(); return g ? list(g).length : 0; };
+    function push(step = o.take()) {
+      const g = gm(), l = list(g); l.push(step);
+      if (o.cap && l.length > o.cap) { const n = l.length - o.cap; l.splice(0, n); for (const x of g.guesses || []) x.at -= n; }   // bookmarks count from the list's start
+    }
+    function undo() { if (!can() || !size()) return false; const g = gm(); o.back(list(g).pop(), g); if (o.after) o.after(); return true; }
+    // Restart: back to the start, with reset(game) doing the page's part. Costs the gold paw. With step (or take), the
+    // board as it was goes on the list first, so Undo brings it back; with neither, the list is emptied.
+    function restart(reset, step) {
+      if (!can() || !size()) return false;
+      const g = gm();
+      if (step !== undefined) push(step); else if (o.take) push(); else list(g).length = 0;
+      g.restarted = true; reset(g); if (o.after) o.after(); return true;
+    }
+    function sync() {
+      const off = over() || !size(), b = $("undoBtn"), r = o.restart && $("restartBtn");
+      if (b) b.disabled = off; if (r) r.disabled = off;
+    }
+    if ($("undoBtn")) $("undoBtn").onclick = () => undo();
+    document.addEventListener("keydown", e => {
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== "z") return;
+      if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) || e.target.isContentEditable || $("overlay").classList.contains("show")) return;
+      e.preventDefault(); undo();
+    });
+    return {push, undo, restart, size, list: g => list(g || gm()), sync};
+  }
+
   /* ---------- bookmarks (guesses) ---------- */
   // Bookmark (called Guess until 2026-11; the code keeps the old names), as in Toydoku and Fair Play, for a game whose
   // moves go on an Undo list (game.history): Bookmark marks the board as it is, and the next thing put on it glows
@@ -1853,9 +1896,10 @@ const G = (() => {
   // and how long the Undo list was before it, so plain Undo past it, or the square being emptied, ends it.
   // o: {game: () => game, undo (one step), draw (after a change), board (the element that shows it's armed), what
   // ("toy", "number"…: for the note line), over (() => true once the puzzle's finished; game.won if not given),
-  // moves (the Undo list, if it isn't game.history)}. Call before(i) just before the move that fills square i goes on the Undo
+  // moves (the Undo list, if it isn't game.history), history (a G.history: its undo and list stand in for undo and moves)}. Call before(i) just before the move that fills square i goes on the Undo
   // list; draw the glow on each of list(); clear() on Restart; sync() wherever the buttons are brought up to date.
   function guesser(o) {
+    if (o.history) { o.undo = o.undo || o.history.undo; o.moves = o.moves || (gm => o.history.list(gm)); }
     let armed = false;
     const g = () => o.game(), btn = $("guessBtn"), back = $("backBtn"), hist = gm => o.moves ? o.moves(gm) : gm.history;
     const list = () => { const gm = g(); if (!gm) return []; gm.guesses = (gm.guesses || []).filter(x => x.at < hist(gm).length); return gm.guesses; };
@@ -2036,6 +2080,6 @@ const G = (() => {
     }
   }
 
-  return {MAGNET, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, meaning, plainText,
+  return {MAGNET, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();
