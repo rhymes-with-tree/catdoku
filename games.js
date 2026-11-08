@@ -1811,6 +1811,21 @@ const G = (() => {
   }
   toolify();
   arrange();
+  // The status line (the goal and the time) goes under the board, above the buttons, in every game (decided
+  // 2026-11-08): the goal at the left, the time at the right, and a note on a line of its own under them. It's
+  // written above the board in each page, so it's moved here, past the board (or the box the board is in).
+  (function statusBelow() {
+    const st = document.querySelector("main > .status");
+    if (!st) return;
+    st.classList.add("below");
+    const board = [...st.parentElement.children].find(el => el !== st && (el.matches("#board,.stage") || el.querySelector("#board")));
+    if (!board) return;
+    // the action games' goals row (Pounce, Bubbles, Cat Pile) comes down with it, just above the status line
+    const goals = st.parentElement.querySelector(":scope > .goals");
+    board.after(st); if (goals) st.before(goals);
+    // a time kept in a group with the moves or score moves out to the right
+    const t = st.querySelector(".info > .timer"); if (t) st.querySelector(".info").after(t);
+  })();
   // Once the gold paw is lost for this puzzle (a hint taken, a restart, a life lost…), or there's none to win (zen), the
   // tools that cost it go back to the usual colour, with no crossed-out paw: there's nothing left to lose. Each page
   // says when with G.pawLost(() => true or false), looked at on every save and every second or so.

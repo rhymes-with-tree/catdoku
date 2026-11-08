@@ -89,11 +89,11 @@ Items marked **Changes the 2026-11-07 plan** say where it differs; each says whe
 will recheck this list, and add games 43–52, before any of it is built.
 
 ### Status line (every game)
-- Goal on the left, time on the right, never both on the left. Goals as a fraction with a small icon for what's
+- Goals as a fraction with a small icon for what's
   counted: Tangle's "56 crossings left" becomes "56/59 ○" (the white dot); Pounce's moves become a fraction.
-- **Changes the 2026-11-07 plan** (step 4 put the status line above the board). **Decided 2026-11-08: under the
-  board, above the buttons, in every game.** Pounce (moves, time, goal) and Bubbles (goal, time, "shelf down in x
-  bats") were the clearest cases. Watch tall boards (Tunnel Run, big Catdoku), where it could fall below the fold.
+- Status line under the board: done (decided 2026-11-08, changing the 2026-11-07 plan's step 4). Keyboard Cat and
+  Meowbile keep their own layouts. Still to check on tall boards (Tunnel Run, big Catdoku), where it could fall below
+  the fold.
 
 ### Button rows (every game)
 - **Restart · New [Noun]** on the last line, a line of their own, kept apart so they aren't pressed by accident
