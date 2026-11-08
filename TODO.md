@@ -89,11 +89,10 @@ Items marked **Changes the 2026-11-07 plan** say where it differs; each says whe
 will recheck this list, and add games 43–52, before any of it is built.
 
 ### Status line (every game)
-- Goals as a fraction with a small icon: done through `G.tally` for Tangle ("4/6 ○"), Pounce ("🐾 12/15"), and on
-  2026-11-08 Copycat (pairs, two boxes), Tunnel Run (pieces joined, a purple tunnel piece), Treat Time (cats fed, a
-  green bowl) and Window Ledges (windows lit, a lit window). Still to choose, game by game, which others change and
-  with what icon; those already counting "N of M": Cross Stitch, High Perch, If It Fits, Junk Drawer and Knit Pick
-  (words), Kitten Caboodle, Laser Pointer, Open the Door!, Tail Chase, Toydoku, Mew Hue's lines, Bird Watch.
+- Goals as a fraction with a small icon: done through `G.tally` for every game counting "N of M": Tangle, Pounce,
+  Copycat, Tunnel Run, Treat Time, Window Ledges, and (build .19) Cross Stitch, High Perch, If It Fits, Junk Drawer,
+  Knit Pick, Kitten Caboodle, Laser Pointer, Open the Door!, Tail Chase, Toydoku, Mew Hue's lines and Bird Watch, each
+  with an icon from its own board; wins and special lines stay in words. For the owner to look over on a phone.
 - Tall boards: checked on 390 × 844 and 375 × 667. Tunnel Run's and Catdoku's biggest boards leave the status line well
   on screen; Bubbles' note line dips just under on a 390 × 844 phone, with its goal and time still showing.
 
