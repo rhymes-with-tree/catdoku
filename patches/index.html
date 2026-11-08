@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.24";
+  var BUILD = "2026-11-07.25";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.24">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.25">
 <style>
 /* The board is a quilt: a stitched binding round the edge, dashed seams between patches. */
 .board{background:#F3EEDF;border:8px solid #853C68;border-radius:12px;outline:2px dashed rgba(255,244,230,.85);outline-offset:-5px}
@@ -120,7 +120,7 @@ main{--nw:min(calc(var(--board) * .4), 210px);--sw:min(calc(var(--board) * .5), 
 
 </main>
 
-<script src="../games.js?v=2026-11-07.24"></script>
+<script src="../games.js?v=2026-11-07.25"></script>
 <script>
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 function nbrs(i,N){const r=Math.floor(i/N),c=i%N,o=[];if(r>0)o.push(i-N);if(r<N-1)o.push(i+N);if(c>0)o.push(i-1);if(c<N-1)o.push(i+1);return o;}
@@ -235,13 +235,10 @@ const clashes = () => {
 
 // Undo steps keep the fabrics and the player's own buttons (older saves kept just the fabrics).
 const mark = () => ({col: game.col.slice(), mine: (game.mine || []).slice()});
-function snapshot() { game.history.push(mark()); if (game.history.length > 300) game.history.shift(); }
-function undo() {
-  if (!game.history.length || game.won) return;
-  const h = game.history.pop();
-  if (Array.isArray(h)) game.col = h; else { game.col = h.col; game.mine = h.mine; }
-  render(); save();
-}
+// Undo (G.history): the newest 300 kept in game.history. Restart can be undone too.
+const undo = G.history({game: () => game, take: mark, cap: 300, after: () => { render(); save(); }, restart: true,
+  back: (h, g) => { if (Array.isArray(h)) g.col = h; else { g.col = h.col; g.mine = h.mine; } },
+  started: () => !game.col.every((c, g) => c === game.given[g]) || !!(game.mine || []).length});
 // Hint: the quilt has one answer. A patch in the wrong fabric is tinted red; otherwise the open patch with the
 // fewest fabrics left to choose from glows gold and the note names its fabric. The player sews it.
 // A hint keeps the next puzzle at this size and costs the gold paw.
@@ -265,7 +262,7 @@ function hint() {
       : n === 1 ? "Only one fabric is left for the glowing patch: its neighbours have the rest." : `The glowing patch has the fewest fabrics left (${n}).`);
   }
 }
-function clearAll() { if (game.won) return; game.restarted = true; snapshot(); game.col = game.given.slice(); game.mine = []; render(); save(); }
+function clearAll() { undo.restart(g => { g.col = g.given.slice(); g.mine = []; }); }
 // The player's own buttons: just notes, in plum, on patches they want to remember. They don't sew a
 // patch down; it can still be changed. MINE is the brush that puts one on or takes it off.
 const MINE = -2;
@@ -376,8 +373,7 @@ function render() {
   const done = game.col.filter(c => c >= 0).length;
   $("count").textContent = `🧵 ${done} / ${game.R} patches`;
   if (bad.size) G.note(`${bad.size} patches match a neighbor.`, 0); else if ($("msg").textContent.includes("match a neighbor")) G.note("");
-  $("undoBtn").disabled = !game.history.length || game.won; $("hintBtn").disabled = game.won;
-  $("restartBtn").disabled = game.won || (game.col.every((c, g) => c === game.given[g]) && !(game.mine || []).length);
+  undo.sync(); $("hintBtn").disabled = game.won;
   [...$("paints").children].forEach((b, k) => b.setAttribute("aria-pressed", k === brush || (brush === MINE && k === look().length)));
 }
 
@@ -427,7 +423,7 @@ function endPress() {
   const p = press; press = null;
   if (!p.drag) { if (brush === MINE) toggleMine(p.start); else paint(p.start, true); }
   const now = mark();
-  if (p.before.col.join() !== now.col.join() || p.before.mine.join() !== now.mine.join()) { game.history.push(p.before); if (game.history.length > 300) game.history.shift(); }
+  if (p.before.col.join() !== now.col.join() || p.before.mine.join() !== now.mine.join()) undo.push(p.before);
   render(); save(); checkWin();
 }
 board.addEventListener("pointerup", endPress);
@@ -442,13 +438,12 @@ const keys = G.gridKeys({on: () => game && !game.won && !busy, size: () => [game
     else if (key === "backspace" || key === "delete") { if (game.given[g] < 0 && game.col[g] >= 0) { const was = brush; brush = game.col[g]; paint(g, true); brush = was; } }
     else if (brush === MINE) toggleMine(g); else paint(g, true);
     const now = mark();
-    if (before.col.join() !== now.col.join() || before.mine.join() !== now.mine.join()) { game.history.push(before); if (game.history.length > 300) game.history.shift(); }
+    if (before.col.join() !== now.col.join() || before.mine.join() !== now.mine.join()) undo.push(before);
     render(); save(); checkWin(); keys.set(i);
   }});
 
 $("newBtn").onclick = newPuzzle;
 $("size").onchange = e => { settings.size = +e.target.value; save(); newPuzzle(); };
-$("undoBtn").onclick = undo;
 $("restartBtn").onclick = clearAll;
 
 /* ---------- how to play ---------- */
@@ -518,7 +513,6 @@ function helpOnFirstVisit() {
 }
 $("helpBtn").onclick = () => { if (!busy) showHelp(); };
 $("hintBtn").onclick = hint;
-document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); } });
 
 G.nav("patches");
 G.checkClock(game);
