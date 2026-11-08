@@ -1830,7 +1830,8 @@ const G = (() => {
       "Where a tap can mark instead of fill, a row under the board picks which (Mark, Dot, Keep, Erase)."]) {
       const li = document.createElement("li"); li.textContent = t; list.append(li);
     }
-    openCard("What's new", "", [["Show me the menu", () => { closeCard(); $("menuBtn").click(); }, true], ["Got it", closeCard]], list);
+    // Show me the menu: the tap mustn't go on to the page, where a tap outside the menu shuts it again at once
+    openCard("What's new", "", [["Show me the menu", e => { e.stopPropagation(); closeCard(); $("menuBtn").click(); }, true], ["Got it", closeCard]], list);
   }
   if (!RETURNING) save(NEWS, {seen: Date.now(), firstVisit: true});
   setTimeout(whatsNew, 1500);
