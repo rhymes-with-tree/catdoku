@@ -1091,7 +1091,7 @@ const G = (() => {
     catastrophe: ["1 to 9: knock over that pot"],
     laserpointer: ["Arrow keys: pick a mirror", "Space or Enter: tip it"],
     treattime: ["Arrow keys: pick a pile", "Space: put it back or take it out", "K or Enter: mark it to stay"],
-    upatree: ["Letters: change the letter picked, or type a whole word", "Enter: climb with the word typed", "Backspace: take a letter off"],
+    upatree: ["Letters: change the letter picked, or type a whole word", "Enter: climb with the word typed", "Backspace: take a letter off, or with none typed, step back down a perch"],
     toydoku: ["Arrow keys: pick a square", "1 to 9: put in a toy", "Backspace or 0: take it out", "N: notes on or off", "Escape: let go of the square"],
     pickpile: ["Arrow keys: pick a block that's free", "Space or Enter: take it"],
     scratchthat: ["Arrow keys: move round the room", "Space or Enter: tap", "P: a post", "X or .: a dot", "Backspace: clear"],
@@ -1330,7 +1330,7 @@ const G = (() => {
     }
     const redraw = () => k >= 0 && k < o.steps.length && show();
     function close() {
-      clearInterval(ticker); removeEventListener("resize", redraw); removeEventListener("scroll", redraw); document.removeEventListener("pointerup", onUp, true);
+      clearInterval(ticker); removeEventListener("resize", redraw); removeEventListener("scroll", redraw); document.removeEventListener("pointerup", onUp, true); document.removeEventListener("keyup", onUp, true);
       for (const ev of ["pointerdown", "click"]) window.removeEventListener(ev, guard, true);
       for (const f of new Set(o.steps.map(st => st.restore).filter(Boolean))) f();   // Your turn steps: the board as it was
       holes = []; layer.remove(); if (o.done) o.done();
@@ -1350,6 +1350,7 @@ const G = (() => {
     }
     const onUp = () => tried(0);
     document.addEventListener("pointerup", onUp, true);
+    document.addEventListener("keyup", onUp, true);   // a step done on the real keyboard (Keyboard Cat's gold key)
     function next(e) {
       if (e) { e.preventDefault(); e.stopPropagation(); }
       const was = o.steps[k]; if (was && was.leave) was.leave();
@@ -1483,6 +1484,7 @@ const G = (() => {
     toydoku: [["autoGrade", "Auto grade", "A wrong toy turns red and costs a life", false, {warn: true}], CHECK, NUMBERS("Digits in place of toys"), NOTES],
     junkdrawer: [["junk", "Junk", "Batteries, keys and coins in the drawer", true, {row: "decor"}],
       ["autoNotes", "Dim used-up magnets", "Magnets no word left to find needs fade", false, {row: "notes"}]],
+    magnets: [["autoAudit", "Auto-Audit", "Every letter turns olive or coral as it goes up; costs the gold paw", false, {warn: true}]],
     shelflife: [["shelf", "Shelf", "The pots stand on a shelf", true, {row: "decor"}]],
     catpile: [["cats", "Cats", "Cats nap on the blanket", true, {row: "decor", at: ["catdoku.catpile.prefs.v1", "cats"]}],
       ["turns", "Turning", "Toys can be turned as well as moved", false, {at: ["catdoku.catpile.prefs.v1", "turns"]}]],
@@ -1835,6 +1837,7 @@ const G = (() => {
     pairs: '<path d="M4 25l5-15 5 15M6 20h6"/><path d="M19 10v15"/><circle cx="23" cy="20.5" r="4.5"/>',
     marks: '<path d="M9 21l4-4 9-9 4 4-9 9-4 4h-4z"/><path d="M5 28h22"/>',
     book: '<path d="M5 8c4-1.5 7.5-.5 11 2 3.5-2.5 7-3.5 11-2v17c-4-1.5-7.5-.5-11 2-3.5-2.5-7-3.5-11-2z"/><path d="M16 10v17"/>',
+    magnet: '<path d="M7 5h6v11a3 3 0 0 0 6 0V5h6v11a9 9 0 0 1-18 0z"/><path d="M7 10h6M19 10h6"/>',   // a horseshoe magnet (Fridge Magnets' Fill one)
     sliders: '<path d="M5 9h22M5 16h22M5 23h22"/><circle cx="11" cy="9" r="2.6"/><circle cx="21" cy="16" r="2.6"/><circle cx="14" cy="23" r="2.6"/>',
     games: '<rect x="6" y="6" width="8" height="8" rx="2"/><rect x="18" y="6" width="8" height="8" rx="2"/><rect x="6" y="18" width="8" height="8" rx="2"/><rect x="18" y="18" width="8" height="8" rx="2"/>',
     digits: '<path d="M4 11l3-2v14M11 12a3 3 0 1 1 5 2.5L11 23h6M21 9h6l-3.5 5a4.2 4.2 0 1 1-3.5 7"/>',
@@ -1845,7 +1848,7 @@ const G = (() => {
     keepBtn: "keep", markerBtn: "marks", shuffleBtn: "shuffle", flipBtn: "flip", finishBtn: "near", completeBtn: "check", skipBtn: "skip",
     colBtn: "palette", dotBtn: "dot", linkBtn: "share", toysBtn: "toys", bestBtn: "best", helpBtn: "help", zoomIn: "zoomin", zoomOut: "zoomout", zoomFit: "fit",
     sightBtn: "sight", liftBtn: "lift", nipBtn: "catnip", shakeBtn: "bubbleshake", fluffBtn: "defluff", swatBtn: "swat", netBtn: "net", rainbowBtn: "losecolor", basketBtn: "basketadd", wipeBtn: "wipe",
-    chooseBtn: "keyboard", revealBtn: "giveup", peekBtn: "peek", perchBtn: "perch", wakeBtn: "cat", reelBtn: "reel", mopBtn: "sponge"};
+    chooseBtn: "keyboard", revealBtn: "giveup", peekBtn: "peek", perchBtn: "perch", wakeBtn: "cat", reelBtn: "reel", mopBtn: "sponge", fillBtn: "magnet"};
   // buttons that keep their own look with an icon in front of the word: every New (a +) and Catlas's Go (an arrow)
   const LEAD = {newBtn: "plus", sNewBtn: "plus", goBtn: "go", settingsSum: "sliders"};
   const iconSVG = name => `<svg class="ic" viewBox="0 0 32 32" aria-hidden="true">${ICON[name]}</svg>`;
@@ -1913,7 +1916,7 @@ const G = (() => {
     hintFree: "hideseek",
     hints: {junkdrawer: "leftBtn"},   // hints by another name: in the red group beside Hint
     helpers: {toybox: "shakeBtn shuffleBtn rainbowBtn basketBtn", bubbles: "sightBtn nipBtn shakeBtn liftBtn", pickpile: "shuffleBtn", mewhue: "shuffleBtn",
-      windup: "shakeBtn fluffBtn netBtn", lmnopom: "swatBtn", birdwatch: "wipeBtn"},
+      windup: "shakeBtn fluffBtn netBtn", lmnopom: "swatBtn", birdwatch: "wipeBtn", magnets: "fillBtn"},
   };
   const has = (list, slug) => (list || "").split(" ").includes(slug);
   const costsPaw = (id, slug = SLUG) => id === "hintBtn" ? !has(PAW_COST.hintFree, slug) : id === "auditBtn" || id === "restartBtn" || has(PAW_COST.hints[slug], id) ||

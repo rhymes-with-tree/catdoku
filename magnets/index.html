@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-08.16"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-08.17"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-08.16">
+<link rel="stylesheet" href="../games.css?v=2026-11-08.17">
 <style>
 /* A fridge door with a crossword of squares on it, and the alphabet magnets Crunch knocked off it on the floor
    below. Every letter goes back on once, and every line of squares spells a word. */
@@ -138,6 +138,7 @@
     <button id="guessBtn" aria-pressed="false">Bookmark</button>
     <button id="backBtn" hidden>Return to Bookmark</button>
     <button id="auditBtn">Audit</button>
+    <button id="fillBtn">Fill one</button>
     <button id="linkBtn">Share</button>
     <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
@@ -149,7 +150,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-08.16"></script>
+<script src="../games.js?v=2026-11-08.17"></script>
 <script>
 /* ---------- fridges ---------- */
 // A fridge is a 10 × 10 crossword with 26 empty squares, and the 26 letters a–z on the floor to fill them, each
@@ -391,7 +392,7 @@ let state = G.load(STORE);
 let settings = Object.assign({level: 1}, state.settings);
 let game = state.game || null, sel = -1, dir = 0, held = null, W = null, IDX = null, F = null;
 // The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
-G.pawLost(() => !game || game.won || game.hinted || game.restarted || game.audited);
+G.pawLost(() => !game || game.won || game.hinted || game.restarted || game.audited || game.filled);
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !running && !$("overlay").classList.contains("show");
 let running = false;
@@ -408,7 +409,8 @@ function derive() {
 }
 const letterAt = k => F.open.has(k) ? game.put[k] || "" : F.sol.get(k) || "";
 // A square's magnet colour: a letter you've put up keeps its Audit colour while it stays on the square it was audited on.
-const magColour = k => !F.open.has(k) ? GIVEN : game.checked && game.checked[k] === game.put[k] ? (game.put[k] === F.sol.get(k) ? RIGHT : WRONG) : LOOSE;
+// With Auto-Audit on, every letter up shows its colour straight away.
+const magColour = k => !F.open.has(k) ? GIVEN : game.put[k] && (settings.autoAudit || game.checked && game.checked[k] === game.put[k]) ? (game.put[k] === F.sol.get(k) ? RIGHT : WRONG) : LOOSE;
 const upLetters = () => new Set(Object.values(game.put));
 const empties = () => game.open.filter(k => !game.put[k]);
 // A fridge that came from a share link or a save: every line of two or more squares a word that counts, and 26
@@ -485,6 +487,7 @@ function update() {
   undo.sync(); guesses.sync();
   $("hintBtn").disabled = game.won;
   $("auditBtn").disabled = game.won;
+  G.uses("fillBtn", game.won ? 0 : FILLS - (game.filled || 0));
 }
 // The squares of the word through square k going way d (or the other way, if there's no word that way).
 function wordAt(k, d) {
@@ -506,6 +509,7 @@ function place(ch, k) {
   undo.push();
   for (const q in game.put) if (game.put[q] === ch) delete game.put[q];
   game.put[k] = ch; game.started = true; held = null;
+  if (settings.autoAudit) game.audited = true;   // Auto-Audit is Audit after every letter: it costs the gold paw
   sel = nextEmpty(k);
   if (sel >= 0 && !wordAt(k, dir).includes(sel)) dir = (F.of.get(sel) || []).length === 1 ? F.d[F.of.get(sel)[0]] : dir;
   afterMove();
@@ -686,11 +690,37 @@ $("auditBtn").onclick = () => {
   hints.show({sq: wrong.map(k => [k, true])}, `${wrong.length} letter${wrong.length > 1 ? "s are" : " is"} in the wrong square. Take ${wrong.length > 1 ? "them" : "it"} down and try again.`, {uncounted: true});
 };
 
+// Auto-Audit: a switch, off at first and kept on the device; while it's on, every letter you put up turns olive or
+// coral straight away. Each letter put up with it on counts as an audit (the gold paw goes).
+G.switch({id: "autoAuditTgl", warn: true, label: "Auto-Audit", line: "Every letter turns olive or coral as it goes up; costs the gold paw", key: "autoAudit",
+  of: () => settings, save, change: on => { if (on && game && playing() && Object.keys(game.put).length) game.audited = true; if (game) { draw(); save(); } }});
+
+// Fill one: a helper, three a fridge, that puts the right letter in one square: the picked square if it's empty or
+// wrong, otherwise the easiest square to work out next (as Hint finds it), or else a wrong one. It costs the gold paw;
+// Undo takes the letter back down (the use stays spent).
+const FILLS = 3;
+$("fillBtn").onclick = () => {
+  if (!playing() || (game.filled || 0) >= FILLS) return;
+  const open = k => F.open.has(k) && game.put[k] !== F.sol.get(k);
+  let k = sel >= 0 && open(sel) ? sel : -1;
+  if (k < 0 && empties().length) {
+    const known = new Map([...F.sol].filter(([q]) => !F.open.has(q) || game.put[q]));
+    const step = deduce(IDX, F.slots, known, game.open, 1) || deduce(IDX, F.slots, known, game.open, 3);
+    k = step && open(step[0]) ? step[0] : empties()[0];
+  }
+  if (k < 0) k = game.open.find(open);
+  if (k === undefined || k < 0) return;
+  game.filled = (game.filled || 0) + 1; hints.clear(false);
+  const ch = F.sol.get(k);
+  place(ch, k);
+  if (!game.won) G.note(`Crunch put the ${ch.toUpperCase()} back up.`, 3000);
+};
+
 /* ---------- endings ---------- */
 // The magnets jiggle, Crunch curls up on the empty floor, and the card comes up.
 function win() {
   game.won = true; G.finishClock(game); hints.clear(false); sel = -1; held = null;
-  const next = game.hinted || game.audited ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  const next = game.hinted || game.audited || game.filled ? game.level : Math.min(MAX_LEVEL, game.level + 1);
   settings.level = next; $("levelSel").value = next; save();
   draw();
   $("board").classList.add("won");
@@ -701,13 +731,13 @@ function win() {
   setTimeout(() => { running = false; $("board").classList.remove("won"); if (game === g) finishCard(); }, matchMedia("(prefers-reduced-motion: reduce)").matches ? 500 : 1300);
 }
 function finishCard() {
-  const next = settings.level, gold = !game.restarted && !game.hinted && !game.audited;
+  const next = settings.level, gold = !game.restarted && !game.hinted && !game.audited && !game.filled;
   let text = `All 26 letters back on the fridge, in ${F.slots.length} words.`;
-  text += game.hinted || game.audited ? ` You had ${game.hinted ? "a hint" : "an audit"}, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  text += game.hinted || game.audited || game.filled ? ` You had ${game.hinted ? "a hint" : game.audited ? "an audit" : "a letter filled in"}, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
   // a gold paw: Crunch rolling about, in place of the random cat photo
   const pic = new Image(); pic.className = "rollpic"; pic.src = catSrc("crunch-6"); pic.alt = "Crunch rolling about on a green mat";
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my fridge", game.result,
-    {title: "Back on the fridge!", goldTitle: "Gold paw, Crunch!", gold, goldWhy: "No hints, audits or restarts!", goldPic: [pic], next: next > game.level ? `Next: level ${next}` : "Next board",
+    {title: "Back on the fridge!", goldTitle: "Gold paw, Crunch!", gold, goldWhy: "No hints, audits, fills or restarts!", goldPic: [pic], next: next > game.level ? `Next: level ${next}` : "Next board",
      after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
 }
 
@@ -790,6 +820,7 @@ function helpOnFirstVisit() {
   steps.push(
     {say: "Drag off or tap twice to remove", lit: game.open.map(xy), outline: [], later: true},
     {say: "Audit marks wrong letters", els: [$("auditBtn")]},
+    {say: "Fill one puts a letter up for you", els: [$("fillBtn")]},
     {say: "Not sure? Bookmark, then try an idea. Return to Bookmark undoes it", els: [$("guessBtn")]},
     {say: "Stuck? Hint places a letter", els: [$("hintBtn")]},
   );
