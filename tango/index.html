@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-07.30"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-07.31"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-07.30">
+<link rel="stylesheet" href="../games.css?v=2026-11-07.31">
 <style>
 /* Two toys share out a grid in the toy box: every line holds as many of one as the other, no three alike in a row,
    and = / × signs between squares say whether neighbours match. */
@@ -92,7 +92,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-07.30"></script>
+<script src="../games.js?v=2026-11-07.31"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // A grid of N × N squares, each 0 or 1 (the two toys). Every row and column has N/2 of each, no three the same
@@ -292,15 +292,17 @@ function draw() {
     : `<span>Tap once: ${img(game.toys[0])}</span><span>Twice: ${img(game.toys[1])}</span>`;
   const empty = game.grid.filter(v => v === -1).length;
   $("count").textContent = game.won ? "Solved!" : empty ? `${empty} square${empty === 1 ? "" : "s"} to fill` : found.bad.size ? "Something's not right" : "";
-  $("undoBtn").disabled = !game.history.length || game.won; $("restartBtn").disabled = !game.history.length || game.won;
+  undo.sync();
   $("hintBtn").disabled = game.won; guesses.sync();
 }
 // Undo steps keep the toys, the player's own signs and their guesses (older saves kept just the toys).
-const snapshot = () => game.history.push({grid: game.grid.slice(), notes: (game.notes || []).map(m => ({...m}))});
-function restore(h) { if (Array.isArray(h)) game.grid = h; else { game.grid = h.grid; game.notes = h.notes; } }
+// Undo is G.history (game.history), and Restart can be undone too.
+const undo = G.history({game: () => game, take: () => ({grid: game.grid.slice(), notes: (game.notes || []).map(m => ({...m}))}), can: playing,
+  back: (h, g) => { if (Array.isArray(h)) g.grid = h; else { g.grid = h.grid; g.notes = h.notes; } }, after: () => { draw(); save(); }, restart: true});
+const snapshot = () => undo.push();
 // Mark = ×: the player's own signs between squares, as notes. While it's on, a tap goes to the edge
 // nearest the finger and turns it = , then ×, then off. They're never checked; they're just reminders.
-const guesses = G.guesser({game: () => game, undo, draw: () => { draw(); save(); }, board: $("board"), what: "square"});
+const guesses = G.guesser({game: () => game, history: undo, draw: () => { draw(); save(); }, board: $("board"), what: "square"});
 let marking = false, litSign = null;  // litSign: a sign the walkthrough is pointing at, coloured to match
 const hints = G.hinter({game: () => game, key: () => game ? game.grid.join() : "", draw: () => draw()});   // marks {i, kind}: a square to look at
 $("markBtn").onclick = () => {
@@ -341,10 +343,7 @@ function tap(i) {
 }
 // Keys: the arrows move a cursor over the squares; Space or Enter taps the square as a tap does.
 keys = G.gridKeys({on: () => playing(), size: () => [game.N, game.N], show: () => draw(), act: i => tap(i)});
-function undo() { if (playing() && game.history.length) { restore(game.history.pop()); draw(); save(); } }
-$("undoBtn").onclick = undo;
-document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && !$("undoBtn").disabled) { e.preventDefault(); $("undoBtn").click(); } });
-$("restartBtn").onclick = () => { if (playing() && game.history.length) { game.restarted = true; snapshot(); game.grid = game.givens.slice(); game.notes = []; guesses.clear(); draw(); save(); G.note("Back to the start. Undo brings your toys back.", 3500); } };
+$("restartBtn").onclick = () => { if (undo.restart(g => { g.grid = g.givens.slice(); g.notes = []; guesses.clear(); })) { G.note("Back to the start. Undo brings your toys back.", 3500); } };
 // Bookmark: the next square you fill glows until it's undone. Return to Bookmark undoes everything back to
 // the latest bookmark in one go (free, as Undo is; G.guesser). Bookmarking puts Mark down.
 $("guessBtn").addEventListener("click", () => { if (guesses.armed() && marking) { marking = false; draw(); } });
