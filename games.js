@@ -2405,11 +2405,14 @@ const G = (() => {
   /* ---------- a goal as a fraction ---------- */
   // The status line's goal as a fraction with a small icon for what's counted (decided 2026-11-08): Tangle's
   // "56/59 ○" (crossings left of those dealt, the white dot the board draws), Pounce's "🐾 12/20" (moves left). VoiceOver
-  // hears it in words (say). icon: an SVG's inside on a 16 × 16 view, or a short text (an emoji); before: icon first.
+  // hears it in words (say). icon: an SVG's inside on a 16 × 16 view (an <image> for a picture), or a short text (an
+  // emoji); before: icon first. With no el, it gives back the HTML, for a line holding more than the fraction.
   function tally(el, n, of, icon, say, before) {
     const ic = /</.test(icon) ? `<svg class="tic" viewBox="0 0 16 16" aria-hidden="true">${icon}</svg>` : `<span class="tic" aria-hidden="true">${icon}</span>`;
     const num = `<span aria-hidden="true">${n}/${of}</span>`;
-    el.innerHTML = `<span class="tally" role="text" aria-label="${say}">${before ? ic + num : num + ic}</span>`;
+    const html = `<span class="tally" role="text" aria-label="${say}">${before ? ic + num : num + ic}</span>`;
+    if (el) el.innerHTML = html;
+    return html;
   }
 
   /* ---------- zoom and full screen ---------- */
