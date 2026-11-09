@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-09.5"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-09.6"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-09.5">
+<link rel="stylesheet" href="../games.css?v=2026-11-09.6">
 <style>
 /* A room seen from above: a pale floor in a periwinkle band, with furniture round the walls, and on the floor a dot
    (no outline) for every spot the cat landed, each with a thick arrow the way it jumped next. A join is a line from
@@ -97,7 +97,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-09.5"></script>
+<script src="../games.js?v=2026-11-09.6"></script>
 <script>
 /* ---------- the run (plain functions, also run in a background worker) ---------- */
 // Zoomies puzzle maker (Signpost): a path through every square, each square's arrow pointing (any distance,
@@ -273,6 +273,7 @@ function runs() {
 const PENS = [["#6AA673", "green"], ["#9874CA", "lavender"], ["#B94588", "plum"], ["#E16A4A", "coral"], ["#4E577D", "navy"],
   ["#B3B94B", "lime"], ["#ECA818", "gold"]];
 const inkOf = () => game.ink || (game.ink = new Array(M()).fill(-1));
+let lineGeo = [];   // each line drawn: its strand's first dot and points along it (see lineAt)
 const runColour = r => PENS[Math.max(0, inkOf()[r.sq[0]])][0];
 
 /* ---------- drawing ---------- */
@@ -342,12 +343,14 @@ function draw() {
   // the picked dot's possible partners: along its arrow, and the dots whose arrows point at it
   if (sel >= 0 && playing()) for (let j = 0; j < M(); j++) if (onRay(sel, j) || onRay(j, sel)) { const [cx, cy] = mid(j); el("circle", {cx, cy, r: 28, class: "mate"}, svg); }
   // the joins: a line from dot to dot, bowed a little on a long jump so it never runs through a dot on the way
-  const links = el("g", {}, svg);
+  const links = el("g", {}, svg); lineGeo = [];
   for (const r of list) for (let o = 0; o + 1 < r.sq.length; o++) {
     const [ax, ay] = mid(r.sq[o]), [bx, by] = mid(r.sq[o + 1]), d = Math.hypot(bx - ax, by - ay), bend = d > 150 ? Math.min(26, d * .12) : 0;
     const mx = (ax + bx) / 2 + (by - ay) / d * bend, my = (ay + by) / 2 - (bx - ax) / d * bend;
     const col = game.won ? "#C98A0E" : runColour(r);
     el("path", {d: `M${ax},${ay} Q${mx},${my} ${bx},${by}`, class: "link", stroke: col}, links);
+    // points along it, for finding which line a tap lands on (lineAt)
+    lineGeo.push({head: r.sq[0], pts: Array.from({length: 13}, (_, t) => { t /= 12; return [(1 - t) ** 2 * ax + 2 * (1 - t) * t * mx + t * t * bx, (1 - t) ** 2 * ay + 2 * (1 - t) * t * my + t * t * by]; })});
   }
   const tiles = el("g", {}, svg), marks = el("g", {}, svg);
   const D8 = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]];
@@ -458,8 +461,24 @@ function solved() {
 let press = null;
 const svgPoint = e => { const p = $("svg").createSVGPoint(); p.x = e.clientX; p.y = e.clientY; return p.matrixTransform($("svg").getScreenCTM().inverse()); };
 const cellOf = e => { const pt = svgPoint(e), x = Math.floor(pt.x / 100), y = Math.floor(pt.y / 100); return x < 0 || y < 0 || x >= game.N || y >= game.N ? -1 : y * game.N + x; };
+// A tap on a line (away from any dot) recolours its whole strand: to the pen picked, or, if it's that colour already,
+// the next pen, so tapping again goes round the colours.
+function lineAt(e) {
+  const {x, y} = svgPoint(e);
+  for (let i = 0; i < M(); i++) { const [cx, cy] = mid(i); if (Math.hypot(x - cx, y - cy) < 28) return null; }
+  let best = null, bd = 16;
+  for (const g of lineGeo) for (const [px, py] of g.pts) { const d = Math.hypot(x - px, y - py); if (d < bd) { bd = d; best = g.head; } }
+  return best;
+}
+function recolour(head) {
+  const ink = inkOf(), now = ink[head], to = now === settings.pen ? (now + 1) % PENS.length : settings.pen;
+  undo.push();
+  for (let k = head; game.succ[k] >= 0; k = game.succ[k]) ink[k] = to;
+  sel = -1; draw(); save();
+}
 $("svg").addEventListener("pointerdown", e => {
   if (!playing()) return;
+  const h = lineAt(e); if (h != null) { e.preventDefault(); recolour(h); return; }
   const i = cellOf(e); if (i < 0) return;
   e.preventDefault();
   try { $("svg").setPointerCapture(e.pointerId); } catch (_) {}
