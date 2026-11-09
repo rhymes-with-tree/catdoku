@@ -466,7 +466,7 @@ const G = (() => {
 
   function openCard(title, text, btns, media, after) {
     if (reopening && btns.some(b => b && b[0] === HOME_LABEL) && $("newBtn") && $("newBtn").onclick) {   // a lost puzzle reopened (see reopen)
-      reopening = false; setTimeout(() => $("newBtn").onclick()); return;   // New's own deal (a tap on it opens the levels)
+      reopening = false; setTimeout(() => $("newBtn").onclick()); return false;   // New's own deal (a tap on it opens the levels)
     }
     const card = $("card"); card.innerHTML = "";
     const h = document.createElement("h2"); h.textContent = title; card.append(h);
@@ -483,6 +483,7 @@ const G = (() => {
     h.id = "cardTitle"; card.setAttribute("role", "dialog"); card.setAttribute("aria-modal", "true"); card.setAttribute("aria-labelledby", "cardTitle");
     $("overlay").classList.add("show");
     const first = row.querySelector("button"); if (first) first.focus();
+    return true;
   }
   function closeCard() { $("overlay").classList.remove("show"); }
   // Escape takes a card's way out where it has one (Close, Cancel, Keep playing, Done, or a look at the board), as
@@ -651,7 +652,7 @@ const G = (() => {
     save(GOLD, {counts, top: tops, levels, seen: [...seen, sig].slice(-30)});
   }
   // The win cards' way out to every game.
-  const HOME_LABEL = "Back to the front page", homeBtn = () => [HOME_LABEL, () => { location.href = HOME; }];
+  const HOME_LABEL = "Back to the front page", SHARE_LABEL = "Share my result", homeBtn = () => [HOME_LABEL, () => { location.href = HOME; }];
   // A win reopened (coming back to a game after winning, however you left it) isn't shown again: the game deals the
   // next puzzle, as the win card's next-puzzle button does. See reopen.
   function winCard(text, onNext, admire = "Admire my board", result, o = {}) {
@@ -676,20 +677,34 @@ const G = (() => {
     media.append(pic);
     const btns = [[o.next || "New puzzle", onNext, true]];
     if (admire !== null) btns.push([admire, () => { closeCard(); if (o.onAdmire) o.onAdmire(); else note(admireNote(), 0); if (admiring) admiring.set(true); }]);
-    btns.push(["Share my result", e => shareResult(result, o.gold, e.currentTarget)],
+    btns.push([SHARE_LABEL, e => shareResult(result, o.gold, e.currentTarget)],
       homeBtn());
     openCard(o.gold ? o.goldTitle || "Gold paw!" : o.title || "Solved!", "", btns, media, o.after);
     // one big Next, and the rest as small icon buttons in a row under it, each with its word small underneath
     // (decided 2026-11-08); the other sizes (o.after, G.otherSize) show as a small link under them (games.css)
+    smallButtons((b, i) => i > 0);
+  }
+  // The open card's buttons that pass test(button, i) move to a row of small icon buttons under the big ones.
+  function smallButtons(test) {
     const row = $("card").querySelector(".btns"), small = document.createElement("div");
     small.className = "smallbtns";
-    for (const b of [...row.children].slice(1)) {
-      const w = b.textContent, home = w === HOME_LABEL, share = w === "Share my result";
+    for (const b of [...row.children].filter(test)) {
+      const w = b.textContent, home = w === HOME_LABEL, share = w === SHARE_LABEL;
       b.setAttribute("aria-label", w); b.title = w; b.classList.add("tool");
       b.innerHTML = iconSVG(home ? "home" : share ? "share" : /^Keep/.test(w) ? "play" : "peek") + `<span class="lbl">${home ? "Front page" : share ? "Share" : w}</span>`;
       small.append(b);
     }
     if (small.children.length) row.after(small);
+  }
+  // A lost puzzle's card (out of lives, stuck, tangled…), laid out like the win card: the game's own ways on (btns,
+  // the first the main one) stay big, then Share, a look at the board ("Admire…", "Look at…") and the front page are
+  // small icon buttons, and the other levels (after, G.otherSize) sit under them. Share sends the level and the
+  // card's title. o: {result: {n: the level or size played}; the page's picker's value when it's left out}.
+  function loseCard(title, text, btns, media, after, o = {}) {
+    const sel = $("levelSel") || $("size"), r = o.result || (sel ? {n: +sel.value} : null);
+    const own = btns.filter(b => b && b[0] !== HOME_LABEL);
+    if (!openCard(title, text, [...own, [SHARE_LABEL, e => shareResult(r, false, e.currentTarget, title)], homeBtn()], media, after)) return;
+    smallButtons(b => b.textContent === SHARE_LABEL || b.textContent === HOME_LABEL || /^(Admire|Look at)/.test(b.textContent));
   }
 
   // Count a moment in the game (a puzzle started or solved) on the GoatCounter dashboard.
@@ -922,17 +937,18 @@ const G = (() => {
   // A finished puzzle's result to share: the game, level or size, time, and gold paw, with a link to the game.
   // Share my result, kept short (decided 2026-11-08): the game, then one line (the level as a fraction of the levels,
   // or the size, the time, the win streak and the gold paw), then the link. Long level names are left out.
-  function shareResult(r, gold, btn) {
+  function shareResult(r, gold, btn, lost) {
     const name = document.querySelector("header h1").textContent, bits = [];
     if (r && r.n != null && T) {
       const sel = $("levelSel") || $("size"), l = label(r.n), vals = sel ? [...sel.options].map(o => o.value) : [], i = vals.indexOf(String(r.n));
       bits.push(/^\d+ × \d+$/.test(l) ? l.replace(/ /g, "") : i >= 0 && vals.length > 1 ? `Level ${i + 1}/${vals.length}` : l.split(" · ")[0]);
     }
-    if (r && r.ms != null && !timerHidden(T && T.name)) bits.push("⏱ " + clock(r.ms));
+    if (!lost && r && r.ms != null && !timerHidden(T && T.name)) bits.push("⏱ " + clock(r.ms));
     const st = T ? streak(T.name).streak : 0;
     if (st > 1) bits.push(`🔥 ${st}`);
     if (gold) bits.push("🐾 Gold paw");
-    track(`${name} result shared`);
+    if (lost) bits.push("😿 " + lost.replace(/!$/, ""));   // a lost puzzle's card title: "Out of lives", "Tangled"
+    track(`${name} ${lost ? "loss" : "result"} shared`);
     sendLink(name, bits.length ? `${name}\n${bits.join(" · ")}` : name, location.origin + location.pathname, {btn});
   }
   // The Share card: a fresh copy of the puzzle, or the puzzle with the moves so far (when o.progress is given;
@@ -2367,12 +2383,12 @@ const G = (() => {
     }
     const reviveBtn = primary => ["Wait, I'm only mostly dead! Mostly dead is slightly alive, folks!", revive, !!primary];
     // Out of lives: the game's own ways on (btns, the first the main one), the revive while there are lives to give
-    // (or a line saying they're used up), then more, and Home.
-    function outCard({text = "Pick how you want to keep going.", btns = [], more = [], media = null, after = null} = {}) {
+    // (or a line saying they're used up), then more, and Share and Home (loseCard); result: {n: the level played}.
+    function outCard({text = "Pick how you want to keep going.", btns = [], more = [], media = null, after = null, result} = {}) {
       const all = [...btns];
       if (canRevive()) all.push(reviveBtn());
       else text = `All ${max} lives on this ${o.on} are used up.`;
-      openCard("Out of lives", text, [...all, ...more, homeBtn()], media, after);
+      loseCard("Out of lives", text, [...all, ...more], media, after, {result});
     }
     return {left, used, say, show, lose, refill, canRevive, revive, reviveBtn, outCard};
   }
@@ -2489,6 +2505,6 @@ const G = (() => {
     }
   }
 
-  return {MAGNET, tally, emoText, radios, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText,
+  return {MAGNET, tally, emoText, radios, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, loseCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();
