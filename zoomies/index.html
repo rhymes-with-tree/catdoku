@@ -44,6 +44,12 @@
 .tile{fill:transparent}
 .arrow{fill:#5E5866}
 .dot{fill:#5FA0C8}
+/* the pens, under the board: a swatch for each colour, the one picked ringed in ink */
+.pens{display:flex;justify-content:center;gap:2px;width:var(--board)}
+.pen{position:relative;flex:0 1 44px;height:44px;min-width:0;padding:0;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pen::after{content:"";position:absolute;left:50%;top:50%;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;background:var(--c)}
+.pen[aria-checked="true"]::before{content:"";position:absolute;left:50%;top:50%;width:40px;height:40px;margin:-20px 0 0 -20px;border-radius:50%;border:3px solid var(--ink);box-sizing:border-box}
+.pen:focus-visible{outline:3px solid #73A7AE;outline-offset:-2px;border-radius:50%}
 .dotnum{font-family:var(--font);font-weight:700;font-size:25px;fill:#2A2530;text-anchor:middle;dominant-baseline:central;pointer-events:none}
 .zoomed .arrow{fill:#C98A0E}
 .link{fill:none;stroke-width:9;stroke-linecap:round}
@@ -71,6 +77,8 @@
   <div class="wrap house stage" id="board"><svg id="svg" tabindex="0" role="application" aria-label="The house"></svg>
     <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
   </div>
+
+  <div class="pens" id="pens" role="radiogroup" aria-label="Line colour"></div>
 
   <div class="actions">
     <button id="hintBtn">Hint</button>
@@ -258,26 +266,14 @@ function runs() {
   let letter = 0; for (const r of out) if (r.base == null && r.sq.length > 1) r.letter = "abcdefghijklmnopqrstuvwxyz"[letter++ % 26];
   return {list: out, of, pred};
 }
-// The colours of runs: sage for the run from the cat's bed (1), and a colour of its own for every other strand, numbered
-// or not, until it joins that one, so strands that aren't joined to the start show as separate, and from each other
-// (the owner's choice: with this many colours about, red-orange no longer reads as a mistake).
-const LOOSE = ["#9874CA", "#B94588", "#E16A4A", "#4E577D", "#B3B94B", "#73A7AE", "#BD5538", "#ECA818"];
-// A strand keeps its colour as it grows: each takes the colour most of its dots had last time (the longest strands
-// choose first), or else the colour fewest strands have. hueOf: each dot's colour from the last drawing.
-let hueOf = new Map();
-function paint(list) {
-  const strands = list.filter(r => r.sq.length > 1 && r.sq[0] !== first()).sort((a, b) => b.sq.length - a.sq.length), used = LOOSE.map(() => 0), next = new Map();
-  for (const r of strands) {
-    const votes = LOOSE.map(() => 0); for (const q of r.sq) if (hueOf.has(q)) votes[hueOf.get(q)]++;
-    let h = -1, best = 0; votes.forEach((v, k) => { if (v > best && !used[k]) { best = v; h = k; } });
-    if (h < 0) { const fewest = Math.min(...used); h = used.indexOf(fewest); }
-    used[h]++; r.hue = h; for (const q of r.sq) next.set(q, h);
-  }
-  hueOf = next;
-}
-const tint = (hex, t) => "#" + [1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) + (255 - parseInt(hex.slice(i, i + 2), 16)) * t).toString(16).padStart(2, "0")).join("");
-const shade = (hex, t) => "#" + [1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * (1 - t) + 0x2A * t).toString(16).padStart(2, "0")).join("");
-const runColour = r => r.sq[0] === first() ? "#6AA673" : LOOSE[r.hue || 0];
+// The pens: a row of colours under the board, like a notes tool. The lines you draw take the pen picked; when two
+// strands join, the whole strand takes the colour of the part with the smaller numbers (the earlier part of the run),
+// so 1-2-3 joined to 4-5-6 is all 1-2-3's colour. A dot on its own joining a strand has no colour yet, so the strand
+// takes the pen. game.ink: each dot's line colour (an index into PENS) for the jump out of it, -1 for none.
+const PENS = [["#6AA673", "green"], ["#9874CA", "lavender"], ["#B94588", "plum"], ["#E16A4A", "coral"], ["#4E577D", "navy"],
+  ["#B3B94B", "lime"], ["#ECA818", "gold"]];
+const inkOf = () => game.ink || (game.ink = new Array(M()).fill(-1));
+const runColour = r => PENS[Math.max(0, inkOf()[r.sq[0]])][0];
 
 /* ---------- drawing ---------- */
 // The furniture, drawn in a 100 × 100 square: each square of the house gets one, picked from the puzzle itself so it
@@ -338,7 +334,6 @@ function furnish(svg, S) {
 function draw() {
   queueMicrotask(say);
   const svg = $("svg"), N = game.N, S = N * 100, {list, of} = runs(), hint = hints.current();
-  paint(list);
   svg.innerHTML = ""; svg.setAttribute("viewBox", `${-ROOM} ${-ROOM} ${S + 2 * ROOM} ${S + 2 * ROOM}`);
   el("rect", {x: -14, y: -14, width: S + 28, height: S + 28, rx: 22, class: "floor"}, svg);
   furnish(svg, S);
@@ -406,12 +401,16 @@ function link(a, b) {
   if (b === first()) { G.note("The run starts in the cat's bed: nothing jumps into it.", 3500); return false; }
   for (let k = b; k >= 0; k = game.succ[k]) if (k === a) { G.note("That would send the cat round in a loop.", 3500); return false; }
   guesses.before(a); undo.push();
-  const pred = game.succ.indexOf(b);
+  const pred = game.succ.indexOf(b), ink = inkOf();
   if (pred >= 0) game.succ[pred] = -1;
   game.succ[a] = b;
+  // the joined strand's colour: the earlier part's, if it has lines yet, or else the pen's
+  const before = game.succ.indexOf(a), c = before >= 0 && ink[before] >= 0 ? ink[before] : settings.pen;
+  for (let k = a; game.succ[k] >= 0; k = game.succ[k]) ink[k] = c;
+  for (let k = game.succ.indexOf(a); k >= 0; k = game.succ.indexOf(k)) ink[k] = c;
   return true;
 }
-function cut(a) { guesses.before(a); undo.push(); game.succ[a] = -1; }
+function cut(a) { guesses.before(a); undo.push(); game.succ[a] = -1; inkOf()[a] = -1; }
 // Two squares tapped (or dragged between, either way) make a pair: if they're joined, they come apart; if one's arrow
 // points at the other, they're joined that way round (where each points at the other, see below).
 // Nothing stays picked afterwards. A square that can't pair with the picked one is picked instead.
@@ -490,14 +489,16 @@ function showCursor() {
 }
 let keys = null;
 keys = G.gridKeys({on: playing, size: () => [game.N, game.N], start: () => sel >= 0 ? sel : first(), show: showCursor,
-  act: i => tap(i), escape: () => { if (sel >= 0) { sel = -1; draw(); } }});
+  keys: ["c"], act: (i, key) => key === "c" ? pickPen((settings.pen + 1) % PENS.length) : tap(i), escape: () => { if (sel >= 0) { sel = -1; draw(); } }});
 // Undo takes back a jump made or cut, or a Reset (the owner asked for Reset here in place of the usual Restart).
-const undo = G.history({game: () => game, take: () => game.succ.slice(), back: (s, g) => { g.succ = s; }, cap: 400, restart: true,
+// A step is the joins and their colours (or, in a save from before colours, the joins alone).
+const undo = G.history({game: () => game, take: () => ({succ: game.succ.slice(), ink: inkOf().slice()}),
+  back: (s, g) => { if (Array.isArray(s)) g.succ = s; else { g.succ = s.succ; g.ink = s.ink; } }, cap: 400, restart: true,
   can: playing, started: () => game.succ.some(j => j >= 0), after: () => { sel = -1; draw(); save(); }});
 // Bookmark: the next jump made or cut glows, and Return to Bookmark undoes back to just before it (free, as Undo is).
 const guesses = G.guesser({game: () => game, history: undo, draw: () => { sel = -1; draw(); save(); }, board: $("board"), what: "jump"});
 $("restartBtn").onclick = () => {
-  if (undo.restart(g => { g.succ = new Array(g.N * g.N).fill(-1); guesses.clear(); })) { sel = -1; G.note("Back to the start of the night. Undo brings your jumps back.", 4000); }
+  if (undo.restart(g => { g.succ = new Array(g.N * g.N).fill(-1); g.ink = new Array(g.N * g.N).fill(-1); guesses.clear(); })) { sel = -1; G.note("Back to the start of the night. Undo brings your jumps back.", 4000); }
 };
 
 /* ---------- hints ---------- */
@@ -571,8 +572,8 @@ function finishCard() {
 /* ---------- new nights ---------- */
 function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
 function begin(p, level) {
-  game = {level, N: p.N, path: p.path.slice(), clue: p.clue.slice(), succ: new Array(p.N * p.N).fill(-1), history: [], won: false, ...G.freshClock()};
-  sel = -1; hueOf = new Map(); derive(); hints.clear(false);
+  game = {level, N: p.N, path: p.path.slice(), clue: p.clue.slice(), succ: new Array(p.N * p.N).fill(-1), ink: new Array(p.N * p.N).fill(-1), history: [], won: false, ...G.freshClock()};
+  sel = -1; derive(); hints.clear(false);
 }
 async function newPuzzle() {
   if (busy) return;
@@ -606,7 +607,7 @@ function openShared(d) {
     const succ = s.map(v => v === 255 ? -1 : v);
     // only jumps along an arrow, none into the cat's bed or out of yours, each square jumped into once
     const into = succ.filter(v => v >= 0);
-    if (succ.every((j, i) => j < 0 || onRay(i, j)) && !into.includes(path[0]) && succ[path[sq - 1]] < 0 && new Set(into).size === into.length) { game.succ = succ; game.timed = false; }
+    if (succ.every((j, i) => j < 0 || onRay(i, j)) && !into.includes(path[0]) && succ[path[sq - 1]] < 0 && new Set(into).size === into.length) { game.succ = succ; game.ink = succ.map(j => j >= 0 ? 0 : -1); game.timed = false; }
   } }
   settings.level = n; $("levelSel").value = n;
   draw(); save(); build.prefetch(n);
@@ -633,7 +634,7 @@ function helpOnFirstVisit() {
     {say: "Join dots anywhere, in any order", lit: all},
     ...(givens.length ? [{say: "Bold numbers: when the cat got there", lit: givens}] : []),
     {say: "Tap a joined pair again to part them", lit: all, later: true},
-    {say: "Coloured numbers come from your joins", lit: all, later: true},
+    {say: "Pick a colour for your next lines", els: [$("pens")], later: true},
     {say: "Not sure? Bookmark, then try a jump. Return to Bookmark undoes it", els: [$("guessBtn")]},
     {say: "Stuck? Hint shows the next jump", els: [$("hintBtn")]},
   ];
@@ -644,6 +645,15 @@ $("helpBtn").onclick = () => { if (!busy) showHelp(); };
 for (let n = 1; n <= LEVELS; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", ""), n));
 $("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
 $("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
+// The pens: tap one, and the lines you draw next take its colour (C on a keyboard goes to the next).
+function pickPen(k) {
+  settings.pen = k; save();
+  [...$("pens").children].forEach((b, j) => b.setAttribute("aria-checked", String(j === k)));
+}
+PENS.forEach(([c, name], k) => { const b = document.createElement("button"); b.className = "pen"; b.setAttribute("role", "radio");
+  b.setAttribute("aria-label", `${name[0].toUpperCase() + name.slice(1)} lines`); b.style.setProperty("--c", c); b.onclick = () => pickPen(k); $("pens").append(b); });
+if (!(settings.pen >= 0 && settings.pen < PENS.length)) settings.pen = 0;
+pickPen(settings.pen);
 G.nav("zoomies");
 G.checkClock(game);
 G.setupTimer({name: "zoomies", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
