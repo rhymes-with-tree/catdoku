@@ -1920,16 +1920,17 @@ const G = (() => {
     b.classList.add("tool"); return true;
   }
   // Which buttons cost the gold paw, game by game (README, Gold paw). Hint costs it everywhere but Hide & Seek;
-  // Audit and Restart wherever there is one; helpers where they're listed. Undo, Bookmark and Return to Bookmark
-  // are free everywhere.
+  // Audit and Restart wherever there is one (but Zoomies' Reset is free, the owner's choice); helpers where they're
+  // listed. Undo, Bookmark and Return to Bookmark are free everywhere.
   const PAW_COST = {
     hintFree: "hideseek",
+    restartFree: "zoomies",
     hints: {junkdrawer: "leftBtn"},   // hints by another name: in the red group beside Hint
     helpers: {toybox: "shakeBtn shuffleBtn rainbowBtn basketBtn", bubbles: "sightBtn nipBtn shakeBtn liftBtn", pickpile: "shuffleBtn", mewhue: "shuffleBtn",
       windup: "shakeBtn fluffBtn netBtn", lmnopom: "swatBtn", birdwatch: "wipeBtn", magnets: "fillBtn"},
   };
   const has = (list, slug) => (list || "").split(" ").includes(slug);
-  const costsPaw = (id, slug = SLUG) => id === "hintBtn" ? !has(PAW_COST.hintFree, slug) : id === "auditBtn" || id === "restartBtn" || has(PAW_COST.hints[slug], id) ||
+  const costsPaw = (id, slug = SLUG) => id === "hintBtn" ? !has(PAW_COST.hintFree, slug) : id === "auditBtn" || (id === "restartBtn" && !has(PAW_COST.restartFree, slug)) || has(PAW_COST.hints[slug], id) ||
     has(PAW_COST.helpers[slug], id);
   // The play tools in one order everywhere: the free ones (Undo, Pencil, Bookmark…), then the game's own, then those
   // that cost the gold paw (Hint, Audit, helpers), grouped. Restart goes down beside New, and Give up after New.
