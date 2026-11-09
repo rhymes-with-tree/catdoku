@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-09.4"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-08.24"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-09.4">
+<link rel="stylesheet" href="../games.css?v=2026-11-08.24">
 <style>
 /* The house at 3 a.m.: a night-blue floor plan, each square a piece of furniture (a pale periwinkle tile with its
    silhouette) and an arrow pointing the way the cat jumped next. Joined squares take their run's colour: sage for the
@@ -36,15 +36,20 @@
 /* A room seen from above: the floor (pale, rounded) with furniture round the walls, and on it a dot for every spot the
    cat landed, each with a thick grey arrow the way it jumped next. A join is a line from dot to dot, in its run's
    colour (sage for the run that's numbered, a colour of its own for each loose run), and the first dot's arrow goes. */
-.house{background:#E9EBF3;border:3px solid var(--ink);border-radius:12px;overflow:hidden;
+.house{background:#7885BA;border:3px solid var(--ink);border-radius:12px;overflow:hidden;
   touch-action:none;user-select:none;-webkit-user-select:none}
 .house svg{display:block;width:100%;height:100%;outline:none}
 .floor{fill:#F7F8F3}
-.furn{fill:#C3C8E0}
-.furn .soft{fill:#DADDEC}
+.furn{fill:#A3ACD2}
+.furn .soft{fill:#B9C0DE}
+/* the two beds, on the floor itself */
+.bedf{fill:#C3C8E0}
+.bedf .soft{fill:#DADDEC}
 .tile{fill:transparent}
 .arrow{fill:#5E5866}
-.dot{fill:#5FA0C8;stroke:#2A2530;stroke-width:2.5}
+.dot{fill:#5FA0C8}
+.dotnum{font-family:var(--font);font-weight:700;font-size:25px;fill:#2A2530;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.zoomed .arrow{fill:#C98A0E}
 .link{fill:none;stroke-width:9;stroke-linecap:round}
 .num{font-family:var(--font);font-weight:700;font-size:28px;text-anchor:middle;dominant-baseline:central;stroke:#F7F8F3;stroke-width:6;paint-order:stroke;stroke-linejoin:round}
 .num.given{font-weight:800;font-size:34px;fill:#2A2530}
@@ -88,7 +93,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-09.4"></script>
+<script src="../games.js?v=2026-11-08.24"></script>
 <script>
 /* ---------- the run (plain functions, also run in a background worker) ---------- */
 // Zoomies puzzle maker (Signpost): a path through every square, each square's arrow pointing (any distance,
@@ -327,7 +332,7 @@ function draw() {
   el("rect", {x: -14, y: -14, width: S + 28, height: S + 28, rx: 22, class: "floor"}, svg);
   furnish(svg, S);
   // the cat's bed under the first dot and yours under the last
-  for (const i of [first(), last()]) { const [x, y] = xyOf(i), f = el("g", {class: "furn", transform: `translate(${x * 100} ${y * 100})`}, svg); f.innerHTML = FURNITURE[i === first() ? "catbed" : "bed"]; }
+  for (const i of [first(), last()]) { const [x, y] = xyOf(i), f = el("g", {class: "bedf", transform: `translate(${x * 100} ${y * 100})`}, svg); f.innerHTML = FURNITURE[i === first() ? "catbed" : "bed"]; }
   // the picked dot's possible partners: along its arrow, and the dots whose arrows point at it
   if (sel >= 0 && playing()) for (let j = 0; j < M(); j++) if (onRay(sel, j) || onRay(j, sel)) { const [cx, cy] = mid(j); el("circle", {cx, cy, r: 28, class: "mate"}, svg); }
   // the joins: a line from dot to dot, bowed a little on a long jump so it never runs through a dot on the way
@@ -344,13 +349,17 @@ function draw() {
     const [x, y] = xyOf(i), [r, o] = of[i], joined = r.sq.length > 1;
     const g = el("g", {class: "sq", "data-i": i, transform: `translate(${x * 100} ${y * 100})`}, tiles);
     el("rect", {x: 0, y: 0, width: 100, height: 100, class: "tile"}, g);
-    // the dot's arrow, the way the cat jumped from it (it stays once joined)
-    if (dir[i] >= 0) el("path", {d: ARROW, class: "arrow", transform: `translate(50 50) rotate(${dir[i] * 45})`}, g);
-    const dot = el("circle", {cx: 50, cy: 50, r: 12, class: "dot"}, g);
-    if (joined && !game.won) dot.style.fill = runColour(r);
+    // the dot's arrow, the way the cat jumped from it: grey, and the colour of its line once that jump is made
+    const col = joined && !game.won ? runColour(r) : null;
+    if (dir[i] >= 0) { const a = el("path", {d: ARROW, class: "arrow", transform: `translate(50 50) rotate(${dir[i] * 45})`}, g); if (col && game.succ[i] >= 0) a.style.fill = col; }
+    // a number worked out from your joins goes inside the dot (made bigger to hold it); a given one stays outside
+    const inside = !game.clue[i] && r.base != null ? String(r.base + o) : "";
+    const dot = el("circle", {cx: 50, cy: 50, r: inside ? 19 : 12, class: "dot"}, g);
+    if (col) dot.style.fill = col;
+    if (inside) { const t = el("text", {x: 50, y: 51, class: "dotnum"}, g); t.textContent = inside; if (inside.length > 1) t.setAttribute("font-size", 21); if (r.clash) t.setAttribute("fill", "#fff"); }
+    if (r.clash && inside) dot.style.fill = "#C8392B";
     let label = "", cls = "num", fill = "";
     if (game.clue[i]) { label = String(game.clue[i]); cls = "num given"; }
-    else if (r.base != null) { label = String(r.base + o); fill = shade(runColour(r), .45); }
     if (r.clash && label) cls += " clash";
     if (label) {
       // on the side away from the arrow (under the dot on your bed)
@@ -361,7 +370,7 @@ function draw() {
     }
   }
   for (const i of guesses.list()) { const [x, y] = xyOf(i); el("rect", {x: x * 100 + 20, y: y * 100 + 20, width: 60, height: 60, rx: 30, class: "guess"}, svg); }
-  if (sel >= 0 && playing()) { const [cx, cy] = mid(sel); el("circle", {cx, cy, r: 22, class: "sel"}, svg); }
+  if (sel >= 0 && playing()) { const [cx, cy] = mid(sel); el("circle", {cx, cy, r: 26, class: "sel"}, svg); }
   // the hint: gold (or red) boxes, and a line for a jump
   if (hint) {
     for (const i of hint.sq || []) { const [x, y] = xyOf(i); el("rect", {x: x * 100 + 14, y: y * 100 + 14, width: 72, height: 72, rx: 36, class: "hintsq" + (hint.bad ? " bad" : "")}, svg); }
