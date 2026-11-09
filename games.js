@@ -61,6 +61,7 @@ const G = (() => {
     ["Pawlinko", "pawlinko", "Take turns with Gus and Peanut knocking toys down the climbing wall into the cat beds", "#7885BA", "quick", "plinko pachinko pegs pegboard galton board drop balls bounce plinko physics yarn toys cat climbing wall tree beds springs action", "2026-11-02"],
     ["Cross Stitch", "crossstitch", "Stitch the sampler by the counts to see the picture", "#BD5538", "logic", "nonogram nonograms picross griddlers paint by numbers hanjie pattern pic-a-pix logic pictures cross stitch sampler embroidery", "2026-11-06"],
     ["Zoomies", "zoomies", "Retrace the cat's 3 a.m. zoomies around the house", "#4E577D", "lines", "signpost arrows path numbers jumps queen chain link zoomies", "2026-11-08"],
+    ["Under the Blanket", "blanket", "Find the cats with a feather", "#8D78AD", "logic", "black box blackbox rays atoms deflection reflection hidden balls feather wand blanket bugsy", "2026-11-09"],
   ];
   // The shelves the front page and the games menu sort the games onto, in order: key (also a plain name for it,
   // for search), heading, one line.
@@ -1091,6 +1092,7 @@ const G = (() => {
     fuzzyspelling: ["Left and right: pick a toy", "Up and down: slide it"],
     catastrophe: ["1 to 9: knock over that pot"],
     laserpointer: ["Arrow keys: pick a mirror", "Space or Enter: tip it"],
+    blanket: ["Arrow keys: move over the blanket and round its edge", "Space or Enter: a slot tries the feather; a square gets a lump", "D, X or .: a dot"],
     treattime: ["Arrow keys: pick a pile", "Space: put it back or take it out", "K or Enter: mark it to stay"],
     upatree: ["Letters: change the letter picked, or type a whole word", "Enter: climb with the word typed", "Backspace: take a letter off, or with none typed, step back down a perch"],
     toydoku: ["Arrow keys: pick a square", "1 to 9: put in a toy", "Backspace or 0: take it out", "N: notes on or off", "Escape: let go of the square"],
@@ -1494,6 +1496,8 @@ const G = (() => {
     toydoku: [["autoGrade", "Auto grade", "A wrong toy turns red and costs a life", false, {warn: true}], CHECK, NUMBERS("Digits in place of toys"), NOTES],
     junkdrawer: [["junk", "Junk", "Batteries, keys and coins in the drawer", true, {row: "decor"}],
       ["autoNotes", "Dim used-up magnets", "Magnets no word left to find needs fade", false, {row: "notes"}]],
+    blanket: [["autoCheck", "Auto check", "Slots that don't fit your lumps turn red", true, {row: "check"}],
+      ["autoNotes", "Auto Notes 🔢", "A dot on every square the feathers prove has no cat; costs the gold paw", false, {row: "notes", warn: true}]],
     magnets: [["autoAudit", "Auto-Audit", "Every letter turns olive or coral as it goes up; costs the gold paw", false, {warn: true}]],
     shelflife: [["shelf", "Shelf", "The pots stand on a shelf", true, {row: "decor"}]],
     catpile: [["cats", "Cats", "Cats nap on the blanket", true, {row: "decor", at: ["catdoku.catpile.prefs.v1", "cats"]}],

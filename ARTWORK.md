@@ -92,7 +92,11 @@ each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the 
   the title, Bugsy hops into each finished box curled up (`bugsy-6`), stretched out (`bugsy-3`) or on his back (`bugsy-1`), about one box in
   four Bowtie drops in instead, curled up (`bowtie-2`), and `bugsy-bowtie-boxes` is on the gold-paw card. Bugsy and Bowtie are the stars of
   Bird Watch: `bowtie-3` stands up on his back legs beside the title, and `bugsy-bowtie-window` is on the gold-paw card. Bowtie is the star of
-  Fish Bones: `bowtie-5` peeks up beside the title, and `bowtie-1` lies on his back, full of fish, on the gold-paw card.
+  Fish Bones: `bowtie-5` peeks up beside the title, and `bowtie-1` lies on his back, full of fish, on the gold-paw card. Bugsy is the star of
+  Under the Blanket: `bugsy-5` peeks beside the title, `bugsy-7` (curled up asleep) is one of the cats found under the blanket
+  (the others are Sunbeams' napping cats, the `NAPPERS` list, which also nap in its walkthrough), and `bugsy-3` stretches out
+  on the gold-paw card. Its feather toy (`blanket/feather-wand.webp`, a wooden stick with a binding and two speckled brown
+  feathers) is the owner's picture, levelled and trimmed; `blanket/feather-head.webp` is its feather end, for the status line.
   Not used yet: `bowtie-4` (lying down with a string, cut off at the right), `bowtie-8` (his face, close up) and
   `bowtie-9` (his face upside down, close up). None is a whole lying-down Bowtie for If It Fits (checked 2026-11-08).
 - **Crunch** (`crunch-…`, grey tabby with green eyes) is the star of Pounce: `crunch-3` sits beside

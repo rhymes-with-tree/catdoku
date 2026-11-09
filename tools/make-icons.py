@@ -1001,10 +1001,34 @@ def zoomies():
     return frame(tint(PERI, .14), out)
 
 
+def blanket():
+    # Under the Blanket: a quilted lavender blanket from above with a cat-shaped lump under it (ears and all), a slot
+    # on the left edge where the feather toy goes in, and a numbered slot on the top edge where it popped out
+    LAV = "#8D78AD"
+    out = f'<rect x="20" y="20" width="60" height="60" rx="6" fill="{tint(LAV, .25)}" stroke="{LAV}" stroke-width="4"/>'
+    for i in range(9):
+        x, y = 22 + (i % 3) * 18.7, 22 + (i // 3) * 18.7
+        if (i % 3 + i // 3) % 2:
+            out += f'<rect x="{x}" y="{y}" width="18.7" height="18.7" fill="{tint(PERI, .3)}"/>'
+    out += f'<path d="M26 26h48v48h-48z M40 22v56M59 22v56M22 40h56M22 59h56" fill="none" stroke="{LAV}" stroke-width="1.2" stroke-dasharray="3 2.5" opacity=".7"/>'
+    # the lump: a sleeping cat's shape pushing the blanket up
+    for sx in (-1, 1):
+        out += f'<path d="M{58 + sx * 9} 55L{58 + sx * 8.5} 45L{58 + sx * 2.5} 51Z" fill="{tint(LAV, .5)}" stroke="#7E6C9A" stroke-width="2" stroke-linejoin="round"/>'
+    out += f'<ellipse cx="58" cy="59" rx="12" ry="9" fill="{tint(LAV, .5)}" stroke="#7E6C9A" stroke-width="2"/>'
+    out += f'<ellipse cx="61" cy="62.5" rx="7" ry="3.5" fill="#7E6C9A" opacity=".25"/>'
+    # the feather toy going in from the left: stick, binding and a speckled brown feather
+    out += f'<path d="M6 34L30 35" stroke="#825840" stroke-width="3.2" stroke-linecap="round"/>'
+    out += f'<path d="M27 35C33 27 42 27 46 30C41 36 33 38 27 35Z" fill="#B08A66" stroke="{INK}" stroke-width="1.4"/>'
+    out += f'<path d="M28 35L44 31" stroke="{INK}" stroke-width=".9"/><circle cx="35" cy="32.5" r=".9" fill="{INK}"/><circle cx="39" cy="31.5" r=".9" fill="{INK}"/>'
+    # a slot that's had a feather out of it: pair 1, in spring blue
+    out += circle(50, 12, 7, "#4E577D", 2) + text(50, 12.5, "1", 10, PAPER)
+    return frame(tint(LAV, .12), out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle, "mewhue": mewhue, "pawlinko": pawlinko, "crossstitch": crossstitch, "junkdrawer": junkdrawer, "zoomies": zoomies}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle, "mewhue": mewhue, "pawlinko": pawlinko, "crossstitch": crossstitch, "junkdrawer": junkdrawer, "zoomies": zoomies, "blanket": blanket}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")
