@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-09.4"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-09.5"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,26 +25,33 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-09.4">
+<link rel="stylesheet" href="../games.css?v=2026-11-09.5">
 <style>
-/* The house at 3 a.m.: a night-blue floor plan, each square a piece of furniture (a pale periwinkle tile with its
-   silhouette) and an arrow pointing the way the cat jumped next. Joined squares take their run's colour: sage for the
-   run that's numbered, its own colour for each loose run (lettered a, b…). */
-/* A plain floor plan, light like the other boards: each square has a small grey arrow, the way the cat jumped next,
-   and, once it's known, its number above it (a given one bold ink; one worked out from your joins in its run's colour).
-   Joined squares are tinted: sage for the run that's numbered, a soft colour of its own for each loose run. */
-/* A room seen from above: the floor (pale, rounded) with furniture round the walls, and on it a dot for every spot the
-   cat landed, each with a thick grey arrow the way it jumped next. A join is a line from dot to dot, in its run's
-   colour (sage for the run that's numbered, a colour of its own for each loose run), and the first dot's arrow goes. */
-.house{background:#E9EBF3;border:3px solid var(--ink);border-radius:12px;overflow:hidden;
+/* A room seen from above: a pale floor in a periwinkle band, with furniture round the walls, and on the floor a dot
+   (no outline) for every spot the cat landed, each with a thick arrow the way it jumped next. A join is a line from
+   dot to dot in its run's colour (sage for the run that's numbered, lavender for a loose run), and once a dot's jump
+   is made its arrow takes that colour too. Given numbers sit beside their dots; numbers worked out from your joins go
+   inside theirs. */
+.house{background:#7885BA;border:3px solid var(--ink);border-radius:12px;overflow:hidden;
   touch-action:none;user-select:none;-webkit-user-select:none}
 .house svg{display:block;width:100%;height:100%;outline:none}
 .floor{fill:#F7F8F3}
-.furn{fill:#C3C8E0}
-.furn .soft{fill:#DADDEC}
+.furn{fill:#A3ACD2}
+.furn .soft{fill:#B9C0DE}
+/* the two beds, on the floor itself */
+.bedf{fill:#C3C8E0}
+.bedf .soft{fill:#DADDEC}
 .tile{fill:transparent}
 .arrow{fill:#5E5866}
-.dot{fill:#5FA0C8;stroke:#2A2530;stroke-width:2.5}
+.dot{fill:#5FA0C8}
+/* the pens, under the board: a swatch for each colour, the one picked ringed in ink */
+.pens{display:flex;justify-content:center;gap:2px;width:var(--board)}
+.pen{position:relative;flex:0 1 44px;height:44px;min-width:0;padding:0;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pen::after{content:"";position:absolute;left:50%;top:50%;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;background:var(--c)}
+.pen[aria-checked="true"]::before{content:"";position:absolute;left:50%;top:50%;width:40px;height:40px;margin:-20px 0 0 -20px;border-radius:50%;border:3px solid var(--ink);box-sizing:border-box}
+.pen:focus-visible{outline:3px solid #73A7AE;outline-offset:-2px;border-radius:50%}
+.dotnum{font-family:var(--font);font-weight:700;font-size:25px;fill:#2A2530;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.zoomed .arrow{fill:#C98A0E}
 .link{fill:none;stroke-width:9;stroke-linecap:round}
 .num{font-family:var(--font);font-weight:700;font-size:28px;text-anchor:middle;dominant-baseline:central;stroke:#F7F8F3;stroke-width:6;paint-order:stroke;stroke-linejoin:round}
 .num.given{font-weight:800;font-size:34px;fill:#2A2530}
@@ -71,6 +78,8 @@
     <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
   </div>
 
+  <div class="pens" id="pens" role="radiogroup" aria-label="Line colour"></div>
+
   <div class="actions">
     <button id="hintBtn">Hint</button>
     <button id="undoBtn">Undo</button>
@@ -88,7 +97,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-09.4"></script>
+<script src="../games.js?v=2026-11-09.5"></script>
 <script>
 /* ---------- the run (plain functions, also run in a background worker) ---------- */
 // Zoomies puzzle maker (Signpost): a path through every square, each square's arrow pointing (any distance,
@@ -257,12 +266,14 @@ function runs() {
   let letter = 0; for (const r of out) if (r.base == null && r.sq.length > 1) r.letter = "abcdefghijklmnopqrstuvwxyz"[letter++ % 26];
   return {list: out, of, pred};
 }
-// The colours of runs: sage for the one joined to a given number, lavender for every loose run not joined up yet (the
-// owner's choice: red-orange read as a mistake, and red is kept for numbers that can't all be right).
-const LOOSE = ["#9874CA"];
-const tint = (hex, t) => "#" + [1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) + (255 - parseInt(hex.slice(i, i + 2), 16)) * t).toString(16).padStart(2, "0")).join("");
-const shade = (hex, t) => "#" + [1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * (1 - t) + 0x2A * t).toString(16).padStart(2, "0")).join("");
-const runColour = r => r.base != null ? "#6AA673" : LOOSE[("abcdefghijklmnopqrstuvwxyz".indexOf(r.letter)) % LOOSE.length];
+// The pens: a row of colours under the board, like a notes tool. The lines you draw take the pen picked; when two
+// strands join, the whole strand takes the colour of the part with the smaller numbers (the earlier part of the run),
+// so 1-2-3 joined to 4-5-6 is all 1-2-3's colour. A dot on its own joining a strand has no colour yet, so the strand
+// takes the pen. game.ink: each dot's line colour (an index into PENS) for the jump out of it, -1 for none.
+const PENS = [["#6AA673", "green"], ["#9874CA", "lavender"], ["#B94588", "plum"], ["#E16A4A", "coral"], ["#4E577D", "navy"],
+  ["#B3B94B", "lime"], ["#ECA818", "gold"]];
+const inkOf = () => game.ink || (game.ink = new Array(M()).fill(-1));
+const runColour = r => PENS[Math.max(0, inkOf()[r.sq[0]])][0];
 
 /* ---------- drawing ---------- */
 // The furniture, drawn in a 100 × 100 square: each square of the house gets one, picked from the puzzle itself so it
@@ -327,7 +338,7 @@ function draw() {
   el("rect", {x: -14, y: -14, width: S + 28, height: S + 28, rx: 22, class: "floor"}, svg);
   furnish(svg, S);
   // the cat's bed under the first dot and yours under the last
-  for (const i of [first(), last()]) { const [x, y] = xyOf(i), f = el("g", {class: "furn", transform: `translate(${x * 100} ${y * 100})`}, svg); f.innerHTML = FURNITURE[i === first() ? "catbed" : "bed"]; }
+  for (const i of [first(), last()]) { const [x, y] = xyOf(i), f = el("g", {class: "bedf", transform: `translate(${x * 100} ${y * 100})`}, svg); f.innerHTML = FURNITURE[i === first() ? "catbed" : "bed"]; }
   // the picked dot's possible partners: along its arrow, and the dots whose arrows point at it
   if (sel >= 0 && playing()) for (let j = 0; j < M(); j++) if (onRay(sel, j) || onRay(j, sel)) { const [cx, cy] = mid(j); el("circle", {cx, cy, r: 28, class: "mate"}, svg); }
   // the joins: a line from dot to dot, bowed a little on a long jump so it never runs through a dot on the way
@@ -344,13 +355,17 @@ function draw() {
     const [x, y] = xyOf(i), [r, o] = of[i], joined = r.sq.length > 1;
     const g = el("g", {class: "sq", "data-i": i, transform: `translate(${x * 100} ${y * 100})`}, tiles);
     el("rect", {x: 0, y: 0, width: 100, height: 100, class: "tile"}, g);
-    // the dot's arrow, the way the cat jumped from it (it stays once joined)
-    if (dir[i] >= 0) el("path", {d: ARROW, class: "arrow", transform: `translate(50 50) rotate(${dir[i] * 45})`}, g);
-    const dot = el("circle", {cx: 50, cy: 50, r: 12, class: "dot"}, g);
-    if (joined && !game.won) dot.style.fill = runColour(r);
+    // the dot's arrow, the way the cat jumped from it: grey, and the colour of its line once that jump is made
+    const col = joined && !game.won ? runColour(r) : null;
+    if (dir[i] >= 0) { const a = el("path", {d: ARROW, class: "arrow", transform: `translate(50 50) rotate(${dir[i] * 45})`}, g); if (col && game.succ[i] >= 0) a.style.fill = col; }
+    // a number worked out from your joins goes inside the dot (made bigger to hold it); a given one stays outside
+    const inside = !game.clue[i] && r.base != null ? String(r.base + o) : "";
+    const dot = el("circle", {cx: 50, cy: 50, r: inside ? 19 : 12, class: "dot"}, g);
+    if (col) dot.style.fill = col;
+    if (inside) { const t = el("text", {x: 50, y: 51, class: "dotnum"}, g); t.textContent = inside; if (inside.length > 1) t.setAttribute("font-size", 21); if (r.clash) t.setAttribute("fill", "#fff"); }
+    if (r.clash && inside) dot.style.fill = "#C8392B";
     let label = "", cls = "num", fill = "";
     if (game.clue[i]) { label = String(game.clue[i]); cls = "num given"; }
-    else if (r.base != null) { label = String(r.base + o); fill = shade(runColour(r), .45); }
     if (r.clash && label) cls += " clash";
     if (label) {
       // on the side away from the arrow (under the dot on your bed)
@@ -361,7 +376,7 @@ function draw() {
     }
   }
   for (const i of guesses.list()) { const [x, y] = xyOf(i); el("rect", {x: x * 100 + 20, y: y * 100 + 20, width: 60, height: 60, rx: 30, class: "guess"}, svg); }
-  if (sel >= 0 && playing()) { const [cx, cy] = mid(sel); el("circle", {cx, cy, r: 22, class: "sel"}, svg); }
+  if (sel >= 0 && playing()) { const [cx, cy] = mid(sel); el("circle", {cx, cy, r: 26, class: "sel"}, svg); }
   // the hint: gold (or red) boxes, and a line for a jump
   if (hint) {
     for (const i of hint.sq || []) { const [x, y] = xyOf(i); el("rect", {x: x * 100 + 14, y: y * 100 + 14, width: 72, height: 72, rx: 36, class: "hintsq" + (hint.bad ? " bad" : "")}, svg); }
@@ -386,12 +401,16 @@ function link(a, b) {
   if (b === first()) { G.note("The run starts in the cat's bed: nothing jumps into it.", 3500); return false; }
   for (let k = b; k >= 0; k = game.succ[k]) if (k === a) { G.note("That would send the cat round in a loop.", 3500); return false; }
   guesses.before(a); undo.push();
-  const pred = game.succ.indexOf(b);
+  const pred = game.succ.indexOf(b), ink = inkOf();
   if (pred >= 0) game.succ[pred] = -1;
   game.succ[a] = b;
+  // the joined strand's colour: the earlier part's, if it has lines yet, or else the pen's
+  const before = game.succ.indexOf(a), c = before >= 0 && ink[before] >= 0 ? ink[before] : settings.pen;
+  for (let k = a; game.succ[k] >= 0; k = game.succ[k]) ink[k] = c;
+  for (let k = game.succ.indexOf(a); k >= 0; k = game.succ.indexOf(k)) ink[k] = c;
   return true;
 }
-function cut(a) { guesses.before(a); undo.push(); game.succ[a] = -1; }
+function cut(a) { guesses.before(a); undo.push(); game.succ[a] = -1; inkOf()[a] = -1; }
 // Two squares tapped (or dragged between, either way) make a pair: if they're joined, they come apart; if one's arrow
 // points at the other, they're joined that way round (where each points at the other, see below).
 // Nothing stays picked afterwards. A square that can't pair with the picked one is picked instead.
@@ -470,14 +489,16 @@ function showCursor() {
 }
 let keys = null;
 keys = G.gridKeys({on: playing, size: () => [game.N, game.N], start: () => sel >= 0 ? sel : first(), show: showCursor,
-  act: i => tap(i), escape: () => { if (sel >= 0) { sel = -1; draw(); } }});
+  keys: ["c"], act: (i, key) => key === "c" ? pickPen((settings.pen + 1) % PENS.length) : tap(i), escape: () => { if (sel >= 0) { sel = -1; draw(); } }});
 // Undo takes back a jump made or cut, or a Reset (the owner asked for Reset here in place of the usual Restart).
-const undo = G.history({game: () => game, take: () => game.succ.slice(), back: (s, g) => { g.succ = s; }, cap: 400, restart: true,
+// A step is the joins and their colours (or, in a save from before colours, the joins alone).
+const undo = G.history({game: () => game, take: () => ({succ: game.succ.slice(), ink: inkOf().slice()}),
+  back: (s, g) => { if (Array.isArray(s)) g.succ = s; else { g.succ = s.succ; g.ink = s.ink; } }, cap: 400, restart: true,
   can: playing, started: () => game.succ.some(j => j >= 0), after: () => { sel = -1; draw(); save(); }});
 // Bookmark: the next jump made or cut glows, and Return to Bookmark undoes back to just before it (free, as Undo is).
 const guesses = G.guesser({game: () => game, history: undo, draw: () => { sel = -1; draw(); save(); }, board: $("board"), what: "jump"});
 $("restartBtn").onclick = () => {
-  if (undo.restart(g => { g.succ = new Array(g.N * g.N).fill(-1); guesses.clear(); })) { sel = -1; G.note("Back to the start of the night. Undo brings your jumps back.", 4000); }
+  if (undo.restart(g => { g.succ = new Array(g.N * g.N).fill(-1); g.ink = new Array(g.N * g.N).fill(-1); guesses.clear(); })) { sel = -1; G.note("Back to the start of the night. Undo brings your jumps back.", 4000); }
 };
 
 /* ---------- hints ---------- */
@@ -551,7 +572,7 @@ function finishCard() {
 /* ---------- new nights ---------- */
 function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
 function begin(p, level) {
-  game = {level, N: p.N, path: p.path.slice(), clue: p.clue.slice(), succ: new Array(p.N * p.N).fill(-1), history: [], won: false, ...G.freshClock()};
+  game = {level, N: p.N, path: p.path.slice(), clue: p.clue.slice(), succ: new Array(p.N * p.N).fill(-1), ink: new Array(p.N * p.N).fill(-1), history: [], won: false, ...G.freshClock()};
   sel = -1; derive(); hints.clear(false);
 }
 async function newPuzzle() {
@@ -586,7 +607,7 @@ function openShared(d) {
     const succ = s.map(v => v === 255 ? -1 : v);
     // only jumps along an arrow, none into the cat's bed or out of yours, each square jumped into once
     const into = succ.filter(v => v >= 0);
-    if (succ.every((j, i) => j < 0 || onRay(i, j)) && !into.includes(path[0]) && succ[path[sq - 1]] < 0 && new Set(into).size === into.length) { game.succ = succ; game.timed = false; }
+    if (succ.every((j, i) => j < 0 || onRay(i, j)) && !into.includes(path[0]) && succ[path[sq - 1]] < 0 && new Set(into).size === into.length) { game.succ = succ; game.ink = succ.map(j => j >= 0 ? 0 : -1); game.timed = false; }
   } }
   settings.level = n; $("levelSel").value = n;
   draw(); save(); build.prefetch(n);
@@ -613,7 +634,7 @@ function helpOnFirstVisit() {
     {say: "Join dots anywhere, in any order", lit: all},
     ...(givens.length ? [{say: "Bold numbers: when the cat got there", lit: givens}] : []),
     {say: "Tap a joined pair again to part them", lit: all, later: true},
-    {say: "Coloured numbers come from your joins", lit: all, later: true},
+    {say: "Pick a colour for your next lines", els: [$("pens")], later: true},
     {say: "Not sure? Bookmark, then try a jump. Return to Bookmark undoes it", els: [$("guessBtn")]},
     {say: "Stuck? Hint shows the next jump", els: [$("hintBtn")]},
   ];
@@ -624,6 +645,15 @@ $("helpBtn").onclick = () => { if (!busy) showHelp(); };
 for (let n = 1; n <= LEVELS; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", ""), n));
 $("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
 $("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
+// The pens: tap one, and the lines you draw next take its colour (C on a keyboard goes to the next).
+function pickPen(k) {
+  settings.pen = k; save();
+  [...$("pens").children].forEach((b, j) => b.setAttribute("aria-checked", String(j === k)));
+}
+PENS.forEach(([c, name], k) => { const b = document.createElement("button"); b.className = "pen"; b.setAttribute("role", "radio");
+  b.setAttribute("aria-label", `${name[0].toUpperCase() + name.slice(1)} lines`); b.style.setProperty("--c", c); b.onclick = () => pickPen(k); $("pens").append(b); });
+if (!(settings.pen >= 0 && settings.pen < PENS.length)) settings.pen = 0;
+pickPen(settings.pen);
 G.nav("zoomies");
 G.checkClock(game);
 G.setupTimer({name: "zoomies", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
