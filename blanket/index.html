@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Under the Blanket</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-11-09.6"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<meta name="theme-color" content="#ECEEE7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1F1C24" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-11-09.6">
+<style>
+/* Bugsy, the star, peeking beside the title */
+.title{display:flex;align-items:flex-end;gap:8px}
+.bugsy{display:block;height:62px;width:auto;margin-bottom:-6px}
+@media (max-height:760px){.bugsy{height:46px;margin-bottom:-4px}}
+.card img.bugsypic{display:block;width:70%;max-width:240px;height:auto;margin:0 auto 14px}
+
+/* A quilted blanket seen from above, with slots all round its edge for the feather wand. Cats nap under it; tap a
+   slot to slide the feather in and see where it pops out. Lumps (where you think a cat is) and dots (where you're
+   sure there's none) are marked on the blanket. Once you lift it, the cats are there, curled up asleep. */
+.bed{--quilt-a:#E2DDEA; --quilt-b:#D7DAEA; --stitch:#8D78AD; --binding:#8D78AD; --sheet:#F7F8F3; --lump:#C6BCD6;
+  background:color-mix(in srgb,#8D78AD 14%,#F7F8F3);border:3px solid #2A2530;border-radius:12px;overflow:hidden;
+  touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.bed .grid{position:absolute;inset:0}
+.bed svg{display:block;width:100%;height:100%;outline:none}
+.sheet{fill:var(--sheet)}
+.sheetline{stroke:color-mix(in srgb,#73A7AE 30%,#fff);stroke-width:3;fill:none}
+.patch{stroke:none}
+.stitch{fill:none;stroke:var(--stitch);stroke-width:2.5;stroke-dasharray:7 6;opacity:.75;pointer-events:none}
+.binding{fill:none;stroke:var(--binding);stroke-width:12}
+.quilt{transition:transform .9s cubic-bezier(.5,0,.3,1),opacity .9s ease-in}
+.quilt.off{transform:translate(0,-112%) rotate(-4deg);opacity:0}
+@media (prefers-reduced-motion:reduce){.quilt{transition:none}}
+.sq{cursor:pointer}
+/* a lump: something cat-shaped under the blanket, ears and all */
+.lump .body{fill:var(--lump);stroke:#7E6C9A;stroke-width:3}
+.lump .ear{fill:var(--lump);stroke:#7E6C9A;stroke-width:3;stroke-linejoin:round}
+.lump .shade{fill:#7E6C9A;opacity:.22}
+.dot{fill:#5E5866;opacity:.65}
+/* the slots round the edge */
+.slot{cursor:pointer}
+.slot .tab{fill:#F7F8F3;stroke:#8D78AD;stroke-width:3}
+.slot .tip{fill:none;stroke:#8D78AD;stroke-width:3;stroke-linecap:round;opacity:.8}
+.slot.done .tab{stroke:#2A2530}
+.slot .num{font:800 46px var(--font);text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.slot.bad .ring{display:inline}
+.slot .ring{display:none;fill:none;stroke:#C8392B;stroke-width:6}
+.slot.flash .tab{animation:flash .5s ease-out 2}
+@keyframes flash{50%{stroke-width:9}}
+/* the feather wand, sliding in and popping out */
+.wand{pointer-events:none}
+.napper{pointer-events:none}
+.cursor{fill:none;stroke:#73A7AE;stroke-width:6;pointer-events:none}
+.tally .tic{width:1.15em;height:1.15em}
+.over{color:var(--bad-text)}
+</style>
+</head>
+<body>
+<main>
+  <header><div class="title"><h1>Under the Blanket</h1><img class="bugsy" id="bugsyImg" src="../cats/bugsy-5.webp" alt="Bugsy, a fluffy brown and white cat, peeking over the edge"></div><div class="stripe"></div><p class="tagline">Find the cats with a feather</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap bed stage" id="board"><div class="grid" id="grid"><svg id="svg" tabindex="0" role="application" aria-label="A blanket with cats hiding under it"></svg></div></div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="liftBtn">Lift</button>
+    <button id="dotBtn" aria-pressed="false">Dot</button>
+    <button id="linkBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New blanket</button>
+  </div>
+</main>
+
+<script src="../games.js?v=2026-11-09.6"></script>
+<script>
+/* ---------- blanket puzzles (plain functions, also run in a background worker) ---------- */
+// The blanket is N × N squares with k cats under it. A feather wand goes in at one of 4N slots round the edge:
+// slots 0..N-1 along the top (column by column), N..2N-1 down the right side, 2N..3N-1 along the bottom and
+// 3N..4N-1 down the left side. It runs straight until a cat is in the way:
+//   a cat straight ahead grabs it (it never comes out: -1);
+//   a cat ahead to one side turns it away from that cat, a quarter turn;
+//   cats ahead on both sides send it back the way it came;
+//   a cat on the edge just beside the slot sends it straight back out.
+// It comes out at a slot: its own (sent back) or another, and the way back is the same run backwards.
+function ubLevel(n) {
+  return [null, {N: 5, k: 2}, {N: 5, k: 3}, {N: 6, k: 3}, {N: 6, k: 4}, {N: 7, k: 4},
+    {N: 8, k: 4}, {N: 8, k: 5}, {N: 9, k: 5}, {N: 9, k: 6}, {N: 10, k: 6}][n];
+}
+// Where slot p starts (just outside the blanket) and which way it heads: [x, y, dx, dy].
+function ubSlot(N, p) {
+  const s = Math.floor(p / N), j = p % N;
+  return [[j, -1, 0, 1], [N, j, -1, 0], [j, N, 0, -1], [-1, j, 1, 0]][s];
+}
+// The slot at x, y just outside the blanket.
+function ubOut(N, x, y) { return y < 0 ? x : x >= N ? N + y : y >= N ? 2 * N + x : 3 * N + y; }
+// Run the wand in at slot p. at(x, y) is 1 for a cat, 0 for none, -1 for not known yet (then null comes back).
+// Returns the slot it comes out at, or -1 if a cat grabs it.
+function ubFire(N, at, p) {
+  let [x, y, dx, dy] = ubSlot(N, p);
+  const cell = (a, b) => a < 0 || b < 0 || a >= N || b >= N ? 0 : at(a, b);
+  // at the slot: a cat in the first square grabs it; a cat beside that square sends it back
+  let ah = cell(x + dx, y + dy);
+  if (ah < 0) return null;
+  if (ah) return -1;
+  const l0 = cell(x + dx + dy, y + dy - dx), r0 = cell(x + dx - dy, y + dy + dx);
+  if (l0 < 0 || r0 < 0) return null;
+  if (l0 || r0) return p;
+  x += dx; y += dy;
+  for (let steps = 0; steps < 8 * N * N; steps++) {
+    ah = cell(x + dx, y + dy);
+    if (ah < 0) return null;
+    if (ah) return -1;
+    // ahead and to the left (as the wand faces), and ahead and to the right
+    const l = cell(x + dx + dy, y + dy - dx), r = cell(x + dx - dy, y + dy + dx);
+    if (l < 0 || r < 0) return null;
+    if (l && r) { dx = -dx; dy = -dy; }
+    else if (l) { const t = dx; dx = -dy; dy = t; }        // turn right, away from the cat on the left
+    else if (r) { const t = dx; dx = dy; dy = -t; }        // turn left
+    else {
+      x += dx; y += dy;
+      if (x < 0 || y < 0 || x >= N || y >= N) return ubOut(N, x, y);
+    }
+  }
+  return -2;   // can't happen: a run can't go round in a loop
+}
+// Every way of hiding k cats that gives the same results for the slots in `shots` ([[slot, out]…]), up to limit
+// (each a sorted list of squares). Squares are decided from the edge in, ring by ring, so the wands' first squares
+// are known early and a wrong guess is caught soon. Null if that takes more than `cap` steps.
+function ubSolve(N, k, shots, limit, cap) {
+  const NN = N * N, ord = [];
+  for (let r = 0; 2 * r < N; r++) for (let i = 0; i < NN; i++) {
+    const x = i % N, y = (i - x) / N;
+    if (Math.min(x, y, N - 1 - x, N - 1 - y) === r) ord.push(i);
+  }
+  const g = new Int8Array(NN).fill(-1), at = (x, y) => g[y * N + x], out = [], most = cap || 4e6;
+  let work = 0;
+  (function go(d, left) {
+    if (out.length >= limit || work > most) return;
+    for (const s of shots) {
+      work++;
+      const o = ubFire(N, at, s[0]);
+      if (o !== null && o !== s[1]) return;
+    }
+    if (d === NN) { if (!left) out.push(ord.filter(i => g[i] === 1).sort((a, b) => a - b)); return; }
+    const i = ord[d];
+    if (NN - d > left) { g[i] = 0; go(d + 1, left); }
+    if (left) { g[i] = 1; go(d + 1, left - 1); }
+    g[i] = -1;
+  })(0, k);
+  return work > most ? null : out;
+}
+function ubShuffle(a) { for (let k = a.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [a[k], a[j]] = [a[j], a[k]]; } return a; }
+// A blanket: hide the cats at random, and keep it if every slot's result, taken together, leaves only one way the
+// cats can be lying. Null to try again.
+function makeBlanket(n) {
+  const {N, k} = ubLevel(n), NN = N * N;
+  const cats = ubShuffle([...Array(NN).keys()]).slice(0, k).sort((a, b) => a - b), has = new Uint8Array(NN);
+  for (const i of cats) has[i] = 1;
+  const res = [...Array(4 * N).keys()].map(p => ubFire(N, (x, y) => has[y * N + x], p));
+  const sols = ubSolve(N, k, res.map((o, p) => [p, o]), 2);
+  if (!sols || sols.length !== 1) return null;
+  return {N, k, cats, res};
+}
+
+/* ---------- game state ---------- */
+// game: {level, N, k, cats (the squares the cats are on), res (where each slot's wand comes out: a slot, or -1 when a
+//        cat grabs it), shots (the slots tried, in order), marks (each square: 0 nothing, 1 a lump, 2 a dot),
+//        history (G.history: [square, what it was], or {marks, shots} for a Restart), won, hinted, restarted,
+//        peeked (lifted the blanket with a lump wrong)…}
+const STORE = "catdoku.blanket.v1", MAX_LEVEL = 10, M = 80, NS = "http://www.w3.org/2000/svg";
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1, autoCheck: true}, state.settings);
+let game = state.game || null, busy = false, running = false;
+const line = () => 2 * game.N;   // the gold line: half the slots
+G.pawLost(() => !game || game.won || game.hinted || game.restarted || game.peeked || game.autoNoted || game.shots.length > line());
+// The tutorial's practice blanket is never saved: while it's out, only the settings are, beside the puzzle already kept.
+const save = () => G.save(STORE, {settings, game: game && game.tutorial ? G.load(STORE).game : game});
+const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
+const levelName = n => { const s = ubLevel(n); return `Level ${n} · ${s.N} × ${s.N}, ${s.k} cats`; };
+const build = G.builder([ubLevel, ubSlot, ubOut, ubFire, ubSolve, ubShuffle, makeBlanket], "makeBlanket");
+const el = (t, a, parent) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (parent) parent.append(e); return e; };
+const catSrc = f => (window.CAT_SRC || {})[f] || `../cats/${f}.webp`;
+const has = () => { const h = new Uint8Array(game.N * game.N); for (const i of game.cats) h[i] = 1; return h; };
+const lumps = () => game.marks.reduce((a, m, i) => m === 1 ? [...a, i] : a, []);
+
+// What's known at each slot: {kind: "grab" | "back" | "pair", n (the pair's number), other (the slot at the other
+// end)}, from the slots tried. A wand that comes out of another slot tells that slot too.
+function known() {
+  const out = {}; let n = 0;
+  for (const p of game.shots) {
+    if (out[p]) continue;
+    const o = game.res[p];
+    if (o < 0) out[p] = {kind: "grab"};
+    else if (o === p) out[p] = {kind: "back"};
+    else { n++; out[p] = {kind: "pair", n, other: o}; out[o] = {kind: "pair", n, other: p}; }
+  }
+  return out;
+}
+// Slot centres, in the board's units (each square is 100).
+function slotXY(p) {
+  const N = game.N, s = Math.floor(p / N), j = p % N, h = M / 2;
+  return [[j * 100 + 50, -h], [N * 100 + h, j * 100 + 50], [j * 100 + 50, N * 100 + h], [-h, j * 100 + 50]][s];
+}
+const centre = i => [i % game.N * 100 + 50, Math.floor(i / game.N) * 100 + 50];
+// Pair colours: the site's palette, darker ones first so white numbers read on them.
+// (Gold is kept for a wand that comes back, and brick for one a cat grabs, on the tabs and the runs drawn at the end.)
+const PAIRS = ["#4E577D", "#6AA673", "#B94588", "#73A7AE", "#8D78AD", "#B3B94B", "#7885BA"];
+
+/* ---------- drawing ---------- */
+let slotEls = [], sqEls = [];
+function paw(g, x, y, s, fill) {
+  el("ellipse", {cx: x, cy: y + 4 * s, rx: 7 * s, ry: 6 * s, fill}, g);
+  for (const [a, b] of [[-8, -4], [-3, -9], [3, -9], [8, -4]]) el("ellipse", {cx: x + a * s, cy: y + b * s, rx: 2.7 * s, ry: 3.3 * s, fill}, g);
+}
+// The feather wand, pointing along +x from the origin: the feather at the front, the stick behind.
+// The feather toy (the owner's picture, feather-wand.webp: 600 × 110, handle on the left, the stick's middle 95.5 down),
+// pointing along +x: the feathers' tip at x = 58 and the stick along y = 0, 280 long.
+const pic = f => (window.TOY_SRC || {})[f] || `${f}.webp`;
+function wand(parent) {
+  const g = el("g", {class: "wand"}, parent), W = 280, H = W * 110 / 600;
+  el("image", {href: pic("feather-wand"), x: 58 - W, y: -H * 95.5 / 110, width: W, height: H}, g);
+  return g;
+}
+function say() {
+  const N = game.N, k = known(), tried = Object.keys(k).map(Number).sort((a, b) => a - b);
+  const side = p => { const s = Math.floor(p / N), j = p % N + 1; return [`top ${j}`, `right ${j}`, `bottom ${j}`, `left ${j}`][s]; };
+  const words = tried.map(p => `${side(p)}: ${k[p].kind === "grab" ? "grabbed" : k[p].kind === "back" ? "came back" : `pair ${k[p].n}, out at ${side(k[p].other)}`}`);
+  const ls = lumps().map(i => G.at(i, N)), dots = game.marks.map((m, i) => m === 2 ? G.at(i, N) : "").filter(Boolean);
+  G.describe($("svg"), `Blanket, ${N} by ${N}, with ${game.k} cats under it. ${tried.length ? "Slots tried: " + G.listed(words, "; ") + "." : "No slots tried yet."} ${ls.length ? "Lumps at " + G.listed(ls, "; ") + "." : ""} ${dots.length ? "Dots at " + G.listed(dots, "; ") + "." : ""} Arrow keys move round the blanket and its edge; Space tries a slot or marks a lump, D marks a dot.`);
+}
+function draw() {
+  queueMicrotask(say);
+  const N = game.N, S = N * 100, svg = $("svg");
+  svg.innerHTML = "";
+  svg.setAttribute("viewBox", `${-M} ${-M} ${S + 2 * M} ${S + 2 * M}`);
+  const defs = el("defs", {}, svg), mrk = el("marker", {id: "demoArrow", viewBox: "0 0 10 10", refX: 5, refY: 5, markerWidth: 3.2, markerHeight: 3.2, orient: "auto-start-reverse"}, defs);
+  el("path", {d: "M0 0 L10 5 L0 10 Z", fill: "#E16A4A", stroke: "#2A2530", "stroke-width": 1}, mrk);
+  // the sheet underneath, and the cats asleep on it (seen once the blanket's lifted)
+  el("rect", {class: "sheet", x: 0, y: 0, width: S, height: S, rx: 10}, svg);
+  let d = ""; for (let x = 25; x < S; x += 50) d += `M${x} 0V${S}`;
+  el("path", {class: "sheetline", d}, svg);
+  el("g", {id: "under"}, svg);
+  el("g", {id: "runs"}, svg);
+  // the quilt
+  const q = el("g", {class: "quilt" + (game.won ? " off" : ""), id: "quilt"}, svg);
+  sqEls = [];
+  for (let i = 0; i < N * N; i++) {
+    const x = i % N, y = Math.floor(i / N);
+    sqEls[i] = el("rect", {class: "patch sq", x: x * 100, y: y * 100, width: 100, height: 100, fill: (x + y) % 2 ? "var(--quilt-b)" : "var(--quilt-a)"}, q);
+  }
+  d = "";
+  for (let i = 0; i < N * N; i++) { const x = i % N * 100, y = Math.floor(i / N) * 100; d += `M${x + 10} ${y + 10}h80v80h-80z`; }
+  el("path", {class: "stitch", d}, q);
+  el("rect", {class: "binding", x: -4, y: -4, width: S + 8, height: S + 8, rx: 12}, q);
+  el("g", {id: "marks"}, q);
+  // the slots
+  const sl = el("g", {id: "slots"}, svg);
+  slotEls = [];
+  for (let p = 0; p < 4 * N; p++) {
+    const [cx, cy] = slotXY(p), g = el("g", {class: "slot", transform: `translate(${cx} ${cy})`}, sl);
+    el("rect", {x: -50, y: -50, width: 100, height: 100, fill: "transparent"}, g);
+    slotEls[p] = g;
+  }
+  // the feather sliding in: over the edge and its slots, but cut off at the blanket, so it goes under
+  const clip = el("clipPath", {id: "outside"}, defs);
+  el("path", {d: `M${-M} ${-M}h${S + 2 * M}v${S + 2 * M}h${-S - 2 * M}z M4 4v${S - 8}h${S - 8}v${-S + 8}z`, "clip-rule": "evenodd"}, clip);
+  el("g", {id: "wands", "clip-path": "url(#outside)"}, svg);
+  el("rect", {class: "hintsq", id: "hintsq", x: -999, y: 0, width: 92, height: 92, rx: 12}, svg);
+  el("rect", {class: "cursor", id: "cursor", x: -999, y: 0, width: 92, height: 92, rx: 12}, svg);
+  if (game.won) { showCats(false); showRuns(false); }
+  update();
+}
+// What a slot shows, in g (centred on the slot): an arrow pointing in while it's untried (rot turns it to face in),
+// a brick paw where a cat grabbed the feather, a gold U-turn where it came straight back, or the pair's number.
+function slotMark(g, kn, rot) {
+  if (!kn) {
+    el("circle", {class: "tab", r: 27}, g);
+    el("path", {class: "tip", d: "M-9 -11 L5 0 L-9 11", transform: `rotate(${rot})`}, g);
+  } else if (kn.kind === "grab") {
+    el("circle", {class: "tab", r: 36, style: "fill:#F7F8F3;stroke:#BD5538;stroke-width:6"}, g);
+    paw(g, 0, 1, 1.9, "#BD5538");
+  } else if (kn.kind === "back") {
+    el("circle", {class: "tab", r: 36, style: "fill:#ECA818"}, g);
+    el("path", {d: "M-10 -11 H4 A10 10 0 0 1 4 9 H-10 M-4 3 L-11 9 L-4 15", fill: "none", stroke: "#2A2530", "stroke-width": 5.5, "stroke-linecap": "round", "stroke-linejoin": "round", transform: `rotate(${rot + 180}) scale(1.3) translate(0 -2)`}, g);
+  } else {
+    const c = PAIRS[(kn.n - 1) % PAIRS.length], dark = /B3B94B|73A7AE/.test(c);
+    el("circle", {class: "tab", r: 36, style: `fill:${c}`}, g);
+    el("text", {class: "num", y: 3, fill: dark ? "#2A2530" : "#fff"}, g).textContent = kn.n;
+  }
+}
+// Marks on the blanket and what's known at each slot; then the status line.
+function update() {
+  const N = game.N, k = known(), mk = $("marks");
+  mk.innerHTML = "";
+  // with Auto Notes on, a dot on every square the feathers prove has no cat (not kept in marks: worked out afresh)
+  const auto = settings.autoNotes && !game.won ? noCat() : null;
+  // Auto Notes costs the gold paw once it has put a dot down on this blanket (never on the tutorial's practice one)
+  if (auto && auto.size && !game.tutorial && !game.autoNoted) { game.autoNoted = true; game.started = true; save(); }
+  game.marks.forEach((m, i) => {
+    if (!m && auto && auto.has(i)) m = 2;
+    if (!m) return;
+    const [cx, cy] = centre(i);
+    if (m === 2) { el("circle", {class: "dot", cx, cy, r: 9}, mk); return; }
+    const g = el("g", {class: "lump", transform: `translate(${cx} ${cy + 6})`}, mk);
+    for (const s of [-1, 1]) el("path", {class: "ear", d: `M${s * 30} -14 L${s * 27} -40 L${s * 8} -26 Z`}, g);
+    el("ellipse", {class: "body", cx: 0, cy: 2, rx: 36, ry: 28}, g);
+    el("ellipse", {class: "shade", cx: 8, cy: 12, rx: 24, ry: 13}, g);
+  });
+  // with Auto check on and every lump down: the slots whose results these lumps wouldn't give turn red
+  const bad = new Set(), ls = lumps();
+  if (settings.autoCheck && ls.length === game.k && !game.won) {
+    const h = new Uint8Array(N * N); for (const i of ls) h[i] = 1;
+    for (const p in k) if (ubFire(N, (x, y) => h[y * N + x], +p) !== game.res[p]) bad.add(+p);
+  }
+  for (let p = 0; p < 4 * N; p++) {
+    const g = slotEls[p], kn = k[p];
+    while (g.childNodes.length > 1) g.lastChild.remove();
+    g.setAttribute("class", "slot" + (kn ? " done" : "") + (bad.has(p) ? " bad" : ""));
+    slotMark(g, kn, [90, 180, 270, 0][Math.floor(p / N)]);
+    el("circle", {class: "ring", r: 42}, g);
+  }
+  // the status line: lumps marked of the cats, and feathers used of the gold line
+  const used = game.shots.length, over = used > line();
+  $("count").innerHTML = game.won ? `All ${game.k} cats found` :
+    G.tally(null, ls.length, game.k, LUMP_ICON, `${ls.length} of ${game.k} lumps marked`) + " · " +
+    `<span class="${over ? "over" : ""}">${G.tally(null, used, line(), FEATHER_ICON(), `${used} feathers used; ${line()} or fewer for a gold paw`)}</span>`;
+  $("liftBtn").disabled = game.won || ls.length !== game.k;
+  $("hintBtn").disabled = game.won;
+  undo.sync();
+  if (!game.won && ls.length === game.k && !hints.current()) G.note(bad.size ? "The red slots don't fit your lumps." : `All ${game.k} lumps marked. Lift the blanket?`, 0);
+  paintHint();
+}
+const LUMP_ICON = '<path d="M2.5 9 L3 3.5 L6 6.5 H10 L13 3.5 L13.5 9 Q13.5 14 8 14 Q2.5 14 2.5 9 Z" fill="#C6BCD6" stroke="#7E6C9A" stroke-width="1.2" stroke-linejoin="round"/>';
+// the feather end of the toy (feather-head.webp, cut from it)
+const FEATHER_ICON = () => `<image href="${pic("feather-head")}" x="0" y="2" width="16" height="12" preserveAspectRatio="xMidYMid meet"/>`;
+
+/* ---------- Auto Notes ---------- */
+// The squares the feathers tried so far prove have no cat under them, from what the player knows (never from the
+// answer). Certain from the edge alone: a feather a cat didn't grab found its first square empty, and one that didn't
+// come straight back found the two edge squares beside that empty too (true of both ends of a pair, as the run back
+// is the same). Then, if the solver can list every way the k cats could lie that fits the results (it gives up past
+// 3000 ways, or a few tenths of a second's work), every square no way has a cat on. Kept until the feathers change.
+let noCatFor = "", noCatSet = new Set();
+function noCat() {
+  const key = game.N + ":" + game.cats.join() + ":" + game.shots.join();
+  if (key === noCatFor) return noCatSet;
+  const N = game.N, k = known(), out = new Set();
+  for (const p in k) {
+    const [x, y, dx, dy] = ubSlot(N, +p), fx = x + dx, fy = y + dy;
+    if (k[p].kind === "grab") continue;
+    out.add(fy * N + fx);
+    if (k[p].kind === "back") continue;
+    for (const [sx, sy] of [[fx + dy, fy + dx], [fx - dy, fy - dx]]) if (sx >= 0 && sy >= 0 && sx < N && sy < N) out.add(sy * N + sx);
+  }
+  const shots = Object.keys(k).map(p => [+p, game.res[p]]);
+  if (shots.length) {
+    const ways = ubSolve(N, game.k, shots, 3000, 3e5);
+    if (ways && ways.length < 3000) {
+      const could = new Set(ways.flat());
+      for (let i = 0; i < N * N; i++) if (!could.has(i)) out.add(i);
+    }
+  }
+  noCatFor = key; noCatSet = out;
+  return out;
+}
+
+/* ---------- the feather ---------- */
+// Slide the wand in at slot p: it goes in under the blanket, then pops out where it comes out (or comes back, or
+// stays caught). The wands are drawn under the quilt, so they vanish beneath it. With reduced motion the result
+// simply shows.
+function wandAt(p, out) {
+  const [cx, cy] = slotXY(p), rot = [90, 180, 270, 0][Math.floor(p / game.N)];
+  const g = el("g", {transform: `translate(${cx} ${cy}) rotate(${rot})`}, $("wands")), w = wand(g);
+  if (out) w.setAttribute("transform", "rotate(180)");   // coming out, the feather leads the way out
+  return w;
+}
+function fire(p) {
+  if (!playing()) return;
+  const k = known();
+  if (k[p]) {
+    const flash = q => { slotEls[q].classList.remove("flash"); slotEls[q].getBoundingClientRect(); slotEls[q].classList.add("flash"); };
+    flash(p); if (k[p].kind === "pair") flash(k[p].other);
+    G.note(k[p].kind === "grab" ? "A cat grabbed the feather here." : k[p].kind === "back" ? "The feather came straight back out here." : `In at one ${k[p].n}, out at the other.`, 3000);
+    return;
+  }
+  game.shots.push(p); game.started = true; hints.clear(false);
+  const o = game.res[p], g0 = game;
+  const said = o < 0 ? "Grabbed! A cat's got the feather." : o === p ? "It came straight back out." : `It popped out at the other ${known()[p].n}.`;
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) { update(); save(); G.note(said, 2500); return; }
+  busy = true;
+  const done = () => { busy = false; if (game !== g0) return; $("wands").innerHTML = ""; update(); save(); G.note(said, 2500); };
+  const go = (w, frames, ms, then) => { const a = w.animate(frames, {duration: ms, easing: "ease-in-out", fill: "forwards"}); a.onfinish = then; };
+  const w = wandAt(p);
+  // in under the blanket…
+  go(w, [{translate: "-30px 0", opacity: 0}, {translate: "-10px 0", opacity: 1, offset: .2}, {translate: "70px 0", opacity: 1}], 420, () => {
+    if (o < 0) return go(w, [{translate: "70px 0"}, {translate: "130px 0"}], 160, () => setTimeout(done, 120));   // snatched
+    if (o === p) return go(w, [{translate: "70px 0"}, {translate: "-10px 0"}], 380, () => setTimeout(done, 200));
+    w.parentNode.remove();
+    // …and out at the other slot
+    const w2 = wandAt(o, true);
+    go(w2, [{translate: "70px 0", opacity: 1}, {translate: "12px 0", opacity: 1}], 420, () => setTimeout(done, 250));
+  });
+}
+// Mark a square: a lump (where a cat is), or a dot (none here). A second tap takes it off.
+function mark(i, dot) {
+  if (!playing()) return;
+  const was = game.marks[i], to = dot ? (was === 2 ? 0 : 2) : (was === 1 ? 0 : 1);
+  if (to === 1 && lumps().length >= game.k) { G.note(`There are only ${game.k} cats. Take a lump off first.`, 3000); return; }
+  game.marks[i] = to; undo.push([i, was]); game.started = true;
+  if (!(to === 1 && lumps().length === game.k)) G.note("");
+  update(); save();
+}
+
+/* ---------- playing ---------- */
+// Where a tap lands: a square of the blanket ({i}), a slot ({p}), or nowhere.
+function spotOf(e) {
+  const pt = $("svg").createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+  const q = pt.matrixTransform($("svg").getScreenCTM().inverse()), N = game.N, S = N * 100;
+  const x = Math.floor(q.x / 100), y = Math.floor(q.y / 100);
+  if (q.x >= 0 && q.y >= 0 && q.x < S && q.y < S) return {i: y * N + x};
+  const inX = q.x >= 0 && q.x < S, inY = q.y >= 0 && q.y < S;
+  if (inX && q.y < 0 && q.y > -M) return {p: x};
+  if (inY && q.x >= S && q.x < S + M) return {p: N + y};
+  if (inX && q.y >= S && q.y < S + M) return {p: 2 * N + x};
+  if (inY && q.x < 0 && q.x > -M) return {p: 3 * N + y};
+  return null;
+}
+$("svg").addEventListener("pointerdown", e => {
+  if (!playing() && !document.querySelector(".spot.trying")) return;
+  const s = spotOf(e); if (!s) return;
+  e.preventDefault();
+  if (s.p !== undefined) fire(s.p); else mark(s.i, dots.on());
+});
+// Keys: the cursor moves over the blanket and round its edge (an (N+2)-square frame, corners left out).
+const keys = G.gridKeys({on: () => playing(), size: () => [game.N + 2, game.N + 2], keys: ["d", "x", "."],
+  start: () => game.N + 3,
+  move: (i, dx, dy) => {
+    const W = game.N + 2; let x = i % W + dx, y = Math.floor(i / W) + dy;
+    x = Math.max(0, Math.min(W - 1, x)); y = Math.max(0, Math.min(W - 1, y));
+    if ((x === 0 || x === W - 1) && (y === 0 || y === W - 1)) return i;   // the corners have no slot
+    return y * W + x;
+  },
+  show: j => showCursor(j),
+  act: (j, key) => {
+    const W = game.N + 2, x = j % W - 1, y = Math.floor(j / W) - 1, N = game.N;
+    if (x >= 0 && y >= 0 && x < N && y < N) return mark(y * N + x, key !== " " || dots.on());
+    if (key !== " ") return false;
+    fire(y < 0 ? x : x >= N ? N + y : y >= N ? 2 * N + x : 3 * N + y);
+  }});
+function showCursor(j) {
+  const c = $("cursor"); if (!c || !game) return;
+  if (j < 0) { c.setAttribute("x", -999); return; }
+  const W = game.N + 2, x = j % W - 1, y = Math.floor(j / W) - 1, N = game.N;
+  let cx, cy;
+  if (x >= 0 && y >= 0 && x < N && y < N) [cx, cy] = centre(y * N + x);
+  else [cx, cy] = slotXY(y < 0 ? x : x >= N ? N + y : y >= N ? 2 * N + x : 3 * N + y);
+  c.setAttribute("x", cx - 46); c.setAttribute("y", cy - 46);
+}
+
+// Undo takes back a mark, or a Restart. A feather tried can't be untried (you'd still know).
+const undo = G.history({game: () => game, can: playing, restart: true, started: () => game.history.length || game.shots.length,
+  back: h => { if (Array.isArray(h)) game.marks[h[0]] = h[1]; else { game.marks = h.marks; game.shots = h.shots; } },
+  after: () => { update(); save(); G.note(""); }});
+$("restartBtn").onclick = () => {
+  if (undo.restart(g => { g.marks = g.marks.map(() => 0); g.shots = []; }, {marks: game.marks.slice(), shots: game.shots.slice()}))
+    G.note("The feathers and marks are cleared. Undo brings them back.", 4000);
+};
+const dots = G.pieces({plain: "Lump", mark: "dotBtn", say: "Dot: a square with no cat under it", change: () => {}});
+
+/* ---------- hints ---------- */
+// First a mark that's wrong (a lump with no cat under it, or a dot on a cat), in red. Otherwise, if the feathers so
+// far still fit another way the cats could be lying, a gold ring round a slot that tells the two apart; and once
+// they fit only one, a gold box on a square with a cat under it that isn't marked yet.
+const hints = G.hinter({game: () => game, key: () => game ? game.marks.join("") + "|" + game.shots.join(",") : "", draw: () => paintHint()});
+function paintHint() {
+  const h = $("hintsq"), m = hints.current(); if (!h) return;
+  for (const x of document.querySelectorAll("#svg .hintsq.extra")) x.remove();
+  if (!m) { h.setAttribute("x", -999); return; }
+  const at = m.cells ? m.cells.map(centre) : [slotXY(m.p)];
+  at.forEach(([x, y], n) => {
+    const r = n ? h.cloneNode() : h;
+    if (n) { r.classList.add("extra"); h.after(r); }
+    r.setAttribute("x", x - 46); r.setAttribute("y", y - 46); r.classList.toggle("bad", !!m.bad);
+  });
+}
+$("hintBtn").onclick = () => {
+  if (!playing()) return;
+  const h = has(), N = game.N, k = known();
+  const wrong = game.marks.map((m, i) => (m === 1 && !h[i]) || (m === 2 && h[i]) ? i : -1).filter(i => i >= 0);
+  const give = (m, words) => { game.hinted = true; game.started = true; save(); hints.show(m, words); update(); };
+  if (wrong.length) {
+    const i = wrong[0];
+    return give({cells: [i], bad: true}, (game.marks[i] === 1 ? "No cat under this lump." : "There's a cat under this dot.") + G.andMore(wrong.length - 1));
+  }
+  const shots = Object.keys(k).map(p => [+p, game.res[p]]);
+  const sols = ubSolve(N, game.k, shots, 2, 1.5e6), mine = game.cats.join();
+  const alt = sols && sols.find(s => s.join() !== mine);
+  if (sols && !alt) {
+    const miss = game.cats.filter(i => game.marks[i] !== 1);
+    if (!miss.length) { G.note("Every lump's right: lift the blanket!", 4000); return; }
+    return give({cells: [miss[0]]}, "The feathers so far say a cat's under here.");
+  }
+  // a slot that tells the answer from the other way (or, if that took too long, one the answer's cats change)
+  let cands;
+  if (alt) { const h2 = new Uint8Array(N * N); for (const i of alt) h2[i] = 1; cands = [...Array(4 * N).keys()].filter(p => !k[p] && ubFire(N, (x, y) => h2[y * N + x], p) !== game.res[p]); }
+  else cands = [...Array(4 * N).keys()].filter(p => !k[p] && game.res[p] !== p);
+  if (!cands.length) cands = [...Array(4 * N).keys()].filter(p => !k[p]);
+  if (!cands.length) { G.note("Every slot's been tried.", 4000); return; }
+  give({p: cands[Math.floor(Math.random() * cands.length)]}, "Try the feather in the gold slot.");
+};
+
+/* ---------- lifting the blanket ---------- */
+$("liftBtn").onclick = () => {
+  if (!playing() || lumps().length !== game.k) return;
+  const h = has(), wrong = lumps().filter(i => !h[i]);
+  if (!wrong.length) return win();
+  // a peek: the blanket's put back, and the lumps that were just rumpled blanket show red
+  game.peeked = true; game.started = true; save();
+  hints.show({cells: wrong, bad: true}, wrong.length === 1 ? "That one's just rumpled blanket. Look again!" : `${wrong.length} of those are just rumpled blanket. Look again!`, {uncounted: true});
+  update();
+};
+// A run's line: the points it passes, and for one that comes back out of its own slot, out and back side by side
+// (a little apart, across the way it went in) so both ways show.
+function runLine(pts, out, p) {
+  if (out !== p || pts.length < 2) return pts;
+  const [ax, ay] = pts[0], [bx, by] = pts[1], len = Math.hypot(bx - ax, by - ay) || 1, nx = -(by - ay) / len * 16, ny = (bx - ax) / len * 16;
+  const there = pts.slice(0, Math.ceil(pts.length / 2));
+  return [...there.map(([x, y]) => [x - nx, y - ny]), ...there.slice().reverse().map(([x, y]) => [x + nx, y + ny])];
+}
+// Once the blanket's off: every feather tried, drawn the way it really went round the cats, in its slot's colour
+// (the pair's colour, brick for one a cat grabbed, gold for one that came back). With animate, each traces out in
+// turn, in the order they were tried.
+const runList = () => { const k = known(), seen = new Set(); return game.shots.filter(p => { const o = game.res[p]; if (seen.has(p)) return false; seen.add(p); if (o >= 0) seen.add(o); return true; }).map(p => ({p, kn: k[p]})); };
+const runCount = () => runList().length;
+function showRuns(animate) {
+  const layer = $("runs"); if (!layer) return;
+  layer.innerHTML = "";
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  runList().forEach(({p, kn}, n) => {
+    const {out, pts} = ubTrace(game.N, game.cats, p), line = runLine(pts, out, p).map(q => q.join(",")).join(" ");
+    const colour = kn.kind === "grab" ? "#BD5538" : kn.kind === "back" ? "#ECA818" : PAIRS[(kn.n - 1) % PAIRS.length];
+    const g = el("g", {class: "run"}, layer);
+    const under = el("polyline", {points: line, fill: "none", stroke: "#2A2530", "stroke-width": 14, "stroke-linejoin": "round", "stroke-linecap": "round", opacity: .3}, g);
+    const top = el("polyline", {points: line, fill: "none", stroke: colour, "stroke-width": 8, "stroke-linejoin": "round", "stroke-linecap": "round"}, g);
+    if (kn.kind === "grab") { const [x, y] = pts[pts.length - 1]; el("circle", {cx: x, cy: y, r: 9, fill: colour, stroke: "#2A2530", "stroke-width": 3}, g); }
+    if (animate && !still) for (const pl of [under, top]) {
+      const len = pl.getTotalLength();
+      pl.style.strokeDasharray = len; pl.style.strokeDashoffset = len;
+      pl.animate([{strokeDashoffset: len}, {strokeDashoffset: 0}], {duration: 700, delay: n * 260, easing: "ease-in-out", fill: "forwards"});
+    }
+  });
+}
+// The cats asleep on the sheet, one of them Bugsy.
+const NAPPERS = ["c14-36", "c16-5", "c14-34", "c15-6", "c14-35", "c15-5", "c16-3"];
+function showCats(animate) {
+  const u = $("under"); u.innerHTML = "";
+  const seed = game.cats.reduce((a, i) => a * 31 + i, 7), pool = NAPPERS.slice();
+  const bugsyAt = seed % game.cats.length;
+  game.cats.forEach((i, n) => {
+    const [cx, cy] = centre(i), f = n === bugsyAt ? "bugsy-7" : pool.splice((seed >> n) % pool.length, 1)[0] || NAPPERS[n % NAPPERS.length];
+    const g = el("g", {class: "napper", transform: `translate(${cx} ${cy}) rotate(${((seed >> (n + 2)) % 5 - 2) * 12})`}, u);
+    el("image", {href: catSrc(f), x: -56, y: -56, width: 112, height: 112}, g);
+  });
+}
+function win() {
+  game.won = true; G.finishClock(game); keys.hide(); hints.clear(false); G.note("");
+  const next = game.hinted || game.peeked ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save();
+  G.track(`Under the Blanket solved level ${game.level}`);
+  const g = game;
+  build.prefetch(next);
+  showCats(); update();
+  setTimeout(() => { if (game === g) showRuns(true); }, 700);
+  running = true;
+  requestAnimationFrame(() => $("quilt").classList.add("off"));
+  setTimeout(() => { running = false; if (game === g) finishCard(); }, matchMedia("(prefers-reduced-motion: reduce)").matches ? 600 : 1500 + Math.min(1800, runCount() * 260));
+}
+function finishCard() {
+  const next = settings.level, used = game.shots.length, gold = !game.restarted && !game.hinted && !game.peeked && !game.autoNoted && used <= line();
+  let text = `You found all ${game.k} cats with ${used} feather${used === 1 ? "" : "s"}.`;
+  if (!gold && !game.hinted && !game.peeked && !game.restarted && !game.autoNoted && used > line()) text += ` Use ${line()} or fewer for a gold paw.`;
+  text += game.hinted || game.peeked ? ` You had ${game.hinted ? "a hint" : "a peek"}, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Look at the cats", game.result,
+    {title: "Found them!", gold, goldWhy: `No hints, peeks or Auto Notes, in ${used} feather${used === 1 ? "" : "s"}!`, next: next > game.level ? `Next: level ${next}` : "Next blanket",
+     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+  if (gold) {
+    const img = document.createElement("img"); img.className = "bugsypic"; img.src = catSrc("bugsy-3"); img.alt = "Bugsy, stretched out on the bed";
+    const c = $("card"), p = c.querySelector("p"); if (p) p.before(img);
+  }
+}
+
+/* ---------- new blankets ---------- */
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
+function begin(p, level) {
+  game = {level, N: p.N, k: p.k, cats: p.cats, res: p.res, shots: [], marks: new Array(p.N * p.N).fill(0),
+    history: [], won: false, ...G.freshClock()};
+  hints.clear(false);
+}
+async function newPuzzle() {
+  if (busy) return;
+  busy = true;
+  const n = settings.level;
+  G.openCard("Tucking the cats in…", "", []);
+  const p = await build.take(n);
+  begin(p, n);
+  busy = false; G.closeCard(); G.note("");
+  draw(); save();
+  build.prefetch(n);
+  G.track(`Under the Blanket new puzzle level ${n}`);
+  helpOnFirstVisit();
+}
+
+/* ---------- sharing ---------- */
+// The cats' squares, two base-36 digits each; with progress, the slots tried (two each) and the marks (0, 1, 2).
+const two = n => n.toString(36).padStart(2, "0"), unTwo = s => (s.match(/../g) || []).map(t => parseInt(t, 36));
+$("linkBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Under the Blanket", won: game.won,
+  puzzle: () => ({g: "blanket", N: game.level, c: game.cats.map(two).join("")}),
+  progress: () => game.shots.map(two).join("") + "." + game.marks.join("")}); };
+function openShared(d) {
+  const spec = ubLevel(d.N), fail = () => G.note("That share link didn't work.", 5000);
+  if (!spec || typeof d.c !== "string" || !/^([0-9a-z]{2})+$/.test(d.c)) return fail();
+  const {N, k} = spec, cats = unTwo(d.c).sort((a, b) => a - b);
+  if (cats.length !== k || cats.some((i, n) => !(i < N * N) || (n && i === cats[n - 1]))) return fail();
+  const h = new Uint8Array(N * N); for (const i of cats) h[i] = 1;
+  const res = [...Array(4 * N).keys()].map(p => ubFire(N, (x, y) => h[y * N + x], p));
+  const sols = ubSolve(N, k, res.map((o, p) => [p, o]), 2);
+  if (!sols || sols.length !== 1) return fail();
+  begin({N, k, cats, res}, d.N);
+  if (typeof d.p === "string") {
+    const [s, m] = d.p.split(".");
+    const shots = unTwo(s || "");
+    if (/^([0-9a-z]{2})*$/.test(s || "") && shots.every(p => p < 4 * N) && new Set(shots).size === shots.length && typeof m === "string" && m.length === N * N && /^[012]*$/.test(m) && [...m].filter(c => c === "1").length <= k) {
+      game.shots = shots; game.marks = [...m].map(Number); game.timed = false;
+    }
+  }
+  settings.level = d.N; $("levelSel").value = d.N;
+  draw(); save(); build.prefetch(d.N);
+}
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  settings.seenHelp = false; helpOnFirstVisit();
+  if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
+}
+// The walkthrough's squares: the blanket and the ring of slots round it, as one (N+2)-square grid.
+function map() {
+  const r = $("svg").getBoundingClientRect(), S = game.N * 100, k = r.width / (S + 2 * M);
+  return {ox: r.left + (M - 100) * k, oy: r.top + (M - 100) * k, cw: 100 * k, ch: 100 * k};
+}
+// The feather's run for the walkthrough's examples, as ubFire runs it, keeping the squares it crosses: {out, pts},
+// pts being the points (in the board's units) from the slot in to the slot out.
+function ubTrace(N, cats, p) {
+  const h = new Set(cats), cell = (a, b) => a >= 0 && b >= 0 && a < N && b < N && h.has(b * N + a) ? 1 : 0;
+  let [x, y, dx, dy] = ubSlot(N, p);
+  const pts = [slotXY(p)], mid = (a, b) => [a * 100 + 50, b * 100 + 50];
+  const edge = () => { pts.push([(x + dx * 0.9) * 100 + 50, (y + dy * 0.9) * 100 + 50]); };   // into the first square a little, so the turn shows
+  if (cell(x + dx, y + dy)) { edge(); return {out: -1, pts}; }
+  if (cell(x + dx + dy, y + dy - dx) || cell(x + dx - dy, y + dy + dx)) { edge(); pts.push(slotXY(p)); return {out: p, pts}; }
+  x += dx; y += dy;
+  for (let n = 0; n < 8 * N * N; n++) {
+    if (cell(x + dx, y + dy)) { pts.push(mid(x, y), [(x + dx * 0.32) * 100 + 50, (y + dy * 0.32) * 100 + 50]); return {out: -1, pts}; }
+    const l = cell(x + dx + dy, y + dy - dx), r = cell(x + dx - dy, y + dy + dx);
+    if (l && r) { pts.push(mid(x, y)); dx = -dx; dy = -dy; }
+    else if (l) { pts.push(mid(x, y)); const t = dx; dx = -dy; dy = t; }
+    else if (r) { pts.push(mid(x, y)); const t = dx; dx = dy; dy = -t; }
+    else {
+      x += dx; y += dy;
+      if (x < 0 || y < 0 || x >= N || y >= N) { const o = ubOut(N, x, y); pts.push(slotXY(o)); return {out: o, pts}; }
+    }
+  }
+  return {out: -2, pts};
+}
+/* ---------- the tutorial ---------- */
+// The walkthrough plays on a practice blanket the size of the one that's out, with one cat under it, on the right-hand
+// edge, two rows down. Your puzzle is put away while it's up (G.yourTurn) and comes back exactly as it was; the practice
+// blanket is never saved. The slots it uses, all worked out from N: a clear run down the first column, the cat's own
+// column (it grabs the feather), the column beside it (the feather turns away and comes out on the left) and the right
+// side's second slot (the cat beside it sends it straight back).
+const tut = N => ({cat: 2 * N + N - 1, clear: 0, grab: N - 1, turn: N - 2, back: N + 1});
+function tutStart() {
+  const N = game.N, t = tut(N), cats = [t.cat], h = new Uint8Array(N * N); h[t.cat] = 1;
+  const res = [...Array(4 * N).keys()].map(p => ubFire(N, (x, y) => h[y * N + x], p));
+  game = {...JSON.parse(JSON.stringify(game)), tutorial: true, k: 1, cats, res, shots: [], marks: new Array(N * N).fill(0), history: [],
+    won: false, hinted: false, peeked: false};
+  hints.clear(false); draw();
+}
+// The slot's place in the walkthrough's (N+2)-square grid.
+const slotSq = p => { const N = game.N, s = Math.floor(p / N), j = p % N + 1; return [[j, 0], [N + 1, j], [j, N + 1], [0, j]][s]; };
+// The feather toy, shown off over the blanket: a stand-in drawing until the toy's own picture comes.
+function showToy() {
+  hideToy();
+  const S = game.N * 100, W = S * 1.04, H = W * 110 / 600, g = el("g", {id: "tuttoy"}, $("svg"));
+  el("image", {href: pic("feather-wand"), x: (S - W) / 2, y: S * 0.5 - H / 2, width: W, height: H}, g);
+}
+const hideToy = () => { const t = $("tuttoy"); if (t) t.remove(); };
+// The blanket turned back over the cat's square, and the cat asleep there.
+function tutReveal() {
+  const old = $("tutcat"); if (old) old.remove();
+  const g = el("g", {id: "tutcat"}, $("svg"));
+  game.cats.forEach((i, n) => {
+    const [cx, cy] = centre(i);
+    el("rect", {x: cx - 48, y: cy - 48, width: 96, height: 96, rx: 14, fill: "#F7F8F3", stroke: "#8D78AD", "stroke-width": 3}, g);
+    el("image", {href: catSrc(NAPPERS[n]), x: cx - 46, y: cy - 46, width: 92, height: 92}, g);
+  });
+}
+// The second practice cat, two squares left of the first, for the U-turn with a cat on each side; and taking it away
+// again if the walkthrough steps back.
+const tutTwo = on => { const t = tut(game.N), two = t.cat - 2; game.cats = on ? [t.cat, two].sort((a, b) => a - b) : [t.cat]; };
+// One feather's run drawn over the blanket, as a dotted line with an arrow, and what its slots would show (a pair
+// gets the next number up). Returns the squares to light: the run's, its slots' and the cat's.
+function tutRun(p, hidden) {
+  undemo();
+  // the path goes under the slots' marks; the example's own marks go on top (both in #demo, taken away together)
+  const N = game.N, {out, pts} = ubTrace(N, game.cats, p), lit = new Set(), demo = el("g", {id: "demo"}, $("svg")), g = el("g", {}, demo);
+  const path = el("g", {}); $("svg").insertBefore(path, $("slots")); demo.pathLayer = path;
+  const line = runLine(pts, out, p).map(q => q.join(",")).join(" ");
+  el("polyline", {points: line, fill: "none", stroke: "#2A2530", "stroke-width": 15, "stroke-linejoin": "round", "stroke-linecap": "round", opacity: .25}, path);
+  el("polyline", {points: line, fill: "none", stroke: "#E16A4A", "stroke-width": 9, "stroke-dasharray": "2 16", "stroke-linejoin": "round", "stroke-linecap": "round", "marker-end": "url(#demoArrow)"}, path);
+  for (let j = 1; j < pts.length; j++) {
+    const [ax, ay] = pts[j - 1], [bx, by] = pts[j], n = Math.ceil(Math.hypot(bx - ax, by - ay) / 25);
+    for (let t = 0; t <= n; t++) {
+      const x = ax + (bx - ax) * t / n, y = ay + (by - ay) * t / n;
+      if (x > 0 && y > 0 && x < N * 100 && y < N * 100) lit.add(`${Math.floor(x / 100) + 1},${Math.floor(y / 100) + 1}`);
+    }
+  }
+  const mk = q => { const [cx, cy] = slotXY(q), s = el("g", {class: "slot done", transform: `translate(${cx} ${cy})`}, g); el("circle", {r: 44, fill: "#F7F8F3"}, s); return s; };
+  const rot = q => [90, 180, 270, 0][Math.floor(q / N)], pairs = Object.values(known()).filter(k => k.kind === "pair").length / 2;
+  // (a slot already tried shows its own mark)
+  if (known()[p]) {}
+  else if (out < 0) slotMark(mk(p), {kind: "grab"}, rot(p));
+  else if (out === p) slotMark(mk(p), {kind: "back"}, rot(p));
+  else { slotMark(mk(p), {kind: "pair", n: pairs + 1}, rot(p)); slotMark(mk(out), {kind: "pair", n: pairs + 1}, rot(out)); }
+  lit.add(slotSq(p).join(",")); if (out >= 0) lit.add(slotSq(out).join(","));
+  if (!hidden) for (const c of game.cats) lit.add(`${c % N + 1},${Math.floor(c / N) + 1}`);
+  return [...lit].map(q => q.split(",").map(Number));
+}
+const undemo = () => { const d = $("demo"); if (d) { if (d.pathLayer) d.pathLayer.remove(); d.remove(); } };
+function helpOnFirstVisit() {
+  if (!game || !playing() || document.querySelector(".spot") || settings.seenHelp) return;
+  const N = game.N, W = N + 2, sq = [], ring = [], t = tut(N), k = game.k;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) sq.push([x + 1, y + 1]);
+  for (let j = 1; j <= N; j++) ring.push([j, 0], [W - 1, j], [j, W - 1], [0, j]);
+  const turn = G.yourTurn(() => game, g => { game = g; }, draw);
+  const column = [slotSq(t.grab), ...[...Array(N).keys()].map(y => [N, y + 1])];
+  // a step whose squares are worked out as it comes up
+  // (hidden: the cat stays under the blanket, and its square isn't lit; two: the second cat is there too)
+  const run = (p, say, more = {}) => { const st = {say, lit: [], restore: turn.from.restore, ...more,
+    enter() { tutTwo(!!more.two); if (!more.hidden) tutReveal(); st.lit.splice(0, st.lit.length, ...tutRun(p, more.hidden)); }}; return st; };
+  const steps = [
+    {say: "Find the cat under the blanket.", lit: sq, restore: turn.from.restore, enter() { turn.from.enter(); tutStart(); }},
+    {say: "The cat loves to play with a long, bendy feather toy.", els: [() => $("tuttoy") || $("svg")], restore: turn.from.restore, enter: showToy, leave: hideToy},
+    // each try goes straight on once the feather's in, to a step that says what happened and waits for a tap
+    {say: "Place the feather toy under the blanket at any of the spots along the edge. Try this one.", lit: [slotSq(t.clear)], restore: turn.from.restore,
+     try: {done: () => game.tutorial && game.shots.includes(t.clear)}},
+    run(t.clear, "It went straight through. No cat there!", {hidden: true, leave: undemo}),
+    {say: "Now, try this one.", lit: [slotSq(t.grab)], restore: turn.from.restore,
+     try: {done: () => game.tutorial && game.shots.includes(t.grab)}},
+    {say: "He stole the feather toy! That means he is hiding somewhere in this column.", lit: column, restore: turn.from.restore, enter() { undemo(); tutTwo(false); tutReveal(); }},
+    run(t.turn, "A few other things to know: if the cat can bat at the feather toy but isn't close enough to steal it, then it will move like this."),
+    run(t.back, "Or like this."),
+    // the last practice step: leaving it puts your own blanket back
+    run(t.turn, "And with a cat on each side, it comes back too.", {two: true, leave: turn.upTo.leave}),
+    {say: `Now find the ${k} cats under this blanket. Tap a square to mark a lump.`, lit: sq},
+    {say: `${2 * N} feathers or fewer for a gold paw`, lit: ring, later: true},
+    {say: "All lumps down? Lift the blanket!", els: [$("liftBtn")]},
+    {say: "Dot: a square with no cat", els: [$("dotBtn")]},
+    {say: "Stuck? Hint shows a slot to try", els: [$("hintBtn")]},
+  ];
+  G.spotlight({grid: $("grid"), w: W, h: W, steps, map, done: () => { undemo(); turn.putBack(); settings.seenHelp = true; save(); }});
+}
+
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", ""), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
+$("helpBtn").onclick = showHelp;
+G.switch({id: "checkTgl", label: "Auto check", line: "Slots that don't fit your lumps turn red", key: "autoCheck", of: () => settings, save,
+  tip: "Auto check: slots that don't fit turn red", change: () => { if (game) update(); }});
+G.switch({id: "autoTgl", label: "Auto\u00a0Notes\u00a0🔢", line: "A dot on every square the feathers prove has no cat; costs the gold paw", key: "autoNotes", of: () => settings, save, warn: true,
+  tip: "Auto Notes: dots for you, but no gold paw", change: () => { if (game) update(); }});
+
+G.nav("blanket");
+G.checkClock(game);
+G.setupTimer({name: "blanket", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+const shared = G.readShare("blanket");
+const hadSave = !!game;
+if (hadSave) G.reopen(() => {
+    const spec = ubLevel(game.level), NN = game.N * game.N;
+    if (!spec || spec.N !== game.N || game.marks.length !== NN || game.res.length !== 4 * game.N || game.cats.length !== game.k) throw new Error("the saved blanket doesn't fit its level");
+    draw();
+    if (game.won) finishCard();
+    build.prefetch(settings.level); helpOnFirstVisit();
+  }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
+else if (!shared) newPuzzle();
+const shareOpts = () => ({name: "Under the Blanket", inProgress: !!(game && !game.won && (game.shots.length || game.history.length)), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, {...shareOpts(), fresh: hadSave ? null : why => Promise.resolve(newPuzzle()).then(() => { G.note(why, 6000); })});
+window.addEventListener("hashchange", () => { const d = G.readShare("blanket"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
