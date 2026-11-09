@@ -15,7 +15,7 @@ Rows are sorted by shelf, in the site's order (Cat Logic, Cat Math, Cat Trails, 
 | Cat Trap | Tape Trap | Cat Logic | Masking-tape squares on the floor; every cat walks to its nearest one and sits |
 | Nonogram | Cross Stitch (built) | Cat Logic | A cross-stitch sampler filled in by the counts; it ends up a picture |
 | Black Box | Under the Blanket | Cat Logic | Cats hiding under the blanket; a feather wand slid under from the edge finds the lumps |
-| Signpost | Zoomies | Cat Trails | Retrace the cat's 3 a.m. sprint, each piece of furniture pointing to its next jump |
+| Signpost | Zoomies (built) | Cat Trails | Retrace the cat's 3 a.m. sprint, each piece of furniture pointing to its next jump |
 | Fliptogram | Cat Flap | Cat Spells | Each tile is a cat flap that swings to its partner letter |
 | Upwordly | Morning Stretch | Cat Spells | A waking cat stretches further with each longer word |
 | Gram Jam | Swap-a-Pom | Cat Spells | Letter pompoms in a craft tray (L-M-N-O-Pom's); swap them to spell words, and the cat bats each word away |
@@ -41,19 +41,18 @@ row, and the games needing new physics or new data come last. Take a game out of
 | # | Game | Shelf | Why here |
 | --- | --- | --- | --- |
 | 1 | Pounce Up | Kitten Play (action) | The second action game, so Kitten Play can be split after it (see `TODO.md`) |
-| 2 | Zoomies | Cat Trails | Yarn's path generator makes the path; the only Trails game on the shortlist |
-| 3 | Under the Blanket | Cat Logic | Laser Pointer's ray tracing does most of it |
-| 4 | Bed Hog | Curious Cat | The long sleeping cats in `cats/` are the pieces, so no new art; needs a solver to make levels with an answer |
-| 5 | Swap-a-Pom | Cat Spells | Reuses L-M-N-O-Pom's pompoms and Pounce's swap-to-match |
-| 6 | Boing! | Curious Cat | Wind Up's physics plus the owner's spring sheet; builds the spring pieces Yarn Golf needs |
-| 7 | Morning Stretch | Cat Spells | Clues from the Wiktionary lookup (`G.meaning`) Fish Bones and Keyboard Cat already use |
-| 8 | Tape Trap | Cat Logic | A new kind of logic puzzle, so its generator is more work |
-| 9 | Yarn Golf | Curious Cat | Boing!'s springs and Wind Up's physics, plus a flick to shoot |
-| 10 | Cat Flap | Cat Spells | Its puzzle maker has to pair the letters so every row can spell a word |
-| 11 | Warm Seat | Curious Cat | After Bed Hog, to decide whether it's its own game or a mode of Bed Hog |
-| 12 | Paw-ball | Kitten Play (action) | Flippers are moving pieces, which Wind Up's physics doesn't have yet; the hardest to build |
-| 13 | Special Delivery | Curious Cat | The rules for the gifts, routes and dog still need working out |
-| 14 | Scent Trail | Cat Spells | Needs a thesaurus built first (Wiktionary's synonyms or WordNet) |
+| 2 | Under the Blanket | Cat Logic | Laser Pointer's ray tracing does most of it |
+| 3 | Bed Hog | Curious Cat | The long sleeping cats in `cats/` are the pieces, so no new art; needs a solver to make levels with an answer |
+| 4 | Swap-a-Pom | Cat Spells | Reuses L-M-N-O-Pom's pompoms and Pounce's swap-to-match |
+| 5 | Boing! | Curious Cat | Wind Up's physics plus the owner's spring sheet; builds the spring pieces Yarn Golf needs |
+| 6 | Morning Stretch | Cat Spells | Clues from the Wiktionary lookup (`G.meaning`) Fish Bones and Keyboard Cat already use |
+| 7 | Tape Trap | Cat Logic | A new kind of logic puzzle, so its generator is more work |
+| 8 | Yarn Golf | Curious Cat | Boing!'s springs and Wind Up's physics, plus a flick to shoot |
+| 9 | Cat Flap | Cat Spells | Its puzzle maker has to pair the letters so every row can spell a word |
+| 10 | Warm Seat | Curious Cat | After Bed Hog, to decide whether it's its own game or a mode of Bed Hog |
+| 11 | Paw-ball | Kitten Play (action) | Flippers are moving pieces, which Wind Up's physics doesn't have yet; the hardest to build |
+| 12 | Special Delivery | Curious Cat | The rules for the gifts, routes and dog still need working out |
+| 13 | Scent Trail | Cat Spells | Needs a thesaurus built first (Wiktionary's synonyms or WordNet) |
 
 Around games 11 to 13, Curious Cat reaches 13 or 14 games: the time to decide on the colour shelf (see `TODO.md`).
 
@@ -95,8 +94,8 @@ Around games 11 to 13, Curious Cat reaches 13 or 14 games: the time to decide on
 | Slitherlink (Loopy) | Cat Trails | Draw one loop; each number says how many of its sides the loop uses | None | Idea list, Tatham | Idea | Making loops with one answer is the hardest generator of the Tatham set |
 | Masyu (Pearl) | Cat Trails | Draw a loop through every pearl; it turns on black pearls and goes straight through white ones | None | Tatham | Idea | |
 | Tracks | Cat Trails | Lay one train track between two stations to match row and column counts | None | Tatham | Idea | |
-| Signpost | Cat Trails | Link the squares into one numbered path where each square's arrow points to the next | None | Tatham | Idea | Shortlist. Yarn's path generator makes the path. Cat theme picked: Zoomies, retrace the cat's 3 a.m. sprint around the house, each piece of furniture pointing to where it jumped next |
 | Laser Pointer (mirror puzzles) | Cat Trails | Tip mirrors so the laser dot runs past every cat; from level 6 the cats are numbered and must see it in order, and from level 11 the dot is already moving, and a mirror it comes back to has to be tipped after it bounces off the first time, to reach the next cat | — | Idea list, Bubbles and Game Suite chats | Built | Solving throws toys out for the cats to catch, with a reminder to end real laser play with a toy they can catch. No named mascot yet; one may be added later |
+| Zoomies (Signpost) | Cat Trails | Link the squares into one numbered path where each square's arrow points to the next | None | Tatham | Built | Retrace the cat's 3 a.m. zoomies around the house: a night-blue floor plan, the owner's own layout (2026-11-09): a dot for each square with a thick grey arrow from it, the number beside it, joins as plain lines dot to dot (each dot keeps its arrow), and at the win the cat spins in the middle rather than running the route, furniture round the walls and the beds under the first and last dots; dots joined as pairs in any order. Its Restart is labelled Reset (the owner's choice). Tried first and dropped as too busy: big arrows over furniture tiles with leap arcs, edge chevrons, and a plain grid. Its own queen's-move path maker (Yarn's only does side steps). No star cat yet: a general tabby (`c19-31`); ask about the star when one is drawn |
 | Yarn (Zip) | Cat Trails | One strand through every square, balls of yarn in order | — | Catdoku setup chat | Built | |
 | Catwalk (Bridges) | Cat Trails | Link cat-tower perches with catwalks to match their numbers | — | Game Suite chat, Tatham | Built | |
 | Tunnel Run (Net) | Cat Trails | Turn tunnel pieces until they all join the cat's bed | — | Game inventory chat, Tatham | Built | |

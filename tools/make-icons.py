@@ -977,10 +977,34 @@ def crossstitch():
     return frame(tint(RED, .14), out)
 
 
+def zoomies():
+    # the house at night: a 3 x 3 floor plan of tiles, each with an arrow to the cat's next jump; the first three are
+    # joined (sage, with their leaps), the run starting at 1
+    NIGHT = "#4E577D"
+    out = f'<rect x="14" y="14" width="72" height="72" rx="8" fill="{NIGHT}"/>'
+    arrows = [2, 3, 6, 0, 5, 6, 1, 2, -1]   # eighths of a turn from up; -1: the end, your bed
+    joined = {0, 1, 5}
+    ap = "M0,-9 L5.5,-2.5 L2,-2.5 L2,8 L-2,8 L-2,-2.5 L-5.5,-2.5 Z"
+    for i, a in enumerate(arrows):
+        x, y = 16 + (i % 3) * 23, 16 + (i // 3) * 23
+        fill = tint(GREEN, .32) if i in joined else tint(PERI, .22)
+        out += f'<rect x="{x}" y="{y}" width="21" height="21" rx="4" fill="{fill}"/>'
+        if a < 0:   # your bed: headboard, mattress and pillow
+            out += f'<g fill="{tint(PERI, .55)}"><rect x="{x + 3}" y="{y + 6}" width="2.5" height="11" rx="1"/><rect x="{x + 4}" y="{y + 11}" width="14" height="4.5" rx="1.5"/></g>'
+            out += f'<ellipse cx="{x + 8.5}" cy="{y + 9.5}" rx="3" ry="1.8" fill="{tint(PERI, .55)}"/>'
+            continue
+        out += f'<path d="{ap}" transform="translate({x + 11} {y + 11.5}) rotate({a * 45})" fill="{INK}"/>'
+    # the leaps: 1 to 2 (right), 2 to 6 (down and right)
+    out += f'<path d="M30 21Q38 15 46 21M53 30Q61 33 62 41" fill="none" stroke="{GREEN}" stroke-width="2.6" stroke-linecap="round"/>'
+    out += f'<circle cx="46" cy="21" r="2" fill="{GREEN}"/><circle cx="62" cy="41" r="2" fill="{GREEN}"/>'
+    out += text(20.5, 20.5, "1", 8)
+    return frame(tint(PERI, .14), out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle, "mewhue": mewhue, "pawlinko": pawlinko, "crossstitch": crossstitch, "junkdrawer": junkdrawer}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle, "mewhue": mewhue, "pawlinko": pawlinko, "crossstitch": crossstitch, "junkdrawer": junkdrawer, "zoomies": zoomies}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")
