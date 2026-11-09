@@ -53,6 +53,8 @@ Cross Stitch has no star cat yet: one of Purrfect Square's 24 sitting cats (the 
 
 Zoomies has no star cat yet: one general brown tabby does it all. `c19-31` (running flat out) sits beside the title and, at the win, drops into the middle of the floor and spins round three times, and `c20-6` (the same tabby in mid-leap) is on the gold-paw card. The same cat's `c19-13` (crouched to spring) and `c20-26` (a near twin of `c19-31`) are left for later.
 
+Bed Hog has no star cat yet: `c14-29` (a ginger cat on its back) sleeps beside its title, and `c14-28` (a tabby stretched out on its back) is on the gold-paw card. The cats on the bed are Sunbeams' sleeping cats (its `SLEEPERS` list, copied into `bedhog/index.html`, with each picture's length against its width): each gets one of the few whose shape is closest to its squares, curled-up cats in one square or a big 2 × 2, cats on their backs in two, and the long stretched-out ones (Jan Brady's `c16-…` among them) in three.
+
 - **Jan Brady** (`jan-brady-…`, fluffy black and white, long dark tail; he's a he) is a one-of-a-kind
   character. The `c16-…` pictures, the fluffy black and white cats napping in Sunbeams, are
   Jan Brady too (they keep their numbered names because the games already use them). He's the

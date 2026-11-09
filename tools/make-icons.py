@@ -1025,10 +1025,53 @@ def blanket():
     return frame(tint(LAV, .12), out)
 
 
+# Bed Hog: a bed from above, the periwinkle headboard and two pillows at the top, the quilt in squares, the human's
+# spot a turned-down white sheet with a dashed edge under the left pillow, and the cats on their outlined blankets as
+# in the game: a ginger cat on a coral blanket half across the spot, a long grey one on a lime blanket down the right,
+# and a curled-up ginger one on a lavender square.
+def bedhog():
+    LAV, SB = "#8D78AD", "#4E577D"
+    x0, y0, s = 16, 30, 17   # the quilt: 4 squares across, 3.5 down (the last half under the frame's edge)
+    out = f'<rect x="12" y="10" width="76" height="24" rx="9" fill="{PERI}" stroke="{INK}" stroke-width="3"/>'
+    for px in (17, 52):
+        out += f'<rect x="{px}" y="17" width="31" height="11" rx="5.5" fill="{PAPER}" stroke="{tint(PERI, .45)}" stroke-width="1.5"/>'
+    out += f'<rect x="{x0}" y="{y0}" width="{4*s}" height="{3.5*s}" fill="{tint(TEAL, .34)}" stroke="{INK}" stroke-width="3"/>'
+    out += f'<path d="M{x0+s} {y0}v{3.5*s}M{x0+2*s} {y0}v{3.5*s}M{x0+3*s} {y0}v{3.5*s}M{x0} {y0+s}h{4*s}M{x0} {y0+2*s}h{4*s}M{x0} {y0+3*s}h{4*s}" stroke="{PAPER}" stroke-width="1.2" opacity=".8"/>'
+    # the spot: two squares across, two down, under the left pillow
+    out += f'<rect x="{x0+1.5}" y="{y0+1.5}" width="{2*s-3}" height="{2*s-3}" rx="3" fill="{PAPER}" stroke="{SB}" stroke-width="1.6" stroke-dasharray="3.2 2.4"/>'
+    out += f'<path d="M{x0+2*s-1.5} {y0+2*s-12}V{y0+2*s-1.5}H{x0+2*s-13}Z" fill="{tint(TEAL, .55)}"/>'
+    def pad(c, r, w, h, col):
+        return f'<rect x="{x0+c*s+1.6}" y="{y0+r*s+1.6}" width="{w*s-3.2}" height="{h*s-3.2}" rx="3.5" fill="{tint(col, .42)}" stroke="{col}" stroke-width="1.8"/>'
+    # a ginger cat on its back, across row 2, columns 2 and 3 (half on the spot)
+    out += pad(1, 1, 2, 1, ORANGE)
+    cy = y0 + 1.5 * s
+    out += (f'<rect x="{x0+s+5}" y="{cy-5}" width="{s+8}" height="10" rx="5" fill="{ORANGE}" stroke="{INK}" stroke-width="1.6"/>'
+            f'<path d="M{x0+s+12} {cy-4.6}v9.2M{x0+s+16} {cy-4.6}v9.2M{x0+s+20} {cy-4.6}v9.2" stroke="{RED}" stroke-width="1.4"/>'
+            f'<path d="M{x0+s+3} {cy-4}l-2.4 -3.4l4.2 1Z M{x0+s+3} {cy+4}l-2.4 3.4l4.2 -1Z" fill="{ORANGE}" stroke="{INK}" stroke-width="1.2" stroke-linejoin="round"/>'
+            f'<circle cx="{x0+s+5.5}" cy="{cy}" r="5" fill="{ORANGE}" stroke="{INK}" stroke-width="1.6"/>'
+            f'<path d="M{x0+3*s-5} {cy+3}q4 2 2.5 5.5" fill="none" stroke="{INK}" stroke-width="3.6" stroke-linecap="round"/>'
+            f'<path d="M{x0+3*s-5} {cy+3}q4 2 2.5 5.5" fill="none" stroke="{ORANGE}" stroke-width="2" stroke-linecap="round"/>')
+    # a long grey tabby stretched down column 4
+    G2 = tint("#5E5866", .62)
+    cx = x0 + 3.5 * s
+    out += pad(3, 0, 1, 3, LIME)
+    out += (f'<rect x="{cx-5}" y="{y0+8}" width="10" height="{2*s+12}" rx="5" fill="{G2}" stroke="{INK}" stroke-width="1.6"/>'
+            f'<path d="M{cx-4.6} {y0+17}h9.2M{cx-4.6} {y0+22}h9.2M{cx-4.6} {y0+27}h9.2M{cx-4.6} {y0+32}h9.2" stroke="#5E5866" stroke-width="1.4"/>'
+            f'<path d="M{cx-4} {y0+6}l-3.4 -2.4l1 4.2Z M{cx+4} {y0+6}l3.4 -2.4l-1 4.2Z" fill="{G2}" stroke="{INK}" stroke-width="1.2" stroke-linejoin="round"/>'
+            f'<circle cx="{cx}" cy="{y0+8}" r="5" fill="{G2}" stroke="{INK}" stroke-width="1.6"/>')
+    # a curled-up ginger cat on a lavender square, row 3, column 1: a ball with two ears and its tail curled round
+    bx, by = x0 + .5 * s, y0 + 2.5 * s
+    out += pad(0, 2, 1, 1, LAV)
+    out += (f'<path d="M{bx-4.6} {by-2.6}l-.6 -4.4l3.6 2.2Z M{bx-1} {by-5}l1.8 -3.8l1.8 3.6Z" fill="{ORANGE}" stroke="{INK}" stroke-width="1.2" stroke-linejoin="round"/>'
+            f'<circle cx="{bx}" cy="{by}" r="5.6" fill="{ORANGE}" stroke="{INK}" stroke-width="1.6"/>'
+            f'<path d="M{bx+4.6} {by+1}Q{bx+2} {by+5.6} {bx-3.6} {by+3.2}" fill="none" stroke="{RED}" stroke-width="1.8" stroke-linecap="round"/>')
+    return frame(tint(PERI, .12), out)
+
+
 ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle, "mewhue": mewhue, "pawlinko": pawlinko, "crossstitch": crossstitch, "junkdrawer": junkdrawer, "zoomies": zoomies, "blanket": blanket}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle, "mewhue": mewhue, "pawlinko": pawlinko, "crossstitch": crossstitch, "junkdrawer": junkdrawer, "zoomies": zoomies, "blanket": blanket, "bedhog": bedhog}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")

@@ -20,7 +20,7 @@ Rows are sorted by shelf, in the site's order (Cat Logic, Cat Math, Cat Trails, 
 | Upwordly | Morning Stretch | Cat Spells | A waking cat stretches further with each longer word |
 | Gram Jam | Swap-a-Pom | Cat Spells | Letter pompoms in a craft tray (L-M-N-O-Pom's); swap them to spell words, and the cat bats each word away |
 | Synonym trail | Scent Trail | Cat Spells | Follow the nose from word to same-meaning word to the treat |
-| Bed Hog | Bed Hog | Curious Cat | Slide the sprawled cats until there's room for the human |
+| Bed Hog | Bed Hog (built) | Curious Cat | Slide the sprawled cats until there's room for the human |
 | Warm Seat | Warm Seat | Curious Cat | Cats shuffle along the sofa to claim the warm spot before it cools |
 | Special Delivery | Special Delivery | Curious Cat | The cat brings its gifts to each person's shoes, avoiding the dog |
 | Fifteen, Sixteen, Twiddle | Purrmutation (built) | Curious Cat | Put a cat picture back: slide, turn blocks, or shift rows |
@@ -41,19 +41,18 @@ row, and the games needing new physics or new data come last. Take a game out of
 | # | Game | Shelf | Why here |
 | --- | --- | --- | --- |
 | 1 | Pounce Up | Kitten Play (action) | The second action game, so Kitten Play can be split after it (see `TODO.md`) |
-| 2 | Bed Hog | Curious Cat | The long sleeping cats in `cats/` are the pieces, so no new art; needs a solver to make levels with an answer |
-| 3 | Swap-a-Pom | Cat Spells | Reuses L-M-N-O-Pom's pompoms and Pounce's swap-to-match |
-| 4 | Boing! | Curious Cat | Wind Up's physics plus the owner's spring sheet; builds the spring pieces Yarn Golf needs |
-| 5 | Morning Stretch | Cat Spells | Clues from the Wiktionary lookup (`G.meaning`) Fish Bones and Keyboard Cat already use |
-| 6 | Tape Trap | Cat Logic | A new kind of logic puzzle, so its generator is more work |
-| 7 | Yarn Golf | Curious Cat | Boing!'s springs and Wind Up's physics, plus a flick to shoot |
-| 8 | Cat Flap | Cat Spells | Its puzzle maker has to pair the letters so every row can spell a word |
-| 9 | Warm Seat | Curious Cat | After Bed Hog, to decide whether it's its own game or a mode of Bed Hog |
-| 10 | Paw-ball | Kitten Play (action) | Flippers are moving pieces, which Wind Up's physics doesn't have yet; the hardest to build |
-| 11 | Special Delivery | Curious Cat | The rules for the gifts, routes and dog still need working out |
-| 12 | Scent Trail | Cat Spells | Needs a thesaurus built first (Wiktionary's synonyms or WordNet) |
+| 2 | Swap-a-Pom | Cat Spells | Reuses L-M-N-O-Pom's pompoms and Pounce's swap-to-match |
+| 3 | Boing! | Curious Cat | Wind Up's physics plus the owner's spring sheet; builds the spring pieces Yarn Golf needs |
+| 4 | Morning Stretch | Cat Spells | Clues from the Wiktionary lookup (`G.meaning`) Fish Bones and Keyboard Cat already use |
+| 5 | Tape Trap | Cat Logic | A new kind of logic puzzle, so its generator is more work |
+| 6 | Yarn Golf | Curious Cat | Boing!'s springs and Wind Up's physics, plus a flick to shoot |
+| 7 | Cat Flap | Cat Spells | Its puzzle maker has to pair the letters so every row can spell a word |
+| 8 | Warm Seat | Curious Cat | After Bed Hog, to decide whether it's its own game or a mode of Bed Hog |
+| 9 | Paw-ball | Kitten Play (action) | Flippers are moving pieces, which Wind Up's physics doesn't have yet; the hardest to build |
+| 10 | Special Delivery | Curious Cat | The rules for the gifts, routes and dog still need working out |
+| 11 | Scent Trail | Cat Spells | Needs a thesaurus built first (Wiktionary's synonyms or WordNet) |
 
-Around games 10 to 12, Curious Cat reaches 13 or 14 games: the time to decide on the colour shelf (see `TODO.md`).
+Around games 9 to 11, Curious Cat reaches 13 or 14 games: the time to decide on the colour shelf (see `TODO.md`).
 
 ## Every idea
 
@@ -131,7 +130,6 @@ Around games 10 to 12, Curious Cat reaches 13 or 14 games: the time to decide on
 | Murdle | Cat Spells | Solve a murder mystery story by logic, using a grid of suspects, weapons and places | Written | You play | No | Needs written stories |
 | Redactle | Cat Spells | Guess the words of a hidden Wikipedia article to reveal its title | Written | wordleunlimited | No | Needs Wikipedia articles |
 | Kaleidocat (Colorscope-style) | Curious Cat | Rebuild a target pattern from a few mirrored pieces whose overlapping colours blend | None | Possible suites | Idea | The saved name Kaleidocat could fit |
-| Bed Hog (Klotski, Rush Hour) | Curious Cat | Slide sprawled cats around the bed until there's room for the human | None | Fair Play chat, idea list | Idea | Shortlist. You play Klotski. The stretched-out napping cats in `cats/` (the long `c14-…`, `c15-…` and `c16-…` sleepers) would make the long pieces and the curled-up ones the small, so no new art. Warm Seat could be a mode of it. Cat theme picked: Bed Hog (the name stays) |
 | Warm Seat | Curious Cat | When someone gets up, plan which cat slides where to take the warm seat | None | Fair Play chat | Idea | Shortlist. Cat theme picked: Warm Seat (the name stays), someone gets up from the sofa and the cats shuffle along the cushions to claim the warm spot before it cools. Could still be a mode of Bed Hog |
 | Special Delivery | Curious Cat | Carry each gift to the right person's shoes by the shortest route, avoiding the dog | None | Fair Play chat | Idea | Shortlist. Cat theme picked: Special Delivery (the name stays), the cat brings its gifts (toy mice, socks, leaves) to each person's shoes, keeping out of the dog's way |
 | Inertia | Curious Cat | Steer a ball that rolls until it hits something; collect every gem and avoid the mines | None | Tatham | Idea | |
@@ -140,6 +138,7 @@ Around games 10 to 12, Curious Cat reaches 13 or 14 games: the time to decide on
 | Boing! (Incredible Machine-style spring placing) | Curious Cat | A ball of yarn rolls off a shelf; place and turn a few springs, press Go, and watch it bounce its way to the cat across the room | None | Owner, Wind Up chat | Idea | Shortlist. Wind Up's physics (balls bouncing off lines and pegs) does the bouncing; the owner's spring sheet (`toys/sheets/springs.webp`) gives the springs: its poses map onto bounces (standing pushes up, tilted pushes diagonally, end-on is a round bumper, lying flat a springy floor, the arc a curved rebound). Levels made so they have an answer, with Hint showing where one spring goes. Cat theme picked: Boing! (the name stays), as in How it plays: yarn off a shelf, springs across the room, a cat at the far side to catch it |
 | Yarn Golf (mini golf) | Curious Cat | Flick a ball of yarn into a cat basket in as few shots as you can, banking it off springs and walls; par for a gold paw | None | Owner, Wind Up chat | Idea | Shortlist. Wind Up's physics with a flick to shoot; springs from the owner's sheet. Cat theme picked: Yarn Golf (the name stays), a course of holes around the house (kitchen, hall, stairs, sofa), each hole a cat basket |
 | Solitaire, FreeCell | Curious Cat | Card patience games | None | Idea list | Idea | Needs card art |
+| Bed Hog (Klotski) | Curious Cat | Slide sprawled cats around the bed until there's room for the human: every cat slides any way, and your spot (2 × 3, under a pillow) must be clear | None | Fair Play chat, idea list | Built | Klotski's way of counting moves, with par (the fewest) on the status line and for the gold paw; free sliding rather than Rush Hour's one way each (the owner's pick). The goal is a clear spot, not moving one big piece out (the owner's pick over classic Klotski). Pieces are Sunbeams' sleeping cats (no new art), each on an outlined blanket coloured by size, as in Cat Pile, and fitted to its squares as in Sunbeams; a Cats switch (Reduce visual clutter) leaves plain blocks. No star cat yet (the owner's call). Beds stop at 5 × 6: bigger ones have too many arrangements to work out par. Warm Seat could still be a mode of it |
 | Purrmutation (Fifteen, Sixteen, Twiddle) | Curious Cat | Put a cat picture back together: slide pieces into the gap (Fifteen), turn blocks of four (Twiddle) or shift whole rows and columns round (Sixteen) | None | Tatham | Built | Shortlist. Built as Cat Shuffle, renamed Purrmutation on 2026-11-03: no star cat, the cat's shuffled too (21 pictures from `cats/`, general and named, on a patchwork quilt drawn from the puzzle's seed). Nine levels: 3 × 3 Slide, Turn, Shift, then 4 × 4, then 5 × 5. Peek shows the whole picture; Numbers numbers the pieces |
 | Cat Mat (Flood) | Curious Cat | Crunch knocks pots of dye over at the corner of a rug; the dye floods the joined squares of the colour it touches, until the rug's one colour | — | Tatham | Built | Began as a knitted blanket called Dye Job, then was Cat-astrophe. Going over the pots is allowed, without a gold paw, and keeps you on the same level |
 | Shelf Life (I Love Hue, colour gradient sort) | Curious Cat | Swap Fred's balls of yarn back into a smooth gradient across a shop shelf; tagged balls stay put, and later levels have empty cubbies to spin a blend for | — | Owner's idea | Built | Starring Fred. Kept clear of I Love Hue's look: yarn on a shelf, not tiles. Its spun balls (levels 10 to 12) came from a mix-the-missing-shade idea. Talked about and passed on: sliding whole rows Loopover-style, an ombré strand in one line, calico tiles to turn so edges blend, a sunbeam floor sorted by brightness. First drawn as a brown wooden shelf with napping cats marking the fixed balls; the owner found the cats out of scale and the brown unpleasant, so the shelf is pale and the fixed balls have tags (paw prints on the balls were tried, but covered them; the tags sat in the cubby's corner at first, then the owner had them moved to the middle of the skein and made about twice the size). A Shelf switch shows just the yarn. Fred was first on top of the shelf; the owner had him made bigger and moved below, and once the shelf is sorted Dottie with her crochet (`dottie-22`) takes his place there. The balls were round balls of yarn at first; the owner drew nine shop-wound skeins, which replaced them, then a squarer nine so the shapes don't make some balls look different from others. Later: a bigger tag, or a clothespin |
