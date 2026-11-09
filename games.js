@@ -689,23 +689,37 @@ const G = (() => {
     const row = $("card").querySelector(".btns"), small = document.createElement("div");
     small.className = "smallbtns";
     for (const b of [...row.children].filter(test)) {
-      const w = b.textContent, home = w === HOME_LABEL, share = w === SHARE_LABEL;
+      const w = b.textContent, [icon, word] = smallLook(w);
       b.setAttribute("aria-label", w); b.title = w; b.classList.add("tool");
-      b.innerHTML = iconSVG(home ? "home" : share ? "share" : /^Keep/.test(w) ? "play" : "peek") + `<span class="lbl">${home ? "Front page" : share ? "Share" : w}</span>`;
+      b.innerHTML = iconSVG(icon) + `<span class="lbl">${word}</span>`;
       small.append(b);
     }
     if (small.children.length) row.after(small);
   }
-  // A lost puzzle's card (out of lives, stuck, tangled…), laid out like the win card: the game's own ways on (btns,
-  // the first the main one) stay big, then Share, a look at the board ("Admire…", "Look at…") and the front page are
-  // small icon buttons, and the other levels (after, G.otherSize) sit under them. Share sends the level and the
-  // card's title. o: {result: {n: the level or size played}; the page's picker's value when it's left out}.
+  // A small button's icon and short word, from its full words (which stay its name for VoiceOver and its tooltip).
+  const AGAIN = /^(Restart|Try (this \w+ )?again)/, FRESH = /^New /, BACK = /^Undo/;
+  function smallLook(w) {
+    if (w === HOME_LABEL) return ["home", "Front page"];
+    if (w === SHARE_LABEL) return ["share", "Share"];
+    if (AGAIN.test(w)) return ["restart", /^Restart/.test(w) ? "Restart" : "Try again"];
+    if (FRESH.test(w)) return ["plus", w.replace(/\s*\(.*\)$/, "")];   // "New puzzle (8 × 8)" → "New puzzle"
+    if (BACK.test(w)) return ["undo", "Undo"];
+    return [/^Keep/.test(w) ? "play" : "peek", w];
+  }
+  // A lost puzzle's card (out of lives, stuck, tangled…), laid out like the win card (decided 2026-11-09): the main way
+  // on (the primary button) and any way to keep this game going (a revive, a helper, Mix it up, 5 more moves) stay big;
+  // starting again (Restart, Try again), a new puzzle, Undo, a look at the board ("Admire…", "Look at…"), Share and the
+  // front page are small icon buttons in a row under them; and the other levels (after, G.otherSize) sit under that.
+  // Share sends the level and the card's title. o: {result: {n: the level or size played}; the page's picker's value
+  // when it's left out}.
   function loseCard(title, text, btns, media, after, o = {}) {
     const sel = $("levelSel") || $("size"), r = o.result || (sel ? {n: +sel.value} : null);
     const own = btns.filter(b => b && b[0] !== HOME_LABEL);
     if (!openCard(title, text, [...own, [SHARE_LABEL, e => shareResult(r, false, e.currentTarget, title)], homeBtn()], media, after)) return;
-    smallButtons(b => b.textContent === SHARE_LABEL || b.textContent === HOME_LABEL || /^(Admire|Look at)/.test(b.textContent));
+    const small = w => w === HOME_LABEL || w === SHARE_LABEL || [AGAIN, FRESH, BACK, /^(Admire|Look at)/].some(re => re.test(w));
+    smallButtons(b => !b.classList.contains("primary") && small(b.textContent));
   }
+
 
   // Count a moment in the game (a puzzle started or solved) on the GoatCounter dashboard.
   // Nothing about the player is sent. Waits a few seconds for the counter script to load.
