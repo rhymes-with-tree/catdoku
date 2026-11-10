@@ -483,8 +483,10 @@ const G = (() => {
     card.append(row); if (after) card.append(after);
     // a dialog to VoiceOver, named by its title
     h.id = "cardTitle"; card.setAttribute("role", "dialog"); card.setAttribute("aria-modal", "true"); card.setAttribute("aria-labelledby", "cardTitle");
-    $("overlay").classList.add("show");
-    const first = row.querySelector("button"); if (first) first.focus();
+    // the card opens at its top, title first: focusing the first button would scroll a tall card (a win card with its
+    // photo, on a phone) down to it and push the title off the screen
+    $("overlay").classList.add("show"); $("overlay").scrollTop = 0;
+    const first = row.querySelector("button"); if (first) first.focus({preventScroll: true});
     return true;
   }
   function closeCard() { $("overlay").classList.remove("show"); }
