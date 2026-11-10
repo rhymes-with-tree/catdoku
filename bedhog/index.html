@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bed Hog</title>
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-11-09.8"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<meta name="theme-color" content="#ECEEE7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1F1C24" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-11-09.8">
+<style>
+/* A bed seen from above, the pillows at the top. The human's spot (2 squares across, 3 long, down from one pillow) is
+   a turned-down white sheet; the cats sprawl on the quilt, and you slide them about until the sheet's clear. */
+.sitter{display:block;height:46px;width:auto;margin-bottom:-2px}
+@media (max-height:760px){.sitter{height:34px}}
+.bed{--W:4;--H:5;position:relative;width:min(var(--board),calc(var(--tall) / var(--aspect,1.4)));margin:0 auto;display:flex;flex-direction:column;
+  user-select:none;-webkit-user-select:none;touch-action:manipulation}
+/* the headboard and the pillows */
+.headboard{position:relative;aspect-ratio:var(--W) / .8;background:#7885BA;border-radius:22px 22px 0 0;box-shadow:0 0 0 3px #2A2530}
+.pillow{position:absolute;bottom:12%;height:62%;border-radius:40% / 50%;background:#F7F8F3;box-shadow:inset 0 -5px 0 color-mix(in srgb,#7885BA 22%,#F7F8F3),0 2px 0 rgba(42,37,48,.25)}
+/* the quilt, stitched in squares */
+.mattress{position:relative;aspect-ratio:var(--W) / var(--H);border-radius:0 0 14px 14px;box-shadow:0 0 0 3px #2A2530;outline:none;
+  background-color:color-mix(in srgb,#73A7AE 34%,#F7F8F3);
+  background-image:linear-gradient(90deg,rgba(247,248,243,.75) 2px,transparent 2px),linear-gradient(rgba(247,248,243,.75) 2px,transparent 2px);
+  background-size:calc(100% / var(--W)) calc(100% / var(--H));background-position:-1px -1px}
+/* the human's spot: the sheet turned down, with a dashed edge */
+.sheet{position:absolute;border-radius:10px;background:#F7F8F3;outline:2.5px dashed #4E577D;outline-offset:-5px;transition:background .4s}
+.sheet::after{content:"";position:absolute;bottom:0;width:34%;aspect-ratio:1;background:linear-gradient(135deg,transparent 50%,color-mix(in srgb,#73A7AE 55%,#F7F8F3) 50%);border-bottom-right-radius:10px}
+.sheet.l::after{right:0} .sheet.r::after{left:0;transform:scaleX(-1)}
+.bed.won .sheet{background:color-mix(in srgb,#ECA818 30%,#F7F8F3)}
+/* the cats: a box over their squares, the picture as big as fits in it (turned for one lying along the bed) */
+.cat{position:absolute;touch-action:none;cursor:grab;transition:left .12s ease-out,top .12s ease-out;z-index:1}
+.cat.drag{z-index:3;cursor:grabbing}
+/* each cat lies on its own blanket, as in Cat Pile: a clear outline round the squares it takes up, coloured by its
+   size (one square lavender, two coral, three lime, the big 2 × 2 plum) */
+.pad{position:absolute;inset:4px;border-radius:12px;background:color-mix(in srgb,var(--c) 42%,#F7F8F3);
+  border:3px solid color-mix(in srgb,var(--c) 62%,#2A2530);box-shadow:0 2px 0 rgba(42,37,48,.2)}
+.cat img{position:absolute;z-index:1;left:50%;top:50%;max-width:none;max-height:none;object-fit:fill;pointer-events:none;filter:drop-shadow(0 1px 1.5px rgba(42,37,48,.35))}
+/* Cats off (Reduce visual clutter): plain blocks, the colour with a soft shine along the top */
+.bed.plain .cat img{display:none}
+.bed.plain .pad{background:var(--c)}
+.bed.plain .pad::after{content:"";position:absolute;left:12%;right:12%;top:8px;height:8px;border-radius:4px;background:color-mix(in srgb,var(--c) 55%,#fff);opacity:.8}
+.cat.sel .pad{outline:3px solid #4E577D;outline-offset:2px}
+/* a hint's gold (.hintcell, games.css) on a cat's blanket and on where it goes, keeping them where they are */
+.pad.hintcell{position:absolute;z-index:0;border-color:#ECA818;outline:3px solid #ECA818} .tgt.hintcell{position:absolute;z-index:2}
+.bed.won .cat{cursor:default}
+/* where a picked cat can go */
+.dot{position:absolute;width:16%;max-width:18px;aspect-ratio:1;border-radius:50%;background:#4E577D;transform:translate(-50%,-50%);pointer-events:none;opacity:.75;z-index:2}
+.tgt{position:absolute;border-radius:12px;outline:3px dashed #ECA818;outline-offset:-4px;pointer-events:none;z-index:2}
+.kcur{position:absolute;border-radius:6px;pointer-events:none;z-index:4}
+.card img.goldcat{display:block;width:70%;max-width:240px;height:auto;margin:0 auto 10px}
+@media (prefers-reduced-motion:reduce){.cat,.sheet{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <header><div class="title"><h1>Bed Hog</h1><img class="sitter" id="sitter" src="../cats/c14-29.webp" alt="A ginger cat asleep on its back"></div><div class="stripe"></div><p class="tagline">Slide the sprawled cats until there's room for you</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="bed stage" id="board">
+    <div class="headboard" id="head" aria-hidden="true"></div>
+    <div class="mattress" id="grid" tabindex="0" role="application" aria-label="The bed"></div>
+  </div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="linkBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New bed</button>
+  </div>
+
+</main>
+
+<script src="../games.js?v=2026-11-09.8"></script>
+<script>
+/* ---------- the bed and its cats (plain functions, also run in a background worker) ---------- */
+// The bed is W squares across and H long, the pillows at the top. The human's spot is 2 squares across and S long,
+// down from the pillow on the left (side 0) or the right (side 1). Each cat is a shape: 1 curled up (1 × 1), 2 and 3 on
+// its back, across or along the bed (2 × 1, 1 × 2), 4 and 5 stretched out, across or along (3 × 1, 1 × 3), and 6 a big
+// fluffy one curled up (2 × 2). A bed is written as a string, a character a square, row by row: the cat's shape on
+// its top left square, "#" on the rest of it and "." where the bed's free. Cats of the same shape are alike to the
+// puzzle, so a bed has one string however its cats are arranged.
+function shapeSize(k) { return [null, [1, 1], [2, 1], [1, 2], [3, 1], [1, 3], [2, 2]][k]; }
+// Levels: the bed's size, the curled-up cats at most (each lets the others round it, so they're kept few), how
+// often each other shape is laid (2 to 6), and how many moves the fewest is, at least and at most (Klotski's way
+// of counting: one cat sliding anywhere it can get to, square by square, is one move).
+function levelSpec(n) {
+  const L = [null,
+    [4, 5, 1, [4, 4, 2, 2, 0], 4, 6],
+    [4, 5, 2, [4, 4, 2, 2, 0], 7, 10],
+    [4, 5, 2, [4, 4, 2, 2, 0], 11, 99],
+    [4, 6, 2, [4, 4, 3, 3, 0], 12, 16],
+    [5, 5, 2, [4, 4, 3, 3, 1], 14, 19],
+    [4, 6, 2, [4, 4, 3, 3, 0], 17, 99],
+    [5, 5, 2, [4, 4, 3, 3, 1], 20, 28],
+    [5, 6, 1, [3, 3, 3, 3, 3], 16, 19],
+    [5, 6, 1, [3, 3, 3, 3, 3], 20, 23],
+    [5, 6, 1, [3, 3, 3, 3, 3], 24, 99]][n];
+  if (!L) return null;
+  return {W: L[0], H: L[1], S: 3, ones: L[2], wts: L[3], lo: L[4], hi: L[5]};
+}
+function spotCells(W, H, S, side) { const o = []; for (let y = 0; y < S; y++) for (let x = 0; x < 2; x++) o.push(y * W + (side ? W - 2 + x : x)); return o; }
+function spotClear(bed, spot) { for (const i of spot) if (bed.charCodeAt(i) !== 46) return false; return true; }
+// Every bed one move on from bed: each cat in turn, everywhere it can slide to. cb(next bed, from, to), with the cat's
+// top left square before and after.
+function nextBeds(bed, W, H, cb) {
+  const N = W * H, b = new Uint8Array(N), seen = new Int32Array(N), todo = new Int32Array(N);
+  for (let i = 0; i < N; i++) b[i] = bed.charCodeAt(i);
+  let stamp = 0;
+  const fill = (k, x, y, c) => { const [w, h] = shapeSize(k); for (let j = 0; j < h; j++) for (let a = 0; a < w; a++) b[(y + j) * W + x + a] = c === 46 ? 46 : a || j ? 35 : c; };
+  for (let i = 0; i < N; i++) {
+    const c = b[i]; if (c < 49 || c > 54) continue;
+    const k = c - 48, [w, h] = shapeSize(k), x0 = i % W, y0 = (i - x0) / W;
+    fill(k, x0, y0, 46);
+    seen[i] = ++stamp; let n = 0; todo[n++] = i;
+    while (n) {
+      const p = todo[--n], x = p % W, y = (p - x) / W;
+      for (let d = 0; d < 4; d++) {
+        const nx = x + (d === 0 ? 1 : d === 1 ? -1 : 0), ny = y + (d === 2 ? 1 : d === 3 ? -1 : 0);
+        if (nx < 0 || ny < 0 || nx + w > W || ny + h > H) continue;
+        const q = ny * W + nx; if (seen[q] === stamp) continue;
+        let ok = true;
+        for (let j = 0; j < h && ok; j++) for (let a = 0; a < w; a++) if (b[(ny + j) * W + nx + a] !== 46) { ok = false; break; }
+        if (!ok) continue;
+        seen[q] = stamp; todo[n++] = q;
+        fill(k, nx, ny, c); cb(String.fromCharCode.apply(null, b), i, q); fill(k, nx, ny, 46);
+      }
+    }
+    fill(k, x0, y0, c);
+  }
+}
+// The cats laid over everything but the spot, at random: the bed once there's room. Null if it didn't work out.
+function goalBed(W, H, S, side, ones, wts) {
+  const b = Array(W * H).fill(".");
+  for (const i of spotCells(W, H, S, side)) b[i] = "x";
+  const fits = (k, x, y) => { const [w, h] = shapeSize(k); if (x + w > W || y + h > H) return false; for (let j = 0; j < h; j++) for (let a = 0; a < w; a++) if (b[(y + j) * W + x + a] !== ".") return false; return true; };
+  for (let i = 0; i < W * H; i++) {
+    if (b[i] !== ".") continue;
+    const x = i % W, y = (i - x) / W, ok = [];
+    for (let k = 2; k <= 6; k++) for (let r = 0; r < wts[k - 2]; r++) if (fits(k, x, y)) ok.push(k);
+    let k;
+    if (ok.length) k = ok[Math.floor(Math.random() * ok.length)]; else if (ones-- > 0) k = 1; else return null;
+    const [w, h] = shapeSize(k);
+    for (let j = 0; j < h; j++) for (let a = 0; a < w; a++) b[(y + j) * W + x + a] = a || j ? "#" : String(k);
+  }
+  return b.map(c => c === "x" ? "." : c).join("");
+}
+// A new bed for level n: cats laid out with the spot clear, then every bed they can be shuffled into, and how few
+// moves each is from a clear spot, counted outwards from all the beds with it clear. One as far as the level wants is
+// picked at random. Big beds take a while to count, so one count makes beds for every level of that size it's far
+// enough for (up to three each, kept for later calls; the worker keeps them between puzzles). Null to try again (too
+// many beds to count, or none far enough).
+function makeBed(n) {
+  const kept = globalThis.bedsKept || (globalThis.bedsKept = {});
+  if (kept[n] && kept[n].length) return kept[n].pop();
+  const {W, H, S, ones, wts} = levelSpec(n), side = Math.random() < .5 ? 0 : 1, spot = spotCells(W, H, S, side);
+  const goal = goalBed(W, H, S, side, ones, wts);
+  if (!goal) return null;
+  const id = new Map([[goal, 0]]), beds = [goal], links = [];
+  for (let t = 0; t < beds.length; t++) {
+    if (beds.length > 150000) return null;
+    const nb = [];
+    nextBeds(beds[t], W, H, q => { let j = id.get(q); if (j === undefined) { j = beds.length; id.set(q, j); beds.push(q); } nb.push(j); });
+    links.push(nb);
+  }
+  const dist = new Int16Array(beds.length).fill(-1), layer = [];
+  beds.forEach((b, i) => { if (spotClear(b, spot)) { dist[i] = 0; layer.push(i); } });
+  let far = 0;
+  for (let h = 0; h < layer.length; h++) { const i = layer[h]; for (const j of links[i]) if (dist[j] < 0) { dist[j] = dist[i] + 1; if (dist[j] > far) far = dist[j]; layer.push(j); } }
+  const same = JSON.stringify([W, H, S, ones, wts]);
+  for (let m = 1; levelSpec(m); m++) {
+    const L = levelSpec(m);
+    if (JSON.stringify([L.W, L.H, L.S, L.ones, L.wts]) !== same || far < L.lo || (m !== n && (kept[m] || []).length >= 3)) continue;
+    const want = Math.min(far, L.hi), pick = [];
+    dist.forEach((d, i) => { if (d === want) pick.push(i); });
+    const list = kept[m] || (kept[m] = []);
+    for (let k = 0; k < 3 && pick.length; k++) list.push({W, H, S, side, bed: beds[pick.splice(Math.floor(Math.random() * pick.length), 1)[0]], par: want});
+  }
+  return kept[n] && kept[n].length ? kept[n].pop() : null;
+}
+// The fewest moves from bed to a clear spot, searching outwards: {par, path: [[from, to]…]}, or null if there's
+// no way (or it ran past the limit).
+function solveBed(o) {
+  const {bed, W, H, S, side} = o, spot = spotCells(W, H, S, side);
+  if (spotClear(bed, spot)) return {par: 0, path: []};
+  const came = new Map([[bed, null]]);
+  let layer = [bed], found = null;
+  for (let d = 1; layer.length && !found; d++) {
+    const next = [];
+    for (const b of layer) {
+      nextBeds(b, W, H, (q, f, t) => {
+        if (found || came.has(q)) return;
+        came.set(q, [b, f, t]);
+        if (spotClear(q, spot)) found = q; else next.push(q);
+      });
+      if (found || came.size > 400000) break;
+    }
+    layer = next;
+  }
+  if (!found) return null;
+  const path = []; let at = found;
+  while (came.get(at)) { const [p, f, t] = came.get(at); path.push([f, t]); at = p; }
+  return {par: path.length, path: path.reverse()};
+}
+// For hints, in the background: the fewest moves from here (always an answer, so the worker doesn't try again).
+function hintPlan(o) { return {r: solveBed(o)}; }
+
+/* ---------- game state ---------- */
+// game: {level, W, H, S, side (the spot's side: 0 left, 1 right), par (the fewest moves), cats ([shape, top left
+//   square, picture] each, in the order dealt), start (cats as dealt), history (each {c, f, t}: cat c slid from square
+//   f to t; or {cats} for a Restart), won, hinted, restarted, clock…}
+const STORE = "catdoku.bedhog.v1", $ = G.$;
+// The cats, seen from above and laid lengthwise, as in Sunbeams (its SLEEPERS): [file, length ÷ width, size: 1 small
+// short-hairs, 2 the fluffy tuxedo, 3 Maine Coons, ragdoll and spotted cat]. General cats in cats/ (who's who in ARTWORK.md).
+// Each cat gets the picture whose shape best fits its squares, stretched a little to fill them; one lying along the bed
+// is turned on its side.
+const SLEEPERS = [
+  ["c14-36", 1.1, 1], ["c16-5", 1.11, 2], ["c14-34", 1.14, 1], ["c15-6", 1.17, 3], ["c14-35", 1.19, 1], ["c15-5", 1.28, 3],
+  ["c16-3", 1.31, 2], ["c16-4", 1.44, 2], ["c15-4", 1.64, 3], ["c15-2", 1.65, 3], ["c14-33", 1.86, 1], ["c14-29", 1.87, 1],
+  ["c16-2", 1.92, 2], ["c14-28", 2.1, 1], ["c14-30", 2.11, 1], ["c14-31", 2.11, 1], ["c14-32", 2.27, 1], ["c15-3", 2.55, 3],
+  ["c15-36", 2.96, 3], ["c16-16", 3.0, 2], ["c16-14", 3.36, 2], ["c15-33", 3.72, 3], ["c15-32", 3.78, 3], ["c15-35", 3.78, 3],
+  ["c16-13", 3.82, 2], ["c16-15", 3.93, 2], ["c14-53", 4.12, 1], ["c16-1", 4.2, 2], ["c14-52", 4.29, 1], ["c15-37", 4.33, 3],
+  ["c14-55", 4.57, 1], ["c14-59", 4.62, 1], ["c14-57", 4.67, 1], ["c15-1", 5.06, 3], ["c14-58", 5.32, 1], ["c15-34", 5.38, 3]];
+const PICS = SLEEPERS.map(c => c[0]);
+// A cat's room, in squares: the picture's length and width once fitted (lying across), stretched at most 12%.
+function fitOf(k, ratio) {
+  const [w, h] = shapeSize(k), pad = Math.min(w, h) * .06, L = Math.max(w, h) - 2 * pad, T = Math.min(w, h) - 2 * pad, want = L / T;
+  const rr = Math.min(Math.max(want, ratio / 1.12), ratio * 1.12), cw = Math.min(L, T * rr);
+  return {w, h, want, cw, ch: cw / rr};
+}
+const COLOUR = [null, "#8D78AD", "#E16A4A", "#E16A4A", "#B3B94B", "#B3B94B", "#B94588"];
+const KIND = [null, "a curled-up cat", "a cat on its back", "a cat on its back", "a stretched-out cat", "a stretched-out cat", "a big fluffy cat"];
+const catSrc = f => (window.CAT_SRC || {})[f] || `../cats/${f}.webp`;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1, seen: false, cats: true}, state.settings);
+let game = state.game || null, busy = false, hinting = false;
+// The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
+G.pawLost(() => !game || game.won || game.hinted || game.restarted);
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.won && !busy && !$("overlay").classList.contains("show");
+const MAX_LEVEL = 10;
+const levelName = n => { const s = levelSpec(n); return `${n} · ${s.W} × ${s.H}`; };
+const build = G.builder([shapeSize, levelSpec, spotCells, spotClear, nextBeds, goalBed, makeBed], "makeBed");
+const hintWork = G.builder([shapeSize, spotCells, spotClear, nextBeds, solveBed, hintPlan], "hintPlan");
+
+/* ---------- the bed, from the cats ---------- */
+function bedOf(cats, W, H) {
+  const b = Array(W * H).fill(".");
+  for (const [k, at] of cats) { const [w, h] = shapeSize(k), x = at % W, y = (at - x) / W; for (let j = 0; j < h; j++) for (let a = 0; a < w; a++) b[(y + j) * W + x + a] = a || j ? "#" : String(k); }
+  return b.join("");
+}
+const bed = () => bedOf(game.cats, game.W, game.H);
+const spot = () => spotCells(game.W, game.H, game.S, game.side);
+// The squares cat c covers when its top left is on at.
+function cellsAt(k, at, W) { const [w, h] = shapeSize(k), x = at % W, y = (at - x) / W, o = []; for (let j = 0; j < h; j++) for (let a = 0; a < w; a++) o.push((y + j) * W + x + a); return o; }
+// Everywhere cat c can slide to, square by square, without the others moving (its top left squares, not where it is).
+function reachOf(c) {
+  const {W, H} = game, [k, at] = game.cats[c], [w, h] = shapeSize(k), b = bed().split("");
+  for (const i of cellsAt(k, at, W)) b[i] = ".";
+  const fits = (x, y) => { if (x < 0 || y < 0 || x + w > W || y + h > H) return false; for (let j = 0; j < h; j++) for (let a = 0; a < w; a++) if (b[(y + j) * W + x + a] !== ".") return false; return true; };
+  const seen = new Set([at]), todo = [at];
+  while (todo.length) {
+    const p = todo.pop(), x = p % W, y = (p - x) / W;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const q = (y + dy) * W + x + dx; if (!seen.has(q) && fits(x + dx, y + dy)) { seen.add(q); todo.push(q); } }
+  }
+  seen.delete(at); return [...seen];
+}
+// Moves made, Klotski's way: sliding the same cat again straight after counts as the same move. A Restart starts over.
+function movesMade() {
+  let n = 0, last = -1;
+  for (const h of game.history) { if (h.cats) { n = 0; last = -1; } else if (h.c !== last) { n++; last = h.c; } }
+  return n;
+}
+
+/* ---------- drawing ---------- */
+let els = [], sel = -1, carry = null;   // the cats' boxes; the cat picked by a tap; the cat being slid with the keys {c, from}
+function draw() {
+  queueMicrotask(say);
+  const {W, H} = game, board = $("board"), grid = $("grid"), head = $("head");
+  board.style.setProperty("--W", W); board.style.setProperty("--H", H);
+  board.style.setProperty("--aspect", (H + .8) / W + .02);   // its height for each pixel across (games.css)
+  board.classList.toggle("won", !!game.won);
+  board.classList.toggle("plain", !settings.cats);
+  // the pillows: one over the spot, one over the rest
+  head.innerHTML = "";
+  const pil = (x0, n) => { const p = document.createElement("div"); p.className = "pillow"; p.style.left = (x0 + .12) / W * 100 + "%"; p.style.width = (n - .24) / W * 100 + "%"; head.append(p); };
+  if (game.side) { pil(0, W - 2); pil(W - 2, 2); } else { pil(0, 2); pil(2, W - 2); }
+  grid.innerHTML = "";
+  const sp = document.createElement("div"); sp.className = "sheet " + (game.side ? "r" : "l"); place(sp, game.side ? W - 2 : 0, 0, 2, game.S);
+  grid.append(sp);
+  els = game.cats.map(([k, , pic], c) => {
+    const [w, h] = shapeSize(k), e = document.createElement("div");
+    e.className = "cat" + (h > w ? " v" : ""); e.dataset.c = c;
+    e.style.setProperty("--w", w); e.style.setProperty("--h", h); e.style.setProperty("--c", COLOUR[k]);
+    const pad = document.createElement("div"); pad.className = "pad";
+    const im = new Image(); im.src = catSrc(pic); im.alt = ""; im.draggable = false; e.append(pad, im);
+    // the picture fitted to the squares (Sunbeams' way), turned for a cat along the bed, and flipped one way or another
+    // (sizes in squares, as a share of the box: the same sums either way round, as the box turns with it)
+    const f = fitOf(k, SLEEPERS[Math.max(0, PICS.indexOf(pic))][1]), flip = (c * 7 + game.start[c][1] * 3) % 4;
+    Object.assign(im.style, {width: f.cw / w * 100 + "%", height: f.ch / h * 100 + "%"});
+    im.style.transform = `translate(-50%,-50%) rotate(${h > w ? 90 : 0}deg) scale(${flip & 1 ? -1 : 1},${flip & 2 ? -1 : 1})`;
+    grid.append(e); return e;
+  });
+  placeAll(); update();
+}
+// Put el over the squares from (x, y), w across and h down.
+function place(el, x, y, w, h) { const {W, H} = game; Object.assign(el.style, {left: x / W * 100 + "%", top: y / H * 100 + "%", width: w / W * 100 + "%", height: h / H * 100 + "%"}); }
+function placeCat(c, at) { const [k] = game.cats[c], [w, h] = shapeSize(k), W = game.W; place(els[c], at % W, Math.floor(at / W), w, h); }
+function placeAll() { game.cats.forEach(([, at], c) => placeCat(c, drag && drag.c === c ? drag.cur : at)); marks(); }
+// The marks over the bed: a picked cat and where it can go, a hint, the keys' cursor.
+function marks() {
+  const grid = $("grid"), W = game.W;
+  grid.querySelectorAll(".dot, .tgt, .kcur").forEach(x => x.remove());
+  els.forEach((e, c) => { e.classList.toggle("sel", c === sel || (carry && carry.c === c)); e.firstChild.classList.remove("hintcell"); });
+  if (sel >= 0 && !game.won) for (const p of reachOf(sel)) {
+    const [w, h] = shapeSize(game.cats[sel][0]), d = document.createElement("div"); d.className = "dot";
+    d.style.left = (p % W + w / 2) / W * 100 + "%"; d.style.top = (Math.floor(p / W) + h / 2) / game.H * 100 + "%"; grid.append(d);
+  }
+  const m = hints.current();
+  if (m) {
+    const c = game.cats.findIndex(([, at]) => at === m.f); if (els[c]) els[c].firstChild.classList.add("hintcell");
+    if (m.t != null) { const [w, h] = shapeSize(game.cats[c][0]), t = document.createElement("div"); t.className = "tgt hintcell"; place(t, m.t % W, Math.floor(m.t / W), w, h); grid.append(t); }
+  }
+  const i = keys ? keys.at() : -1;
+  if (i >= 0 && !game.won) { const k = document.createElement("div"); k.className = "kcur kbcursor"; place(k, i % W, Math.floor(i / W), 1, 1); grid.append(k); }
+}
+// The bed in words, for VoiceOver (G.describe): the spot, then each cat and the squares it lies on.
+function say() {
+  if (!game) return;
+  const {W, H} = game, col = x => `column ${x + 1}`;
+  const cats = game.cats.map(([k, at]) => {
+    const [w, h] = shapeSize(k), x = at % W, y = Math.floor(at / W);
+    const where = w === 1 && h === 1 ? G.at(at, W) : `rows ${y + 1}${h > 1 ? `–${y + h}` : ""}, columns ${x + 1}${w > 1 ? `–${x + w}` : ""}`.replace(/^rows (\d+),/, h > 1 ? "$&" : "row $1,");
+    return `${KIND[k]}${k === 2 || k === 4 ? " across" : k === 3 || k === 5 ? " along the bed" : ""} on ${where}`;
+  });
+  const sx = game.side ? W - 2 : 0;
+  G.describe($("grid"), `A bed ${W} squares across and ${H} long, the pillows at the top. Your spot is ${col(sx)} and ${col(sx + 1)}, rows 1 to ${game.S}. ${game.won ? "It's clear: there's room for you." : `Cats: ${G.listed(cats, "; ")}. Arrow keys pick a square; Space picks up the cat there, the arrows slide it, and Space puts it down.`}`);
+}
+function update() {
+  const n = movesMade();
+  $("count").textContent = game.won ? `Room in ${n} · par ${game.par}` : `Par ${game.par} · ${n} so far`;
+  $("hintBtn").disabled = game.won || hinting;
+  undo.sync(); marks();
+}
+
+/* ---------- playing ---------- */
+// Cat c slides from f to t: one step on the Undo list.
+function slide(c, f, t) {
+  if (!playing() || f === t) return;
+  game.started = true; sel = -1;
+  game.cats[c][1] = t; undo.push({c, f, t});
+  placeAll(); update();
+  if (spotClear(bed(), spot())) { win(); return; }
+  save();
+}
+// The square under a pointer, and where in it ([x, y] in squares), or null.
+function sqAt(e) { const r = $("grid").getBoundingClientRect(), x = (e.clientX - r.left) / r.width * game.W, y = (e.clientY - r.top) / r.height * game.H; return x < 0 || y < 0 || x >= game.W || y >= game.H ? null : [x, y]; }
+// Of the places p (top left squares) cat c could go, the one whose middle is nearest (x, y), in squares.
+function nearest(c, ps, x, y) {
+  const [w, h] = shapeSize(game.cats[c][0]), W = game.W;
+  let best = null, bd = Infinity;
+  for (const p of ps) { const d = (p % W + w / 2 - x) ** 2 + (Math.floor(p / W) + h / 2 - y) ** 2; if (d < bd) { bd = d; best = p; } }
+  return best;
+}
+// Dragging a cat: it follows the finger as far as it can slide; let go and it stays. A tap picks it (dots show where
+// it can go) and a tap on one of those squares sends it there.
+let drag = null;
+$("grid").addEventListener("pointerdown", e => {
+  if (!playing() || e.button > 0) return;
+  const el = e.target.closest(".cat"), at = sqAt(e);
+  if (!el) {
+    if (sel >= 0 && at) {
+      const sq = Math.floor(at[1]) * game.W + Math.floor(at[0]), k = game.cats[sel][0];
+      const ok = reachOf(sel).filter(p => cellsAt(k, p, game.W).includes(sq));
+      if (ok.length) { slide(sel, game.cats[sel][1], nearest(sel, ok, ...at)); return; }
+    }
+    sel = -1; marks(); return;
+  }
+  const c = +el.dataset.c, [k, from] = game.cats[c];
+  drag = {c, from, cur: from, x0: e.clientX, y0: e.clientY, moved: false, ps: [from, ...reachOf(c)], cell: $("grid").getBoundingClientRect().width / game.W};
+  el.classList.add("drag"); el.setPointerCapture(e.pointerId);
+  void k;
+});
+$("grid").addEventListener("pointermove", e => {
+  if (!drag) return;
+  const dx = (e.clientX - drag.x0) / drag.cell, dy = (e.clientY - drag.y0) / drag.cell;
+  if (!drag.moved && Math.hypot(dx, dy) < .3) return;
+  drag.moved = true;
+  const [k] = game.cats[drag.c], [w, h] = shapeSize(k), W = game.W;
+  const to = nearest(drag.c, drag.ps, drag.from % W + w / 2 + dx, Math.floor(drag.from / W) + h / 2 + dy);
+  if (to !== drag.cur) { drag.cur = to; placeCat(drag.c, to); }
+});
+function endDrag(cancel) {
+  if (!drag) return;
+  const d = drag; drag = null; els[d.c].classList.remove("drag");
+  if (!cancel && d.cur !== d.from) slide(d.c, d.from, d.cur);
+  else if (!cancel && !d.moved) { sel = sel === d.c ? -1 : d.c; placeAll(); if (sel >= 0 && !reachOf(sel).length) G.note("That cat's boxed in for now.", 2500); }
+  else placeAll();
+}
+$("grid").addEventListener("pointerup", () => endDrag(false));
+$("grid").addEventListener("pointercancel", () => endDrag(true));
+
+// Keys: the arrows move a cursor over the squares. Space on a cat picks it up; then the arrows slide it a square at a
+// time (the cursor goes with it) and Space puts it down, as one move. Escape puts it back where it was.
+const keys = G.gridKeys({
+  on: () => playing(),
+  show: () => marks(),
+  size: () => [game.W, game.H],
+  move(i, dx, dy) {
+    const W = game.W, x = i % W + dx, y = Math.floor(i / W) + dy;
+    if (!carry) return Math.max(0, Math.min(game.H - 1, y)) * W + Math.max(0, Math.min(W - 1, x));
+    const at = game.cats[carry.c][1], to = at + dy * W + dx;
+    if (!reachOf(carry.c).includes(to) || Math.abs(dx) + Math.abs(dy) !== 1 || (dx && Math.floor(to / W) !== Math.floor(at / W))) return i;
+    game.cats[carry.c][1] = to; placeCat(carry.c, to);
+    return i + dy * W + dx;
+  },
+  act(i) {
+    if (carry) { const {c, from} = carry; carry = null; const t = game.cats[c][1]; game.cats[c][1] = from; if (t !== from) slide(c, from, t); else marks(); return; }
+    const sq = game.cats.findIndex(([k, at]) => cellsAt(k, at, game.W).includes(i));
+    if (sq < 0) { if (sel >= 0) { const k = game.cats[sel][0], ok = reachOf(sel).filter(p => cellsAt(k, p, game.W).includes(i)); if (ok.length) { slide(sel, game.cats[sel][1], ok[0]); return; } } return; }
+    sel = -1; carry = {c: sq, from: game.cats[sq][1]}; marks();
+    G.note("Arrow keys slide it; Space puts it down.", 3000);
+  },
+  escape() { if (carry) { game.cats[carry.c][1] = carry.from; placeCat(carry.c, carry.from); carry = null; } sel = -1; marks(); },
+});
+
+// Undo takes back a slide, or a Restart.
+const undo = G.history({game: () => game, can: playing, restart: true,
+  back: h => { sel = -1; carry = null; if (h.cats) game.cats = h.cats.map(x => x.slice()); else game.cats[h.c][1] = h.f; },
+  after: () => { placeAll(); update(); save(); }});
+$("restartBtn").onclick = () => {
+  if (undo.restart(g => { sel = -1; carry = null; g.cats = g.start.map(x => x.slice()); }, {cats: game.cats.map(x => x.slice())})) {
+    placeAll(); update(); save();
+    G.note("Back to how the cats started. Undo brings your moves back.", 4000);
+  }
+};
+
+/* ---------- hints ---------- */
+// Hint works out the fewest moves from here (in the background) and shows the first: the cat to slide, in gold, and
+// asked again, where it goes. The player makes the move. A hint keeps the player on the same level and costs the gold paw.
+const hints = G.hinter({game: () => game, key: () => game ? bed() : "", draw: () => marks()});
+let plan = null;
+$("hintBtn").onclick = async () => {
+  if (!playing() || hinting) return;
+  const g = game, key = bed();
+  if (!plan || plan.key !== key) {
+    hinting = true; update();
+    const slow = setTimeout(() => G.note("Thinking…", 0), 300);
+    const {r} = await hintWork.take({bed: key, W: g.W, H: g.H, S: g.S, side: g.side});
+    clearTimeout(slow); hinting = false; G.note("");
+    if (game !== g || bed() !== key) { update(); return; }
+    if (!r || !r.path.length) { update(); G.note("No hint found. Try Undo or Restart.", 4000); return; }
+    plan = {key, path: r.path};
+  }
+  const [f, t] = plan.path[0], again = hints.level() > 0, left = plan.path.length;
+  game.hinted = true; game.started = true; sel = -1; save(); update();
+  hints.show(again ? {f, t} : {f}, again ? "Slide the gold cat to the gold outline." : `Slide the gold cat. ${left === 1 ? "That makes room!" : `${left} moves from here.`}`);
+};
+
+/* ---------- endings ---------- */
+function win() {
+  game.won = true; G.finishClock(game); keys.hide(); hints.clear(false); sel = -1; carry = null; plan = null;
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save();
+  $("board").classList.add("won"); update(); say();
+  G.track(`Bed Hog solved level ${game.level}`);
+  build.prefetch(next);
+  const g = game;
+  setTimeout(() => { if (game === g) finishCard(); }, matchMedia("(prefers-reduced-motion: reduce)").matches ? 300 : 900);
+}
+function finishCard() {
+  const next = settings.level, n = movesMade(), gold = !game.restarted && !game.hinted && n <= game.par;
+  let text = `There's room for you, in ${n} move${n === 1 ? "" : "s"}${n <= game.par ? ", as few as it can be done in." : `; it can be done in ${game.par}.`}`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  const im = new Image(); im.className = "goldcat"; im.src = catSrc("c14-28"); im.alt = "A tabby cat stretched out asleep on its back";
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the bed", game.result,
+    {title: "Room for you!", gold, goldWhy: "Par, with no hints or restarts!", goldPic: [im],
+     next: next > game.level ? `Next: level ${next}` : "Next bed", after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- new beds ---------- */
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
+// Pictures for the cats of bed b, a different one for each cat where there are enough.
+// As in Sunbeams: the pictures closest in shape to the cat's squares (a little nearer for one not on the bed yet, and
+// for a big one in the 2 × 2, a small one in a single square), one of the closest few at random.
+function dealPics(b) {
+  const out = [], used = {};
+  for (let i = 0; i < b.length; i++) {
+    const k = +b[i]; if (!(k >= 1)) continue;
+    const {want} = fitOf(k, 1), size = k === 6 ? 3 : k === 1 ? 1 : 0;
+    const fit = SLEEPERS.map(c => [Math.abs(Math.log(c[1] / want)) + .3 * (used[c[0]] || 0) + (size ? .15 * Math.abs(c[2] - size) : 0), c[0]]).sort((p, q) => p[0] - q[0]);
+    const near = fit.filter(p => p[0] <= fit[0][0] + .12).slice(0, 4), pick = near[Math.floor(Math.random() * near.length)][1];
+    used[pick] = (used[pick] || 0) + 1; out.push([k, i, pick]);
+  }
+  return out;
+}
+function begin(p, level, cats, extra = {}) {
+  game = {level, W: p.W, H: p.H, S: p.S, side: p.side, par: p.par, cats: cats.map(x => x.slice()), start: cats.map(x => x.slice()),
+    history: [], won: false, ...G.freshClock(), ...extra};
+  sel = -1; carry = null; plan = null; keys.hide(); hints.clear(false);
+}
+async function newPuzzle() {
+  if (busy) return;
+  busy = true;
+  const n = settings.level;
+  G.openCard("Making the bed…", "", []);
+  const p = await build.take(n);
+  begin(p, n, dealPics(p.bed));
+  busy = false; G.closeCard(); G.note("");
+  draw(); save();
+  build.prefetch(n);
+  G.track(`Bed Hog new puzzle level ${n}`);
+  helpOnFirstVisit();
+}
+
+/* ---------- sharing ---------- */
+// The cats as dealt, three characters each: shape, top left square (base 36) and picture (its place in SLEEPERS,
+// base 36); with progress, the cats now, the same way.
+const enc = cats => cats.map(([k, at, pic]) => k + at.toString(36) + PICS.indexOf(pic).toString(36)).join("");
+function dec(s, W, H) {
+  if (typeof s !== "string" || s.length % 3 || s.length > 90) return null;
+  const cats = [];
+  for (let i = 0; i < s.length; i += 3) {
+    const k = +s[i], at = parseInt(s[i + 1], 36), pic = parseInt(s[i + 2], 36);
+    if (!(k >= 1 && k <= 6) || !(at >= 0 && at < W * H) || !PICS[pic]) return null;
+    const [w, h] = shapeSize(k); if (at % W + w > W || Math.floor(at / W) + h > H) return null;
+    cats.push([k, at, PICS[pic]]);
+  }
+  const b = bedOf(cats, W, H);
+  return b.replace(/[.#]/g, "").length === cats.length && cats.reduce((s2, [k]) => s2 + shapeSize(k)[0] * shapeSize(k)[1], 0) === W * H - (b.match(/\./g) || []).length ? cats : null;
+}
+$("linkBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Bed Hog", won: game.won,
+  puzzle: () => ({g: "bedhog", N: game.level, s: game.side, c: enc(game.start)}),
+  progress: () => ({q: enc(game.cats)})}); };
+// Whether `now` is the same cats as `start`, each moved (a link someone has changed by hand might not be).
+const sameCats = (a, b) => a.length === b.length && a.every(([k, , p], i) => b[i][0] === k && b[i][2] === p);
+function openShared(d) {
+  const fail = () => G.note("That share link didn't work.", 5000);
+  if (!(Number.isInteger(d.N) && d.N >= 1 && d.N <= MAX_LEVEL) || (d.s !== 0 && d.s !== 1)) { fail(); return; }
+  const {W, H, S} = levelSpec(d.N), cats = dec(d.c, W, H);
+  if (!cats || spotClear(bedOf(cats, W, H), spotCells(W, H, S, d.s))) { fail(); return; }
+  // par, worked out here (the link only carries the cats; this takes a moment at most)
+  const r = solveBed({bed: bedOf(cats, W, H), W, H, S, side: d.s});
+  if (!r) { fail(); return; }
+  let now = d.p ? dec(d.p.q, W, H) : null;
+  if (now && !sameCats(cats, now)) now = null;
+  begin({W, H, S, side: d.s, par: r.par}, d.N, cats);
+  if (now) { game.cats = now; game.timed = false; }
+  settings.level = d.N; $("levelSel").value = d.N;
+  draw(); save(); build.prefetch(game.level);
+  if (now && spotClear(bed(), spot())) win(); else helpOnFirstVisit();
+}
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  settings.seen = false;
+  helpOnFirstVisit();
+  if (!spotlightUp()) { settings.seen = true; G.helpLater(); }
+}
+const spotlightUp = () => !!document.querySelector(".spot");
+function helpOnFirstVisit() {
+  if (!game || !playing() || spotlightUp() || settings.seen) return;
+  const {W, H} = game, xy = i => [i % W, Math.floor(i / W)], all = [...Array(W * H).keys()].map(xy);
+  const sp = spot().map(xy);
+  // a cat that can slide, and the squares it can reach, for the try
+  const c = game.cats.findIndex((_, i) => reachOf(i).length) , turn = G.yourTurn(() => game, g => { game = g; sel = -1; carry = null; plan = null; }, draw);
+  let was = "";
+  const mine = c < 0 ? all : [...new Set([game.cats[c][1], ...reachOf(c)].flatMap(p => cellsAt(game.cats[c][0], p, W)))].map(xy);
+  const done = () => { settings.seen = true; save(); };
+  const steps = [
+    {say: "Cats are hogging your side 🐈", lit: sp},
+    {say: "Drag a cat to slide it", lit: mine, ...turn.upTo, try: {done: () => bed() !== was},
+      enter() { turn.from.enter(); was = bed(); }},
+    {say: "Clear your spot to win", lit: sp, tone: "ok"},
+    {say: "Par is the fewest moves", els: [$("count")]},
+    {say: "Or tap a cat, then a dot", lit: all, later: true},
+    {say: "One cat, slid again, is one move", lit: all, later: true},
+    {say: "Stuck? Hint shows a cat to move", els: [$("hintBtn")]},
+  ];
+  G.spotlight({grid: $("grid"), w: W, h: H, steps, done});
+}
+
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
+$("helpBtn").onclick = showHelp;
+G.switch({id: "catsTgl", label: "Cats", line: "Cats nap on the bed", key: "cats", of: () => settings, save, change: () => { if (game) draw(); }});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+
+G.nav("bedhog");
+G.checkClock(game);
+G.setupTimer({name: "bedhog", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
+
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+const shared = G.readShare("bedhog");
+const hadSave = !!game;
+if (hadSave) G.reopen(() => {
+    const s = levelSpec(game.level);
+    if (!s || s.W !== game.W || s.H !== game.H || !Array.isArray(game.cats) || !dec(enc(game.cats), game.W, game.H) || !dec(enc(game.start), game.W, game.H)) throw new Error("the saved bed doesn't fit");
+    draw();
+    if (game.won) finishCard(); else helpOnFirstVisit();
+    build.prefetch(settings.level);
+  }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
+else if (!shared) newPuzzle();
+const shareOpts = () => ({name: "Bed Hog", inProgress: !!(game && !game.won && game.history.length), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, {...shareOpts(), fresh: hadSave ? null : why => Promise.resolve(newPuzzle()).then(() => { G.note(why, 6000); })});
+window.addEventListener("hashchange", () => { const d = G.readShare("bedhog"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
