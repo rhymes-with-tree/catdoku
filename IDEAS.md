@@ -38,19 +38,26 @@ picked when it's made). The order puts games that reuse code or art already on t
 games early so Kitten Play can be split. Shelves take turns so the New badge doesn't show the same shelf twice in a
 row, and the games needing new physics or new data come last. Take a game out of this list when it's built.
 
-| # | Game | Shelf | Why here |
-| --- | --- | --- | --- |
-| 1 | Pounce Up | Kitten Play (action) | The second action game, so Kitten Play can be split after it (see `TODO.md`) |
-| 2 | Swap-a-Pom | Cat Spells | Reuses L-M-N-O-Pom's pompoms and Pounce's swap-to-match |
-| 3 | Boing! | Curious Cat | Wind Up's physics plus the owner's spring sheet; builds the spring pieces Yarn Golf needs |
-| 4 | Morning Stretch | Cat Spells | Clues from the Wiktionary lookup (`G.meaning`) Fish Bones and Keyboard Cat already use |
-| 5 | Tape Trap | Cat Logic | A new kind of logic puzzle, so its generator is more work |
-| 6 | Yarn Golf | Curious Cat | Boing!'s springs and Wind Up's physics, plus a flick to shoot |
-| 7 | Cat Flap | Cat Spells | Its puzzle maker has to pair the letters so every row can spell a word |
-| 8 | Warm Seat | Curious Cat | After Bed Hog, to decide whether it's its own game or a mode of Bed Hog |
-| 9 | Paw-ball | Kitten Play (action) | Flippers are moving pieces, which Wind Up's physics doesn't have yet; the hardest to build |
-| 10 | Special Delivery | Curious Cat | The rules for the gifts, routes and dog still need working out |
-| 11 | Scent Trail | Cat Spells | Needs a thesaurus built first (Wiktionary's synonyms or WordNet) |
+| # | Game | Shelf | Model · effort | Why here |
+| --- | --- | --- | --- | --- |
+| 1 | Pounce Up | Kitten Play (action) | Opus · high | The second action game, so Kitten Play can be split after it (see `TODO.md`) |
+| 2 | Swap-a-Pom | Cat Spells | Sonnet · high | Reuses L-M-N-O-Pom's pompoms and Pounce's swap-to-match |
+| 3 | Boing! | Curious Cat | Opus · high | Wind Up's physics plus the owner's spring sheet; builds the spring pieces Yarn Golf needs |
+| 4 | Morning Stretch | Cat Spells | Sonnet · high | Clues from the Wiktionary lookup (`G.meaning`) Fish Bones and Keyboard Cat already use |
+| 5 | Tape Trap | Cat Logic | Opus · high | A new kind of logic puzzle, so its generator is more work |
+| 6 | Yarn Golf | Curious Cat | Opus · high | Boing!'s springs and Wind Up's physics, plus a flick to shoot |
+| 7 | Cat Flap | Cat Spells | Opus · high | Its puzzle maker has to pair the letters so every row can spell a word |
+| 8 | Warm Seat | Curious Cat | Sonnet · high | After Bed Hog, to decide whether it's its own game or a mode of Bed Hog |
+| 9 | Paw-ball | Kitten Play (action) | Opus · high | Flippers are moving pieces, which Wind Up's physics doesn't have yet; the hardest to build |
+| 10 | Special Delivery | Curious Cat | Opus · high | The rules for the gifts, routes and dog still need working out |
+| 11 | Scent Trail | Cat Spells | Opus · high | Needs a thesaurus built first (Wiktionary's synonyms or WordNet) |
+
+Model · effort is a suggestion for the chat that builds the game, not a rule (Sonnet, Opus and Fable are the models;
+effort is low, medium, high, xhigh or max). Sonnet at high suits a game that mostly reuses code and art already on the
+site. Opus at high suits new physics, a new puzzle generator or a game whose rules still need working out. Move up to
+Fable only for the one part Opus gets stuck on (a level solver, flipper collisions, proving a puzzle has one answer);
+max is rarely worth it. Medium is enough for small follow-ups such as tuning a level or fixing a label. Revisit these
+once a few games have been built this way.
 
 Around games 9 to 11, Curious Cat reaches 13 or 14 games: the time to decide on the colour shelf (see `TODO.md`).
 
