@@ -1044,12 +1044,6 @@ const G = (() => {
     try { await fetch(FEEDBACK_FORM + "formResponse", {method: "POST", mode: "no-cors", body, signal: ctl.signal}); }
     finally { clearTimeout(t); }
   }
-  // the same, as the form itself in a new tab, filled in, for when the page can't send it
-  function feedbackFormUrl(f) {
-    const q = new URLSearchParams({usp: "pp_url"});
-    for (const [k, v] of Object.entries(f)) if (FEEDBACK_FIELD[k] && v) q.append(FEEDBACK_FIELD[k], String(v).slice(0, 1500));
-    return FEEDBACK_FORM + "viewform?" + q;
-  }
   function feedbackCard() {
     if (feedbackPage.pause) try { feedbackPage.pause(); } catch (e) {}
     const info = feedbackInfo(), d = feedbackDraft;
@@ -1083,12 +1077,9 @@ const G = (() => {
         Object.assign(d, {kind: "", message: "", contact: ""});
         openCard("Thank you!", f.contact ? "It's on its way. We'll write back if we can." : "It's on its way. Every note helps make the games better.", [["Close", closeCard, true]]);
       } catch (e) {
-        // a real link to the form, filled in (window.open is refused in some places, an artifact preview among them)
-        openCard("It didn't send", window.PREVIEW ? "This preview can't send it from the page. Your note is kept: open the form to send it there."
-          : "It may be the connection. Your note is kept: try again, or send it from the form itself.", [["Try again", feedbackCard, true], ["Cancel", closeCard]]);
-        const link = Object.assign(document.createElement("a"), {className: "btnLink", href: feedbackFormUrl(f), target: "_blank", rel: "noopener", textContent: "Open the form"});
-        link.onclick = () => setTimeout(closeCard, 300);
-        $("card").querySelector(".btns button").after(link);
+        // the note stays in feedbackDraft, so Try again (or Send feedback later) has it all back
+        openCard("It didn't send", window.PREVIEW ? "This preview can't send it: on the site it goes straight to us. Your note is kept."
+          : "It may be the connection. Your note is kept, so you can try again in a moment.", [["Try again", feedbackCard, true], ["Cancel", closeCard]]);
       }
     };
     openCard("Send feedback", `What do you think of ${info.name.replace(/ \(beta\)$/, "")}? Tell us anything: we read every note.`, [["Send", send, true], ["Cancel", closeCard]], box);
