@@ -1252,7 +1252,7 @@ const G = (() => {
     zoomies: ["Arrow keys: pick a square", "Space or Enter: pick a square, then another to join the pair (or part it)", "C: the next line colour", "Escape: let go"],
     crossstitch: ["Arrow keys: pick a square", "Space or Enter: stitch it, or take the stitch out", "X or .: a dot, for a square that stays empty", "Backspace: clear the square", "Shift with an arrow: carry what you put down along the row or column"],
     tango: ["Arrow keys: pick a square", "Space or Enter: tap it (one toy, then the other, then empty)"],
-    pounceup: ["Left and right (or tap): steer, or walk along a shelf", "With Pounce when I tap on: Up, W or Space pounces", "P (or Space): pause"],
+    pounceup: ["Left and right (or tap): steer, or walk along a shelf", "Up, W or Space: pounce (unless Pounce by herself is on)", "P (or Space): pause"],
     pawlinko: ["Setting up: arrows move the next piece, Enter places it, R flips a perch, Space throws", "Left and right: aim (Shift for big steps)", "Down, Space or Enter: knock it off", "X: swap in the next thing", "Placing a perch: arrows move it, R flips it, Enter puts it there", "Winding a strand: arrows pick one, Enter winds it", "Escape: put a helper away"],
   };
   const keyboardish = () => matchMedia("(hover: hover) and (pointer: fine)").matches;
