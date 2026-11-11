@@ -10,7 +10,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-11.7"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-11.8"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-11.7">
+<link rel="stylesheet" href="../games.css?v=2026-11-11.8">
 <style>
 /* Rayla pounces from shelf to shelf up a tall bookcase: tap where she should go and she bounces off every shelf she
    lands on, swatting things off as she goes. Springs throw her higher; lemons, candles and tape she keeps clear of;
@@ -49,6 +49,8 @@
 .tapgo{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;
   font-weight:800;font-size:22px;color:#2A2530;text-shadow:0 2px 0 #fff8;text-align:center;padding:0 16px}
 .tapgo[hidden]{display:none}
+.tapgo{flex-direction:column;gap:12px}
+.tapgo .goal{max-width:86%;padding:6px 14px;border:2px solid #2A2530;border-radius:12px;background:#F7F8F3;font-size:18px;line-height:1.25;text-shadow:none}
 .stage{--aspect:1.333}
 @media (orientation:landscape) and (max-height:500px){body:not(.full) .case{width:100%;min-width:0}}
 .card img.pic{display:block;width:70%;max-width:240px;height:auto;margin:0 auto 14px}
@@ -78,8 +80,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-11.7"></script>
-<script src="../tablethings.js?v=2026-11-11.7"></script>
+<script src="../games.js?v=2026-11-11.8"></script>
+<script src="../tablethings.js?v=2026-11-11.8"></script>
 <script>
 /* ---------- the world ---------- */
 // The bookcase is 300 units across; the window onto it is 400 tall and only ever moves up. y counts up from the floor.
@@ -87,14 +89,42 @@
 const W = 300, VH = 400, SIDE = 10, FT = 30;
 // A pounce clears about 4⅓ feet (a spring about 12½); she lands, crouches a moment (SETTLE seconds), then pounces again.
 const GRAV = 800, POUNCE = 456, SPRING = 780, ZOOM = 650, RUN = 210, SETTLE = .45, WALK = 120;
-const ENDLESS = 11;
+const ENDLESS = 12;
 // Level n: the height of the bookcase in feet, and from which level each new thing turns up
-const GOALS = [null, 40, 55, 70, 90, 110, 135, 160, 190, 220, 260];
-const FROM = {swat: 1, spring: 2, lemon: 3, candle: 4, slide: 5, tape: 6, loose: 7, nip: 8};
+const GOALS = [null, 40, 55, 70, 85, 100, 120, 140, 160, 185, 210, 240];
+const FROM = {swat: 1, spring: 2, lemon: 3, candle: 5, slide: 7, tape: 8, nip: 9, loose: 10};
 const NEW = {swat: "Rayla swats off anything with a gold sparkle: land beside it, or walk into it!", spring: "A spring! Land on it for a big pounce.",
   lemon: "A lemon! Rayla can't stand citrus, so land clear of it.", candle: "A candle! Keep Rayla's whiskers out of the flame.",
   slide: "Some shelves slide from side to side.", tape: "Tape! Rayla won't land on it.",
-  loose: "Cracked shelves give way, so don't land on them!", nip: "Catnip! Grab it for the zoomies."};
+  loose: "Cracked shelves give way, so don't land on them!", nip: "Catnip! Land on it and Rayla rolls around in it… and then who knows!"};
+// Each level's goal, as well as reaching the basket (the owner's idea, 2026-11-11): never the same goal twice, and
+// each about the thing that level brings in, a thing to touch (knock off, springs, fish, glasses of water, catnip) or one
+// not to (lemons, candles, tape, cracked shelves), with a race on the sliding shelves and a tidy climb to finish.
+// A count goal (n) is never more than half of what that bookcase holds (planTask). Touching what a level is about
+// avoiding ends the climb; elsewhere those things just give her a fright. On the tidy level a shelf has at most one thing
+// to knock off, and none beside a lemon, a candle or tape, so there's always somewhere to land clear of it.
+const TASKS = [null, {kind: "knock", n: 5}, {kind: "springs", n: 3}, {kind: "lemons"}, {kind: "fish", n: 8}, {kind: "candles"},
+  {kind: "water", n: 6}, {kind: "time", s: 90}, {kind: "tape"}, {kind: "nip", n: 3}, {kind: "loose"}, {kind: "tidy"}];
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const TASK_TEXT = {
+  knock: t => [`Knock off ${plural(t.n, "thing", "things")} on the way up!`, `knock off ${t.n}`],
+  springs: t => [`Boing! Bounce on ${plural(t.n, "spring", "springs")} on the way up.`, plural(t.n, "spring", "springs")],
+  lemons: () => ["Oh no! So many lemons! Don't touch a single one.", "so many lemons!"],
+  fish: t => [`Get ${plural(t.n, "fish treat", "fish treats")} on the way up!`, `${t.n} fish`],
+  candles: () => ["Candles everywhere! Keep Rayla's whiskers out of every flame.", "mind the candles"],
+  water: t => [`Splash! Knock over ${plural(t.n, "glass", "glasses")} of water.`, `${plural(t.n, "glass", "glasses")} of water`],
+  time: t => [`Quick! Reach the basket in ${t.s} seconds.`, `under ${t.s} s`],
+  tape: () => ["Tape everywhere! Don't let Rayla touch any.", "avoid the tape"],
+  nip: t => [`Catnip! Roll in it ${plural(t.n, "time", "times")} on the way up.`, `roll in catnip ${plural(t.n, "time", "times")}`],
+  loose: () => ["Cracked shelves! Don't land on a single one.", "no cracked shelves"],
+  tidy: () => ["Shh! Don't knock anything off.", "knock nothing off"],
+};
+const taskLine = t => t ? TASK_TEXT[t.kind](t)[0] : "";
+const taskShort = t => t ? TASK_TEXT[t.kind](t)[1] : "";
+// the count goals: what's counted, and what it's called on the card at the basket
+const COUNTED = {knock: ["knocked", "things to knock off", "Not enough knocked off!"], fish: ["fish", "fish treats", "Not enough fish!"],
+  water: ["water", "glasses of water", "Not enough splashes!"], springs: ["springs", "springs", "Not enough boings!"],
+  nip: ["nips", "rolls in catnip", "Not enough catnip!"]};
 const levelName = n => n === ENDLESS ? "Endless" : `Level ${n} · ${GOALS[n]} ft`;
 const has = (n, f) => n === ENDLESS || n >= FROM[f];
 
@@ -143,7 +173,7 @@ function rand(g) { let t = g.r = (g.r + 0x6D2B79F5) >>> 0; t = Math.imul(t ^ t >
 // little harder on the way up; Endless gets harder all the way to 450 ft.
 function hardness(g, y) {
   if (g.level === ENDLESS) return Math.min(1, y / (450 * FT));
-  return Math.min(1, (g.level - 1) / 9 * .82 + y / (GOALS[g.level] * FT) * .16);
+  return Math.min(1, (g.level - 1) / (ENDLESS - 2) * .82 + y / (GOALS[g.level] * FT) * .16);
 }
 // Shelves are made a little ahead of the window. Every shelf on the way up can be reached from the one below (the
 // gap is never more than 3½ feet, and a pounce clears 4⅓), and always has room to land clear of a lemon, a
@@ -166,13 +196,15 @@ function build(g, upto) {
     // one end of the shelf may have something in the way: a lemon, a lit candle or a strip of tape
     const end = R() < .5 ? -1 : 1, hz = R();
     let busy = 0;   // how far in from the end that's taken
-    if (w >= 74 && has(g.level, "lemon") && hz < .07 + .06 * d) { s.things.push({k: "l", dx: end * (w / 2 - 16)}); busy = 32; }
-    else if (w >= 74 && has(g.level, "candle") && hz < .16 + .1 * d) { s.things.push({k: "c", dx: end * (w / 2 - 12)}); busy = 24; }
-    else if (w >= 80 && has(g.level, "tape") && hz < .25 + .1 * d) { const tw = Math.round(28 + R() * 10); s.tape = {dx: end * (w / 2 - tw / 2 - 2), w: tw}; busy = tw + 4; }
-    if (R() < .1 && has(g.level, "spring")) s.spring = Math.round(-end * (R() * (w / 2 - busy - 14)));
+    const k = kindOf(g);   // a level about one of them has far more of it
+    if (w >= 74 && has(g.level, "lemon") && hz < (k === "lemons" ? .5 : .07 + .06 * d)) { s.things.push({k: "l", dx: end * (w / 2 - 16)}); busy = 32; }
+    else if (w >= 74 && has(g.level, "candle") && hz < (k === "candles" ? .4 : .16 + .1 * d)) { s.things.push({k: "c", dx: end * (w / 2 - 12)}); busy = 24; }
+    else if (w >= 80 && has(g.level, "tape") && hz < (k === "tape" ? .6 : .25 + .1 * d)) { const tw = Math.round(28 + R() * 10); s.tape = {dx: end * (w / 2 - tw / 2 - 2), w: tw}; busy = tw + 4; }
+    if (R() < (k === "springs" ? .4 : .1) && has(g.level, "spring")) s.spring = Math.round(-end * (R() * (w / 2 - busy - 14)));
     // at the other end, things to swat off (or a pile of books, which won't budge) and books standing up
-    if (R() < .6) s.things.push({k: pick(SWATS), dx: -end * (w / 2 - 14)});
-    if (busy === 0 && w >= 90 && R() < .35) s.things.push({k: pick(SWATS), dx: end * (w / 2 - 14)});
+    const tidy = k === "tidy", swatK = () => k === "water" && R() < .6 ? "g" : pick(SWATS);   // the splash level: mostly glasses of water
+    if (R() < .6 && !(tidy && busy)) s.things.push({k: swatK(), dx: -end * (w / 2 - 14)});
+    if (busy === 0 && w >= 90 && R() < .35 && !tidy) s.things.push({k: swatK(), dx: end * (w / 2 - 14)});
     else if (busy === 0 && R() < .5) {
       const n = 1 + Math.floor(R() * 4); let at = w / 2 - 4;
       s.books = [];
@@ -181,13 +213,26 @@ function build(g, upto) {
     g.shelves.push(s);
     // in between: a cracked shelf that gives way, or (low down, on the easy levels) a spare shelf to help
     const mid = (g.genY + y) / 2, mw = Math.round(60 + R() * 30), mx = SIDE + mw / 2 + R() * (W - 2 * SIDE - mw);
-    if (has(g.level, "loose") && R() < .15 + .2 * d && Math.abs(mx - s.x) > 40) g.shelves.push({id: g.n++, kind: "loose", x: mx, y: mid, w: mw, things: []});
+    if (has(g.level, "loose") && R() < (k === "loose" ? .45 : .15 + .2 * d) && Math.abs(mx - s.x) > 40) g.shelves.push({id: g.n++, kind: "loose", x: mx, y: mid, w: mw, things: []});
     else if (R() < .35 * (1 - d) && Math.abs(mx - s.x) > 60) g.shelves.push({id: g.n++, kind: "plain", x: mx, y: mid, w: mw, things: R() < .5 ? [{k: pick(SWATS), dx: (R() < .5 ? -1 : 1) * (mw / 2 - 14)}] : []});
-    // fish treats to pick up, and now and then a sprig of catnip
-    if (R() < .3) g.items.push({kind: "fish", x: Math.max(SIDE + 14, Math.min(W - SIDE - 14, s.x + (R() - .5) * 60)), y: y + 50 + R() * 40});
-    else if (has(g.level, "nip") && R() < .03) g.items.push({kind: "nip", x: s.x, y: y + 60});
+    // fish treats to pick up, and now and then a sprig of catnip lying on a shelf (not a sliding one), in the middle
+    if (R() < (k === "fish" ? .55 : .3)) g.items.push({kind: "fish", x: Math.max(SIDE + 14, Math.min(W - SIDE - 14, s.x + (R() - .5) * 60)), y: y + 50 + R() * 40});
+    else if (has(g.level, "nip") && s.kind === "plain" && R() < (k === "nip" ? .4 : .04)) g.items.push({kind: "nip", x: s.x, y: y + 17});
     g.genY = y;
   }
+}
+const kindOf = g => TASKS[g.level] && TASKS[g.level].kind;
+// A level's goal for this bookcase: a knock or fish goal is cut to half of what this one holds (built ahead
+// from the same seed, so it's the same bookcase)
+function planTask(n, seed) {
+  const t = TASKS[n]; if (!t) return null;
+  if (!COUNTED[t.kind]) return {...t};
+  const sim = {level: n, r: seed, n: 0, genY: 0, done: false, shelves: [], items: []};
+  build(sim, Infinity);
+  const have = t.kind === "fish" || t.kind === "nip" ? sim.items.filter(it => it.kind === t.kind).length
+    : t.kind === "springs" ? sim.shelves.filter(s => s.spring != null).length
+    : sim.shelves.reduce((a, s) => a + s.things.filter(x => t.kind === "water" ? x.k === "g" : SWATS.includes(x.k)).length, 0);
+  return {...t, n: Math.max(1, Math.min(t.n, Math.floor(have * .5)))};
 }
 // Where a shelf is now (the sliding ones go to and fro)
 const shelfX = (g, s) => s.kind === "slide" ? s.x + s.range * Math.sin(s.phase + g.t * s.speed / s.range) : s.x;
@@ -204,32 +249,47 @@ let game = null;
 G.pawLost(() => !game || game.level === ENDLESS || !!settings.tries[game.level]);
 const save = () => G.save(STORE, {settings});
 const slow = G.slower("pounceup");
-// Pounce when I tap: Rayla waits crouched on each shelf until you tap, then pounces towards the tap (springs still
-// throw her up at once). Off, she pounces by herself each time she lands.
-const tapMode = () => !!settings.tapPounce;
-G.switch({id: "tapTgl", label: "Pounce when I tap", line: "Rayla waits on each shelf until you tap where she should go", key: "tapPounce", of: settings, save,
-  change: on => { if (game) game.cat.queued = false; G.note(on ? "Rayla waits on each shelf now: tap where she should pounce." : "Rayla pounces by herself again.", 3500); }});
+// Rayla waits crouched on each shelf until you tap, then pounces towards the tap (springs still throw her up at once):
+// the way she plays unless Pounce by herself is on (the owner's choice, 2026-11-11), when she pounces again each time
+// she lands. (Before, tapping was a switch, Pounce when I tap, and off at first.)
+const tapMode = () => !settings.autoPounce;
+G.switch({id: "tapTgl", label: "Pounce by herself", line: "Rayla pounces again by herself each time she lands, without waiting for a tap", key: "autoPounce", of: settings, save,
+  change: on => { if (game) game.cat.queued = false; G.note(on ? "Rayla pounces by herself now: steer her where to land." : "Rayla waits on each shelf again: tap where she should pounce.", 3500); }});
 
 function newRun(n, seed) {
   seed = seed >>> 0 || Math.floor(Math.random() * 4294967295) >>> 0;
   game = {level: n, seed, r: seed, n: 0, t: 0, genY: 0, done: false,
     shelves: [{id: -1, kind: "floor", x: W / 2, y: 0, w: W, things: []}], items: [], falling: [],
     cat: {x: W / 2, y: 0, vx: 0, vy: 0, face: -1, landed: -1, on: null, off: 0, settle: 0, scared: 0, zoom: 0},
-    cam: -40, top: 0, fish: 0, knocked: 0, seenNew: {}, state: "ready", ...G.freshClock()};
+    cam: -40, top: 0, fish: 0, knocked: 0, water: 0, springs: 0, nips: 0, seenNew: {}, state: "ready", task: planTask(n, seed), ...G.freshClock()};
   if (n === ENDLESS) game.timed = false;
   build(game, VH + 200);
   aim = null; keys.l = keys.r = false;
-  showTap("Tap to start pouncing");
+  showTap("Tap to start pouncing", taskLine(game.task));
   status(); paint();
 }
-function showTap(t) { $("tapgo").hidden = !t; $("tapgo").textContent = t || ""; }
-const FISH_ICON = `<img src="${FISH}" alt="">`, MUG_ICON = `<img src="${thingSrc("m")}" alt="">`;
+// the words over the bookcase (and, before the climb, the level's goal in a box above them)
+function showTap(t, goal) {
+  const el = $("tapgo"); el.hidden = !t; el.textContent = "";
+  if (goal) el.append(Object.assign(document.createElement("span"), {className: "goal", textContent: goal}));
+  if (t) el.append(Object.assign(document.createElement("span"), {textContent: t}));
+}
+const FISH_ICON = `<img src="${FISH}" alt="">`, MUG_ICON = `<img src="${thingSrc("m")}" alt="">`, GLASS_ICON = `<img src="${thingSrc("g")}" alt="">`,
+  SPRING_ICON = `<img src="${SPRING_PIC}" alt="">`, NIP_ICON = `<img src="${NIP.src}" alt="">`;
 function status() {
   const goal = game.level === ENDLESS ? 0 : GOALS[game.level], ft = Math.min(goal || Infinity, Math.floor(game.top / FT));
+  const t = game.task, k = t && t.kind, left = k === "time" ? Math.max(0, Math.ceil(t.s - game.t)) : 0;
+  // the fish and knock-offs as they are, the goal's count as a fraction, or the seconds left
+  const of = kind => k === kind ? `/${t.n}` : "";
+  const goalIcon = {water: GLASS_ICON, springs: SPRING_ICON, nip: NIP_ICON}[k];
   $("count").innerHTML = `<b>${ft}</b>${goal ? ` of ${goal}` : ""} ft` +
-    (game.fish ? `<span class="sep"></span>${FISH_ICON}${game.fish}` : "") + (game.knocked ? `<span class="sep"></span>${MUG_ICON}${game.knocked}` : "") +
-    (!goal && settings.best ? `<span class="sep"></span>best ${settings.best}` : "");
-  $("count").setAttribute("aria-label", `${ft}${goal ? ` of ${goal}` : ""} feet up, ${game.fish} fish treats, ${game.knocked} things knocked off`);
+    (game.fish || k === "fish" ? `<span class="sep"></span>${FISH_ICON}${game.fish}${of("fish")}` : "") +
+    (game.knocked || k === "knock" ? `<span class="sep"></span>${MUG_ICON}${game.knocked}${of("knock")}` : "") +
+    (goalIcon ? `<span class="sep"></span>${goalIcon}${game[COUNTED[k][0]]}/${t.n}` : "") +
+    (k === "time" ? `<span class="sep"></span>${left}s left` : "") + (!goal && settings.best ? `<span class="sep"></span>best ${settings.best}` : "");
+  $("count").setAttribute("aria-label", `${ft}${goal ? ` of ${goal}` : ""} feet up, ${game.fish}${of("fish").replace("/", " of ")} fish treats, ` +
+    `${game.knocked}${of("knock").replace("/", " of ")} things knocked off` + (goalIcon ? `, ${game[COUNTED[k][0]]} of ${t.n} ${COUNTED[k][1]}` : "") +
+    (k === "time" ? `, ${left} seconds left` : ""));
   G.relabel($("pauseBtn"), game.state === "paused" ? "Go on" : "Pause", game.state === "paused" ? "play" : "pause");
   $("pauseBtn").disabled = !["running", "paused"].includes(game.state);
 }
@@ -286,16 +346,17 @@ function walk(s, dir, h) {
 // A swat: the thing slides off the end of the shelf, away from her, and falls (a crash far below).
 function swat(s, sx, t) {
   const g = game, c = g.cat, away = Math.sign(sx + t.dx - c.x) || (t.dx < 0 ? -1 : 1);
-  t.off = true; g.knocked++;
+  t.off = true; g.knocked++; if (t.k === "g") g.water++;
   g.falling.push({k: t.k, x: sx + t.dx, y: s.y, vx: away * (140 + 60 * Math.random()), vy: 180, a: 0, spin: away * (4 + 4 * Math.random())});
   c.face = away; status();
+  if (kindOf(g) === "tidy") missed("Crash!", "Rayla knocked something off, and on this bookcase she mustn't knock anything off.");
 }
 function step(h) {
   const g = game, c = g.cat;
   g.t += h;
   const dir = (keys.r ? 1 : 0) - (keys.l ? 1 : 0);
   const on = c.on != null && g.shelves.find(s => s.id === c.on);
-  if (on) { walk(on, dir, h); if (c.on == null) return; }
+  if (on && !c.roll) { walk(on, dir, h); if (c.on == null) return; }   // no walking off mid-roll
   if (c.scared > 0) c.scared -= h;
   else if (dir) { c.vx = Math.max(-RUN, Math.min(RUN, c.vx + dir * 2600 * h)); aim = null; }
   else if (aim != null) {
@@ -314,7 +375,11 @@ function step(h) {
   for (const f of g.falling) { f.vy -= GRAV * h; f.x += f.vx * h; f.y += f.vy * h; f.a += f.spin * h; if (!f.crash && f.y < g.cam - 20) { f.crash = g.t; f.cx = f.x; } }
   if (g.falling.length > 12) g.falling = g.falling.filter(f => !f.crash || g.t - f.crash < .5);
   if (g.state === "ready") { c.y = 0; c.vy = 0; noticeNew(); return; }   // crouched on the floor, waiting to pounce
-  if (on) {   // then up she goes (not while she's walking)
+  if (on && c.roll > 0) {   // rolling about in catnip, then whatever the catnip decides
+    c.y = on.y; c.vy = 0; c.roll -= h; c.settle = Math.max(c.settle, .05);
+    if (c.roll <= 0) catnipDice();
+  }
+  if (on && c.on != null) {   // then up she goes (not while she's walking)
     c.y = on.y; c.vy = 0; c.settle -= h;
     if (c.walking) c.settle = Math.max(c.settle, tapMode() ? 0 : SETTLE);
     if (c.settle <= 0 && (!tapMode() || c.queued)) { c.on = null; c.vy = POUNCE; c.queued = false; }
@@ -334,39 +399,72 @@ function step(h) {
     if (s.gone || !s.things.length || Math.abs(s.y - c.y) > 60) continue;
     const sx = shelfX(g, s);
     for (const t of s.things) if (t.k === "c" && Math.abs(sx + t.dx - c.x) < 14 && c.y < s.y + .74 * THING_SIZE.c && c.y + 26 > s.y + .5 * THING_SIZE.c) {
-      fright(c.x < sx + t.dx ? -1 : 1, 345, 250, .6, "Yowl! Too close to the candle!", "candle"); break;
+      fright(c.x < sx + t.dx ? -1 : 1, 345, 250, .6, "Yowl! Too close to the candle!", "candle");
+      if (kindOf(g) === "candles") missed("Too hot!", "Rayla's whiskers got too close to a candle flame, and on this bookcase she must keep clear of every one.");
+      break;
     }
   }
   // picking things up
-  for (const it of g.items) if (!it.got && Math.abs(it.x - c.x) < 22 && Math.abs(it.y - (c.y + 18)) < 26) {
+  for (const it of g.items) if (!it.got && Math.abs(it.x - c.x) < 22 && Math.abs(it.y - (c.y + 18)) < 26 && (it.kind === "fish" || (c.on != null && !c.roll))) {
     it.got = g.t;
     if (it.kind === "fish") { g.fish++; status(); }
-    else { c.zoom = 1.4; c.scared = 0; c.on = null; G.note("Zoomies!", 1500); }
+    else { c.roll = 1.3; c.walking = false; c.walkTo = null; aim = null; g.nips++; status(); G.note("Rolling in the catnip…", 1400); }   // see catnipDice
   }
   // the window follows her up, never down
   g.cam = Math.max(g.cam, g.cam + (c.y - VH * .42 - g.cam) * Math.min(1, h * 9));
   if (g.level !== ENDLESS) g.cam = Math.min(g.cam, GOALS[g.level] * FT - 120);   // and stops with the top of the bookcase in view
   if (c.y > g.top) { const before = Math.floor(g.top / FT); g.top = c.y; if (Math.floor(g.top / FT) !== before) status(); }
   if (c.y < g.cam - 60) fell();
+  if (g.task && g.task.kind === "time" && g.state === "running") {
+    if (g.t >= g.task.s) missed("Too slow!", `Rayla didn't reach the basket in ${g.task.s} seconds.`);
+    else if (Math.ceil(g.task.s - g.t) !== g.shownLeft) { g.shownLeft = Math.ceil(g.task.s - g.t); status(); }
+  }
   // shelves and things left far below are put away; new ones are made above
   if (g.shelves.length > 60) g.shelves = g.shelves.filter(s => s.y > g.cam - 200);
   if (g.items.length > 30) g.items = g.items.filter(it => it.y > g.cam - 200);
   build(g, g.cam + VH + 200);
   noticeNew();
 }
+// After a roll in the catnip, a dice roll: now and then she's just too mellow to bother; mostly the zoomies, straight
+// up; and once in a while ZOOMIES, much higher.
+function catnipDice() {
+  const c = game.cat, r = Math.random();
+  c.roll = 0;
+  if (r < .2) { G.note("Ahh… Rayla's too mellow for zoomies.", 2000); return; }
+  c.on = null; c.scared = 0; c.zoom = r < .8 ? .9 + Math.random() * .7 : 2.4;
+  G.note(r < .8 ? "Zoomies!" : "ZOOOOOOMIES!", 1600);
+}
 // What happens on landing: returns true if she stays on this shelf (a cracked one gives way under her).
 function land(s, sx) {
   const g = game, c = g.cat;
-  if (s.kind === "loose") { s.gone = g.t; g.cause = "loose"; return false; }
+  if (s.kind === "loose") {
+    s.gone = g.t; g.cause = "loose";
+    if (kindOf(g) === "loose") missed("Crack!", "Rayla landed on a cracked shelf, and on this bookcase she mustn't land on a single one.");
+    return false;
+  }
   c.y = s.y; c.landed = g.t;
-  if (s.kind === "top") { win(); return true; }
+  if (s.kind === "top") {
+    const t = g.task, n = t && COUNTED[t.kind], short = n && g[n[0]] < t.n;
+    if (short) missed(n[2], `Rayla made it to the basket with ${g[n[0]]} of the ${t.n} ${n[1]}.`, true);
+    else win();
+    return true;
+  }
   const lemon = s.things.find(t => t.k === "l" && Math.abs(c.x - (sx + t.dx)) < 26);
-  if (lemon) { fright(c.x < sx + lemon.dx ? -1 : 1, 395, 270, .6, "Ew, citrus!", "lemon"); return true; }
-  if (s.tape && Math.abs(c.x - (sx + s.tape.dx)) < s.tape.w / 2 + 6) { fright(c.x < sx + s.tape.dx ? -1 : 1, 270, 220, .45, "Sticky paws!", "tape"); return true; }
+  if (lemon) {
+    fright(c.x < sx + lemon.dx ? -1 : 1, 395, 270, .6, "Ew, citrus!", "lemon");
+    if (kindOf(g) === "lemons") missed("Ew, citrus!", "Rayla touched a lemon, and on this bookcase she mustn't touch a single one.");
+    return true;
+  }
+  if (s.tape && Math.abs(c.x - (sx + s.tape.dx)) < s.tape.w / 2 + 6) {
+    fright(c.x < sx + s.tape.dx ? -1 : 1, 270, 220, .45, "Sticky paws!", "tape");
+    if (kindOf(g) === "tape") missed("Sticky paws!", "Rayla touched tape, and on this bookcase she mustn't touch any.");
+    return true;
+  }
   g.cause = null;   // a good landing
   // a swat at anything in reach
-  for (const t of s.things) if (!t.off && SWATS.includes(t.k) && Math.abs(sx + t.dx - c.x) < 38) swat(s, sx, t);
-  if (s.spring != null && Math.abs(c.x - (sx + s.spring)) < 16) { c.vy = SPRING; s.boing = g.t; return true; }
+  const reach = kindOf(g) === "tidy" ? 26 : 38;   // on a tidy level, only what she lands right beside
+  for (const t of s.things) if (g.state === "running" && !t.off && SWATS.includes(t.k) && Math.abs(sx + t.dx - c.x) < reach) swat(s, sx, t);
+  if (s.spring != null && Math.abs(c.x - (sx + s.spring)) < 16) { c.vy = SPRING; s.boing = g.t; g.springs++; status(); return true; }
   c.vy = 0; c.on = s.id; c.off = c.x - sx; c.settle = tapMode() ? .2 : SETTLE; c.queued = false; c.walkTo = null; c.walking = false;
   return true;
 }
@@ -459,7 +557,7 @@ function paint() {
   for (const it of g.items) {
     if (it.y < cam - 30 || it.y > cam + VH + 30) continue;
     const gone = it.got ? (g.t - it.got) / .3 : 0; if (gone >= 1) continue;
-    const im = it.kind === "fish" ? pic(FISH) : NIP, s = (it.kind === "fish" ? 26 : 34) * (1 + gone * .6), bob = Math.sin(g.t * 3 + it.x) * 3;
+    const im = it.kind === "fish" ? pic(FISH) : NIP, s = (it.kind === "fish" ? 26 : 34) * (1 + gone * .6), bob = it.kind === "fish" ? Math.sin(g.t * 3 + it.x) * 3 : 0;
     if (ready(im)) { ctx.save(); ctx.globalAlpha = 1 - gone; ctx.translate(it.x, it.y + bob + gone * 20); ctx.scale(1, -1); ctx.drawImage(im, -s / 2, -s / 2, s, s); ctx.restore(); }
   }
   // things swatted off, tumbling down; a crash at the bottom as each one goes
@@ -552,6 +650,7 @@ function basket(x, y) {
 function cat() {
   const g = game, c = g.cat, right = c.face > 0;
   if (g.state === "ready") return rayla("low", c.x, c.y, 1, 0, 0, right);
+  if (c.roll > 0) return rayla("low", c.x, c.y + 6, 1, .25, Math.sin(g.t * 13) * .7, Math.sin(g.t * 6.5) > 0);   // rolling in catnip
   if (c.scared > 0) return rayla("startled", c.x, c.y - 2, .85, 0, Math.sin(g.t * 30) * .12, right);
   if (c.zoom > 0) return rayla("bound", c.x, c.y + 20, 1, .5, 1.25, right);
   if (c.on != null && c.walking) return rayla("low", c.x, c.y, 1, 0, 0, right);
@@ -598,7 +697,7 @@ addEventListener("keydown", e => {
     e.preventDefault(); keys[KEY[e.key]] = true;
     if (game.state === "paused") resume(); else if (game.state === "ready" && !spot) start();
   } else if (tapMode() && ["ArrowUp", " ", "w", "W"].includes(e.key) && !spot && ["ready", "running"].includes(game.state)) {
-    e.preventDefault();   // with Pounce when I tap on, Up, W or Space pounces (P pauses)
+    e.preventDefault();   // waiting for a tap (Pounce by herself off), Up, W or Space pounces (P pauses)
     if (game.state === "ready") start(); else if (game.cat.on != null) game.cat.queued = true;
   } else if ((e.key === " " || e.key === "p" || e.key === "P") && !spot) {
     if (game.state === "ready" && e.key === " ") { e.preventDefault(); start(); }
@@ -625,16 +724,27 @@ function fell() {
     text = `${safe} She climbed ${ft} ft${got.length ? `, with ${G.listed(got)}` : ""}.` + (best ? "" : ` Your best is ${settings.best} ft.`);
     G.track(`Pounce Up Endless fell at ${Math.floor(ft / 50) * 50} ft`);
   } else {
-    G.breakStreak();
-    settings.tries[g.level] = (settings.tries[g.level] || 0) + 1;
     text = `${safe} She got ${ft} ft up, ${GOALS[g.level] - ft} ft short of the basket.`;
     G.track(`Pounce Up fell on level ${g.level}`);
   }
+  lost(g, title, text);
+}
+// The level's goal missed (something knocked off on a tidy level, a lemon touched, out of time, or too few fish or
+// knock-offs at the basket): the climb ends there, as a miss does.
+function missed(title, text, atTop) {
+  const g = game; if (g.state !== "running") return;
+  g.state = "fell"; g.cat.vx = 0; status();
+  G.track(`Pounce Up missed the goal on level ${g.level}`);
+  lost(g, title, `${text} ${atTop ? "So close!" : `She got ${Math.floor(g.top / FT)} ft up.`}`, atTop);
+}
+function lost(g, title, text, atTop) {
+  if (g.level !== ENDLESS) { G.breakStreak(); settings.tries[g.level] = (settings.tries[g.level] || 0) + 1; }
   save();
   setTimeout(() => {
     if (game !== g) return;
     G.loseCard(title, text, [["Try again", () => { G.closeCard(); newRun(g.level, g.seed); }, true], ["New bookcase", () => { G.closeCard(); newRun(g.level); }], G.homeBtn()],
-      Object.assign(catPic(RAYLA.feet, "Rayla, standing safe on all four paws"), {className: "pic feet"}), G.otherSize($("levelSel"), g.level, startLevel, "Or play a different level:"), {result: {n: g.level}});
+      atTop ? catPic(RAYLA.basket, "Rayla curled up in her basket") : Object.assign(catPic(RAYLA.feet, "Rayla, standing safe on all four paws"), {className: "pic feet"}),
+      G.otherSize($("levelSel"), g.level, startLevel, "Or play a different level:"), {result: {n: g.level}});
   }, 600);
 }
 function win() {
@@ -644,7 +754,10 @@ function win() {
   G.track(`Pounce Up won level ${g.level}`);
   setTimeout(() => {
     if (game !== g) return;
-    const text = `Rayla made it to the basket, ${GOALS[g.level]} ft up${got.length ? `, with ${G.listed(got)}` : ""}.` +
+    const met = !g.task ? "" : g.task.kind === "time" ? ` In ${Math.floor(g.t)} seconds, with ${Math.ceil(g.task.s - g.t)} to spare!`
+      : {tidy: " And she didn't knock a thing off!", lemons: " And not a lemon touched!", candles: " And not a whisker singed!",
+         tape: " And not one sticky paw!", loose: " And not one cracked shelf!"}[g.task.kind] || "";
+    const text = `Rayla made it to the basket, ${GOALS[g.level]} ft up${got.length ? `, with ${G.listed(got)}` : ""}.${met}` +
       (g.level === ENDLESS - 1 ? " That's the tallest bookcase; try Endless next!" : ` Next up: level ${next}.`);
     G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the view", g.result,
       {title: "Made it!", gold: first, goldWhy: "First try!", goldTitle: "What a pounce, Rayla!", goldPic: [catPic(RAYLA.leap, "Rayla in mid-leap")],
@@ -661,8 +774,8 @@ $("newBtn").onclick = () => { if (game) { leaveRun(); newRun(game.level); } };
 $("linkBtn").onclick = () => { if (game) { pause(); G.shareCard({name: "Pounce Up", what: "bookcase", won: game.state === "won", puzzle: () => ({g: "pounceup", N: game.level, s: game.seed})}); } };
 // Send feedback (games.js): what's sent about the climb in play, with a link to this bookcase
 G.feedbackFor({pause, share: () => game && {g: "pounceup", N: game.level, s: game.seed},
-  details: () => game ? [levelName(game.level), `${game.state}, ${Math.floor(game.top / FT)} ft up`, `${game.fish} fish, ${game.knocked} knocked off`,
-    `Pounce when I tap ${tapMode() ? "on" : "off"}`, `Slower ${slow() > 1 ? "on" : "off"}`].join(" · ") : ""});
+  details: () => game ? [levelName(game.level), game.task ? `goal: ${taskShort(game.task)}` : "", `${game.state}, ${Math.floor(game.top / FT)} ft up`, `${game.fish} fish, ${game.knocked} knocked off`,
+    `Pounce by herself ${tapMode() ? "off" : "on"}`, `Slower ${slow() > 1 ? "on" : "off"}`].filter(Boolean).join(" · ") : ""});
 function openShared(d) {
   const n = +d.N, s = +d.s;
   if (!(n >= 1 && n <= ENDLESS) || !(s > 0 && s < 4294967296)) throw new Error("the shared bookcase doesn't fit the game");
@@ -713,7 +826,7 @@ setInterval(() => {
 }, 500);
 
 /* ---------- start ---------- */
-for (let n = 1; n <= ENDLESS; n++) $("levelSel").append(new Option(n === ENDLESS ? "Endless" : `${n} · ${GOALS[n]} ft${n === ENDLESS - 1 ? " (hardest)" : ""}`, n));
+for (let n = 1; n <= ENDLESS; n++) $("levelSel").append(new Option(n === ENDLESS ? "Endless" : `${n} · ${GOALS[n]} ft, ${taskShort(TASKS[n])}`, n));
 $("levelSel").onchange = e => { startLevel(+e.target.value); $("levelSel").blur(); };
 G.nav("pounceup");
 G.setupTimer({name: "pounceup", game: () => game, playing: g => g.state === "running", save, label: levelName, noun: "level",
