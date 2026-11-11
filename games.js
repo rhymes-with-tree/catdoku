@@ -308,6 +308,13 @@ const G = (() => {
     for (const opt of document.querySelectorAll("main .bar .opt")) if (!opt.closest(".card,.overlay")) setList.append(opt);
     for (const bar of document.querySelectorAll("main .bar.toggles")) if (!bar.children.length) bar.remove();
     menu.append(setList, allSet);
+    if (feedbackHere(current)) item("chat", "Send feedback", () => feedbackCard(), beta ? "It's in beta: tell us what you think" : "Tell us what you think");
+    const betaTag = beta && head.querySelector(".title .beta");
+    if (betaTag) {   // the Beta label beside the title opens the feedback card too
+      const b = document.createElement("button"); b.type = "button"; b.className = "beta betaBtn"; b.textContent = betaTag.textContent;
+      b.title = "In beta: things may change. Tap to tell us what you think"; b.setAttribute("aria-label", "Beta: send feedback");
+      b.onclick = () => feedbackCard(); betaTag.replaceWith(b);
+    }
     head.append(menu);
 
     function sync() {
@@ -991,6 +998,100 @@ const G = (() => {
       ...(o.progress ? [[won ? "Share my solved board" : "Share with my progress", () => send(Object.assign(o.puzzle(), {p: o.progress()}), "with progress")]] : []),
       ["Cancel", closeCard],
     ]);
+  }
+
+  /* ---------- feedback ---------- */
+  // Send feedback (2026-11-11: the beta games first, then every game the same day): a card to tell us what you think,
+  // from the game's menu (and the Beta label beside a beta game's title). It's sent from the page to the owner's Google Form, whose
+  // answers land in a Google Sheet, so the player stays in the game. Sent with it, to help put things right: the game,
+  // the build, what the page says about the game in play (feedbackFor), a link to this puzzle, the screen and the
+  // browser. Nothing else about the player, and nothing at all until they press Send. The form's questions are all
+  // text and none is required; the Extra ones carry the build, the device and the link.
+  const FEEDBACK_FORM = "https://docs.google.com/forms/d/e/1FAIpQLSd8Jj91hpbI2jH0R23oWbV-CZLogoxftmUdeb25Qmqe8cLryQ/";
+  const FEEDBACK_FIELD = {kind: "entry.1677249528", message: "entry.353537297", game: "entry.278349968", details: "entry.1788484241",
+    contact: "entry.1215492194", build: "entry.1018258034", device: "entry.1596067276", link: "entry.1931990482"};
+  const FEEDBACK_KINDS = ["Love it", "Too hard", "Too easy", "Confusing", "Something's broken", "An idea"];
+  // where it's offered: every game (false would keep it to the games in beta)
+  const FEEDBACK_EVERYWHERE = true;
+  const feedbackHere = slug => FEEDBACK_EVERYWHERE || BETA.some(g => g[1] === slug);
+  // the page's part: {details() (a line about the game in play: level, settings…), share() (the share link's data for
+  // this puzzle, or null), pause()}
+  let feedbackPage = {};
+  const feedbackFor = o => { feedbackPage = o || {}; };
+  const feedbackDraft = {kind: "", message: "", contact: ""};
+  function feedbackInfo() {
+    const slug = CURRENT, name = (rowOf(slug) || [document.querySelector("header h1") ? document.querySelector("header h1").textContent : slug])[0];
+    const sel = $("levelSel") || $("size");
+    let details = "";
+    try {   // the page's own line, else its level or size picker's choice
+      details = feedbackPage.details ? feedbackPage.details() : sel && sel.selectedOptions[0] ? `${sel.id === "size" ? "Size" : "Level"} ${sel.selectedOptions[0].textContent.replace(/^(Level|Size)\s*/i, "")}` : "";
+    } catch (e) {}
+    let link = location.origin + location.pathname, puzzle = false;
+    try { const d = feedbackPage.share && feedbackPage.share(); if (d) { link = shareUrl(d); puzzle = true; } } catch (e) {}
+    const mm = q => matchMedia(q).matches;
+    const device = [`${innerWidth} × ${innerHeight}`, `${devicePixelRatio}×`, mm("(prefers-color-scheme: dark)") ? "dark" : "light",
+      mm("(pointer: coarse)") ? "touch" : "mouse", document.documentElement.classList.contains("bigText") ? "big text" : "",
+      sideways() ? "sideways" : "", navigator.userAgent].filter(Boolean).join(" · ");
+    // the build: the page's BUILD, or (on the older pages, which don't share it) the ?v= that loaded games.js
+    const v = document.querySelector('script[src*="games.js?v="]'), build = window.SITE_BUILD || (v ? v.getAttribute("src").split("?v=")[1] : "");
+    return {slug, name: BETA.some(g => g[1] === slug) ? `${name} (beta)` : name, details, link, puzzle, device, build};
+  }
+  // post it to the form; resolves once it's gone (the form doesn't say whether it took it), rejects if it couldn't go
+  async function sendFeedback(f) {
+    const body = new URLSearchParams();
+    for (const [k, v] of Object.entries(f)) if (FEEDBACK_FIELD[k] && v) body.append(FEEDBACK_FIELD[k], String(v).slice(0, 4000));
+    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 12000);
+    try { await fetch(FEEDBACK_FORM + "formResponse", {method: "POST", mode: "no-cors", body, signal: ctl.signal}); }
+    finally { clearTimeout(t); }
+  }
+  // the same, as the form itself in a new tab, filled in, for when the page can't send it
+  function feedbackFormUrl(f) {
+    const q = new URLSearchParams({usp: "pp_url"});
+    for (const [k, v] of Object.entries(f)) if (FEEDBACK_FIELD[k] && v) q.append(FEEDBACK_FIELD[k], String(v).slice(0, 1500));
+    return FEEDBACK_FORM + "viewform?" + q;
+  }
+  function feedbackCard() {
+    if (feedbackPage.pause) try { feedbackPage.pause(); } catch (e) {}
+    const info = feedbackInfo(), d = feedbackDraft;
+    const box = document.createElement("div"); box.className = "feedback";
+    const kinds = document.createElement("div"); kinds.className = "fbKinds"; kinds.setAttribute("role", "group"); kinds.setAttribute("aria-label", "What kind of feedback");
+    for (const k of FEEDBACK_KINDS) {
+      const b = document.createElement("button"); b.type = "button"; b.textContent = k; b.setAttribute("aria-pressed", String(d.kind === k));
+      b.onclick = () => { d.kind = d.kind === k ? "" : k; for (const x of kinds.children) x.setAttribute("aria-pressed", String(x.textContent === d.kind)); };
+      kinds.append(b);
+    }
+    const field = (label, el, hint) => {
+      const l = document.createElement("label"); l.className = "fbField";
+      const t = document.createElement("span"); t.textContent = label; l.append(t, el);
+      if (hint) { const h = document.createElement("small"); h.textContent = hint; l.append(h); }
+      return l;
+    };
+    const msg = Object.assign(document.createElement("textarea"), {rows: 4, maxLength: 4000, value: d.message, placeholder: "What happened, what you liked, what you'd change…"});
+    msg.oninput = () => { d.message = msg.value; };
+    const contact = Object.assign(document.createElement("input"), {type: "text", maxLength: 200, value: d.contact, autocomplete: "email", placeholder: "Email or name"});
+    contact.oninput = () => { d.contact = contact.value; };
+    const sent = document.createElement("p"); sent.className = "fbSent";
+    sent.textContent = `Sent with it: ${info.name}, build ${info.build || "?"}${info.details ? ", " + info.details : ""}, ${info.puzzle ? "a link to this puzzle" : "the page's address"}, your screen size and your browser's name.`;
+    box.append(kinds, field("Tell us more", msg), field("How can we reach you?", contact, "Only if you'd like a reply."), sent);
+    const send = async () => {
+      if (!d.kind && !d.message.trim()) { msg.focus(); msg.placeholder = "Pick one above, or write a few words here"; return; }
+      const f = {kind: d.kind, message: d.message.trim(), contact: d.contact.trim(), game: info.name, details: info.details, build: info.build, device: info.device, link: info.link};
+      const btn = $("card").querySelector(".btns button.primary"); if (btn) { btn.disabled = true; btn.textContent = "Sending…"; }
+      try {
+        await sendFeedback(f);
+        track(`${info.name} feedback sent${d.kind ? ": " + d.kind : ""}`);
+        Object.assign(d, {kind: "", message: "", contact: ""});
+        openCard("Thank you!", f.contact ? "It's on its way. We'll write back if we can." : "It's on its way. Every note helps make the games better.", [["Close", closeCard, true]]);
+      } catch (e) {
+        // a real link to the form, filled in (window.open is refused in some places, an artifact preview among them)
+        openCard("It didn't send", window.PREVIEW ? "This preview can't send it from the page. Your note is kept: open the form to send it there."
+          : "It may be the connection. Your note is kept: try again, or send it from the form itself.", [["Try again", feedbackCard, true], ["Cancel", closeCard]]);
+        const link = Object.assign(document.createElement("a"), {className: "btnLink", href: feedbackFormUrl(f), target: "_blank", rel: "noopener", textContent: "Open the form"});
+        link.onclick = () => setTimeout(closeCard, 300);
+        $("card").querySelector(".btns button").after(link);
+      }
+    };
+    openCard("Send feedback", `What do you think of ${info.name.replace(/ \(beta\)$/, "")}? Tell us anything: we read every note.`, [["Send", send, true], ["Cancel", closeCard]], box);
   }
 
   /* ---------- choosing toys ---------- */
@@ -1889,6 +1990,7 @@ const G = (() => {
     reel: '<circle cx="12" cy="18" r="8"/><path d="M6.5 14.5c4 .5 8 3.5 10 9M7 22c3-3 7-5 12-4.5"/><path d="M20 17c3-1.5 5.5-5 7-10"/>',   // winding up a strand
     sponge: '<rect x="4" y="12" width="24" height="13" rx="3.5"/><circle cx="10" cy="18" r="1.2"/><circle cx="16" cy="16" r="1.2"/><circle cx="21" cy="20" r="1.2"/><path d="M9 8c1.2-2 2.4-2 3.6 0M19 8c1.2-2 2.4-2 3.6 0"/>',
     wallshake: '<rect x="10" y="5" width="12" height="22" rx="2"/><path d="M5 10v12M27 10v12M2 13v6M30 13v6"/>',
+    chat: '<path d="M6 7h20a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H14l-6 5v-5H6a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"/><path d="M10 13h12M10 17h8"/>',
     keyboard: '<rect x="3" y="9" width="26" height="15" rx="3"/><path d="M8 14h.2M12 14h.2M16 14h.2M20 14h.2M24 14h.2M10 19h12"/>',
     left: '<path d="M11 9h15M11 16h15M11 23h15"/><path d="M5.5 9h.2M5.5 16h.2M5.5 23h.2"/>',
     pairs: '<path d="M4 25l5-15 5 15M6 20h6"/><path d="M19 10v15"/><circle cx="23" cy="20.5" r="4.5"/>',
@@ -2537,5 +2639,5 @@ const G = (() => {
   }
 
   return {MAGNET, tally, emoText, radios, pawLost, pieces, GAMES, BETA, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, loseCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText,
-          setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
+          setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, feedbackCard, feedbackFor, toyPicker, pickLook};
 })();

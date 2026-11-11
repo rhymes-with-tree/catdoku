@@ -81,9 +81,16 @@ Bed Hog has no star cat yet: `c14-29` (a ginger cat on its back) sleeps beside i
   along a shelf; `rayla-crouch` crouched on a shelf after landing; `rayla-leap` going up (and on the gold-paw card);
   `rayla-dive` dropping straight down; `rayla-bound` coming down sideways and running up with the zoomies;
   `rayla-startled` after a fright; `rayla-basket` curled up in the basket at the top; and `rayla-crouch2`, standing
-  safe on all four paws, on the card after a miss. They were cut from a small copy of the sheet, so swap in the
-  full-size ones when they come. **Moonpie**, on the same sheet (brown and white), is a cuddly cat, not for action
-  games; none of her pictures are in `cats/` yet.
+  safe on all four paws, on the card after a miss. They're cut from the owner's full-size sheet (2026-11-11, 2000 ×
+  1196 with a see-through background, so no white edge in Dark Mode; the second copy, with `rayla-bound` clear of
+  `rayla-startled`), which has Moonpie and Ferguson too. Pounce Up draws every pose at one scale (`SC`, units per
+  pixel of the sheet).
+- **Moonpie** (`moonpie-…`, brown and white with blue eyes) has seven poses from the same sheet, named as Rayla's are:
+  `moonpie-sit`, `-crouch`, `-leap`, `-dive`, `-bound`, `-low` and `-crouch2`. They're in `cats/` for later, not for
+  Pounce Up (the owner, 2026-11-11). She was first noted as a cuddly cat rather than one for action games.
+- **Ferguson** (`ferguson-…`, a fluffy black cat with yellow eyes) has nine poses from the same sheet, the same set
+  as Rayla's: `ferguson-sit`, `-crouch`, `-startled`, `-leap`, `-basket`, `-dive`, `-low`, `-bound` and `-crouch2`. In
+  `cats/` for later, not for Pounce Up.
 
 Purrmutation has no star cat: its cats are shuffled too. Each puzzle draws one of 21 big, whole pictures as large as fits on a patchwork quilt and cuts the picture into pieces: the general cats `c14-34`, `c14-35`, `c14-36`, `c15-5`, `c15-6` (curled up), `c15-38` and `c14-63` (sitting), and the named cats `bowtie-6`, `bugsy-4`, `bugsy-6`, `bugsy-bowtie-boxes`, `crunch-4` to `crunch-7`, `dottie-5`, `dottie-22`, `laya-2`, `laya-3`, `laya-4` and `laya-7` (the list `PICS` in `catshuffle/index.html`). The win card names a named cat ("Crunch is back in the picture"), and the gold-paw card shows the finished picture.
 

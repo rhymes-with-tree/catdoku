@@ -69,8 +69,6 @@ Cat Spells 13, Curious Cat 12, colour 4, Kitten Play (match and pop) 5, action 8
 
 Pounce Up went up as an unlisted beta on 2026-11-11 (`pounceup/`, in `BETA` in `games.js`), so the owner could share it
 from the site while it's still being tuned. Before it joins `GAMES` (and the front page):
-- the owner's full-size pictures of Rayla: `cats/rayla-*.webp` were cut from a small JPEG of the sheet (960 × 720), so
-  they're soft and keep a faint white edge in Dark Mode;
 - decide the gold paw (first try for now), and whether pouncing is by itself or on a tap (the Pounce when I tap
   switch), and whether full screen is worth it (the board is about 390 pixels wide on a laptop);
 - the rest of the new-game skill's port: the README section, a front-page icon (`tools/make-icons.py`), its settings
@@ -78,6 +76,16 @@ from the site while it's still being tuned. Before it joins `GAMES` (and the fro
   Off and Pounce Up), and the full test list;
 - then move its row from `BETA` to `GAMES` (with the date it joins), take the beta label off the page, and split Kitten
   Play (above): it's the second of Pawlinko, Pounce Up and Paw-ball.
+
+## Feedback: what's left
+
+Send feedback went into every game's menu on 2026-11-11 (the card in `games.js`, to the owner's Google Form; README,
+"Feedback"). Left for later:
+- a link to the puzzle in play: only Pounce Up gives one (`G.feedbackFor`); the other games send their level (from the
+  level picker) and the page's address. Each game's Share already knows its puzzle, so each can pass the same data;
+- the front page, which has no menu row for it;
+- whether a beta's win and miss cards should ask a one-tap "How was that level?" (sent as a GoatCounter event: no
+  words, so nothing new leaves the device, and it shows how hard each level feels).
 
 ## Pawlinko: sound effects
 

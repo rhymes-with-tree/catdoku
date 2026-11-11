@@ -174,6 +174,8 @@ the reason they don't apply.
 
 ### Privacy
 - ✅ **Process data on the device:** everything is kept in the browser; GoatCounter counts plays without cookies.
+  Send feedback (in every game's menu) sends only what the player writes, with the game, build, puzzle link, screen and
+  browser, and only when they press Send; the card says what goes with it.
 
 ### Multitasking
 - ✅ **Pause when people switch away:** the clock runs only while the page is showing; action games pause.
