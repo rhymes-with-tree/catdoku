@@ -79,7 +79,7 @@ from the site while it's still being tuned. Before it joins `GAMES` (and the fro
 
 ## Pawstcards: finish the beta
 
-Pawstcards went up as an unlisted beta on 2026-11-11 (`pawstcards/`, in `BETA` in `games.js`) with 22 countries; it has 32 since the second batch. Before
+Pawstcards went up as an unlisted beta on 2026-11-11 (`pawstcards/`, in `BETA` in `games.js`) with 22 countries; it has 42 since the third batch. Before
 it joins `GAMES` (and the front page):
 - more places, in batches, until it has as many of Catlas's 245 as have good postcards (`tools/pawstcards/NOTES.md`
   says how a batch is made; the owner wants them picked on Fable). The Easy list first, then Medium and Hard;
@@ -87,7 +87,7 @@ it joins `GAMES` (and the front page):
 - then levels: Easy, Medium and Hard trips from Catlas's lists (there's one level until there are enough places);
 - Pinecone's own pictures, when the owner has drawn her (she/her): beside the title, on the win and gold-paw cards,
   and the front-page icon. A general black cat (`c18-27`, `c19-15`) stands in;
-- the postcards' file is one script of every place (227 KB for 32): split it by place, loaded as a trip is dealt,
+- the postcards' file is one script of every place (295 KB for 42): split it by place, loaded as a trip is dealt,
   before it grows past a few hundred KB;
 - `places.js` is a copy of Catlas's names (written by `tools/pawstcards/make.py`): move them to one shared file
   that both pages load;

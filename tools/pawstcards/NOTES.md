@@ -31,6 +31,8 @@ paragraph.sentence.count in the article as fetched, so an article that has chang
   covers Mongols). A passage where part of a name still shows is dropped. Accents are ignored when matching.
   Mind names that are also words: Iceland's own name, Ísland, covered every "island" until it was taken out; Russia
   has "Rus" as a whole word only (a stem would cover "rush"), and France has "Gaul" that way (not "de Gaulle").
+  Poland's "Polish" and "Pole" and Britain's "Brit" are covered with their capital letters only (`case`).
+  England, Scotland and Wales are left showing in the United Kingdom's postcards: they're in it, not it.
   `words` in `EXTRA` are whole words, capitals as written ("US", "U.S."). A name that starts with an ordinary word
   ("South Africa", "United States") would drop every passage with "south" in it: `show` lets that word through.
 - **What's dropped:** a first sentence that leans on one that isn't there ("These…", "However…", "The company…" just

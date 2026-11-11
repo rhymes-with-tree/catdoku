@@ -421,7 +421,21 @@ EXTRA = {
     "UKR": {"names": ["Ukrain", "Ukrayin"], "capital": ["Kiev"]},
     "CHL": {"demonyms": ["Chilean"]},
     "SAU": {"names": ["Saud", "Arabia"], "words": ["KSA"]},
+    "IRN": {"names": ["Persia", "Eran"], "words": ["Fars", "Farsi"], "capital": ["Teheran"]},
+    "KAZ": {"names": ["Kazakh", "Qazaq"], "capital": ["Nur-Sultan", "Akmola", "Tselinograd"]},
+    "IDN": {"names": ["Indones", "Nusantara", "Dutch East Indies", "East Indies"], "capital": ["Batavia"]},
+    "PAK": {"names": ["Pakistan"]},
+    "DEU": {"names": ["German", "Deutsch", "Teuton"], "words": ["FRG", "GDR"]},
+    # "Brit" with its capital only (not "brittle"); England, Scotland and Wales are left showing: they're in it, not it
+    "GBR": {"names": ["Britain", "Britannia", "Britannic"], "demonyms": ["British", "Briton"], "case": ["Brit"],
+            "words": ["UK", "U.K.", "GB"], "show": ["unite", "great"]},
+    "GRC": {"names": ["Hellas", "Hellen", "Greco", "Graeco", "Ellada"], "capital": ["Athen"]},
+    "PRK": {"names": ["Korea", "Choson", "Joseon"], "words": ["DPRK"], "show": ["north"]},
+    "FIN": {"names": ["Suomi", "Suomen"], "capital": ["Helsingfors"]},
+    # "Polish" and "Pole" with their capitals only (not "polish" or "the North Pole"... which has one: mind it)
+    "POL": {"names": ["Polska", "Polonia"], "case": ["Polish", "Pole"], "capital": ["Warszawa"]},
 }
-AKA = {"VNM": ["Viet Nam"], "NZL": ["Aotearoa"], "USA": ["United States of America", "America"], "RUS": ["Russian Federation"]}
+AKA = {"VNM": ["Viet Nam"], "NZL": ["Aotearoa"], "USA": ["United States of America", "America"], "RUS": ["Russian Federation"],
+       "GBR": ["Great Britain", "Britain"]}
 
 CANDIDATES = 0

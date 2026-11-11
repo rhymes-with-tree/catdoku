@@ -15,4 +15,9 @@ PLACES = {
     "ZAF": ("South Africa", "South Africa", "Southern Africa"), "MDG": ("Madagascar", "Madagascar", "East Africa"),
     "UKR": ("Ukraine", "Ukraine", "Eastern Europe"), "CHL": ("Chile", "Chile", "South America"),
     "SAU": ("Saudi Arabia", "Saudi Arabia", "Western Asia"),
+    "IRN": ("Iran", "Iran", "Western Asia"), "KAZ": ("Kazakhstan", "Kazakhstan", "Central Asia"),
+    "IDN": ("Indonesia", "Indonesia", "Southeast Asia"), "PAK": ("Pakistan", "Pakistan", "South Asia"),
+    "DEU": ("Germany", "Germany", "Central Europe"), "GBR": ("United Kingdom", "United Kingdom", "Northwestern Europe"),
+    "GRC": ("Greece", "Greece", "Southern Europe"), "PRK": ("North Korea", "North Korea", "East Asia"),
+    "FIN": ("Finland", "Finland", "Northern Europe"), "POL": ("Poland", "Poland", "Central Europe"),
 }
