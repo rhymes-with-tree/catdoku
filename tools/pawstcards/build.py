@@ -244,8 +244,9 @@ def cover_terms(name, aka, ib, extra):
     for c in sorted(caps, key=len, reverse=True):
         terms.append((r"(?<![\w])" + re.escape(c) + r"\w*", False))
     for w in extra.get("words", []):
-        terms.append((r"(?<![\w])" + re.escape(fold(w)) + r"\b", False))
-    stems = {n.lower()[:5] for n in names | dem | set(map(fold, extra.get("stems", []))) if len(n) >= 5}
+        terms.append((r"(?<![\w])" + re.escape(fold(w)) + r"(?!\w)", False))       # not \b: "U.S." ends in a full stop
+    # a name that starts with an ordinary word ("South Africa", "United States") would drop every "south": "show" lets those through
+    stems = {n.lower()[:5] for n in names | dem | set(map(fold, extra.get("stems", []))) if len(n) >= 5} - set(extra.get("show", []))
     return terms, stems, sorted(caps)
 
 
@@ -406,7 +407,21 @@ EXTRA = {
     "CAN": {"demonyms": ["Canadian"], "names": ["Canad"]},
     "PER": {"demonyms": ["Peruvian"]},
     "KEN": {"demonyms": ["Kenyan"]},
+    # "US" and "U.S." as whole words only (not "us"); George and the state go under with the capital
+    "USA": {"names": ["America", "Usonia"], "words": ["US", "U.S.", "U.S", "USA", "U.S.A."], "show": ["unite"]},
+    # not a bare "Rus" stem: it would cover rush and rustic
+    "RUS": {"names": ["Rossiya", "Muscov"], "words": ["Rus", "Rus'", "RSFSR"]},
+    # "Frank" with its capital only (not "frankly"); Gaul as whole words (not de Gaulle)
+    "FRA": {"names": ["Francia", "Franco", "Francophon"], "demonyms": ["French", "Frank"], "case": ["Frank"],
+            "words": ["Gaul", "Gauls", "Gaulish", "Gallic", "Gallo"], "capital": ["Lutetia"]},
+    "ESP": {"names": ["España", "Espana", "Hispan"], "demonyms": ["Spanish", "Spaniard"]},
+    "CHN": {"names": ["Zhongguo", "Cathay"], "demonyms": ["Chinese"], "words": ["Sino", "PRC", "ROC"], "capital": ["Peking", "Peiping"]},
+    "ZAF": {"names": ["Suid-Afrika", "Mzansi"], "words": ["RSA"], "capital": ["Pretoria", "Cape Town", "Bloemfontein", "Tshwane"], "show": ["south"]},
+    "MDG": {"names": ["Madagas", "Malgach"], "demonyms": ["Malagasy"], "capital": ["Tananarive"]},
+    "UKR": {"names": ["Ukrain", "Ukrayin"], "capital": ["Kiev"]},
+    "CHL": {"demonyms": ["Chilean"]},
+    "SAU": {"names": ["Saud", "Arabia"], "words": ["KSA"]},
 }
-AKA = {"VNM": ["Viet Nam"], "NZL": ["Aotearoa"]}
+AKA = {"VNM": ["Viet Nam"], "NZL": ["Aotearoa"], "USA": ["United States of America", "America"], "RUS": ["Russian Federation"]}
 
 CANDIDATES = 0

@@ -10,4 +10,9 @@ PLACES = {
     "THA": ("Thailand", "Thailand", "Southeast Asia"), "ARG": ("Argentina", "Argentina", "South America"),
     "ETH": ("Ethiopia", "Ethiopia", "East Africa"), "ISL": ("Iceland", "Iceland", "Northern Europe"),
     "CUB": ("Cuba", "Cuba", "the Caribbean"),
+    "USA": ("United States", "United States", "North America"), "RUS": ("Russia", "Russia", "Eastern Europe and North Asia"),
+    "FRA": ("France", "France", "Western Europe"), "ESP": ("Spain", "Spain", "Southern Europe"), "CHN": ("China", "China", "East Asia"),
+    "ZAF": ("South Africa", "South Africa", "Southern Africa"), "MDG": ("Madagascar", "Madagascar", "East Africa"),
+    "UKR": ("Ukraine", "Ukraine", "Eastern Europe"), "CHL": ("Chile", "Chile", "South America"),
+    "SAU": ("Saudi Arabia", "Saudi Arabia", "Western Asia"),
 }

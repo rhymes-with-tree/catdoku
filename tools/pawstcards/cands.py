@@ -8,7 +8,7 @@ import json, os, re, sys
 import build
 from places import PLACES
 from catsrc import SRC
-build.CANDIDATES = 8
+build.CANDIDATES = 12
 os.makedirs("cand", exist_ok=True)
 only = sys.argv[1:]
 
@@ -61,7 +61,7 @@ for code, arts in SRC.items():
         for sc, pi, cid, cov in cands:
             if pi in seen: continue
             seen.add(pi); keep.append((cid, cov))
-            if len(keep) >= 7: break
+            if len(keep) >= 12: break
         lines.append(f"# {title}")
         for cid, cov in keep:
             out[code].append((cid, cov)); lines.append(f"{cid} {cov}")
