@@ -69,6 +69,7 @@ Cat Spells 13, Curious Cat 12, colour 4, Kitten Play (match and pop) 5, action 8
 
 Pounce Up went up as an unlisted beta on 2026-11-11 (`pounceup/`, in `BETA` in `games.js`), so the owner could share it
 from the site while it's still being tuned. Before it joins `GAMES` (and the front page):
+- tune the goals (TASKS in `pounceup/index.html`: the counts and the race's time), from the owner's play;
 - decide the gold paw (first try for now), and whether pouncing is by itself or on a tap (the Pounce when I tap
   switch), and whether full screen is worth it (the board is about 390 pixels wide on a laptop);
 - the rest of the new-game skill's port: the README section, a front-page icon (`tools/make-icons.py`), its settings
