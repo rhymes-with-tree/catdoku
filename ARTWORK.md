@@ -76,6 +76,15 @@ Bed Hog has no star cat yet: `c14-29` (a ginger cat on its back) sleeps beside i
   `fred-23` prowls on the floor below the shelf of yarn he knocked out of order, Dottie (`dottie-22`, with her teal crochet)
   settles in there once it's sorted, and `fred-16` crouches to pounce on the gold-paw card.
 
+- **Rayla** (`rayla-…`, a pale silver tabby with blue eyes) is the star of Pounce Up (in beta). Her sheet (the owner's,
+  2026-11-11) has nine poses, all used there: `rayla-sit` beside the title; `rayla-low` waiting on the floor and walking
+  along a shelf; `rayla-crouch` crouched on a shelf after landing; `rayla-leap` going up (and on the gold-paw card);
+  `rayla-dive` dropping straight down; `rayla-bound` coming down sideways and running up with the zoomies;
+  `rayla-startled` after a fright; `rayla-basket` curled up in the basket at the top; and `rayla-crouch2`, standing
+  safe on all four paws, on the card after a miss. They were cut from a small copy of the sheet, so swap in the
+  full-size ones when they come. **Moonpie**, on the same sheet (brown and white), is a cuddly cat, not for action
+  games; none of her pictures are in `cats/` yet.
+
 Purrmutation has no star cat: its cats are shuffled too. Each puzzle draws one of 21 big, whole pictures as large as fits on a patchwork quilt and cuts the picture into pieces: the general cats `c14-34`, `c14-35`, `c14-36`, `c15-5`, `c15-6` (curled up), `c15-38` and `c14-63` (sitting), and the named cats `bowtie-6`, `bugsy-4`, `bugsy-6`, `bugsy-bowtie-boxes`, `crunch-4` to `crunch-7`, `dottie-5`, `dottie-22`, `laya-2`, `laya-3`, `laya-4` and `laya-7` (the list `PICS` in `catshuffle/index.html`). The win card names a named cat ("Crunch is back in the picture"), and the gold-paw card shows the finished picture.
 
 Meowbile puts a general cat beside its title, `c18-21` (a calico sitting and looking up at the mobile), and `c18-38` (a ginger cat leaping up) is on the gold-paw card.

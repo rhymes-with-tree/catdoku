@@ -64,6 +64,12 @@ const G = (() => {
     ["Under the Blanket", "blanket", "Find the cats with a feather", "#8D78AD", "logic", "black box blackbox rays atoms deflection reflection hidden balls feather wand blanket bugsy", "2026-11-09"],
     ["Bed Hog", "bedhog", "Slide the sprawled cats until there's room for you", "#E16A4A", "teasers", "klotski rush hour sliding block puzzle unblock slide bed hog huarong sleeping cats", "2026-11-09"],
   ];
+  // Games in beta: their pages work (open them by their address), but they're left off the front page, the games menu,
+  // search, favorites and the daily challenge until they're finished. Same fields as GAMES.
+  const BETA = [
+    ["Pounce Up", "pounceup", "Help Rayla pounce up the tallest bookcase in the house", "#7885BA", "quick", "doodle jump platform jumping climbing bookcase shelves action", "2026-11-11"],
+  ];
+  const rowOf = slug => GAMES.find(g => g[1] === slug) || BETA.find(g => g[1] === slug);
   // The shelves the front page and the games menu sort the games onto, in order: key (also a plain name for it,
   // for search), heading, one line.
   const GROUPS = [
@@ -178,7 +184,7 @@ const G = (() => {
   // A star button that adds a game to the favorites or takes it off; every star for that game on the page follows,
   // and `onChange` runs after (to redraw a Favorites row). `withLabel` adds a word, for a game's own page.
   function favStar(slug, onChange, withLabel, say = withLabel) {
-    const b = document.createElement("button"), name = (GAMES.find(g => g[1] === slug) || [slug])[0];
+    const b = document.createElement("button"), name = (rowOf(slug) || [slug])[0];
     b.type = "button"; b.className = "favStar" + (withLabel ? " labelled" : ""); b.dataset.slug = slug;
     b.onclick = e => {
       e.preventDefault(); e.stopPropagation();
@@ -241,7 +247,7 @@ const G = (() => {
   // game's switches and pickers (moved here from under the board). Share, Best times and How to play are the page's
   // own buttons, kept out of sight (pageTools), so a row here just presses one.
   function gameMenu(head, current, base, o) {
-    const name = (GAMES.find(g => g[1] === current) || [current])[0];
+    const name = (rowOf(current) || [current])[0], beta = BETA.some(g => g[1] === current);
     head.classList.add("withMenu");
     // the cat (or cats) beside the title and the game's line go on a row of their own under the title, and scroll
     const title = head.querySelector(".title"), pics = title ? [...title.querySelectorAll(":scope > img")] : [];
@@ -282,7 +288,7 @@ const G = (() => {
       else toyPicker({kinds: CHEST, off: toysOff(), min: 1, src: f => `${HOME}toys/${f}.webp`,
         save: off => { saveToys(off); note("Saved. The toy games use them from their next board.", 3500); }});
     }, "The toys every game uses");
-    heading(name);
+    heading(beta ? `${name} (beta)` : name);
     const fav = item("star", "", () => {
       const on = toggleFavorite(current);
       document.querySelectorAll(".favStar").forEach(x => x.dataset.slug === current && x.refresh());
@@ -311,6 +317,7 @@ const G = (() => {
       daily.classList.toggle("done", done);
       const on = favorites().includes(current);
       set(fav, on ? "In your favorites" : "Add to favorites", on ? "Tap to take it off" : "");
+      fav.hidden = beta;   // a beta game can't be a favorite yet: it isn't on the front page
       fav.querySelector(".ic").classList.toggle("on", on);
       for (const [id, row] of page) { const b = $(id); row.hidden = !b || b.hidden; row.disabled = !!(b && b.disabled); }
       keys.hidden = !(KEYS[current] && keyboardish());
@@ -758,7 +765,7 @@ const G = (() => {
     .bests .bestnum{text-align:right}
     .bests tr.now td{font-weight:800}
     .card h3{margin:4px 0 6px;font-size:calc(18px*var(--ts))}
-    .spot{position:fixed;inset:0;z-index:9;overflow:hidden;cursor:pointer;animation:spotIn .35s ease-out;-webkit-tap-highlight-color:transparent;touch-action:none}
+    .spot{position:fixed;inset:0;z-index:35;overflow:hidden;cursor:pointer;animation:spotIn .35s ease-out;-webkit-tap-highlight-color:transparent;touch-action:none}
     .spot:focus{outline:none}
     .spot svg{position:absolute;inset:0;display:block}
     .spot .dim{fill:rgba(42,37,48,.66)}
@@ -1153,6 +1160,7 @@ const G = (() => {
     zoomies: ["Arrow keys: pick a square", "Space or Enter: pick a square, then another to join the pair (or part it)", "C: the next line colour", "Escape: let go"],
     crossstitch: ["Arrow keys: pick a square", "Space or Enter: stitch it, or take the stitch out", "X or .: a dot, for a square that stays empty", "Backspace: clear the square", "Shift with an arrow: carry what you put down along the row or column"],
     tango: ["Arrow keys: pick a square", "Space or Enter: tap it (one toy, then the other, then empty)"],
+    pounceup: ["Left and right (or tap): steer, or walk along a shelf", "With Pounce when I tap on: Up, W or Space pounces", "P (or Space): pause"],
     pawlinko: ["Setting up: arrows move the next piece, Enter places it, R flips a perch, Space throws", "Left and right: aim (Shift for big steps)", "Down, Space or Enter: knock it off", "X: swap in the next thing", "Placing a perch: arrows move it, R flips it, Enter puts it there", "Winding a strand: arrows pick one, Enter winds it", "Escape: put a helper away"],
   };
   const keyboardish = () => matchMedia("(hover: hover) and (pointer: fine)").matches;
@@ -2528,6 +2536,6 @@ const G = (() => {
     }
   }
 
-  return {MAGNET, tally, emoText, radios, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, loseCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText,
+  return {MAGNET, tally, emoText, radios, pawLost, pieces, GAMES, BETA, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, loseCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
 })();

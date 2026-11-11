@@ -65,6 +65,20 @@ With the shortlist built and both splits, the shelves would be (66 games): Cat L
 Cat Spells 13, Curious Cat 12, colour 4, Kitten Play (match and pop) 5, action 8. Without the colour split, Curious Cat
 15 and no colour shelf.
 
+## Pounce Up: finish the beta
+
+Pounce Up went up as an unlisted beta on 2026-11-11 (`pounceup/`, in `BETA` in `games.js`), so the owner could share it
+from the site while it's still being tuned. Before it joins `GAMES` (and the front page):
+- the owner's full-size pictures of Rayla: `cats/rayla-*.webp` were cut from a small JPEG of the sheet (960 × 720), so
+  they're soft and keep a faint white edge in Dark Mode;
+- decide the gold paw (first try for now), and whether pouncing is by itself or on a tap (the Pounce when I tap
+  switch), and whether full screen is worth it (the board is about 390 pixels wide on a laptop);
+- the rest of the new-game skill's port: the README section, a front-page icon (`tools/make-icons.py`), its settings
+  on the Settings page, catnip and tape drawings moved into `tablethings.js` (they're copied in Tail Chase, Knock It
+  Off and Pounce Up), and the full test list;
+- then move its row from `BETA` to `GAMES` (with the date it joins), take the beta label off the page, and split Kitten
+  Play (above): it's the second of Pawlinko, Pounce Up and Paw-ball.
+
 ## Pawlinko: sound effects
 
 The owner wants sound effects for Pawlinko, put aside for later (2026-11-02): a knock as each thing hits a hold,
