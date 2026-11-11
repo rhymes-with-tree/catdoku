@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pawstcards</title>
+<!-- In beta: not on the front page yet (games.js, BETA), and kept out of search engines until it's finished -->
+<meta name="robots" content="noindex">
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-11-11.8"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<meta name="theme-color" content="#ECEEE7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1F1C24" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-11-11.8">
+<style>
+/* The board is the postcard on top of the pile: a travelling cat's message, with every word that names the place
+   covered by her inky paw prints. Under it, a stamp for each kind of postcard (the next one comes from the kind
+   chosen), and the answer, given the way the player picks, as in Catlas: four names (Pick), typing with the list of
+   every place (List) or typing with no list (Type). */
+.title{display:flex;align-items:flex-end;gap:6px}
+/* the beta label beside the title, until the game is finished */
+.beta{align-self:center;padding:1px 8px;border:2px solid var(--gold-text);border-radius:999px;color:var(--gold-text);font-weight:800;font-size:calc(12px*var(--ts));letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.sitter{display:block;height:64px;width:auto;margin-bottom:-4px}
+@media (max-height:760px){.sitter{height:46px;margin-bottom:-3px}}
+/* a black cat on a dark page: a faint light edge so she still shows */
+@media (prefers-color-scheme:dark){.sitter{filter:drop-shadow(0 0 1px rgba(236,238,231,.55)) drop-shadow(0 0 5px rgba(236,238,231,.2))}}
+
+.desk.wrap{height:auto}
+.desk{width:var(--board);display:flex;flex-direction:column;gap:8px;--card:color-mix(in srgb,#ECA818 9%,#fff)}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;min-height:0}
+.tabs:empty{display:none}
+.tabs button{min-width:52px;min-height:36px;padding:2px 10px;border-radius:999px;font-size:15px;font-weight:700;display:inline-flex;align-items:center;gap:4px;position:relative}
+.tabs button::after{content:"";position:absolute;inset:-4px}
+.tabs button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.postcard{position:relative;background:var(--card);border:2px solid color-mix(in srgb,#ECA818 45%,#2A2530);border-radius:10px;
+  box-shadow:0 2px 0 rgba(42,37,48,.15),0 8px 18px -10px rgba(42,37,48,.45);padding:14px 14px 12px;min-height:calc(var(--board) * .62);
+  display:flow-root;color:#2A2530}
+.postcard::before{content:"";position:absolute;inset:6px;border:1.5px dashed color-mix(in srgb,#ECA818 35%,transparent);border-radius:6px;pointer-events:none}
+.postcard .corner{float:right;position:relative;width:92px;height:96px;margin:-4px -4px 4px 8px}
+.stamp{position:absolute;right:0;top:0;width:58px;height:70px;display:grid;place-items:center;font-size:30px;line-height:1;
+  background:var(--sc);
+  -webkit-mask:radial-gradient(circle 3.5px at 50% 50%,#0000 98%,#000) -3.5px -3.5px/7px 7px, linear-gradient(#000,#000) 3.5px 3.5px/calc(100% - 7px) calc(100% - 7px) no-repeat;
+  mask:radial-gradient(circle 3.5px at 50% 50%,#0000 98%,#000) -3.5px -3.5px/7px 7px, linear-gradient(#000,#000) 3.5px 3.5px/calc(100% - 7px) calc(100% - 7px) no-repeat}
+.stamp i{font-style:normal;display:grid;place-items:center;width:44px;height:56px;background:color-mix(in srgb,var(--sc) 22%,#fff);border-radius:2px}
+.postmark{position:absolute;left:0;top:34px;width:62px;height:62px;border-radius:50%;border:2px solid rgba(42,37,48,.55);
+  display:grid;place-items:center;text-align:center;font-size:9.5px;font-weight:800;line-height:1.05;letter-spacing:0;overflow-wrap:anywhere;color:rgba(42,37,48,.75);
+  transform:rotate(-14deg);background:radial-gradient(circle,transparent 60%,transparent 61%);padding:4px;text-transform:uppercase}
+.postmark.known{border-color:#B23A28;color:#B23A28}
+.postcard .kind{margin:0 0 4px;font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--sc-ink)}
+.postcard .asked{margin:0 0 6px;font-size:calc(15px*var(--ts));font-weight:600;line-height:1.3;color:#5E5866}
+.postcard .asked b{color:var(--sc-ink)}
+.postcard .say{margin:0;font-size:calc(17px*var(--ts));line-height:1.45;font-weight:500;text-wrap:pretty}
+.postcard .love{margin:8px 0 0;text-align:right;font-size:calc(15px*var(--ts));font-weight:700;color:#5E5866}
+/* she signs with her own paw: the same inky print that covers the names, big */
+.postcard .love{display:flex;justify-content:flex-end;align-items:flex-end;gap:6px}
+.sig{display:inline-block;width:2.9em;height:2.45em;transform:rotate(14deg);margin:-4px 2px -2px 0}
+.sig svg{display:block;width:100%;height:100%;fill:#2A2530;opacity:.9}
+.postcard.empty{display:grid;place-items:center;text-align:center}
+.postcard.empty p{margin:0;max-width:22em;font-size:calc(18px*var(--ts));font-weight:700;line-height:1.35;color:#5E5866;text-wrap:balance}
+.postcard.empty .big{display:block;font-size:44px;margin-bottom:6px}
+/* the black cat's paw print over each word that names the place */
+.paw{display:inline-block;width:1.45em;height:1.1em;vertical-align:-.18em;margin:0 .05em}
+.paw svg{display:block;width:100%;height:100%;fill:#2A2530;opacity:.9}
+.was{background:color-mix(in srgb,#ECA818 45%,#fff);border-radius:4px;padding:0 3px;font-weight:700;color:#2A2530;box-shadow:inset 0 -2px 0 #ECA818}
+/* each kind of postcard has a colour from the palette */
+.k-history{--sc:#BD5538;--sc-ink:#8E3C25}
+.k-geography{--sc:#6AA673;--sc-ink:#3F7748}
+.k-politics{--sc:#B94588;--sc-ink:#8A2F64}
+.k-economy{--sc:#ECA818;--sc-ink:#7A5400}
+.k-people{--sc:#73A7AE;--sc-ink:#3E6E75}
+.k-culture{--sc:#E16A4A;--sc-ink:#9E4129}
+.k-cats{--sc:#8D78AD;--sc-ink:#5E4B80}
+
+.pad [hidden]{display:none!important}
+.pad{width:var(--board);display:flex;flex-direction:column;align-items:center;gap:10px}
+.ask{margin:0;font-size:calc(17px*var(--ts));font-weight:700;text-align:center;color:var(--ink)}
+.ask small{font-weight:600;color:var(--ink-soft)}
+.ask .q{display:block;margin-top:2px;font-weight:600;text-wrap:balance}
+.ask .blank{display:inline-block;min-width:4.2em;padding:0 4px;border-bottom:3px solid var(--ink);font-weight:800;color:var(--gold-text);line-height:1.1}
+.pad{container-type:inline-size}
+.stamps{width:100%;display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@container (min-width:530px){.stamps{grid-template-columns:repeat(7,1fr)}}
+@container (max-width:350px){.stamps{grid-template-columns:repeat(3,1fr)}}
+@container (max-width:290px){.stamps{grid-template-columns:repeat(2,1fr)}}
+.stamps button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 4px 5px;min-height:76px;border-radius:10px;line-height:1.1;
+  background:color-mix(in srgb,var(--sc) 16%,var(--panel));border:2px solid var(--sc)}
+.stamps button .ic{font-size:24px;line-height:1.1}
+.stamps button b{font-size:calc(14px*var(--ts));font-weight:800;color:var(--ink)}
+.stamps button small{font-size:calc(12px*var(--ts));font-weight:600;color:var(--ink-soft)}
+.stamps button:disabled{opacity:.4}
+.reveal{margin:-4px 0 0;font-size:22px;font-weight:800;letter-spacing:.18em;color:var(--gold-text);text-align:center;font-variant-numeric:tabular-nums}
+.reveal:empty{display:none}
+.choices{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.choices button{padding:10px 8px;line-height:1.2;min-height:52px}
+.choices button.out{text-decoration:line-through;opacity:.45}
+.choices button.wrong{border-color:#C8392B;color:var(--bad-text);text-decoration:line-through}
+.choices button.gold{box-shadow:0 0 0 4px #ECA818}
+.choices button.right{background:var(--sage-green);border-color:#3F7748;color:#fff}
+.typebox{width:100%;position:relative;display:flex;gap:8px}
+.typebox input::-webkit-search-cancel-button,.typebox input::-webkit-search-decoration{-webkit-appearance:none;appearance:none}
+.typebox input{-webkit-appearance:none;appearance:none;flex:1;min-width:0;font:inherit;font-size:18px;font-weight:600;color:var(--ink);background:var(--panel);border:2px solid var(--ink);border-radius:10px;padding:7px 12px}
+.list{width:100%;max-height:min(34vh,236px);overflow-y:auto;margin:0;padding:4px;list-style:none;background:var(--panel);border:2px solid var(--line);border-radius:10px}
+.list li{padding:5px 10px;border-radius:7px;cursor:pointer;font-weight:600}
+.list li:hover{background:var(--hover)}
+.list li[aria-selected="true"]{background:var(--ink);color:var(--paper)}
+.list li.none{color:var(--ink-soft);cursor:default;font-weight:500}
+.tried{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
+.tried:empty{display:none}
+.tried span{font-size:14px;font-weight:600;color:var(--bad-text);border:2px solid #E8A598;border-radius:999px;padding:0 10px;text-decoration:line-through}
+.dots{display:flex;gap:5px;align-items:center}
+.status .left{display:flex;gap:12px;align-items:center}
+.dots i{width:11px;height:11px;border-radius:50%;border:2px solid var(--ink-soft)}
+.dots i.ok{background:var(--sage-green);border-color:#3F7748}
+.dots i.miss{background:#E16A4A;border-color:#9E4129}
+.dots i.now{border-color:var(--ink);transform:scale(1.25)}
+.answered{width:100%;text-align:center}
+.answered h3{margin:0 0 4px;font-size:calc(24px*var(--ts));font-weight:800;line-height:1.15}
+.answered h3 b{color:var(--bad-text)}
+.answered p{margin:0 0 10px;font-size:calc(14px*var(--ts));color:var(--ink-soft);line-height:1.35}
+.answered p a{color:inherit;font-weight:700}
+.answered .flag{font-size:1.1em}
+
+@media (orientation:landscape) and (max-height:500px){
+  body:not(.full) main > .stage .postcard{max-height:calc(var(--tall) - 50px);overflow-y:auto;min-height:0}
+  body:not(.full) main > .stage{--board:min(54vw,520px)}
+}
+</style>
+</head>
+<body>
+
+<main>
+  <header><div class="title"><h1>Pawstcards</h1><span class="beta" title="Still being made: things may change">Beta</span><img class="sitter" id="sitter" src="../cats/c18-27.webp" alt="A black cat sitting beside the title"></div><div class="stripe"></div><p class="tagline">Guess where Pinecone is from her postcards</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span class="left"><span class="dots" id="count" aria-label=""></span><span class="hearts" id="hearts" hidden></span></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap stage desk" id="board">
+    <div class="tabs" id="tabs" role="toolbar" aria-label="Postcards read"></div>
+    <article class="postcard" id="postcard" tabindex="-1" aria-live="polite"></article>
+  </div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="pad" id="pad">
+    <p class="ask" id="ask"></p>
+    <div class="stamps" id="stamps" role="group" aria-label="What to ask Pinecone about"></div>
+    <p class="reveal" id="reveal" aria-live="polite"></p>
+    <div class="choices" id="choices" hidden></div>
+    <form class="typebox" id="typebox" hidden autocomplete="off">
+      <input id="guess" name="guess" type="search" enterkeyhint="go" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="words" aria-label="Your answer" placeholder="Where is Pinecone?">
+      <button type="submit" class="primary" id="goBtn">Go</button>
+    </form>
+    <ul class="list" id="list" role="listbox" aria-label="Countries" hidden></ul>
+    <div class="tried" id="tried" aria-label="Wrong guesses"></div>
+    <div class="answered" id="answered" hidden></div>
+  </div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="restartBtn">Restart</button>
+    <button id="linkBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <button id="newBtn" class="primary">New trip</button>
+  </div>
+  <div class="bar toggles">
+    <div class="opt"><label>Answer <select id="styleSel" aria-label="How you answer"></select></label></div>
+  </div>
+</main>
+
+<script src="../games.js?v=2026-11-11.8"></script>
+<script src="places.js?v=2026-11-11.8"></script>
+<script src="postcards.js?v=2026-11-11.8"></script>
+<script>
+
+/* ---------- the places and their postcards ---------- */
+// NAMES, DEPS and AKA (places.js): every place a guess can name, the same as Catlas's, so a wrong guess can be any of them.
+// POST (postcards.js): the places Pinecone has been, each with its postcards by kind, hardest first, picked by hand
+// from Wikipedia (tools/pawstcards/NOTES.md); the words that name the place are in [[double brackets]].
+const CAT_PIC = "../cats/c18-27.webp", GOLD_PIC = "../cats/c19-15.webp";
+
+const nameOf = c => NAMES[c] || (DEPS[c] && DEPS[c][0]) || c;
+const PLACES = [...Object.keys(NAMES), ...Object.keys(DEPS)];
+const KINDS = [["history", "History", "🏛️"], ["geography", "Geography", "⛰️"], ["politics", "Politics", "🗳️"],
+  ["economy", "Economy", "💰"], ["people", "People", "👥"], ["culture", "Culture", "🎭"], ["cats", "Cats", "🐈"]];
+const KIND = Object.fromEntries(KINDS.map(k => [k[0], k]));
+// Continents, from the order of NAMES (Africa, the Americas, Asia, Europe, Oceania), for Pick's wrong names.
+const CONT = {};
+{ let c = 0; const firsts = ["DZA", "ATG", "AFG", "ALB", "AUS"]; for (const k of Object.keys(NAMES)) { if (firsts.includes(k)) c = firsts.indexOf(k); CONT[k] = c; } }
+
+/* ---------- names ---------- */
+function norm(s) {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/&/g, " and ")
+    .replace(/\bst\b\.?/g, "saint").replace(/[^a-z]+/g, " ").replace(/\bthe\b/g, " ").replace(/\s+/g, " ").trim();
+}
+const LOOKUP = new Map();
+for (const c of PLACES) for (const n of [nameOf(c), ...(AKA[c] || [])]) LOOKUP.set(norm(n), c);
+const SORTED = [...PLACES].sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+function matching(q) {
+  q = norm(q); if (!q) return SORTED;
+  const starts = [], words = [];
+  for (const c of SORTED) {
+    const ns = [nameOf(c), ...(AKA[c] || [])].map(norm);
+    if (ns.some(n => n.startsWith(q))) starts.push(c);
+    else if (ns.some(n => (" " + n).includes(" " + q))) words.push(c);
+  }
+  return [...starts, ...words];
+}
+const flag = c => POST[c].iso ? [...POST[c].iso].map(ch => String.fromCodePoint(0x1F1E6 + ch.charCodeAt(0) - 65)).join("") : "";
+const theName = n => /^(United|Netherlands|Philippines|Bahamas|Gambia|Maldives|Marshall|Solomon|Comoros|Seychelles|Czech|Dominican|Central African|Democratic|Republic|Falkland|Faroe|Cayman|British|U\.S\.|Northern|Cook|Turks|Virgin)/.test(n) ? "the " + n : n;
+
+/* ---------- a trip ---------- */
+const KEY = "catdoku.pawstcards.v1", TRIP = 10, TRIES = 2, MAX_CARDS = 5, GOLD_CARDS = 20;
+const STYLES = {pick: ["Pick", "Choose from 4 names. Makes it easier."], list: ["List", "Type, with a list of every place to choose from."],
+  type: ["Type", "Type the name with no list. Makes it harder."]};
+const STYLE_ORDER = ["pick", "list", "type"];
+const $ = G.$;
+const tries = G.lives({el: $("hearts"), per: TRIES, max: TRIES, on: "place", unit: ["try", "tries"]});
+let saved = G.load(KEY), settings = Object.assign({style: "list"}, saved.settings), recent = saved.recent || [], game = null, busy = false;
+G.pawLost(() => !game || game.won || game.hinted || game.restarted || game.res.some(r => !r.first) || cardsUsed() > GOLD_CARDS);
+const save = () => G.save(KEY, {settings, recent, game});
+const style = () => settings.style;
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const current = () => game.trip[game.i] && game.trip[game.i].c;
+const cardsUsed = () => game ? game.res.reduce((n, r) => n + r.cards, 0) + (game.won || game.card.seen ? 0 : game.card.read.length) : 0;
+const bestKey = g => STYLE_ORDER.indexOf(g.style) + 1;
+
+function wrongNames(c) {
+  const all = Object.keys(NAMES).filter(d => d !== c && CONT[d] === CONT[c]);
+  return shuffle(all).slice(0, 3);
+}
+function makeTrip() {
+  const pool = Object.keys(POST), fresh = pool.filter(c => !recent.includes(c));
+  const codes = shuffle(fresh.length >= TRIP ? fresh : pool).slice(0, TRIP);
+  return codes.map(c => ({c, opts: shuffle([c, ...wrongNames(c)])}));
+}
+const freshCard = () => ({read: [], view: -1, wrong: [], hints: 0, out: [], seen: false});
+function newTrip(trip) {
+  game = {style: style(), trip: trip || makeTrip(), i: 0, res: [], card: freshCard(), hinted: false, restarted: false, won: false, ...G.freshClock()};
+  if (!trip) recent = [...recent, ...game.trip.map(t => t.c)].slice(-12);
+  G.track("Pawstcards new trip");
+  save(); show();
+}
+function setStyle(s) {
+  settings.style = s; $("styleSel").value = s;
+  if (game && !game.won && STYLE_ORDER.indexOf(s) < STYLE_ORDER.indexOf(game.style)) game.style = s;
+  active = -1; save(); if (game) show();
+}
+
+/* ---------- drawing ---------- */
+const PAW = `<svg viewBox="0 0 26 22" aria-hidden="true"><path d="M13 9.6c3.4 0 7 4.6 7 7.6 0 2.4-2 3.6-4 3.6-1.3 0-2-.5-3-.5s-1.7.5-3 .5c-2 0-4-1.2-4-3.6 0-3 3.6-7.6 7-7.6z"/><ellipse cx="4.6" cy="9.4" rx="2.6" ry="3.1" transform="rotate(-18 4.6 9.4)"/><ellipse cx="9.6" cy="4.4" rx="2.6" ry="3.3" transform="rotate(-6 9.6 4.4)"/><ellipse cx="16.4" cy="4.4" rx="2.6" ry="3.3" transform="rotate(6 16.4 4.4)"/><ellipse cx="21.4" cy="9.4" rx="2.6" ry="3.1" transform="rotate(18 21.4 9.4)"/></svg>`;
+const esc = s => s.replace(/[&<>"]/g, ch => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"})[ch]);
+// A postcard's words, with each covered word as a paw print (or, once the place is answered, the word itself, marked).
+function cardHtml(text, open) {
+  let k = 0;
+  return text.split(/\[\[(.*?)\]\]/).map((part, i) => {
+    if (i % 2 === 0) return esc(part);
+    if (open) return `<mark class="was">${esc(part)}</mark>`;
+    const turn = [-14, 9, -4, 15, -9, 5][k++ % 6];
+    return `<span class="paw" role="img" aria-label="paw print" style="transform:rotate(${turn}deg)">${PAW}</span>`;
+  }).join("");
+}
+function show() {
+  hints.current();   // a hint's words go once the place or the answer moves on
+  const code = current(), card = game.card, done = game.won, seen = !done && card.seen;
+  $("count").innerHTML = game.trip.map((t, i) => `<i class="${i < game.res.length ? (game.res[i].first ? "ok" : "miss") : i === game.i && !done ? "now" : ""}"></i>`).join("");
+  $("count").setAttribute("aria-label", `Place ${Math.min(game.i + 1, TRIP)} of ${TRIP}`);
+  $("hearts").hidden = done || seen || !card.read.length;
+  if (!$("hearts").hidden) tries.show(TRIES - card.wrong.length, TRIES);
+  drawCard();
+  // the stamps: one for each kind, with how many are left of it
+  const can = !done && !seen && !busy && card.read.length < MAX_CARDS;
+  const q = `<span class="q">“What have you learned about the <span class="blank" id="blank">&nbsp;</span> of where you're visiting?”</span>`;
+  $("ask").innerHTML = done ? "Trip done!" : seen ? "" : !card.read.length ? `Send Pinecone a message:${q}`
+    : card.read.length < MAX_CARDS ? `Send another? <small>(she'll answer ${MAX_CARDS - card.read.length} more)</small>${q}` : "Pinecone won't answer any more. Where is she?";
+  $("ask").hidden = seen;
+  $("stamps").hidden = done || seen || card.read.length >= MAX_CARDS;
+  $("stamps").innerHTML = "";
+  if (!done) for (const [k, word, ic] of KINDS) {
+    const left = POST[code][k].length - card.read.filter(r => r[0] === k).length;
+    const b = document.createElement("button"); b.className = "k-" + k; b.dataset.k = k;
+    b.innerHTML = `<span class="ic" aria-hidden="true">${ic}</span><b>${word}</b><small>${left ? left + " left" : "none left"}</small>`;
+    b.setAttribute("aria-label", `Ask about the ${word.toLowerCase()} (${left} ${left === 1 ? "postcard" : "postcards"} left)`);
+    b.disabled = !can || !left; b.onclick = () => readCard(k);
+    // the word drops into the question's blank while a finger or the pointer is on it
+    const fill = on => { const bl = $("blank"); if (bl) bl.textContent = on ? word.toLowerCase() : " "; };
+    b.onpointerenter = b.onfocus = () => fill(true); b.onpointerleave = b.onblur = () => fill(false);
+    $("stamps").append(b);
+  }
+  const asking = !done && !seen && card.read.length > 0;
+  const letters = Math.max(0, card.hints - 1);
+  $("reveal").textContent = asking && style() !== "pick" && letters ? spell(nameOf(code), letters) : "";
+  $("choices").hidden = !asking || style() !== "pick";
+  $("typebox").hidden = !asking || style() === "pick";
+  $("list").hidden = !asking || style() !== "list";
+  if (asking && style() === "pick") {
+    $("choices").innerHTML = "";
+    for (const o of game.trip[game.i].opts) {
+      const b = document.createElement("button"); b.textContent = nameOf(o);
+      if (card.wrong.includes(o)) b.className = "wrong"; else if (card.out.includes(o)) b.className = "out";
+      else if (o === code && letters > 2) b.className = "gold";
+      b.disabled = card.wrong.includes(o) || card.out.includes(o);
+      b.onclick = () => answer(o, b);
+      $("choices").append(b);
+    }
+  }
+  if (asking && style() === "list") fillList();
+  $("tried").innerHTML = asking && style() !== "pick" ? card.wrong.map(c => `<span>${esc(nameOf(c))}</span>`).join("") : "";
+  // once answered: the place, and where the postcards came from
+  $("answered").hidden = !seen;
+  if (seen) {
+    const r = game.res[game.i], last = game.i >= TRIP - 1, t = POST[code].title || nameOf(code);
+    $("answered").innerHTML = `<h3>${r.found ? "Found her!" : "Sorry!"} Pinecone's in ${r.found ? "" : "<b>"}${esc(theName(nameOf(code)))}${r.found ? "" : "</b>"} <span class="flag">${flag(code)}</span></h3>`
+      + `<p>Her postcards are from ${[t, ...(POST[code].more || [])].map(a => `<a target="_blank" rel="noopener" href="https://en.wikipedia.org/wiki/${encodeURIComponent(a.replace(/ /g, "_"))}">${esc(a)}</a>`).join(", ")} on Wikipedia (CC BY-SA). Tap the numbers above to read them again.</p>`;
+    const b = document.createElement("button"); b.className = "primary"; b.id = "nextBtn"; b.textContent = last ? "See how I did" : "Next place";
+    b.onclick = advance; $("answered").append(b);
+  }
+  $("hintBtn").disabled = done || seen || !card.read.length;
+}
+// The postcard being read (the newest, unless an earlier one's tab is pressed), and the tabs to go back to the others.
+function drawCard() {
+  const code = current(), card = game.card, open = game.won || card.seen, pc = $("postcard");
+  $("tabs").innerHTML = "";
+  if (card.read.length > 1) card.read.forEach(([k], i) => {
+    const b = document.createElement("button"); b.className = "k-" + k;
+    b.innerHTML = `<span aria-hidden="true">${KIND[k][2]}</span>${i + 1}`;
+    b.setAttribute("aria-label", `Postcard ${i + 1}, ${KIND[k][1]}`); b.setAttribute("aria-pressed", i === card.view);
+    b.onclick = () => { card.view = i; save(); drawCard(); };
+    $("tabs").append(b);
+  });
+  if (!card.read.length || game.won) {
+    pc.className = "postcard empty";
+    pc.innerHTML = game.won ? `<p><span class="big" aria-hidden="true">🧳</span>Pinecone's home! Thanks for all the messages.</p>`
+      : `<p><span class="big" aria-hidden="true">📬</span>Pinecone's on vacation! She won't say where, but she'll tell you what she's learned. Send her a message.</p>`;
+    return;
+  }
+  const [k, j] = card.read[card.view], text = POST[code][k][j];
+  const mark = open ? esc(nameOf(code)) : card.hints ? esc(POST[code].region || "") : "";
+  pc.className = "postcard k-" + k;
+  pc.innerHTML = `<div class="corner"><span class="stamp" aria-hidden="true"><i>${KIND[k][2]}</i></span>`
+    + `<span class="postmark${mark ? " known" : ""}" aria-label="${mark ? "Postmark: " + mark : "The postmark is smudged"}">${mark || "· · ·"}</span></div>`
+    + `<p class="kind">Postcard ${card.view + 1} · ${KIND[k][1]}</p><p class="asked">You asked what I've learned about the <b>${KIND[k][1].toLowerCase()}</b> here. Well…</p>`
+    + `<p class="say">${cardHtml(text, open)}</p><p class="love">Love, Pinecone <span class="sig" role="img" aria-label="her paw print">${PAW}</span></p>`;
+}
+// "K _ _ _ _" with the first n letters showing (spaces and hyphens always show).
+function spell(name, n) {
+  let k = 0;
+  return [...name].map(ch => /[\p{L}]/u.test(ch) ? (k++ < n ? ch : "_") : ch).join(" ");
+}
+
+/* ---------- reading and answering ---------- */
+function readCard(k) {
+  const card = game.card;
+  if (!game || game.won || card.seen || busy || card.read.length >= MAX_CARDS) return;
+  const j = card.read.filter(r => r[0] === k).length;
+  if (j >= POST[current()][k].length) return;
+  game.started = true;
+  card.read.push([k, j]); card.view = card.read.length - 1;
+  save(); show();
+  $("postcard").scrollIntoView({block: "nearest", behavior: "smooth"});
+  focusTyping();
+}
+let active = -1;
+function fillList() {
+  const list = $("list"), cs = matching($("guess").value);
+  list.innerHTML = "";
+  if (!cs.length) { const li = document.createElement("li"); li.className = "none"; li.textContent = "No country or territory starts like that"; list.append(li); }
+  cs.forEach((c, i) => {
+    const li = document.createElement("li"); li.setAttribute("role", "option"); li.textContent = nameOf(c); li.dataset.c = c;
+    li.setAttribute("aria-selected", i === active);
+    li.onpointerdown = e => e.preventDefault();
+    li.onclick = () => { $("guess").value = nameOf(c); active = 0; fillList(); list.scrollTop = 0; };
+    list.append(li);
+  });
+}
+$("guess").addEventListener("input", () => { active = $("guess").value.trim() ? 0 : -1; if (style() === "list") { fillList(); $("list").scrollTop = 0; } });
+$("guess").addEventListener("keydown", e => {
+  if (style() !== "list" || !["ArrowDown", "ArrowUp"].includes(e.key)) return;
+  e.preventDefault();
+  const n = $("list").querySelectorAll("li[data-c]").length; if (!n) return;
+  active = (active + (e.key === "ArrowDown" ? 1 : -1) + n) % n; fillList();
+  const li = $("list").querySelectorAll("li[data-c]")[active]; if (li) li.scrollIntoView({block: "nearest"});
+});
+$("typebox").addEventListener("submit", e => {
+  e.preventDefault();
+  const text = $("guess").value, exact = LOOKUP.get(norm(text));
+  if (exact) return submit(exact);
+  if (style() === "list") { const li = $("list").querySelectorAll("li[data-c]")[Math.max(active, 0)]; if (li && text.trim()) return submit(li.dataset.c); }
+  if (!text.trim()) { G.note("Type where you think Pinecone is."); return; }
+  G.note(`There's no country or territory called “${text.trim()}”. Check the spelling?`);
+});
+function submit(c) { $("guess").value = ""; active = -1; answer(c); }
+const focusTyping = () => { if (style() !== "pick" && matchMedia("(hover: hover)").matches && !$("typebox").hidden) $("guess").focus({preventScroll: true}); };
+
+function answer(c, btn) {
+  const card = game.card;
+  if (busy || !game || game.won || card.seen || !card.read.length) return;
+  game.started = true;
+  const code = current();
+  if (c !== code) {
+    if (!card.wrong.includes(c)) card.wrong.push(c);
+    if (card.wrong.length >= TRIES) {
+      game.res.push({c: code, first: false, found: false, hinted: card.hints > 0, cards: card.read.length});
+      G.note(`Sorry! Pinecone's in ${theName(nameOf(code))}.`, 2600);
+      return reveal();
+    }
+    G.note(`Not ${theName(nameOf(c))}. One more try!`, 2500);
+    save(); show(); focusTyping();
+    return;
+  }
+  game.res.push({c, first: !card.wrong.length && !card.hints, found: true, hinted: card.hints > 0, cards: card.read.length});
+  if (btn) btn.className = "right";
+  G.note(card.wrong.length || card.hints ? `${nameOf(c)}, yes.` : `${nameOf(c)}! First try.`, 1800);
+  reveal();
+}
+// The paw prints lift: every postcard read shows the words they covered.
+function reveal() {
+  $("guess").blur();
+  game.card.seen = true; save(); show();
+  $("postcard").scrollIntoView({block: "nearest", behavior: "smooth"});
+  setTimeout(() => { const b = $("nextBtn"); if (b) b.focus({preventScroll: true}); }, 50);
+}
+function advance() {
+  game.i++; game.card = freshCard();
+  if (game.i >= TRIP) return win();
+  save(); show();
+  $("board").scrollIntoView({block: "nearest", behavior: "smooth"});
+}
+// As in Catlas: 8 or more on the first try is a good trip; gold paw: all 10 on the first try, no hints, and no more
+// than 20 postcards read in all.
+function win() {
+  game.won = true; game.i = TRIP - 1;
+  const first = game.res.filter(r => r.first).length, found = game.res.filter(r => r.found).length, cards = game.res.reduce((n, r) => n + r.cards, 0);
+  const clean = !game.hinted && !game.restarted, gold = clean && first === TRIP && cards <= GOLD_CARDS;
+  G.finishClock(Object.assign(game, {level: bestKey(game)}));
+  save(); show();
+  G.track("Pawstcards finished a trip");
+  const why = gold ? "" : first === TRIP && cards > GOLD_CARDS ? ` For the gold paw, use ${GOLD_CARDS} postcards or fewer.`
+    : clean ? " Gold paw: every place on the first try, from 20 postcards or fewer." : "";
+  const pic = src => { const i = new Image(); i.src = src; i.alt = "Pinecone, home from her travels"; i.style.cssText = "display:block;margin:0 auto;max-height:150px;width:auto"; return [i]; };
+  G.winCard(`${first} of ${TRIP} on the first try, ${found} found, from ${cards} postcards.${why}`, () => { G.closeCard(); newTrip(); }, null, game.result,
+    {title: "Pinecone's home!", gold, goldWhy: "Found her on the first try every time, from 20 postcards or fewer!", next: "New trip", pic: pic(CAT_PIC), goldPic: pic(GOLD_PIC)});
+}
+
+/* ---------- hints ---------- */
+// The first hint clears the postmark (where it was posted); after that, as in Catlas: Pick crosses out a wrong name
+// (then rings the right one in gold), and List and Type spell out one more letter of the name.
+const hints = G.hinter({game: () => game, key: () => game ? `${game.i}|${game.card.hints}|${game.card.wrong.length}` : "", draw: () => {}});
+$("hintBtn").onclick = () => {
+  if (!game || game.won || busy || game.card.seen || !game.card.read.length) return;
+  const code = current(), card = game.card;
+  card.hints++; game.hinted = true; game.started = true;
+  let say;
+  if (card.hints === 1) say = `Look at the postmark: it was posted in ${POST[code].region}.`;
+  else if (style() === "pick") {
+    const left = game.trip[game.i].opts.filter(o => o !== code && !card.wrong.includes(o) && !card.out.includes(o));
+    if (left.length) { const o = left[Math.floor(Math.random() * left.length)]; card.out.push(o); say = `It isn't ${theName(nameOf(o))}.`; }
+    else { card.hints = 4; say = "It's the one ringed in gold."; }
+  } else {
+    const letters = [...nameOf(code)].filter(ch => /\p{L}/u.test(ch)).length;
+    card.hints = Math.min(card.hints, letters + 1);
+    say = card.hints - 1 >= letters ? "That's the whole name." : "One more letter, under the messages.";
+  }
+  save(); show(); hints.show({n: card.hints}, say);
+};
+$("restartBtn").onclick = () => { if (!game) return; const t = game.trip; newTrip(t); game.restarted = true; save(); };
+$("newBtn").onclick = () => newTrip();
+for (const s of STYLE_ORDER) $("styleSel").append(new Option(STYLES[s][0], s));
+$("styleSel").onchange = () => setStyle($("styleSel").value);
+G.radios($("styleSel"), "Answer", {pick: "Pick from 4 names", list: "Type, with a list to choose from", type: "Type it, no help"});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? bestKey(game) : STYLE_ORDER.indexOf(settings.style) + 1);
+G.setupTimer({name: "pawstcards", game: () => game, playing: g => !g.won && !(g.card && g.card.seen), save, label: n => STYLES[STYLE_ORDER[n - 1]][0], noun: "answer style"});
+// Keys: 1 to 7 read a postcard of that kind, ← and → go through the postcards read, when not typing.
+document.addEventListener("keydown", e => {
+  if (!game || e.target.closest("input, select, textarea") || e.ctrlKey || e.metaKey || e.altKey || $("overlay").classList.contains("show") || document.querySelector(".spot")) return;
+  const card = game.card;
+  if (/^[1-7]$/.test(e.key)) { e.preventDefault(); readCard(KINDS[+e.key - 1][0]); }
+  else if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && card.read.length > 1) {
+    e.preventDefault(); card.view = Math.max(0, Math.min(card.read.length - 1, card.view + (e.key === "ArrowLeft" ? -1 : 1))); save(); drawCard();
+  }
+});
+
+/* ---------- how to play ---------- */
+function walkthrough() {
+  if (!game) return;
+  const steps = [
+    {say: "Pinecone's on vacation", lit: [[0, 0]], outline: []},
+    {say: "Her paws hide where she is", lit: [[0, 0]], outline: []},
+    {say: "Ask what she's learned", lit: [], els: [[$("ask"), $("stamps")]]},
+    {say: `She'll answer ${MAX_CARDS} messages a place`, lit: [], els: [$("ask")]},
+    {say: "Then say where she is: two tries", lit: [], els: [() => style() === "pick" ? $("choices") : $("typebox")], later: true},
+    {say: "Pick how you answer", lit: [], els: [$("styleSelPills")]},
+    {say: "Stuck? Hint (costs the gold paw)", lit: [], els: [$("hintBtn")]}];
+  G.spotlight({grid: $("postcard"), w: 1, h: 1, steps, done: () => { settings.seenHelp = true; save(); }});
+}
+$("helpBtn").onclick = () => game && game.won ? G.helpLater() : walkthrough();
+
+/* ---------- start ---------- */
+G.nav("pawstcards");
+/* ---------- share links ---------- */
+// A link to the same ten places in the same order, and, if wanted, how each answered one went.
+$("linkBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Pawstcards", what: "trip", won: game.won,
+  puzzle: () => ({g: "pawstcards", N: 1, t: game.trip.map(t => t.c).join(" ")}),
+  progress: () => game.res.map(r => [+r.first, +r.found, +r.hinted, r.cards])}); };
+function openShared(d) {
+  const codes = String(d.t || "").split(" ");
+  if (codes.length !== TRIP || new Set(codes).size !== TRIP || !codes.every(c => POST[c])) { G.note("That share link didn't work. It may have been cut off.", 6000); return; }
+  newTrip(codes.map(c => ({c, opts: shuffle([c, ...wrongNames(c)])})));
+  if (!Array.isArray(d.p)) return;
+  game.res = d.p.slice(0, TRIP).filter(Array.isArray).map((r, i) => ({c: game.trip[i].c, first: !!r[0], found: !!r[1], hinted: !!r[2], cards: Math.max(1, Math.min(MAX_CARDS, Math.floor(+r[3]) || 1))}));
+  game.i = game.res.length; game.timed = false; game.started = true; game.hinted = game.res.some(r => r.hinted);
+  if (game.i >= TRIP) win(); else { save(); show(); }
+}
+const shareOpts = () => ({name: "Pawstcards", inProgress: !!(game && !game.won && (game.res.length || game.card.read.length)), open: openShared});
+const shared = G.readShare("pawstcards");
+if (saved.game && saved.game.trip) G.reopen(() => {
+  if (!saved.game.trip.every(t => POST[t.c])) throw new Error("a place on the trip has no postcards");
+  game = saved.game; G.checkClock(game); show();
+}, msg => { newTrip(); G.note(msg, 5000); });
+else newTrip();
+if (shared) G.offerShare(shared, shareOpts());
+window.addEventListener("hashchange", () => { const d = G.readShare("pawstcards"); if (d) G.offerShare(d, shareOpts()); });
+if (!settings.seenHelp && !shared) setTimeout(walkthrough, 400);
+setStyle(settings.style);
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>

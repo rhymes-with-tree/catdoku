@@ -68,6 +68,7 @@ const G = (() => {
   // search, favorites and the daily challenge until they're finished. Same fields as GAMES.
   const BETA = [
     ["Pounce Up", "pounceup", "Help Rayla pounce up the tallest bookcase in the house", "#7885BA", "quick", "doodle jump platform jumping climbing bookcase shelves action", "2026-11-11"],
+    ["Pawstcards", "pawstcards", "Guess where Pinecone is from her postcards", "#73A7AE", "quick", "geography countries wikipedia postcards guess the country clues redacted trivia travel pinecone", "2026-11-11"],
   ];
   const rowOf = slug => GAMES.find(g => g[1] === slug) || BETA.find(g => g[1] === slug);
   // The shelves the front page and the games menu sort the games onto, in order: key (also a plain name for it,
@@ -1233,6 +1234,7 @@ const G = (() => {
     magnets: ["Arrow keys: pick a square", "Letters: put one up", "Backspace: take a letter down", "Space: turn to the other word"],
     purrfect: ["Arrow keys: pick a square", "Digits: type a number (two quickly for 10 and up)", "Backspace: take it out"],
     atlas: ["Arrow keys: move round the map", "Type your answer and press Enter"],
+    pawstcards: ["1 to 7: ask Pinecone about that kind", "Left and Right arrows: go through her postcards", "Type your answer and press Enter"],
     catburglar: ["Arrow keys: move the crosshair", "Space or Enter: tap there"],
     catpile: ["1 to 3: pick a clump", "Arrow keys: move it", "R: turn it", "Space: put it down"],
     fishbones: ["Arrow keys: go from bone to bone", "Space or Enter: pick one up, then put it down on another", "Escape: let go"],
