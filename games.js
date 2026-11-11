@@ -1597,6 +1597,8 @@ const G = (() => {
   // SETTINGS[slug] is a list of {key, name, line, def (its value when nothing's saved), row (one of ROWS, for a setting
   // the page's top rows set for every game at once), warn (it can cost a life or the gold paw, so changed on the page
   // mid-puzzle it waits for the next game), at ([storage key, field]; else the game's own store, field settings.key),
+  // inv (a row setting that's on when the row's on end isn't: dimming in the Reduce visual clutter row, where the
+  // other switches add things, so On turns them off and turns the dimming on),
   // opts ([value, name] for a choice of several), get/set (where games.js keeps it itself: Timer, Slower)}.
   const TIMERS = "catdoku.timers.v1", COMFORT = "catdoku.comfort.v2", PENDING = "catdoku.pending.v1";
   // Rows at the top of the page, three ways each: words[0] · By game · words[2]; on is the end that turns every switch on.
@@ -1631,16 +1633,17 @@ const G = (() => {
     highperch: [CHECK, NOTES], opendoor: [NOTES], windowledges: [["sets", "Show sets", "The digits that can make each ledge's total", true], NOTES],
     toydoku: [["autoGrade", "Auto grade", "A wrong toy turns red and costs a life", false, {warn: true}], CHECK, NUMBERS("Digits in place of toys"), NOTES],
     junkdrawer: [["junk", "Junk", "Batteries, keys and coins in the drawer", true, {row: "decor"}],
-      ["autoNotes", "Dim used-up magnets", "Magnets no word left to find needs fade", false, {row: "notes"}]],
+      ["autoNotes", "Dim used-up magnets", "Magnets no word left to find needs fade", false, {row: "decor", inv: true}]],
     blanket: [["autoCheck", "Auto check", "Slots that don't fit your lumps turn red", true, {row: "check"}],
       ["autoNotes", "Auto Notes 🔢", "A dot on every square the feathers prove has no cat; costs the gold paw", false, {row: "notes", warn: true}]],
+    crossstitch: [CHECK],
     magnets: [["autoAudit", "Auto-Audit", "Every letter turns olive or coral as it goes up; costs the gold paw", false, {warn: true}]],
     shelflife: [["shelf", "Shelf", "The pots stand on a shelf", true, {row: "decor"}]],
     catpile: [["cats", "Cats", "Cats nap on the blanket", true, {row: "decor", at: ["catdoku.catpile.prefs.v1", "cats"]}],
       ["turns", "Turning", "Toys can be turned as well as moved", false, {at: ["catdoku.catpile.prefs.v1", "turns"]}]],
     bedhog: [["cats", "Cats", "Cats nap on the bed", true, {row: "decor"}]],
     catshuffle: [NUMBERS("Each piece shows where it goes")], windup: [NUMBERS("Each toy shows a number too")],
-    pickpile: [["dim", "Dim stuck blocks", "Blocks that can't come off yet are dimmed", true, {row: "decor"}]],
+    pickpile: [["dim", "Dim stuck blocks", "Blocks that can't come off yet are dimmed", true, {row: "decor", inv: true}]],
     toebeans: [["rev", "Reverse", "Count back down from the total to the start", false]],
     twirl: [["twisty", "Twisty ribbons", "Off, every ribbon is drawn flat", true, {row: "decor", at: ["catdoku.twirl.prefs.v1", "twisty"]}]],
     atlas: [["style", "Answer", "How you answer", "list", {opts: [["pick", "Pick from 4 names"], ["list", "Type, with a list to choose from"], ["type", "Type it, no help"]]}]],
@@ -1677,9 +1680,9 @@ const G = (() => {
   }
   const pendingOf = e => { const p = load(PENDING)[e.slug]; return p && e.key in p ? p[e.key] : undefined; };
   // A row's games, and which of its three it's on: what was chosen, unless a game's been changed since (By game).
-  const rowGames = id => GAMES.map(g => (SETTINGS[g[1]] || []).find(e => e.row === id)).filter(Boolean);
+  const rowGames = id => GAMES.flatMap(g => (SETTINGS[g[1]] || []).filter(e => e.row === id));   // (Junk Drawer has two in Reduce visual clutter)
   function rowMode(id) {
-    const r = ROWS.find(x => x.id === id), vals = rowGames(id).map(e => { const p = pendingOf(e); return p === undefined ? !!readSetting(e) : !!p; });
+    const r = ROWS.find(x => x.id === id), vals = rowGames(id).map(e => { const p = pendingOf(e); return (p === undefined ? !!readSetting(e) : !!p) !== !!e.inv; });
     const all = vals.every(v => v), none = !vals.some(v => v), m = load(COMFORT)[id];
     const end = on => on ? r.on : 2 - r.on;
     if (m === 1) return 1;
@@ -1688,7 +1691,7 @@ const G = (() => {
   }
   function setRow(id, m) {
     const r = ROWS.find(x => x.id === id), all = load(COMFORT); all[id] = m; save(COMFORT, all);
-    if (m !== 1) for (const e of rowGames(id)) writeSetting(e, m === r.on);
+    if (m !== 1) for (const e of rowGames(id)) writeSetting(e, (m === r.on) !== !!e.inv);
   }
   // a game's own switch changed one of a row's settings: the row goes to By game (the other games keep theirs)
   function byGame(slug, key) {
