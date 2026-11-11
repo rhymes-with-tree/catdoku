@@ -90,6 +90,7 @@ const W = 300, VH = 400, SIDE = 10, FT = 30;
 // A pounce clears about 4⅓ feet (a spring about 12½); she lands, crouches a moment (SETTLE seconds), then pounces again.
 const GRAV = 800, POUNCE = 456, SPRING = 780, ZOOM = 650, RUN = 210, SETTLE = .45, WALK = 120;
 const ENDLESS = 12;
+const BASKET_X = W / 2 + 70;   // where the basket stands on top of the bookcase
 // Level n: the height of the bookcase in feet, and from which level each new thing turns up
 const GOALS = [null, 40, 55, 70, 85, 100, 120, 140, 160, 185, 210, 240];
 const FROM = {swat: 1, spring: 2, lemon: 3, candle: 5, slide: 7, tape: 8, nip: 9, loose: 10};
@@ -185,7 +186,12 @@ function build(g, upto) {
     const d = hardness(g, g.genY), R = () => rand(g), pick = a => a[Math.floor(R() * a.length)];
     let y = g.genY + 32 + 42 * d + R() * (18 + 13 * d);
     if (y > goal - 40) {   // the top of the bookcase, with one more shelf first if it would be out of reach
-      if (goal - g.genY <= 100) { g.shelves.push({id: g.n++, kind: "top", x: W / 2, y: goal, w: W - 2 * SIDE, things: []}); g.done = true; break; }
+      if (goal - g.genY <= 100) {
+        g.shelves.push({id: g.n++, kind: "top", x: W / 2, y: goal, w: W - 2 * SIDE, things: []}); g.done = true;
+        // a few fish treats along the top, on her way to the basket (the owner's idea: she may want them)
+        for (let i = 0; i < 3; i++) g.items.push({kind: "fish", x: SIDE + 24 + (i + R() * .6) * (BASKET_X - 52 - SIDE - 24) / 2.6, y: goal + 18, top: true});
+        break;
+      }
       y = g.genY + (goal - g.genY) / 2;
     }
     const w = Math.round(92 - 34 * d + R() * (36 - 12 * d)), room = W - 2 * SIDE - w;
@@ -333,6 +339,7 @@ function walk(s, dir, h) {
   if (!want) return;
   c.face = want;
   let lo = -s.w / 2 - 12, hi = s.w / 2 + 12;   // past these she steps off the end
+  if (s.kind === "top") { lo = -s.w / 2 + 16; hi = s.w / 2 - 16; }   // ...but not off the top: the sides of the bookcase
   for (const t of s.things) if (t.k === "l") { if (t.dx < c.off) lo = Math.max(lo, t.dx + 24); else hi = Math.min(hi, t.dx - 24); }
   if (s.tape) { const r = s.tape.w / 2 + 6; if (s.tape.dx < c.off) lo = Math.max(lo, s.tape.dx + r); else hi = Math.min(hi, s.tape.dx - r); }
   const off = c.off + want * WALK * h;
@@ -342,6 +349,7 @@ function walk(s, dir, h) {
     return;
   }
   c.off = off;
+  if (s.kind === "top" && Math.abs(shelfX(g, s) + off - BASKET_X) < 14) { intoBasket(); return; }
   // walking into something she can knock off swats it
   for (const t of s.things) if (!t.off && SWATS.includes(t.k) && Math.abs(t.dx - c.off) < 22 && Math.sign(t.dx - c.off) === want) swat(s, shelfX(g, s), t);
 }
@@ -384,8 +392,9 @@ function step(h) {
   if (on && c.on != null) {   // then up she goes (not while she's walking)
     c.y = on.y; c.vy = 0; c.settle -= h;
     if (c.walking) c.settle = Math.max(c.settle, tapMode() ? 0 : SETTLE);
-    if (c.settle <= 0 && (!tapMode() || c.queued)) { c.on = null; c.vy = POUNCE; c.queued = false; }
-    else if (tapMode() && c.settle < -2.5 && !g.toldTap) { g.toldTap = true; G.note("Tap where she should pounce.", 3000); }
+    if (c.settle <= 0 && ((!tapMode() && on.kind !== "top") || c.queued)) { c.on = null; c.vy = POUNCE; c.queued = false; }
+    else if (on.kind === "top" && c.settle < -4 && !c.walking && !g.toldBasket) { g.toldBasket = true; G.note("Tap the basket and Rayla walks over for a snooze.", 3500); }
+    else if (tapMode() && on.kind !== "top" && c.settle < -2.5 && !g.toldTap) { g.toldTap = true; G.note("Tap where she should pounce.", 3000); }
   }
   else if (c.zoom > 0) { c.zoom -= h; c.vy = ZOOM; } else c.vy -= GRAV * h;
   const was = c.y; c.y += c.vy * h;
@@ -466,6 +475,14 @@ function catnipDice() {
   c.on = null; c.scared = 0; c.zoom = r < .8 ? .9 + Math.random() * .7 : 2.4;
   G.note(r < .8 ? "Zoomies!" : "ZOOOOOOMIES!", 1600);
 }
+// Rayla climbs into her basket on top of the bookcase (walking in, or landing in it) and that's the climb done, if
+// the level's count goal is met.
+function intoBasket() {
+  const g = game, t = g.task, n = t && COUNTED[t.kind], short = n && g[n[0]] < t.n;
+  g.cat.walking = false; g.cat.walkTo = null;
+  if (short) missed(n[2], `Rayla made it to the basket with ${g[n[0]]} of the ${t.n} ${n[1]}.`, true);
+  else win();
+}
 // What happens on landing: returns true if she stays on this shelf (a cracked one gives way under her).
 function land(s, sx) {
   const g = game, c = g.cat;
@@ -476,10 +493,8 @@ function land(s, sx) {
   }
   c.y = s.y; c.landed = g.t;
   if (s.kind === "top") {
-    const t = g.task, n = t && COUNTED[t.kind], short = n && g[n[0]] < t.n;
-    if (short) missed(n[2], `Rayla made it to the basket with ${g[n[0]]} of the ${t.n} ${n[1]}.`, true);
-    else win();
-    return true;
+    if (Math.abs(c.x - BASKET_X) < 24) { intoBasket(); return true; }
+    if (!g.toldTop) { g.toldTop = true; G.note("The top! Walk Rayla into her basket for a snooze.", 4000); }
   }
   const lemon = s.things.find(t => t.k === "l" && Math.abs(c.x - (sx + t.dx)) < 26);
   if (lemon) {
@@ -586,7 +601,7 @@ function paint() {
   }
   // shelves
   for (const s of g.shelves) if (s.kind !== "floor" && s.y > cam - 50 && s.y < cam + VH + 60) shelf(s, shelfX(g, s));
-  if (goal < cam + VH + 60) basket(W / 2 + 70, goal);
+  if (goal < cam + VH + 60) basket(BASKET_X, goal);
   // things to pick up, bobbing
   for (const it of g.items) {
     if (it.y < cam - 30 || it.y > cam + VH + 30) continue;
@@ -667,7 +682,16 @@ function shelf(s, x) {
 }
 // the basket on top of the bookcase: a toy mouse in it, and once she's there, Rayla curled up in it
 function basket(x, y) {
-  if (game.state === "won") { rayla("basket", x, y - 2, 1.2); return; }
+  if (game.state === "won") {   // curled up in it, snoozing
+    rayla("basket", x, y - 2, 1.2);
+    ctx.save(); ctx.scale(1, -1); ctx.fillStyle = "#4E577D"; ctx.textAlign = "center";
+    [[10, 12], [18, 15], [27, 19]].forEach(([dx, size], i) => {
+      const t = (performance.now() / 1000 * .6 + i * .33) % 1;
+      ctx.globalAlpha = Math.sin(t * Math.PI); ctx.font = `800 ${size}px 'Baloo 2', ui-rounded, sans-serif`;
+      ctx.fillText("z", x + dx + t * 6, -(y + 52 + i * 12 + t * 10));
+    });
+    ctx.restore(); return;
+  }
   ctx.save(); ctx.translate(x, y);
   const m = pic(MOUSE);
   if (ready(m)) { ctx.save(); ctx.translate(-4, 26); ctx.scale(1, -1); ctx.drawImage(m, -16, -16, 32, 32); ctx.restore(); }
@@ -791,13 +815,13 @@ function win() {
     const met = !g.task ? "" : g.task.kind === "time" ? ` In ${Math.floor(g.t)} seconds, with ${Math.ceil(g.task.s - g.t)} to spare!`
       : {tidy: " And she didn't knock a thing off!", lemons: g.warned ? " Only the one lemon, and she shook it off!" : " And not a lemon touched!", candles: " And not a whisker singed!",
          tape: " And not one sticky paw!", loose: " And not one cracked shelf!"}[g.task.kind] || "";
-    const text = `Rayla made it to the basket, ${GOALS[g.level]} ft up${got.length ? `, with ${G.listed(got)}` : ""}.${met}` +
+    const text = `Rayla curled up in her basket for a snooze, ${GOALS[g.level]} ft up${got.length ? `, with ${G.listed(got)}` : ""}.${met}` +
       (g.level === ENDLESS - 1 ? " That's the tallest bookcase; try Endless next!" : ` Next up: level ${next}.`);
     G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the view", g.result,
       {title: "Made it!", gold: first, goldWhy: "First try!", goldTitle: "What a pounce, Rayla!", goldPic: [catPic(RAYLA.leap, "Rayla in mid-leap")],
        pic: window.PREVIEW ? [catPic(RAYLA.basket, "Rayla curled up in her basket")] : undefined,
        next: next > g.level ? `Next: level ${next}` : "Next bookcase", after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
-  }, 1000);
+  }, 1800);   // a moment to see her snoozing first
 }
 function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); G.closeCard(); newRun(n); }
 // Restart climbs the same bookcase again; New bookcase builds another. Leaving a climb partway counts as a try.
