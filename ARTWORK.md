@@ -84,7 +84,8 @@ Bed Hog has no star cat yet: `c14-29` (a ginger cat on its back) sleeps beside i
   safe on all four paws, on the card after a miss. They're cut from the owner's full-size sheet (2026-11-11, 2000 ×
   1196 with a see-through background, so no white edge in Dark Mode; the second copy, with `rayla-bound` clear of
   `rayla-startled`), which has Moonpie and Ferguson too. Pounce Up draws every pose at one scale (`SC`, units per
-  pixel of the sheet).
+  pixel of the sheet). `rayla-low` is turned 13.5° from the sheet so she lies level, her paws and hips on the floor
+  (the owner, 2026-11-11: she looked to hover).
 - **Moonpie** (`moonpie-…`, brown and white with blue eyes) has seven poses from the same sheet, named as Rayla's are:
   `moonpie-sit`, `-crouch`, `-leap`, `-dive`, `-bound`, `-low` and `-crouch2`. They're in `cats/` for later, not for
   Pounce Up (the owner, 2026-11-11). She was first noted as a cuddly cat rather than one for action games.
