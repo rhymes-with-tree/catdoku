@@ -1627,7 +1627,7 @@ const G = (() => {
       NUMBERS("Each ball shows its place in the run")],
     patches: [["fabric", "Fabric patterns", "Each fabric has a pattern as well as a color", true, {row: "decor"}], CHECK],
     sunbeams: [CHECK], tango: [CHECK],
-    scratchthat: [CHECK, ["dotFirst", "Dot first", "A tap puts a dot down first, then a post", false]],
+    scratchthat: [CHECK],
     highperch: [CHECK, NOTES], opendoor: [NOTES], windowledges: [["sets", "Show sets", "The digits that can make each ledge's total", true], NOTES],
     toydoku: [["autoGrade", "Auto grade", "A wrong toy turns red and costs a life", false, {warn: true}], CHECK, NUMBERS("Digits in place of toys"), NOTES],
     junkdrawer: [["junk", "Junk", "Batteries, keys and coins in the drawer", true, {row: "decor"}],
@@ -1640,11 +1640,10 @@ const G = (() => {
       ["turns", "Turning", "Toys can be turned as well as moved", false, {at: ["catdoku.catpile.prefs.v1", "turns"]}]],
     bedhog: [["cats", "Cats", "Cats nap on the bed", true, {row: "decor"}]],
     catshuffle: [NUMBERS("Each piece shows where it goes")], windup: [NUMBERS("Each toy shows a number too")],
-    pickpile: [["dim", "Dim stuck blocks", "Blocks that can't come off yet are dimmed", true]],
+    pickpile: [["dim", "Dim stuck blocks", "Blocks that can't come off yet are dimmed", true, {row: "decor"}]],
     toebeans: [["rev", "Reverse", "Count back down from the total to the start", false]],
-    twirl: [["twisty", "Twisty ribbons", "Off, every ribbon is drawn flat", true, {at: ["catdoku.twirl.prefs.v1", "twisty"]}]],
+    twirl: [["twisty", "Twisty ribbons", "Off, every ribbon is drawn flat", true, {row: "decor", at: ["catdoku.twirl.prefs.v1", "twisty"]}]],
     atlas: [["style", "Answer", "How you answer", "list", {opts: [["pick", "Pick from 4 names"], ["list", "Type, with a list to choose from"], ["type", "Type it, no help"]]}]],
-    knitpick: [["mode", "Words", "Which words are hidden", "themes", {opts: [["themes", "Cat themes"], ["everyday", "Everyday words"]]}]],
   };
   const SLOWS = ["birdwatch", "tailchase", "windup", "lmnopom"], UNTIMED = ["keyboardcat"];
   const timerHidden = slug => { const t = load(TIMERS)[slug]; return t === undefined ? !!load(PREFS).hideTimer : !!t; };

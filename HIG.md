@@ -193,7 +193,7 @@ the reason they don't apply.
 - ⚠️ **Toggles:** Apple keeps the switch style for list rows; ours are switches in the settings row, each with just a
   short name (no line under it since 2026-11-07: a switch doesn't change how hard a puzzle counts, so it's safe to
   flip to find out, and its tip says what it does the first time). Left as is.
-- ✅ **Pickers** (level menus); ✅ **segmented control** (Pawlette's Zen and Swipe); ✅ **labels**; ✅ **lists and tables**
+- ✅ **Pickers** (level menus); ✅ **segmented control** (Catlas's Answer pills; Pawlette's Zen and Swipe until November 2026); ✅ **labels**; ✅ **lists and tables**
   (Best times); ✅ **collections** (the front page's tiles); ✅ **page controls** (🔧 the walkthrough's dots);
   ✅ **progress** (counts and the Catdoku streak).
 - ✅ **Alerts:** none at launch; cards only for things that need a choice.
