@@ -110,7 +110,7 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 const TASK_TEXT = {
   knock: t => [`Knock off ${plural(t.n, "thing", "things")} on the way up!`, `knock off ${t.n}`],
   springs: t => [`Boing! Bounce on ${plural(t.n, "spring", "springs")} on the way up.`, plural(t.n, "spring", "springs")],
-  lemons: () => ["Oh no! So many lemons! Don't touch a single one.", "so many lemons!"],
+  lemons: () => ["Oh no! So many lemons! Rayla gets one warning, then don't touch another.", "so many lemons!"],
   fish: t => [`Get ${plural(t.n, "fish treat", "fish treats")} on the way up!`, `${t.n} fish`],
   candles: () => ["Candles everywhere! Keep Rayla's whiskers out of every flame.", "mind the candles"],
   water: t => [`Splash! Knock over ${plural(t.n, "glass", "glasses")} of water.`, `${plural(t.n, "glass", "glasses")} of water`],
@@ -276,7 +276,7 @@ function showTap(t, goal) {
   if (t) el.append(Object.assign(document.createElement("span"), {textContent: t}));
 }
 const FISH_ICON = `<img src="${FISH}" alt="">`, MUG_ICON = `<img src="${thingSrc("m")}" alt="">`, GLASS_ICON = `<img src="${thingSrc("g")}" alt="">`,
-  SPRING_ICON = `<img src="${SPRING_PIC}" alt="">`, NIP_ICON = `<img src="${NIP.src}" alt="">`;
+  SPRING_ICON = `<img src="${SPRING_PIC}" alt="">`, LEMON_ICON = `<img src="${thingSrc("l")}" alt="">`, NIP_ICON = `<img src="${NIP.src}" alt="">`;
 function status() {
   const goal = game.level === ENDLESS ? 0 : GOALS[game.level], ft = Math.min(goal || Infinity, Math.floor(game.top / FT));
   const t = game.task, k = t && t.kind, left = k === "time" ? Math.max(0, Math.ceil(t.s - game.t)) : 0;
@@ -287,10 +287,11 @@ function status() {
     (game.fish || k === "fish" ? `<span class="sep"></span>${FISH_ICON}${game.fish}${of("fish")}` : "") +
     (game.knocked || k === "knock" ? `<span class="sep"></span>${MUG_ICON}${game.knocked}${of("knock")}` : "") +
     (goalIcon ? `<span class="sep"></span>${goalIcon}${game[COUNTED[k][0]]}/${t.n}` : "") +
+    (k === "lemons" ? `<span class="sep"></span>${LEMON_ICON}${game.warned ? "no warnings left" : "1 warning"}` : "") +
     (k === "time" ? `<span class="sep"></span>${left}s left` : "") + (!goal && settings.best ? `<span class="sep"></span>best ${settings.best}` : "");
   $("count").setAttribute("aria-label", `${ft}${goal ? ` of ${goal}` : ""} feet up, ${game.fish}${of("fish").replace("/", " of ")} fish treats, ` +
     `${game.knocked}${of("knock").replace("/", " of ")} things knocked off` + (goalIcon ? `, ${game[COUNTED[k][0]]} of ${t.n} ${COUNTED[k][1]}` : "") +
-    (k === "time" ? `, ${left} seconds left` : ""));
+    (k === "lemons" ? (game.warned ? ", no lemon warnings left" : ", one lemon warning") : "") + (k === "time" ? `, ${left} seconds left` : ""));
   G.relabel($("pauseBtn"), game.state === "paused" ? "Go on" : "Pause", game.state === "paused" ? "play" : "pause");
   $("pauseBtn").disabled = !["running", "paused"].includes(game.state);
 }
@@ -388,15 +389,21 @@ function step(h) {
   }
   else if (c.zoom > 0) { c.zoom -= h; c.vy = ZOOM; } else c.vy -= GRAV * h;
   const was = c.y; c.y += c.vy * h;
+  // after the warning lemon, she drops onto the shelf picked for her, below (warnLemon)
+  if (c.rescue && c.vy < 0) {
+    const r = g.shelves.find(o => o.id === c.rescue.id), rx = r && shelfX(g, r) + c.rescue.dx;
+    if (!r) c.rescue = null;
+    else { c.vx = 0; c.x += (rx - c.x) * Math.min(1, h * 8); if (c.y <= r.y) { c.y = r.y; c.x = rx; c.rescue = null; c.scared = 0; land(r, shelfX(g, r)); } }
+  }
   // landing on a shelf, from above
-  if (c.vy < 0 && c.scared <= 0) for (const s of g.shelves) {
+  if (c.vy < 0 && c.scared <= 0 && !c.rescue) for (const s of g.shelves) {
     if (s.gone || was < s.y || c.y > s.y) continue;
     const sx = shelfX(g, s);
     if (Math.abs(c.x - sx) > s.w / 2 + 8) continue;
     if (land(s, sx)) break;
   }
   // a candle's flame, if she goes through it on the way up or down
-  if (c.scared <= 0 && c.zoom <= 0) for (const s of g.shelves) {
+  if (c.scared <= 0 && c.zoom <= 0 && !c.rescue) for (const s of g.shelves) {
     if (s.gone || !s.things.length || Math.abs(s.y - c.y) > 60) continue;
     const sx = shelfX(g, s);
     for (const t of s.things) if (t.k === "c" && Math.abs(sx + t.dx - c.x) < 14 && c.y < s.y + .74 * THING_SIZE.c && c.y + 26 > s.y + .5 * THING_SIZE.c) {
@@ -426,6 +433,30 @@ function step(h) {
   build(g, g.cam + VH + 200);
   noticeNew();
 }
+// On the lemon level the first lemon is a warning (the owner's idea): she leaps back from it and drops safely onto a
+// shelf below that's still in view, somewhere clear of lemons and tape, and goes on from there. The next one ends it.
+// False if there's no such shelf (then it ends there).
+function warnLemon(from, away) {
+  const g = game, c = g.cat;
+  const spot = s => {
+    let best = null;
+    for (let dx = -s.w / 2 + 8; dx <= s.w / 2 - 8; dx += 2) {
+      if (s.things.some(t => (t.k === "l" && Math.abs(dx - t.dx) < 34) || (t.k === "c" && Math.abs(dx - t.dx) < 22)) || (s.tape && Math.abs(dx - s.tape.dx) < s.tape.w / 2 + 12)
+        || (s.spring != null && Math.abs(dx - s.spring) < 20)) continue;
+      if (best == null || Math.abs(dx) < Math.abs(best)) best = dx;
+    }
+    return best;
+  };
+  const below = g.shelves.filter(o => !o.gone && o.kind !== "loose" && o.kind !== "top" && o.y < from.y - 5 && o.y > g.cam + 10).sort((a, b) => b.y - a.y);
+  for (const o of below) {
+    const dx = spot(o); if (dx == null) continue;
+    g.warned = true; status();
+    fright(away, 300, 120, .25, "Ew, citrus! That's her one warning: no more lemons!", "lemon");
+    c.rescue = {id: o.id, dx};
+    return true;
+  }
+  return false;
+}
 // After a roll in the catnip, a dice roll: now and then she's just too mellow to bother; mostly the zoomies, straight
 // up; and once in a while ZOOMIES, much higher.
 function catnipDice() {
@@ -452,8 +483,10 @@ function land(s, sx) {
   }
   const lemon = s.things.find(t => t.k === "l" && Math.abs(c.x - (sx + t.dx)) < 26);
   if (lemon) {
-    fright(c.x < sx + lemon.dx ? -1 : 1, 395, 270, .6, "Ew, citrus!", "lemon");
-    if (kindOf(g) === "lemons") missed("Ew, citrus!", "Rayla touched a lemon, and on this bookcase she mustn't touch a single one.");
+    const away = c.x < sx + lemon.dx ? -1 : 1;
+    if (kindOf(g) === "lemons" && !g.warned && warnLemon(s, away)) return true;
+    fright(away, 395, 270, .6, "Ew, citrus!", "lemon");
+    if (kindOf(g) === "lemons") missed("Ew, citrus!", "Rayla touched a second lemon. One warning was all she got.");
     return true;
   }
   if (s.tape && Math.abs(c.x - (sx + s.tape.dx)) < s.tape.w / 2 + 6) {
@@ -756,7 +789,7 @@ function win() {
   setTimeout(() => {
     if (game !== g) return;
     const met = !g.task ? "" : g.task.kind === "time" ? ` In ${Math.floor(g.t)} seconds, with ${Math.ceil(g.task.s - g.t)} to spare!`
-      : {tidy: " And she didn't knock a thing off!", lemons: " And not a lemon touched!", candles: " And not a whisker singed!",
+      : {tidy: " And she didn't knock a thing off!", lemons: g.warned ? " Only the one lemon, and she shook it off!" : " And not a lemon touched!", candles: " And not a whisker singed!",
          tape: " And not one sticky paw!", loose: " And not one cracked shelf!"}[g.task.kind] || "";
     const text = `Rayla made it to the basket, ${GOALS[g.level]} ft up${got.length ? `, with ${G.listed(got)}` : ""}.${met}` +
       (g.level === ENDLESS - 1 ? " That's the tallest bookcase; try Endless next!" : ` Next up: level ${next}.`);
