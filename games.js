@@ -13,7 +13,7 @@ const G = (() => {
     ["Patches", "patches", "Sew a four-fabric quilt", "#73A7AE", "logic", "map four colour color quilt"],
     ["Sunbeams", "sunbeams", "Every cat gets a warm spot", "#ECA818", "logic", "shikaku rectangles"],
     ["Toy Box", "toybox", "Help Laya put every toy back in its basket", "#B3B94B", "teasers", "sort ball sort"],
-    ["Pounce", "pounce", "Line up three of a kind for Crunch to pounce on", "#6AA673", "quick", "match 3 match-3 three in a row"],
+    ["Pounc3", "pounce", "Line up three of a kind for Crunch to pounce on", "#6AA673", "quick", "pounce match 3 match-3 three in a row"],
     ["Twirl", "twirl", "Clear every ribbon off the mat so Bugsy can nap", "#B94588", "teasers", "ribbons unblock"],
     ["Toe Beans", "toebeans", "Make the number on the big pad", "#DD9DAD", "numbers", "countdown 24 sums arithmetic maths math"],
     ["Knock It Off", "knockitoff", "Help Fred push everything off the table", "#7885BA", "teasers", "push sokoban table"],
