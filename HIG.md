@@ -174,7 +174,7 @@ the reason they don't apply.
 
 ### Privacy
 - ✅ **Process data on the device:** everything is kept in the browser; GoatCounter counts plays without cookies.
-  Send feedback (in the beta games) sends only what the player writes, with the game, build, puzzle link, screen and
+  Send feedback (in every game's menu) sends only what the player writes, with the game, build, puzzle link, screen and
   browser, and only when they press Send; the card says what goes with it.
 
 ### Multitasking

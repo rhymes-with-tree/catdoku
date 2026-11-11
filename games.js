@@ -1001,8 +1001,8 @@ const G = (() => {
   }
 
   /* ---------- feedback ---------- */
-  // Send feedback (decided 2026-11-11, for the games in beta first): a card to tell us what you think, from the game's
-  // menu (and the Beta label beside a beta game's title). It's sent from the page to the owner's Google Form, whose
+  // Send feedback (2026-11-11: the beta games first, then every game the same day): a card to tell us what you think,
+  // from the game's menu (and the Beta label beside a beta game's title). It's sent from the page to the owner's Google Form, whose
   // answers land in a Google Sheet, so the player stays in the game. Sent with it, to help put things right: the game,
   // the build, what the page says about the game in play (feedbackFor), a link to this puzzle, the screen and the
   // browser. Nothing else about the player, and nothing at all until they press Send. The form's questions are all
@@ -1011,8 +1011,8 @@ const G = (() => {
   const FEEDBACK_FIELD = {kind: "entry.1677249528", message: "entry.353537297", game: "entry.278349968", details: "entry.1788484241",
     contact: "entry.1215492194", build: "entry.1018258034", device: "entry.1596067276", link: "entry.1931990482"};
   const FEEDBACK_KINDS = ["Love it", "Too hard", "Too easy", "Confusing", "Something's broken", "An idea"];
-  // where it's offered: the games in beta (true would offer it in every game)
-  const FEEDBACK_EVERYWHERE = false;
+  // where it's offered: every game (false would keep it to the games in beta)
+  const FEEDBACK_EVERYWHERE = true;
   const feedbackHere = slug => FEEDBACK_EVERYWHERE || BETA.some(g => g[1] === slug);
   // the page's part: {details() (a line about the game in play: level, settings…), share() (the share link's data for
   // this puzzle, or null), pause()}
@@ -1023,14 +1023,18 @@ const G = (() => {
     const slug = CURRENT, name = (rowOf(slug) || [document.querySelector("header h1") ? document.querySelector("header h1").textContent : slug])[0];
     const sel = $("levelSel") || $("size");
     let details = "";
-    try { details = feedbackPage.details ? feedbackPage.details() : sel && sel.selectedOptions[0] ? sel.selectedOptions[0].textContent : ""; } catch (e) {}
-    let link = location.origin + location.pathname;
-    try { const d = feedbackPage.share && feedbackPage.share(); if (d) link = shareUrl(d); } catch (e) {}
+    try {   // the page's own line, else its level or size picker's choice
+      details = feedbackPage.details ? feedbackPage.details() : sel && sel.selectedOptions[0] ? `${sel.id === "size" ? "Size" : "Level"} ${sel.selectedOptions[0].textContent.replace(/^(Level|Size)\s*/i, "")}` : "";
+    } catch (e) {}
+    let link = location.origin + location.pathname, puzzle = false;
+    try { const d = feedbackPage.share && feedbackPage.share(); if (d) { link = shareUrl(d); puzzle = true; } } catch (e) {}
     const mm = q => matchMedia(q).matches;
     const device = [`${innerWidth} × ${innerHeight}`, `${devicePixelRatio}×`, mm("(prefers-color-scheme: dark)") ? "dark" : "light",
       mm("(pointer: coarse)") ? "touch" : "mouse", document.documentElement.classList.contains("bigText") ? "big text" : "",
       sideways() ? "sideways" : "", navigator.userAgent].filter(Boolean).join(" · ");
-    return {slug, name: BETA.some(g => g[1] === slug) ? `${name} (beta)` : name, details, link, device, build: window.SITE_BUILD || ""};
+    // the build: the page's BUILD, or (on the older pages, which don't share it) the ?v= that loaded games.js
+    const v = document.querySelector('script[src*="games.js?v="]'), build = window.SITE_BUILD || (v ? v.getAttribute("src").split("?v=")[1] : "");
+    return {slug, name: BETA.some(g => g[1] === slug) ? `${name} (beta)` : name, details, link, puzzle, device, build};
   }
   // post it to the form; resolves once it's gone (the form doesn't say whether it took it), rejects if it couldn't go
   async function sendFeedback(f) {
@@ -1067,7 +1071,7 @@ const G = (() => {
     const contact = Object.assign(document.createElement("input"), {type: "text", maxLength: 200, value: d.contact, autocomplete: "email", placeholder: "Email or name"});
     contact.oninput = () => { d.contact = contact.value; };
     const sent = document.createElement("p"); sent.className = "fbSent";
-    sent.textContent = `Sent with it: ${info.name}, build ${info.build || "?"}${info.details ? ", " + info.details : ""}, a link to this ${info.slug ? "puzzle" : "page"}, your screen size and your browser's name.`;
+    sent.textContent = `Sent with it: ${info.name}, build ${info.build || "?"}${info.details ? ", " + info.details : ""}, ${info.puzzle ? "a link to this puzzle" : "the page's address"}, your screen size and your browser's name.`;
     box.append(kinds, field("Tell us more", msg), field("How can we reach you?", contact, "Only if you'd like a reply."), sent);
     const send = async () => {
       if (!d.kind && !d.message.trim()) { msg.focus(); msg.placeholder = "Pick one above, or write a few words here"; return; }
