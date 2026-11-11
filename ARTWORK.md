@@ -94,6 +94,8 @@ Bed Hog has no star cat yet: `c14-29` (a ginger cat on its back) sleeps beside i
 
 Purrmutation has no star cat: its cats are shuffled too. Each puzzle draws one of 21 big, whole pictures as large as fits on a patchwork quilt and cuts the picture into pieces: the general cats `c14-34`, `c14-35`, `c14-36`, `c15-5`, `c15-6` (curled up), `c15-38` and `c14-63` (sitting), and the named cats `bowtie-6`, `bugsy-4`, `bugsy-6`, `bugsy-bowtie-boxes`, `crunch-4` to `crunch-7`, `dottie-5`, `dottie-22`, `laya-2`, `laya-3`, `laya-4` and `laya-7` (the list `PICS` in `catshuffle/index.html`). The win card names a named cat ("Crunch is back in the picture"), and the gold-paw card shows the finished picture.
 
+Pawstcards (in beta) has a stand-in for its star, Pinecone (she/her; the owner will draw her): a general black cat, `c18-27` sitting beside the title and on the win card, and `c19-15` on the gold-paw card. The paw print that covers the place's name on her postcards, and the big one she signs with, is drawn in the page (`PAW` in `pawstcards/index.html`).
+
 Meowbile puts a general cat beside its title, `c18-21` (a calico sitting and looking up at the mobile), and `c18-38` (a ginger cat leaping up) is on the gold-paw card.
 
 Shelf Life's skeins of yarn (`shelflife/skeins/skein-1` to `-9`) are the owner's drawing of nine shop-wound skeins, all near enough square, cut apart:

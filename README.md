@@ -9,7 +9,7 @@ Open `index.html` in any modern browser: the front page has a tile for every gam
 **Games in beta** are on the site but not on the front page yet: their pages work when opened by their address (for
 sharing with a few people while they're tuned), with a Beta label beside the title (a tap on it sends feedback), and they're kept out of the games
 menu, search, favorites, the daily challenge and search engines (`BETA` in `games.js`, beside `GAMES`). Today:
-Pounce Up, at `pounceup/` (Rayla pounces up a tall bookcase; see `IDEAS.md` and `TODO.md`).
+Pounce Up, at `pounceup/` (Rayla pounces up a tall bookcase; see `IDEAS.md` and `TODO.md`), and Pawstcards, at `pawstcards/` (Pinecone is on vacation and won't say where: ask what she's learned about the history, geography, politics, economy, people, culture or cats of where she is, and guess the country from her postcards, which are passages from Wikipedia with the place's name under her paw prints; see `IDEAS.md`, `TODO.md` and `tools/pawstcards/NOTES.md`).
 
 ## Across every game
 
