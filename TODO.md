@@ -95,6 +95,22 @@ Knock It Off's forgiving first two levels, and Pounce saving while toys fall):
   at 20 are the same.
 - [ ] **Errors to look at:** Catlas (2: `main` and `by` on null, `atlas/` lines 580 and 824 as of 2026-11-03).
 
+### The owner's notes on the list (2026-11-12)
+
+- **One new move a level.** The how-to and the on-ramp are divided in a way that isn't ideal: the walkthrough tells
+  the rules up front, and then the levels get harder. Better: each early level brings in one new move, and a win on
+  it is the reward. A direction for every game with levels, to be tried on one or two first.
+- **No point of no return.** Levels shouldn't get harder without the player choosing it; make it easy to stay on a
+  level. (Mewstermind already only moves up on a gold paw.) Toe Beans getting that hard with few wins is disheartening.
+- **Night Light: slow down.** The owner can't win past level 1. Its two things (the plain game, and cats that point
+  their own way) are tough mixed; perhaps two games, Night Light and Day Light.
+- **Tunnel Run** has the same two-things problem (turning and sliding); perhaps Tunnel Run and Tunnel Run 2.
+- **Wind Up:** the higher levels always need a shake, so a gold paw there may be impossible.
+- **Pounce: a new name** that starts with Pounce and says it's a match-3.
+- **Mewstermind** is harder than expected.
+- **Toy Box, Twirl and Knock It Off need more** past their hardest level.
+- **Zen:** look for more games that could have a Zen (Pounce and Bubbles have one).
+
 ## Pounce Up: tune the goals
 
 Pounce Up joined the front page on 2026-11-12. Its level goals (`TASKS` in `pounceup/index.html`: the counts, the
