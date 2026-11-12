@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-12.17"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-12.18"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-12.17">
+<link rel="stylesheet" href="../games.css?v=2026-11-12.18">
 <style>
 /* Every game's settings on one page, as a grid of small icon buttons (the owner's design, 2026-11-12). The top row
    sets a thing for every game at once, and a tap goes round its three ways (Show · Hide · By game). Under it, a row
@@ -56,6 +56,8 @@ header{align-items:flex-start}
 .sb.off .slash{display:inline}
 .sb.mixed{border:1.5px dashed var(--line)}
 .sb.choice{background:color-mix(in srgb,var(--pacific-blue) 18%,transparent);border-color:color-mix(in srgb,var(--pacific-blue) 50%,transparent)}
+.sb.costsPaw{position:relative}
+.sb.costsPaw .w2{color:inherit}
 .sb .wait{font-size:calc(10px*var(--ts));font-weight:800;color:var(--ink)}
 .sb .wait[hidden]{display:none}
 /* the shelves */
@@ -83,12 +85,12 @@ header{align-items:flex-start}
 <body>
 <main>
   <a class="back" href="../">← All the games</a>
-  <header><h1>Settings</h1><div class="stripe"></div><p class="tagline">Tap an icon to turn it on or off. The top row sets every game at once; open a shelf to set its games one by one.</p></header>
+  <header><h1>Settings</h1><div class="stripe"></div><p class="tagline">Tap an icon to change it. The top row sets every game at once; open a shelf to set its games one by one. One in brick red with a crossed-out paw costs the gold paw.</p></header>
   <section class="box" aria-labelledby="everyHead"><p class="rowHead" id="everyHead">Every game</p><div class="icons" id="every"></div></section>
   <div class="shelves" id="shelves"></div>
 </main>
 
-<script src="../games.js?v=2026-11-12.17"></script>
+<script src="../games.js?v=2026-11-12.18"></script>
 <script>
 const $ = G.$;
 const syncs = [], syncAll = () => syncs.forEach(f => f());
@@ -112,11 +114,15 @@ const iconOf = name => {
 // the five columns: their icon, and what each of the top row's three ways says (in the order a tap goes round them)
 const COLS = [
   {row: "timers", icon: "timer", name: "Timer", ways: [[0, "Show"], [2, "Hide"], [1, "By game"]]},
-  {row: "speed", icon: "speed", name: "Speed", short: "Slow", ways: [[2, "Slow"], [0, "Fast"], [1, "By game"]]},
-  {row: "decor", icon: "clutter", name: "Visual clutter", short: "Clutter", ways: [[2, "Regular"], [0, "Reduced"], [1, "By game"]]},
-  {row: "check", icon: "check", name: "Auto check", short: "Check", ways: [[0, "Check"], [2, "No check"], [1, "By game"]]},
-  {row: "notes", icon: "notes", name: "Auto Notes", short: "Notes", ways: [[0, "Notes"], [2, "No notes"], [1, "By game"]]},
+  {row: "speed", icon: "speed", name: "Speed", ways: [[2, "Slow"], [0, "Regular"], [1, "By game"]], states: ["Regular", "Slow"], choice: true},
+  {row: "decor", icon: "clutter", name: "Visual clutter", short: "Clutter", ways: [[2, "Regular"], [0, "Reduced"], [1, "By game"]], states: ["Reduced", "Regular"], choice: true},
+  {row: "check", icon: "check", name: "Auto check", short: "Check", ways: [[0, "Check"], [2, "No check"], [1, "By game"]], states: ["Off", "On"]},
+  {row: "notes", icon: "notes", name: "Auto Notes", short: "Notes", ways: [[0, "Notes"], [2, "No notes"], [1, "By game"]], states: ["Off", "On"]},
 ];
+COLS[0].states = ["Hide", "Show"];
+// A setting that can cost the gold paw is drawn as the games draw such tools: brick red with a crossed-out paw.
+const pawMark = (b, list) => { if (list.some(e => e.paw)) b.classList.add("costsPaw"); };
+const pawSays = list => list.some(e => e.paw) ? ", costs the gold paw" : "";
 const gameName = slug => G.GAMES.find(g => g[1] === slug)[0];
 
 // a button: icon, then one or two small lines of words
@@ -138,7 +144,10 @@ for (const c of COLS) {
   syncs.push(() => {
     const m = G.rowMode(c.row), word = c.ways.find(([x]) => x === m)[1];
     w2.textContent = word;
-    b.classList.toggle("on", m === c.ways[0][0]); b.classList.toggle("off", m === c.ways[1][0]); b.classList.toggle("mixed", m === 1);
+    // Speed and Clutter are two ways, neither of them off (Slow or Regular, Regular or Reduced): no line through them
+    if (c.choice) b.classList.toggle("choice", m !== 1);
+    else { b.classList.toggle("on", m === c.ways[0][0]); b.classList.toggle("off", m === c.ways[1][0]); }
+    b.classList.toggle("mixed", m === 1);
     b.setAttribute("aria-label", `${c.name} for every game: ${word}. Tap for ${c.ways[(c.ways.findIndex(([x]) => x === m) + 1) % 3][1]}`);
   });
   $("every").append(b);
@@ -147,14 +156,16 @@ for (const c of COLS) {
 // A game's on/off icon for a column: its settings in that row (Junk Drawer has two clutter switches, one icon).
 // On means the thing is there: the timer showing, slow speed, the clutter (decorations, no dimming), checking, notes.
 function columnButton(slug, c, list) {
-  const b = button(c.icon, ""), w = b.querySelector(".w");
-  w.textContent = c.short || c.name;
+  const b = button(c.icon, ""), w = b.querySelector(".w"), w2 = b.querySelector(".w2");
+  w.textContent = c.short || c.name; w2.hidden = false; pawMark(b, list);
+  if (c.choice) b.classList.add("choice");   // two ways, neither of them off: no line through the icon
   const shown = e => { const p = G.pendingOf(e); return !!(p === undefined ? G.readSetting(e) : p) !== !!e.inv; };
   b.onclick = () => { const to = !list.some(shown); for (const e of list) G.writeSetting(e, to !== !!e.inv); syncAll(); };
   syncs.push(() => {
     const on = list.some(shown);
-    b.classList.toggle("on", on); b.classList.toggle("off", !on); b.setAttribute("aria-pressed", String(on));
-    b.setAttribute("aria-label", `${gameName(slug)}: ${c.name}`);
+    w2.textContent = c.states[on ? 1 : 0];
+    if (c.choice) b.setAttribute("aria-label", `${gameName(slug)}, ${c.name}: ${w2.textContent}${pawSays(list)}. Tap for ${c.states[on ? 0 : 1]}`);
+    else { b.classList.toggle("on", on); b.classList.toggle("off", !on); b.setAttribute("aria-pressed", String(on)); b.setAttribute("aria-label", `${gameName(slug)}: ${c.name}${pawSays(list)}`); }
     b.querySelector(".wait").hidden = !list.some(e => G.pendingOf(e) !== undefined);
   });
   return b;
@@ -162,6 +173,7 @@ function columnButton(slug, c, list) {
 // A game's own setting: on/off (its words say which, or it's lit when on), or a choice a tap goes round.
 function ownButton(slug, e) {
   const b = button(e.icon || "sliders", ""), w = b.querySelector(".w");
+  pawMark(b, [e]);
   const now = () => { const p = G.pendingOf(e); return p === undefined ? G.readSetting(e) : p; };
   if (e.opts) {
     const names = e.short || Object.fromEntries(e.opts);
@@ -175,7 +187,7 @@ function ownButton(slug, e) {
   } else {
     w.textContent = e.short || e.name;
     b.onclick = () => { G.writeSetting(e, !now()); syncAll(); };
-    syncs.push(() => { const on = !!now(); b.classList.toggle("on", on); b.classList.toggle("off", !on); b.setAttribute("aria-pressed", String(on)); b.setAttribute("aria-label", `${gameName(slug)}: ${e.name}`); });
+    syncs.push(() => { const on = !!now(); b.classList.toggle("on", on); b.classList.toggle("off", !on); b.setAttribute("aria-pressed", String(on)); b.setAttribute("aria-label", `${gameName(slug)}: ${e.name}${pawSays([e])}`); });
   }
   syncs.push(() => { b.querySelector(".wait").hidden = G.pendingOf(e) === undefined; });
   return b;

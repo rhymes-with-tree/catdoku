@@ -810,11 +810,14 @@ const G = (() => {
     .spot .arrowLine.back{stroke:var(--ink)}
     .spot .arrowHead{fill:#FFF4D2;stroke:var(--ink);stroke-linejoin:round;paint-order:stroke fill}
     .spot .say{position:absolute;left:4%;right:4%;max-width:100vw;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;pointer-events:none}
-    .spot .say b{font-size:clamp(24px,7vw,36px);font-weight:800;line-height:1.1;color:#FFF4D2;-webkit-text-stroke:6px var(--ink);paint-order:stroke fill;text-wrap:balance}
-    .spot .say small{font-size:15px;font-weight:600;color:#FFF4D2;-webkit-text-stroke:3px var(--ink);paint-order:stroke fill;opacity:.9;animation:spotTap 1.6s ease-in-out infinite}
+    /* the words sit on a card of their own (the owner, 2026-11-12: outlined letters over the board were hard to read) */
+    .spot .say .card{display:flex;flex-direction:column;align-items:center;gap:4px;max-width:100%;box-sizing:border-box;padding:10px 18px 11px;border-radius:18px;
+      background:#2A2530;border:2px solid #FFF4D2;box-shadow:0 6px 20px rgba(0,0,0,.35)}
+    .spot .say b{font-size:calc(clamp(21px,5.8vw,28px)*var(--ts-big,1));font-weight:700;line-height:1.2;letter-spacing:.01em;color:#FFF4D2;text-wrap:balance}
+    .spot .say small{font-size:calc(15px*var(--ts-big,1));font-weight:600;color:#FFF4D2;opacity:.85;animation:spotTap 1.6s ease-in-out infinite}
     .spot .say b .w{white-space:nowrap}
     .spot .say b .emo img{display:inline-block;width:1.15em;height:1.15em;vertical-align:-.2em}
-    .spot .say b .emo{-webkit-text-stroke:0;display:inline-block;background:#FFF4D2;border:3px solid var(--ink);border-radius:999px;padding:0 .12em;margin:0 .04em;line-height:1.15;font-size:.85em;vertical-align:.06em}
+    .spot .say b .emo{display:inline-block;background:#FFF4D2;border:2px solid #FFF4D2;border-radius:999px;padding:0 .12em;margin:0 .04em;line-height:1.15;font-size:.85em;vertical-align:.06em}
     /* the walkthrough's own bar, centred at the bottom of the screen: a dot for each step (Apple's page control) and Skip */
     .spot .spotBar{position:fixed;left:50%;transform:translateX(-50%);max-width:calc(100vw - 24px);bottom:max(14px,env(safe-area-inset-bottom));display:flex;align-items:center;gap:14px;
       padding:4px 6px 4px 16px;border-radius:999px;background:rgba(42,37,48,.82);pointer-events:auto;cursor:default}
@@ -826,7 +829,7 @@ const G = (() => {
     .spot.trying{pointer-events:none}   /* an interactive step: taps go through to what it lights (and nowhere else) */
     .spot.trying .spotBar{pointer-events:auto}
     .spotGo{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;pointer-events:none;animation:spotGo 1.3s ease-out forwards}
-    .spotGo b{font-size:clamp(34px,10vw,52px);font-weight:800;color:#FFF4D2;-webkit-text-stroke:7px var(--ink);paint-order:stroke fill}
+    .spotGo b{font-size:clamp(30px,9vw,46px);font-weight:800;color:#FFF4D2;padding:8px 24px 10px;border-radius:20px;background:#2A2530;border:2px solid #FFF4D2;box-shadow:0 6px 20px rgba(0,0,0,.35)}
     @keyframes spotGo{0%{opacity:0;transform:scale(.7)}18%{opacity:1;transform:scale(1.06)}30%{transform:scale(1)}70%{opacity:1}100%{opacity:0;transform:scale(1.08)}}
     @keyframes spotIn{from{opacity:0}}
     @keyframes spotTap{50%{opacity:.45}}
@@ -1299,11 +1302,14 @@ const G = (() => {
     openCard("Keyboard Shortcuts", "", [["Close", closeCard, true]], ul);
   }
   document.addEventListener("keydown", e => {
-    if (e.key !== "?" || e.ctrlKey || e.metaKey || e.altKey || !CURRENT || !KEYS[CURRENT] || document.querySelector(".spot") || $("overlay").classList.contains("show")) return;
+    if (e.key !== "?" || e.ctrlKey || e.metaKey || e.altKey || !CURRENT || !KEYS[CURRENT] || $("overlay").classList.contains("show")) return;
     if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) || e.target.isContentEditable) return;
+    // during a walkthrough (whose last step says "Press ? for the keys"), ? ends it, as Skip does, and opens them
+    if (document.querySelector(".spot")) { if (!endSpot) return; endSpot(); }
     e.preventDefault(); keysCard();
   });
 
+  let endSpot = null;   // the walkthrough that's up: how to end it, as Skip does
   function spotlight(o) {
     const tip = o.finish === false;
     // on a computer, the whole walkthrough ends by pointing to the keys
@@ -1444,7 +1450,8 @@ const G = (() => {
       // "Tap to go on" only on the first step: after that the dots say there's more, and the fewer words the better
       tap.textContent = st.try && !st.tried ? (st.try.tip || "") : k === 0 && steps().length > 1 ? "Tap to go on" : "";
       if (!tap.textContent) tap.hidden = true;
-      say.append(bw, tap); layer.append(say);
+      const card = document.createElement("span"); card.className = "card"; card.append(bw, tap);
+      say.append(card); layer.append(say);
       // The words go over the board where they cover the least of the lit squares (and, among those,
       // nearest the middle), so they never sit on what the step is pointing at if they can help it.
       const sh = say.offsetHeight, l = say.offsetLeft, r = l + say.offsetWidth;
@@ -1503,10 +1510,11 @@ const G = (() => {
       clearInterval(ticker); removeEventListener("resize", redraw); removeEventListener("scroll", redraw); document.removeEventListener("pointerup", onUp, true); document.removeEventListener("keyup", onUp, true);
       for (const ev of ["pointerdown", "click"]) window.removeEventListener(ev, guard, true);
       for (const f of new Set(o.steps.map(st => st.restore).filter(Boolean))) f();   // Your turn steps: the board as it was
-      holes = []; layer.remove(); if (o.done) o.done();
+      holes = []; layer.remove(); if (endSpot === end) endSpot = null; if (o.done) o.done();
     }
     // Skip (or Escape): the walkthrough ends here, and counts as seen; How to play has it all again.
     function end() { const was = o.steps[k]; if (was && was.leave) was.leave(); k = o.steps.length; close(); }
+    endSpot = end;
     // after a tap on an interactive step's squares: once it's done, say so in green and go on
     // (checked for a moment after each tap, as a move can finish after a short slide or animation)
     function tried(n = 0) {
@@ -1587,6 +1595,12 @@ const G = (() => {
     opt.innerHTML = '<label class="toggle"><input type="checkbox"><span class="sw"></span><span class="swName"></span></label>';
     const box = opt.querySelector("input"); box.id = o.id;
     emoText(opt.querySelector(".swName"), o.label);
+    // a switch that can cost the gold paw (paw in SETTINGS) is drawn as the games draw such tools: its name in brick
+    // red with a small crossed-out paw (the owner, 2026-11-12), as on the Settings page
+    if ((SETTINGS[CURRENT || SLUG] || []).some(e => e.key === o.key && e.paw)) {
+      opt.classList.add("costsPaw"); const m = document.createElement("span"); m.className = "pawMark"; m.title = "Costs the gold paw";
+      m.setAttribute("aria-hidden", "true"); opt.querySelector(".swName").append(m);
+    }
     // the line shows only on a switch that can cost a life or the gold paw (o.warn); on the rest it's read out, not shown
     if (o.line) {
       const s = document.createElement("span"); s.className = o.warn ? "hint" : "hint quiet"; s.id = o.id + "Line"; emoText(s, o.line);
@@ -1643,7 +1657,7 @@ const G = (() => {
   } catch (e) {}
   const ROWS = [   // no line under a row: its name and three words say it all; On (or Show) comes first
     {id: "timers", name: "Timer", words: ["Show", "By game", "Hide"], on: 0},
-    {id: "speed", name: "Action game speed", words: ["Regular", "By game", "Slower"], on: 2},
+    {id: "speed", name: "Action game speed", words: ["Regular", "By game", "Slow"], on: 2},
     {id: "decor", name: "Reduce visual clutter", words: ["On", "By game", "Off"], on: 2},   // on: the games' own switches (Fabric patterns, Junk…) off
     {id: "check", name: "Auto check", words: ["On", "By game", "Off"], on: 0},
     {id: "notes", name: "Auto Notes", words: ["On", "By game", "Off"], on: 0},
@@ -1653,7 +1667,8 @@ const G = (() => {
   const CHECK = ["autoCheck", "Auto check", "Rule breaks turn red as you play", true, {row: "check"}];
   const NOTES = ["autoNotes", "Auto Notes 🔢", "Every maybe filled in for you", false, {row: "notes"}];
   const NUMBERS = line => ["numbers", "Numbers", line, false, {icon: "digits", words: ["Hide numbers", "Show numbers"]}];
-  const GRADE = what => ["autoGrade", "Auto grade", `A wrong ${what} turns red and costs a life`, false, {warn: true, icon: "heart"}];
+  // paw: the setting can cost the gold paw (a life lost costs it too), so the Settings page draws it as the games draw such tools
+  const GRADE = what => ["autoGrade", "Auto grade", `A wrong ${what} turns red and costs a life`, false, {warn: true, paw: true, icon: "heart"}];
   const SET_LIST = {
     catdoku: [GRADE("🐱"),
       ["autoExclude", "Auto Notes 🐾", "🐾 go round each 🐱 for you", false, {row: "notes"}]],
@@ -1666,12 +1681,12 @@ const G = (() => {
     junkdrawer: [["junk", "Junk", "Batteries, keys and coins in the drawer", true, {row: "decor"}],
       ["autoNotes", "Dim used-up magnets", "Magnets no word left to find needs fade", false, {row: "decor", inv: true}]],
     blanket: [["autoCheck", "Auto check", "Slots that don't fit your lumps turn red", true, {row: "check"}],
-      ["autoNotes", "Auto Notes 🔢", "A dot on every square the feathers prove has no cat; costs the gold paw", false, {row: "notes", warn: true}]],
+      ["autoNotes", "Auto Notes 🔢", "A dot on every square the feathers prove has no cat; costs the gold paw", false, {row: "notes", warn: true, paw: true}]],
     crossstitch: [CHECK],
-    magnets: [["autoAudit", "Auto grade", "A wrong letter turns red and costs a life", false, {warn: true, icon: "heart"}]],   // (named Auto-Audit until 2026-11)
+    magnets: [["autoAudit", "Auto grade", "A wrong letter turns red and costs a life", false, {warn: true, paw: true, icon: "heart"}]],   // (named Auto-Audit until 2026-11)
     shelflife: [["shelf", "Shelf", "The pots stand on a shelf", true, {row: "decor"}]],
     catpile: [["cats", "Cats", "Cats nap on the blanket", true, {row: "decor", at: ["catdoku.catpile.prefs.v1", "cats"]}],
-      ["turns", "Turning", "Toys can be turned as well as moved", false, {short: "Rotation OK", icon: "rotate", at: ["catdoku.catpile.prefs.v1", "turns"]}]],
+      ["turns", "Turning", "Toys can be turned as well as moved; a turn costs the gold paw", false, {warn: true, paw: true, short: "Rotation OK", icon: "rotate", at: ["catdoku.catpile.prefs.v1", "turns"]}]],
     bedhog: [["cats", "Cats", "Cats nap on the bed", true, {row: "decor"}]],
     catshuffle: [NUMBERS("Each piece shows where it goes")], windup: [NUMBERS("Each toy shows a number too")],
     pickpile: [["dim", "Dim stuck blocks", "Blocks that can't come off yet are dimmed", true, {row: "decor", inv: true}]],

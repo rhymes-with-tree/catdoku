@@ -220,6 +220,5 @@ The owner's grid for the new Settings page differed from the games in a few plac
 - Window Ledges' Show sets (on by default): the owner never asked for it and isn't sure about it. Keep or take out?
 - The grid had "Other Settings" in the Every game row and "Check" on the Cat Logic shelf's row: left out until it's
   clear what they'd do.
-- Speed says Slow · Fast · By game (the owner's words); "Regular" might read better than "Fast" for normal speed.
 - Auto grade (Catdoku, Toydoku, Fridge Magnets) is a heart among each game's own settings, not under Check, so the
   Every game Check never turns lives on; the grid had Catdoku's under Check.
