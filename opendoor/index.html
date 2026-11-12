@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-12.6"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-12.7"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-12.6">
+<link rel="stylesheet" href="../games.css?v=2026-11-12.7">
 <style>
 /* A KenKen house: every row and column holds 1 to N once, and walls split the floor into rooms whose numbers
    must make the room's sign. Each room has a door that opens when the room is right; with every door open,
@@ -108,7 +108,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-12.6"></script>
+<script src="../games.js?v=2026-11-12.7"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N grid where every row and column holds 1 to N once, cut into rooms (cages). Each room has a sign:
@@ -296,6 +296,16 @@ let game = state.game || null, busy = false, sel = -1, running = false;
 // The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
 G.pawLost(() => !game || game.won || game.hinted || game.restarted);
 const save = () => G.save(STORE, {settings, game});
+// Three wins at a level move you up and three slips (a hint, or a Restart after putting numbers in) move you down: G.ladder.
+const climb = G.ladder("opendoor", MAX_LEVEL);
+// A hint or a Restart on this house: it counts once, and the house no longer counts as a win toward moving up.
+function slip() {
+  if (game.slipped || game.won) return;
+  game.slipped = true;
+  const r = climb.lost(game.level);
+  if (r.down) { game.down = r.next; settings.level = r.next; $("levelSel").value = r.next; build.prefetch(r.next); }
+  save();
+}
 const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
 const OPS = {"+": "+", "-": "−", "x": "×", "/": "÷", "": ""};
 // on the board: the same, with ÷ drawn (two clear dots and a bar)
@@ -483,7 +493,7 @@ function hint() {
   if (!playing()) return;
   const sol = solution(), g = game.grid;
   if (!sol) { G.note("Couldn't work out a hint for this puzzle. Try Undo, or check for a wrong number.", 4000); return; }
-  game.hinted = true; game.started = true; save();
+  game.hinted = true; game.started = true; slip(); save();
   const wrong = g.map((v, i) => v && v !== sol[i] ? i : -1).filter(i => i >= 0);
   if (wrong.length) {
     const i = wrong.includes(sel) ? sel : wrong[0];
@@ -510,8 +520,9 @@ function whyNumber(i) {
 }
 $("hintBtn").onclick = hint;
 $("restartBtn").onclick = () => {
-  if (undo.restart(g => { guesses.clear(); g.grid = g.grid.map(() => 0); g.notes = g.notes.map(() => 0); if (settings.autoNotes) pad.fill(); }))
-    G.note("Every door's shut again. Undo brings your numbers back.", 3500);
+  if (undo.restart(g => { guesses.clear(); g.grid = g.grid.map(() => 0); g.notes = g.notes.map(() => 0); if (settings.autoNotes) pad.fill(); })) {
+    slip(); G.note("Every door's shut again. Undo brings your numbers back.", 3500);
+  }
 };
 addEventListener("resize", () => { if (game && plan) draw(); });
 
@@ -519,7 +530,9 @@ addEventListener("resize", () => { if (game && plan) draw(); });
 // Every door is open, so a cat curls up asleep in every doorway, then the finishing card.
 function win() {
   game.won = true; G.finishClock(game); sel = -1; pad.off();
-  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  // a house with a hint or a restart was counted when that happened; a clean one is a win toward moving up
+  let next = game.down || game.level;
+  if (!game.slipped) { const r = climb.won(game.level); next = r.next; game.climbLine = climb.say(r); }
   settings.level = next; $("levelSel").value = next; save();
   draw();
   G.track(`Open the Door solved level ${game.level}`);
@@ -545,9 +558,10 @@ const showNums = () => admire.sync();
 function finishCard() {
   const next = settings.level, N = game.N;
   let text = `Every door in the ${N} × ${N} house is open, and a cat's fast asleep in every doorway.`;
-  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  text += " " + (game.down ? `That's 3 hints or restarts at level ${game.level}, so next comes level ${game.down}.`
+    : game.slipped ? "A house with a hint or a restart doesn't count toward moving up." : game.climbLine || "");
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my house", game.result,
-    {title: "Door's open!", gold: !game.restarted && !game.hinted, goldWhy: "No hints or restarts!", next: next > game.level ? `Next: level ${next}` : "Next board", after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+    {title: "Door's open!", gold: !game.restarted && !game.hinted, goldWhy: "No hints or restarts!", next: G.ANOTHER, after: G.otherSize($("levelSel"), next, startLevel, G.CHANGE)});
 }
 
 /* ---------- new puzzles ---------- */

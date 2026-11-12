@@ -100,15 +100,17 @@ cats that point their own way are Day Light (`daylight/`, in beta).
 
 - [ ] **Day Light: out of beta.** The owner plays it first. Still to settle: a cat of its own (Dottie stands in), its
   place on the front page and in the daily challenge, and whether the sunny room reads well.
-- [ ] **Tunnel Run and a second game (decided: split).** Tunnel Run keeps turning (levels 1 to 3 and 11 to 18 today);
-  the sliding tracks (4 to 8) and the all-slide rugs (9 and 10) become a game of their own, each with a slower
-  start. Needs a name (the owner said "Tunnel Run 2 or similar"), and moving saves, best times and links as Night
-  Light's page does.
-- [ ] **Moving up and down (decided).** Three wins at a level move you up, and three losses move you down; nothing
-  gets harder on one win. The owner also suggested the win card's buttons be "Give me another!" and "Change the
-  difficulty" (or similar). It touches every game with levels (each sets its own next level today), so it wants one
-  shared helper in `games.js`, tried on two or three games first. To settle: what counts as a loss in a puzzle that
-  can't be lost (giving up with New? a hint?), and whether a gold paw still moves you up at once.
+- [ ] **Tunnel Run: what becomes of the sliding tracks?** The owner chose to split them off, then asked whether they
+  differ from Purrmutation. The move is the same as Purrmutation's Sixteen (a whole row or column slides round);
+  the puzzle differs (join the tunnels, where any piece that fits will do, against putting a picture back, where
+  every piece has one home). Levels 4 to 10 have had about 25 starts in all. Choices put to the owner: a game of
+  its own, a Tracks switch inside Tunnel Run, or dropping them. Either way Tunnel Run's own levels become
+  turning only (1 to 3 and 11 to 18 today), with saves, best times and links moved as Night Light's page does.
+- [ ] **Moving up and down: the rest of the games.** Three wins at a level move you up and three losses move you
+  down (a loss in a puzzle that can't be lost: a hint, or a Restart after working on it), with Give me another! and
+  Change the difficulty on the win card. It's `G.ladder` in `games.js`, in Night Light, Day Light, Open the Door!
+  and Toe Beans since 2026-11-12 (README, "Moving up and down"). Once the owner has played those, bring it to every
+  other game with levels or sizes (each sets its own next level today), and fix each README section's wording.
 - [ ] **Wind Up (decided).** Raise the line, and make the whole basket taller on the higher levels (as Tunnel Run's rug
   grows on its bigger levels), so they can be won without a Shake; and allow about three helpers a game before the
   gold paw is lost. The owner finds the higher levels always need a Shake, so a gold paw there isn't possible today.

@@ -514,6 +514,30 @@ const G = (() => {
     if (out) { e.preventDefault(); out.click(); }
   });
 
+  // Moving up and down by threes (the owner's call, 2026-11-12, so nobody is carried to a level they can't win): three
+  // wins at a level move you up one, and three losses move you down one; one win changes nothing. A loss is a lost game,
+  // or, in a puzzle that can't be lost, a hint or a Restart after working on it (once a puzzle). The tally is kept on
+  // this device by game (`name`, with a suffix for a second mode) and starts again whenever the level changes, by
+  // itself or by the player's own pick. G.ladder(name, max) gives won(level) and lost(level), each returning
+  // {level, next, up, down, wins, losses, top}, and say(r, what) for the card's line (what: "misses", "hints or restarts").
+  // The win card's main button is G.ANOTHER and its level picker's words are G.CHANGE, in the games that use it:
+  // Night Light, Day Light, Open the Door! and Toe Beans so far (TODO.md has the rest).
+  const LADDER = "catdoku.ladder.v1", ANOTHER = "Give me another!", CHANGE = "Change the difficulty:";
+  function ladder(name, max, min = 1) {
+    const step = (level, win) => {
+      const all = load(LADDER), was = all[name], t = was && was.l === level ? was : {l: level, w: 0, x: 0};
+      if (win) t.w++; else t.x++;
+      const up = win && t.w >= 3 && level < max, down = !win && t.x >= 3 && level > min, next = level + (up ? 1 : down ? -1 : 0);
+      all[name] = up || down ? {l: next, w: 0, x: 0} : t; save(LADDER, all);
+      return {level, next, up, down, wins: t.w, losses: t.x, top: level >= max};
+    };
+    const say = (r, what = "misses") => r.up ? `That's 3 wins at level ${r.level}: up to level ${r.next}!`
+      : r.down ? `That's 3 ${what} at level ${r.level}, so next comes level ${r.next}.`
+      : r.top ? "That's the hardest level." : r.wins === 2 ? `2 of 3 wins at level ${r.level}: one more moves you up.`
+      : r.wins === 1 && !r.losses ? `1 of 3 wins at level ${r.level}.` : r.wins ? `${Math.min(3, r.wins)} of 3 wins at level ${r.level}.` : "";
+    return {won: level => step(level, true), lost: level => step(level, false), say};
+  }
+
   // Moving up: after a clean win the next puzzle is one size bigger, up to the largest the page's size
   // list offers. The finishing cards also offer every other size, so players can always choose.
   const sizeUp = (N, sel) => Math.min(Math.max(...[...sel.options].map(o => +o.value)), N + 1);
@@ -2638,6 +2662,6 @@ const G = (() => {
     }
   }
 
-  return {MAGNET, tally, emoText, radios, pawLost, pieces, GAMES, BETA, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, loseCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText,
+  return {ladder, ANOTHER, CHANGE, MAGNET, tally, emoText, radios, pawLost, pieces, GAMES, BETA, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, loseCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, feedbackCard, feedbackFor, toyPicker, pickLook};
 })();
