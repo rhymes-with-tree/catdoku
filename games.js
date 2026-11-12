@@ -80,7 +80,7 @@ const G = (() => {
     ["lines", "Cat Trails", "Join, link and route things"],
     ["words", "Cat Spells", "Spell, find and climb words"],
     ["teasers", "Curious Cat", "Moves to plan and shapes to fit"],
-    ["quick", "Kitten Play", "Match, pop and pile"],
+    ["quick", "Kitten Play", "Match, pop and merge"],
     // the action and looking games, split off Kitten Play on 2026-11-12 once Pawlinko and Pounce Up had arrived (the owner's name)
     ["prowl", "On the Prowl", "Chase, spot and pounce"],
   ];

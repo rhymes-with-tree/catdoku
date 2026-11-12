@@ -23,7 +23,7 @@ Test each on a real iPhone: Safari's AutoFill doesn't show in the headless brows
 
 ## Shelves: what's left after the Kitten Play split
 
-Kitten Play was split on 2026-11-12: it keeps match, pop and pile (Pounce on Three, Bubbles, Cat Pile, Wind Up, Mew
+Kitten Play was split on 2026-11-12: it keeps match, pop and merge (Pounce on Three, Bubbles, Cat Pile, Wind Up, Mew
 Hue), and On the Prowl (the owner's name) has the action and looking games (Tail Chase, Bird Watch, Pawlinko, Pounce
 Up, Copycat, Cat Burglar, Catlas, and Pawstcards in beta). Its colour is coral. `IDEAS.md` still lists ideas under
 Kitten Play: move the action ones (Paw-ball, a fling game, kneading in time) to On the Prowl when they're next touched.
