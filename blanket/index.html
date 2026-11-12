@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-12.17"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-12.19"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-12.17">
+<link rel="stylesheet" href="../games.css?v=2026-11-12.19">
 <style>
 /* Bugsy, the star, peeking beside the title */
 .title{display:flex;align-items:flex-end;gap:8px}
@@ -99,7 +99,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-12.17"></script>
+<script src="../games.js?v=2026-11-12.19"></script>
 <script>
 /* ---------- blanket puzzles (plain functions, also run in a background worker) ---------- */
 // The blanket is N × N squares with k cats under it. A feather wand goes in at one of 4N slots round the edge:
@@ -110,8 +110,10 @@
 //   cats ahead on both sides send it back the way it came;
 //   a cat on the edge just beside the slot sends it straight back out.
 // It comes out at a slot: its own (sent back) or another, and the way back is the same run backwards.
+// Level 1 is one cat (since 2026-11-12, one new move a level: the straight run, the grab, the turn and the edge's
+// U-turn), and two cats at level 2 bring in the U-turn between two cats; then as before, one level up.
 function ubLevel(n) {
-  return [null, {N: 5, k: 2}, {N: 5, k: 3}, {N: 6, k: 3}, {N: 6, k: 4}, {N: 7, k: 4},
+  return [null, {N: 5, k: 1}, {N: 5, k: 2}, {N: 5, k: 3}, {N: 6, k: 3}, {N: 6, k: 4}, {N: 7, k: 4},
     {N: 8, k: 4}, {N: 8, k: 5}, {N: 9, k: 5}, {N: 9, k: 6}, {N: 10, k: 6}][n];
 }
 // Where slot p starts (just outside the blanket) and which way it heads: [x, y, dx, dy].
@@ -195,7 +197,7 @@ function makeBlanket(n) {
 //        cat grabs it), shots (the slots tried, in order), marks (each square: 0 nothing, 1 a lump, 2 a dot),
 //        history (G.history: [square, what it was], or {marks, shots} for a Restart), won, hinted, restarted,
 //        peeked (lifted the blanket with a lump wrong)…}
-const STORE = "catdoku.blanket.v1", MAX_LEVEL = 10, M = 80, NS = "http://www.w3.org/2000/svg";
+const STORE = "catdoku.blanket.v1", MAX_LEVEL = 11, M = 80, NS = "http://www.w3.org/2000/svg";
 const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1, autoCheck: true}, state.settings);
@@ -204,8 +206,21 @@ const line = () => 2 * game.N;   // the gold line: half the slots
 G.pawLost(() => !game || game.won || game.hinted || game.restarted || game.peeked || game.autoNoted || game.shots.length > line());
 // The tutorial's practice blanket is never saved: while it's out, only the settings are, beside the puzzle already kept.
 const save = () => G.save(STORE, {settings, game: game && game.tutorial ? G.load(STORE).game : game});
+// The levels moved on 2026-11-12: a one-cat blanket became level 1, so levels 1 to 10 became 2 to 11. Saves, best
+// times and share links from before carry the old numbers (settings.levels and a link's L are 11 from then on).
+// Anyone who'd seen the walkthrough by then saw the U-turn between two cats in it (settings.metTwo).
+if (settings.levels !== 11) {
+  if (state.settings) {
+    if (settings.level >= 1) settings.level++;
+    if (game && game.level) game.level++;
+    const bests = G.load("catdoku.bests.v1"), mine = bests.blanket;
+    if (mine) { bests.blanket = {}; for (const n in mine) bests.blanket[+n + 1] = mine[n]; G.save("catdoku.bests.v1", bests); }
+    if (settings.seenHelp) settings.metTwo = true;
+  }
+  settings.levels = 11; save();
+}
 const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
-const levelName = n => { const s = ubLevel(n); return `Level ${n} · ${s.N} × ${s.N}, ${s.k} cats`; };
+const levelName = n => { const s = ubLevel(n); return `Level ${n} · ${s.N} × ${s.N}, ${s.k} cat${s.k === 1 ? "" : "s"}`; };
 const build = G.builder([ubLevel, ubSlot, ubOut, ubFire, ubSolve, ubShuffle, makeBlanket], "makeBlanket");
 const el = (t, a, parent) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (parent) parent.append(e); return e; };
 const catSrc = f => (window.CAT_SRC || {})[f] || `../cats/${f}.webp`;
@@ -636,16 +651,17 @@ async function newPuzzle() {
   draw(); save();
   build.prefetch(n);
   G.track(`Under the Blanket new puzzle level ${n}`);
-  helpOnFirstVisit();
+  helpOnFirstVisit(); helpOnFirstVisit(true);
 }
 
 /* ---------- sharing ---------- */
 // The cats' squares, two base-36 digits each; with progress, the slots tried (two each) and the marks (0, 1, 2).
 const two = n => n.toString(36).padStart(2, "0"), unTwo = s => (s.match(/../g) || []).map(t => parseInt(t, 36));
 $("linkBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Under the Blanket", won: game.won,
-  puzzle: () => ({g: "blanket", N: game.level, c: game.cats.map(two).join("")}),
+  puzzle: () => ({g: "blanket", N: game.level, L: 11, c: game.cats.map(two).join("")}),
   progress: () => game.shots.map(two).join("") + "." + game.marks.join("")}); };
 function openShared(d) {
+  if (d.L !== 11) d.N++;   // a link from before the levels moved
   const spec = ubLevel(d.N), fail = () => G.note("That share link didn't work.", 5000);
   if (!spec || typeof d.c !== "string" || !/^([0-9a-z]{2})+$/.test(d.c)) return fail();
   const {N, k} = spec, cats = unTwo(d.c).sort((a, b) => a - b);
@@ -667,8 +683,9 @@ function openShared(d) {
 }
 
 /* ---------- how to play ---------- */
+let helpTapped = false;   // How to play: every step, the U-turn between two cats included
 function showHelp() {
-  settings.seenHelp = false; helpOnFirstVisit();
+  settings.seenHelp = false; helpTapped = true; helpOnFirstVisit(); helpTapped = false;
   if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
 }
 // The walkthrough's squares: the blanket and the ring of slots round it, as one (N+2)-square grid.
@@ -764,12 +781,17 @@ function tutRun(p, hidden) {
   return [...lit].map(q => q.split(",").map(Number));
 }
 const undemo = () => { const d = $("demo"); if (d) { if (d.pathLayer) d.pathLayer.remove(); d.remove(); } };
-function helpOnFirstVisit() {
-  if (!game || !playing() || document.querySelector(".spot") || settings.seenHelp) return;
+// two: the first blanket with two or more cats, after the walkthrough, shows the U-turn between two cats on the
+// practice blanket (the one move a second cat brings), then your blanket comes back.
+function helpOnFirstVisit(two) {
+  if (!game || !playing() || document.querySelector(".spot")) return;
+  if (two ? !settings.seenHelp || settings.metTwo || game.k < 2 || game.tutorial : settings.seenHelp) return;
   const N = game.N, W = N + 2, sq = [], ring = [], t = tut(N), k = game.k;
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) sq.push([x + 1, y + 1]);
   for (let j = 1; j <= N; j++) ring.push([j, 0], [W - 1, j], [j, W - 1], [0, j]);
   const turn = G.yourTurn(() => game, g => { game = g; }, draw);
+  // a first visit at level 1 leaves out the U-turn between two cats; anywhere else it's in, and counts as met
+  const sawTwo = helpTapped || k >= 2;
   const column = [slotSq(t.grab), ...[...Array(N).keys()].map(y => [N, y + 1])];
   // a step whose squares are worked out as it comes up
   // (hidden: the cat stays under the blanket, and its square isn't lit; two: the second cat is there too)
@@ -786,16 +808,27 @@ function helpOnFirstVisit() {
      try: {done: () => game.tutorial && game.shots.includes(t.grab)}},
     {say: "He stole the feather toy! That means he is hiding somewhere in this column.", lit: column, restore: turn.from.restore, enter() { undemo(); tutTwo(false); tutReveal(); }},
     run(t.turn, "A few other things to know: if the cat can bat at the feather toy but isn't close enough to steal it, then it will move like this."),
-    run(t.back, "Or like this."),
+    // the last practice step on a first visit at level 1, so leaving it puts your own blanket back
+    run(t.back, "Or like this.", sawTwo ? {} : {leave: turn.upTo.leave}),
     // the last practice step: leaving it puts your own blanket back
-    run(t.turn, "And with a cat on each side, it comes back too.", {two: true, leave: turn.upTo.leave}),
-    {say: `Now find the ${k} cats under this blanket. Tap a square to mark a lump.`, lit: sq},
+    // the U-turn between two cats waits for the first blanket with two (or How to play): "two", below
+    run(t.turn, "And with a cat on each side, it comes back too.", {two: true, leave: turn.upTo.leave, twoCats: true}),
+    {say: `Now find ${k === 1 ? "the cat" : `the ${k} cats`} under this blanket. Tap a square to mark a lump.`, lit: sq},
     {say: `${2 * N} feathers or fewer for a gold paw`, lit: ring, later: true},
     {say: "All lumps down? Lift the blanket!", els: [$("liftBtn")]},
     {say: "Dot: a square with no cat", els: [$("dotBtn")]},
     {say: "Stuck? Hint shows a slot to try", els: [$("hintBtn")]},
   ];
-  G.spotlight({grid: $("grid"), w: W, h: W, steps, map, done: () => { undemo(); turn.putBack(); settings.seenHelp = true; save(); }});
+  if (two) {
+    const twoSteps = [
+      {say: "A second cat brings one more thing to know.", lit: sq, restore: turn.from.restore, enter() { turn.from.enter(); tutStart(); }},
+      run(t.turn, "With a cat on each side, the feather comes back.", {two: true, leave: turn.upTo.leave}),
+      {say: `Now find the ${k} cats under this blanket.`, lit: sq}];
+    G.spotlight({grid: $("grid"), w: W, h: W, steps: twoSteps, map, lesson: true, done: () => { undemo(); turn.putBack(); settings.metTwo = true; save(); }});
+    return;
+  }
+  G.spotlight({grid: $("grid"), w: W, h: W, steps: steps.filter(st => !st.twoCats || sawTwo), map,
+    done: () => { undemo(); turn.putBack(); settings.seenHelp = true; if (sawTwo) settings.metTwo = true; save(); }});
 }
 
 for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", ""), n));
@@ -821,7 +854,7 @@ if (hadSave) G.reopen(() => {
     if (!spec || spec.N !== game.N || game.marks.length !== NN || game.res.length !== 4 * game.N || game.cats.length !== game.k) throw new Error("the saved blanket doesn't fit its level");
     draw();
     if (game.won) finishCard();
-    build.prefetch(settings.level); helpOnFirstVisit();
+    build.prefetch(settings.level); helpOnFirstVisit(); helpOnFirstVisit(true);
   }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
 else if (!shared) newPuzzle();
 const shareOpts = () => ({name: "Under the Blanket", inProgress: !!(game && !game.won && (game.shots.length || game.history.length)), open: openShared, after: helpOnFirstVisit});

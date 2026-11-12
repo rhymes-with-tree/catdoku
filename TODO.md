@@ -74,11 +74,10 @@ cats that point their own way are Day Light (`daylight/`, in beta).
   win on it is the reward. Night Light's and Day Light's new first levels (one tap, then two) are a first go at it.
   Already this way: Knock It Off, High Perch, Laser Pointer, Unravel. Done 2026-11-12: Open the Door! (× and ÷ each
   get a level, so 8 levels, and each new sign gets a spotlight the first time it turns up; GoatCounter's level 3 and
-  up are the old levels before then). Proposed and waiting for the owner's pick: Pounce on Three (the walkthrough
-  teaches zoomies, the L, the T and catnip before a first match: teach each the first time it's made), Fair Play
-  (level 1 with no = or × signs, which arrive at level 2 with a spotlight; the walkthrough teaches them now even
-  when the puzzle has none), Under the Blanket (level 1 one cat; the U-turn between two cats taught when it first
-  happens; the owner's fine with re-tuning or adding levels).
+  up are the old levels before then). Also done 2026-11-12: Pounce on Three (each special toy
+  shown the first time it's made), Fair Play (no signs at level 1; = and × arrive at level 2 with a spotlight) and
+  Under the Blanket (a one-cat level 1, so 11 levels; the U-turn between two cats is a short lesson on the first
+  two-cat blanket). Next to look at: which other games teach everything up front.
 - [ ] **Toe Beans:** getting that hard with few wins is disheartening; the moving-down rule above is the fix to try.
 - [ ] **Mewstermind** is harder than the owner expected (2 starts and 1 win in GoatCounter so far, too few to say
   where).
@@ -220,6 +219,5 @@ The owner's grid for the new Settings page differed from the games in a few plac
 - Window Ledges' Show sets (on by default): the owner never asked for it and isn't sure about it. Keep or take out?
 - The grid had "Other Settings" in the Every game row and "Check" on the Cat Logic shelf's row: left out until it's
   clear what they'd do.
-- Speed says Slow · Fast · By game (the owner's words); "Regular" might read better than "Fast" for normal speed.
 - Auto grade (Catdoku, Toydoku, Fridge Magnets) is a heart among each game's own settings, not under Check, so the
   Every game Check never turns lives on; the grid had Catdoku's under Check.
