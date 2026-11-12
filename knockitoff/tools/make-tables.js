@@ -3,7 +3,8 @@
 
    For each level it deals twice as many tables as it keeps, counts the traps on each (pushes from the
    starting position that leave the table impossible to clear, like rolling something into a corner it
-   can't leave, or a candle beside books), and keeps the tables with the most traps. They're written to
+   can't leave, or a candle beside books), and keeps the tables with the most traps; on levels 1 and 2 it keeps
+   the ones with the fewest instead, so a first table forgives a wrong push (see GENTLE). They're written to
    ../tables/NN.json, which the game loads so a table is ready at once.
 
    node knockitoff/tools/make-tables.js                 every level, 300 tables each
@@ -53,6 +54,10 @@ function traps(t) {
   return count;
 }
 
+// Levels that keep the tables with the fewest traps, and among equals the ones that need fewer moves: the first
+// two (since 2026-11-12, when GoatCounter showed 27 starts and 17 clears at level 1, and 18 and 7 at level 2).
+const GENTLE = 2;
+
 // ---------- one level, in its own process ----------
 function makeLevel(n, keep) {
   const tables = [];
@@ -63,13 +68,13 @@ function makeLevel(n, keep) {
     if (process.send && i % 50 === 49) process.send({n, progress: i + 1, of: keep * 2});
   }
   // the most traps first; among equals, the ones that need more moves
-  tables.sort((a, b) => b.traps - a.traps || b.t.best - a.t.best);
+  tables.sort((a, b) => (b.traps - a.traps || b.t.best - a.t.best) * (n <= GENTLE ? -1 : 1));
   const kept = tables.slice(0, keep);
   for (let i = kept.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [kept[i], kept[j]] = [kept[j], kept[i]]; }
   const file = path.join(OUT, String(n).padStart(2, "0") + ".json");
   fs.writeFileSync(file, JSON.stringify({level: n, tables: kept.map(k => pack(k.t))}) + "\n");
   const avg = kept.reduce((s, k) => s + k.traps, 0) / kept.length;
-  return `level ${n}: kept ${kept.length} of ${tables.length}, traps ${kept[kept.length - 1] ? Math.min(...kept.map(k => k.traps)) : 0}+ (average ${avg.toFixed(1)}) -> ${path.relative(process.cwd(), file)}`;
+  return `level ${n}: kept ${kept.length} of ${tables.length}, traps ${kept.length ? Math.min(...kept.map(k => k.traps)) : 0} to ${kept.length ? Math.max(...kept.map(k => k.traps)) : 0} (average ${avg.toFixed(1)}) -> ${path.relative(process.cwd(), file)}`;
 }
 
 if (process.argv[2] === "--child") {
