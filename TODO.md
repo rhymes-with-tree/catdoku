@@ -24,11 +24,11 @@ Test each on a real iPhone: Safari's AutoFill doesn't show in the headless brows
 ## Shelves: what's left after the Kitten Play split
 
 Kitten Play was split on 2026-11-12: it keeps match, pop and merge (Pounce on Three, Bubbles, Cat Pile, Wind Up, Mew
-Hue, and Copycat: matching, not prowling), and On the Prowl (the owner's name) has the action and looking games (Tail Chase, Bird Watch, Pawlinko, Pounce
+Hue, and Copycat: matching, not prowling; Pawlette and Shelf Life joined it from Curious Cat the same day, the owner's call), and On the Prowl (the owner's name) has the action and looking games (Tail Chase, Bird Watch, Pawlinko, Pounce
 Up, Cat Burglar, Catlas, and Pawstcards in beta). Its colour is coral.
 
 Still open from the earlier notes: Cat Spells stays one shelf (the owner's call), and a colour-games shelf only if
-Curious Cat gets crowded (Cat Mat, Shelf Life, Pawlette, Mew Hue).
+the colour games crowd a shelf (Cat Mat on Curious Cat; Shelf Life, Pawlette and Mew Hue on Kitten Play).
 
 ## On-ramps and pacing, from the GoatCounter numbers (2026-11-12)
 
@@ -79,8 +79,6 @@ cats that point their own way are Day Light (`daylight/`, in beta).
   Under the Blanket (a one-cat level 1, so 11 levels; the U-turn between two cats is a short lesson on the first
   two-cat blanket). Next to look at: which other games teach everything up front.
 - [ ] **Toe Beans:** getting that hard with few wins is disheartening; the moving-down rule above is the fix to try.
-- [ ] **Mewstermind** is harder than the owner expected (2 starts and 1 win in GoatCounter so far, too few to say
-  where).
 - [ ] **Toy Box, Twirl and Knock It Off need more** past their hardest level.
 - [ ] **Zen:** look for more games that could have one (Pounce on Three and Bubbles do).
 
