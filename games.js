@@ -856,10 +856,12 @@ const G = (() => {
   function showTime() {
     const g = T && T.game(), btn = $("timer"); if (!btn) return;
     if (!g || !g.timed) { btn.textContent = ""; btn.hidden = true; return; }
-    btn.hidden = false;
+    // A timer switched off (here or on the Settings page) leaves nothing on screen: a stopwatch reading –:–– still
+    // looked like a clock (the owner, 2026-11-12). It comes back from Timers on the Settings page.
     const hide = timerHidden(T.name);
-    btn.textContent = hide ? "⏱ –:––" : "⏱ " + clock(g.ms || 0);
-    btn.setAttribute("aria-label", hide ? "Timer hidden. Tap to show the time." : `Time ${clock(g.ms || 0)}. Tap to hide the time.`);
+    btn.hidden = hide; if (hide) { btn.textContent = ""; return; }
+    btn.textContent = "⏱ " + clock(g.ms || 0);
+    btn.setAttribute("aria-label", `Time ${clock(g.ms || 0)}. Tap to hide the time.`);
   }
   // Fields a new puzzle starts with. Leaving a puzzle you'd started (and not solved) for a new one ends your win streak.
   const freshClock = () => { takePending(); const g = T && T.game(); if (g && g.started && !g.result) breakStreak(); return {ms: 0, timed: true, started: false}; };
@@ -998,7 +1000,7 @@ const G = (() => {
   // Share my result, kept short (decided 2026-11-08): the game, then one line (the level as a fraction of the levels,
   // or the size, the time, the win streak and the gold paw), then the link. Long level names are left out.
   function shareResult(r, gold, btn, lost) {
-    const name = document.querySelector("header h1").textContent, bits = [];
+    const name = document.querySelector("header h1").textContent.replace(/\u00AD/g, ""), bits = [];
     if (r && r.n != null && T) {
       const sel = $("levelSel") || $("size"), l = label(r.n), vals = sel ? [...sel.options].map(o => o.value) : [], i = vals.indexOf(String(r.n));
       bits.push(/^\d+ × \d+$/.test(l) ? l.replace(/ /g, "") : i >= 0 && vals.length > 1 ? `Level ${i + 1}/${vals.length}` : l.split(" · ")[0]);
@@ -1048,7 +1050,7 @@ const G = (() => {
   const feedbackFor = o => { feedbackPage = o || {}; };
   const feedbackDraft = {kind: "", message: "", contact: ""};
   function feedbackInfo() {
-    const slug = CURRENT, name = (rowOf(slug) || [document.querySelector("header h1") ? document.querySelector("header h1").textContent : slug])[0];
+    const slug = CURRENT, name = (rowOf(slug) || [document.querySelector("header h1") ? document.querySelector("header h1").textContent.replace(/\u00AD/g, "") : slug])[0];
     const sel = $("levelSel") || $("size");
     let details = "";
     try {   // the page's own line, else its level or size picker's choice
@@ -1883,6 +1885,10 @@ const G = (() => {
   // A word's meanings from Wiktionary (this needs the internet): up to three, each {pos (noun, verb…), text}, for
   // Keyboard Cat's clues and Fish Bones' word list. Rejects when there are none or Wiktionary can't be reached.
   // Asked again, a word comes from memory.
+  // Where a one-word name may break when it has to go onto two lines (a soft hyphen: "Mewster-" then "mind"),
+  // rather than anywhere or not at all (the owner's call, 2026-11-12: Mewstermind split badly at large text).
+  const BREAKS = {Mewstermind: "Mewster\u00ADmind", Purrmutation: "Purr\u00ADmutation"};
+  const breakable = name => BREAKS[name] || name;
   function plainText(html) { const d = document.createElement("div"); d.innerHTML = html; d.querySelectorAll("sup, .reference, style").forEach(x => x.remove()); return d.textContent.replace(/\s+/g, " ").trim(); }
   const meanings = {};
   function meaning(w) {
@@ -2167,18 +2173,23 @@ const G = (() => {
   })();
   // Once the gold paw is lost for this puzzle (a hint taken, a restart, a life lost…), or there's none to win (zen), the
   // tools that cost it go back to the usual colour, with no crossed-out paw: there's nothing left to lose. Each page
-  // says when with G.pawLost(() => true or false), looked at on every save and every second or so.
-  let pawGone = null, pawWas = null;
-  function pawLost(fn) { pawGone = fn; checkPaw(); }
+  // says when with G.pawLost(() => true or false), looked at on every save and every second or so. A page whose
+  // tools are free for a while (Wind Up's first three helpers) passes free(id) too: true while that button costs
+  // nothing yet, so it stays plain until it would cost the paw.
+  let pawGone = null, pawFree = null, pawWas = null;
+  function pawLost(fn, free) { pawGone = fn; pawFree = free || null; checkPaw(); }
   function checkPaw() {
     if (!pawGone) return;
-    let lost = false; try { lost = !!pawGone(); } catch (e) { return; }   // the page's game may not be set up yet
-    if (lost === pawWas) return;
-    pawWas = lost;
-    for (const b of document.querySelectorAll("main button[data-paw]")) {
-      b.classList.toggle("costsPaw", !lost);
-      if (b.dataset.paw !== "own") b.title = lost ? "" : "Costs the gold paw";
-    }
+    const bs = [...document.querySelectorAll("main button[data-paw]")];
+    let lost = false, plain;
+    try { lost = !!pawGone(); plain = bs.map(b => lost || !!(pawFree && pawFree(b.id))); } catch (e) { return; }   // the page's game may not be set up yet
+    const key = plain.join();
+    if (key === pawWas) return;
+    pawWas = key;
+    bs.forEach((b, i) => {
+      b.classList.toggle("costsPaw", !plain[i]);
+      if (b.dataset.paw !== "own") b.title = plain[i] ? "" : "Costs the gold paw";
+    });
   }
   setInterval(() => { if (!document.hidden) checkPaw(); }, 1000);
   // What's new: the first time someone who played before the November 2026 redesign opens a game, a card says where
@@ -2665,6 +2676,6 @@ const G = (() => {
     }
   }
 
-  return {ladder, ANOTHER, CHANGE, MAGNET, tally, emoText, radios, pawLost, pieces, GAMES, BETA, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, loseCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText,
+  return {ladder, ANOTHER, CHANGE, MAGNET, tally, emoText, radios, pawLost, pieces, GAMES, BETA, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, loseCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText, breakable,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, feedbackCard, feedbackFor, toyPicker, pickLook};
 })();

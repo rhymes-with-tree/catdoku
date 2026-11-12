@@ -25,8 +25,7 @@ Test each on a real iPhone: Safari's AutoFill doesn't show in the headless brows
 
 Kitten Play was split on 2026-11-12: it keeps match, pop and merge (Pounce on Three, Bubbles, Cat Pile, Wind Up, Mew
 Hue, and Copycat: matching, not prowling), and On the Prowl (the owner's name) has the action and looking games (Tail Chase, Bird Watch, Pawlinko, Pounce
-Up, Cat Burglar, Catlas, and Pawstcards in beta). Its colour is coral. `IDEAS.md` still lists ideas under
-Kitten Play: move the action ones (Paw-ball, a fling game, kneading in time) to On the Prowl when they're next touched.
+Up, Cat Burglar, Catlas, and Pawstcards in beta). Its colour is coral.
 
 Still open from the earlier notes: Cat Spells stays one shelf (the owner's call), and a colour-games shelf only if
 Curious Cat gets crowded (Cat Mat, Shelf Life, Pawlette, Mew Hue).
@@ -48,8 +47,6 @@ Knock It Off's forgiving first two levels, and Pounce saving while toys fall):
   Caboodle 10 → 5.
 - [ ] **Somewhere to go past the hardest level.** Toy Box's level 21 is a fifth of its starts; Twirl and Knock It Off
   at 20 are the same.
-- [ ] **Catlas: two errors, once each on 2026-10-24.** Both are the map not having loaded when something asked it
-  for a place (`world` was null). Not seen since; check that nothing can be tapped before the map is in.
 
 ### The owner's notes on the list, and what was decided (2026-11-12)
 
@@ -57,23 +54,31 @@ Done the same day: Tunnel Run is turning only, with its sliding rugs behind a Tr
 cats that point their own way are Day Light (`daylight/`, in beta).
 
 - [ ] **Day Light: out of beta.** The owner plays it first. Still to settle: a cat of its own (Dottie stands in), its
-  place on the front page and in the daily challenge, and whether the sunny room reads well.
+  place on the front page and in the daily challenge, and whether the sunny room reads well. From the owner's first
+  play (2026-11-12): a missing arrow needed marking, so a small red cross now marks each of the plain four ways a cat
+  that points its own way leaves out.
 - [ ] **Moving up and down: the rest of the games.** Three wins at a level move you up and three losses move you
   down (a loss in a puzzle that can't be lost: a hint, or a Restart after working on it), with Give me another! and
   Change the difficulty on the win card. It's `G.ladder` in `games.js`, in Night Light, Day Light, Open the Door!
-  and Toe Beans since 2026-11-12 (README, "Moving up and down"). Once the owner has played those, bring it to every
+  and Toe Beans since 2026-11-12 (README, "Moving up and down"). On hold (the owner, 2026-11-12): not until there's
+  data on how it plays in those four. Then bring it to every
   other game with levels or sizes (each sets its own next level today), and fix each README section's wording.
-- [ ] **Wind Up: play the deeper baskets.** Done 2026-11-12: levels 6 to 12 have a deeper basket and a higher line, and
-  the first three helpers don't cost the gold paw. Checked with a simple bot, not a person: the owner should say
-  whether levels 7 to 12 can now be won without a Shake. The helper buttons still wear the red "costs the gold paw"
-  mark from the first use; it should only show once the free ones are gone.
-- [ ] **Front page carousel: the owner to try it on a phone.** Rebuilt 2026-11-12 after the first try (tabs with a
-  swipe that didn't work in the preview): the shelves now stand side by side in a row that scrolls with the finger
-  and stops at each, with the next one's edge showing, a nudge on the first visit, a title card across each shelf,
-  and today's challenge above the search box (README, first paragraph).
+- [ ] **Front page carousel: the owner to try it on a phone again.** The owner's first go on a phone (2026-11-12): it
+  moved with a finger but was far too sensitive, a normal swipe flew most of the way along, and it could stop between
+  two shelves. Rebuilt the same day so the page moves the row itself: exactly one shelf a swipe (a quarter of the way
+  or a flick), never stopping between two (README, first paragraph). Checked with touch in the headless browser only.
+- [ ] **Tunnel Run: the owner doesn't really like it** (2026-11-12, after trying the Tracks switch). Ask what's missing
+  before changing anything; it may be one for the on-ramp work (one new move a level) or for a rethink.
 - [ ] **One new move a level.** The how-to and the on-ramp are divided in a way that isn't ideal: the walkthrough
   tells the rules up front, and then the levels get harder. Better: each early level brings in one new move, and a
   win on it is the reward. Night Light's and Day Light's new first levels (one tap, then two) are a first go at it.
+  Already this way: Knock It Off, High Perch, Laser Pointer, Unravel. Done 2026-11-12: Open the Door! (× and ÷ each
+  get a level, so 8 levels, and each new sign gets a spotlight the first time it turns up; GoatCounter's level 3 and
+  up are the old levels before then). Proposed and waiting for the owner's pick: Pounce on Three (the walkthrough
+  teaches zoomies, the L, the T and catnip before a first match: teach each the first time it's made), Fair Play
+  (level 1 with no = or × signs, which arrive at level 2 with a spotlight; the walkthrough teaches them now even
+  when the puzzle has none), Under the Blanket (level 1 one cat; the U-turn between two cats taught when it first
+  happens; the owner's fine with re-tuning or adding levels).
 - [ ] **Toe Beans:** getting that hard with few wins is disheartening; the moving-down rule above is the fix to try.
 - [ ] **Mewstermind** is harder than the owner expected (2 starts and 1 win in GoatCounter so far, too few to say
   where).
