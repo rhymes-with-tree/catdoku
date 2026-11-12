@@ -79,8 +79,6 @@ cats that point their own way are Day Light (`daylight/`, in beta).
   Under the Blanket (a one-cat level 1, so 11 levels; the U-turn between two cats is a short lesson on the first
   two-cat blanket). Next to look at: which other games teach everything up front.
 - [ ] **Toe Beans:** getting that hard with few wins is disheartening; the moving-down rule above is the fix to try.
-- [ ] **Mewstermind** is harder than the owner expected (2 starts and 1 win in GoatCounter so far, too few to say
-  where).
 - [ ] **Toy Box, Twirl and Knock It Off need more** past their hardest level.
 - [ ] **Zen:** look for more games that could have one (Pounce on Three and Bubbles do).
 
