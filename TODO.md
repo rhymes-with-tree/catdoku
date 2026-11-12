@@ -49,7 +49,8 @@ two groups:
 - action: Pawlinko (was Kitty Plinko), Paw-ball, Pounce Up, a fling game, kneading in time with the purr; with Tail Chase and Bird
   Watch, and the looking games (Copycat, Cat Burglar, Catlas) could go with them
 The action group is two to five games today, too few for a shelf. Once a couple of the shortlisted ones (Pawlinko,
-Paw-ball, Pounce Up) are built, split it.
+Paw-ball, Pounce Up) are built, split it. That's now: Pawlinko (2026-11-02) and Pounce Up (2026-11-12) are both on the
+site, waiting for the owner to name the action shelf.
 
 **Cat Spells stays one shelf.** With its five shortlisted ideas it would have 13 games, but there's no natural split:
 finding words and moving letters to make words are the same kind of game (the owner's call). Cat Math has no ideas
@@ -65,18 +66,11 @@ With the shortlist built and both splits, the shelves would be (66 games): Cat L
 Cat Spells 13, Curious Cat 12, colour 4, Kitten Play (match and pop) 5, action 8. Without the colour split, Curious Cat
 15 and no colour shelf.
 
-## Pounce Up: finish the beta
+## Pounce Up: tune the goals
 
-Pounce Up went up as an unlisted beta on 2026-11-11 (`pounceup/`, in `BETA` in `games.js`), so the owner could share it
-from the site while it's still being tuned. Before it joins `GAMES` (and the front page):
-- tune the goals (TASKS in `pounceup/index.html`: the counts and the race's time), from the owner's play;
-- decide the gold paw (first try for now), and whether Pounce by herself (off at first: she waits for a tap)
-  stays a switch, and whether full screen is worth it (the board is about 390 pixels wide on a laptop);
-- the rest of the new-game skill's port: the README section, a front-page icon (`tools/make-icons.py`), its settings
-  on the Settings page, catnip and tape drawings moved into `tablethings.js` (they're copied in Tail Chase, Knock It
-  Off and Pounce Up), and the full test list;
-- then move its row from `BETA` to `GAMES` (with the date it joins), take the beta label off the page, and split Kitten
-  Play (above): it's the second of Pawlinko, Pounce Up and Paw-ball.
+Pounce Up joined the front page on 2026-11-12. Its level goals (`TASKS` in `pounceup/index.html`: the counts, the
+race's 90 seconds, the candle level's share of candles) were set from an autopilot's play, which is clumsier than a
+person; tune them from the owner's play and the Send feedback notes.
 
 ## Pawstcards: finish the beta
 
