@@ -25,8 +25,7 @@ Test each on a real iPhone: Safari's AutoFill doesn't show in the headless brows
 
 Kitten Play was split on 2026-11-12: it keeps match, pop and merge (Pounce on Three, Bubbles, Cat Pile, Wind Up, Mew
 Hue, and Copycat: matching, not prowling), and On the Prowl (the owner's name) has the action and looking games (Tail Chase, Bird Watch, Pawlinko, Pounce
-Up, Cat Burglar, Catlas, and Pawstcards in beta). Its colour is coral. `IDEAS.md` still lists ideas under
-Kitten Play: move the action ones (Paw-ball, a fling game, kneading in time) to On the Prowl when they're next touched.
+Up, Cat Burglar, Catlas, and Pawstcards in beta). Its colour is coral.
 
 Still open from the earlier notes: Cat Spells stays one shelf (the owner's call), and a colour-games shelf only if
 Curious Cat gets crowded (Cat Mat, Shelf Life, Pawlette, Mew Hue).
@@ -48,8 +47,6 @@ Knock It Off's forgiving first two levels, and Pounce saving while toys fall):
   Caboodle 10 → 5.
 - [ ] **Somewhere to go past the hardest level.** Toy Box's level 21 is a fifth of its starts; Twirl and Knock It Off
   at 20 are the same.
-- [ ] **Catlas: two errors, once each on 2026-10-24.** Both are the map not having loaded when something asked it
-  for a place (`world` was null). Not seen since; check that nothing can be tapped before the map is in.
 
 ### The owner's notes on the list, and what was decided (2026-11-12)
 
@@ -65,8 +62,7 @@ cats that point their own way are Day Light (`daylight/`, in beta).
   other game with levels or sizes (each sets its own next level today), and fix each README section's wording.
 - [ ] **Wind Up: play the deeper baskets.** Done 2026-11-12: levels 6 to 12 have a deeper basket and a higher line, and
   the first three helpers don't cost the gold paw. Checked with a simple bot, not a person: the owner should say
-  whether levels 7 to 12 can now be won without a Shake. The helper buttons still wear the red "costs the gold paw"
-  mark from the first use; it should only show once the free ones are gone.
+  whether levels 7 to 12 can now be won without a Shake.
 - [ ] **Front page carousel: the owner to try it on a phone.** Rebuilt 2026-11-12 after the first try (tabs with a
   swipe that didn't work in the preview): the shelves now stand side by side in a row that scrolls with the finger
   and stops at each, with the next one's edge showing, a nudge on the first visit, a title card across each shelf,

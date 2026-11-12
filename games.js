@@ -2167,18 +2167,23 @@ const G = (() => {
   })();
   // Once the gold paw is lost for this puzzle (a hint taken, a restart, a life lost…), or there's none to win (zen), the
   // tools that cost it go back to the usual colour, with no crossed-out paw: there's nothing left to lose. Each page
-  // says when with G.pawLost(() => true or false), looked at on every save and every second or so.
-  let pawGone = null, pawWas = null;
-  function pawLost(fn) { pawGone = fn; checkPaw(); }
+  // says when with G.pawLost(() => true or false), looked at on every save and every second or so. A page whose
+  // tools are free for a while (Wind Up's first three helpers) passes free(id) too: true while that button costs
+  // nothing yet, so it stays plain until it would cost the paw.
+  let pawGone = null, pawFree = null, pawWas = null;
+  function pawLost(fn, free) { pawGone = fn; pawFree = free || null; checkPaw(); }
   function checkPaw() {
     if (!pawGone) return;
-    let lost = false; try { lost = !!pawGone(); } catch (e) { return; }   // the page's game may not be set up yet
-    if (lost === pawWas) return;
-    pawWas = lost;
-    for (const b of document.querySelectorAll("main button[data-paw]")) {
-      b.classList.toggle("costsPaw", !lost);
-      if (b.dataset.paw !== "own") b.title = lost ? "" : "Costs the gold paw";
-    }
+    const bs = [...document.querySelectorAll("main button[data-paw]")];
+    let lost = false, plain;
+    try { lost = !!pawGone(); plain = bs.map(b => lost || !!(pawFree && pawFree(b.id))); } catch (e) { return; }   // the page's game may not be set up yet
+    const key = plain.join();
+    if (key === pawWas) return;
+    pawWas = key;
+    bs.forEach((b, i) => {
+      b.classList.toggle("costsPaw", !plain[i]);
+      if (b.dataset.paw !== "own") b.title = plain[i] ? "" : "Costs the gold paw";
+    });
   }
   setInterval(() => { if (!document.hidden) checkPaw(); }, 1000);
   // What's new: the first time someone who played before the November 2026 redesign opens a game, a card says where
