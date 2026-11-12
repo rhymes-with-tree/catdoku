@@ -66,6 +66,34 @@ With the shortlist built and both splits, the shelves would be (66 games): Cat L
 Cat Spells 13, Curious Cat 12, colour 4, Kitten Play (match and pop) 5, action 8. Without the colour split, Curious Cat
 15 and no colour shelf.
 
+## On-ramps and pacing, from the GoatCounter numbers (2026-11-12)
+
+From GoatCounter's counts, 2026-10-05 to 2026-11-12 ("27 → 11" is a level started 27 times and solved 11). The samples
+are small (10 to 40 a level) and a start includes pressing New, so these are signs, not rates. In order (done so far,
+2026-11-12: Open the Door's and Toe Beans' easier level 1, Tunnel Run's Hint, and starts counted in Wind Up, Pawlinko
+and L-M-N-O-Pom):
+
+- [ ] **Toe Beans: levels 9 and 10?** 0 solves in 9 starts, but five of those ended with Close enough, 1 to 6 away,
+  which is the game working as meant. Leave unless the owner finds them too hard.
+- [ ] **Tunnel Run: is a new order worth it?** A second look says the numbers don't back it firmly: the levels with one
+  and two tracks hold up (7 → 7, 7 → 4), and the 1 win in 10 starts from level 6 up is one or two people. The loss is
+  at level 2 (21 → 11), a plain 6 × 6. Moving the bigger turning-only rugs (11 to 16) ahead of the tracks would
+  renumber the levels (saved rugs, best times and share links go by number), so it's the owner's call.
+- [ ] **High Perch: the wall at level 4.** No wins from level 4 up (0 of 10 starts), and level 3 (the first arrows) is
+  8 → 4. Another arrows level before the lookouts, and more clues left in.
+- [ ] **Wind Up: ease levels 9 to 12.** Losses pass wins from level 9 (12 lost, 9 won; level 10: 17 lost, 5 won).
+- [ ] **Sized games open a size smaller for a new player.** Solved at the size they open on: Catdoku 8 × 8 53% (6 × 6:
+  92%), Patches 8 × 8 54%, Yarn 6 × 6 58% (5 × 5: 86%), Sunbeams 7 × 7 68% (5 × 5: 95%).
+- [ ] **Knock It Off: one new thing at level 2.** 18 → 7 at level 2 (27 → 17 at level 1); it's the only level that
+  brings in two things at once (lemons and books).
+- [ ] **Night Light: levels 2 to 4.** 19 won level 1 but only 9 started level 2, and no wins from level 4 up.
+- [ ] **Pounce: check level 1.** 23 → 12, though the move limits were tuned for a near-certain win.
+- [ ] **Weak level 1s to watch** (small samples): Cat Pile 16 → 7, Scratch That 17 → 8, Window Ledges 11 → 5, Kitten
+  Caboodle 10 → 5.
+- [ ] **Somewhere to go past the hardest level.** Toy Box's level 21 is a fifth of its starts; Twirl and Knock It Off
+  at 20 are the same.
+- [ ] **Errors to look at:** Pounce (`t.k` on null, 3 times), Catlas (2).
+
 ## Pounce Up: tune the goals
 
 Pounce Up joined the front page on 2026-11-12. Its level goals (`TASKS` in `pounceup/index.html`: the counts, the
