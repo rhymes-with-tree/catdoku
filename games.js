@@ -13,7 +13,7 @@ const G = (() => {
     ["Patches", "patches", "Sew a four-fabric quilt", "#73A7AE", "logic", "map four colour color quilt"],
     ["Sunbeams", "sunbeams", "Every cat gets a warm spot", "#ECA818", "logic", "shikaku rectangles"],
     ["Toy Box", "toybox", "Help Laya put every toy back in its basket", "#B3B94B", "teasers", "sort ball sort"],
-    ["Pounce", "pounce", "Line up three of a kind for Crunch to pounce on", "#6AA673", "quick", "match 3 match-3 three in a row"],
+    ["Pounce on Three", "pounce", "Line up three of a kind for Crunch to pounce on", "#6AA673", "quick", "match 3 match-3 three in a row"],
     ["Twirl", "twirl", "Clear every ribbon off the mat so Bugsy can nap", "#B94588", "teasers", "ribbons unblock"],
     ["Toe Beans", "toebeans", "Make the number on the big pad", "#DD9DAD", "numbers", "countdown 24 sums arithmetic maths math"],
     ["Knock It Off", "knockitoff", "Help Fred push everything off the table", "#7885BA", "teasers", "push sokoban table"],
@@ -68,6 +68,7 @@ const G = (() => {
   // Games in beta: their pages work (open them by their address), but they're left off the front page, the games menu,
   // search, favorites and the daily challenge until they're finished. Same fields as GAMES.
   const BETA = [
+    ["Day Light", "daylight", "Get every cat napping in the sun, though some point their own way", "#ECA818", "teasers", "lights out flip switch spots arrows night light nap", "2026-11-12"],
     ["Pawstcards", "pawstcards", "Guess where Pinecone is from her postcards", "#73A7AE", "quick", "geography countries wikipedia postcards guess the country clues redacted trivia travel pinecone", "2026-11-11"],
   ];
   const rowOf = slug => GAMES.find(g => g[1] === slug) || BETA.find(g => g[1] === slug);
@@ -1217,6 +1218,7 @@ const G = (() => {
     tunnelrun: ["Arrow keys: pick a piece", "Space or Enter: turn it (Shift turns it back)", "Shift with an arrow: slide its track"],
     copycat: ["Arrow keys: pick a box", "Space or Enter: open it"],
     nightlight: ["Arrow keys: pick a cat", "Space or Enter: tap it"],
+    daylight: ["Arrow keys: pick a cat", "Space or Enter: tap it"],
     unravel: ["Arrow keys: go from peg to peg", "Space or Enter: start there, go on to it, or wind back to it"],
     tailchase: ["Arrow keys or WASD: steer", "Space: pause"],
     keyboardcat: ["Letters: type a word", "Enter: try it", "Backspace: take a letter off", "Space: mix the keys"],

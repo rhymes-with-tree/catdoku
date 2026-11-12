@@ -83,9 +83,6 @@ Knock It Off's forgiving first two levels, and Pounce saving while toys fall):
 - [ ] **Wind Up: watch levels 9 to 12.** Losses pass wins from level 9 (12 lost, 9 won; level 10: 17 lost, 5 won), but
   nearly all of them are from its first four days (2026-10-30 to 11-02), and it's a game where losing is part of
   playing. It counts starts now; look again with a few weeks of them before changing anything.
-- [ ] **Night Light: does it hold interest?** 19 won level 1 (3 × 3, three taps) but only 9 went on to level 2, where
-  7 of 9 won; so it isn't hardness, they stopped after winning. No wins from level 4 up (4 starts). A design
-  question for the owner: a more interesting first room, or the cats that point their own way (level 10 on) sooner.
 - [ ] **Pounce: check level 1.** 23 → 12, though the move limits were tuned for a near-certain win. Running out of
   moves wasn't counted, so that may be people looking in and leaving; it's counted from 2026-11-12 ("Pounce out of
   moves on level N"). Look again with a few weeks of it.
@@ -93,23 +90,38 @@ Knock It Off's forgiving first two levels, and Pounce saving while toys fall):
   Caboodle 10 → 5.
 - [ ] **Somewhere to go past the hardest level.** Toy Box's level 21 is a fifth of its starts; Twirl and Knock It Off
   at 20 are the same.
-- [ ] **Errors to look at:** Catlas (2: `main` and `by` on null, `atlas/` lines 580 and 824 as of 2026-11-03).
+- [ ] **Catlas: two errors, once each on 2026-10-24.** Both are the map not having loaded when something asked it
+  for a place (`world` was null). Not seen since; check that nothing can be tapped before the map is in.
 
-### The owner's notes on the list (2026-11-12)
+### The owner's notes on the list, and what was decided (2026-11-12)
 
-- **One new move a level.** The how-to and the on-ramp are divided in a way that isn't ideal: the walkthrough tells
-  the rules up front, and then the levels get harder. Better: each early level brings in one new move, and a win on
-  it is the reward. A direction for every game with levels, to be tried on one or two first.
-- **No point of no return.** Levels shouldn't get harder without the player choosing it; make it easy to stay on a
-  level. (Mewstermind already only moves up on a gold paw.) Toe Beans getting that hard with few wins is disheartening.
-- **Night Light: slow down.** The owner can't win past level 1. Its two things (the plain game, and cats that point
-  their own way) are tough mixed; perhaps two games, Night Light and Day Light.
-- **Tunnel Run** has the same two-things problem (turning and sliding); perhaps Tunnel Run and Tunnel Run 2.
-- **Wind Up:** the higher levels always need a shake, so a gold paw there may be impossible.
-- **Pounce: a new name** that starts with Pounce and says it's a match-3.
-- **Mewstermind** is harder than expected.
-- **Toy Box, Twirl and Knock It Off need more** past their hardest level.
-- **Zen:** look for more games that could have a Zen (Pounce and Bubbles have one).
+Done the same day: Pounce is Pounce on Three; Night Light is plain rooms only, 15 levels from one tap; its rooms with
+cats that point their own way are Day Light (`daylight/`, in beta).
+
+- [ ] **Day Light: out of beta.** The owner plays it first. Still to settle: a cat of its own (Dottie stands in), its
+  place on the front page and in the daily challenge, and whether the sunny room reads well.
+- [ ] **Tunnel Run and a second game (decided: split).** Tunnel Run keeps turning (levels 1 to 3 and 11 to 18 today);
+  the sliding tracks (4 to 8) and the all-slide rugs (9 and 10) become a game of their own, each with a slower
+  start. Needs a name (the owner said "Tunnel Run 2 or similar"), and moving saves, best times and links as Night
+  Light's page does.
+- [ ] **Moving up and down (decided).** Three wins at a level move you up, and three losses move you down; nothing
+  gets harder on one win. The owner also suggested the win card's buttons be "Give me another!" and "Change the
+  difficulty" (or similar). It touches every game with levels (each sets its own next level today), so it wants one
+  shared helper in `games.js`, tried on two or three games first. To settle: what counts as a loss in a puzzle that
+  can't be lost (giving up with New? a hint?), and whether a gold paw still moves you up at once.
+- [ ] **Wind Up (decided).** Raise the line, and make the whole basket taller on the higher levels (as Tunnel Run's rug
+  grows on its bigger levels), so they can be won without a Shake; and allow about three helpers a game before the
+  gold paw is lost. The owner finds the higher levels always need a Shake, so a gold paw there isn't possible today.
+- [ ] **Front page: one shelf at a time.** A carousel: see Cat Logic, or Cat Math, or the next, rather than
+  everything in one very long list. Show the owner a preview before changing the page.
+- [ ] **One new move a level.** The how-to and the on-ramp are divided in a way that isn't ideal: the walkthrough
+  tells the rules up front, and then the levels get harder. Better: each early level brings in one new move, and a
+  win on it is the reward. Night Light's and Day Light's new first levels (one tap, then two) are a first go at it.
+- [ ] **Toe Beans:** getting that hard with few wins is disheartening; the moving-down rule above is the fix to try.
+- [ ] **Mewstermind** is harder than the owner expected (2 starts and 1 win in GoatCounter so far, too few to say
+  where).
+- [ ] **Toy Box, Twirl and Knock It Off need more** past their hardest level.
+- [ ] **Zen:** look for more games that could have one (Pounce on Three and Bubbles do).
 
 ## Pounce Up: tune the goals
 
