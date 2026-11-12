@@ -402,6 +402,25 @@ def nightlight():
     return frame("#221D36", out)
 
 
+# Day Light: Night Light's room by day. Black cats on a sunny floor, most napping, one awake on a spring-blue
+# square with an arrow of its own pointing at the cat diagonally below.
+def daylight():
+    out = f'<rect x="52" y="12" width="36" height="36" rx="6" fill="#73A7AE" opacity=".55"/>'
+    for r in range(2):
+        for c in range(2):
+            x, y = 30 + c * 40, 32 + r * 38
+            awake = (r, c) == (0, 1)
+            out += (f'<path d="M{x-14} {y+8}C{x-16} {y-2} {x-15} {y-8} {x-13} {y-12}L{x-12} {y-22}L{x-5} {y-14}C{x-2} {y-15} {x+2} {y-15} {x+5} {y-14}'
+                    f'L{x+12} {y-22}L{x+13} {y-12}C{x+15} {y-8} {x+16} {y-2} {x+14} {y+8}C{x+10} {y+16} {x-10} {y+16} {x-14} {y+8}Z" fill="{INK}" opacity="{1 if awake else .3}"/>')
+            if awake:
+                out += (f'<ellipse cx="{x-6}" cy="{y}" rx="4.5" ry="3.8" fill="#D4DB5E"/><ellipse cx="{x+6}" cy="{y}" rx="4.5" ry="3.8" fill="#D4DB5E"/>'
+                        f'<ellipse cx="{x-6}" cy="{y}" rx="1.1" ry="3.2" fill="{INK}"/><ellipse cx="{x+6}" cy="{y}" rx="1.1" ry="3.2" fill="{INK}"/>')
+            else:
+                out += f'<path d="M{x-10} {y}Q{x-6} {y+3} {x-2} {y}M{x+2} {y}Q{x+6} {y+3} {x+10} {y}" fill="none" stroke="{INK}" stroke-width="1.8" stroke-linecap="round" opacity=".55"/>'
+    out += f'<path d="M50 60L62 54L56 48Z" fill="#4E577D" stroke="#FFF6D6" stroke-width="1.5" stroke-linejoin="round"/>'
+    return frame("#FBE9B0", out)
+
+
 # Unravel: a strand of yarn along part of a pegboard shape, the ball at its end, an arrow on one line.
 def unravel():
     pts = {(0, 0): (24, 26), (1, 0): (50, 26), (2, 0): (76, 26), (0, 1): (24, 52), (1, 1): (50, 52), (2, 1): (76, 52), (0, 2): (24, 78), (1, 2): (50, 78), (2, 2): (76, 78)}
@@ -1103,7 +1122,7 @@ def pounceup():
 ICONS = {"catdoku": catdoku, "pounceup": pounceup, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle, "mewhue": mewhue, "pawlinko": pawlinko, "crossstitch": crossstitch, "junkdrawer": junkdrawer, "zoomies": zoomies, "blanket": blanket, "bedhog": bedhog}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "daylight": daylight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle, "mewhue": mewhue, "pawlinko": pawlinko, "crossstitch": crossstitch, "junkdrawer": junkdrawer, "zoomies": zoomies, "blanket": blanket, "bedhog": bedhog}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")

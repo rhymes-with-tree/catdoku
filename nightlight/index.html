@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-12.2"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-12.13"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-12.2">
+<link rel="stylesheet" href="../games.css?v=2026-11-12.13">
 <style>
 /* A dark room full of cats. Awake cats' eyes glow; tap a cat and it and the cats beside it blink, so open
    eyes shut and shut eyes open. When every cat's asleep, the room goes dark. */
@@ -51,6 +51,8 @@
 .title{display:flex;align-items:flex-end;gap:8px}
 .dottiepeek{display:block;height:52px;width:auto;margin-bottom:-2px}
 @media (max-height:760px){.dottiepeek{height:38px}}
+.sister{margin:14px 0 0;text-align:center;color:var(--ink-soft);font-size:calc(15px*var(--ts))}
+.sister a{color:var(--ink);font-weight:800;display:inline-block;padding:12px 4px}
 .card img.dottiepic{display:block;width:66%;max-width:230px;height:auto;margin:0 auto 14px}
 </style>
 </head>
@@ -76,20 +78,23 @@
     <label>Level <select id="levelSel" aria-label="Level"></select></label>
     <button id="newBtn" class="primary">New room</button>
   </div>
+  <!-- the rooms where cats point their own way (levels 10 to 19 until 2026-11-12) are a game of their own now -->
+  <p class="sister"><a href="../daylight/">Day Light</a>: rooms where some cats point their own way</p>
 </main>
 
-<script src="../games.js?v=2026-11-12.2"></script>
+<script src="../games.js?v=2026-11-12.13"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
-// Every cat has arrows, and a tap blinks the cat and the cats its arrows point at. Levels 1 to 9 are plain
-// (every cat points at the four beside it), growing from 3 × 3 to 9 × 9; level 10 starts small again with some
-// cats that point their own way, and 18 and 19 are all such cats. Levels: [columns, rows, taps the answer
-// takes, how many cats point their own way].
+// Every cat has arrows, and a tap blinks the cat and the cats its arrows point at. Here every cat points at the
+// four beside it (the cats that point their own way moved to Day Light, `daylight/`, on 2026-11-12). Fifteen
+// levels, one small step each: a 3 × 3 room that takes one tap, then two, then three; 4 × 4 from two taps to
+// four; 5 × 5 from three; then up to 9 × 9. (Until 2026-11-12 the room grew every level, 3 × 3 with 3 taps
+// then 4 × 4 with 4, and the owner couldn't get past level 1.) Levels: [columns, rows, taps the answer takes,
+// how many cats point their own way (none here)].
 function levelOf(n) {
-  return [null, [3, 3, 3, 0], [4, 4, 4, 0], [5, 5, 5, 0], [5, 5, 7, 0], [6, 6, 9, 0], [7, 7, 12, 0],
-    [7, 7, 15, 0], [8, 8, 18, 0], [9, 9, 22, 0],
-    [3, 3, 3, 2], [4, 4, 4, 2], [4, 4, 5, 3], [5, 5, 6, 5], [5, 5, 7, 12], [5, 5, 8, 25],
-    [6, 6, 9, 18], [6, 6, 11, 36], [7, 7, 12, 49], [7, 7, 14, 49]][n];
+  return [null, [3, 3, 1, 0], [3, 3, 2, 0], [3, 3, 3, 0], [4, 4, 2, 0], [4, 4, 3, 0], [4, 4, 4, 0],
+    [5, 5, 3, 0], [5, 5, 4, 0], [5, 5, 5, 0], [5, 5, 7, 0], [6, 6, 9, 0], [7, 7, 12, 0],
+    [7, 7, 15, 0], [8, 8, 18, 0], [9, 9, 22, 0]][n];
 }
 // The eight ways an arrow can point, as bits of a cat's arrows: up, up-right, right, … clockwise.
 function arrowDirs() { return [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]]; }
@@ -182,7 +187,7 @@ function arrowMarks(a) {
 /* ---------- game ---------- */
 // game: {level, W, H, start (awake at the start), awake, par (fewest taps), taps (every tap counts, even ones
 //        undone), history (undo steps), hinted, won, arrows (each cat's arrows, as bits)}
-const STORE = "catdoku.nightlight.v1", MAX_LEVEL = 19, FIRST_ARROWS = 10;
+const STORE = "catdoku.nightlight.v1", MAX_LEVEL = 15;
 const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1}, state.settings);
@@ -191,18 +196,43 @@ let game = state.game || null, busy = false, lit = -1;
 G.pawLost(() => !game || game.won || game.hinted || game.restarted || game.taps > game.par);
 const hints = G.hinter({game: () => game, key: () => game ? game.awake.join("") : "", draw: () => draw()});   // marks {i}: a cat to tap
 const save = () => G.save(STORE, {settings, game});
-// Until build 2026-11-02.9 there were 10 levels, with arrows from level 3; those are now levels 12 to 19.
-// Saves, best times and share links from then carry their old numbers, so move them up.
+// The levels have been renumbered twice, and saves, best times and share links carry the numbers of their day:
+// until build 2026-11-02.9 there were 10 levels with arrows from level 3 (oldLevel moves those to the 19 that
+// followed: plain rooms 1 to 9, arrows 10 to 19), and on 2026-11-12 the arrows moved to Day Light and the plain
+// rooms became 15 (PLAIN: where each of the nine went; DAY: where each arrows level went in Day Light).
 const oldLevel = n => n >= 3 ? n + 9 : n;
-if (settings.levels !== 19) {
-  settings.levels = 19; settings.level = oldLevel(settings.level);
-  if (game && game.level) game.level = oldLevel(game.level);
-  const bests = G.load("catdoku.bests.v1"), mine = bests.nightlight;
-  if (mine) { bests.nightlight = {}; for (const n in mine) bests.nightlight[oldLevel(+n)] = mine[n]; G.save("catdoku.bests.v1", bests); }
+const PLAIN = [0, 3, 6, 9, 10, 11, 12, 13, 14, 15], DAY = n => n === 10 ? 3 : n - 6, DAY_STORE = "catdoku.daylight.v1";
+// A level number from a save or link (levels: 19, or anything else for the first ten) → [here, level] or ["day", level].
+const moved = (n, levels) => { if (levels !== 19) n = oldLevel(n); return n >= 10 ? ["day", DAY(n)] : ["night", PLAIN[n] || 1]; };
+if (settings.levels !== 15) {
+  if (state.settings) {   // someone who has played before
+    const was = settings.levels, [where, lv] = moved(settings.level, was);
+    settings.level = where === "day" ? MAX_LEVEL : lv;
+    // a player who had reached the arrows carries on in Day Light at the same room: their level, and the room that was out
+    const day = G.load(DAY_STORE);
+    if (where === "day" && !day.settings) G.save(DAY_STORE, {settings: {level: lv, levels: 13}, game: game && game.level && moved(game.level, was)[0] === "day" ? {...game, level: moved(game.level, was)[1]} : null});
+    if (game && game.level) { const [w, l] = moved(game.level, was); if (w === "day") game = null; else game.level = l; }
+    const bests = G.load("catdoku.bests.v1"), mine = bests.nightlight;
+    if (mine) {
+      bests.nightlight = {}; bests.daylight = bests.daylight || {};
+      for (const n in mine) { const [w, l] = moved(+n, was); (w === "day" ? bests.daylight : bests.nightlight)[l] = mine[n]; }
+      G.save("catdoku.bests.v1", bests);
+    }
+  }
+  settings.levels = 15; save();
+}
+// Three wins at a level move you up and three slips (a hint, or a Restart after tapping) move you down: G.ladder.
+const climb = G.ladder("nightlight", MAX_LEVEL);
+// A hint or a Restart on this room: it counts once, and the room no longer counts as a win toward moving up.
+function slip() {
+  if (game.slipped || game.won) return;
+  game.slipped = true;
+  const r = climb.lost(game.level);
+  if (r.down) { game.down = r.next; settings.level = r.next; $("levelSel").value = r.next; build.prefetch(r.next); }
   save();
 }
 const playing = () => game && !game.won && !busy && !$("overlay").classList.contains("show");
-const levelName = n => { const [W, H, T] = levelOf(n); return `Level ${n} · ${W} × ${H}, ${T} taps${n >= FIRST_ARROWS ? ", arrows" : ""}`; };
+const levelName = n => { const [W, H, T] = levelOf(n); return `Level ${n} · ${W} × ${H}, ${T} tap${T === 1 ? "" : "s"}`; };
 const build = G.builder([levelOf, arrowDirs, inRoom, blinks, fewestTaps, makeArrows, makeRoom], "makeRoom");
 const plainArrows = (W, H) => Array.from({length: W * H}, (_, i) => inRoom(W, H, i, true));
 const awakeCount = () => game.awake.filter(Boolean).length;
@@ -251,15 +281,16 @@ const keys = G.gridKeys({on: () => playing(), size: () => [game.W, game.H],
 // count, so Undo is free but doesn't win back the taps; Restart costs the gold paw.
 const undo = G.history({game: () => game, back: i => flip(i), can: playing, after: () => { draw(); save(); }, restart: true});
 $("restartBtn").onclick = () => {
-  if (undo.restart(g => { g.awake = g.start.slice(); })) G.note("Back to the start. Your taps still count.", 3500);
+  const worked = game && game.taps > 0;
+  if (undo.restart(g => { g.awake = g.start.slice(); })) { if (worked) slip(); G.note("Back to the start. Your taps still count.", 3500); }
 };
-// Hint: glow a cat that's part of the shortest way from here (the player taps it). A hint keeps you on the same level.
+// Hint: glow a cat that's part of the shortest way from here (the player taps it). A hint is a slip (see slip).
 function hint() {
   if (!playing()) return;
   const best = fewestTaps(game.W, game.H, game.awake, game.arrows);
   if (!best || !best.length) { G.note("No hint can be found for this room.", 4000); return; }
   const i = best[Math.floor(Math.random() * best.length)];
-  game.hinted = true; save();
+  game.hinted = true; slip(); save();
   hints.show({i}, `Tap the glowing cat. ${best.length === 1 ? "That's the last one!" : `${best.length} taps to go.`}`);
 }
 $("hintBtn").onclick = hint;
@@ -268,7 +299,9 @@ $("hintBtn").onclick = hint;
 const goldOK = () => !game.hinted && !game.restarted && game.taps <= game.par;
 function win() {
   game.won = true; G.finishClock(game);
-  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  // a room with a hint or a restart was counted when that happened; a clean one is a win toward moving up
+  let next = game.down || game.level;
+  if (!game.slipped) { const r = climb.won(game.level); next = r.next; game.climbLine = climb.say(r); }
   settings.level = next; $("levelSel").value = next; save(); draw();
   G.track(`Night Light solved level ${game.level}`);
   build.prefetch(next);
@@ -280,10 +313,11 @@ function dottiePic() { const im = new Image(); im.className = "dottiepic"; im.sr
 function finishCard() {
   const next = settings.level;
   let text = `Every cat's asleep, in ${game.taps} tap${game.taps === 1 ? "" : "s"} (the fewest is ${game.par}).`;
-  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  text += " " + (game.down ? `That's 3 hints or restarts at level ${game.level}, so next comes level ${game.down}.`
+    : game.slipped ? "A room with a hint or a restart doesn't count toward moving up." : game.climbLine || "");
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the dark", game.result,
-    {title: "Goodnight!", gold: goldOK(), goldWhy: "The fewest taps, with no hint or restart!", goldTitle: "Goodnight, Dottie!", goldPic: [dottiePic()], next: next > game.level ? `Next: level ${next}` : "Next board",
-     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+    {title: "Goodnight!", gold: goldOK(), goldWhy: "The fewest taps, with no hint or restart!", goldTitle: "Goodnight, Dottie!", goldPic: [dottiePic()], next: G.ANOTHER,
+     after: G.otherSize($("levelSel"), next, startLevel, G.CHANGE)});
 }
 
 /* ---------- new rooms ---------- */
@@ -303,10 +337,10 @@ async function newPuzzle() {
 
 /* ---------- sharing ---------- */
 $("linkBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Night Light", won: game.won,
-  puzzle: () => ({g: "nightlight", N: game.level, L: 19, awake: game.start, a: game.arrows}),
+  puzzle: () => ({g: "nightlight", N: game.level, L: 15, awake: game.start, a: game.arrows}),
   progress: () => ({awake: game.awake, taps: game.taps})}); };
 function openShared(d) {
-  if (d.L !== 19) d.N = oldLevel(d.N);   // a link from when there were 10 levels
+  if (d.L !== 15) d.N = moved(d.N, d.L)[1];   // a link from before the levels were renumbered (one to an arrows room never gets here: see the start)
   const lv = levelOf(d.N), size = lv && lv[0] * lv[1], ok = a => Array.isArray(a) && lv && a.length === size && a.every(v => v === 0 || v === 1);
   // every arrow has to point at a cat in the room; links from before arrows have none, and point the plain way
   const arrows = !lv ? null : d.a === undefined ? plainArrows(lv[0], lv[1])
@@ -373,6 +407,10 @@ $("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : setti
 
 if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
 $("levelSel").value = settings.level;
+// A link to a room with cats that point their own way, from before they moved: Day Light opens it.
+{ const m = location.hash.match(/^#share=([\w-]+)/); let d = null;
+  try { d = m && JSON.parse(decodeURIComponent(escape(atob(m[1].replace(/-/g, "+").replace(/_/g, "/"))))); } catch (e) {}
+  if (d && d.g === "nightlight" && d.L !== 15 && moved(d.N, d.L)[0] === "day") location.replace("../daylight/" + location.hash); }
 const shared = G.readShare("nightlight");
 const hadSave = !!(game && Array.isArray(game.awake));
 if (hadSave) G.reopen(() => {

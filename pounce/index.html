@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Pounce</title>
+<title>Pounce on Three</title>
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-12.2"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-12.13"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -24,7 +24,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-12.2">
+<link rel="stylesheet" href="../games.css?v=2026-11-12.13">
 <style>
 /* A quilted play mat in a wooden frame, covered in toys. */
 .wrap canvas{display:block;width:100%;height:100%;border:3px solid #5C3A22;border-radius:12px;touch-action:none;
@@ -53,7 +53,7 @@
 </head>
 <body>
 <main>
-  <header><div class="title"><h1>Pounce</h1><img class="crunch" src="../cats/crunch-3.webp" alt="Crunch, a grey tabby cat with green eyes"></div><div class="stripe"></div><p class="tagline">Line up three of a kind for Crunch to pounce on</p></header>
+  <header><div class="title"><h1>Pounce on Three</h1><img class="crunch" src="../cats/crunch-3.webp" alt="Crunch, a grey tabby cat with green eyes"></div><div class="stripe"></div><p class="tagline">Line up three of a kind for Crunch to pounce on</p></header>
   <nav class="games" id="games" aria-label="Games"></nav>
 
   <div class="status">
@@ -82,7 +82,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-12.2"></script>
+<script src="../games.js?v=2026-11-12.13"></script>
 <script>
 const $ = G.$;
 G.nav("pounce");
@@ -278,7 +278,8 @@ let offToys = G.toysOff(TOYS_PREF);
 const deal = n => makeLevel(n, Math.random, offToys);
 let busy = false, picked = -1, cursor = -1, now = 0, effects = [], hintAt = 0, hint = null;
 const hints = G.hinter({game: () => S, key: () => S ? S.g.map(t => t ? t.k + "." + t.sp : "").join() : "", draw: () => {}});   // marks {pair}: two toys to swap (the mat redraws itself every frame)
-const save = () => { if (S && !S.over) { S.d.grid = S.g.map(t => [t.k, t.sp]); S.d.ms = S.ms; G.save(STORE, {level: S.level, d: S.d, climb}); } };
+// (not while toys are falling and some squares are empty: the last save stands until the mat is whole again)
+const save = () => { if (S && !S.over && S.g.every(t => t)) { S.d.grid = S.g.map(t => [t.k, t.sp]); S.d.ms = S.ms; G.save(STORE, {level: S.level, d: S.d, climb}); } };
 
 function start(level, d) {
   if (d.kinds.some(k => !KINDS[k]) || d.grid.length !== N * N) throw new Error("the saved level is from another version of the game");
@@ -316,7 +317,7 @@ $("restartBtn").onclick = () => {
   start(S.level, Object.assign(JSON.parse(S.d.fresh), {fresh: S.d.fresh, helped: S.d.helped, restarted: S.d.restarted || S.started || S.over, extra: 0, caught: 0}));
 };
 // Share: a link to this board as it was dealt (the toys, the goals and the moves).
-$("linkBtn").onclick = () => { if (S && S.level) G.shareCard({name: "Pounce", what: "board", won: S.over,
+$("linkBtn").onclick = () => { if (S && S.level) G.shareCard({name: "Pounce on Three", what: "board", won: S.over,
   puzzle: () => { const f = S.d.fresh ? JSON.parse(S.d.fresh) : S.d;
     return {g: "pounce", N: S.level, b: f.grid.map(([k, sp]) => k + (sp ? "." + sp : "")).join(","), gl: f.goals.map(gl => gl.k).join(""), m: f.moves}; }}); };
 // A shared board, checked first: 64 toys of known kinds, goals among them, and a move count.
@@ -454,6 +455,7 @@ function win() {
 function outOfMoves() {
   G.breakStreak();   // losing ends the win streak
   S.over = true;
+  G.track(`Pounce out of moves on level ${S.level}`);
   const still = S.d.goals.filter(left).map(gl => toyName(left(gl), gl.k));
   const list = still.length > 1 ? still.slice(0, -1).join(", ") + " and " + still[still.length - 1] : still[0];
   const btns = [];
@@ -687,6 +689,7 @@ const INTRO = "catdoku.pounce.intro.v1";
 function intro(again) {
   if (!again && G.load(INTRO).seen) return;
   if (!S || S.over || busy || document.querySelector(".spot")) return;
+  if (S.g.some(t => !t)) return;   // toys still falling: How to play can be asked for again once they've landed
   const mv = findMove(S.g); if (!mv) return;
   const [a, b] = mv, xy = i => [i % N, Math.floor(i / N)];
   const swapOver = () => { swapCells(S.g, a, b); slide(S.g[a], a, 0.2); slide(S.g[b], b, 0.2); };
@@ -731,7 +734,7 @@ const toyChest = () => ({kinds: KINDS, off: offToys, min: MIN_COLOURS, src: toyS
   else G.note("Saved. Your toys are used from the next board.", 4000);
 }});
 $("toysBtn").onclick = () => G.toyPicker(toyChest());
-G.needToys({...toyChest(), off: () => offToys, game: "Pounce"});
+G.needToys({...toyChest(), off: () => offToys, game: "Pounce on Three"});
 G.setupTimer({name: "pounce", game: () => S, playing: g => !g.over, save,
   label: n => `Level ${n}`, noun: "level",
   emptyText: "Finish a level and your times will show up here. They're kept on this device only."});
@@ -739,7 +742,7 @@ $("bestBtn").onclick = () => G.showBests("Best times", S && S.level ? S.level : 
 
 const saved = G.load(STORE), first = saved.level ?? 1, shared = G.readShare("pounce");
 climb = saved.climb || saved.level || 1;
-const shareOpts = () => ({name: "Pounce", inProgress: !!(S && !S.over && S.started), open: d => { try { openShared(d); } catch (e) { G.note("That share link didn't work.", 5000); } }});
+const shareOpts = () => ({name: "Pounce on Three", inProgress: !!(S && !S.over && S.started), open: d => { try { openShared(d); } catch (e) { G.note("That share link didn't work.", 5000); } }});
 window.addEventListener("hashchange", () => { const d = G.readShare("pounce"); if (d) G.offerShare(d, shareOpts()); });
 // a shared board opens in place of the saved one
 let openedShare = false;

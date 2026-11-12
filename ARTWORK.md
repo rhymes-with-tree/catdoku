@@ -30,6 +30,11 @@ Most of the cats are just cats, and any game can use them. The `c14-…`, `c15-�
 have names, and most have their own files (`name-1.webp`, `name-2.webp`, …). Every named cat can also be used as an ordinary cat
 anywhere, but keep track of who they are, because they'll be featured in games of their own.
 
+**Stars decided, pictures still to come** (the owner, 2026-11-12): **Pangur Bán** (Pangur for short) will be the star of
+Cat Burglar, and **Fitzwilliam Darcy** (Fitz) the star of Pawlette. Neither has pictures in `cats/` yet; when they
+arrive, add each to the list below with what they look like, and give the game its title cat, gold-paw card,
+tagline and front-page icon as Bowtie has in Tunnel Run.
+
 Purrfect Square puts one of 24 general cats, picked at random each visit, beside its title: those sitting up and facing out
 (`c14-63`, `c18-6`, `-7`, `-17`, `-19`, `-21`, `-26`, `-27`, `-32`, `-40`, `c19-1`, `-5`, `-6`, `-14`, `-16`, `-17`, `-28`, `-32`, `-37`, `-40`,
 `c20-1`, `-17`, `-18`, `-30`; the list is `SITTERS` in `purrfect/index.html`).
@@ -120,7 +125,7 @@ each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the 
   feathers) is the owner's picture, levelled and trimmed; `blanket/feather-head.webp` is its feather end, for the status line.
   Not used yet: `bowtie-4` (lying down with a string, cut off at the right), `bowtie-8` (his face, close up) and
   `bowtie-9` (his face upside down, close up). None is a whole lying-down Bowtie for If It Fits (checked 2026-11-08).
-- **Crunch** (`crunch-…`, grey tabby with green eyes) is the star of Pounce: `crunch-3` sits beside
+- **Crunch** (`crunch-…`, grey tabby with green eyes) is the star of Pounce on Three (`pounce/`): `crunch-3` sits beside
   the title, `crunch-1` creeps up from the corner of the mat to cheer a chain of matches, and
   `crunch-6` rolls about on the gold-paw card. Crunch is the star of Cat Mat too: `crunch-7`
   (standing, one paw out, flipped to face the pot) bats the pots of dye over at the corner of the rug,
@@ -128,7 +133,7 @@ each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the 
   at the alphabet magnets on the floor, `crunch-4` curls up on the empty floor once every letter is back on the fridge, and `crunch-6` rolls about on
   the gold-paw card.
 - **Dottie** (Dottie Dietrich, `dottie-…`, all-black shorthair with yellow-green eyes, stocky, with a Burmese tail
-  that has two cricks in it, sometimes a purple collar or a teal bow; not to be mixed up with Peanut, the small black cat) is the mascot of Night Light: `dottie-1` peeks from under the red blanket beside
+  that has two cricks in it, sometimes a purple collar or a teal bow; not to be mixed up with Peanut, the small black cat) is the mascot of Night Light (and stands in for Day Light, which has no cat of its own yet): `dottie-1` peeks from under the red blanket beside
   the title, every cat in the room is one of the `dottie-face-…` pictures (cut from `dottie-10`, `-16`,
   `-18` and `-14`; they go dark when a cat's asleep), and `dottie-2` sleeps on the gold-paw card. A few poses come with things: peeking from
   under a red blanket (`dottie-1`), hanging from a green toothbrush (`dottie-9`), hugging a blue blanket

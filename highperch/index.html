@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-12.2"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-12.13"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-12.2">
+<link rel="stylesheet" href="../games.css?v=2026-11-12.13">
 <style>
 /* A cattery floor of cat trees, 1 to N perches tall: one of each height in every row and column. Arrows between
    trees point down to the shorter one, and lookout cats round the walls count the trees they can see. When
@@ -91,8 +91,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-12.2"></script>
-<script src="../cattower.js?v=2026-11-12.2"></script>
+<script src="../games.js?v=2026-11-12.13"></script>
+<script src="../cattower.js?v=2026-11-12.13"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N floor of cat trees, 1 to N perches tall: every row and column has one tree of each height.
@@ -100,10 +100,12 @@
 // as in Futoshiki), and lookout cats round the edge, each saying how many trees it can see along its row or
 // column, since a taller tree hides the shorter ones behind it (looks, as in Skyscrapers).
 // Levels: the size, which clues it uses (G givens, S signs, L lookouts), and how many spare clues it keeps
-// beyond the fewest that still make the puzzle work out.
+// beyond the fewest that still make the puzzle work out. keep: trees left standing whether they're needed or not,
+// on the levels that bring in arrows and lookouts (since 2026-11-12: those floors came with one or two trees and
+// GoatCounter showed 8 starts and 4 solves at level 3, and no solves in 10 starts from level 4 up).
 function levelOf(n) {
-  return [null, {N: 4, t: "G", extra: 3}, {N: 5, t: "G", extra: 3}, {N: 4, t: "GS", extra: 2}, {N: 5, t: "GS", extra: 1},
-    {N: 4, t: "GL", extra: 2}, {N: 5, t: "GL", extra: 1}, {N: 6, t: "GSL", extra: 2}, {N: 6, t: "GSL", extra: 0},
+  return [null, {N: 4, t: "G", extra: 4}, {N: 5, t: "G", extra: 4}, {N: 4, t: "GS", extra: 2, keep: 3}, {N: 5, t: "GS", extra: 2, keep: 5},
+    {N: 4, t: "GL", extra: 2, keep: 3}, {N: 5, t: "GL", extra: 2, keep: 5}, {N: 6, t: "GSL", extra: 2, keep: 4}, {N: 6, t: "GSL", extra: 0},
     {N: 7, t: "GSL", extra: 0}, {N: 7, t: "SL", extra: 0}][n];
 }
 // A random full grid: fill square by square with numbers in a random order, backing up when stuck.
@@ -198,7 +200,7 @@ function reason(N, clues, all) {
 // puzzle to work out by reasoning alone, then put back the level's spare clues. Working out by reasoning
 // alone also means there's exactly one answer.
 function makeFloor(n) {
-  const {N, t, extra} = levelOf(n), sol = randomLatin(N), all = t.includes("L") ? perms(N) : [];
+  const {N, t, extra, keep = 0} = levelOf(n), sol = randomLatin(N), all = t.includes("L") ? perms(N) : [];
   const shuffle = a => { for (let k = a.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [a[k], a[j]] = [a[j], a[k]]; } return a; };
   const givens = shuffle([...Array(N * N).keys()].map(i => ["g", [i, sol[i]]]));
   const others = [];
@@ -210,12 +212,15 @@ function makeFloor(n) {
   const pack = list => ({givens: list.filter(c => c[0] === "g").map(c => c[1]), signs: list.filter(c => c[0] === "s").map(c => c[1]), looks: list.filter(c => c[0] === "l").map(c => c[1])});
   if (!reason(N, pack(have), all)) return null;
   const gone = [];
-  for (const c of have.slice()) {
+  for (const c of have.slice(keep)) {   // the first `keep` are trees (givens come first), and stay
     const without = have.filter(x => x !== c);
     if (reason(N, pack(without), all)) { have = without; gone.push(c); }
   }
   shuffle(gone);
   have = have.concat(gone.slice(0, extra));
+  // a floor with trees kept still shows at least three of each kind of clue its level is there to teach
+  const count = k => have.filter(c => c[0] === k).length;
+  if (keep && ((t.includes("S") && count("s") < 3) || (t.includes("L") && count("l") < 3))) return makeFloor(n);
   return {N, sol, ...pack(have)};
 }
 

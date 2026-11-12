@@ -13,7 +13,7 @@ const G = (() => {
     ["Patches", "patches", "Sew a four-fabric quilt", "#73A7AE", "logic", "map four colour color quilt"],
     ["Sunbeams", "sunbeams", "Every cat gets a warm spot", "#ECA818", "logic", "shikaku rectangles"],
     ["Toy Box", "toybox", "Help Laya put every toy back in its basket", "#B3B94B", "teasers", "sort ball sort"],
-    ["Pounce", "pounce", "Line up three of a kind for Crunch to pounce on", "#6AA673", "quick", "match 3 match-3 three in a row"],
+    ["Pounce on Three", "pounce", "Line up three of a kind for Crunch to pounce on", "#6AA673", "quick", "match 3 match-3 three in a row"],
     ["Twirl", "twirl", "Clear every ribbon off the mat so Bugsy can nap", "#B94588", "teasers", "ribbons unblock"],
     ["Toe Beans", "toebeans", "Make the number on the big pad", "#DD9DAD", "numbers", "countdown 24 sums arithmetic maths math"],
     ["Knock It Off", "knockitoff", "Help Fred push everything off the table", "#7885BA", "teasers", "push sokoban table"],
@@ -28,7 +28,7 @@ const G = (() => {
     ["Copycat", "copycat", "Find the boxes with matching toys", "#D08A4E", "quick", "memory pairs concentration"],
     ["Night Light", "nightlight", "Help Dottie get every cat to close its eyes", "#3A3358", "teasers", "lights out flip"],
     ["Unravel", "unravel", "Cover every line with one strand of yarn", "#E16A4A", "lines", "one line euler draw"],
-    ["Tail Chase", "tailchase", "Help Jan Brady catch the toys without getting tangled", "#C9773F", "quick", "snake action"],
+    ["Tail Chase", "tailchase", "Help Jan Brady catch the toys without getting tangled", "#C9773F", "prowl", "snake action"],
     ["Keyboard Cat", "keyboardcat", "Make words from the keys that still work", "#8D78AD", "words", "spelling bee"],
     ["If It Fits", "iffits", "Build the box, and Bugsy comes to sit in it", "#C4925C", "teasers", "tangram shapes"],
     ["High Perch", "highperch", "Raise every cat tree to just the right height", "#8E5E3E", "logic", "skyscrapers towers futoshiki sudoku latin square"],
@@ -42,14 +42,14 @@ const G = (() => {
     ["Pick of the Pile", "pickpile", "Help Fred put the toy blocks away in pairs", "#7885BA", "teasers", "mahjong solitaire mahjongg shanghai tile match pairs"],
     ["Fridge Magnets", "magnets", "Help Crunch put every letter back on the fridge", "#BD5538", "words", "unolingo crossword alphabet letters", "2026-10-19"],
     ["Purrfect Square", "purrfect", "Make every row, column and diagonal add up the same", "#ECA818", "numbers", "magic square sums arithmetic maths math", "2026-10-20"],
-    ["Catlas", "atlas", "Name the country where each cat is hiding", "#5FA0C8", "quick", "geography countries world map quiz seterra flags places territories wild cats", "2026-10-22"],
-    ["Cat Burglar", "catburglar", "Catch the cat that's sneaked into the painting", "#4E577D", "quick", "hidden object find spot seek paintings art museum met where's waldo wally", "2026-10-22"],
+    ["Catlas", "atlas", "Name the country where each cat is hiding", "#5FA0C8", "prowl", "geography countries world map quiz seterra flags places territories wild cats", "2026-10-22"],
+    ["Cat Burglar", "catburglar", "Catch the cat that's sneaked into the painting", "#4E577D", "prowl", "hidden object find spot seek paintings art museum met where's waldo wally", "2026-10-22"],
     ["Cat Pile", "catpile", "Pile napping cats on the blanket and clear the lines", "#E16A4A", "quick", "blockudoku block blast woodoku 1010 blocks shapes tetris polyomino sudoku lines", "2026-10-23"],
     ["Fish Bones", "fishbones", "Swap the bones until Bowtie's fish spells words again", "#73A7AE", "words", "waffle swap letters crossword word puzzle fish skeleton", "2026-10-25"],
     ["Mewstermind", "stash", "Work out which toys the cat stashed in the boxes", "#7885BA", "logic", "toy stash mastermind guess code breaker codebreaker bulls and cows deduction colours colors hidden", "2026-10-26"],
     ["Knit Pick", "knitpick", "Help Laya find the words knitted into her blanket", "#8D78AD", "words", "word search wordsearch wonderword find a word hidden word puzzle", "2026-10-26"],
     ["Junk Drawer", "junkdrawer", "Connect the fridge magnets in Dottie's junk drawer to spell words", "#E16A4A", "words", "boggle squaredle word grid word hunt find words letter grid", "2026-11-06"],
-    ["Bird Watch", "birdwatch", "Help Bugsy and Bowtie spot the birds without waking the human", "#73A7AE", "quick", "whack-a-mole whack a mole birds window tapping action reflexes", "2026-10-26"],
+    ["Bird Watch", "birdwatch", "Help Bugsy and Bowtie spot the birds without waking the human", "#73A7AE", "prowl", "whack-a-mole whack a mole birds window tapping action reflexes", "2026-10-26"],
     ["Shelf Life", "shelflife", "Help Fred put the yarn back in order", "#B94588", "teasers", "i love hue gradient colour color sort shades swap yarn", "2026-10-26"],
     ["Meowbile", "meowbile", "Weigh the toys on the cat's mobile", "#7885BA", "numbers", "solveme mobiles mobile balance scales weights weigh algebra equations maths math", "2026-10-27"],
     ["Kitten Caboodle", "kittencaboodle", "Wake the kittens. Spell the words made from the mother's root word.", "#B3B94B", "words", "rootonym word roots prefixes suffixes etymology greek latin vocabulary definitions clues kittens", "2026-10-29"],
@@ -58,17 +58,18 @@ const G = (() => {
     ["Window Ledges", "windowledges", "Add up the windows to match every total", "#B3B94B", "numbers", "kakuro cross sums sums arithmetic maths math", "2026-10-31"],
     ["Purrmutation", "catshuffle", "Put the cat's picture back together", "#9874CA", "teasers", "cat shuffle fifteen 15 puzzle sixteen twiddle sliding tiles slide puzzle picture shuffle scramble rotate turn", "2026-11-01"],
     ["Mew Hue", "mewhue", "Slide paint together and line up the colours", "#B94588", "quick", "colour color mixing paint swipe slide merge lines rows columns 2048 hue pawlette", "2026-11-01"],
-    ["Pawlinko", "pawlinko", "Take turns with Gus and Peanut knocking toys down the climbing wall into the cat beds", "#7885BA", "quick", "plinko pachinko pegs pegboard galton board drop balls bounce plinko physics yarn toys cat climbing wall tree beds springs action", "2026-11-02"],
+    ["Pawlinko", "pawlinko", "Take turns with Gus and Peanut knocking toys down the climbing wall into the cat beds", "#7885BA", "prowl", "plinko pachinko pegs pegboard galton board drop balls bounce plinko physics yarn toys cat climbing wall tree beds springs action", "2026-11-02"],
     ["Cross Stitch", "crossstitch", "Stitch the sampler by the counts to see the picture", "#BD5538", "logic", "nonogram nonograms picross griddlers paint by numbers hanjie pattern pic-a-pix logic pictures cross stitch sampler embroidery", "2026-11-06"],
     ["Zoomies", "zoomies", "Retrace the cat's 3 a.m. zoomies around the house", "#4E577D", "lines", "signpost arrows path numbers jumps queen chain link zoomies", "2026-11-08"],
     ["Under the Blanket", "blanket", "Find the cats with a feather", "#8D78AD", "logic", "black box blackbox rays atoms deflection reflection hidden balls feather wand blanket bugsy", "2026-11-09"],
     ["Bed Hog", "bedhog", "Slide the sprawled cats until there's room for you", "#E16A4A", "teasers", "klotski rush hour sliding block puzzle unblock slide bed hog huarong sleeping cats", "2026-11-09"],
-    ["Pounce Up", "pounceup", "Help Rayla pounce up the tallest bookcase in the house", "#7885BA", "quick", "doodle jump platform jumping climbing bookcase shelves action springs", "2026-11-12"],
+    ["Pounce Up", "pounceup", "Help Rayla pounce up the tallest bookcase in the house", "#7885BA", "prowl", "doodle jump platform jumping climbing bookcase shelves action springs", "2026-11-12"],
   ];
   // Games in beta: their pages work (open them by their address), but they're left off the front page, the games menu,
   // search, favorites and the daily challenge until they're finished. Same fields as GAMES.
   const BETA = [
-    ["Pawstcards", "pawstcards", "Guess where Pinecone is from her postcards", "#73A7AE", "quick", "geography countries wikipedia postcards guess the country clues redacted trivia travel pinecone", "2026-11-11"],
+    ["Day Light", "daylight", "Get every cat napping in the sun, though some point their own way", "#ECA818", "teasers", "lights out flip switch spots arrows night light nap", "2026-11-12"],
+    ["Pawstcards", "pawstcards", "Guess where Pinecone is from her postcards", "#73A7AE", "prowl", "geography countries wikipedia postcards guess the country clues redacted trivia travel pinecone", "2026-11-11"],
   ];
   const rowOf = slug => GAMES.find(g => g[1] === slug) || BETA.find(g => g[1] === slug);
   // The shelves the front page and the games menu sort the games onto, in order: key (also a plain name for it,
@@ -79,14 +80,16 @@ const G = (() => {
     ["lines", "Cat Trails", "Join, link and route things"],
     ["words", "Cat Spells", "Spell, find and climb words"],
     ["teasers", "Curious Cat", "Moves to plan and shapes to fit"],
-    ["quick", "Kitten Play", "Match, pop, spot and chase"],
+    ["quick", "Kitten Play", "Match, pop and merge"],
+    // the action and looking games, split off Kitten Play on 2026-11-12 once Pawlinko and Pounce Up had arrived (the owner's name)
+    ["prowl", "On the Prowl", "Chase, spot and pounce"],
   ];
   // A shelf's games, A to Z by name (ignoring punctuation, so L-M-N-O-Pom sits among the Ls). GAMES itself keeps its own
   // order, which today's challenge takes its turns from.
   const onShelf = key => GAMES.filter(g => g[4] === key)
     .sort((a, b) => a[0].replace(/[^A-Za-z0-9 ]/g, "").localeCompare(b[0].replace(/[^A-Za-z0-9 ]/g, ""), "en", {sensitivity: "base"}));
   // Each shelf's colour: its games' tiles on the front page and in the games menu, and its label and shortcut.
-  const SHELF_COLOUR = {logic: "#BD5538", numbers: "#ECA818", lines: "#73A7AE", words: "#B94588", teasers: "#7885BA", quick: "#6AA673"};
+  const SHELF_COLOUR = {logic: "#BD5538", numbers: "#ECA818", lines: "#73A7AE", words: "#B94588", teasers: "#7885BA", quick: "#6AA673", prowl: "#E16A4A"};
   const $ = id => document.getElementById(id);
   // Fridge Magnets' alphabet magnets (shared with Junk Drawer, styled by .fmag in games.css): pacific blue, each letter
   // lying at its own tilt
@@ -512,6 +515,30 @@ const G = (() => {
     const out = [...ov.querySelectorAll(".btns button, .smallbtns button")].find(b => /^(Close|Cancel|Keep playing|Done|Admire|Look at)/.test(b.textContent.trim()));
     if (out) { e.preventDefault(); out.click(); }
   });
+
+  // Moving up and down by threes (the owner's call, 2026-11-12, so nobody is carried to a level they can't win): three
+  // wins at a level move you up one, and three losses move you down one; one win changes nothing. A loss is a lost game,
+  // or, in a puzzle that can't be lost, a hint or a Restart after working on it (once a puzzle). The tally is kept on
+  // this device by game (`name`, with a suffix for a second mode) and starts again whenever the level changes, by
+  // itself or by the player's own pick. G.ladder(name, max) gives won(level) and lost(level), each returning
+  // {level, next, up, down, wins, losses, top}, and say(r, what) for the card's line (what: "misses", "hints or restarts").
+  // The win card's main button is G.ANOTHER and its level picker's words are G.CHANGE, in the games that use it:
+  // Night Light, Day Light, Open the Door! and Toe Beans so far (TODO.md has the rest).
+  const LADDER = "catdoku.ladder.v1", ANOTHER = "Give me another!", CHANGE = "Change the difficulty:";
+  function ladder(name, max, min = 1) {
+    const step = (level, win) => {
+      const all = load(LADDER), was = all[name], t = was && was.l === level ? was : {l: level, w: 0, x: 0};
+      if (win) t.w++; else t.x++;
+      const up = win && t.w >= 3 && level < max, down = !win && t.x >= 3 && level > min, next = level + (up ? 1 : down ? -1 : 0);
+      all[name] = up || down ? {l: next, w: 0, x: 0} : t; save(LADDER, all);
+      return {level, next, up, down, wins: t.w, losses: t.x, top: level >= max};
+    };
+    const say = (r, what = "misses") => r.up ? `That's 3 wins at level ${r.level}: up to level ${r.next}!`
+      : r.down ? `That's 3 ${what} at level ${r.level}, so next comes level ${r.next}.`
+      : r.top ? "That's the hardest level." : r.wins === 2 ? `2 of 3 wins at level ${r.level}: one more moves you up.`
+      : r.wins === 1 && !r.losses ? `1 of 3 wins at level ${r.level}.` : r.wins ? `${Math.min(3, r.wins)} of 3 wins at level ${r.level}.` : "";
+    return {won: level => step(level, true), lost: level => step(level, false), say};
+  }
 
   // Moving up: after a clean win the next puzzle is one size bigger, up to the largest the page's size
   // list offers. The finishing cards also offer every other size, so players can always choose.
@@ -1217,6 +1244,7 @@ const G = (() => {
     tunnelrun: ["Arrow keys: pick a piece", "Space or Enter: turn it (Shift turns it back)", "Shift with an arrow: slide its track"],
     copycat: ["Arrow keys: pick a box", "Space or Enter: open it"],
     nightlight: ["Arrow keys: pick a cat", "Space or Enter: tap it"],
+    daylight: ["Arrow keys: pick a cat", "Space or Enter: tap it"],
     unravel: ["Arrow keys: go from peg to peg", "Space or Enter: start there, go on to it, or wind back to it"],
     tailchase: ["Arrow keys or WASD: steer", "Space: pause"],
     keyboardcat: ["Letters: type a word", "Enter: try it", "Backspace: take a letter off", "Space: mix the keys"],
@@ -1645,6 +1673,7 @@ const G = (() => {
     bedhog: [["cats", "Cats", "Cats nap on the bed", true, {row: "decor"}]],
     catshuffle: [NUMBERS("Each piece shows where it goes")], windup: [NUMBERS("Each toy shows a number too")],
     pickpile: [["dim", "Dim stuck blocks", "Blocks that can't come off yet are dimmed", true, {row: "decor", inv: true}]],
+    tunnelrun: [["tracks", "Tracks", "Rugs where whole rows and columns slide", false, {icon: "swap", words: ["Turning rugs", "Sliding tracks"]}]],
     toebeans: [["rev", "Reverse", "Count back down from the total to the start", false, {icon: "swap", words: ["Match the Paw", "Paw = 0"]}]],
     twirl: [["twisty", "Twisty ribbons", "Off, every ribbon is drawn flat", true, {row: "decor", at: ["catdoku.twirl.prefs.v1", "twisty"]}]],
     pounceup: [["autoPounce", "Pounce by herself", "Rayla pounces again each time she lands, without waiting for a tap", false]],
@@ -2636,6 +2665,6 @@ const G = (() => {
     }
   }
 
-  return {MAGNET, tally, emoText, radios, pawLost, pieces, GAMES, BETA, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, loseCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText,
+  return {ladder, ANOTHER, CHANGE, MAGNET, tally, emoText, radios, pawLost, pieces, GAMES, BETA, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, loseCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, feedbackCard, feedbackFor, toyPicker, pickLook};
 })();

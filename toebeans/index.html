@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-12.2";
+  var BUILD = "2026-11-12.13";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-12.2">
+<link rel="stylesheet" href="../games.css?v=2026-11-12.13">
 <style>
 /* Six number tiles up top, then one outlined paw: its four toe beans are + − × ÷ and its main pad holds the goal.
    An exact hit fills every pad at once in gold (--pc, with --pt for text on it). */
@@ -125,13 +125,19 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-12.2"></script>
+<script src="../games.js?v=2026-11-12.13"></script>
 <script>
 /* ---------- puzzles ---------- */
 // Each level: [fewest steps the goal needs, lowest goal, highest goal, the big numbers that can be dealt].
 // Four small numbers (1 to 9, all different) and two big ones are dealt, and the goal is picked from
 // everything they can make that needs exactly that many steps. (A function, so the puzzle worker gets it too.)
-function levelInfo(n) { return [null,
+// The usual game's first two levels are gentler than Reverse's (since 2026-11-12, when 28 starts at level 1 had come
+// to 13 solves): one step at level 1 (two of the numbers make the goal), and two steps over level 1 and 2's old
+// range at level 2. Reverse (rev) keeps two steps at both, since one step there would be a number already dealt.
+function levelInfo(n, rev) {
+  if (!rev && n === 1) return [1, 10, 60, [10, 11, 12, 15, 20]];
+  if (!rev && n === 2) return [2, 10, 99, [10, 11, 12, 15, 20, 25]];
+  return [null,
   [2, 10, 60, [10, 11, 12, 15, 20]], [2, 20, 99, [10, 11, 12, 15, 20, 25]], [3, 30, 150, [10, 11, 12, 13, 15, 20, 25]],
   [3, 60, 220, [10, 11, 12, 13, 15, 20, 25]], [3, 100, 320, [11, 12, 13, 15, 17, 20, 25]], [4, 100, 400, [11, 12, 13, 15, 17, 20, 25]],
   [4, 150, 550, [11, 12, 13, 15, 17, 19, 20, 25]], [4, 200, 750, [11, 12, 13, 15, 17, 19, 20, 25]],
@@ -234,7 +240,7 @@ function revStarts(nums, cap) {
 }
 // A Reverse puzzle: numbers dealt as for the usual game, and a start in the level's range needing exactly its steps.
 function makeReverse(level) {
-  const [steps, lo, hi, bigPool] = levelInfo(level);
+  const [steps, lo, hi, bigPool] = levelInfo(level, true);
   for (let tries = 0; tries < 200; tries++) {
     const small = new Set(); while (small.size < 4) small.add(1 + Math.floor(Math.random() * 9));
     const big = new Set(); while (big.size < 2) big.add(bigPool[Math.floor(Math.random() * bigPool.length)]);
@@ -277,6 +283,17 @@ const rev = () => !!settings.rev;
 const builder = () => rev() ? buildRev : build;
 const lvKey = () => rev() ? "levelRev" : "level";
 const myLevel = () => settings[lvKey()];
+// Three exact goals at a level move you up; three slips (a hint, or finishing more than 10 away) move you down
+// (G.ladder; until 2026-11-12 one exact goal moved you up and one far finish moved you down). Each mode has its own tally.
+const climb = () => G.ladder(game.rev ? "toebeans-rev" : "toebeans", MAX_LEVEL);
+// A hint, or a finish far from the goal, on this puzzle: it counts once.
+function slip() {
+  if (game.slipped || game.won) return;
+  game.slipped = true;
+  const r = climb().lost(game.N);
+  if (r.down) { game.down = r.next; settings[lvKey()] = r.next; $("levelSel").value = r.next; builder().prefetch(r.next); }
+  save();
+}
 const save = () => G.save(STORE, {settings, game});
 
 const GOLD = ["#E8B422", "#2A2530"];   // a golden paw: the goal hit exactly
@@ -337,7 +354,7 @@ function hint() {
   const left = game.beans.filter(v => v !== null), way = oneWay(left, game.goal);
   if (!way) { G.note(game.history.length ? "The goal can't be made from these numbers. Try Undo." : "Couldn't find a way to the goal.", 5000); return; }
   if (!way.length) return;
-  game.hinted = true; save();
+  game.hinted = true; slip(); save();
   const [a, o, b] = way[0], i = game.beans.indexOf(a), j = game.beans.findIndex((v, k) => v === b && k !== i);
   pick = null; op = null;
   if (!hints.level()) return hints.show({i, j}, `Try ${a} and ${b} together. Ask again for the sign.`);
@@ -348,7 +365,7 @@ function revHint() {
   const left = game.beans.filter(v => v !== null), way = revWay(left, game.pad);
   if (!way) { G.note(game.history.length ? "The pad can't get to 0 from here. Try Undo." : "Couldn't find a way to 0.", 5000); return; }
   if (!way.length) return;
-  game.hinted = true; save();
+  game.hinted = true; slip(); save();
   const [a, o, b, , onPad] = way[0];
   let i, j, padFirst = false;
   if (!onPad) { i = game.beans.indexOf(a); j = game.beans.findIndex((v, k) => v === b && k !== i); }
@@ -361,10 +378,12 @@ function revHint() {
 }
 
 /* ---------- finishing ---------- */
-const levelPick = (current, text) => G.otherSize($("levelSel"), current, startLevel, text || "Or play a different level:");
+const levelPick = (current, text) => G.otherSize($("levelSel"), current, startLevel, text || G.CHANGE);
 function win() {
   game.won = true; G.finishClock(game);
-  const next = game.hinted ? game.N : Math.min(MAX_LEVEL, game.N + 1);
+  // a goal hit with a hint was counted as a slip when the hint was asked for; a clean one is a win toward moving up
+  let next = game.down || game.N;
+  if (!game.slipped) { const r = climb().won(game.N); next = r.next; game.climbLine = climb().say(r); }
   settings[lvKey()] = next; $("levelSel").value = next; save(); render();
   G.track(`Toe Beans${game.rev ? " reverse" : ""} solved level ${game.N}`);
   builder().prefetch(next);
@@ -373,21 +392,20 @@ function win() {
 }
 function finishCard() {
   const next = myLevel(), top = game.N === MAX_LEVEL, did = game.rev ? `${game.start} all the way down to 0.` : `${game.goal} exactly.`;
-  const text = game.hinted ? `${did} You had a hint, so here's another at level ${next}.`
-    : top ? `${did} That's the hardest level, so the next one is level ${MAX_LEVEL} again.`
-    : `${did} Level ${game.N} done; next up is level ${next}.`;
+  const text = did + " " + (game.down ? `That's 3 hints or misses at level ${game.N}, so next comes level ${game.down}.`
+    : game.slipped ? "A goal hit with a hint doesn't count toward moving up." : game.climbLine || "");
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my paw", game.result,
-    {title: "Got it!", gold: !game.hinted, goldWhy: "Exactly right, with no hints!", top: top, next: next > game.N ? `Next: level ${next}` : "Next board", after: levelPick(next)});
+    {title: "Got it!", gold: !game.hinted, goldWhy: "Exactly right, with no hints!", top: top, next: G.ANOTHER, after: levelPick(next)});
 }
 
-// Close enough: finishing without the goal, once within 10 of it, keeps your level. (The button is greyed out until
-// then; further off, a finish would move you back one.)
+// Close enough: finishing without the goal, once within 10 of it, counts neither way. (The button is greyed out
+// until then; further off, a finish is a miss, and three misses or hints at a level move you back one.)
 const nearEnough = d => d <= 10;
 function finishHere() {
   if (!playing()) return;
-  const c = closest(), d = Math.abs(c - target()), back = Math.max(1, game.N - 1);
+  const c = closest(), d = Math.abs(c - target());
   const result = nearEnough(d) ? `That's close enough to stay on level ${game.N}.`
-    : game.N === 1 ? "You'll stay on level 1." : `Finishing now moves you back to level ${back}.`;
+    : game.N === 1 ? "You'll stay on level 1." : "Finishing now counts as a miss (three at a level move you back one).";
   G.openCard("Close enough?", game.rev ? `The pad's on ${c}, ${d} away from 0. ${result}` : `Your closest is ${c}, ${d} away from ${game.goal}. ${result}`,
     [["Finish", () => { G.closeCard(); giveUp(); }, true], ["Keep trying", G.closeCard]]);
 }
@@ -395,7 +413,8 @@ function giveUp() {
   G.breakStreak();   // losing ends the win streak
   const c = closest(), d = Math.abs(c - target());
   game.over = true; game.closest = c;
-  settings[lvKey()] = nearEnough(d) ? game.N : Math.max(1, game.N - 1);
+  if (!nearEnough(d)) slip();   // (a hint on this puzzle has counted already)
+  settings[lvKey()] = game.down || game.N;
   $("levelSel").value = myLevel(); pick = null; op = null;
   save(); render();
   G.track(`Toe Beans${game.rev ? " reverse" : ""} finished level ${game.N} ${d} away`);
@@ -407,7 +426,7 @@ function overCard() {
   const media = document.createElement("div");
   const p = document.createElement("p");
   p.textContent = (game.rev ? `You got the pad down to ${game.closest}. ` : `You got to ${game.closest}, ${d} away from ${game.goal}. `) +
-    (next === game.N ? `Next up is another level ${next}.` : `Next up is level ${next}.`);
+    (next === game.N ? "" : `That's 3 hints or misses at level ${game.N}, so next comes level ${next}.`);
   media.append(p);
   const way = game.rev ? revWay(game.nums, game.start) : oneWay(game.nums, game.goal);
   if (way) {
@@ -415,7 +434,7 @@ function overCard() {
     w.textContent = "One way: " + way.map(([a, o, b, r]) => `${a} ${SIGN[o]} ${b} = ${r}`).join(", then ");
     media.append(w);
   }
-  G.loseCard(nearEnough(d) ? `So close: ${d} away!` : "Not this time", "", [[next > game.N ? `Next: level ${next}` : "Next board", () => { G.closeCard(); startLevel(next); }, true],
+  G.loseCard(nearEnough(d) ? `So close: ${d} away!` : "Not this time", "", [[G.ANOTHER, () => { G.closeCard(); startLevel(next); }, true],
     ["Look at my numbers", () => { G.closeCard(); G.note("Tap New puzzle when you're ready for another.", 0); }], G.homeBtn()], media, levelPick(next), {result: {n: game.N}});
 }
 
@@ -565,7 +584,7 @@ function helpOnFirstVisit() {
     {say: "You needn't use them all", els: [all]},
     {say: "Stuck? Hint shows a step", els: [$("hintBtn")]},
     {say: "Within 10? Close enough ends it", els: [$("finishBtn")]},
-    {say: "Exact: gold paw and next level", els: [$("paw")], ...fill},
+    {say: "Exact: a gold paw", els: [$("paw")], ...fill},
   ];
   G.spotlight({grid: $("beans"), w: 1, h: 1, steps, done: () => { settings.seenHelp = true; save(); render(); }});
 }

@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-12.2"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-12.13"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-12.2">
+<link rel="stylesheet" href="../games.css?v=2026-11-12.13">
 <style>
 /* A KenKen house: every row and column holds 1 to N once, and walls split the floor into rooms whose numbers
    must make the room's sign. Each room has a door that opens when the room is right; with every door open,
@@ -108,14 +108,16 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-12.2"></script>
+<script src="../games.js?v=2026-11-12.13"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N grid where every row and column holds 1 to N once, cut into rooms (cages). Each room has a sign:
 // a number and a sum (+), difference (−), product (×) or quotient (÷) its numbers make. A room of one
-// square just shows its number. Levels: [size, the signs it uses, whether it can be solved without a guess].
+// square just shows its number. Levels: [size, the signs it uses, whether it can be solved without a guess,
+// the most squares in a room]. Level 1 is a first house (since 2026-11-12, when 27 starts at level 1 had come to
+// 11 solves): rooms of one or two squares and + only; level 2 keeps to rooms of three.
 function levelOf(n) {
-  return [null, [4, "+-", 1], [5, "+-", 1], [5, "+-x/", 1], [6, "+-x/", 1], [7, "+-x/", 1], [8, "+-x/", 1], [9, "+-x/", 0]][n];
+  return [null, [4, "+", 1, 2], [5, "+-", 1, 3], [5, "+-x/", 1, 4], [6, "+-x/", 1, 4], [7, "+-x/", 1, 4], [8, "+-x/", 1, 4], [9, "+-x/", 0, 4]][n];
 }
 // A random full grid: fill square by square with numbers in a random order, backing up when stuck
 // (and starting over if it takes too long).
@@ -148,14 +150,14 @@ function cageValue(op, vals) {
   if (op === "/") return hi % lo ? 0 : hi / lo;
   return vals[0];
 }
-// Cut the grid into rooms of one to four squares, mostly two and three.
-function makeRooms(N) {
+// Cut the grid into rooms of one to four squares (or up to `most`), mostly two and three.
+function makeRooms(N, most = 4) {
   const room = new Array(N * N).fill(-1), rooms = [], order = [...Array(N * N).keys()];
   for (let k = order.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [order[k], order[j]] = [order[j], order[k]]; }
   const nbrs = i => { const r = Math.floor(i / N), c = i % N, out = []; if (r) out.push(i - N); if (r < N - 1) out.push(i + N); if (c) out.push(i - 1); if (c < N - 1) out.push(i + 1); return out; };
   for (const s of order) {
     if (room[s] >= 0) continue;
-    const want = [2, 2, 2, 3, 3, 3, 4, N > 5 ? 4 : 3][Math.floor(Math.random() * 8)], cells = [s];
+    const want = Math.min(most, [2, 2, 2, 3, 3, 3, 4, N > 5 ? 4 : 3][Math.floor(Math.random() * 8)]), cells = [s];
     room[s] = rooms.length;
     while (cells.length < want) {
       const free = [...new Set(cells.flatMap(nbrs))].filter(j => room[j] < 0);
@@ -167,7 +169,7 @@ function makeRooms(N) {
   // a lone square joins a small room next door, now and then, so there aren't too many given numbers
   for (let k = 0; k < rooms.length; k++) {
     if (rooms[k].length !== 1 || Math.random() < 0.3) continue;
-    const next = nbrs(rooms[k][0]).map(j => room[j]).filter(q => rooms[q].length < 4 && q !== k);
+    const next = nbrs(rooms[k][0]).map(j => room[j]).filter(q => rooms[q].length < most && q !== k);
     if (!next.length) continue;
     const q = next[Math.floor(Math.random() * next.length)];
     rooms[q].push(rooms[k][0]); room[rooms[k][0]] = q; rooms[k] = [];
@@ -258,12 +260,15 @@ function solveRooms(N, cages, limit = 2) {
 // gets a new sign, or is split in two, and it's checked again. On a level that needs no guess, a room where
 // the solver got stuck is changed the same way until it never has to guess.
 function makePuzzle(n) {
-  const [N, ops, logic] = levelOf(n);
+  const [N, ops, logic, most] = levelOf(n);
   for (;;) {
-    const sol = randomLatin(N), cages = makeRooms(N).map(cells => ({cells, ...pickSign(cells, sol, ops)}));
+    const sol = randomLatin(N), cages = makeRooms(N, most).map(cells => ({cells, ...pickSign(cells, sol, ops)}));
     for (let tries = 0; tries < 40; tries++) {
       const r = solveRooms(N, cages);
-      if (r.count === 1 && !(logic && r.stuck.length)) return {N, cages: cages.map(c => [c.cells, c.t, c.op])};
+      if (r.count === 1 && !(logic && r.stuck.length)) {
+        if (most === 2 && cages.filter(c => c.cells.length === 1).length > N) break;   // too many numbers given away: another house
+        return {N, cages: cages.map(c => [c.cells, c.t, c.op])};
+      }
       if (r.count < 0 || (r.count !== 1 && !r.second)) break;
       const diff = r.count === 1 ? r.stuck : r.first.map((v, i) => v !== r.second[i] ? i : -1).filter(i => i >= 0);
       const d = diff[Math.floor(Math.random() * diff.length)], k = cages.findIndex(c => c.cells.includes(d)), cg = cages[k];
@@ -274,6 +279,8 @@ function makePuzzle(n) {
         const connected = cells => { const seen = new Set([cells[0]]), todo = [cells[0]]; while (todo.length) { const i = todo.pop(); for (const j of cells) if (!seen.has(j) && (Math.abs(i - j) === N || (Math.abs(i - j) === 1 && Math.floor(i / N) === Math.floor(j / N)))) { seen.add(j); todo.push(j); } } return seen.size === cells.length; };
         if (connected(b)) { cages.splice(k, 1, {cells: a, ...pickSign(a, sol, ops)}, {cells: b, ...pickSign(b, sol, ops)}); continue; }
       }
+      // a two-square room with only one sign to give can't change its sign: it becomes two one-square rooms
+      if (cg.cells.length === 2 && ops.length === 1) { cages.splice(k, 1, ...cg.cells.map(i => ({cells: [i], op: "", t: sol[i]}))); continue; }
       Object.assign(cg, pickSign(cg.cells, sol, ops));
     }
   }
@@ -289,11 +296,21 @@ let game = state.game || null, busy = false, sel = -1, running = false;
 // The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
 G.pawLost(() => !game || game.won || game.hinted || game.restarted);
 const save = () => G.save(STORE, {settings, game});
+// Three wins at a level move you up and three slips (a hint, or a Restart after putting numbers in) move you down: G.ladder.
+const climb = G.ladder("opendoor", MAX_LEVEL);
+// A hint or a Restart on this house: it counts once, and the house no longer counts as a win toward moving up.
+function slip() {
+  if (game.slipped || game.won) return;
+  game.slipped = true;
+  const r = climb.lost(game.level);
+  if (r.down) { game.down = r.next; settings.level = r.next; $("levelSel").value = r.next; build.prefetch(r.next); }
+  save();
+}
 const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
 const OPS = {"+": "+", "-": "−", "x": "×", "/": "÷", "": ""};
 // on the board: the same, with ÷ drawn (two clear dots and a bar)
 const OPS_SHOWN = {...OPS, "/": '<svg class="opdiv" viewBox="0 0 10 10" aria-hidden="true"><circle cx="5" cy="1.7" r="1.35"/><rect x=".6" y="4.15" width="8.8" height="1.7" rx=".85"/><circle cx="5" cy="8.3" r="1.35"/></svg>'};
-const levelName = n => { const [N, ops, logic] = levelOf(n); return `Level ${n} · ${N} × ${N}${ops === "+-" ? ", + and − only" : ""}${logic ? "" : ", may need a guess"}`; };
+const levelName = n => { const [N, ops, logic] = levelOf(n); return `Level ${n} · ${N} × ${N}${ops === "+" ? ", + only" : ops === "+-" ? ", + and − only" : ""}${logic ? "" : ", may need a guess"}`; };
 const build = G.builder([levelOf, randomLatin, cageValue, makeRooms, pickSign, solveRooms, makePuzzle], "makePuzzle");
 // floor colours for the rooms (no two rooms side by side match), and each one lit up once its room is right
 const FLOORS = [["#EFE2CC", "#FFF4D6"], ["#DDE7D6", "#F1FBE6"], ["#E2DDEC", "#F6F1FF"], ["#EDD9D3", "#FFEFE8"], ["#D8E4E6", "#EEFAFB"]];
@@ -476,7 +493,7 @@ function hint() {
   if (!playing()) return;
   const sol = solution(), g = game.grid;
   if (!sol) { G.note("Couldn't work out a hint for this puzzle. Try Undo, or check for a wrong number.", 4000); return; }
-  game.hinted = true; game.started = true; save();
+  game.hinted = true; game.started = true; slip(); save();
   const wrong = g.map((v, i) => v && v !== sol[i] ? i : -1).filter(i => i >= 0);
   if (wrong.length) {
     const i = wrong.includes(sel) ? sel : wrong[0];
@@ -503,8 +520,9 @@ function whyNumber(i) {
 }
 $("hintBtn").onclick = hint;
 $("restartBtn").onclick = () => {
-  if (undo.restart(g => { guesses.clear(); g.grid = g.grid.map(() => 0); g.notes = g.notes.map(() => 0); if (settings.autoNotes) pad.fill(); }))
-    G.note("Every door's shut again. Undo brings your numbers back.", 3500);
+  if (undo.restart(g => { guesses.clear(); g.grid = g.grid.map(() => 0); g.notes = g.notes.map(() => 0); if (settings.autoNotes) pad.fill(); })) {
+    slip(); G.note("Every door's shut again. Undo brings your numbers back.", 3500);
+  }
 };
 addEventListener("resize", () => { if (game && plan) draw(); });
 
@@ -512,7 +530,9 @@ addEventListener("resize", () => { if (game && plan) draw(); });
 // Every door is open, so a cat curls up asleep in every doorway, then the finishing card.
 function win() {
   game.won = true; G.finishClock(game); sel = -1; pad.off();
-  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  // a house with a hint or a restart was counted when that happened; a clean one is a win toward moving up
+  let next = game.down || game.level;
+  if (!game.slipped) { const r = climb.won(game.level); next = r.next; game.climbLine = climb.say(r); }
   settings.level = next; $("levelSel").value = next; save();
   draw();
   G.track(`Open the Door solved level ${game.level}`);
@@ -538,9 +558,10 @@ const showNums = () => admire.sync();
 function finishCard() {
   const next = settings.level, N = game.N;
   let text = `Every door in the ${N} × ${N} house is open, and a cat's fast asleep in every doorway.`;
-  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  text += " " + (game.down ? `That's 3 hints or restarts at level ${game.level}, so next comes level ${game.down}.`
+    : game.slipped ? "A house with a hint or a restart doesn't count toward moving up." : game.climbLine || "");
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my house", game.result,
-    {title: "Door's open!", gold: !game.restarted && !game.hinted, goldWhy: "No hints or restarts!", next: next > game.level ? `Next: level ${next}` : "Next board", after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+    {title: "Door's open!", gold: !game.restarted && !game.hinted, goldWhy: "No hints or restarts!", next: G.ANOTHER, after: G.otherSize($("levelSel"), next, startLevel, G.CHANGE)});
 }
 
 /* ---------- new puzzles ---------- */

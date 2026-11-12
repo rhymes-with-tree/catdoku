@@ -21,50 +21,69 @@ Still to try:
 - if none of that works, a `contenteditable` box styled like the input
 Test each on a real iPhone: Safari's AutoFill doesn't show in the headless browser the tests use.
 
-## Shelves: split Kitten Play once its action games arrive
+## Shelves: what's left after the Kitten Play split
 
-Talked through with the owner on 2026-11-02, the reasoning kept so it can be weighed again. That day Toy Box, Night
-Light and Pawlette moved to Curious Cat, Cat Pile to Kitten Play, and Catlas to Kitten Play, retiring Cat Travels.
-Shelves live in `GROUPS` in `games.js` (with their colours in `SHELF_COLOUR`, short names in `SHORT` in `index.html`,
-and colours again in `calendar/index.html`), and a game's shelf is the fifth field of its row in `GAMES`.
+Kitten Play was split on 2026-11-12: it keeps match, pop and merge (Pounce on Three, Bubbles, Cat Pile, Wind Up, Mew
+Hue, and Copycat: matching, not prowling), and On the Prowl (the owner's name) has the action and looking games (Tail Chase, Bird Watch, Pawlinko, Pounce
+Up, Cat Burglar, Catlas, and Pawstcards in beta). Its colour is coral. `IDEAS.md` still lists ideas under
+Kitten Play: move the action ones (Paw-ball, a fling game, kneading in time) to On the Prowl when they're next touched.
 
-**The test for Curious Cat and Kitten Play.** Curious Cat ("Moves to plan and shapes to fit") gives you a fixed board
-to plan your way through, and nothing new turns up while you think. Kitten Play ("Match, pop, spot and chase") keeps
-bringing new things (falling toys, the next bubble, birds, the snake moving), so chance and timing count as much as
-planning, and you play for a score or a level's goal rather than solving one set position; its looking games
-(Copycat, Cat Burglar, Catlas) are quick rounds of spotting and finding. Cat Trails ("Join, link and route things")
-holds together: every game there is drawing or routing lines. Yarn, Catwalk and Tunnel Run are logic puzzles with one
-answer, but drawing lines puts them on Trails, and that's on purpose. Borderline on Curious Cat but staying: Pick of
-the Pile (partly spotting pairs, still a fixed board to clear in a good order) and Shelf Life (judged by eye more than
-planned).
+Still open from the earlier notes: Cat Spells stays one shelf (the owner's call), and a colour-games shelf only if
+Curious Cat gets crowded (Cat Mat, Shelf Life, Pawlette, Mew Hue).
 
-**Don't add shelves yet.** A phone shows three tiles across, and every shelf adds a label tile and starts a new row,
-so a shelf of two to four games costs a lot of screen for little. Counts on 2026-11-02, games on the site / shortlist
-ideas: Cat Logic 9/3, Cat Math 6/0, Cat Trails 6/1, Cat Spells 8/5, Curious Cat 10/5, Kitten Play 11/2.
+## On-ramps and pacing, from the GoatCounter numbers (2026-11-12)
 
-**Split Kitten Play once its action games arrive.** It's more than one kind of game sharing a shelf. Its ideas fall in
-two groups:
-- match and pop: Onet-style pairs, SameGame groups, a triple-tile tray; with Pounce, Bubbles, Wind Up, Mew Hue and
-  Cat Pile
-- action: Pawlinko (was Kitty Plinko), Paw-ball, Pounce Up, a fling game, kneading in time with the purr; with Tail Chase and Bird
-  Watch, and the looking games (Copycat, Cat Burglar, Catlas) could go with them
-The action group is two to five games today, too few for a shelf. Once a couple of the shortlisted ones (Pawlinko,
-Paw-ball, Pounce Up) are built, split it. That's now: Pawlinko (2026-11-02) and Pounce Up (2026-11-12) are both on the
-site, waiting for the owner to name the action shelf.
+From GoatCounter's counts, 2026-10-05 to 2026-11-12 ("27 → 11" is a level started 27 times and solved 11). The samples
+are small (10 to 40 a level) and a start includes pressing New, so these are signs, not rates. In order (done so far,
+2026-11-12: Open the Door's and Toe Beans' easier level 1, Tunnel Run's Hint, starts counted in Wind Up, Pawlinko
+and L-M-N-O-Pom, High Perch's trees left standing, smaller first sizes in Catdoku, Patches, Yarn and Sunbeams, 
+Knock It Off's forgiving first two levels, and Pounce saving while toys fall):
 
-**Cat Spells stays one shelf.** With its five shortlisted ideas it would have 13 games, but there's no natural split:
-finding words and moving letters to make words are the same kind of game (the owner's call). Cat Math has no ideas
-waiting, but six games is a fine shelf; leave it.
+- [ ] **Toe Beans: levels 9 and 10?** 0 solves in 9 starts, but five of those ended with Close enough, 1 to 6 away,
+  which is the game working as meant. Leave unless the owner finds them too hard.
+- [ ] **Pounce: check level 1.** 23 → 12, though the move limits were tuned for a near-certain win. Running out of
+  moves wasn't counted, so that may be people looking in and leaving; it's counted from 2026-11-12 ("Pounce out of
+  moves on level N"). Look again with a few weeks of it.
+- [ ] **Weak level 1s to watch** (small samples): Cat Pile 16 → 7, Scratch That 17 → 8, Window Ledges 11 → 5, Kitten
+  Caboodle 10 → 5.
+- [ ] **Somewhere to go past the hardest level.** Toy Box's level 21 is a fifth of its starts; Twirl and Knock It Off
+  at 20 are the same.
+- [ ] **Catlas: two errors, once each on 2026-10-24.** Both are the map not having loaded when something asked it
+  for a place (`world` was null). Not seen since; check that nothing can be tapped before the map is in.
 
-**Colour games, if Curious Cat gets crowded.** Cat Mat (flood fill), Shelf Life (colour gradient), Pawlette (mix
-paint to order), all on Curious Cat, and Mew Hue (slide and mix paint) on Kitten Play are colour games. With its five
-shortlisted ideas built, Curious Cat would be the biggest shelf at 15. If that's too many, split the colour games off
-into a shelf of their own: a colour shelf of 4, leaving Curious Cat with 12. Not decided; weigh it once the shortlist
-is mostly built.
+### The owner's notes on the list, and what was decided (2026-11-12)
 
-With the shortlist built and both splits, the shelves would be (66 games): Cat Logic 12, Cat Math 6, Cat Trails 7,
-Cat Spells 13, Curious Cat 12, colour 4, Kitten Play (match and pop) 5, action 8. Without the colour split, Curious Cat
-15 and no colour shelf.
+Done the same day: Tunnel Run is turning only, with its sliding rugs behind a Tracks switch; Pounce is Pounce on Three; Night Light is plain rooms only, 15 levels from one tap; its rooms with
+cats that point their own way are Day Light (`daylight/`, in beta).
+
+- [ ] **Day Light: out of beta.** The owner plays it first. Still to settle: a cat of its own (Dottie stands in), its
+  place on the front page and in the daily challenge, and whether the sunny room reads well.
+- [ ] **Moving up and down: the rest of the games.** Three wins at a level move you up and three losses move you
+  down (a loss in a puzzle that can't be lost: a hint, or a Restart after working on it), with Give me another! and
+  Change the difficulty on the win card. It's `G.ladder` in `games.js`, in Night Light, Day Light, Open the Door!
+  and Toe Beans since 2026-11-12 (README, "Moving up and down"). Once the owner has played those, bring it to every
+  other game with levels or sizes (each sets its own next level today), and fix each README section's wording.
+- [ ] **Wind Up: play the deeper baskets.** Done 2026-11-12: levels 6 to 12 have a deeper basket and a higher line, and
+  the first three helpers don't cost the gold paw. Checked with a simple bot, not a person: the owner should say
+  whether levels 7 to 12 can now be won without a Shake. The helper buttons still wear the red "costs the gold paw"
+  mark from the first use; it should only show once the free ones are gone.
+- [ ] **Front page carousel: the owner to try it on a phone.** Rebuilt 2026-11-12 after the first try (tabs with a
+  swipe that didn't work in the preview): the shelves now stand side by side in a row that scrolls with the finger
+  and stops at each, with the next one's edge showing, a nudge on the first visit, a title card across each shelf,
+  and today's challenge above the search box (README, first paragraph).
+- [ ] **One new move a level.** The how-to and the on-ramp are divided in a way that isn't ideal: the walkthrough
+  tells the rules up front, and then the levels get harder. Better: each early level brings in one new move, and a
+  win on it is the reward. Night Light's and Day Light's new first levels (one tap, then two) are a first go at it.
+- [ ] **Toe Beans:** getting that hard with few wins is disheartening; the moving-down rule above is the fix to try.
+- [ ] **Mewstermind** is harder than the owner expected (2 starts and 1 win in GoatCounter so far, too few to say
+  where).
+- [ ] **Toy Box, Twirl and Knock It Off need more** past their hardest level.
+- [ ] **Zen:** look for more games that could have one (Pounce on Three and Bubbles do).
+
+## Star cats decided, waiting for pictures
+
+Pangur Bán (Pangur) for Cat Burglar and Fitzwilliam Darcy (Fitz) for Pawlette (the owner, 2026-11-12; `ARTWORK.md`,
+"Stars decided"). Once their pictures are in `cats/`, put each into its game.
 
 ## Pounce Up: tune the goals
 
