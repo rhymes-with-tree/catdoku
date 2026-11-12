@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-11.9";
+  var BUILD = "2026-11-12.1";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-11.9">
+<link rel="stylesheet" href="../games.css?v=2026-11-12.1">
 <style>
 .board{background:var(--panel)}
 .cell{border-top:1px solid var(--line);border-left:1px solid var(--line);cursor:pointer}
@@ -98,19 +98,11 @@
     <button id="newBtn" class="primary">New puzzle</button>
   </div>
   <div class="yarncats"><img src="kitten.png" alt="" aria-hidden="true"><p class="colorway" id="colorway"></p><img src="kitten-tangled.png" alt="" aria-hidden="true"></div>
-  <div class="bar toggles">
-    <div class="opt"><label>Colors
-      <select id="shades" aria-label="How close the colors are">
-        <option value="wide">Wide range</option><option value="medium">Medium</option>
-        <option value="veryclose">Very close</option>
-      </select>
-    </label><span class="hint">How alike the balls' colors are</span></div>
-  </div>
 
 </main>
 
-<script src="../games.js?v=2026-11-11.9"></script>
-<script src="../colorways.js?v=2026-11-11.9"></script>
+<script src="../games.js?v=2026-11-12.1"></script>
+<script src="../colorways.js?v=2026-11-12.1"></script>
 <script>
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 function nbrs(i,N){const r=Math.floor(i/N),c=i%N,o=[];if(r>0)o.push(i-N);if(r<N-1)o.push(i+N);if(c>0)o.push(i-1);if(c<N-1)o.push(i+1);return o;}
@@ -197,12 +189,14 @@ function makeYarn(N){
 
 /* ---------- yarn colors ---------- */
 // The colorways and the blending live in colorways.js, shared with Twirl.
-// The Colors picker: which colorway set, and how much of it a puzzle uses.
+// How alike the balls' colours are: a wide range (variegated), medium (blends) or very close (colourways). Each
+// puzzle picks one at random (a Colors setting chose until November 2026).
 const SHADES = {wide: {ramps: VARIEGATED, w: 1}, medium: {ramps: BLENDS, w: 1}, veryclose: {ramps: COLORWAYS, w: 1}};
 
-// One color per ball, in order along a random slice of a colorway.
-function yarnColors(K, level, name) {
-  const {ramps, w} = SHADES[level] || SHADES.wide, names = Object.keys(ramps);
+// One color per ball, in order along a random slice of a colorway: the colorway named (re-dyeing a saved puzzle),
+// or one from a set picked at random.
+function yarnColors(K, name) {
+  const sets = Object.values(SHADES), {ramps, w} = sets.find(x => x.ramps[name]) || sets[Math.floor(Math.random() * sets.length)], names = Object.keys(ramps);
   if (!ramps[name]) name = names[Math.floor(Math.random() * names.length)];
   const a0 = Math.random() * (1 - w), ramp = Math.random() < .5 ? ramps[name] : ramps[name].slice().reverse();
   return {colorway: name, colors: Array.from({length: K}, (_, i) => rampAt(ramp, a0 + w * (K > 1 ? i / (K - 1) : 0)))};
@@ -211,10 +205,8 @@ function yarnColors(K, level, name) {
 const STORE = "catdoku.yarn.v1";
 const $ = G.$;
 let state = G.load(STORE);
-let settings = Object.assign({size: 6, shades: "wide", numbers: false}, state.settings);
-// Earlier versions saved it as a number, or offered a "close" level.
-if (typeof settings.shades === "number") settings.shades = {1: "wide", .7: "medium", .5: "veryclose", .35: "veryclose"}[settings.shades] || "wide";
-if (!SHADES[settings.shades]) settings.shades = settings.shades === "close" ? "veryclose" : "wide";
+let settings = Object.assign({size: 6, numbers: false}, state.settings);
+delete settings.shades;   // the Colors setting, until November 2026
 let game = state.game || null, busy = false;
 // The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
 G.pawLost(() => !game || game.won || game.hinted || game.restarted);
@@ -291,7 +283,7 @@ async function newPuzzle() {
   const N = settings.size;
   G.openCard("Untangling yarn…", N >= 8 ? "Big boards can take a few seconds to build." : "", []);
   const p = await build.take(N);
-  game = Object.assign({N, clue: p.clue, path: p.path, trail: [], history: [], won: false}, yarnColors(Math.max(...p.clue), settings.shades), G.freshClock());
+  game = Object.assign({N, clue: p.clue, path: p.path, trail: [], history: [], won: false}, yarnColors(Math.max(...p.clue)), G.freshClock());
   busy = false;
   G.closeCard(); buildBoard(); render(); save(); G.note("");
   G.track(`Yarn new puzzle ${N}x${N}`);
@@ -454,12 +446,6 @@ board.addEventListener("pointercancel", endPress);
 
 $("newBtn").onclick = newPuzzle;
 $("size").onchange = e => { settings.size = +e.target.value; save(); newPuzzle(); };
-// Colors don't change the answer, so the current puzzle is simply re-dyed.
-$("shades").onchange = e => {
-  settings.shades = e.target.value;
-  if (game) { Object.assign(game, yarnColors(game.colors.length, settings.shades, game.colorway)); render(); }
-  save();
-};
 G.switch({id: "numTgl", label: "Numbers", line: "Each ball shows its place in the run", key: "numbers", of: () => settings, save,
   change: () => { if (game) render(); }});
 $("restartBtn").onclick = clearAll;
@@ -490,7 +476,7 @@ function sharedOK(d) {
 }
 function openShared(d) {
   if (!sharedOK(d)) { G.note("That share link didn't work.", 5000); return; }
-  if (d.colors == null) d = {...d, ...yarnColors(Math.max(...d.clue), settings.shades)};
+  if (d.colors == null) d = {...d, ...yarnColors(Math.max(...d.clue))};
   game = {N: d.N, clue: d.clue, path: d.path, trail: d.p ? d.p.trail : [], history: [], won: false,
           colorway: d.colorway, colors: d.colors, ...G.freshClock()};
   if (d.p) game.timed = false;
@@ -498,9 +484,8 @@ function openShared(d) {
   if (d.p) checkWin();
 }
 const shared = G.readShare("yarn");
-$("shades").value = settings.shades;
 $("size").value = settings.size;
-if (game && game.clue && !game.colorway) Object.assign(game, yarnColors(Math.max(...game.clue), settings.shades));
+if (game && game.clue && !game.colorway) Object.assign(game, yarnColors(Math.max(...game.clue)));
 const hadSave = !!(game && game.clue);
 if (hadSave) G.reopen(() => { buildBoard(); render(); if (game.won) finishCard(); build.prefetch(game.N); helpOnFirstVisit(); },
   why => { game = null; busy = false; newPuzzle().then(() => G.note(why, 0)); });

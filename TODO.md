@@ -194,3 +194,14 @@ will recheck this list, and add games 43–52, before any of it is built.
   bounces", and Hint says when to wait). In levels 1–10 a mirror is set once; the dot sometimes bounces off both
   its faces, with the same slant both times. Checked by making 12 rooms a level through the page's own
   `makeRoom`: every moving room had such a mirror, and no still room did. README now says so for levels 1–10.
+
+## Settings page: questions left from the grid redesign (2026-11-12)
+
+The owner's grid for the new Settings page differed from the games in a few places; asked, not yet answered:
+- Keyboard Cat has no timer (it's in `UNTIMED` in `games.js`), but the grid gave it one: add one, timing each keyboard?
+- Window Ledges' Show sets (on by default): the owner never asked for it and isn't sure about it. Keep or take out?
+- The grid had "Other Settings" in the Every game row and "Check" on the Cat Logic shelf's row: left out until it's
+  clear what they'd do.
+- Speed says Slow · Fast · By game (the owner's words); "Regular" might read better than "Fast" for normal speed.
+- Auto grade (Catdoku, Toydoku, Fridge Magnets) is a heart among each game's own settings, not under Check, so the
+  Every game Check never turns lives on; the grid had Catdoku's under Check.

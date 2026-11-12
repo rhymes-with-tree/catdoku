@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-11.9"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-12.1"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-11.9">
+<link rel="stylesheet" href="../games.css?v=2026-11-12.1">
 <style>
 /* Laya's blanket: knitted in plain, undyed yarn, with the letters in it. Under the letters is a colourful pattern
    that shows as they're dragged across; a word found stays dyed, and the whole pattern shows once every word is
@@ -98,14 +98,10 @@
     <label>Level <select id="levelSel" aria-label="Level"></select></label>
     <button id="newBtn" class="primary">New blanket</button>
   </div>
-  <div class="bar toggles">
-    <div class="opt"><label>Words <select id="modeSel" aria-label="Words"><option value="themes">Cat themes</option><option value="everyday">Everyday words</option></select></label>
-      <span class="hint">Cat themes give each blanket a theme; everyday words are any familiar words.</span></div>
-  </div>
 </main>
 
-<script src="../games.js?v=2026-11-11.9"></script>
-<script src="../colorways.js?v=2026-11-11.9"></script>
+<script src="../games.js?v=2026-11-12.1"></script>
+<script src="../colorways.js?v=2026-11-12.1"></script>
 <script>
 /* ---------- levels ---------- */
 // [blanket size, ways the words run, most letters left over for the hidden word]. Ways: E across, S down,
@@ -250,7 +246,8 @@ function loadWords() {
 const STORE = "catdoku.knitpick.v1";
 const $ = G.$;
 let state = G.load(STORE);
-let settings = Object.assign({level: 1, mode: "themes"}, state.settings);
+let settings = Object.assign({level: 1}, state.settings);
+delete settings.mode;   // Words (cat themes or everyday) was a setting until 2026-11: now each blanket is either, half and half
 let game = state.game || null, making = 0;
 // The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
 G.pawLost(() => !game || game.won || game.hinted || game.restarted);
@@ -278,12 +275,14 @@ function deal(n, p, mode) {
 }
 async function newPuzzle() {
   G.closeCard(); hints.clear(false);
-  const ticket = ++making, n = settings.level, mode = settings.mode;
-  if (mode === "everyday") { try { await loadWords(); } catch (e) { G.note(`${e.message}, so here's a cat theme instead.`, 5000); settings.mode = "themes"; $("modeSel").value = "themes"; return newPuzzle(); } }
+  // half the blankets have a cat theme, half everyday words (a cat theme if the word list won't load)
+  const ticket = ++making, n = settings.level;
+  let mode = Math.random() < 0.5 ? "everyday" : "themes";
+  if (mode === "everyday") { try { await loadWords(); } catch (e) { mode = "themes"; } }
   if (ticket !== making) return;
-  const p = make(n, settings.mode);
+  const p = make(n, mode);
   if (!p) { G.note("Couldn't knit that blanket. Try New blanket.", 5000); return; }
-  game = deal(n, p, settings.mode); draw(); save();
+  game = deal(n, p, mode); draw(); save();
   G.track(`Knit Pick new puzzle level ${game.level}`);
 }
 function startLevel(n) { settings.level = n; $("levelSel").value = n; newPuzzle(); }
@@ -541,11 +540,6 @@ function helpOnFirstVisit() {
 /* ---------- start ---------- */
 for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", "") + (n === MAX_LEVEL ? " (biggest)" : ""), n));
 $("levelSel").onchange = e => startLevel(+e.target.value);
-$("modeSel").onchange = e => {
-  settings.mode = e.target.value; save();
-  if (!game || game.won || (!foundCount() && !game.guessed)) newPuzzle();
-  else G.note(`Your next blanket will have ${settings.mode === "everyday" ? "everyday words" : "a cat theme"}.`, 3500);
-};
 $("newBtn").onclick = newPuzzle;
 $("helpBtn").onclick = showHelp;
 
@@ -556,9 +550,7 @@ G.setupTimer({name: "knitpick", game: () => game, playing: g => !g.won, save, la
 $("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
 
 if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
-if (settings.mode !== "everyday") settings.mode = "themes";
-$("levelSel").value = settings.level; $("modeSel").value = settings.mode;
-G.radios($("modeSel"), "Words");   // both kinds of words in sight, as radio pills
+$("levelSel").value = settings.level;
 const shared = G.readShare("knitpick");
 const hadSave = !!(game && typeof game.grid === "string");
 if (hadSave) G.reopen(() => {

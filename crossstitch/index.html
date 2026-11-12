@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-11.9"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-12.1"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-11.9">
+<link rel="stylesheet" href="../games.css?v=2026-11-12.1">
 <style>
 /* A cross-stitch sampler: aida cloth held in a wooden embroidery hoop, with a chart's grid on it (a darker line every
    five squares), and the counts for each row down the left and each column along the top. Stitches are crosses in one
@@ -71,6 +71,7 @@
 .clues > div:nth-child(odd){background:color-mix(in srgb,var(--ink) 5%,transparent)}
 .colClues > div{border-radius:6px 6px 0 0} .rowClues > div{border-radius:6px 0 0 6px}
 .clues > div.done{color:var(--ink-soft);opacity:.45}
+.clues > div.broken{color:var(--bad-text);opacity:1;font-weight:700}
 .clues > div.cur{background:color-mix(in srgb,#73A7AE 28%,transparent)}
 .clues > div.hint{background:color-mix(in srgb,#ECA818 55%,transparent);opacity:1;color:var(--ink)}
 .corner{grid-column:1;grid-row:1;display:flex;align-items:center;justify-content:center}
@@ -114,7 +115,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-11.9"></script>
+<script src="../games.js?v=2026-11-12.1"></script>
 <script>
 /* ---------- the patterns ---------- */
 // Each pattern is a picture square by square: "." is bare cloth, a letter a stitch in that thread. The bigger ones are
@@ -268,7 +269,7 @@ const STORE = "catdoku.crossstitch.v1";
 const SITTERS = "c14-63 c18-6 c18-7 c18-17 c18-19 c18-21 c18-26 c18-27 c18-32 c18-40 c19-1 c19-5 c19-6 c19-14 c19-16 c19-17 c19-28 c19-32 c19-37 c19-40 c20-1 c20-17 c20-18 c20-30".split(" ");
 const $ = G.$;
 let state = G.load(STORE);
-let settings = Object.assign({level: 1, seen: {}}, state.settings);
+let settings = Object.assign({level: 1, seen: {}, autoCheck: true}, state.settings);
 let game = state.game || null, running = false, cursor = -1;
 // The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
 G.pawLost(() => !game || game.won || game.hinted || game.restarted);
@@ -289,6 +290,10 @@ function makePlan() {
 const lineCells = (isRow, a) => [...Array(game.N)].map((_, q) => isRow ? a * game.N + q : q * game.N + a);
 const lineDone = (isRow, a) => { const l = lineCells(isRow, a).map(i => game.grid[i] === 1 ? 1 : 0), want = (isRow ? plan.rows : plan.cols)[a], got = runsOf(l);
   return got.length === want.length && got.every((v, q) => v === want[q]); };
+// Auto check: a row or column whose stitches and dots can no longer match its counts (lineSolve finds no way) is broken,
+// and its counts turn red. It goes by the rules, not the picture, so it never gives a square away.
+const lineBroken = (isRow, a) => settings.autoCheck && !game.won &&
+  !lineSolve((isRow ? plan.rows : plan.cols)[a], lineCells(isRow, a).map(i => game.grid[i] === 1 ? 1 : game.grid[i] === 2 ? 0 : -1));
 
 /* ---------- the board ---------- */
 function buildBoard() {
@@ -344,12 +349,12 @@ function draw() {
     c.style.setProperty("--th", won && plan.cells[i] ? THREADS[plan.cells[i]] : "");
     c.setAttribute("aria-label", `Row ${y + 1}, column ${x + 1}: ${g[i] === 1 ? "stitched" : g[i] === 2 ? "dot, stays bare" : "bare"}`);
   }
-  [...$("rowClues").children].forEach((d, y) => { d.classList.toggle("done", lineDone(true, y)); d.classList.toggle("cur", y === cy); d.classList.toggle("hint", !!m && m.line === "r" + y); });
-  [...$("colClues").children].forEach((d, x) => { d.classList.toggle("done", lineDone(false, x)); d.classList.toggle("cur", x === cx); d.classList.toggle("hint", !!m && m.line === "c" + x); });
+  [...$("rowClues").children].forEach((d, y) => { d.classList.toggle("done", lineDone(true, y)); d.classList.toggle("broken", lineBroken(true, y)); d.classList.toggle("cur", y === cy); d.classList.toggle("hint", !!m && m.line === "r" + y); });
+  [...$("colClues").children].forEach((d, x) => { d.classList.toggle("done", lineDone(false, x)); d.classList.toggle("broken", lineBroken(false, x)); d.classList.toggle("cur", x === cx); d.classList.toggle("hint", !!m && m.line === "c" + x); });
   $("sampler").classList.toggle("won", won);
   // VoiceOver: each row's and column's counts go with its squares
-  for (let y = 0; y < N; y++) kids[y * N].setAttribute("aria-label", kids[y * N].getAttribute("aria-label") + `. Row ${y + 1} counts ${plan.rows[y].join(" ") || "0"}`);
-  for (let x = 0; x < N; x++) kids[x].setAttribute("aria-label", kids[x].getAttribute("aria-label") + `. Column ${x + 1} counts ${plan.cols[x].join(" ") || "0"}`);
+  for (let y = 0; y < N; y++) kids[y * N].setAttribute("aria-label", kids[y * N].getAttribute("aria-label") + `. Row ${y + 1} counts ${plan.rows[y].join(" ") || "0"}${lineBroken(true, y) ? ", can't fit" : ""}`);
+  for (let x = 0; x < N; x++) kids[x].setAttribute("aria-label", kids[x].getAttribute("aria-label") + `. Column ${x + 1} counts ${plan.cols[x].join(" ") || "0"}${lineBroken(false, x) ? ", can't fit" : ""}`);
   const done = g.filter(v => v === 1).length, total = plan.sol.filter(Boolean).length;
   // stitches made of all of them, with a cross stitch as the board draws it, / on top (G.tally)
   if (won) $("count").textContent = `Finished: ${plan.name}!`;
@@ -582,6 +587,9 @@ $("helpBtn").onclick = showHelp;
 addEventListener("resize", () => { if (game && plan) layout(); });
 $("sitter").src = picSrc("cats/" + SITTERS[Math.floor(Math.random() * SITTERS.length)]);
 
+// Auto check: a switch, on at first and kept on the device, as in the other Cat Logic games
+G.switch({id: "checkTgl", label: "Auto check", line: "Rule breaks turn red as you play", key: "autoCheck", of: () => settings, save,
+  change: () => { if (game) draw(); }});
 G.nav("crossstitch");
 G.checkClock(game);
 G.setupTimer({name: "crossstitch", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
