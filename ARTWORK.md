@@ -121,8 +121,10 @@ each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the 
   Fish Bones: `bowtie-5` peeks up beside the title, and `bowtie-1` lies on his back, full of fish, on the gold-paw card. Bugsy is the star of
   Under the Blanket: `bugsy-5` peeks beside the title, `bugsy-7` (curled up asleep) is one of the cats found under the blanket
   (the others are Sunbeams' napping cats, the `NAPPERS` list, which also nap in its walkthrough), and `bugsy-3` stretches out
-  on the gold-paw card. Its feather toy (`blanket/feather-wand.webp`, a wooden stick with a binding and two speckled brown
-  feathers) is the owner's picture, levelled and trimmed; `blanket/feather-head.webp` is its feather end, for the status line.
+  on the gold-paw card. Its feather toy (a wooden stick with a binding and two speckled feathers) is the owner's picture, levelled, trimmed and
+  cut in two: `blanket/feather-stick.webp`, the stick as drawn, and `blanket/feather-plume.webp`, the feathers in grey, which
+  the page colours (a palette colour that stands out from each blanket); `blanket/feather-head.webp` is the grey feather end,
+  for the status line.
   Not used yet: `bowtie-4` (lying down with a string, cut off at the right), `bowtie-8` (his face, close up) and
   `bowtie-9` (his face upside down, close up). None is a whole lying-down Bowtie for If It Fits (checked 2026-11-08).
 - **Crunch** (`crunch-…`, grey tabby with green eyes) is the star of Pounce on Three (`pounce/`): `crunch-3` sits beside
