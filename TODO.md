@@ -80,9 +80,6 @@ Knock It Off's forgiving first two levels, and Pounce saving while toys fall):
   and two tracks hold up (7 → 7, 7 → 4), and the 1 win in 10 starts from level 6 up is one or two people. The loss is
   at level 2 (21 → 11), a plain 6 × 6. Moving the bigger turning-only rugs (11 to 16) ahead of the tracks would
   renumber the levels (saved rugs, best times and share links go by number), so it's the owner's call.
-- [ ] **Wind Up: watch levels 9 to 12.** Losses pass wins from level 9 (12 lost, 9 won; level 10: 17 lost, 5 won), but
-  nearly all of them are from its first four days (2026-10-30 to 11-02), and it's a game where losing is part of
-  playing. It counts starts now; look again with a few weeks of them before changing anything.
 - [ ] **Pounce: check level 1.** 23 → 12, though the move limits were tuned for a near-certain win. Running out of
   moves wasn't counted, so that may be people looking in and leaving; it's counted from 2026-11-12 ("Pounce out of
   moves on level N"). Look again with a few weeks of it.
@@ -111,9 +108,10 @@ cats that point their own way are Day Light (`daylight/`, in beta).
   Change the difficulty on the win card. It's `G.ladder` in `games.js`, in Night Light, Day Light, Open the Door!
   and Toe Beans since 2026-11-12 (README, "Moving up and down"). Once the owner has played those, bring it to every
   other game with levels or sizes (each sets its own next level today), and fix each README section's wording.
-- [ ] **Wind Up (decided).** Raise the line, and make the whole basket taller on the higher levels (as Tunnel Run's rug
-  grows on its bigger levels), so they can be won without a Shake; and allow about three helpers a game before the
-  gold paw is lost. The owner finds the higher levels always need a Shake, so a gold paw there isn't possible today.
+- [ ] **Wind Up: play the deeper baskets.** Done 2026-11-12: levels 6 to 12 have a deeper basket and a higher line, and
+  the first three helpers don't cost the gold paw. Checked with a simple bot, not a person: the owner should say
+  whether levels 7 to 12 can now be won without a Shake. The helper buttons still wear the red "costs the gold paw"
+  mark from the first use; it should only show once the free ones are gone.
 - [ ] **Front page: one shelf at a time.** A carousel: see Cat Logic, or Cat Math, or the next, rather than
   everything in one very long list. Show the owner a preview before changing the page.
 - [ ] **One new move a level.** The how-to and the on-ramp are divided in a way that isn't ideal: the walkthrough
@@ -124,6 +122,11 @@ cats that point their own way are Day Light (`daylight/`, in beta).
   where).
 - [ ] **Toy Box, Twirl and Knock It Off need more** past their hardest level.
 - [ ] **Zen:** look for more games that could have one (Pounce on Three and Bubbles do).
+
+## Star cats decided, waiting for pictures
+
+Pangur Bán (Pangur) for Cat Burglar and Fitzwilliam Darcy (Fitz) for Pawlette (the owner, 2026-11-12; `ARTWORK.md`,
+"Stars decided"). Once their pictures are in `cats/`, put each into its game.
 
 ## Pounce Up: tune the goals
 
