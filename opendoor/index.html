@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-12.16"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-12.17"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-12.16">
+<link rel="stylesheet" href="../games.css?v=2026-11-12.17">
 <style>
 /* A KenKen house: every row and column holds 1 to N once, and walls split the floor into rooms whose numbers
    must make the room's sign. Each room has a door that opens when the room is right; with every door open,
@@ -108,7 +108,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-12.16"></script>
+<script src="../games.js?v=2026-11-12.17"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N grid where every row and column holds 1 to N once, cut into rooms (cages). Each room has a sign:
@@ -116,9 +116,14 @@
 // square just shows its number. Levels: [size, the signs it uses, whether it can be solved without a guess,
 // the most squares in a room]. Level 1 is a first house (since 2026-11-12, when 27 starts at level 1 had come to
 // 11 solves): rooms of one or two squares and + only; level 2 keeps to rooms of three.
+// One new sign a level (since 2026-11-12, the owner's "one new move a level"): + at 1, − at 2, × at 3, ÷ at 4,
+// each house showing at least two rooms of its level's newest sign; then the houses grow. Until then there were
+// 7 levels, with × and ÷ arriving together at level 3 (a 5 × 5); see "the levels moved" below for old saves.
 function levelOf(n) {
-  return [null, [4, "+", 1, 2], [5, "+-", 1, 3], [5, "+-x/", 1, 4], [6, "+-x/", 1, 4], [7, "+-x/", 1, 4], [8, "+-x/", 1, 4], [9, "+-x/", 0, 4]][n];
+  return [null, [4, "+", 1, 2], [5, "+-", 1, 3], [5, "+-x", 1, 3], [5, "+-x/", 1, 4], [6, "+-x/", 1, 4], [7, "+-x/", 1, 4], [8, "+-x/", 1, 4], [9, "+-x/", 0, 4]][n];
 }
+// The sign a level brings in, which every house at that level shows at least twice ("" from level 5 on).
+function newSign(n) { return n >= 2 && n <= 4 ? levelOf(n)[1].slice(-1) : ""; }
 // A random full grid: fill square by square with numbers in a random order, backing up when stuck
 // (and starting over if it takes too long).
 function randomLatin(N) {
@@ -267,6 +272,7 @@ function makePuzzle(n) {
       const r = solveRooms(N, cages);
       if (r.count === 1 && !(logic && r.stuck.length)) {
         if (most === 2 && cages.filter(c => c.cells.length === 1).length > N) break;   // too many numbers given away: another house
+        if (newSign(n) && cages.filter(c => c.op === newSign(n)).length < 2) break;   // the level's new sign must show
         return {N, cages: cages.map(c => [c.cells, c.t, c.op])};
       }
       if (r.count < 0 || (r.count !== 1 && !r.second)) break;
@@ -288,7 +294,7 @@ function makePuzzle(n) {
 
 
 /* ---------- the house ---------- */
-const STORE = "catdoku.opendoor.v1", MAX_LEVEL = 7;
+const STORE = "catdoku.opendoor.v1", MAX_LEVEL = 8;
 const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1, autoNotes: false}, state.settings);
@@ -296,6 +302,23 @@ let game = state.game || null, busy = false, sel = -1, running = false;
 // The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
 G.pawLost(() => !game || game.won || game.hinted || game.restarted);
 const save = () => G.save(STORE, {settings, game});
+// The levels moved on 2026-11-12: × got a level of its own at 3, so levels 3 to 7 became 4 to 8. Saves, best
+// times, the moving-up tally and share links from before carry the old numbers (settings.levels and a link's L
+// are 8 from then on).
+const movedUp = n => n >= 3 ? n + 1 : n;
+if (settings.levels !== 8) {
+  if (state.settings) {   // someone who has played before
+    settings.level = movedUp(settings.level);
+    if (game && game.level) game.level = movedUp(game.level);
+    const bests = G.load("catdoku.bests.v1"), mine = bests.opendoor;
+    if (mine) { bests.opendoor = {}; for (const n in mine) bests.opendoor[movedUp(+n)] = mine[n]; G.save("catdoku.bests.v1", bests); }
+    const tally = G.load("catdoku.ladder.v1");
+    if (tally.opendoor) { tally.opendoor.l = movedUp(tally.opendoor.l); G.save("catdoku.ladder.v1", tally); }
+    // the signs they've already played with need no introducing
+    if (settings.seenHelp) settings.met = [...levelOf(Math.min(settings.level, 4))[1]];
+  }
+  settings.levels = 8; save();
+}
 // Three wins at a level move you up and three slips (a hint, or a Restart after putting numbers in) move you down: G.ladder.
 const climb = G.ladder("opendoor", MAX_LEVEL);
 // A hint or a Restart on this house: it counts once, and the house no longer counts as a win toward moving up.
@@ -310,8 +333,8 @@ const playing = () => game && !game.won && !busy && !running && !$("overlay").cl
 const OPS = {"+": "+", "-": "−", "x": "×", "/": "÷", "": ""};
 // on the board: the same, with ÷ drawn (two clear dots and a bar)
 const OPS_SHOWN = {...OPS, "/": '<svg class="opdiv" viewBox="0 0 10 10" aria-hidden="true"><circle cx="5" cy="1.7" r="1.35"/><rect x=".6" y="4.15" width="8.8" height="1.7" rx=".85"/><circle cx="5" cy="8.3" r="1.35"/></svg>'};
-const levelName = n => { const [N, ops, logic] = levelOf(n); return `Level ${n} · ${N} × ${N}${ops === "+" ? ", + only" : ops === "+-" ? ", + and − only" : ""}${logic ? "" : ", may need a guess"}`; };
-const build = G.builder([levelOf, randomLatin, cageValue, makeRooms, pickSign, solveRooms, makePuzzle], "makePuzzle");
+const levelName = n => { const [N, ops, logic] = levelOf(n); return `Level ${n} · ${N} × ${N}${{"+": ", + only", "+-": ", + and − only", "+-x": ", +, − and × only"}[ops] || ""}${logic ? "" : ", may need a guess"}`; };
+const build = G.builder([levelOf, newSign, randomLatin, cageValue, makeRooms, pickSign, solveRooms, makePuzzle], "makePuzzle");
 // floor colours for the rooms (no two rooms side by side match), and each one lit up once its room is right
 const FLOORS = [["#EFE2CC", "#FFF4D6"], ["#DDE7D6", "#F1FBE6"], ["#E2DDEC", "#F6F1FF"], ["#EDD9D3", "#FFEFE8"], ["#D8E4E6", "#EEFAFB"]];
 
@@ -575,21 +598,23 @@ async function newPuzzle() {
   if (busy) return;
   busy = true;
   const n = settings.level;
-  G.openCard("Building the house…", n >= 6 ? "Big houses can take a few seconds." : "", []);
+  G.openCard("Building the house…", n >= 7 ? "Big houses can take a few seconds." : "", []);
   const p = await build.take(n);
   begin(p, n);
   busy = false; G.closeCard(); G.note("");
   draw(); save();
   build.prefetch(n);
   G.track(`Open the Door new puzzle level ${n}`);
+  setTimeout(meetSigns, 400);
 }
 
 /* ---------- sharing ---------- */
 $("linkBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Open the Door!", won: game.won,
-  puzzle: () => ({g: "opendoor", N: game.level, c: game.cages}),
+  puzzle: () => ({g: "opendoor", N: game.level, L: 8, c: game.cages}),
   progress: () => ({grid: game.grid, notes: game.notes})}); };
 // A puzzle from a share link, with its numbers so far if they were sent (that isn't timed).
 function openShared(d) {
+  if (d.L !== 8) d.N = movedUp(d.N);   // a link from before the levels moved
   const lv = levelOf(d.N), N = lv && lv[0];
   const okCages = Array.isArray(d.c) && d.c.every(c => Array.isArray(c) && Array.isArray(c[0]) && c[0].every(i => Number.isInteger(i) && i >= 0 && i < N * N) && Number.isInteger(c[1]) && OPS[c[2]] !== undefined)
     && d.c.flatMap(c => c[0]).sort((a, b) => a - b).every((i, k) => i === k) && d.c.flatMap(c => c[0]).length === N * N;
@@ -640,7 +665,20 @@ function helpOnFirstVisit() {
   ];
   // the Your turn steps come early: doing comes before the rest of the rules
   { const t = steps.findIndex(st => st.try); if (t > 1) steps.splice(1, 0, ...steps.splice(t, 2)); }
-  G.spotlight({grid: $("cells"), w: N, h: N, steps, done: () => { settings.seenHelp = true; save(); }});
+  G.spotlight({grid: $("cells"), w: N, h: N, steps, done: () => { settings.seenHelp = true; settings.met = [...new Set([...(settings.met || []), room.op])]; save(); }});
+}
+
+// One new sign a level: the first house on this device with a sign the player hasn't met (−, × or ÷; + comes in
+// the walkthrough) shows one of its rooms with what the sign means, as a step of its own (settings.met).
+const SIGN_SAYS = {"+": (t, n) => `${t}+: ${n === 2 ? "both" : "these"} add up to ${t}`, "-": t => `${t}−: the bigger minus the smaller is ${t}`,
+  "x": (t, n) => `${t}×: ${n === 2 ? "both" : "these"} multiply to ${t}`, "/": t => `${t}÷: the bigger divided by the smaller is ${t}`};
+function meetSigns() {
+  if (!game || game.won || !settings.seenHelp || !playing() || document.querySelector(".spot")) return;
+  const met = settings.met || [], N = game.N, xy = i => [i % N, Math.floor(i / N)];
+  const fresh = ["+", "-", "x", "/"].filter(op => !met.includes(op)).map(op => plan.rooms.find(r => r.op === op)).filter(Boolean);
+  if (!fresh.length) return;
+  const steps = fresh.map(r => ({say: SIGN_SAYS[r.op](r.t, r.cells.length), lit: r.cells.map(xy), outline: [r.cells.map(xy)], op: r.op}));
+  G.spotlight({grid: $("cells"), w: N, h: N, steps, done: () => { settings.met = [...new Set([...met, ...steps.map(st => st.op)])]; save(); }});
 }
 
 for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", "") + (n === MAX_LEVEL ? " (hardest)" : ""), n));
@@ -664,7 +702,7 @@ if (hadSave) G.reopen(() => {
     if (!Array.isArray(game.notes)) game.notes = new Array(game.N * game.N).fill(0);
     makePlan(); pad.make(); draw();
     if (game.won) finishCard();
-    build.prefetch(settings.level); helpOnFirstVisit();
+    build.prefetch(settings.level); helpOnFirstVisit(); setTimeout(meetSigns, 400);
   }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
 else if (!shared) newPuzzle().then(helpOnFirstVisit);
 const shareOpts = () => ({name: "Open the Door!", inProgress: !!(game && !game.won && game.history.length), open: openShared, after: helpOnFirstVisit});

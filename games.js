@@ -1000,7 +1000,7 @@ const G = (() => {
   // Share my result, kept short (decided 2026-11-08): the game, then one line (the level as a fraction of the levels,
   // or the size, the time, the win streak and the gold paw), then the link. Long level names are left out.
   function shareResult(r, gold, btn, lost) {
-    const name = document.querySelector("header h1").textContent, bits = [];
+    const name = document.querySelector("header h1").textContent.replace(/\u00AD/g, ""), bits = [];
     if (r && r.n != null && T) {
       const sel = $("levelSel") || $("size"), l = label(r.n), vals = sel ? [...sel.options].map(o => o.value) : [], i = vals.indexOf(String(r.n));
       bits.push(/^\d+ × \d+$/.test(l) ? l.replace(/ /g, "") : i >= 0 && vals.length > 1 ? `Level ${i + 1}/${vals.length}` : l.split(" · ")[0]);
@@ -1050,7 +1050,7 @@ const G = (() => {
   const feedbackFor = o => { feedbackPage = o || {}; };
   const feedbackDraft = {kind: "", message: "", contact: ""};
   function feedbackInfo() {
-    const slug = CURRENT, name = (rowOf(slug) || [document.querySelector("header h1") ? document.querySelector("header h1").textContent : slug])[0];
+    const slug = CURRENT, name = (rowOf(slug) || [document.querySelector("header h1") ? document.querySelector("header h1").textContent.replace(/\u00AD/g, "") : slug])[0];
     const sel = $("levelSel") || $("size");
     let details = "";
     try {   // the page's own line, else its level or size picker's choice
@@ -1885,6 +1885,10 @@ const G = (() => {
   // A word's meanings from Wiktionary (this needs the internet): up to three, each {pos (noun, verb…), text}, for
   // Keyboard Cat's clues and Fish Bones' word list. Rejects when there are none or Wiktionary can't be reached.
   // Asked again, a word comes from memory.
+  // Where a one-word name may break when it has to go onto two lines (a soft hyphen: "Mewster-" then "mind"),
+  // rather than anywhere or not at all (the owner's call, 2026-11-12: Mewstermind split badly at large text).
+  const BREAKS = {Mewstermind: "Mewster\u00ADmind", Purrmutation: "Purr\u00ADmutation"};
+  const breakable = name => BREAKS[name] || name;
   function plainText(html) { const d = document.createElement("div"); d.innerHTML = html; d.querySelectorAll("sup, .reference, style").forEach(x => x.remove()); return d.textContent.replace(/\s+/g, " ").trim(); }
   const meanings = {};
   function meaning(w) {
@@ -2672,6 +2676,6 @@ const G = (() => {
     }
   }
 
-  return {ladder, ANOTHER, CHANGE, MAGNET, tally, emoText, radios, pawLost, pieces, GAMES, BETA, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, loseCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText,
+  return {ladder, ANOTHER, CHANGE, MAGNET, tally, emoText, radios, pawLost, pieces, GAMES, BETA, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, loseCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText, breakable,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, feedbackCard, feedbackFor, toyPicker, pickLook};
 })();
