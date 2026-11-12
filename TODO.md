@@ -41,10 +41,6 @@ Knock It Off's forgiving first two levels, and Pounce saving while toys fall):
 
 - [ ] **Toe Beans: levels 9 and 10?** 0 solves in 9 starts, but five of those ended with Close enough, 1 to 6 away,
   which is the game working as meant. Leave unless the owner finds them too hard.
-- [ ] **Tunnel Run: is a new order worth it?** A second look says the numbers don't back it firmly: the levels with one
-  and two tracks hold up (7 → 7, 7 → 4), and the 1 win in 10 starts from level 6 up is one or two people. The loss is
-  at level 2 (21 → 11), a plain 6 × 6. Moving the bigger turning-only rugs (11 to 16) ahead of the tracks would
-  renumber the levels (saved rugs, best times and share links go by number), so it's the owner's call.
 - [ ] **Pounce: check level 1.** 23 → 12, though the move limits were tuned for a near-certain win. Running out of
   moves wasn't counted, so that may be people looking in and leaving; it's counted from 2026-11-12 ("Pounce out of
   moves on level N"). Look again with a few weeks of it.
@@ -57,17 +53,11 @@ Knock It Off's forgiving first two levels, and Pounce saving while toys fall):
 
 ### The owner's notes on the list, and what was decided (2026-11-12)
 
-Done the same day: Pounce is Pounce on Three; Night Light is plain rooms only, 15 levels from one tap; its rooms with
+Done the same day: Tunnel Run is turning only, with its sliding rugs behind a Tracks switch; Pounce is Pounce on Three; Night Light is plain rooms only, 15 levels from one tap; its rooms with
 cats that point their own way are Day Light (`daylight/`, in beta).
 
 - [ ] **Day Light: out of beta.** The owner plays it first. Still to settle: a cat of its own (Dottie stands in), its
   place on the front page and in the daily challenge, and whether the sunny room reads well.
-- [ ] **Tunnel Run: what becomes of the sliding tracks?** The owner chose to split them off, then asked whether they
-  differ from Purrmutation. The move is the same as Purrmutation's Sixteen (a whole row or column slides round);
-  the puzzle differs (join the tunnels, where any piece that fits will do, against putting a picture back, where
-  every piece has one home). Levels 4 to 10 have had about 25 starts in all. Choices put to the owner: a game of
-  its own, a Tracks switch inside Tunnel Run, or dropping them. Either way Tunnel Run's own levels become
-  turning only (1 to 3 and 11 to 18 today), with saves, best times and links moved as Night Light's page does.
 - [ ] **Moving up and down: the rest of the games.** Three wins at a level move you up and three losses move you
   down (a loss in a puzzle that can't be lost: a hint, or a Restart after working on it), with Give me another! and
   Change the difficulty on the win card. It's `G.ladder` in `games.js`, in Night Light, Day Light, Open the Door!
