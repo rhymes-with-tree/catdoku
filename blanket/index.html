@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-12.21"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-12.22"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-12.21">
+<link rel="stylesheet" href="../games.css?v=2026-11-12.22">
 <style>
 /* Bugsy, the star, peeking beside the title */
 .title{display:flex;align-items:flex-end;gap:8px}
@@ -100,8 +100,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-12.21"></script>
-<script src="../colorways.js?v=2026-11-12.21"></script>
+<script src="../games.js?v=2026-11-12.22"></script>
+<script src="../colorways.js?v=2026-11-12.22"></script>
 <script>
 /* ---------- blanket puzzles (plain functions, also run in a background worker) ---------- */
 // The blanket is N × N squares with k cats under it. A feather wand goes in at one of 4N slots round the edge:
@@ -114,8 +114,9 @@
 // It comes out at a slot: its own (sent back) or another, and the way back is the same run backwards.
 // Level 1 is one cat (since 2026-11-12, one new move a level: the straight run, the grab, the turn and the edge's
 // U-turn), and two cats at level 2 bring in the U-turn between two cats; then as before, one level up.
+// Level 1 is the smallest blanket, 4 × 4 with one cat (the owner, 2026-11-12), before the 5 × 5 one-cat level.
 function ubLevel(n) {
-  return [null, {N: 5, k: 1}, {N: 5, k: 2}, {N: 5, k: 3}, {N: 6, k: 3}, {N: 6, k: 4}, {N: 7, k: 4},
+  return [null, {N: 4, k: 1}, {N: 5, k: 1}, {N: 5, k: 2}, {N: 5, k: 3}, {N: 6, k: 3}, {N: 6, k: 4}, {N: 7, k: 4},
     {N: 8, k: 4}, {N: 8, k: 5}, {N: 9, k: 5}, {N: 9, k: 6}, {N: 10, k: 6}][n];
 }
 // Where slot p starts (just outside the blanket) and which way it heads: [x, y, dx, dy].
@@ -199,7 +200,7 @@ function makeBlanket(n) {
 //        cat grabs it), shots (the slots tried, in order), marks (each square: 0 nothing, 1 a lump, 2 a dot),
 //        history (G.history: [square, what it was], or {marks, shots} for a Restart), won, hinted, restarted,
 //        peeked (lifted the blanket with a lump wrong)…}
-const STORE = "catdoku.blanket.v1", MAX_LEVEL = 11, M = 80, NS = "http://www.w3.org/2000/svg";
+const STORE = "catdoku.blanket.v1", MAX_LEVEL = 12, M = 80, NS = "http://www.w3.org/2000/svg";
 const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1, autoCheck: true}, state.settings);
@@ -208,18 +209,22 @@ const line = () => 2 * game.N;   // the gold line: half the slots
 G.pawLost(() => !game || game.won || game.hinted || game.restarted || game.peeked || game.autoNoted || game.shots.length > line());
 // The tutorial's practice blanket is never saved: while it's out, only the settings are, beside the puzzle already kept.
 const save = () => G.save(STORE, {settings, game: game && game.tutorial ? G.load(STORE).game : game});
-// The levels moved on 2026-11-12: a one-cat blanket became level 1, so levels 1 to 10 became 2 to 11. Saves, best
-// times and share links from before carry the old numbers (settings.levels and a link's L are 11 from then on).
-// Anyone who'd seen the walkthrough by then saw the U-turn between two cats in it (settings.metTwo).
-if (settings.levels !== 11) {
+// The levels moved twice on 2026-11-12, each time by a level put in front: first a 5 × 5 one-cat blanket (levels 1
+// to 10 became 2 to 11; settings.levels and a link's L were 11 from then), then the 4 × 4 one (1 to 11 became 2 to
+// 12; L is 12 from then). Every blanket kept its size and cats, so a save, its best times or a link moves up one
+// from 11, or two from before. Anyone who'd seen the walkthrough before the first move saw the U-turn between two
+// cats in it (settings.metTwo).
+const LEVELS = 12, movedBy = L => L === LEVELS ? 0 : L === 11 ? 1 : 2;
+if (settings.levels !== LEVELS) {
   if (state.settings) {
-    if (settings.level >= 1) settings.level++;
-    if (game && game.level) game.level++;
+    const by = movedBy(settings.levels);
+    if (settings.level >= 1) settings.level = Math.min(LEVELS, settings.level + by);
+    if (game && game.level) game.level = Math.min(LEVELS, game.level + by);
     const bests = G.load("catdoku.bests.v1"), mine = bests.blanket;
-    if (mine) { bests.blanket = {}; for (const n in mine) bests.blanket[+n + 1] = mine[n]; G.save("catdoku.bests.v1", bests); }
-    if (settings.seenHelp) settings.metTwo = true;
+    if (mine) { bests.blanket = {}; for (const n in mine) bests.blanket[Math.min(LEVELS, +n + by)] = mine[n]; G.save("catdoku.bests.v1", bests); }
+    if (settings.levels !== 11 && settings.seenHelp) settings.metTwo = true;
   }
-  settings.levels = 11; save();
+  settings.levels = LEVELS; save();
 }
 const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
 const levelName = n => { const s = ubLevel(n); return `Level ${n} · ${s.N} × ${s.N}, ${s.k} cat${s.k === 1 ? "" : "s"}`; };
@@ -717,10 +722,10 @@ async function newPuzzle() {
 // The cats' squares, two base-36 digits each; with progress, the slots tried (two each) and the marks (0, 1, 2).
 const two = n => n.toString(36).padStart(2, "0"), unTwo = s => (s.match(/../g) || []).map(t => parseInt(t, 36));
 $("linkBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Under the Blanket", won: game.won,
-  puzzle: () => ({g: "blanket", N: game.level, L: 11, c: game.cats.map(two).join("")}),
+  puzzle: () => ({g: "blanket", N: game.level, L: LEVELS, c: game.cats.map(two).join("")}),
   progress: () => game.shots.map(two).join("") + "." + game.marks.join("")}); };
 function openShared(d) {
-  if (d.L !== 11) d.N++;   // a link from before the levels moved
+  if (Number.isInteger(d.N)) d.N += movedBy(d.L);   // a link from before the levels moved
   const spec = ubLevel(d.N), fail = () => G.note("That share link didn't work.", 5000);
   if (!spec || typeof d.c !== "string" || !/^([0-9a-z]{2})+$/.test(d.c)) return fail();
   const {N, k} = spec, cats = unTwo(d.c).sort((a, b) => a - b);
