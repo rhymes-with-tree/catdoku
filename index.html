@@ -10,7 +10,7 @@ if (/^#share=/.test(location.hash)) location.replace("catdoku/" + location.hash)
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-12.8";
+  var BUILD = "2026-11-12.9";
   fetch("version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,10 +27,10 @@ if (/^#share=/.test(location.hash)) location.replace("catdoku/" + location.hash)
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="games.css?v=2026-11-12.8">
+<link rel="stylesheet" href="games.css?v=2026-11-12.9">
 <style>
-/* The front page: today's challenge, a search box, shortcuts to the shelves, the games starred (once there are some), then
-   every game in one grid, shelf by shelf (Cat Logic, Cat Spells…): each shelf starts a new row with a label tile in its
+/* The front page: a search box, the shelves' names as tabs, today's challenge, then one shelf at a time (since
+   2026-11-12; the All tab is every game in one grid, shelf by shelf, as it was): each shelf starts with a label tile in its
    colour, a little apart from the shelf before, and every game's tile is in its shelf's colour. A tile has an icon drawn from its
    board, a line about it (on wider screens) and how many you've solved once you've played. */
 main{max-width:1240px}   /* on a wide screen the shelves spread out, six tiles across at most */
@@ -60,10 +60,17 @@ main{max-width:1240px}   /* on a wide screen the shelves spread out, six tiles a
 /* shortcuts to the shelves, and how to pin a game to the top */
 .jump{display:flex;flex-wrap:wrap;justify-content:center;gap:10px 6px;max-width:640px}
 .jump[hidden],.favTip[hidden]{display:none}
-.jump a{position:relative;display:inline-flex;align-items:center;min-height:34px;font-size:calc(14px*var(--ts));font-weight:600;padding:1px 12px;border:2px solid var(--line);border-radius:999px;background:var(--panel);color:var(--ink);text-decoration:none}
-.jump a::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--dot);margin-right:6px;vertical-align:1px}
-.jump a:hover,.jump a:focus-visible{border-color:var(--ink)}
-.jump a::after{content:"";position:absolute;left:0;right:0;top:-5px;bottom:-5px}   /* 44 points tall to a finger */
+.jump button{position:relative;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;min-height:34px;font-size:calc(14px*var(--ts));font-weight:600;padding:1px 12px;border:2px solid var(--line);border-radius:999px;background:var(--panel);color:var(--ink);text-decoration:none}
+.jump button::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--dot);margin-right:6px;vertical-align:1px}
+.jump button:hover,.jump button:focus-visible{border-color:var(--ink)}
+/* the shelf that's showing: filled in ink, like a pressed tab */
+.jump button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.jump button[hidden]{display:none}
+/* a shelf sliding in from the side it was asked for */
+@keyframes shelfIn{from{opacity:0;transform:translateX(var(--from,24px))}to{opacity:1;transform:none}}
+.shelf.all.slide > :not(.daily){animation:shelfIn .22s ease-out}
+@media (prefers-reduced-motion:reduce){.shelf.all.slide > :not(.daily){animation:none}}
+.jump button::after{content:"";position:absolute;left:0;right:0;top:-5px;bottom:-5px}   /* 44 points tall to a finger */
 .favTip{margin:-4px 0 0;font-size:calc(14px*var(--ts));color:var(--ink-soft);text-align:center}
 /* a mastered game keeps its shelf's colour, and its solved count goes in a small gold label: "Mastered · 12 solved" */
 .tile .masterPill{margin-top:6px}
@@ -134,7 +141,7 @@ main{max-width:1240px}   /* on a wide screen the shelves spread out, six tiles a
   <p class="siteFoot"><a href="settings/">Settings</a> · <a href="calendar/">Launch history</a></p>
 </main>
 
-<script src="games.js?v=2026-11-12.8"></script>
+<script src="games.js?v=2026-11-12.9"></script>
 <script>
 // Each tile shows a little picture of the game's board, drawn by tools/make-icons.py.
 // How many puzzles you've finished in each game, from the best-times records kept on this device.
@@ -200,41 +207,69 @@ function label(title, line, colour, id) {
 }
 const favLabel = label("Favorites", "The games you've starred", "#8D78AD", "shelf-favorites");
 all.append($("daily"), favLabel);
-let favTiles = [];
+let favTiles = [], shown = G.load("catdoku.shelf.v1").shelf || "";
 function drawFavs() {
   const q = $("find").value.trim(), starred = G.favorites();
   favTiles.forEach(t => t.remove());
-  favTiles = q ? [] : starred.map(s => G.GAMES.find(g => g[1] === s)).map(g => tile(g));
+  favTiles = q || !["all", "favorites"].includes(shown) ? [] : starred.map(s => G.GAMES.find(g => g[1] === s)).map(g => tile(g));
   favLabel.after(...favTiles);
   favLabel.hidden = !favTiles.length;
   $("favTip").hidden = !!starred.length || !!q;
+  if (typeof tabs !== "undefined" && tabs.length && tabs[0].el.hidden === !!starred.length) apply();   // the first star brings the Favorites shelf, and the last one gone takes it away
 }
-drawFavs();
 const shelves = G.GROUPS.map(([key, title, line]) => {
   const lab = label(title, line, SHELF_COLOUR[key] || "#7885BA", `shelf-${key}`);
   const tiles = G.onShelf(key).map(g => tile(g));   // A to Z on each shelf
   if (tiles.length) all.append(lab, ...tiles);
   return {label: lab, tiles};
 });
-// Shortcuts to the shelves, each with its own short name and its colour.
+// One shelf at a time (the owner's call, 2026-11-12: everything in one list had grown very long): the row of shelf
+// names under the search box is a set of tabs, and the grid shows today's challenge and the one shelf picked, with
+// Favorites as a shelf of its own once there are some, and All for the whole list as it used to be. A swipe left or
+// right on the games goes to the next shelf, and the shelf last looked at is remembered on this device. Searching
+// looks across every shelf, whichever is showing.
 const SHORT = {logic: "Logic", numbers: "Math", lines: "Trails", words: "Spells", teasers: "Curious", quick: "Kitten Play"};
-for (const [key, title] of G.GROUPS) {
-  if (!G.GAMES.some(g => g[4] === key)) continue;
-  const a = document.createElement("a"); a.href = `#shelf-${key}`; a.textContent = SHORT[key] || title; a.title = title;
-  a.style.setProperty("--dot", SHELF_COLOUR[key]); $("jump").append(a);
+const SHELF_KEY = "catdoku.shelf.v1", tabs = [];
+function tab(key, text, title, colour) {
+  const b = document.createElement("button"); b.type = "button"; b.textContent = text; b.title = title;
+  b.style.setProperty("--dot", colour); b.onclick = () => show(key); $("jump").append(b); tabs.push({key, el: b});
 }
-// Search: show only the games that match, on their shelves (Favorites hides while searching).
-$("find").oninput = () => {
-  const q = $("find").value.trim();
+tab("favorites", "Favorites", "The games you've starred", "#8D78AD");
+G.GROUPS.forEach(([key, title], i) => { shelves[i].key = key; if (G.GAMES.some(g => g[4] === key)) tab(key, SHORT[key] || title, title, SHELF_COLOUR[key]); });
+tab("all", "All", "Every game", "var(--ink-soft)");
+const open = () => tabs.filter(t => !t.el.hidden).map(t => t.key);
+function show(key, from) {
+  const was = open().indexOf(shown), now = open().indexOf(key);
+  shown = key; G.save(SHELF_KEY, {shelf: key}); apply();
+  // slide in from the side the new shelf is on
+  all.style.setProperty("--from", (from !== undefined ? from : now >= was ? 1 : -1) * 24 + "px");
+  all.classList.remove("slide"); void all.offsetWidth; all.classList.add("slide");
+}
+function apply() {
+  const q = $("find").value.trim(), starred = G.favorites().length > 0;
+  tabs[0].el.hidden = !starred;
+  if (!open().includes(shown)) shown = starred ? "favorites" : G.GROUPS[0][0];
   $("daily").hidden = !!q; $("jump").hidden = !!q;
   drawFavs();
   for (const sh of shelves) {
-    let any = false;
-    for (const w of sh.tiles) { const hit = !q || G.matches(G.GAMES.find(g => g[1] === w.dataset.slug), q); w.hidden = !hit; any = any || hit; }
+    const on = !!q || shown === "all" || shown === sh.key; let any = false;
+    for (const w of sh.tiles) { const hit = on && (!q || G.matches(G.GAMES.find(g => g[1] === w.dataset.slug), q)); w.hidden = !hit; any = any || hit; }
     sh.label.hidden = !any;
   }
+  for (const t of tabs) t.el.setAttribute("aria-pressed", String(t.key === shown));
   $("none").hidden = !q || shelves.some(sh => !sh.label.hidden);
-};
+}
+$("find").oninput = apply;
+apply();
+// A swipe across the games: the next shelf, or the one before.
+{ let x0 = 0, y0 = 0;
+  all.addEventListener("touchstart", e => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, {passive: true});
+  all.addEventListener("touchend", e => {
+    const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0, keys = open(), i = keys.indexOf(shown);
+    if ($("find").value.trim() || Math.abs(dx) < 60 || Math.abs(dx) < 2 * Math.abs(dy)) return;
+    const j = i + (dx < 0 ? 1 : -1);
+    if (j >= 0 && j < keys.length) show(keys[j], dx < 0 ? 1 : -1);
+  }, {passive: true}); }
 function $(id) { return document.getElementById(id); }
 </script>
 <!-- Visit counts (GoatCounter: no cookies, nothing personal) -->

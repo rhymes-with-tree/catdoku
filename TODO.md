@@ -112,8 +112,13 @@ cats that point their own way are Day Light (`daylight/`, in beta).
   the first three helpers don't cost the gold paw. Checked with a simple bot, not a person: the owner should say
   whether levels 7 to 12 can now be won without a Shake. The helper buttons still wear the red "costs the gold paw"
   mark from the first use; it should only show once the free ones are gone.
-- [ ] **Front page: one shelf at a time.** A carousel: see Cat Logic, or Cat Math, or the next, rather than
-  everything in one very long list. Show the owner a preview before changing the page.
+- [ ] **Front page: one shelf at a time, for the owner to look at.** Built 2026-11-12 (README, first paragraph): tabs
+  for the shelves, Favorites and All, and a swipe between them. The owner asked for "more of a carousel"; this is
+  tabs with a swipe rather than pages that scroll sideways, since shelves are very different lengths. Change or
+  undo it on their say.
+- [ ] **A name for the action shelf** (the split of Kitten Play, above). The owner's first thought is "On the Prowl",
+  not settled. Ideas given: On the Prowl, Quick Paws, Cat Reflexes, The Zoomies (but Zoomies is a game), Pounce
+  Practice, Hunting Hour, Alley Cat.
 - [ ] **One new move a level.** The how-to and the on-ramp are divided in a way that isn't ideal: the walkthrough
   tells the rules up front, and then the levels get harder. Better: each early level brings in one new move, and a
   win on it is the reward. Night Light's and Day Light's new first levels (one tap, then two) are a first go at it.
