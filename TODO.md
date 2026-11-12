@@ -71,8 +71,8 @@ Cat Spells 13, Curious Cat 12, colour 4, Kitten Play (match and pop) 5, action 8
 From GoatCounter's counts, 2026-10-05 to 2026-11-12 ("27 → 11" is a level started 27 times and solved 11). The samples
 are small (10 to 40 a level) and a start includes pressing New, so these are signs, not rates. In order (done so far,
 2026-11-12: Open the Door's and Toe Beans' easier level 1, Tunnel Run's Hint, starts counted in Wind Up, Pawlinko
-and L-M-N-O-Pom, High Perch's trees left standing, smaller first sizes in Catdoku, Patches, Yarn and Sunbeams, and
-Knock It Off's forgiving first two levels):
+and L-M-N-O-Pom, High Perch's trees left standing, smaller first sizes in Catdoku, Patches, Yarn and Sunbeams, 
+Knock It Off's forgiving first two levels, and Pounce saving while toys fall):
 
 - [ ] **Toe Beans: levels 9 and 10?** 0 solves in 9 starts, but five of those ended with Close enough, 1 to 6 away,
   which is the game working as meant. Leave unless the owner finds them too hard.
@@ -83,13 +83,17 @@ Knock It Off's forgiving first two levels):
 - [ ] **Wind Up: watch levels 9 to 12.** Losses pass wins from level 9 (12 lost, 9 won; level 10: 17 lost, 5 won), but
   nearly all of them are from its first four days (2026-10-30 to 11-02), and it's a game where losing is part of
   playing. It counts starts now; look again with a few weeks of them before changing anything.
-- [ ] **Night Light: levels 2 to 4.** 19 won level 1 but only 9 started level 2, and no wins from level 4 up.
-- [ ] **Pounce: check level 1.** 23 → 12, though the move limits were tuned for a near-certain win.
+- [ ] **Night Light: does it hold interest?** 19 won level 1 (3 × 3, three taps) but only 9 went on to level 2, where
+  7 of 9 won; so it isn't hardness, they stopped after winning. No wins from level 4 up (4 starts). A design
+  question for the owner: a more interesting first room, or the cats that point their own way (level 10 on) sooner.
+- [ ] **Pounce: check level 1.** 23 → 12, though the move limits were tuned for a near-certain win. Running out of
+  moves wasn't counted, so that may be people looking in and leaving; it's counted from 2026-11-12 ("Pounce out of
+  moves on level N"). Look again with a few weeks of it.
 - [ ] **Weak level 1s to watch** (small samples): Cat Pile 16 → 7, Scratch That 17 → 8, Window Ledges 11 → 5, Kitten
   Caboodle 10 → 5.
 - [ ] **Somewhere to go past the hardest level.** Toy Box's level 21 is a fifth of its starts; Twirl and Knock It Off
   at 20 are the same.
-- [ ] **Errors to look at:** Pounce (`t.k` on null, 3 times), Catlas (2).
+- [ ] **Errors to look at:** Catlas (2: `main` and `by` on null, `atlas/` lines 580 and 824 as of 2026-11-03).
 
 ## Pounce Up: tune the goals
 
