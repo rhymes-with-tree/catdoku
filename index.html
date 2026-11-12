@@ -10,7 +10,7 @@ if (/^#share=/.test(location.hash)) location.replace("catdoku/" + location.hash)
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-12.15";
+  var BUILD = "2026-11-12.16";
   fetch("version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@ if (/^#share=/.test(location.hash)) location.replace("catdoku/" + location.hash)
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="games.css?v=2026-11-12.15">
+<link rel="stylesheet" href="games.css?v=2026-11-12.16">
 <style>
 /* The front page: a search box, the shelves' names as tabs, today's challenge, then one shelf at a time (since
    2026-11-12; the All tab is every game in one grid, shelf by shelf, as it was): each shelf starts with a label tile in its
@@ -66,15 +66,17 @@ main{max-width:1240px}   /* on a wide screen the shelves spread out, six tiles a
 /* the shelf that's showing: filled in ink, like a pressed tab */
 .jump button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
 .jump button[hidden]{display:none}
-/* The shelves stand side by side in a row that scrolls sideways and stops at each one (a carousel): a swipe goes to
-   the next, and its edge shows at the side of the screen so it's plain there is one. The row is as tall as the shelf
-   that's showing (set by the page). While searching, the shelves with a match stack up instead. */
-.pager{position:relative;display:flex;align-items:flex-start;gap:12px;width:100%;padding-inline:4%;scroll-padding-inline:4%;overflow-x:auto;overflow-y:hidden;
-  scroll-snap-type:x mandatory;overscroll-behavior-x:contain;scrollbar-width:none;transition:height .2s}
+/* The shelves stand side by side in a row (a carousel): a swipe goes to the next one, and its edge shows at the side of
+   the screen so it's plain there is one. The page moves the row itself (touch-action leaves only up and down to the
+   browser), so a swipe goes exactly one shelf and never stops between two: the browser's own snapping, tried first,
+   flew most of the way along the row on an iPhone (2026-11-12). The row is as tall as the shelf that's showing (set
+   by the page). While searching, the shelves with a match stack up instead. */
+.pager{position:relative;display:flex;align-items:flex-start;gap:12px;width:100%;padding-inline:4%;overflow:hidden;touch-action:pan-y;
+  scrollbar-width:none;transition:height .2s}
 .pager::-webkit-scrollbar{display:none}
-.page{flex:0 0 100%;min-width:0;scroll-snap-align:start;scroll-snap-stop:always;display:flex;flex-direction:column;gap:10px}
+.page{flex:0 0 100%;min-width:0;display:flex;flex-direction:column;gap:10px}
 .page[hidden]{display:none}
-.pager.searching{flex-direction:column;overflow:visible;padding-inline:0;scroll-snap-type:none;gap:18px}
+.pager.searching{flex-direction:column;overflow:visible;padding-inline:0;touch-action:auto;gap:18px}
 @media (prefers-reduced-motion:reduce){.pager{transition:none}}
 /* a shelf's title card: its name, what kind of games they are, and how many, right across the top of the shelf */
 .shelfHead{display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 12px;padding:12px 16px;border-radius:16px;line-height:1.15;
@@ -154,7 +156,7 @@ main{max-width:1240px}   /* on a wide screen the shelves spread out, six tiles a
   <p class="siteFoot"><a href="settings/">Settings</a> · <a href="calendar/">Launch history</a></p>
 </main>
 
-<script src="games.js?v=2026-11-12.15"></script>
+<script src="games.js?v=2026-11-12.16"></script>
 <script>
 // Each tile shows a little picture of the game's board, drawn by tools/make-icons.py.
 // How many puzzles you've finished in each game, from the best-times records kept on this device.
@@ -210,7 +212,7 @@ function tile(g) {
 }
 // One shelf at a time, side by side (the owner's call, 2026-11-12: everything in one list had grown very long).
 // Today's challenge sits above the search box. Under it, the shelves' names are tabs, and the shelves themselves
-// stand in a row that scrolls sideways, stopping at each: swipe for the next (its edge shows at the side of the
+// stand in a row, one swipe a shelf: swipe for the next (its edge shows at the side of the
 // screen, and on a first visit the row nudges across and back once, so it's plain it moves), or tap a name.
 // Favorites is the first shelf once a game is starred. The shelf last looked at is remembered on this device.
 // Searching stacks up every shelf that has a match.
@@ -254,12 +256,52 @@ pager.addEventListener("scroll", () => {
   if (ticking || pager.classList.contains("searching")) return;
   ticking = true;
   requestAnimationFrame(() => {
+    if (drag && drag.on) { ticking = false; return; }   // mid-swipe: the shelf's settled when the finger lifts
     ticking = false;
     const at = pager.scrollLeft + pad(), near = open().reduce((best, p) => !best || Math.abs(p.el.offsetLeft - at) < Math.abs(best.el.offsetLeft - at) ? p : best, null);
     if (near && near.key !== shown) { shown = near.key; G.save(SHELF_KEY, {...G.load(SHELF_KEY), shelf: shown}); sync(); }
   });
 }, {passive: true});
 addEventListener("resize", () => go(shown));
+// Swiping: the row follows the finger sideways, and on lifting it goes on to the next shelf (or back one) if it moved
+// a quarter of the way or was flicked, and otherwise springs back. An up-and-down move is left to the page's scroll.
+// A swipe that ends on a tile doesn't open it. A trackpad's sideways scroll turns one shelf per stroke.
+let drag = null, swiped = false;
+const toShelf = (from, step) => { const list = open(), i = Math.max(0, list.findIndex(p => p.key === from)); go(list[Math.max(0, Math.min(list.length - 1, i + step))].key, true); };
+pager.addEventListener("pointerdown", e => {
+  if (e.pointerType === "mouse" || pager.classList.contains("searching")) return;
+  drag = {id: e.pointerId, x: e.clientX, y: e.clientY, left: pager.scrollLeft, from: shown, on: false, t: 0}; swiped = false;
+});
+pager.addEventListener("pointermove", e => {
+  if (!drag || e.pointerId !== drag.id) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  if (!drag.on) {
+    if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+    if (Math.abs(dy) >= Math.abs(dx)) { drag = null; return; }   // up and down: the page scrolls
+    drag.on = swiped = true; drag.x = e.clientX; drag.t = performance.now();
+    try { pager.setPointerCapture(e.pointerId); } catch (_) {}
+  }
+  const now = performance.now();
+  drag.v = (e.clientX - (drag.lastX ?? drag.x)) / Math.max(1, now - (drag.lastT ?? drag.t)); drag.lastX = e.clientX; drag.lastT = now;
+  pager.scrollLeft = drag.left - (e.clientX - drag.x);
+});
+function endDrag(e) {
+  if (!drag || e.pointerId !== drag.id) return;
+  const d = drag; drag = null;
+  if (!d.on) return;
+  const dx = e.type === "pointercancel" ? 0 : e.clientX - d.x, flick = Math.abs(d.v || 0) > .4 && Math.sign(d.v) === Math.sign(dx);
+  toShelf(d.from, Math.abs(dx) > pager.clientWidth / 4 || flick ? (dx < 0 ? 1 : -1) : 0);
+}
+pager.addEventListener("pointerup", endDrag); pager.addEventListener("pointercancel", endDrag);
+pager.addEventListener("click", e => { if (swiped) { e.preventDefault(); e.stopPropagation(); swiped = false; } }, true);
+let wheelSum = 0, wheelWait = 0;
+pager.addEventListener("wheel", e => {
+  if (pager.classList.contains("searching") || Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+  e.preventDefault();
+  if (performance.now() < wheelWait) return;
+  wheelSum += e.deltaX;
+  if (Math.abs(wheelSum) > 40) { toShelf(shown, wheelSum > 0 ? 1 : -1); wheelSum = 0; wheelWait = performance.now() + 600; }
+}, {passive: false});
 function drawFavs() {
   favPage.tiles.forEach(t => t.remove());
   favPage.tiles = G.favorites().map(s => G.GAMES.find(g => g[1] === s)).filter(Boolean).map(g => tile(g));
@@ -288,8 +330,8 @@ addEventListener("load", () => go(shown));   // once the pictures and the font a
 if (!G.load(SHELF_KEY).nudged && !matchMedia("(prefers-reduced-motion: reduce)").matches) setTimeout(() => {
   if ($("find").value.trim() || open().length < 2) return;
   const x = pager.scrollLeft;
-  pager.style.scrollSnapType = "none"; pager.scrollTo({left: x + 90, behavior: "smooth"});
-  setTimeout(() => { pager.scrollTo({left: x, behavior: "smooth"}); setTimeout(() => { pager.style.scrollSnapType = ""; }, 500); }, 550);
+  pager.scrollTo({left: x + 90, behavior: "smooth"});
+  setTimeout(() => pager.scrollTo({left: x, behavior: "smooth"}), 550);
   G.save(SHELF_KEY, {...G.load(SHELF_KEY), nudged: true});
 }, 1200);
 function $(id) { return document.getElementById(id); }

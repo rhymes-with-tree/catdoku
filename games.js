@@ -856,10 +856,12 @@ const G = (() => {
   function showTime() {
     const g = T && T.game(), btn = $("timer"); if (!btn) return;
     if (!g || !g.timed) { btn.textContent = ""; btn.hidden = true; return; }
-    btn.hidden = false;
+    // A timer switched off (here or on the Settings page) leaves nothing on screen: a stopwatch reading –:–– still
+    // looked like a clock (the owner, 2026-11-12). It comes back from Timers on the Settings page.
     const hide = timerHidden(T.name);
-    btn.textContent = hide ? "⏱ –:––" : "⏱ " + clock(g.ms || 0);
-    btn.setAttribute("aria-label", hide ? "Timer hidden. Tap to show the time." : `Time ${clock(g.ms || 0)}. Tap to hide the time.`);
+    btn.hidden = hide; if (hide) { btn.textContent = ""; return; }
+    btn.textContent = "⏱ " + clock(g.ms || 0);
+    btn.setAttribute("aria-label", `Time ${clock(g.ms || 0)}. Tap to hide the time.`);
   }
   // Fields a new puzzle starts with. Leaving a puzzle you'd started (and not solved) for a new one ends your win streak.
   const freshClock = () => { takePending(); const g = T && T.game(); if (g && g.started && !g.result) breakStreak(); return {ms: 0, timed: true, started: false}; };
