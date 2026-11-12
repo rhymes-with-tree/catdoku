@@ -76,7 +76,7 @@ Bed Hog has no star cat yet: `c14-29` (a ginger cat on its back) sleeps beside i
   `fred-23` prowls on the floor below the shelf of yarn he knocked out of order, Dottie (`dottie-22`, with her teal crochet)
   settles in there once it's sorted, and `fred-16` crouches to pounce on the gold-paw card.
 
-- **Rayla** (`rayla-…`, a pale silver tabby with blue eyes) is the star of Pounce Up (in beta). Her sheet (the owner's,
+- **Rayla** (`rayla-…`, a pale silver tabby with blue eyes) is the star of Pounce Up. Her sheet (the owner's,
   2026-11-11) has nine poses, all used there: `rayla-sit` beside the title; `rayla-low` waiting on the floor and walking
   along a shelf; `rayla-crouch` crouched on a shelf after landing; `rayla-leap` going up (and on the gold-paw card);
   `rayla-dive` dropping straight down; `rayla-bound` coming down sideways and running up with the zoomies;

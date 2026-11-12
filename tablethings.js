@@ -65,5 +65,13 @@ const TABLE = (() => {
   };
   // a thing's drawing without its shadow, for one in the air
   const noShadow = svg => svg.replace(/<ellipse cx="50" cy="84"[^>]*rgba\(70,35,10,\.28\)"\/>/, "");
-  return {INK, SHADOW, HEART, ART, rollArt, KINDS, noShadow};
+  // a piece of tape across a square, part of a strip (Knock It Off, Tail Chase)
+  const TAPE = `<rect x="-1" y="33" width="102" height="34" fill="#EFE6CC" opacity=".95"/><path d="M-1 33 H101 M-1 67 H101" stroke="#BFAE84" stroke-width="2.5"/>
+    <path d="M8 40 L22 60 M38 40 L52 60 M68 40 L82 60" stroke="#D9CDA8" stroke-width="2"/>`;
+  // a patch of catnip (Knock It Off, Tail Chase and Pounce Up)
+  const CATNIP = `<ellipse cx="50" cy="52" rx="38" ry="32" fill="#B9D59E" opacity=".75"/>
+    <g fill="#6AA673" stroke="#3C6E45" stroke-width="1.5">${[[30, 40, -40], [50, 30, 0], [70, 40, 40], [36, 64, -70], [64, 64, 70], [50, 56, 0]].map(([x, y, a]) =>
+      `<path d="M${x} ${y + 9} C${x - 8} ${y + 2} ${x - 6} ${y - 8} ${x} ${y - 11} C${x + 6} ${y - 8} ${x + 8} ${y + 2} ${x} ${y + 9} Z" transform="rotate(${a} ${x} ${y})"/>`).join("")}</g>
+    <g fill="#D9C8F0" stroke="#7885BA" stroke-width="1"><circle cx="42" cy="26" r="3.5"/><circle cx="58" cy="24" r="3.5"/><circle cx="50" cy="20" r="3.5"/></g>`;
+  return {INK, SHADOW, HEART, ART, rollArt, KINDS, noShadow, TAPE, CATNIP};
 })();

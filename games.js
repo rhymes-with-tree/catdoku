@@ -63,11 +63,11 @@ const G = (() => {
     ["Zoomies", "zoomies", "Retrace the cat's 3 a.m. zoomies around the house", "#4E577D", "lines", "signpost arrows path numbers jumps queen chain link zoomies", "2026-11-08"],
     ["Under the Blanket", "blanket", "Find the cats with a feather", "#8D78AD", "logic", "black box blackbox rays atoms deflection reflection hidden balls feather wand blanket bugsy", "2026-11-09"],
     ["Bed Hog", "bedhog", "Slide the sprawled cats until there's room for you", "#E16A4A", "teasers", "klotski rush hour sliding block puzzle unblock slide bed hog huarong sleeping cats", "2026-11-09"],
+    ["Pounce Up", "pounceup", "Help Rayla pounce up the tallest bookcase in the house", "#7885BA", "quick", "doodle jump platform jumping climbing bookcase shelves action springs", "2026-11-12"],
   ];
   // Games in beta: their pages work (open them by their address), but they're left off the front page, the games menu,
   // search, favorites and the daily challenge until they're finished. Same fields as GAMES.
   const BETA = [
-    ["Pounce Up", "pounceup", "Help Rayla pounce up the tallest bookcase in the house", "#7885BA", "quick", "doodle jump platform jumping climbing bookcase shelves action", "2026-11-11"],
     ["Pawstcards", "pawstcards", "Guess where Pinecone is from her postcards", "#73A7AE", "quick", "geography countries wikipedia postcards guess the country clues redacted trivia travel pinecone", "2026-11-11"],
   ];
   const rowOf = slug => GAMES.find(g => g[1] === slug) || BETA.find(g => g[1] === slug);
@@ -1647,10 +1647,11 @@ const G = (() => {
     pickpile: [["dim", "Dim stuck blocks", "Blocks that can't come off yet are dimmed", true, {row: "decor", inv: true}]],
     toebeans: [["rev", "Reverse", "Count back down from the total to the start", false, {icon: "swap", words: ["Match the Paw", "Paw = 0"]}]],
     twirl: [["twisty", "Twisty ribbons", "Off, every ribbon is drawn flat", true, {row: "decor", at: ["catdoku.twirl.prefs.v1", "twisty"]}]],
+    pounceup: [["autoPounce", "Pounce by herself", "Rayla pounces again each time she lands, without waiting for a tap", false]],
     atlas: [["style", "Answer", "How you answer", "list", {icon: "chat", opts: [["pick", "Pick from 4 names"], ["list", "Type, with a list to choose from"], ["type", "Type it, no help"]],
       short: {pick: "4 Choices", list: "Full List", type: "Just Type"}}]],
   };
-  const SLOWS = ["birdwatch", "tailchase", "windup", "lmnopom"], UNTIMED = ["keyboardcat"];
+  const SLOWS = ["birdwatch", "tailchase", "windup", "lmnopom", "pounceup"], UNTIMED = ["keyboardcat"];
   const timerHidden = slug => { const t = load(TIMERS)[slug]; return t === undefined ? !!load(PREFS).hideTimer : !!t; };
   const SETTINGS = {};
   for (const [, slug] of GAMES) {

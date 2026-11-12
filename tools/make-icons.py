@@ -1068,7 +1068,39 @@ def bedhog():
     return frame(tint(PERI, .12), out)
 
 
-ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
+def pounceup():
+    """The bookcase from the game: shelves up its back wall, Rayla (a pale silver tabby) mid-pounce, nose up, from one
+    to the top with her path dotted behind her, a gold spring on the low shelf, and her basket on top."""
+    wall, wood = "#E9D3B4", "#C99A62"
+    out = "".join(f'<path d="M{x} 9V91" stroke="#D9BF9C" stroke-width="1.2"/>' for x in (30, 52, 74))
+    out += f'<rect x="7" y="24" width="86" height="7" fill="{wood}" stroke="{INK}" stroke-width="2"/>'   # the top
+    for x, y, w in ((12, 82, 34), (56, 64, 32)):
+        out += f'<rect x="{x}" y="{y}" width="{w}" height="5.5" rx="1.5" fill="{wood}" stroke="{INK}" stroke-width="2"/>'
+    # the spring on the low shelf
+    out += f'<path d="M24 82 l5 -2.5 l-5 -2.5 l5 -2.5 l-5 -2.5 l5 -2.5" fill="none" stroke="{YELLOW}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>'
+    # the basket on top, with its weave
+    out += f'<path d="M60 24 L62 13 H84 L86 24 Z" fill="{wood}" stroke="{INK}" stroke-width="2" stroke-linejoin="round"/>'
+    out += "".join(f'<path d="M{x} 14V23" stroke="#8E6534" stroke-width="1"/>' for x in (66, 70, 74, 78, 82))
+    # her pounce, dotted, from the right-hand shelf
+    out += f'<path d="M72 62 C72 54 66 50 58 48" fill="none" stroke="{PERI}" stroke-width="2.4" stroke-dasharray="1 4.5" stroke-linecap="round"/>'
+    # Rayla mid-leap, nose up and to the left: front legs reaching, back legs trailing, tail up behind
+    fur, stripe, eye = "#E2D6C8", "#8C7B6B", "#4E8FB0"
+    legs = "M26 47 L16 44 M29 49 L19 50 M47 48 L57 52 M49 46 L59 47"
+    out += (f'<g transform="rotate(24 38 46)">'
+            f'<path d="M48 44 C55 42 58 36 57 30" fill="none" stroke="{INK}" stroke-width="5.4" stroke-linecap="round"/>'
+            f'<path d="M48 44 C55 42 58 36 57 30" fill="none" stroke="{fur}" stroke-width="3" stroke-linecap="round"/>'
+            f'<path d="{legs}" stroke="{INK}" stroke-width="4.4" stroke-linecap="round"/>'
+            f'<path d="{legs}" stroke="{fur}" stroke-width="2.4" stroke-linecap="round"/>'
+            f'<ellipse cx="38" cy="47" rx="12.5" ry="6" fill="{fur}" stroke="{INK}" stroke-width="2"/>'
+            f'<path d="M34 41.6 V52 M39 41 V53 M44 41.8 V52" stroke="{stripe}" stroke-width="1.6"/>'
+            f'<path d="M19 41 L18 33 L23.5 37.5 Z M25.5 37.5 L28.5 32 L29.5 39 Z" fill="{fur}" stroke="{INK}" stroke-width="1.6" stroke-linejoin="round"/>'
+            f'<circle cx="24" cy="43" r="6.4" fill="{fur}" stroke="{INK}" stroke-width="2"/>'
+            f'<circle cx="21.6" cy="42" r="1.2" fill="{eye}"/><circle cx="26.4" cy="42" r="1.2" fill="{eye}"/>'
+            f'<path d="M23 45.5 L24 46.5 L25 45.5" fill="none" stroke="{INK}" stroke-width="1"/></g>')
+    return frame(wall, out)
+
+
+ICONS = {"catdoku": catdoku, "pounceup": pounceup, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
          "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle, "mewhue": mewhue, "pawlinko": pawlinko, "crossstitch": crossstitch, "junkdrawer": junkdrawer, "zoomies": zoomies, "blanket": blanket, "bedhog": bedhog}
