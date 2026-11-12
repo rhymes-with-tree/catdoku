@@ -1312,8 +1312,8 @@ const G = (() => {
   let endSpot = null;   // the walkthrough that's up: how to end it, as Skip does
   function spotlight(o) {
     const tip = o.finish === false;
-    // on a computer, the whole walkthrough ends by pointing to the keys
-    if (!tip && CURRENT && KEYS[CURRENT] && keyboardish() && !o.steps.some(st => st.keysStep))
+    // on a computer, the whole walkthrough ends by pointing to the keys (not a short lesson on one new thing, o.lesson)
+    if (!tip && !o.lesson && CURRENT && KEYS[CURRENT] && keyboardish() && !o.steps.some(st => st.keysStep))
       o = {...o, steps: [...o.steps, {say: "On a keyboard? Press ? for the keys", keysStep: true, els: [o.grid]}]};
     if (!tip) {   // switches are taught when they're turned on, never in the walkthrough
       const sw = o.steps.filter(isSwitchStep);

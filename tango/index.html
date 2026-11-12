@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-12.18"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-12.19"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-12.18">
+<link rel="stylesheet" href="../games.css?v=2026-11-12.19">
 <style>
 /* Two toys share out a grid in the toy box: every line holds as many of one as the other, no three alike in a row,
    and = / × signs between squares say whether neighbours match. */
@@ -93,14 +93,16 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-12.18"></script>
+<script src="../games.js?v=2026-11-12.19"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // A grid of N × N squares, each 0 or 1 (the two toys). Every row and column has N/2 of each, no three the same
 // in a line; clues are some squares already filled, and = or × signs between some side-by-side squares.
 // Levels: each size first with a few extra toys put out to start, then with only the clues it needs.
 // Level 1 (the third number) also puts out toys until it can be solved with the simple rules alone, no guessing.
-function levelOf(n) { return [null, [6, 3, true], [6, 0], [8, 5], [8, 0], [10, 6], [10, 0]][n]; }
+// One new rule a level (the owner's call, 2026-11-12): level 1 has no = or × signs (the fourth), so it's just
+// "equal of each" and "no three in a row"; the signs come in at level 2, at least two of each.
+function levelOf(n) { return [null, [6, 3, true, true], [6, 0], [8, 5], [8, 0], [10, 6], [10, 0]][n]; }
 // Every way to finish a grid, counted up to `limit`: fill squares one at a time, after working out every square the
 // rules force (a pair or gap in a line, a full line, or a sign next to a filled square).
 // With `out`, the last answer found is left in out.grid.
@@ -175,10 +177,10 @@ function randomGrid(N) {
 
 // Make a puzzle: start from a full grid, offer clues (filled squares and signs) at random until there's only one
 // answer, then take away any clue that isn't needed.
-function makePuzzle(N) {
+function makePuzzle(N, noSigns) {
   const sol = randomGrid(N), clues = [];
   for (let i = 0; i < N * N; i++) clues.push({sq: i});
-  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+  if (!noSigns) for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
     if (c + 1 < N) clues.push({a: r * N + c, b: r * N + c + 1});
     if (r + 1 < N) clues.push({a: r * N + c, b: (r + 1) * N + c});
   }
@@ -199,7 +201,11 @@ function makePuzzle(N) {
   return {N, sol, givens, signs};
 }
 function makeLevel(n) {
-  const [N, extra, easy] = levelOf(n), p = makePuzzle(N), empty = p.givens.map((v, i) => v === -1 ? i : -1).filter(i => i >= 0);
+  const [N, extra, easy, noSigns] = levelOf(n);
+  let p = makePuzzle(N, noSigns);
+  // level 2 brings the signs in: at least two of each, so both are there to meet
+  while (n === 2 && (p.signs.filter(s => s.same).length < 2 || p.signs.filter(s => !s.same).length < 2)) p = makePuzzle(N);
+  const empty = p.givens.map((v, i) => v === -1 ? i : -1).filter(i => i >= 0);
   // put out toys until the simple rules finish the puzzle, then the head start on top
   while (easy && empty.length && !countSolutions(N, p.givens, p.signs, 0)) { const i = empty.splice(Math.floor(Math.random() * empty.length), 1)[0]; p.givens[i] = p.sol[i]; }
   for (let k = 0; k < extra && empty.length; k++) { const i = empty.splice(Math.floor(Math.random() * empty.length), 1)[0]; p.givens[i] = p.sol[i]; }
@@ -251,6 +257,9 @@ let facesFor = "";
 const markTool = G.pieces({plain: "Toy", plainIcon: "toys", many: 2, face: toyFace, mark: "markBtn", can: () => game && !game.won, pick: () => { guesses.disarm(); draw(); },
   change: on => { guesses.disarm(); draw(); if (on && !settings.seenMarks) { settings.seenMarks = true; save(); G.note("Your teal = and × are just notes for you.", 6000); } }});   // the plain tap beside Mark, in a row of their own under the board
 const save = () => G.save(STORE, {settings, game});
+// Signs met (settings.met: "=" and "×"): the walkthrough shows them only when the puzzle has them, and a sign first
+// seen later gets a spotlight of its own (meetSigns). Anyone who saw the walkthrough before 2026-11-12 met both there.
+if (settings.seenHelp && !settings.met) settings.met = ["=", "×"];
 const playing = () => game && !game.won && !busy && !$("overlay").classList.contains("show");
 const levelName = n => { const [N, extra] = levelOf(n); return `Level ${n} · ${N} × ${N}${extra ? ", a head start" : ""}`; };
 const build = G.builder([levelOf, countSolutions, randomGrid, makePuzzle, makeLevel], "makeLevel");
@@ -463,6 +472,7 @@ async function newPuzzle() {
   draw(); save();
   build.prefetch(n);
   G.track(`Fair Play new puzzle level ${n}`);
+  setTimeout(meetSigns, 400);
 }
 
 /* ---------- sharing ---------- */
@@ -486,23 +496,33 @@ function openShared(d) {
 /* ---------- how to play ---------- */
 // How to play plays the walkthrough on the board (there's no rules card).
 function showHelp() {
-  settings.seenHelp = false; helpOnFirstVisit();
+  settings.seenHelp = false; helpAgain = true; helpOnFirstVisit(); helpAgain = false;
   if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
+}
+let helpAgain = false;   // How to play, which shows both signs even on a puzzle without them
+// The first puzzle with a sign the player hasn't met (level 2, after level 1's signless boxes): a spotlight on it.
+function meetSigns() {
+  if (!settings.seenHelp || !game || !playing() || document.querySelector(".spot")) return;
+  const met = settings.met || [];
+  if (game.signs.some(s => !met.includes(s.same ? "=" : "×"))) helpOnFirstVisit(true);
 }
 // First visit only: walk through the puzzle that's out. One step puts three of a kind in a row (just while
 // it's up) so the red outline shows; the box goes back as it was.
-function helpOnFirstVisit() {
-  if (settings.seenHelp || !game || !playing() || document.querySelector(".spot")) return;
+function helpOnFirstVisit(signsOnly) {
+  if ((signsOnly ? !settings.seenHelp : settings.seenHelp) || !game || !playing() || document.querySelector(".spot")) return;
   const N = game.N, xy = i => [i % N, Math.floor(i / N)], all = [...Array(N * N).keys()].map(xy);
   // the squares sit in a grid with gaps, so work out where they are from the first and last
   const map = () => { const sq = $("squares").children, a = sq[0].getBoundingClientRect(), z = sq[N * N - 1].getBoundingClientRect(), gap = (z.right - a.left - N * a.width) / (N - 1);
     return {ox: a.left - gap / 2, oy: a.top - gap / 2, cw: a.width + gap, ch: a.height + gap}; };
   const empty = game.grid.findIndex((v, i) => v === -1 && game.givens[i] === -1);
-  // three empty squares in a row, for the "no three alike" example
-  let three = null;
-  for (let r = 0; r < N && !three; r++) for (let c = 0; c + 2 < N && !three; c++) {
-    const run = [0, 1, 2].map(d => r * N + c + d);
-    if (run.every(i => game.grid[i] === -1)) three = run;
+  // three in a line for the "no three alike" example: empty, or else any filled squares already the same toy, so
+  // the example never changes a toy that's there (a first board, full of toys put out, rarely has three empty)
+  let three = null, threeOf = 0;
+  const runs = [];
+  for (let r = 0; r < N; r++) for (let c = 0; c + 2 < N; c++) runs.push([0, 1, 2].map(d => r * N + c + d), [0, 1, 2].map(d => (c + d) * N + r));
+  for (const want of [0, 1, 2]) {   // as few filled squares as can be
+    three = runs.find(run => { const vs = run.map(i => game.grid[i]).filter(v => v !== -1); return vs.length === want && vs.every(v => v === vs[0]); });
+    if (three) { threeOf = Math.max(0, ...three.map(i => game.grid[i])); break; }
   }
   const row = r => [...Array(N).keys()].map(c => [c, r]), col = c => [...Array(N).keys()].map(r => [c, r]);
   const showing = change => { let was; return {enter: () => { was = game.grid.slice(); change(); draw(); }, leave: () => { game.grid = was; draw(); }}; };
@@ -519,7 +539,10 @@ function helpOnFirstVisit() {
       return {a: i, b: j, same: isSame, borrowed: true};
     }
   };
-  const same = game.signs.find(s => s.same) || example(true), diff = game.signs.find(s => !s.same) || example(false);
+  // the puzzle's own signs; How to play borrows squares for one it hasn't got, a first visit leaves it for later
+  const met = settings.met || [], fresh = sign => !signsOnly || !met.includes(sign);
+  const same = fresh("=") && (game.signs.find(s => s.same) || (helpAgain ? example(true) : null)),
+    diff = fresh("×") && (game.signs.find(s => !s.same) || (helpAgain ? example(false) : null));
   // fill a sign's squares, adding the sign itself for the step when it's borrowed
   // the sign is coloured to match (green for =, red for ×) just while its step is up
   const signStep = (say, s) => {
@@ -528,6 +551,11 @@ function helpOnFirstVisit() {
       enter: () => { if (s.borrowed) game.signs.push(s); litSign = {s, tone}; fill.enter(); },
       leave: () => { if (s.borrowed) game.signs = game.signs.filter(x => x !== s); litSign = null; fill.leave(); }};
   };
+  if (signsOnly) {
+    const steps = [same && signStep("= means the same", same), diff && signStep("× means different", diff)].filter(Boolean);
+    if (steps.length) G.spotlight({grid: $("squares"), w: N, h: N, map, steps, lesson: true, done: () => { settings.met = [...new Set([...met, ...(same ? ["="] : []), ...(diff ? ["×"] : [])])]; save(); }});
+    return;
+  }
   const steps = [{say: "Fill every square with a toy", lit: all, els: [$("key")]}];
   // one short step per tap, so tapping along shows each one in turn
   if (empty >= 0) {
@@ -541,13 +569,13 @@ function helpOnFirstVisit() {
   }
   steps.push({say: "Rows: equal of each", lit: row(Math.floor(N / 2))},
              {say: "Columns too", lit: col(Math.floor(N / 2))});
-  if (three) steps.push({say: "No three in a row", lit: three.map(xy), marks: [[...xy(three[2]), "❌", 0.8]], ...showing(() => { for (const i of three) game.grid[i] = 0; })});
+  if (three) steps.push({say: "No three in a row", lit: three.map(xy), marks: [[...xy(three[2]), "❌", 0.8]], ...showing(() => { for (const i of three) game.grid[i] = threeOf; })});
   if (same) steps.push(signStep("= means the same", same));
   if (diff) steps.push(signStep("× means different", diff));
   steps.push({say: "Mark your own × and =", els: [$("markBtn")]},
              {say: "Not sure? Bookmark, then try an idea. Return to Bookmark undoes it", els: [$("guessBtn")]},
              {say: "Stuck? Hint shows a toy", els: [$("hintBtn")]});
-  G.spotlight({grid: $("squares"), w: N, h: N, map, steps, done: () => { settings.seenHelp = true; save(); }});
+  G.spotlight({grid: $("squares"), w: N, h: N, map, steps, done: () => { settings.seenHelp = true; settings.met = [...new Set([...(settings.met || []), ...(same ? ["="] : []), ...(diff ? ["×"] : [])])]; save(); }});
 }
 
 /* ---------- choosing toys ---------- */
@@ -588,7 +616,7 @@ if (hadSave) G.reopen(() => {
     if (!levelOf(game.level) || game.grid.length !== game.N * game.N) throw new Error("the saved puzzle doesn't fit its level");
     draw();
     if (game.won) finishCard();
-    build.prefetch(settings.level); helpOnFirstVisit();
+    build.prefetch(settings.level); helpOnFirstVisit(); setTimeout(meetSigns, 400);
   }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
 else if (!shared) newPuzzle().then(helpOnFirstVisit);
 const shareOpts = () => ({name: "Fair Play", inProgress: !!(game && !game.won && game.history.length), open: openShared, after: helpOnFirstVisit});
