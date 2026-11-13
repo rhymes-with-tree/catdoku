@@ -33,7 +33,8 @@ anywhere, but keep track of who they are, because they'll be featured in games o
 **Stars decided, pictures still to come** (the owner, 2026-11-12): **Pangur Bán** (Pangur for short) will be the star of
 Cat Burglar, and **Fitzwilliam Darcy** (Fitz) the star of Pawlette. Neither has pictures in `cats/` yet; when they
 arrive, add each to the list below with what they look like, and give the game its title cat, gold-paw card,
-tagline and front-page icon as Bowtie has in Tunnel Run. **Crow**, the shop cat at a witch's supply shop, is to star
+tagline and front-page icon as Bowtie has in Tunnel Run. **Crow**, the shop cat at a witch's supply shop (The Raven's Wing Magical Co-Op in Portland, Oregon,
+https://theravenswing.com/), is to star
 in Crow's Drawers, dowsing for things hidden in the shop's apothecary drawers (the owner, 2026-11-13; see `IDEAS.md`).
 Crow looks like Ferguson (a black cat with yellow eyes) but much sleeker, not fluffy; the owner will have pictures soon.
 
