@@ -925,8 +925,8 @@ def lmnopom():
     return frame(tint("#8D78AD", .15), marm + out)
 
 
-# Swap-a-Pom: a craft tray of letter pompoms, two of them swapping (the curved arrow over them) to spell CAT across
-# the middle, lit gold, and Moonpie's face (white, with brick-brown ears and patches round her blue eyes) peeking over
+# Swap-a-Pom: a craft tray of letter pompoms, two of them swapping (the curved arrow over them), reading CTE PIE (the owner's
+# choice, 2026-11-13), the top row lit gold, and Moonpie's face (white, with brick-brown ears and patches round her blue eyes) peeking over
 # the tray's top edge.
 def swapapom():
     BROWN = "#824235"   # brick, a shade towards the ink
@@ -940,9 +940,9 @@ def swapapom():
              f'<path d="M24.7 31.6L26 32.8L27.3 31.6" fill="none" stroke="{INK}" stroke-width="1.2" stroke-linecap="round"/>')
     out = f'<rect x="9" y="36" width="82" height="56" rx="11" fill="{tint(TEAL, .35)}" stroke="{PERI}" stroke-width="3"/>'
     out += f'<rect x="14" y="48" width="72" height="22" rx="11" fill="{tint(YELLOW, .55)}"/>'
-    out += "".join(pom(x, 59, c, ch) for x, c, ch in [(27, GREEN, "C"), (50, PERI, "A"), (73, PLUM, "T")])
-    out += "".join(pom(x, 81, c, ch) for x, c, ch in [(27, LIME, "E"), (50, TEAL, "R"), (73, GREEN, "M")])
-    # the swap: a two-headed arrow arching over A and T
+    out += "".join(pom(x, 59, c, ch) for x, c, ch in [(27, GREEN, "C"), (50, PERI, "T"), (73, PLUM, "E")])
+    out += "".join(pom(x, 81, c, ch) for x, c, ch in [(27, LIME, "P"), (50, TEAL, "I"), (73, GREEN, "E")])
+    # the swap: a two-headed arrow arching over T and E
     out += (f'<path d="M51 46Q61.5 34 72 46" fill="none" stroke="{INK}" stroke-width="2.2" stroke-linecap="round"/>'
             f'<path d="M50.2 41.2L51 46.2L55.6 44.3M72.8 41.2L72 46.2L67.4 44.3" fill="none" stroke="{INK}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>')
     return frame(tint("#8D78AD", .15), out + face)
