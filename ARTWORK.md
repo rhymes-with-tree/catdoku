@@ -96,9 +96,10 @@ Bed Hog has no star cat yet: `c14-29` (a ginger cat on its back) sleeps beside i
   **Her nose is NOT white, and she has a bobtail** (the owner, 2026-11-13). Her face is brown down to the nose, with a little
   white blaze between the eyes that stops above it, and her tail is a short round pompom. Any picture of her with a white
   nose or a long tail is wrong: check every new one, and say so if the owner missed it ("I will gladly be corrected").
-  Of the seven, `-sit`, `-crouch`, `-crouch2` and `-leap` are right. Three are wrong: `-low` and `-bound` have the blaze
-  running down to a white muzzle and pink nose, and `-dive` has both a white nose and a long tail. `-low` is in Swap-a-Pom
-  (see `TODO.md`); don't use any of the three until they're fixed or redrawn.
+  Three of the seven came off the sheet wrong and were fixed by hand on 2026-11-13: `-low`, `-bound` and `-dive` had the
+  blaze running down to a white muzzle and pink nose, now painted brown from the fur around them (her nose a rosy brown,
+  as in `-sit`), and `-dive` had a long tail, now cut off at the rump and replaced with `-crouch2`'s bobtail. The
+  originals are in the git history if a fix ever needs redoing.
   **Her personality:** she cuddles you and keeps you company while you play games (the owner, 2026-11-13: very sweet; have
   that come through). So she's a companion, never a cat who bats things away or chases: she purrs, blinks slowly, leans on
   you and is proud of you. She's the star of Swap-a-Pom (in beta): `moonpie-sit` beside the title; `moonpie-low` lying along
