@@ -34,7 +34,8 @@ anywhere, but keep track of who they are, because they'll be featured in games o
 Cat Burglar, and **Fitzwilliam Darcy** (Fitz) the star of Pawlette. Neither has pictures in `cats/` yet; when they
 arrive, add each to the list below with what they look like, and give the game its title cat, gold-paw card,
 tagline and front-page icon as Bowtie has in Tunnel Run. **Crow**, the shop cat at a witch's supply shop, is to star
-in a treasure hunt (the owner, 2026-11-13; which game isn't picked yet, see `IDEAS.md`), with no pictures yet either.
+in Crow's Drawers, dowsing for things hidden in the shop's apothecary drawers (the owner, 2026-11-13; see `IDEAS.md`).
+Crow looks like Ferguson (a black cat with yellow eyes) but much sleeker, not fluffy; the owner will have pictures soon.
 
 Purrfect Square puts one of 24 general cats, picked at random each visit, beside its title: those sitting up and facing out
 (`c14-63`, `c18-6`, `-7`, `-17`, `-19`, `-21`, `-26`, `-27`, `-32`, `-40`, `c19-1`, `-5`, `-6`, `-14`, `-16`, `-17`, `-28`, `-32`, `-37`, `-40`,
