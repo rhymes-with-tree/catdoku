@@ -91,12 +91,21 @@ Bed Hog has no star cat yet: `c14-29` (a ginger cat on its back) sleeps beside i
   `rayla-startled`), which has Moonpie and Ferguson too. Pounce Up draws every pose at one scale (`SC`, units per
   pixel of the sheet). `rayla-low` is turned 13.5° from the sheet so she lies level, her paws and hips on the floor
   (the owner, 2026-11-11: she looked to hover).
-- **Moonpie** (`moonpie-…`, brown and white with blue eyes) has seven poses from the same sheet, named as Rayla's are:
-  `moonpie-sit`, `-crouch`, `-leap`, `-dive`, `-bound`, `-low` and `-crouch2`. They're in `cats/` for later, not for
-  Pounce Up (the owner, 2026-11-11). She was first noted as a cuddly cat rather than one for action games.
+- **Moonpie** (`moonpie-…`, brown and white with blue eyes; she's a she) has seven poses from the same sheet, named as Rayla's are:
+  `moonpie-sit`, `-crouch`, `-leap`, `-dive`, `-bound`, `-low` and `-crouch2`. Not for Pounce Up (the owner, 2026-11-11).
+  **Her personality:** she cuddles you and keeps you company while you play games (the owner, 2026-11-13: very sweet; have
+  that come through). So she's a companion, never a cat who bats things away or chases: she purrs, blinks slowly, leans on
+  you and is proud of you. She's the star of Swap-a-Pom (in beta): `moonpie-sit` beside the title; `moonpie-low` lying along
+  the tray's top edge, turned 15° so she lies level on the rim (she trembles in a tiny purr at every word, rather than
+  bouncing: the owner's call); and `moonpie-crouch2`, looking up at you, on the gold-paw card. **Her purr** is in `cats/` too,
+  `moonpie-purr.mp3`: the owner's own recording of her (2026-11-03), only trimmed, made into a 13.8-second loop and turned
+  up. There's a fan in the background, but the owner liked it better than every cleaned-up version (noise removal made her
+  sound watery), so it stays as recorded. Any game can use it.
 - **Ferguson** (`ferguson-…`, a fluffy black cat with yellow eyes) has nine poses from the same sheet, the same set
-  as Rayla's: `ferguson-sit`, `-crouch`, `-startled`, `-leap`, `-basket`, `-dive`, `-low`, `-bound` and `-crouch2`. In
-  `cats/` for later, not for Pounce Up.
+  as Rayla's: `ferguson-sit`, `-crouch`, `-startled`, `-leap`, `-basket`, `-dive`, `-low`, `-bound` and `-crouch2`. Not
+  for Pounce Up. Ferguson is to be the star of Boing! (the owner, 2026-11-13; the game isn't on the site yet, see `TODO.md`): in
+  the preview `ferguson-sit` is beside the title, `ferguson-basket` waits on a cupboard for the yarn, and `ferguson-leap`
+  is on the gold-paw card.
 
 Purrmutation has no star cat: its cats are shuffled too. Each puzzle draws one of 21 big, whole pictures as large as fits on a patchwork quilt and cuts the picture into pieces: the general cats `c14-34`, `c14-35`, `c14-36`, `c15-5`, `c15-6` (curled up), `c15-38` and `c14-63` (sitting), and the named cats `bowtie-6`, `bugsy-4`, `bugsy-6`, `bugsy-bowtie-boxes`, `crunch-4` to `crunch-7`, `dottie-5`, `dottie-22`, `laya-2`, `laya-3`, `laya-4` and `laya-7` (the list `PICS` in `catshuffle/index.html`). The win card names a named cat ("Crunch is back in the picture"), and the gold-paw card shows the finished picture.
 

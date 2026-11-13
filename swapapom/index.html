@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Swap-a-Pom</title>
+<!-- In beta: not on the front page yet (games.js, BETA), and kept out of search engines until it's finished -->
+<meta name="robots" content="noindex">
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-11-13.1"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<meta name="theme-color" content="#ECEEE7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1F1C24" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-11-13.1">
+<style>
+/* A craft tray of letter pompoms, one in each round well. Swap two side by side to spell a word across or down.
+   Moonpie lies along the top of the tray keeping you company: she purrs at every word and gathers the pompoms up. */
+.title{display:flex;align-items:flex-end;gap:8px}
+.moon{display:block;height:64px;width:auto;margin-bottom:-4px}
+@media (max-height:760px){.moon{height:48px}}
+.status .info{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;min-width:0}
+.chip{display:inline-flex;align-items:center;height:26px;padding:0 10px;border:2px solid var(--ink);border-radius:999px;
+  background:var(--panel);font-variant-numeric:tabular-nums;white-space:nowrap}
+.chip.low{background:color-mix(in srgb,#ECA818 70%,white)}
+.chip.out{background:color-mix(in srgb,#E16A4A 60%,white)}
+@media (prefers-color-scheme:dark){.chip.low,.chip.out{color:#2A2530}}
+/* the points: a bar filling up to the level's goal */
+.meter{width:var(--board);display:flex;align-items:center;gap:10px;font-weight:800;font-variant-numeric:tabular-nums;
+  font-size:calc(16px*var(--ts))}
+.meter .bar0{flex:1;height:14px;border:2px solid var(--ink);border-radius:999px;background:var(--panel);overflow:hidden}
+.meter .fill{height:100%;width:0;background:#ECA818;transition:width .4s}
+.meter.done .fill{background:#6AA673}
+/* Moonpie, lying along the tray's top edge at its right-hand corner: her lying picture is turned 15° so her belly
+   lies level on the rim. She's in the tray's box (.wrap), so she stays on the rim whatever the screen; the points bar
+   above keeps clear of her. On a phone held sideways the box makes room above the tray for her (--rim). */
+.wrap{--rim:0px;--pic:56px}
+.meter{padding-right:96px}
+.lounge{all:unset;position:absolute;right:4px;bottom:calc(100% - var(--rim) - var(--pic) * .3);z-index:5;cursor:pointer;rotate:15deg;
+  transform-origin:50% 100%;-webkit-tap-highlight-color:transparent}
+.lounge img{display:block;height:var(--pic);width:auto;pointer-events:none}
+/* she's a button that's pressed while the sound is on; the shared style for a pressed button (ink behind it) isn't for her */
+.wrap .lounge[aria-pressed]{background:none;color:inherit}
+.lounge:focus-visible{outline:3px solid #73A7AE;outline-offset:2px;border-radius:12px}
+/* a purr: she trembles all over, a tiny fast shake (no bounce), for as long as the purr lasts (--purrs: how many shakes) */
+.lounge.purr{animation:purr .07s linear var(--purrs,14)}
+@keyframes purr{25%{transform:translate(.9px,-.5px)} 50%{transform:translate(-.7px,.4px)} 75%{transform:translate(.6px,.6px)}}
+.heart{position:absolute;bottom:calc(100% - var(--rim) + var(--pic) * .45);z-index:6;pointer-events:none;font-size:18px;color:#B94588;
+  animation:heart 1.3s ease-out forwards}
+@keyframes heart{to{transform:translate(var(--dx),-46px) scale(1.25);opacity:0}}
+@media (orientation:landscape) and (max-height:500px){
+  body:not(.full) main > .wrap.stage{--rim:34px;--pic:44px;padding-top:var(--rim);height:calc(var(--board) + var(--rim));
+    --board:min(58vw,calc(var(--high) - var(--rim)))}
+  body:not(.full) .meter{padding-right:0}
+}
+.wrap canvas{display:block;width:100%;height:100%;touch-action:none;user-select:none;-webkit-user-select:none;cursor:pointer;outline:none}
+.found{width:var(--board);margin-top:2px}
+.found h2{font-size:calc(16px*var(--ts));margin:0 0 4px;text-align:center}
+.found p{margin:0;text-align:center;line-height:1.7;font-size:calc(17px*var(--ts))}
+.found a{display:inline-block;margin:0 4px;color:var(--ink);text-decoration:none;border-bottom:2px solid color-mix(in srgb,#B94588 45%,white);font-weight:600;white-space:nowrap}
+.found a small{opacity:.75;font-weight:600;margin-left:2px}
+.found[hidden]{display:none}
+.card img.pic{display:block;width:70%;max-width:240px;height:auto;margin:0 auto 14px}
+</style>
+</head>
+<body>
+<main>
+  <header><div class="title"><h1>Swap-a-Pom</h1><span class="beta" title="Still being made: things may change">Beta</span><img class="moon" id="moonPic" src="../cats/moonpie-sit.webp" alt="Moonpie, a brown and white cat with blue eyes, sitting"></div><div class="stripe"></div><p class="tagline">Swap the pompoms to spell words, with Moonpie for company</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status">
+    <span class="info"><span class="chip" id="swaps"></span><button class="timer" id="timer" hidden></button></span>
+    <span class="msg" id="msg" aria-live="polite"></span>
+  </div>
+  <div class="meter" id="meter"><span id="ptsTxt" aria-hidden="true"></span><span class="bar0" role="img" id="bar0"><span class="fill" id="fill"></span></span><span id="goalTxt" aria-hidden="true"></span></div>
+
+  <div class="wrap stage">
+    <canvas id="board" tabindex="0" aria-label="A craft tray of letter pompoms"></canvas>
+    <button class="lounge" id="lounge" aria-pressed="false" aria-label="Moonpie, lying on the edge of the tray to keep you company. Tap to hear her purr."><img src="../cats/moonpie-low.webp" alt=""></button>
+    <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+  </div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="restartBtn">Restart</button>
+    <button id="linkBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New tray</button>
+  </div>
+  <div class="bar toggles"><div class="opt"><label class="toggle"><input type="checkbox" id="soundTgl"><span class="sw"></span><span class="swName">Sound</span></label></div></div>
+  <section class="found" id="found" hidden><h2>Moonpie's keeping these for you</h2><p id="foundList"></p></section>
+</main>
+
+<script src="../games.js?v=2026-11-13.1"></script>
+<script>
+const $ = G.$;
+
+/* ---------- the rules (plain functions, no drawing) ---------- */
+// The tray is N pompoms across and down, each with a letter. Swap two neighbours so a word reads across (left to
+// right) or down (top to bottom); the cat bats every word away, the pompoms above drop into the gaps and new ones
+// fall in from the bag, which can spell more words.
+const N = 7, MAXW = 7;
+const VAL = {a: 1, b: 3, c: 3, d: 2, e: 1, f: 4, g: 2, h: 4, i: 1, j: 8, k: 5, l: 1, m: 3, n: 1, o: 1, p: 3, qu: 10, r: 1, s: 1, t: 1, u: 1, v: 4, w: 4, x: 8, y: 4, z: 10, "?": 0};
+// L-M-N-O-Pom's bags: Scrabble's tiles (a few more S's), and the early levels' bag of the letters most words are made of.
+const BAG = {e: 12, a: 9, i: 8, o: 8, n: 6, r: 6, t: 6, l: 4, s: 6, u: 3, d: 4, g: 3, b: 2, c: 2, m: 2, p: 2, f: 2, h: 2, v: 2, w: 2, y: 2, k: 1, j: 1, x: 1, qu: 1, z: 1};
+const EASY_BAG = {e: 12, a: 9, i: 8, o: 8, n: 7, r: 7, t: 7, l: 5, s: 7, u: 4, d: 5, g: 2, b: 1, c: 4, m: 4, p: 4, f: 1, h: 2, v: 1, w: 1, y: 3, k: 1, j: 0, x: 0, qu: 0, z: 0};
+const mulberry = s => () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+// Letters for a seed, one shuffled bag after another, so vowels and consonants stay in balance. easy 1 is the early
+// bag, 0 Scrabble's; gold is how often a pompom counts its letter twice (2L), maple how often it doubles the word (2W).
+function letterStream(seed, lv) {
+  const rnd = mulberry(seed); let bag = [];
+  return () => {
+    if (!bag.length) {
+      for (const [l, c] of Object.entries(BAG)) for (let i = Math.round(c + (EASY_BAG[l] - c) * lv.easy); i > 0; i--) bag.push(l);
+      for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [bag[i], bag[j]] = [bag[j], bag[i]]; }
+    }
+    const l = bag.pop(), r = rnd();
+    return {l, k: r < lv.gold ? 1 : r < lv.gold + lv.maple ? 2 : 0};
+  };
+}
+// Whether the pompoms spell a word, a fluffball ("?") standing for any letter; returns the word or null.
+function spells(tiles, dict) {
+  if (!tiles.some(t => t.l === "?")) { const w = tiles.map(t => t.l).join(""); return dict.has(w) ? w : null; }
+  if (tiles.filter(t => t.l === "?").length > 2) return null;
+  const go = (i, acc) => {
+    if (i === tiles.length) return dict.has(acc) ? acc : null;
+    if (tiles[i].l !== "?") return go(i + 1, acc + tiles[i].l);
+    for (const c of "eariotnslcudpmhgbfywkvxzjq") { const r = go(i + 1, acc + c); if (r) return r; }
+    return null;
+  };
+  return go(0, "");
+}
+// A word's points, Scrabble style: its letters (a 2L pompom's twice), doubled for each 2W pompom, times
+// (length - 2), so a longer word is worth much more.
+function wordScore(tiles) {
+  let s = 0, m = 1;
+  for (const t of tiles) { s += VAL[t.l] * (t.k === 1 ? 2 : 1); if (t.k === 2) m *= 2; }
+  return s * m * Math.max(1, tiles.length - 2);
+}
+// The cells of row a (dir 0) or column a (dir 1), in reading order.
+const line = (dir, a) => [...Array(N).keys()].map(x => dir ? x * N + a : a * N + x);
+// The words in a line: the set of words that don't overlap worth the most points (as in L-M-N-O-Pom).
+function lineWords(g, cells, dict) {
+  const n = cells.length, best = Array(n + 1).fill(null); best[n] = {pts: 0, words: []};
+  for (let i = n - 1; i >= 0; i--) {
+    let b = best[i + 1];
+    for (let j = i + 3; j <= Math.min(n, i + MAXW); j++) {
+      const tiles = cells.slice(i, j).map(c => g[c]);
+      if (tiles.some(t => !t)) break;
+      const w = spells(tiles, dict); if (!w) continue;
+      const pts = wordScore(tiles), cand = {pts: pts + best[j].pts, words: [{cells: cells.slice(i, j), word: w, pts}, ...best[j].words]};
+      if (cand.pts > b.pts) b = cand;
+    }
+    best[i] = b;
+  }
+  return best[0].words;
+}
+// Every word on the tray, or only those in the lines through some cells. A pompom can be in a word across and a word
+// down at once, and counts in both.
+function wordsOn(g, dict, through) {
+  const out = [];
+  for (let dir = 0; dir < 2; dir++) for (let a = 0; a < N; a++) {
+    if (through && !through.some(i => (dir ? i % N : Math.floor(i / N)) === a)) continue;
+    for (const w of lineWords(g, line(dir, a), dict)) if (!through || w.cells.some(c => through.includes(c))) out.push(w);
+  }
+  return out;
+}
+function swapCells(g, a, b) { const t = g[a]; g[a] = g[b]; g[b] = t; }
+const neighbours = (a, b) => Math.abs(a - b) === N || (Math.abs(a - b) === 1 && Math.floor(a / N) === Math.floor(b / N));
+// Every swap that spells a word, with what it's worth straight away (not counting what falls in after), best first.
+function allMoves(g, dict) {
+  const out = [];
+  for (let i = 0; i < N * N; i++) for (const j of [i % N < N - 1 ? i + 1 : -1, i + N < N * N ? i + N : -1]) {
+    if (j < 0) continue;
+    if (g[i].l === g[j].l && g[i].k === g[j].k) continue;
+    swapCells(g, i, j); const ws = wordsOn(g, dict, [i, j]); swapCells(g, i, j);
+    if (ws.length) out.push({a: i, b: j, words: ws, pts: ws.reduce((s, w) => s + w.pts, 0)});
+  }
+  return out.sort((x, y) => y.pts - x.pts || x.words[0].word.length - y.words[0].word.length);
+}
+function findMove(g, dict) {
+  for (let i = 0; i < N * N; i++) for (const j of [i % N < N - 1 ? i + 1 : -1, i + N < N * N ? i + N : -1]) {
+    if (j < 0) continue;
+    swapCells(g, i, j); const ok = wordsOn(g, dict, [i, j]).length; swapCells(g, i, j);
+    if (ok) return [i, j];
+  }
+  return null;
+}
+// A word ends at cell i (across or down) in a tray filled in reading order up to i.
+function endsWord(g, i, dict) {
+  const x = i % N, y = Math.floor(i / N);
+  for (let len = 3; len <= MAXW; len++) {
+    if (x - len + 1 >= 0 && spells([...Array(len).keys()].map(k => g[i - len + 1 + k]), dict)) return true;
+    if (y - len + 1 >= 0 && spells([...Array(len).keys()].map(k => g[i - (len - 1 - k) * N]), dict)) return true;
+  }
+  return false;
+}
+// A fresh tray with no word spelled yet and at least one swap that spells one.
+function newTray(next, dict) {
+  for (let tries = 0; ; tries++) {
+    const g = [];
+    for (let i = 0; i < N * N; i++) {
+      let t, n = 0;
+      do { t = next(); g[i] = t; } while (endsWord(g, i, dict) && ++n < 30);
+    }
+    if (findMove(g, dict) || tries > 50) return g;
+  }
+}
+// Pompoms drop to fill the gaps and new ones fall in from the bag. Returns the new pompoms with how far above the
+// tray each starts. The new ones are drawn so they don't spell a word by themselves (a pompom that would is put back
+// for the next one, up to a few times), so a chain comes from what the player's word knocked down, not from luck.
+function dropDown(g, next, dict) {
+  const fresh = [], spare = [];
+  for (let c = 0; c < N; c++) {
+    let w = N - 1;
+    for (let r = N - 1; r >= 0; r--) { const t = g[r * N + c]; if (t) { g[r * N + c] = null; g[w * N + c] = t; w--; } }
+    const gap = w + 1;
+    for (; w >= 0; w--) fresh.push([w * N + c, gap]);
+  }
+  const draw = () => spare.length ? spare.shift() : next();
+  for (const [i] of fresh) {
+    let t = draw();
+    for (let n = 0; n < 12; n++) {
+      g[i] = t;
+      if (!dict || !wordsOn(g, dict, [i]).some(w => w.cells.includes(i))) break;
+      const t2 = next(); spare.push(t); t = t2;
+    }
+    g[i] = t;
+  }
+  return fresh.map(([i, gap]) => [g[i], gap]);
+}
+// Shake the tray when no swap is left: the same pompoms, in a new order with no word spelled and a swap to make.
+function shake(g, dict, rnd) {
+  for (let tries = 0; tries < 400; tries++) {
+    const o = g.slice();
+    for (let i = o.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [o[i], o[j]] = [o[j], o[i]]; }
+    if (!wordsOn(o, dict).length && findMove(o, dict)) return o;
+  }
+  return null;
+}
+// What one round of batting does: every word on the tray goes, worth its points times the round (a chain counts
+// double, then triple…). From level `fluffFrom`, a word of five or more leaves a fluffball behind, where the swapped
+// pompom was (or in the middle of the word), which can be any letter.
+function batPlan(g, dict, moved, fluff) {
+  const words = wordsOn(g, dict); if (!words.length) return null;
+  const clear = new Set(), make = [];
+  for (const w of words) w.cells.forEach(c => clear.add(c));
+  if (fluff) for (const w of words.filter(w => w.cells.length >= 5).sort((a, b) => b.cells.length - a.cells.length)) {
+    const at = w.cells.find(c => moved.includes(c) && !make.includes(c)) ?? w.cells.find((c, k) => k >= w.cells.length >> 1 && !make.includes(c));
+    if (at !== undefined) make.push(at);
+  }
+  make.forEach(c => clear.delete(c));
+  return {words, clear, make};
+}
+
+// Twelve levels, one new thing at a time: the points to reach and the swaps to do it in, how far the letters lean to
+// the common ones (easy, 1 the early bag, 0 Scrabble's), how often a pompom is gold (2L) or brick (2W), and whether
+// a word of five or more leaves a fluffball.
+const LV = [null,
+  {goal: 150, swaps: 15, easy: 1, gold: 0, maple: 0, fluff: false},
+  {goal: 200, swaps: 15, easy: 1, gold: .08, maple: 0, fluff: false},
+  {goal: 250, swaps: 15, easy: .9, gold: .07, maple: .03, fluff: false},
+  {goal: 300, swaps: 15, easy: .8, gold: .07, maple: .03, fluff: true},
+  {goal: 330, swaps: 15, easy: .6, gold: .07, maple: .03, fluff: true},
+  {goal: 350, swaps: 14, easy: .4, gold: .07, maple: .03, fluff: true},
+  {goal: 370, swaps: 14, easy: .2, gold: .06, maple: .03, fluff: true},
+  {goal: 370, swaps: 13, easy: 0, gold: .06, maple: .03, fluff: true},
+  {goal: 390, swaps: 13, easy: 0, gold: .06, maple: .03, fluff: true},
+  {goal: 400, swaps: 12, easy: 0, gold: .05, maple: .03, fluff: true},
+  {goal: 420, swaps: 12, easy: 0, gold: .05, maple: .03, fluff: true},
+  {goal: 450, swaps: 12, easy: 0, gold: .05, maple: .03, fluff: true}];
+
+/* ---------- words ---------- */
+// The shared word list's familiar and common words, three to seven letters, less a few nobody wants to see spelled
+// by chance (L-M-N-O-Pom's list). Hints prefer the familiar ones.
+const NOT = new Set("cock fags hos hoes prick rapes rapist semen boobs penis vagina scrotum slag pimp retards spastic gyp gypsy redskin squaw bimbo hooker horny nude nudes orgasm sperm erotic bitchy pussy bastard incest molest".split(" "));
+let DICT = null, FAMILIAR = null;
+const wordsReady = (async () => {
+  const w = window.WORDS_INLINE || await fetch(`../words/words.json?v=${window.SITE_BUILD || ""}`).then(r => { if (!r.ok) throw new Error("couldn't load the word list"); return r.json(); });
+  const ok = x => /^[a-z]{3,7}$/.test(x) && !NOT.has(x);
+  DICT = new Set([w.familiar, w.common].join(" ").split(" ").filter(ok));
+  FAMILIAR = new Set(w.familiar.split(" ").filter(ok));
+})();
+
+/* ---------- pictures ---------- */
+const catSrc = f => (window.CAT_SRC && window.CAT_SRC[f]) || `../cats/${f}.webp`;
+const picCache = {};
+const pic = src => picCache[src] || (picCache[src] = Object.assign(new Image(), {src}));
+const GOLD = "#ECA818", MAPLE = "#BD5538", INK = "#2A2530";
+// a tint of a palette colour: f of the way to white
+const tint = (hex, f) => "#" + [1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * (1 - f) + 255 * f).toString(16).padStart(2, "0")).join("");
+// Pompoms, as in L-M-N-O-Pom: Spelling String's pompom photo tinted to one of the site's colours, plain letters in
+// pacific blue, plum, sage, lime, lavender and periwinkle, a 2L pompom gold and a 2W pompom brick; the blank is Wind
+// Up's grey fluffball with googly eyes.
+const POM_SRC = window.POM_SRC || "../fuzzyspelling/pompom.webp", EYE_SRC = window.EYE_SRC || "../fuzzyspelling/eye.webp";
+const POM_PLAIN = ["#73A7AE", "#B94588", "#6AA673", "#B3B94B", "#8D78AD", "#7885BA"];
+const tints = {};
+function tinted(hex) {
+  if (tints[hex]) return tints[hex];
+  const im = pic(POM_SRC); if (!(im.complete && im.naturalWidth)) return null;
+  const c = document.createElement("canvas"); c.width = c.height = 160; const x = c.getContext("2d"); x.drawImage(im, 0, 0, 160, 160);
+  if (hex) {
+    const d = x.getImageData(0, 0, 160, 160), m = [1, 3, 5].map(i => Math.min(1, parseInt(hex.slice(i, i + 2), 16) / 255 * 1.22));
+    for (let i = 0; i < d.data.length; i += 4) for (let k = 0; k < 3; k++) d.data[i + k] *= m[k];
+    x.putImageData(d, 0, 0);
+  }
+  return tints[hex] = c;
+}
+// One pompom at x, y (its middle), s across, turned its own way.
+function drawPom(c, t, x, y, s, alpha = 1) {
+  c.save(); c.globalAlpha = alpha; c.translate(x, y);
+  const blank = t.l === "?", im = tinted(blank ? "" : t.k === 1 ? GOLD : t.k === 2 ? MAPLE : POM_PLAIN[(t.id || 0) % POM_PLAIN.length]);
+  if (im) { c.save(); c.rotate(((t.id || 0) * 47 % 360) * Math.PI / 180 + (t.spin || 0)); c.drawImage(im, -s * .56, -s * .56, s * 1.12, s * 1.12); c.restore(); }
+  else { c.beginPath(); c.arc(0, 0, s * .46, 0, 7); c.fillStyle = blank ? "#B4AEBB" : t.k === 1 ? GOLD : t.k === 2 ? MAPLE : POM_PLAIN[(t.id || 0) % POM_PLAIN.length]; c.fill(); }
+  if (blank) {
+    const eye = pic(EYE_SRC);
+    if (eye.complete && eye.naturalWidth) for (const dx of [-1, 1]) { c.save(); c.translate(dx * s * .18, -s * .04); c.rotate(((t.id || 0) * 97 + dx * 13) % 360 * Math.PI / 180); c.drawImage(eye, -s * .15, -s * .15, s * .3, s * .3); c.restore(); }
+  } else {
+    const L = t.l === "qu" ? "Qu" : t.l.toUpperCase();
+    c.font = `800 ${s * (t.l === "qu" ? .46 : .54)}px "Baloo 2", sans-serif`; c.textAlign = "center"; c.textBaseline = "middle";
+    c.lineJoin = "round"; c.lineWidth = s * .08; c.strokeStyle = "rgba(255,255,255,.55)"; c.strokeText(L, 0, s * .04);
+    c.fillStyle = INK; c.fillText(L, 0, s * .04);
+    c.font = `800 ${s * .22}px "Baloo 2", sans-serif`; c.lineWidth = s * .06; c.strokeText(VAL[t.l], s * .3, s * .32); c.fillText(VAL[t.l], s * .3, s * .32);
+    if (t.k) {
+      c.font = `800 ${s * .2}px "Baloo 2", sans-serif`; c.lineWidth = s * .04; c.strokeStyle = INK;
+      c.beginPath(); c.roundRect(-s * .5, -s * .5, s * .36, s * .24, s * .08); c.fillStyle = "#fff"; c.fill(); c.stroke();
+      c.fillStyle = INK; c.fillText(t.k === 1 ? "2L" : "2W", -s * .32, -s * .37);
+    }
+  }
+  c.restore();
+}
+
+/* ---------- game ---------- */
+// game: {level, seed, drawn (letters taken from the bag so far), board [N*N tiles {l, k, id, x, y}], swaps (left), pts,
+//        words [[word, pts]], hinted, restarted, extra (5 more swaps taken), over}
+const STORE = "catdoku.swapapom.v1", INTRO = "catdoku.swapapom.intro.v1";
+const MAX_LEVEL = LV.length - 1;
+let game = null, next = null, nextId = 1, busy = false, picked = -1, cursor = -1, now = 0, effects = [];
+// The gold paw's gone for this tray once any of these is true, and the tools that cost it lose their red (games.js).
+G.pawLost(() => !game || game.over || game.hinted || game.restarted || !!game.extra);
+const tile = t => ({l: t.l, k: t.k, id: nextId++});
+// The bag for a seed, counting the letters taken, so a saved tray carries on with the same letters.
+function bagFor(seed, level, skip = 0) {
+  const raw = letterStream(seed, LV[level]); let n = 0;
+  const f = () => { n++; return tile(raw()); };
+  for (let i = 0; i < skip; i++) f();
+  f.count = () => n;
+  return f;
+}
+const save = () => { if (!game || busy) return;
+  G.save(STORE, {level: game.level, game: game.over ? null : {level: game.level, seed: game.seed, drawn: next.count(), swaps: game.swaps, pts: game.pts,
+    words: game.words, hinted: game.hinted, restarted: game.restarted, extra: game.extra, ms: game.ms, started: game.started, timed: game.timed,
+    board: game.board.map(t => t.l + t.k)}}); };
+function place(g) { g.forEach((t, i) => { t.x = i % N; t.y = Math.floor(i / N); delete t.t0; }); }
+
+function newGame(level, seed, keep = {}) {
+  G.closeCard();
+  level = Math.min(MAX_LEVEL, Math.max(1, level));
+  seed = seed || (Math.random() * 2 ** 31) | 0;
+  next = bagFor(seed, level);
+  const board = newTray(next, DICT);
+  game = {level, N: level, seed, board, swaps: LV[level].swaps, pts: 0, words: [], hinted: !!keep.hinted, restarted: !!keep.restarted, extra: 0, over: false, ...G.freshClock()};
+  place(board); busy = false; picked = -1; effects = []; hints.clear(false); hum();
+  $("levelSel").value = level;
+  hud(); listWords(); save();
+  if (!keep.quiet) G.track(`Swap-a-Pom level ${level} started`);
+  setTimeout(meet, 400);
+}
+function reopenGame(s) {
+  if (!LV[s.level] || !Array.isArray(s.board) || s.board.length !== N * N) throw new Error("the saved tray is from another version of the game");
+  const board = s.board.map(v => { const m = /^([a-z?]|qu)([012])$/.exec(v); if (!m) throw new Error("bad pompom"); return tile({l: m[1], k: +m[2]}); });
+  next = bagFor(s.seed, s.level, s.drawn);
+  game = {level: s.level, N: s.level, seed: s.seed, board, swaps: s.swaps, pts: s.pts, words: s.words || [], hinted: !!s.hinted, restarted: !!s.restarted,
+    extra: s.extra || 0, over: false, ...G.freshClock()};
+  if (s.ms) { game.ms = s.ms; game.started = true; } if (s.timed === false) game.timed = false;
+  G.checkClock(game);
+  place(board); $("levelSel").value = s.level; hud(); listWords();
+  if (!game.swaps) outOfSwaps();
+}
+
+/* ---------- the points, the swaps and the words batted ---------- */
+function hud() {
+  const g = game, lv = LV[g.level], of = lv.swaps + 5 * g.extra;
+  G.tally($("swaps"), g.swaps, of, "🐾", `${g.swaps} of ${of} ${of === 1 ? "swap" : "swaps"} left`, true);
+  $("swaps").classList.toggle("low", g.swaps > 0 && g.swaps <= 3); $("swaps").classList.toggle("out", !g.swaps);
+  $("ptsTxt").textContent = g.pts; $("goalTxt").textContent = lv.goal;
+  $("fill").style.width = Math.min(100, g.pts / lv.goal * 100) + "%";
+  $("meter").classList.toggle("done", g.pts >= lv.goal);
+  $("bar0").setAttribute("aria-label", `${g.pts} of ${lv.goal} points`);
+}
+function listWords() {
+  const ws = game.words;
+  $("found").hidden = !ws.length;
+  $("foundList").replaceChildren(...ws.slice().reverse().map(([w, p]) => {
+    const a = document.createElement("a"); a.href = `https://en.wiktionary.org/wiki/${w}#English`; a.target = "_blank"; a.rel = "noopener";
+    a.append(w.toUpperCase()); const s = document.createElement("small"); s.textContent = p; a.append(s); return a;
+  }));
+}
+
+/* ---------- swapping ---------- */
+const sleep = s => new Promise(res => setTimeout(res, s * 1000));
+const still = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+// Slide a pompom to its well from wherever it's drawn now.
+function slide(t, i, dur) { const [x, y] = drawnAt(t); t.fx = x; t.fy = y; t.x = i % N; t.y = Math.floor(i / N); t.t0 = now; t.dur = still() ? 0.001 : dur; }
+function drawnAt(t) {
+  if (t.t0 === undefined) return [t.x, t.y];
+  const u = Math.min(1, (now - t.t0) / t.dur), e = 1 - Math.pow(1 - u, 3);
+  return [t.fx + (t.x - t.fx) * e, t.fy + (t.y - t.fy) * e];
+}
+async function trySwap(a, b) {
+  if (busy || !game || game.over || !neighbours(a, b)) return;
+  busy = true; picked = -1;
+  const g0 = game, g = game.board;
+  swapCells(g, a, b); slide(g[a], a, .16); slide(g[b], b, .16);
+  await sleep(.18);
+  if (game !== g0) return;
+  // Every swap counts. With no word, the pompoms stay where they were put (a way to set up a word for later), but
+  // the swap is used all the same.
+  game.swaps--; hud();
+  if (!wordsOn(g, DICT, [a, b]).length) G.note(`No word, but the swap stays. ${pickOf(NUDGES)} ${game.swaps} ${game.swaps === 1 ? "swap" : "swaps"} left.`, 3500);
+  else if (!await bat([a, b])) return;
+  busy = false;
+  afterSwap();
+}
+const CHEERS = ["Chain!", "Double chain!", "Triple chain!", "Paws-itively amazing!"];
+/* ---------- Moonpie ---------- */
+// Moonpie's here to keep you company: she lies on the edge of the tray, purrs at every word (hearts float up, more of
+// them for a longer word), gathers up the pompoms, and has something kind to say whatever happens.
+const pickOf = xs => xs[Math.floor(Math.random() * xs.length)];
+const PURRS = ["Moonpie purrs.", "Moonpie gives you a slow blink.", "Moonpie tucks her paws in, content.", "Moonpie's tail swishes happily.",
+  "Moonpie purrs a little louder.", "Moonpie leans against your arm."];
+const BIG_PURRS = ["Moonpie headbutts your hand. What a word!", "Moonpie kneads the edge of the tray, purring away.",
+  "Moonpie rolls over for a belly rub. Lovely word!", "Moonpie chirps at you. She's so proud."];
+const NUDGES = ["Moonpie nudges your hand.", "Moonpie blinks at you: no rush.", "Moonpie snuggles a bit closer.", "Moonpie's still purring."];
+/* ---------- Moonpie's purr ---------- */
+// Moonpie's own purr (the owner's recording, as recorded: only made into a loop and turned up): a seamless loop, with a little of each end copied past the other so the
+// loop points sit inside real sound whatever the mp3 decoder does at the start. Off until it's turned on (Sound, or a
+// tap on Moonpie), as a browser only plays sound after a tap. While you play she purrs softly; a word makes her purr
+// louder for a moment (longer for a longer word), and a win gets a long contented purr.
+const SOUND = "catdoku.sound.v1", PURR_SRC = window.PURR_SRC || "../cats/moonpie-purr.mp3", PURR_PAD = .15, PURR_LOOP = 13.78;
+const purring = {on: !!G.load(SOUND).on, ctx: null, gain: null, base: .45};
+function purrBytes() {
+  if (!PURR_SRC.startsWith("data:")) return fetch(PURR_SRC).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); });
+  const b = atob(PURR_SRC.split(",")[1]), a = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i);
+  return Promise.resolve(a.buffer);
+}
+function wake() {   // from a tap or a key: start the sound, if it's on
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!purring.on || !AC) return;
+  if (!purring.ctx) {
+    const c = purring.ctx = new AC(); purring.gain = c.createGain(); purring.gain.gain.value = 0; purring.gain.connect(c.destination);
+    purrBytes().then(b => new Promise((ok, bad) => c.decodeAudioData(b, ok, bad))).then(buf => {
+      const s = c.createBufferSource(); s.buffer = buf; s.loop = true; s.loopStart = PURR_PAD; s.loopEnd = PURR_PAD + PURR_LOOP;
+      s.connect(purring.gain); s.start(0, PURR_PAD); swell(.9, 1.6);   // a hello purr as she starts
+    }).catch(() => G.note("Moonpie's purr didn't load.", 3000));
+  }
+  if (purring.ctx.state !== "running") purring.ctx.resume();
+  hum();
+}
+// How loud she purrs now: softly while you play; not at all with the sound off, the page hidden or the tray done.
+const quietNow = () => !purring.on || document.hidden || !game || game.over;
+function hum() {
+  const c = purring.ctx; if (!c) return;
+  const g = purring.gain.gain; g.cancelScheduledValues(c.currentTime); g.setTargetAtTime(quietNow() ? 0 : purring.base, c.currentTime, .35);
+}
+function swell(peak, secs) {
+  const c = purring.ctx; if (!c || !purring.on) return;
+  const g = purring.gain.gain, t = c.currentTime;
+  g.cancelScheduledValues(t); g.setTargetAtTime(peak, t, .08); g.setTargetAtTime(quietNow() ? 0 : purring.base, t + secs, .6);
+}
+function setSound(on, say = true) {
+  purring.on = on; G.save(SOUND, {on}); $("soundTgl").checked = on; $("lounge").setAttribute("aria-pressed", on);
+  if (on) { wake(); swell(.9, 1.6); } else hum();
+  if (say) G.note(on ? "Moonpie purrs for you. (Sound on)" : "Moonpie purrs quietly to herself. (Sound off)", 3000);
+}
+$("soundTgl").checked = purring.on; $("lounge").setAttribute("aria-pressed", purring.on);
+$("soundTgl").onchange = e => setSound(e.target.checked);
+$("lounge").onclick = () => { purr(3); setSound(!purring.on); };
+addEventListener("pointerdown", wake, true); addEventListener("keydown", wake, true);
+document.addEventListener("visibilitychange", hum);
+function purr(longest) {
+  const secs = .9 + .45 * Math.max(0, longest - 3);
+  swell(Math.min(1, .8 + .05 * Math.max(0, longest - 3)), secs);
+  const im = $("lounge"); im.style.setProperty("--purrs", Math.round(secs / .07)); im.classList.remove("purr"); void im.offsetWidth; im.classList.add("purr");
+  if (!still()) for (let k = 0; k < Math.min(4, longest - 2); k++) {
+    const h = document.createElement("span"); h.className = "heart"; h.textContent = "♥"; h.setAttribute("aria-hidden", "true");
+    h.style.right = `${56 + k * 6}px`; h.style.setProperty("--dx", `${(k - 1.5) * 12}px`); h.style.animationDelay = `${k * .15}s`;
+    $("lounge").after(h); setTimeout(() => h.remove(), 1600 + k * 150);
+  }
+}
+// Every word on the tray goes: Moonpie gathers its pompoms up to her, and the pompoms above drop and new ones fall
+// in, which may spell more (a chain: the second round's words count double, the third's triple…). False if a new
+// tray was dealt meanwhile.
+async function bat(moved) {
+  const g0 = game, g = game.board; let round = 0, plan;
+  while ((plan = batPlan(g, DICT, round ? [] : moved, LV[game.level].fluff))) {
+    round++;
+    const dur = still() ? .05 : .6, most = Math.max(...plan.words.map(w => w.cells.length));
+    purr(most);
+    if (round === 1) G.note(pickOf(most >= 5 ? BIG_PURRS : PURRS), 3000);
+    for (const w of plan.words) {
+      const p = w.pts * round; game.pts += p; game.words.push([w.word, p]);
+      const cx = w.cells.reduce((s, c) => s + c % N, 0) / w.cells.length, cy = w.cells.reduce((s, c) => s + Math.floor(c / N), 0) / w.cells.length;
+      effects.push({type: "pts", text: `+${p} ${w.word.toUpperCase()}`, x: cx, y: cy, t0: now + dur * .5, dur: 1.2});
+    }
+    if (round >= 2) effects.push({type: "cheer", text: CHEERS[Math.min(round - 2, CHEERS.length - 1)], t0: now, dur: 1.1});
+    [...plan.clear].forEach((c, k) => {   // each pompom floats up to Moonpie, one after another
+      const t = g[c], [x, y] = drawnAt(t);
+      effects.push({type: "pop", t, x, y, t0: now + k * .05, dur: .55});
+      g[c] = null;
+    });
+    for (const c of plan.make) { const t = g[c]; t.l = "?"; t.k = 0; t.born = now; made.push(t); }
+    hud(); listWords();
+    await sleep(dur + .1);
+    if (game !== g0) return false;
+    const fresh = new Map(dropDown(g, next, DICT));
+    let longest = 0;
+    g.forEach((t, i) => {
+      if (fresh.has(t)) { t.x = i % N; t.y = Math.floor(i / N) - fresh.get(t); delete t.t0; }
+      const [, y] = drawnAt(t), dist = Math.floor(i / N) - y;
+      if (dist > .01) { const d = .1 + .07 * Math.sqrt(dist * 6); longest = Math.max(longest, d); slide(t, i, d); }
+    });
+    await sleep(still() ? .05 : longest + .05);
+    if (game !== g0) return false;
+  }
+  return true;
+}
+function afterSwap() {
+  save();
+  if (game.pts >= LV[game.level].goal) return win();
+  if (!game.swaps) return outOfSwaps();
+  if (!findMove(game.board, DICT)) {
+    const o = shake(game.board, DICT, Math.random);
+    if (o) { G.note("No word to make, so the tray gets a shake.", 3000); game.board = o; o.forEach((t, i) => slide(t, i, .45)); save(); }
+  }
+  meet();
+}
+function win() {
+  game.over = true;
+  G.track(`Swap-a-Pom level ${game.level} done`);
+  swell(1, 5);
+  const result = G.finishClock(game), g = game, helped = g.hinted || g.extra;
+  const nxt = helped ? g.level : Math.min(MAX_LEVEL, g.level + 1);
+  G.save(STORE, {level: nxt});
+  const spare = g.swaps ? ` with ${g.swaps} ${g.swaps === 1 ? "swap" : "swaps"} to spare` : " on the very last swap";
+  const text = g.hinted ? `${g.pts} points${spare}. You had a hint, so here's another at level ${nxt}.`
+    : g.extra ? `${g.pts} points${spare}. You had 5 more swaps, so here's another at level ${nxt}.`
+    : nxt > g.level ? `${g.pts} points${spare}. Next up: level ${nxt}.` : `${g.pts} points${spare}. That's the hardest level; next up is another one.`;
+  const im = new Image(); im.className = "pic"; im.src = catSrc("moonpie-crouch2"); im.alt = "Moonpie looking up at you, so proud";
+  setTimeout(() => game === g && G.winCard(text, () => newGame(nxt), "Admire my tray", result, {title: "Purr-fect!", gold: !helped && !g.restarted,
+    goldWhy: "No hints or restarts!", goldTitle: "Moonpie's so proud of you!", goldPic: [im], lines: [pickOf(["Moonpie's purring her heart out.", "Moonpie snuggles up beside you.", "Moonpie gives you a slow, happy blink."])], next: nxt > g.level ? `Next: level ${nxt}` : "Next tray",
+    after: G.otherSize($("levelSel"), nxt, newGame, "Or play a different level:")}), 900);
+}
+function outOfSwaps() {
+  G.breakStreak();
+  game.over = true; save(); hum();
+  G.track(`Swap-a-Pom out of swaps on level ${game.level}`);
+  const lv = LV[game.level], btns = [];
+  if (!game.extra) btns.push(["5 more swaps", () => { G.closeCard(); game.extra++; game.swaps += 5; game.over = false; hud(); save(); hum(); }, true]);
+  btns.push(["Try again", () => newGame(game.level, 0, {hinted: game.hinted}), !btns.length], G.homeBtn());
+  G.loseCard("Out of swaps!", `${game.pts} of ${lv.goal} points, ${lv.goal - game.pts} short. Moonpie curls up beside you: one more go?`, btns, null,
+    G.otherSize($("levelSel"), game.level, newGame, "Or play a different level:"), {result: {n: game.level}});
+}
+
+/* ---------- drawing ---------- */
+const canvas = $("board"), ctx = canvas.getContext("2d");
+const CELL = 50, PAD = 14, W = N * CELL + PAD * 2;
+const TRAY = tint("#73A7AE", .62), WELL = tint("#73A7AE", .42), RIM = "#4E577D";
+let scale = 1;
+const hints = G.hinter({game: () => game, key: () => game ? game.board.map(t => t ? t.l + t.k : "").join() : "", draw: () => {}});   // marks {pair: [a, b]}
+const mid = i => [PAD + (i % N + .5) * CELL, PAD + (Math.floor(i / N) + .5) * CELL];
+function ring(i, colour, w, r = .47) { const [x, y] = mid(i); ctx.beginPath(); ctx.arc(x, y, CELL * r, 0, 7); ctx.strokeStyle = colour; ctx.lineWidth = w; ctx.stroke(); }
+function draw() {
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  ctx.clearRect(0, 0, W, W);
+  // the tray: a plastic craft tray with a round well for each pompom
+  ctx.beginPath(); ctx.roundRect(2, 2, W - 4, W - 4, 22); ctx.fillStyle = TRAY; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = RIM; ctx.stroke();
+  for (let i = 0; i < N * N; i++) {
+    const [x, y] = mid(i);
+    ctx.beginPath(); ctx.arc(x, y, CELL * .45, 0, 7); ctx.fillStyle = WELL; ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y + 1.5, CELL * .45, Math.PI * 1.1, Math.PI * 1.9); ctx.strokeStyle = "rgba(42,37,48,.18)"; ctx.lineWidth = 2; ctx.stroke();
+  }
+  if (!game) return;
+  const mark = hints.current();
+  if (mark) for (const i of mark.pair) { ring(i, "#ECA818", 5, .5); if (!still()) ring(i, `rgba(236,168,24,${.35 + .35 * Math.sin(now * 6)})`, 9, .5); }
+  if (picked >= 0) ring(picked, "#ECA818", 4, .5);
+  game.board.forEach(t => {
+    if (!t) return;
+    const [x, y] = drawnAt(t), grow = t.born !== undefined ? Math.min(1, (now - t.born) / .3) : 1;
+    drawPom(ctx, t, PAD + (x + .5) * CELL, PAD + (y + .5) * CELL, CELL * .88 * (.4 + .6 * grow));
+  });
+  if (cursor >= 0) ring(cursor, G.CURSOR, 4, .52);
+  effects = effects.filter(e => now < e.t0 + e.dur + (e.type === "pop" ? 1 : 0));
+  for (const e of effects) {
+    const u = (now - e.t0) / e.dur; if (u < 0) { if (e.type === "pop") drawPom(ctx, e.t, PAD + (e.x + .5) * CELL, PAD + (e.y + .5) * CELL, CELL * .88); continue; }
+    if (e.type === "pop" && u < 1) {   // gathered up: it floats up to Moonpie on the top right edge of the tray, shrinking
+      const v = u * u * (3 - 2 * u), tx = N - 1.2, ty = -.6;
+      e.t.spin = u * 3;
+      drawPom(ctx, e.t, PAD + (e.x + .5 + (tx - e.x) * v) * CELL, PAD + (e.y + .5 + (ty - e.y) * v - Math.sin(u * Math.PI) * .8) * CELL, CELL * .88 * (1 - u * .6), u > .75 ? (1 - u) / .25 : 1);
+    } else if (e.type === "pts" && u < 1) {
+      ctx.save(); ctx.globalAlpha = u > .7 ? (1 - u) / .3 : 1; ctx.font = `800 20px "Baloo 2", sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      const x = Math.max(70, Math.min(W - 70, PAD + (e.x + .5) * CELL)), y = PAD + (e.y + .5) * CELL - u * 26;
+      ctx.lineJoin = "round"; ctx.lineWidth = 6; ctx.strokeStyle = INK; ctx.strokeText(e.text, x, y); ctx.fillStyle = "#FFF4D2"; ctx.fillText(e.text, x, y); ctx.restore();
+    } else if (e.type === "cheer" && u < 1) {
+      const sz = 40 * (u < .15 ? .6 + u / .15 * .4 : 1);
+      ctx.save(); ctx.globalAlpha = u > .7 ? (1 - u) / .3 : 1; ctx.font = `800 ${sz}px "Baloo 2", sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.lineJoin = "round"; ctx.lineWidth = 8; ctx.strokeStyle = INK; ctx.strokeText(e.text, W / 2, W / 2 - u * 30); ctx.fillStyle = "#FFF4D2"; ctx.fillText(e.text, W / 2, W / 2 - u * 30); ctx.restore();
+    }
+  }
+}
+function resize() {
+  const r = canvas.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  if (!r.width) return;
+  canvas.width = canvas.height = Math.round(r.width * dpr); scale = canvas.width / W;
+}
+new ResizeObserver(resize).observe(canvas);
+let last = performance.now();
+function loop(t) { now += Math.min(.05, (t - last) / 1000); last = t; draw(); requestAnimationFrame(loop); }
+// The tray in words, for VoiceOver, twice a second: each row's letters, the gold, brick and fluffball ones named.
+const say1 = t => !t ? "empty" : t.l === "?" ? "fluffball" : (t.l === "qu" ? "Qu" : t.l.toUpperCase()) + (t.k === 1 ? " gold" : t.k === 2 ? " brick" : "");
+setInterval(() => {
+  if (!game) return;
+  const rows = [...Array(N).keys()].map(r => `row ${r + 1}: ${game.board.slice(r * N, r * N + N).map(say1).join(", ")}`);
+  G.describe(canvas, `A tray of letter pompoms, ${N} by ${N}. ${G.listed(rows, "; ")}.${picked >= 0 ? ` Picked: ${G.at(picked, N)}.` : ""} Arrow keys move, Space picks a pompom and then a neighbour to swap with.`);
+}, 500);
+
+/* ---------- input ---------- */
+// Drag a pompom onto a neighbour, or tap one and then the other.
+let press = null;
+const cellAtPoint = e => {
+  const r = canvas.getBoundingClientRect(), x = Math.floor(((e.clientX - r.left) / r.width * W - PAD) / CELL), y = Math.floor(((e.clientY - r.top) / r.height * W - PAD) / CELL);
+  return x >= 0 && x < N && y >= 0 && y < N ? y * N + x : -1;
+};
+canvas.addEventListener("pointerdown", e => {
+  if (!game || game.over || busy) return;
+  const i = cellAtPoint(e); if (i < 0) return;
+  e.preventDefault(); cursor = -1;
+  try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+  press = {i, x: e.clientX, y: e.clientY};
+});
+canvas.addEventListener("pointermove", e => {
+  if (!press) return;
+  const r = canvas.getBoundingClientRect(), dx = e.clientX - press.x, dy = e.clientY - press.y, far = r.width / N * .35;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < far) return;
+  const i = press.i, c = i % N, j = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? (c < N - 1 ? i + 1 : -1) : (c > 0 ? i - 1 : -1)) : (dy > 0 ? i + N : i - N);
+  press = null;
+  if (j >= 0 && j < N * N) trySwap(i, j);
+});
+canvas.addEventListener("pointerup", () => { if (!press) return; const i = press.i; press = null; tapCell(i); });
+canvas.addEventListener("pointercancel", () => { press = null; });
+function tapCell(i) {
+  if (picked >= 0 && neighbours(picked, i)) return trySwap(picked, i);
+  picked = picked === i ? -1 : i;
+}
+G.gridKeys({on: () => game && !game.over && !busy, show: i => { cursor = i; }, act: i => { if (game.timed !== false) game.started = true; tapCell(i); }, size: () => [N, N],
+  start: () => picked >= 0 ? picked : 24, escape: () => { picked = -1; }});
+
+/* ---------- hints ---------- */
+// The best swap there is (the most points straight away), keeping to familiar words where one will do. The first hint
+// outlines the two pompoms; asked again, it names the word.
+$("hintBtn").onclick = () => {
+  if (!game || game.over || busy || document.querySelector(".spot")) return;
+  const all = allMoves(game.board, DICT), fam = all.filter(m => m.words.every(w => FAMILIAR.has(w.word))), m = fam[0] || all[0];
+  if (!m) { G.note("No word to make here; the tray will get a shake.", 3000); return; }
+  if (!game.hinted) { game.hinted = true; save(); }
+  const word = m.words.map(w => w.word.toUpperCase());
+  hints.show({pair: [m.a, m.b]}, hints.level() ? `Swap the outlined pompoms to spell ${G.listed(word)}.` : "Swap the two outlined pompoms.");
+};
+
+/* ---------- buttons ---------- */
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(n === MAX_LEVEL ? `${n} (hardest)` : String(n), n));
+$("levelSel").onchange = e => newGame(+e.target.value);
+$("newBtn").onclick = () => newGame(game ? game.level : 1);
+$("restartBtn").onclick = () => { if (game) newGame(game.level, game.seed, {hinted: game.hinted, restarted: game.restarted || game.started || game.over || game.words.length > 0, quiet: true}); };
+$("linkBtn").onclick = () => { if (game) G.shareCard({name: "Swap-a-Pom", what: "tray", won: game.over && game.pts >= LV[game.level].goal, puzzle: () => ({g: "swapapom", N: game.level, s: game.seed})}); };
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : 1);
+function openShared(d) {
+  if (!(d.N >= 1 && d.N <= MAX_LEVEL) || !Number.isInteger(d.s)) throw new Error("the shared tray doesn't fit the game");
+  newGame(d.N, d.s);
+}
+
+/* ---------- how to play ---------- */
+// A real swap on the tray that's out (the best familiar one), kept: it's the player's own first move. The gold, brick
+// and fluffball pompoms each wait for How to play, or are shown the first time they turn up (meet).
+const xy = i => [i % N, Math.floor(i / N)];
+// where the wells are, in page pixels, for the walkthrough (the tray has a rim round them)
+const trayMap = () => { const r = canvas.getBoundingClientRect(), s = r.width / W; return {ox: r.left + PAD * s, oy: r.top + PAD * s, cw: CELL * s, ch: CELL * s}; };
+function special(say, k) {   // a pompom in the middle shown as gold, brick or a fluffball, just while the step is up
+  let was = null; const i = 24;
+  return {say, lit: [xy(i)], later: true, enter: () => { const t = game.board[i]; if (t) { was = [t.l, t.k]; if (k === 3) t.l = "?"; else t.k = k; } },
+    leave: () => { const t = game.board[i]; if (t && was) [t.l, t.k] = was; was = null; }};
+}
+function intro(again) {
+  if (!again && G.load(INTRO).seen) return;
+  if (!game || game.over || busy || document.querySelector(".spot")) return;
+  const all = allMoves(game.board, DICT), m = all.filter(m => m.words.every(w => FAMILIAR.has(w.word)))[0] || all[0];
+  if (!m) return;
+  const A = game.board[m.a], B = game.board[m.b];
+  hints.clear();
+  const steps = [
+    {say: `Swap these two to spell ${m.words[0].word.toUpperCase()}`, lit: [xy(m.a), xy(m.b)], try: {done: () => game.board[m.a] !== A || game.board[m.b] !== B, yes: "A word! Moonpie purrs"}},
+    {say: "Words read across or down"},
+    {say: "Longer words score far more"},
+    {say: "No word? The swap stays, and counts"},
+    {say: "Reach the goal before your swaps run out", els: [$("meter"), $("swaps")]},
+    {say: "Tap Moonpie to hear her purr", els: [$("lounge")]},
+    special("Gold 2L counts its letter twice", 1),
+    special("Brick 2W doubles the word", 2),
+    special("Five letters leave a fluffball: any letter", 3),
+    {say: "Stuck? Hint shows a swap", els: [$("hintBtn")]},
+  ];
+  G.spotlight({grid: canvas, w: N, h: N, map: trayMap,
+    steps, done: () => { const d = G.load(INTRO); G.save(INTRO, {...d, seen: true, met: again ? ["gold", "brick", "fluff"] : d.met || []}); }});
+}
+function helpCard(tries = 0) {
+  if (game && !game.over && busy && !document.querySelector(".spot")) { if (tries < 20) setTimeout(() => helpCard(tries + 1), 200); return; }
+  intro(true);
+  if (!document.querySelector(".spot")) G.helpLater();
+}
+$("helpBtn").onclick = () => helpCard();
+// The first gold or brick pompom on a tray, and the first fluffball made, are lit with what they do, one at a time.
+let made = [];
+const MEET = {gold: "Gold 2L counts its letter twice", brick: "Brick 2W doubles the word", fluff: "A fluffball can be any letter"};
+function meet() {
+  const d = G.load(INTRO), met = d.met || [];
+  if (!d.seen || !game || game.over || busy || document.querySelector(".spot")) return;
+  let what = null, i = -1;
+  const f = made.find(t => game.board.includes(t)); made = [];
+  if (f && !met.includes("fluff")) { what = "fluff"; i = game.board.indexOf(f); }
+  else for (const [k, name] of [[1, "gold"], [2, "brick"]]) if (!met.includes(name) && (i = game.board.findIndex(t => t.k === k && t.l !== "?")) >= 0) { what = name; break; }
+  if (!what || i < 0) return;
+  G.spotlight({grid: canvas, w: N, h: N, finish: false, map: trayMap,
+    steps: [{say: MEET[what], lit: [xy(i)]}], done: () => G.save(INTRO, {...G.load(INTRO), met: [...met, what]})});
+}
+// A level that brings in fluffballs says so as it starts.
+const NEWS = {4: "New: a word of five letters or more leaves a fluffball."};
+
+G.nav("swapapom");
+G.setupTimer({name: "swapapom", game: () => game, playing: g => !g.over, save, label: n => `Level ${n}`, noun: "level",
+  emptyText: "Finish a level and your times will show up here. They're kept on this device only."});
+const shareOpts = () => ({name: "Swap-a-Pom", inProgress: !!(game && !game.over && game.started), open: d => { try { openShared(d); } catch (e) { G.note("That share link didn't work.", 5000); } }});
+window.addEventListener("hashchange", () => { const d = G.readShare("swapapom"); if (d) G.offerShare(d, shareOpts()); });
+requestAnimationFrame(loop);
+wordsReady.then(() => {
+  const saved = G.load(STORE), shared = G.readShare("swapapom");
+  let opened = false;
+  if (shared) try { openShared(shared); opened = true; G.note("Here's the shared tray. Good luck!", 6000); G.track("Swap-a-Pom shared puzzle opened"); } catch (e) { G.note("That share link didn't work.", 5000); }
+  if (!opened) G.reopen(() => { if (saved.game) reopenGame(saved.game); else newGame(saved.level || 1); }, why => { newGame(saved.level || 1); G.note(why, 0); });
+  if (NEWS[game.level] && !game.started) G.note(NEWS[game.level], 6000);
+  intro();
+}).catch(e => G.note(`The word list didn't load (${e.message}). Check the connection and reload.`, 0));
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
