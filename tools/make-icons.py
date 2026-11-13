@@ -925,6 +925,28 @@ def lmnopom():
     return frame(tint("#8D78AD", .15), marm + out)
 
 
+# Swap-a-Pom: a craft tray of letter pompoms, two of them swapping (the curved arrow over them), reading CTE PIE (the owner's
+# choice, 2026-11-13), the top row lit gold, and Moonpie's face (white, with brick-brown ears and patches round her blue eyes) peeking over
+# the tray's top edge.
+def swapapom():
+    BROWN = "#824235"   # brick, a shade towards the ink
+    def pom(x, y, col, ch):
+        return (f'<circle cx="{x}" cy="{y}" r="9.5" fill="{col}" stroke="{INK}" stroke-width="1.5"/>'
+                f'<text x="{x}" y="{y + 1}" font-size="12" fill="{INK}" stroke="#fff" stroke-width="2.4" paint-order="stroke" stroke-linejoin="round" {FONT}>{ch}</text>')
+    face = catface(26, 27, 11, "#fff").split("<circle")[0]
+    face += (f'<ellipse cx="21.6" cy="27.6" rx="3.6" ry="3" fill="{BROWN}"/><ellipse cx="30.4" cy="27.6" rx="3.6" ry="3" fill="{BROWN}"/>'
+             f'<path d="M15 29.2L16.1 15.5L22.2 21Q18 24 15 29.2ZM37 29.2L35.9 15.5L29.8 21Q34 24 37 29.2Z" fill="{BROWN}" stroke="{INK}" stroke-width="2" stroke-linejoin="round"/>'
+             f'<circle cx="21.8" cy="27.8" r="1.8" fill="{TEAL}" stroke="{INK}" stroke-width=".8"/><circle cx="30.2" cy="27.8" r="1.8" fill="{TEAL}" stroke="{INK}" stroke-width=".8"/>'
+             f'<path d="M24.7 31.6L26 32.8L27.3 31.6" fill="none" stroke="{INK}" stroke-width="1.2" stroke-linecap="round"/>')
+    out = f'<rect x="9" y="36" width="82" height="56" rx="11" fill="{tint(TEAL, .35)}" stroke="{PERI}" stroke-width="3"/>'
+    out += f'<rect x="14" y="48" width="72" height="22" rx="11" fill="{tint(YELLOW, .55)}"/>'
+    out += "".join(pom(x, 59, c, ch) for x, c, ch in [(27, GREEN, "C"), (50, PERI, "T"), (73, PLUM, "E")])
+    out += "".join(pom(x, 81, c, ch) for x, c, ch in [(27, LIME, "P"), (50, TEAL, "I"), (73, GREEN, "E")])
+    # the swap: a two-headed arrow arching over T and E
+    out += (f'<path d="M51 46Q61.5 34 72 46" fill="none" stroke="{INK}" stroke-width="2.2" stroke-linecap="round"/>'
+            f'<path d="M50.2 41.2L51 46.2L55.6 44.3M72.8 41.2L72 46.2L67.4 44.3" fill="none" stroke="{INK}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>')
+    return frame(tint("#8D78AD", .15), out + face)
+
 # Window Ledges: a brick wall with arched windows, three of them lit gold with a digit, the rest dark, and two white
 # shutters (the clue squares) with their totals, in the game's colours.
 def windowledges():
@@ -1122,7 +1144,7 @@ def pounceup():
 ICONS = {"catdoku": catdoku, "pounceup": pounceup, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "daylight": daylight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle, "mewhue": mewhue, "pawlinko": pawlinko, "crossstitch": crossstitch, "junkdrawer": junkdrawer, "zoomies": zoomies, "blanket": blanket, "bedhog": bedhog}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "daylight": daylight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle, "mewhue": mewhue, "pawlinko": pawlinko, "crossstitch": crossstitch, "junkdrawer": junkdrawer, "zoomies": zoomies, "blanket": blanket, "bedhog": bedhog, "swapapom": swapapom}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")

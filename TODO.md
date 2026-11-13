@@ -115,6 +115,32 @@ it joins `GAMES` (and the front page):
   and the full test list;
 - then move its row from `BETA` to `GAMES` (with the date it joins) and take the beta label off the page.
 
+## Swap-a-Pom: finish the beta
+
+Swap-a-Pom went up as an unlisted beta on 2026-11-13 (`swapapom/`, in `BETA` in `games.js`). Before it joins `GAMES` (and
+the front page):
+- the owner plays it, and the level goals are tuned from that (they were set with simulated players, who never make a
+  swap with no word, which the owner's rule now allows);
+- **Sound, for the whole site.** Moonpie's purr is the site's first sound. Its switch is the page's own (Sound, in the
+  game's Settings, or a tap on Moonpie), kept under `catdoku.sound.v1`, a name meant for every game. Make it one setting
+  on the Settings page and move the playing (`wake`, `hum`, `swell` in `swapapom/index.html`: Web Audio, a loop with its
+  ends copied past each other) into `games.js`, ready for Pawlinko's sound effects below;
+- the owner hears the purr on a phone: whether the soft purr while playing is too loud or too quiet (`purring.base`), and
+  whether Moonpie should tremble a little the whole time it's on (offered, not asked for yet). On an iPhone the silent
+  switch mutes it;
+- then move its row from `BETA` to `GAMES` (with the date it joins) and take out its `noindex` line.
+
+## Boing!: the preview, waiting to be made
+
+A preview of Boing! was made on 2026-11-13 (https://claude.ai/artifact/JnemuF5eg6skXE6RLEYADR, the owner's own; the whole
+page, rules, level maker and drawing, is in it). The owner was happy with it as it is ("This is fine"), place-and-turn as
+`IDEAS.md` describes, with Ferguson as the star. Still to do: make it with the new-game skill, from the preview's code.
+- The springs in the preview are cut from `toys/sheets/springs.webp` (standing, leaning, end-on and lying flat, in eight
+  colours, 96 px). The README says that sheet has coloured fringes round each spring: check the cuts on a dark background,
+  or cut them from `springs-grey.webp` and tint them as the pompoms are.
+- Its rooms take up to two seconds to make at the busier levels, so they're made in a Web Worker.
+- Unused so far: the arc pose on the sheet.
+
 ## Feedback: what's left
 
 Send feedback went into every game's menu on 2026-11-11 (the card in `games.js`, to the owner's Google Form; README,
@@ -127,11 +153,12 @@ Send feedback went into every game's menu on 2026-11-11 (the card in `games.js`,
 
 ## Pawlinko: sound effects
 
-The owner wants sound effects for Pawlinko, put aside for later (2026-11-02): a knock as each thing hits a hold,
-a boing off a coil spring, a splash when coffee or water spills, a soft thump as it lands in a bed (and a sleepy
-grumble from a napping cat), and a cheer for a tandem. No game on the site has sound yet, so this needs a shared way to
-play it first: a Sound switch in the settings (off by default, as browsers only play sound after a tap), quiet enough
-for a phone, and sounds that follow the thing's kind (a bell rings, a mug clunks, a feather makes none).
+The owner wants sound effects for Pawlinko, put aside for later (2026-11-02): a knock as each thing hits a hold, a
+boing off a coil spring, a splash when coffee or water spills, a soft thump as it lands in a bed (and a sleepy grumble
+from a napping cat), and a cheer for a tandem. Swap-a-Pom (in beta) has the site's first sound, Moonpie's purr, with
+the start of a shared way to play it (see its section above). It still needs to be shared: a Sound switch in the
+settings (off by default, as browsers only play sound after a tap), quiet enough for a phone, and sounds that follow
+the thing's kind (a bell rings, a mug clunks, a feather makes none).
 
 
 
