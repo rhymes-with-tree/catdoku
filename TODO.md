@@ -128,6 +128,8 @@ the front page):
 - the owner hears the purr on a phone: whether the soft purr while playing is too loud or too quiet (`purring.base`), and
   whether Moonpie should tremble a little the whole time it's on (offered, not asked for yet). On an iPhone the silent
   switch mutes it;
+- Moonpie on the tray's edge, `moonpie-low`, has a white nose, which she doesn't have (the owner, 2026-11-13; see
+  `ARTWORK.md`): paint her nose and muzzle brown, have the owner redraw the pose, or lay a right pose along the rim;
 - then move its row from `BETA` to `GAMES` (with the date it joins) and take out its `noindex` line.
 
 ## Boing!: the preview, waiting to be made
