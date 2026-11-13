@@ -111,7 +111,19 @@ Bed Hog has no star cat yet: `c14-29` (a ginger cat on its back) sleeps beside i
   bouncing: the owner's call); and `moonpie-crouch2`, looking up at you, on the gold-paw card. **Her purr** is in `cats/` too,
   `moonpie-purr.mp3`: the owner's own recording of her (2026-11-03), only trimmed, made into a 13.8-second loop and turned
   up. There's a fan in the background, but the owner liked it better than every cleaned-up version (noise removal made her
-  sound watery), so it stays as recorded. Any game can use it.
+  sound watery), so it stays as recorded. Any game can use it. Its source recording came again with the ones below
+  (`Purrs.m4a`, 15 s), so it isn't added twice.
+  **More of her purrs and her snores** (the owner's recordings, 2026-11-13, for Moonpurrs; any game can use them), in
+  `cats/` as mp3 (64 kbps, mono), each only trimmed and turned up so its loudest moment is at -1.5 dB, nothing cleaned:
+  - `moonpie-purrs-1.mp3`, 32.6 s (from `Purrs.m4a`): a steady purr with a dip at every breath, about one a second.
+  - `moonpie-purrs-2.mp3`, 22.9 s (`Moonpurrs.m4a`): the loudest and most even; a broader hiss comes in at 7 s.
+  - `moonpie-purrs-3.mp3`, 19.6 s (a Signal voice message from 2026-11-02, so lower quality): a breath about every 1.6 s,
+    and a steady tone near 700 Hz under it.
+  - `moonpie-snores-1.mp3`, 12.1 s (`Moonpie_snores.m4a`): four clear snores, one every 2.7 s or so.
+  - `moonpie-snores-2.mp3`, 24.6 s (`Moonsnores.m4a`): about 8 s of something steady, then softer snores every 3.5 s or
+    so. Whether the start is her purr sputtering out into the snores, or a fan, is the owner's to say.
+  The snores were very quiet (turned up 28 to 34 dB), so the room's hum is turned up with them; a game plays them softly.
+  The purrs' rumble is 26 to 30 Hz, too fast to tap to: a rhythm game's beat is her breathing.
 - **Ferguson** (`ferguson-…`, a fluffy black cat with yellow eyes) has nine poses from the same sheet, the same set
   as Rayla's: `ferguson-sit`, `-crouch`, `-startled`, `-leap`, `-basket`, `-dive`, `-low`, `-bound` and `-crouch2`. Not
   for Pounce Up. Ferguson is to be the star of Boing! (the owner, 2026-11-13; the game isn't on the site yet, see `TODO.md`): in
