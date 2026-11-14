@@ -1644,7 +1644,7 @@ const G = (() => {
   // Sound effects (the owner's call, 2026-11-14: on by default; turned off on the Settings page, for every game at once
   // or game by game, or with Sound in a game's own ☰ Menu). Every sound is made as it plays (Web Audio: oscillators,
   // noise and filters), each the owner's pick from a listening page of candidates. A game can also play a recording
-  // (G.sound.clip: Moonpie's purr in Pawlette), loaded once the sound has started. A browser plays nothing
+  // (G.sound.clip, kept for the Moonpie games), loaded once the sound has started. A browser plays nothing
   // until the first tap or key, so the sound starts then. The page tells Safari it's background sound ("ambient"), so it
   // plays alongside someone's music and an iPhone's silent switch mutes it.
   // G.sound.play(name, o) plays one: the shared ones below (tap, put, wrong, hint, win, gold, lose; the win, gold-paw and
@@ -1711,7 +1711,7 @@ const G = (() => {
       s.buffer = noiseBuf; b.type = type; b.Q.value = q;
       if (fs) path(b.frequency, t, fs); else b.frequency.setValueAtTime(f, t);
       env(g.gain, t, a, vol, dur, hold); s.connect(b); b.connect(g);
-      if (trem) { const tg = ctx.createGain(); tg.gain.value = 1 - trem[1]; vibrato(tg.gain, t, dur, trem[0], trem[1]); g.connect(tg); tg.connect(out); }   // a flutter: [rate, depth]
+      if (trem) { const tg = ctx.createGain(); tg.gain.value = 1 - trem[1]; vibrato(tg.gain, t, dur, trem[0], trem[1], trem[2]); g.connect(tg); tg.connect(out); }   // a flutter: [rate, depth, depth at the end]
       else g.connect(out);
       s.start(t, rnd(0, 1.5)); s.stop(t + dur + .05);
     }
@@ -1750,10 +1750,57 @@ const G = (() => {
     const thump = (t, vol = .45, f = 130) => { tone({fs: [[0, f], [.08, f * .55]], t, dur: .1, vol}); noise({t, dur: .06, vol: vol * .6, type: "lowpass", f: 500}); };
     const tick = (t, vol = .2, f = 3000) => noise({t, dur: .015, vol, f, q: 3, a: .001});
     const boing = (t, low = 140, high = 420, dur = .55, vol = .3) => tone({fs: [[0, low], [.05, high], [dur, high * .9]], t, dur, vol, vib: [11, high * .2, 0]});
-    const chirp = (t, vol = .5, up = 1) => voice({t, fs: [[0, 420 * up], [.07, 380 * up], [.2, 620 * up]], dur: .24, vol, trem: [32, .45], formants: [[800, 5], [1500, 6]]});
-    const hiss = (t, dur = .55, vol = .35) => { noise({t, dur, vol, a: .04, hold: dur * .4, type: "highpass", f: 2600}); noise({t, dur, vol: vol * .6, a: .04, hold: dur * .4, f: 5200, q: 2}); };
+    // a voice more alive (the owner's call for a better chirp, meow and yawn, 2026-11-14): the pitch follows a path with a
+    // little wobble, each vowel filter its own path ({fs, q, g}), breath (noise through the same filters) mixes in, and a
+    // rolled "rr" (trem [rate, depth, depth at the end]) can fade as the sound opens up
+    function voice2({t, fs, dur, vol = .5, formants, breath = 0, trem, vib, a = .03}) {
+      const r = shorter(dur); dur *= r; a *= r; fs = squeeze(r, fs);
+      const o = ctx.createOscillator(), sum = ctx.createGain(), g = ctx.createGain(); o.type = "sawtooth"; path(o.frequency, t, fs);
+      if (vib) vibrato(o.frequency, t, dur, vib[0], vib[1]);
+      const src = [o];
+      if (breath) { const s = ctx.createBufferSource(), bg = ctx.createGain(); s.buffer = noiseBuf; bg.gain.value = breath * 6; s.connect(bg); src.push(bg); s.start(t, rnd(0, 1.5)); s.stop(t + dur + .05); }
+      for (const fm of formants) {
+        const b = ctx.createBiquadFilter(), fg = ctx.createGain(); b.type = "bandpass"; b.Q.value = fm.q; fg.gain.value = fm.g ?? 1;
+        path(b.frequency, t, squeeze(r, fm.fs)); for (const x of src) x.connect(b); b.connect(fg); fg.connect(sum);
+      }
+      env(g.gain, t, a, vol, dur);
+      if (trem) { const tg = ctx.createGain(); tg.gain.value = 1 - trem[1]; vibrato(tg.gain, t, dur, trem[0], trem[1], trem[2]); sum.connect(tg); tg.connect(g); }
+      else sum.connect(g);
+      g.connect(master); o.start(t); o.stop(t + dur + .05);
+    }
+    // the better sounds of 2026-11-14, as on the listening page: a cat's chirp ("brrp"), a hiss, water (a bubble is a little
+    // sine that rises as it closes; drops, splashes, pours and dunks are made of them), a meow, a big yawn (low < 1 for a
+    // person's), scratching on sisal, a fabric rustle and a crinkle
+    const chirp = (t, vol = .45, up = 1) => voice2({t, dur: .22, vol, a: .012, fs: [[0, 520 * up], [.08, 800 * up], [.22, 640 * up]],
+      formants: [{fs: [[0, 650], [.22, 950]], q: 4}, {fs: [[0, 1500], [.22, 1950]], q: 6, g: .7}], trem: [34, .75, .1], breath: .06});
+    const hiss = (t, dur = .6, vol = .38) => {
+      noise({t, dur: .05, vol: vol * 1.2, type: "highpass", f: 3500, a: .002});
+      noise({t: t + .01, dur, vol, a: .02, hold: dur * .45, f: 4200, q: .8, trem: [13, .25]});
+      noise({t: t + .01, dur, vol: vol * .5, a: .02, hold: dur * .45, type: "highpass", f: 6500, trem: [17, .2]});
+      noise({t: t + .01, dur: dur * .6, vol: vol * .25, a: .02, f: 1400, q: 1.5}); };
+    const bubble = (t, f, vol = .12) => tone({fs: [[0, f], [.03, f * 2.2]], t, dur: .045, vol, a: .002});
+    const plip = (t, vol = .22) => { bubble(t, 650, vol); bubble(t + .06, 1300, vol * .3); };
+    const splash = (t, size = 1) => {
+      noise({t, dur: .32 * size, vol: .35 * size, type: "lowpass", fs: [[0, 3500], [.32 * size, 800]], a: .004});
+      noise({t, dur: .16, vol: .12 * size, type: "highpass", f: 3200, a: .003});
+      for (let i = 0; i < 10 * size; i++) bubble(t + rnd(.02, .45 * size), rnd(600, 1800), .1); };
+    const pour = (t, dur = .9) => { noise({t, dur, vol: .2, type: "lowpass", f: 900, a: .08, hold: dur * .5, trem: [8, .3]}); for (let i = 0; i < 28; i++) bubble(t + rnd(.03, dur * .9), rnd(500, 1500), .07); };
+    const dunk = (t, size = 1) => {
+      tone({fs: [[0, 180], [.12, 420]], t, dur: .14, vol: .3 * size, a: .005});
+      noise({t, dur: .18, vol: .2 * size, type: "lowpass", fs: [[0, 1600], [.18, 500]], a: .004});
+      for (let i = 0; i < 6; i++) bubble(t + rnd(.06, .35), rnd(500, 1300), .08); };
+    const meow = (t, vol = .5) => voice2({t, dur: .62, vol, a: .05, fs: [[0, 420], [.1, 620], [.3, 700], [.62, 430]], vib: [6, 10],
+      formants: [{fs: [[0, 350], [.15, 800], [.4, 900], [.62, 450]], q: 5}, {fs: [[0, 1900], [.15, 1700], [.4, 1300], [.62, 900]], q: 7}, {fs: [[0, 3000], [.62, 2600]], q: 8, g: .4}], breath: .12});
+    const yawn = (t, vol = .45, low = 1) => voice2({t, dur: 1.2, vol, a: .12, fs: [[0, 560 * low], [.25, 640 * low], [.8, 330 * low], [1.2, 250 * low]], vib: [5, 8],
+      formants: [{fs: [[0, 500], [.35, 950], [.9, 700], [1.2, 400]], q: 4}, {fs: [[0, 1600], [.35, 1350], [1.2, 900]], q: 5}], breath: .25});
+    const scratching = t => { for (let i = 0; i < 7; i++) { const at = t + i * .16 + rnd(0, .03), up = i % 2;
+      noise({t: at, dur: .12, vol: .3, a: .01, fs: [[0, up ? 1400 : 2600], [.12, up ? 2600 : 1300]], q: 1.2, trem: [70 + rnd(0, 30), .7]});
+      noise({t: at, dur: .1, vol: .08, type: "lowpass", f: 500}); } };
+    const rustle = t => { for (let i = 0; i < 3; i++) { const at = t + i * .035 + rnd(0, .015);
+      noise({t: at, dur: .06, vol: .12, a: .012, fs: [[0, rnd(2200, 3200)], [.06, rnd(1400, 2000)]], q: .9, trem: [55 + rnd(0, 25), .55]}); } };
+    const crinkle = (t, n = 9, span = .14) => { for (let i = 0; i < n; i++) noise({t: t + rnd(0, span), dur: .008, vol: rnd(.06, .16), type: "highpass", f: rnd(3500, 6500), a: .001}); };
+    const purr = t => noise({t, dur: 1.2, vol: .3, type: "lowpass", f: 220, a: .15, hold: .6, trem: [26, .8]});   // a soft purr (made, not Moonpie's)
     const slideDown = (t, f0 = 1100, f1 = 330, dur = .65, vol = .18) => tone({fs: [[0, f0], [dur, f1]], t, dur, vol, a: .03, hold: dur * .6, vib: [6, 14]});
-    const mrrp = (t, vol = .55) => voice({t, fs: [[0, 380], [.08, 330], [.26, 480]], dur: .3, vol, trem: [30, .4]});   // "mrrp?": tape, everywhere (the owner, 2026-11-14)
     // recordings: G.sound.clip(name, file) to have one ready (fetched once the sound starts), kit.clip(name, t, vol) to play
     // it as it is (not shortened); kit.clip says false if it isn't there yet
     function fetchClip(name) {
@@ -1765,7 +1812,7 @@ const G = (() => {
       const s = ctx.createBufferSource(), g = ctx.createGain(); s.buffer = buf; g.gain.value = vol; s.connect(g); g.connect(master); s.start(t); return true;
     }
     const PENTA = [523, 587, 659, 784, 880, 1047, 1175, 1319, 1568, 1760, 2093, 2349, 2637, 3136];
-    const kit = {clip, tone, noise, modal, bell, mallet, musicBox, voice, whoosh, thump, tick, boing, chirp, mrrp, hiss, slideDown, filt, vibrato, rnd, pick, PENTA};
+    const kit = {clip, tone, noise, modal, bell, mallet, musicBox, voice, voice2, whoosh, thump, tick, boing, chirp, hiss, bubble, plip, splash, pour, dunk, meow, yawn, scratching, rustle, crinkle, purr, slideDown, filt, vibrato, rnd, pick, PENTA};
 
     // the moments every game shares (the owner's picks)
     const SOUNDS = {

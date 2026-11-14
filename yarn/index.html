@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-14.7";
+  var BUILD = "2026-11-14.8";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-14.7">
+<link rel="stylesheet" href="../games.css?v=2026-11-14.8">
 <style>
 .board{background:var(--panel)}
 .cell{border-top:1px solid var(--line);border-left:1px solid var(--line);cursor:pointer}
@@ -101,8 +101,8 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-14.7"></script>
-<script src="../colorways.js?v=2026-11-14.7"></script>
+<script src="../games.js?v=2026-11-14.8"></script>
+<script src="../colorways.js?v=2026-11-14.8"></script>
 <script>
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 function nbrs(i,N){const r=Math.floor(i/N),c=i%N,o=[];if(r>0)o.push(i-N);if(r<N-1)o.push(i+N);if(c>0)o.push(i-1);if(c<N-1)o.push(i+1);return o;}
@@ -217,16 +217,27 @@ const lastNum = () => Math.max(...game.clue);
 const adjacent = (a, b) => { const N = game.N; return Math.abs(a - b) === N || (Math.abs(a - b) === 1 && Math.floor(a / N) === Math.floor(b / N)); };
 const nextNum = () => game.trail.reduce((n, k) => game.clue[k] ? game.clue[k] + 1 : n, 1);
 
+/* ---------- sound ---------- */
+// The owner's picks from the listening page (2026-11-14), played through G.sound (games.js; on unless Settings turns it off).
+// A square of strand is a soft pad, a ball reached a soft chime, winding back a swish down, and a ball out of turn every
+// game's low buzz.
+const SND = G.sound.kit;
+G.sound.define({
+  "yarn.step": t => SND.noise({t, dur: .03, vol: .08, type: "lowpass", f: 900}),   // a soft pad
+  "yarn.ball": t => SND.bell({f: 1568, t, dur: .5, vol: .06, ratio: 2.01, index: .6}),   // a soft chime
+  "yarn.back": t => SND.whoosh(t, 2200, 1200, .1, .12),   // a swish down
+});
+const grew = v => G.sound.play(game.clue[v] ? "yarn.ball" : "yarn.step");
 // Try to extend the strand into square v. Returns true if it moved.
 function step(v) {
   const t = game.trail, i = t.indexOf(v);
-  if (i >= 0) { if (i < t.length - 1) { t.length = i + 1; return true; } return false; }
-  if (!t.length) { if (game.clue[v] !== 1) return false; t.push(v); return true; }
+  if (i >= 0) { if (i < t.length - 1) { t.length = i + 1; G.sound.play("yarn.back"); return true; } return false; }
+  if (!t.length) { if (game.clue[v] !== 1) return false; t.push(v); grew(v); return true; }
   const end = t[t.length - 1];
   if (!adjacent(end, v)) return false;
   if (game.clue[end] === lastNum()) return false;           // the last number ends the strand
-  if (game.clue[v] && game.clue[v] !== nextNum()) { G.note("That ball comes later on the skein."); return false; }
-  t.push(v); return true;
+  if (game.clue[v] && game.clue[v] !== nextNum()) { G.note("That ball comes later on the skein."); G.sound.play("wrong"); return false; }
+  t.push(v); grew(v); return true;
 }
 // Fast drags skip squares: walk a straight line one square at a time.
 function stepToward(v) {

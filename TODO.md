@@ -172,8 +172,17 @@ https://claude.ai/artifact/AiHXuVwvwB5CJSBPvgGNKS (the owner's own; its source i
 - **Pawlinko's hold sound:** the owner picked Rope thud for "hits a hold" and a sound of its own for every thing, so
   every knock plays the thing's own and the rope thud plays nowhere (it isn't in the page). If the holds should thud
   under each thing's sound, or the plainer things (yarn, fluffball, feather) should thud instead, say so.
-- **The other games:** On the Prowl, Kitten Play, Cat Logic and Cat Math are done (2026-11-14); Undo, Bookmark and a
-  life lost sound in every game that has them. Left: Cat Trails, Cat Spells and Curious Cat. The shared tap, put-down and not-allowed sounds (`tap`, `put`,
+- **The other games:** On the Prowl, Kitten Play, Cat Logic, Cat Math and Cat Trails are done (2026-11-14); Undo,
+  Bookmark and a life lost sound in every game that has them. Left: Cat Spells and Curious Cat.
+- **To pick again:** Tail Chase's Tangled and Tape were a mrrp, which the owner took out (2026-11-14); until they're
+  picked again they have the lose card's own sound. The listening page lists them under Pick again.
+- **The better sounds** (hiss, scratching, chirps, water, meow, big yawn, fabric rustle, crinkle; 2026-11-14) are in the
+  games wherever those sounds were picked; the owner is to hear them on the listening page (Better sounds to hear).
+- **Per-row volume and length:** the listening page gives every row its own (Volume · Length); `G.sound` doesn't yet
+  take a sound's own volume or length, so the first picks that change one need that added (a multiplier for each name,
+  set by `G.sound.define`'s caller or a table in `games.js`).
+- **Testers:** the listening page can go to testers (shared from its Share menu); Send opens the site's feedback form
+  with their picks in its last field (the link field) and their name in the contact field. The shared tap, put-down and not-allowed sounds (`tap`, `put`,
   `wrong`) are for the rest. Add them a shelf at a time, quick and action games first, each game's own sounds where the
   shared ones don't fit (the listening page can be extended for each shelf, so the owner picks as before).
 - **On a phone:** the owner hears it all on an iPhone: the length (`LENGTH` in `games.js`, 55% since the sounds went on too long; the listening page's Length slider tries others), the loudness (`VOLUME` in `games.js`, .47, matching the

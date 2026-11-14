@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-14.7"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-14.8"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-14.7">
+<link rel="stylesheet" href="../games.css?v=2026-11-14.8">
 <style>
 /* A room seen from above: a pale floor in a periwinkle band, with furniture round the walls, and on the floor a dot
    (no outline) for every spot the cat landed, each with a thick arrow the way it jumped next. A join is a line from
@@ -97,7 +97,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-14.7"></script>
+<script src="../games.js?v=2026-11-14.8"></script>
 <script>
 /* ---------- the run (plain functions, also run in a background worker) ---------- */
 // Zoomies puzzle maker (Signpost): a path through every square, each square's arrow pointing (any distance,
@@ -399,10 +399,18 @@ function draw() {
 /* ---------- playing ---------- */
 // Join a to b (a jumps to b): b must be along a's arrow, nothing jumps into the cat's bed or out of yours, and no loops.
 // It takes the place of any jump a made before and any jump into b.
+/* ---------- sound ---------- */
+// The owner's picks from the listening page (2026-11-14), played through G.sound (games.js; on unless Settings turns it off).
+// Two dots joined zip up, taken apart zip down; a join that can't be (or clashes with a number) is every game's low buzz.
+const SND = G.sound.kit;
+G.sound.define({
+  "zm.join": t => SND.tone({fs: [[0, 500], [.12, 1800]], t, dur: .13, vol: .1}),   // a zip
+  "zm.unjoin": t => SND.tone({fs: [[0, 1800], [.12, 500]], t, dur: .13, vol: .1}),   // a zip down
+});
 function link(a, b) {
-  if (a === last()) { G.note("Your bed is where the run ends: no more jumps from there.", 3500); return false; }
-  if (b === first()) { G.note("The run starts in the cat's bed: nothing jumps into it.", 3500); return false; }
-  for (let k = b; k >= 0; k = game.succ[k]) if (k === a) { G.note("That would send the cat round in a loop.", 3500); return false; }
+  if (a === last()) { G.note("Your bed is where the run ends: no more jumps from there.", 3500); G.sound.play("wrong"); return false; }
+  if (b === first()) { G.note("The run starts in the cat's bed: nothing jumps into it.", 3500); G.sound.play("wrong"); return false; }
+  for (let k = b; k >= 0; k = game.succ[k]) if (k === a) { G.note("That would send the cat round in a loop.", 3500); G.sound.play("wrong"); return false; }
   guesses.before(a); undo.push();
   const pred = game.succ.indexOf(b), ink = inkOf();
   if (pred >= 0) game.succ[pred] = -1;
@@ -411,9 +419,10 @@ function link(a, b) {
   const before = game.succ.indexOf(a), c = before >= 0 && ink[before] >= 0 ? ink[before] : settings.pen;
   for (let k = a; game.succ[k] >= 0; k = game.succ[k]) ink[k] = c;
   for (let k = game.succ.indexOf(a); k >= 0; k = game.succ.indexOf(k)) ink[k] = c;
+  G.sound.play("zm.join"); if (runs().list.some(r => r.clash)) G.sound.play("wrong", {}, .12);
   return true;
 }
-function cut(a) { guesses.before(a); undo.push(); game.succ[a] = -1; inkOf()[a] = -1; }
+function cut(a) { guesses.before(a); undo.push(); game.succ[a] = -1; inkOf()[a] = -1; G.sound.play("zm.unjoin"); }
 // Two squares tapped (or dragged between, either way) make a pair: if they're joined, they come apart; if one's arrow
 // points at the other, they're joined that way round (where each points at the other, see below).
 // Nothing stays picked afterwards. A square that can't pair with the picked one is picked instead.
