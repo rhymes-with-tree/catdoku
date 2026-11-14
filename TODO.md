@@ -177,7 +177,7 @@ https://claude.ai/artifact/AiHXuVwvwB5CJSBPvgGNKS (the owner's own; its source i
 - **Pounce Up's walking** is silent for now (the owner, 2026-11-14): the pitter-patter was too much and the tiny ticks
   not enough. Three in-between ones are on the listening page (Soft pads, Two soft steps, Ticks with a pad) for when
   it comes back, or a library sound.
-- **On a phone:** the owner hears it all on an iPhone: the loudness (`VOLUME` in `games.js`, .47, matching the
+- **On a phone:** the owner hears it all on an iPhone: the length (`LENGTH` in `games.js`, 55% since the sounds went on too long; the listening page's Length slider tries others), the loudness (`VOLUME` in `games.js`, .47, matching the
   listening page at the 59 the owner last used), and whether Pawlinko gets too busy with several things falling.
 - **The Settings page's Every game Sound** sets the games on the front page; a beta game (Swap-a-Pom now) has only its
   menu's switch until it joins.
