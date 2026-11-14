@@ -217,7 +217,18 @@ const save = () => G.save(STORE, {settings, game});
 const setOf = a => new Set(a || []);
 let open, mark, caught;
 // Lives (G.lives): 3 on a floor, and 3 more a revive, up to 9 (livesUsed, taken as 3 in a save without it)
-const lives = G.lives({el: $("hearts"), of: () => game, key: "lives", on: "floor", revived: () => { Object.assign(game, {lost: false, hinted: true}); store(); draw(); }});
+/* ---------- sound ---------- */
+// The owner's picks from the listening page (2026-11-14), played through G.sound (games.js; on unless Settings turns it off).
+// A cat woken is a hiss, in place of the logic games' life lost; a doodle taken off is their pop out (erase).
+const SND = G.sound.kit;
+const flap = (t, p = 1) => { SND.noise({t, dur: .07, vol: .35, f: 420 * p, q: 1, a: .005}); SND.thump(t, .12, 140 * p); };
+G.sound.define({
+  "hs.open": t => flap(t),   // a cardboard flap, as in Copycat
+  "hs.cascade": t => { for (let i = 0; i < 5; i++) flap(t + i * .05, SND.rnd(.9, 1.2)); },   // a patter of flaps: a 0 opens the boxes round it
+  "hs.doodle": t => SND.tone({fs: [[0, 1900], [.08, 2300]], t, dur: .09, vol: .05, vib: [50, 100]}),   // a marker squeak
+  "hs.woken": t => SND.hiss(t, .35, .3),   // a hiss
+});
+const lives = G.lives({el: $("hearts"), of: () => game, key: "lives", on: "floor", sound: false, revived: () => { Object.assign(game, {lost: false, hinted: true}); store(); draw(); }});
 const label = i => nbrs(i).reduce((s, j) => s + cat[j], 0);
 
 function load() {   // the working copies of the saved game
@@ -250,14 +261,15 @@ function check(i) {
     game.cats = cats; game.first = i; game.started = true; load();
   }
   if (cat[i]) {   // a startled cat: it costs a life, and that box is known from now on
-    caught.add(i); lives.lose(); store();
+    caught.add(i); lives.lose(); store(); G.sound.play("hs.woken");
     const sq = $("board").children[i];
     G.note(game.lives ? "Hiss! A cat was in there." : "", 0);
     draw(); sq.style.visibility = "hidden";
     bigHiss(sq, () => { sq.style.visibility = ""; sq.classList.add("hiss"); if (!game.lives) outOfLives(); });
     return;
   }
-  spread(i); store(); draw(); checkWin();
+  const was = open.size; spread(i); G.sound.play(open.size - was > 1 ? "hs.cascade" : "hs.open");
+  store(); draw(); checkWin();
 }
 // HISS fills the screen, holds for a moment, then shrinks down onto the box it came from.
 function bigHiss(sq, done) {
@@ -275,6 +287,7 @@ function bigHiss(sq, done) {
 }
 function toggleMark(i) {
   if (!playing() || !game.cats || open.has(i) || caught.has(i)) return;
+  G.sound.play(mark.has(i) ? "erase" : "hs.doodle");
   mark.has(i) ? mark.delete(i) : mark.add(i); store(); draw();
 }
 // Tapping a labelled box whose cats are all marked (or found) checks the rest around it.

@@ -357,11 +357,23 @@ function draw() {
 // Tap a floor square: a post, then a dot (no post here), then empty again; or with Dot first on, a dot then a post.
 // Every move is a list of [square, what it was], so a drag of dots undoes in one go.
 const nextOf = v => settings.dotFirst ? (v === -1 ? 0 : v === 0 ? 1 : -1) : (v === -1 ? 1 : v === 1 ? 0 : -1);
+/* ---------- sound ---------- */
+// The owner's picks from the listening page (2026-11-14), played through G.sound (games.js; on unless Settings turns it off).
+// A post is a sisal thunk, a dot the logic games' pencil tick (mark), taking either away their pop out (erase); two posts
+// that see each other (with Auto check on) every game's low buzz; Dottie scratches once the room's solved.
+const SND = G.sound.kit;
+G.sound.define({
+  "st.post": t => { SND.thump(t, .3, 120); SND.noise({t, dur: .05, vol: .15, f: 2000, q: 1}); },   // a sisal thunk
+  "st.scratch": t => { for (let i = 0; i < 6; i++) SND.noise({t: t + i * .09 + SND.rnd(0, .02), dur: .06, vol: .25, f: SND.rnd(1500, 3000), q: 1.5, a: .01}); },   // scratching
+});
+const seen = () => look().bad.filter(Boolean).length;
+function sounds(to, broke) { G.sound.play(to === 1 ? "st.post" : to === 0 ? "mark" : "erase"); if (to === 1 && settings.autoCheck && seen() > broke) G.sound.play("wrong", {}, .12); }
 function tap(i, to) {
   if (!playing() || game.g[i] !== -1) return;
-  const was = game.s[i];
+  const was = game.s[i], broke = seen();
   game.s[i] = to === undefined ? nextOf(was) : to;
   if (game.s[i] === was) return;
+  sounds(game.s[i], broke);
   if (game.s[i] === 1) guesses.before(i);
   undo.push([[i, was]]);
   after();
@@ -400,7 +412,7 @@ addEventListener("pointermove", e => {
 function dragMark(i) {
   const was = game.s[i], to = drag.add ? (was === -1 ? 0 : was) : (was === 0 ? -1 : was);
   if (to === was) return;
-  game.s[i] = to; drag.move.push([i, was]); draw();
+  game.s[i] = to; drag.move.push([i, was]); draw(); G.sound.play(to === 0 ? "mark" : "erase");
 }
 addEventListener("pointerup", () => {
   if (!drag) return;
@@ -467,7 +479,7 @@ $("hintBtn").onclick = hint;
 /* ---------- winning ---------- */
 const goldOK = () => !game.hinted && !game.restarted;
 function win() {
-  game.won = true; G.finishClock(game); G.note("");
+  game.won = true; G.finishClock(game); G.note(""); G.sound.play("st.scratch", {}, .3);
   const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
   settings.level = next; $("levelSel").value = next; save(); draw();
   rooms.prefetch(next);
