@@ -57,6 +57,17 @@ canvas{display:block;height:120px;cursor:crosshair}
 .note{width:100%;font:inherit;border:1.5px solid var(--line);background:var(--bg);color:var(--fg);border-radius:8px;padding:6px 8px}
 .del{margin-left:auto}
 .empty{color:var(--muted);font-size:.9rem}
+/* sorted cuts fold to one line; a recording whose cuts are all sorted folds to its heading */
+.cut.mini{grid-template-columns:auto minmax(0,1fr) auto;align-items:center;padding:6px 10px}
+.cut.mini .playbtn{width:32px;height:32px;font-size:.8rem}
+.mini .line{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;min-width:0}
+.mini .nm{font-weight:600;overflow-wrap:anywhere}
+.mini .sub{color:var(--muted);font-size:.82rem;font-variant-numeric:tabular-nums}
+.badge{font-size:.75rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--c)}
+.mini .notetext{flex-basis:100%;color:var(--muted);font-size:.82rem}
+.src.folded .scroller,.src.folded .hint,.src.folded .cuts,.src.folded .zoom{display:none}
+.summary{font-size:.85rem;font-variant-numeric:tabular-nums}
+.summary b{font-weight:700}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
@@ -99,7 +110,11 @@ const $ = id => document.getElementById(id);
 const store = {get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }};
 
-let cuts = {};          // id -> {src, start, end, name, tag, status, note}
+let cuts = {};
+const open = store.get("bench.open", {});   // what the viewer opened or folded by hand: cut id, or "src:"+number
+const setOpen = (k, v) => { open[k] = v; store.set("bench.open", open); };
+const cutOpen = (id, c) => open[id] ?? c.status === "new";
+const srcOpen = s => { const l = Object.values(cuts).filter(c => c.src === s.fid); return open["src:" + s.fid] ?? (!l.length || l.some(c => c.status === "new")); };          // id -> {src, start, end, name, tag, status, note}
 let db = null, col = null, filter = store.get("bench.filter", "all"), selected = null;
 const buffers = {}, peaks = {}, zoom = {};
 let ctx = null, playing = null;
@@ -213,14 +228,26 @@ function renderFilters() {
 }
 $("filters").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; filter = b.dataset.v; store.set("bench.filter", filter); render(); });
 
+function miniEl(id, c, s) {
+  const el = document.createElement("div"); el.className = "cut mini" + (id === selected ? " sel" : ""); el.dataset.id = id; el.dataset.s = c.status;
+  const lab = (STATUS.find(x => x[0] === c.status) || [, ""])[1];
+  el.innerHTML = `<button class="playbtn" aria-label="Play">▶</button><div class="line"><span class="nm"></span><span class="sub"></span><span class="badge">${lab}</span>${c.note ? '<span class="notetext"></span>' : ""}</div><button class="btn">Edit</button>`;
+  el.querySelector(".nm").textContent = c.name || "Untitled";
+  el.querySelector(".sub").textContent = `${c.tag || "no tag"} · ${(+c.start).toFixed(2)}–${(+c.end).toFixed(2)} s`;
+  if (c.note) el.querySelector(".notetext").textContent = c.note;
+  el.querySelector(".playbtn").onclick = () => { select(id, false); play(s, c.start, c.end); };
+  el.querySelector(".btn").onclick = () => { setOpen(id, true); renderCuts(s); };
+  return el;
+}
 function cutEl(id, c, s) {
+  if (!cutOpen(id, c)) return miniEl(id, c, s);
   const el = document.createElement("div"); el.className = "cut" + (id === selected ? " sel" : ""); el.dataset.id = id; el.dataset.s = c.status;
   el.innerHTML = `<button class="playbtn" aria-label="Play ${c.name}">▶</button>
   <div class="fields">
     <div class="row1"><input class="name" id="n-${id}" aria-label="Name" value=""><input class="tag" id="t-${id}" list="tags" aria-label="Tag" placeholder="tag" value="">
       <span class="times"><input type="number" step="0.01" min="0" id="a-${id}" aria-label="Start, seconds"> to <input type="number" step="0.01" min="0" id="b-${id}" aria-label="End, seconds"> s</span></div>
     <div class="row1"><div class="seg" role="group" aria-label="Decision">${STATUS.slice(1).map(([v, l]) => `<button data-v="${v}" aria-pressed="${c.status === v}">${l}</button>`).join("")}</div>
-      <button class="btn del">Delete</button></div>
+      ${c.status !== "new" ? '<button class="btn fold">Fold</button>' : ""}<button class="btn del">Delete</button></div>
     <input class="note" id="o-${id}" aria-label="Note" placeholder="${c.status === "recut" ? "What to change: start later, end before the second chirp…" : "Note (optional)"}">
   </div>`;
   const q = sel => el.querySelector(sel);
@@ -233,7 +260,10 @@ function cutEl(id, c, s) {
   q(`#a-${id}`).onchange = e => { const v = +e.target.value; if (v >= 0 && v < c.end) upd("start", v); else e.target.value = c.start; };
   q(`#b-${id}`).onchange = e => { const v = +e.target.value; if (v > c.start && v <= s.dur) upd("end", v); else e.target.value = c.end; };
   q(".playbtn").onclick = () => { select(id, false); play(s, c.start, c.end); };
-  q(".seg").onclick = e => { const b = e.target.closest("button"); if (!b) return; c.status = c.status === b.dataset.v ? "new" : b.dataset.v; save(id); renderFilters(); renderCuts(s); drawSrc(s); };
+  q(".seg").onclick = e => { const b = e.target.closest("button"); if (!b) return; c.status = c.status === b.dataset.v ? "new" : b.dataset.v;
+    setOpen(id, c.status === "new" || c.status === "recut");   // Keep and Toss fold the cut away; Re-cut stays open for its note
+    save(id); renderFilters(); renderCuts(s); drawSrc(s); updateHead(s); };
+  q(".fold")?.addEventListener("click", () => { setOpen(id, false); renderCuts(s); updateHead(s); });
   q(".del").onclick = e => { const b = e.target;
     if (b.dataset.sure) { delete cuts[id]; save(id); renderFilters(); renderCuts(s); drawSrc(s); return; }
     b.dataset.sure = "1"; b.textContent = "Delete for good?"; setTimeout(() => { if (b.isConnected) { delete b.dataset.sure; b.textContent = "Delete"; } }, 3000); };
@@ -246,6 +276,15 @@ function renderCuts(s) {
   box.replaceChildren(...list.map(([id, c]) => cutEl(id, c, s)));
   if (!list.length) box.innerHTML = `<p class="empty">${filter === "all" ? "No cuts yet. Drag across the waveform to make one." : "None here with this filter."}</p>`;
 }
+// the heading's tally and Show/Hide; a recording with every cut sorted folds to its heading until opened
+function updateHead(s) {
+  const el = document.querySelector(`[data-fid="${s.fid}"]`); if (!el) return;
+  const l = Object.values(cuts).filter(c => c.src === s.fid), n = k => l.filter(c => c.status === k).length, o = srcOpen(s);
+  el.classList.toggle("folded", !o);
+  el.querySelector(".summary").innerHTML = l.length ? STATUS.filter(([k]) => n(k)).map(([k, lab]) => `<b style="color:var(--${k})">${n(k)}</b> ${lab.toLowerCase()}`).join(" · ") : "";
+  el.querySelector(".foldbtn").textContent = o ? "Hide" : "Show";
+  el.querySelector(".foldbtn").setAttribute("aria-expanded", String(o));
+}
 function render() {
   renderFilters();
   const list = $("list"); list.replaceChildren();
@@ -253,16 +292,18 @@ function render() {
     const n = Object.values(cuts).filter(c => c.src === s.fid).length;
     const el = document.createElement("section"); el.className = "src"; el.dataset.fid = s.fid;
     el.innerHTML = `<div class="srchead"><div><h2>${s.name}</h2><p class="meta">Freesound ${s.fid} · ${s.by} · ${s.dur.toFixed(1)} s${s.offset ? ` (silent until ${s.offset} s; the wave starts there)` : ""} · ${n} cut${n === 1 ? "" : "s"}</p></div>
-      <div class="tools"><button data-a="all">▶ Whole clip</button><button data-a="stop">■ Stop</button>
-      <button data-a="out" aria-label="Zoom out">−</button><button data-a="in" aria-label="Zoom in">+</button></div></div>
+      <p class="summary"></p></div>
+      <div class="tools"><button data-a="fold" class="foldbtn"></button><button data-a="all">▶ Whole clip</button><button data-a="stop">■ Stop</button>
+      <span class="zoom tools"><button data-a="out" aria-label="Zoom out">−</button><button data-a="in" aria-label="Zoom in">+</button></span></div></div>
       <div class="scroller"><canvas aria-label="Waveform of ${s.name}. Tap a cut to play it; drag its edges to re-cut it; drag across the wave to make a new cut."></canvas></div>
       <p class="hint">Tap the wave to play from there. Drag a cut's edge to move it. Drag across empty wave for a new cut.</p>
       <div class="cuts"></div>`;
     list.append(el);
     el.querySelector(".tools").onclick = e => { const a = e.target.closest("button")?.dataset.a; if (!a) return;
+      if (a === "fold") { setOpen("src:" + s.fid, !srcOpen(s)); updateHead(s); drawSrc(s); return; }
       if (a === "all") play(s, s.offset || 0); else if (a === "stop") stop();
       else { zoom[s.fid] = Math.max(1, Math.min(64, (zoom[s.fid] || 1) * (a === "in" ? 2 : .5))); drawSrc(s); } };
-    bindCanvas(s, el.querySelector("canvas")); renderCuts(s); drawSrc(s);
+    bindCanvas(s, el.querySelector("canvas")); renderCuts(s); updateHead(s); drawSrc(s);
     load(s).then(() => drawSrc(s)).catch(() => {});
   }
 }
