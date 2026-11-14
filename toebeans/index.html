@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-14.6";
+  var BUILD = "2026-11-14.7";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-14.6">
+<link rel="stylesheet" href="../games.css?v=2026-11-14.7">
 <style>
 /* Six number tiles up top, then one outlined paw: its four toe beans are + − × ÷ and its main pad holds the goal.
    An exact hit fills every pad at once in gold (--pc, with --pt for text on it). */
@@ -125,7 +125,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-14.6"></script>
+<script src="../games.js?v=2026-11-14.7"></script>
 <script>
 /* ---------- puzzles ---------- */
 // Each level: [fewest steps the goal needs, lowest goal, highest goal, the big numbers that can be dealt].
@@ -309,35 +309,44 @@ function closest() {
 }
 
 const snap = () => game.rev ? {b: game.beans.slice(), p: game.pad} : game.beans.slice();
+/* ---------- sound ---------- */
+// The owner's picks from the listening page (2026-11-14), played through G.sound (games.js; on unless Settings turns it off).
+// A number picked is every game's tap, Reset the rewind swoosh of Return to Bookmark (back).
+const SND = G.sound.kit;
+G.sound.define({
+  "tb.op": t => SND.tone({f: 520, type: "triangle", t, dur: .08, vol: .15}),   // a soft boop: a toe bean
+  "tb.combine": t => { SND.mallet({f: 784, t, dur: .25, vol: .12}); SND.mallet({f: 1047, t: t + .06, dur: .3, vol: .12}); },   // two notes together
+  "tb.golden": t => SND.PENTA.slice(5, 11).forEach((f, i) => SND.bell({f, t: t + i * .05, dur: .4, vol: .06, ratio: 2.01, index: .5})),   // sparkle up: a golden paw
+});
 function tapBean(i) {
   if (!playing() || game.beans[i] === null) return;
   if (pick === "pad" && op !== null) return padStep(game.pad, op, game.beans[i], i);
-  if (pick === null || op === null) pick = pick === i ? null : i;
+  if (pick === null || op === null) { pick = pick === i ? null : i; if (pick !== null) G.sound.play("tap"); }
   else if (pick === i) { pick = null; op = null; }
   else {
     const r = opResult(game.beans[pick], op, game.beans[i]);
     if (r === null) return;
     undo.push();
     game.beans[i] = r; game.beans[pick] = null; pick = null; op = null; popped = i;
-    save();
-    if (!game.rev && r === game.goal) return win();
+    save(); G.sound.play("tb.combine");
+    if (!game.rev && r === game.goal) { G.sound.play("tb.golden", {}, .2); return win(); }
   }
   render();
 }
-function tapToe(o) { if (!playing() || pick === null) return; op = op === o ? null : o; render(); }
+function tapToe(o) { if (!playing() || pick === null) return; op = op === o ? null : o; if (op) G.sound.play("tb.op"); render(); }
 // Reverse mode: tap the pad, a toe bean and a number, or a number, a toe bean and the pad; the answer goes on the pad.
 function tapPad() {
   if (!playing() || !game.rev) return;
   if (pick !== null && pick !== "pad" && op !== null) return padStep(game.beans[pick], op, game.pad, pick);
-  pick = pick === "pad" ? null : "pad"; op = null; render();
+  pick = pick === "pad" ? null : "pad"; op = null; if (pick) G.sound.play("tap"); render();
 }
 function padStep(a, o, b, tile) {
   const r = padResult(a, o, b);
   if (r === null) return;
   undo.push();
   game.pad = r; game.beans[tile] = null; pick = null; op = null; popped = "pad";
-  save();
-  if (r === 0) return win();
+  save(); G.sound.play("tb.combine");
+  if (r === 0) { G.sound.play("tb.golden", {}, .2); return win(); }
   render();
 }
 const undo = G.history({game: () => game, take: snap, over: () => !playing(),
@@ -533,7 +542,7 @@ $("resetBtn").onclick = () => {
   const start = undo.list()[0];
   undo.push();
   if (game.rev) { game.beans = start.b.slice(); game.pad = start.p; } else game.beans = start.slice();
-  pick = null; op = null; render(); save();
+  pick = null; op = null; render(); save(); G.sound.play("back");
 };
 $("newBtn").onclick = newPuzzle;
 $("hintBtn").onclick = hint;
