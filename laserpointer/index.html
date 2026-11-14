@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-14.7"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-14.8"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-14.7">
+<link rel="stylesheet" href="../games.css?v=2026-11-14.8">
 <style>
 /* A room seen from above: a wooden floor inside a wall, with a laser pointer poking in at one edge. Cats sit on
    some squares and mirrors stand on others; tap a mirror to tip it the other way. The red dot runs straight and
@@ -102,7 +102,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-14.7"></script>
+<script src="../games.js?v=2026-11-14.8"></script>
 <script>
 /* ---------- laser puzzles (plain functions, also run in a background worker) ---------- */
 // The room is N × N squares. The laser pointer sits just off one edge and shines in along a row or column.
@@ -584,8 +584,8 @@ function liveArrive() {
   const i = live.at;
   if (game.tilt[i] >= 0) { live.visits.push([i, game.tilt[i]]); live.d = bounce(live.d, game.tilt[i]); }
   else if (game.cat[i] && !live.seen.has(i)) {
-    if (order() && game.cat[i] !== live.next) { live.on = false; cats[i].classList.add("tooSoon"); liveFail(`Cat ${game.cat[i]} saw the dot too soon!`); return; }
-    live.seen.add(i); live.next++; pounce(i); save();
+    if (order() && game.cat[i] !== live.next) { live.on = false; cats[i].classList.add("tooSoon"); G.sound.play("wrong"); liveFail(`Cat ${game.cat[i]} saw the dot too soon!`); return; }
+    live.seen.add(i); live.next++; pounce(i); save(); G.sound.play("line");
   }
   if (++live.steps > 6 * N * N) { live.on = false; liveFail("The dot ran out of puff."); return; }
   const j = step(N, i, live.d), [cx, cy] = centre(i);
@@ -618,13 +618,21 @@ function cellOf(e) {
   const p = pt.matrixTransform($("svg").getScreenCTM().inverse()), x = Math.floor(p.x / 100), y = Math.floor(p.y / 100);
   return x >= 0 && y >= 0 && x < game.N && y < game.N ? y * game.N + x : -1;
 }
+/* ---------- sound ---------- */
+// The owner's picks from the listening page (2026-11-14), played through G.sound (games.js; on unless Settings turns it off).
+// A mirror tipped is a tink; a cat newly seeing the dot the logic games' soft note (line), and one that sees it too soon
+// every game's low buzz. The toys at the end are left to the win card.
+G.sound.define({"lp.tip": t => G.sound.kit.modal({t, parts: [[2600, 1, .08], [5200, .3, .05]], vol: .12, click: 0})});   // a mirror tink
+const catsNow = () => [document.querySelectorAll("#svg .cat.lit").length, document.querySelectorAll("#svg .cat.tooSoon").length];
 function tip(i) {
   if (!playing()) return;
   if (isLive() && !live.on) { liveStart(); return; }
   if (game.tilt[i] < 0) return;
   game.tilt[i] ^= 1; undo.push(i); game.started = true;
-  setTilt(i);
-  if (update()) win(); else save();
+  setTilt(i); G.sound.play("lp.tip");
+  const [lit, soon] = catsNow(), won = update(), [lit2, soon2] = catsNow();
+  if (soon2 > soon) G.sound.play("wrong", {}, .15); else if (lit2 > lit) G.sound.play("line", {}, .15);
+  if (won) win(); else save();
 }
 $("svg").addEventListener("pointerdown", e => { if (!playing()) return; const i = cellOf(e); if (i >= 0 || (isLive() && !live.on)) { e.preventDefault(); tip(i); } });
 function showCursor() {

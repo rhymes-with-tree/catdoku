@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-14.7";
+  var BUILD = "2026-11-14.8";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-14.7">
+<link rel="stylesheet" href="../games.css?v=2026-11-14.8">
 <style>
 /* Strands of yarn knotted through balls of yarn on a felt mat. Drag the balls until no two strands cross. */
 .mat{width:var(--board);aspect-ratio:1;background:#F3E3C7;border:3px solid #B98C5E;border-radius:18px;position:relative;overflow:hidden;
@@ -62,8 +62,8 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-14.7"></script>
-<script src="../colorways.js?v=2026-11-14.7"></script>
+<script src="../games.js?v=2026-11-14.8"></script>
+<script src="../colorways.js?v=2026-11-14.8"></script>
 <script>
 /* ---------- levels ---------- */
 // Strands per level, and whether the yarn is ombré. Every two strands meet at one ball, so 4 strands make 6 balls,
@@ -217,11 +217,20 @@ function draw() {
 
 /* ---------- dragging ---------- */
 const at = e => { const pt = $("svg").createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; return pt.matrixTransform($("svg").getScreenCTM().inverse()); };
+/* ---------- sound ---------- */
+// The owner's picks from the listening page (2026-11-14), played through G.sound (games.js; on unless Settings turns it off).
+// A ball picked up is a soft pad, set down a soft plop, and a soft tick for each crossing gone.
+const SND = G.sound.kit;
+G.sound.define({
+  "tg.pick": t => SND.noise({t, dur: .03, vol: .1, type: "lowpass", f: 900}),   // a soft pad
+  "tg.drop": t => SND.tone({fs: [[0, 600], [.08, 250]], t, dur: .08, vol: .2}),   // a soft plop
+  "tg.uncross": t => SND.tick(t, .1, 2600),   // a soft tick
+});
 $("svg").addEventListener("pointerdown", e => {
   if (!game || $("overlay").classList.contains("show")) return;
   const el = e.target.closest(".ball"); if (!el) return;
   const id = +el.dataset.id, b = game.balls[id], p = at(e);
-  drag = {id, ox: b.x - p.x, oy: b.y - p.y, moved: false};
+  drag = {id, ox: b.x - p.x, oy: b.y - p.y, moved: false, was: crossings(game.balls, game.edges).length}; G.sound.play("tg.pick");
   $("svg").setPointerCapture(e.pointerId); draw();
 });
 $("svg").addEventListener("pointermove", e => {
@@ -232,10 +241,12 @@ $("svg").addEventListener("pointermove", e => {
 });
 function drop() {
   if (!drag) return;
-  const moved = drag.moved; drag = null;
+  const moved = drag.moved, was = drag.was; drag = null;
   if (moved && !game.won) game.moves++;
   // once it's untangled it stays won: the yarn can keep being moved about to make other shapes
-  if (draw() === 0 && !game.won) win(); else save();
+  const left = draw();
+  if (moved) { G.sound.play("tg.drop"); for (let k = 0; was != null && k < Math.min(4, was - left); k++) G.sound.play("tg.uncross", {}, .1 + k * .08); }
+  if (left === 0 && !game.won) win(); else save();
 }
 $("svg").addEventListener("pointerup", drop);
 $("svg").addEventListener("pointercancel", drop);
