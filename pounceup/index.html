@@ -101,6 +101,9 @@ G.sound.define({
   "pounce.loose": t => { S.noise({t, dur: .03, vol: .6, type: "highpass", f: 1500, a: .001}); S.modal({t, parts: [[200, 1, .15], [520, .4, .1]], vol: .3, click: 0}); S.noise({t: t + .05, dur: .3, vol: .2, type: "lowpass", fs: [[0, 600], [.3, 150]]}); },   // crack
   "pounce.lemon": t => S.hiss(t),   // a hiss
   "pounce.candle": t => S.hiss(t, .35, .3),   // a short hiss
+  // a candle burning on the floor below: a crackle, played every second until it's put out (pops and a low roar)
+  "pounce.crackle": t => { for (let i = 0; i < 7; i++) S.tick(t + S.rnd(0, .9), S.rnd(.08, .22), S.rnd(1200, 4200));
+    S.noise({t, dur: 1, vol: .06, type: "lowpass", f: 400, a: .2, hold: .5}); },
   "pounce.nip": t => S.tone({f: 600, t, dur: 1.0, vol: .12, a: .1, hold: .5, vib: [7, 80]}),   // rolling in catnip: a wobbly slide
   "pounce.zoomies": (t, o) => S.whoosh(t, 300, o.big ? 4000 : 2500, o.big ? .9 : .6, .35),   // a rising whoosh
   "pounce.mellow": t => S.slideDown(t, 700, 350, 1.0, .12),   // too mellow: a slow slide down
@@ -302,7 +305,7 @@ function newRun(n, seed) {
   game = {level: n, seed, r: seed, n: 0, t: 0, genY: 0, done: false,
     shelves: [{id: -1, kind: "floor", x: W / 2, y: 0, w: W, things: []}], items: [], falling: [],
     cat: {x: W / 2, y: 0, vx: 0, vy: 0, face: -1, landed: -1, on: null, off: 0, settle: 0, scared: 0, zoom: 0},
-    cam: -40, top: 0, fish: 0, knocked: 0, water: 0, springs: 0, nips: 0, touched: 0, fires: [], seenNew: {}, state: "ready", task: planTask(n, seed), ...G.freshClock()};
+    cam: -40, top: 0, fish: 0, knocked: 0, water: 0, springs: 0, nips: 0, touched: 0, fires: [], smoke: [], seenNew: {}, state: "ready", task: planTask(n, seed), ...G.freshClock()};
   if (n === ENDLESS) game.timed = false;
   build(game, VH + 200);
   aim = null; keys.l = keys.r = false;
@@ -480,8 +483,12 @@ function step(h) {
   }
   if (g.fires.length && g.state === "running") {   // a candle knocked off, still burning
     if (g.t - g.fires[0] >= FIRE_S) return humanCame();
-    if (Math.ceil(FIRE_S - (g.t - g.fires[0])) !== g.shownFire) { g.shownFire = Math.ceil(FIRE_S - (g.t - g.fires[0])); status(); }
+    if (Math.ceil(FIRE_S - (g.t - g.fires[0])) !== g.shownFire) { g.shownFire = Math.ceil(FIRE_S - (g.t - g.fires[0])); status(); G.sound.play("pounce.crackle"); }
+    // smoke rising up from below, thicker the longer it burns
+    if (Math.random() < h * (5 + (g.t - g.fires[0]))) g.smoke.push({x: SIDE + Math.random() * (W - 2 * SIDE), y: g.cam - 10, r: 8 + Math.random() * 8, born: g.t, vx: (Math.random() - .5) * 20});
   }
+  for (const m of g.smoke) { m.y += 45 * h; m.x += m.vx * h; m.r += 9 * h; }
+  if (g.smoke.length) g.smoke = g.smoke.filter(m => g.t - m.born < 3.5);
   // shelves and things left far below are put away; new ones are made above
   if (g.shelves.length > 60) g.shelves = g.shelves.filter(s => s.y > g.cam - 200);
   if (g.items.length > 30) g.items = g.items.filter(it => it.y > g.cam - 200);
@@ -646,6 +653,16 @@ function paint() {
     const gl = ctx.createLinearGradient(0, cam, 0, cam + 90), p = .45 + .15 * Math.sin(g.t * 7);
     gl.addColorStop(0, `rgba(225,106,74,${p})`); gl.addColorStop(1, "rgba(236,168,24,0)");
     ctx.fillStyle = gl; ctx.fillRect(0, cam - 10, W, 100);
+    // flames licking up from below the window
+    ctx.fillStyle = "#E16A4A"; ctx.strokeStyle = "#ECA818"; ctx.lineWidth = 2;
+    for (let x = SIDE + 12, i = 0; x < W - SIDE; x += 26, i++) {
+      const fh = 16 + 8 * Math.sin(g.t * (9 + i % 3) + i * 1.7) * (stillMotion.matches ? 0 : 1) + (i % 2) * 6;
+      ctx.beginPath(); ctx.moveTo(x - 9, cam - 2); ctx.quadraticCurveTo(x - 7, cam + fh * .6, x, cam + fh); ctx.quadraticCurveTo(x + 7, cam + fh * .6, x + 9, cam - 2); ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+  }
+  for (const m of g.smoke) {   // smoke, still drifting up for a moment after it's put out
+    const age = (g.t - m.born) / 3.5;
+    ctx.fillStyle = `rgba(90,85,95,${.32 * (1 - age)})`; ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, 7); ctx.fill();
   }
   if (g.state !== "won") cat();
   // the sides of the bookcase, and on a level, how far up you are (gold up the right-hand side)
