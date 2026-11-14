@@ -1643,7 +1643,8 @@ const G = (() => {
   /* ---------- sound ---------- */
   // Sound effects (the owner's call, 2026-11-14: on by default; turned off on the Settings page, for every game at once
   // or game by game, or with Sound in a game's own ☰ Menu). Every sound is made as it plays (Web Audio: oscillators,
-  // noise and filters, no files), each the owner's pick from a listening page of candidates. A browser plays nothing
+  // noise and filters), each the owner's pick from a listening page of candidates. A game can also play a recording
+  // (G.sound.clip: Moonpie's purr in Pawlette), loaded once the sound has started. A browser plays nothing
   // until the first tap or key, so the sound starts then. The page tells Safari it's background sound ("ambient"), so it
   // plays alongside someone's music and an iPhone's silent switch mutes it.
   // G.sound.play(name, o) plays one: the shared ones below (tap, put, wrong, hint, win, gold, lose; the win, gold-paw and
@@ -1653,6 +1654,7 @@ const G = (() => {
   const soundOn = slug => load(SOUND)[slug] !== false;
   const sound = (() => {
     let ctx = null, master = null, noiseBuf = null;
+    const clips = {}, wanted = {};   // recordings: name -> decoded sound, and name -> file (from the site's top folder)
     const VOLUME = .47;   // as loud as the listening page was when the owner picked (59 of 100)
     // How long each note, thump or swoosh lasts, as a share of how long it was when the owner picked it: they went on
     // too long (the owner, 2026-11-14). A sound's notes still start when they did; each one is shorter (its attack,
@@ -1672,6 +1674,7 @@ const G = (() => {
         master = ctx.createGain(); master.gain.value = VOLUME; master.connect(comp); comp.connect(ctx.destination);
         noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
         const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+        for (const name in wanted) fetchClip(name);
       }
       if (ctx.state !== "running" && !document.hidden) ctx.resume().catch(() => {});
       return ctx;
@@ -1751,8 +1754,18 @@ const G = (() => {
     const hiss = (t, dur = .55, vol = .35) => { noise({t, dur, vol, a: .04, hold: dur * .4, type: "highpass", f: 2600}); noise({t, dur, vol: vol * .6, a: .04, hold: dur * .4, f: 5200, q: 2}); };
     const slideDown = (t, f0 = 1100, f1 = 330, dur = .65, vol = .18) => tone({fs: [[0, f0], [dur, f1]], t, dur, vol, a: .03, hold: dur * .6, vib: [6, 14]});
     const mrrp = (t, vol = .55) => voice({t, fs: [[0, 380], [.08, 330], [.26, 480]], dur: .3, vol, trem: [30, .4]});   // "mrrp?": tape, everywhere (the owner, 2026-11-14)
+    // recordings: G.sound.clip(name, file) to have one ready (fetched once the sound starts), kit.clip(name, t, vol) to play
+    // it as it is (not shortened); kit.clip says false if it isn't there yet
+    function fetchClip(name) {
+      fetch(HOME + wanted[name]).then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status))
+        .then(b => new Promise((ok, bad) => ctx.decodeAudioData(b, ok, bad))).then(buf => { clips[name] = buf; }).catch(() => {});
+    }
+    function clip(name, t, vol = 1) {
+      const buf = clips[name]; if (!buf) return false;
+      const s = ctx.createBufferSource(), g = ctx.createGain(); s.buffer = buf; g.gain.value = vol; s.connect(g); g.connect(master); s.start(t); return true;
+    }
     const PENTA = [523, 587, 659, 784, 880, 1047, 1175, 1319, 1568, 1760, 2093, 2349, 2637, 3136];
-    const kit = {tone, noise, modal, bell, mallet, musicBox, voice, whoosh, thump, tick, boing, chirp, mrrp, hiss, slideDown, filt, vibrato, rnd, pick, PENTA};
+    const kit = {clip, tone, noise, modal, bell, mallet, musicBox, voice, whoosh, thump, tick, boing, chirp, mrrp, hiss, slideDown, filt, vibrato, rnd, pick, PENTA};
 
     // the moments every game shares (the owner's picks)
     const SOUNDS = {
@@ -1775,6 +1788,7 @@ const G = (() => {
       subs.forEach(f => f(v));
     }
     return {play, set, on, kit, context, define: map => Object.assign(SOUNDS, map),
+      clip: (name, file) => { wanted[name] = file; if (ctx) fetchClip(name); },
       out: () => master, onChange: f => subs.push(f), get ctx() { return ctx; }};
   })();
   // Sound in a game's own ☰ Menu (added after the page's own switches)

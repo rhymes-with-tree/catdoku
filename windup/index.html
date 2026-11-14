@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-14.4"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-14.5"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -24,7 +24,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-14.4">
+<link rel="stylesheet" href="../games.css?v=2026-11-14.5">
 <style>
 /* Gus sits on the rim of a basket and drops balls of yarn into it; two of a kind that touch wind into one bigger
    ball. Peanut watches from the corner with the next ball. Don't let the yarn pile up over the line. */
@@ -111,8 +111,8 @@ body.full .zoombox{width:auto;margin:0;display:flex;grid-column:3;grid-row:5;ali
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-14.4"></script>
-<script src="../colorways.js?v=2026-11-14.4"></script>
+<script src="../games.js?v=2026-11-14.5"></script>
+<script src="../colorways.js?v=2026-11-14.5"></script>
 <script>
 /* ---------- the basket ---------- */
 // World units: the basket is W wide and H deep; Gus sits CAT above its rim. Ten sizes of yarn ball, each winding up
@@ -313,7 +313,7 @@ function dropFloor() {
   const g = game;
   if (!g || !hasNet(g) || g.state !== "running" || g.net > 0 || $("overlay").classList.contains("show") || document.querySelector(".spot")) return;
   if (!g.netReady) { G.note("Not heavy enough yet: wind and drop more yarn first.", 2500); return; }
-  g.net = NET_FOR; g.shakeT = SHAKE_FOR;
+  g.net = NET_FOR; g.shakeT = SHAKE_FOR; G.sound.play("wu.floor");
   // a sifting shake: the big balls are bounced up and the small ones pushed down, so the small ones slip under them
   for (const b of g.balls) {
     if (b.r <= NET_HOLE + .5) { b.vy += 250; b.vx += (Math.random() - .5) * 200; }
@@ -389,6 +389,19 @@ function step(g, h) {
   for (const b of B) { b.vx *= .9995; b.vy *= .9995; if (b.vx * b.vx + b.vy * b.vy < .25 && b.age > .3) { b.vx *= .9; b.vy *= .9; } b.a += b.w * h; }
   return merges;
 }
+/* ---------- sound ---------- */
+// The owner's picks from the listening page (2026-11-14), played through G.sound (games.js; on unless Settings turns it off).
+const SND = G.sound.kit;
+G.sound.define({
+  "wu.drop": t => SND.whoosh(t, 1400, 700, .15, .15),   // a soft whoosh as Gus lets go
+  "wu.land": (t, o) => SND.thump(t, .3 * (o.v || 1), 130),   // a soft thump, softer for a gentler landing
+  "wu.merge": (t, o) => { const p = 1.6 / Math.sqrt(o.n || 3); SND.tone({fs: [[0, 300 * p], [.05, 1200 * p]], t, dur: .06, vol: .22}); },   // a pop, lower for a bigger ball
+  "wu.goal": t => [1319, 1568, 1976].forEach((f, i) => SND.bell({f, t: t + i * .06, dur: .45, vol: .08, ratio: 2.01, index: .6})),   // sparkle
+  "wu.over": (t, o) => SND.tick(t, .14, (o.k || 0) % 2 ? 1500 : 2200),   // tick-tock while the yarn's over the line
+  "wu.shake": t => SND.tone({f: 160, type: "triangle", t, dur: .6, vol: .2, a: .02, hold: .3, vib: [9, 50]}),   // wobble, as in Pawlinko
+  "wu.defluff": t => SND.noise({t, dur: .35, vol: .2, type: "highpass", fs: [[0, 2000], [.35, 5000]], a: .05, hold: .15}),   // a brush
+  "wu.floor": t => SND.thump(t, .45, 80),   // a thunk
+});
 function mergeAll(g, pairs) {
   const used = new Set(), gone = new Set(), made = [];
   for (const [a, c] of pairs) {
@@ -405,6 +418,7 @@ function mergeAll(g, pairs) {
     g.fx.push({x, y, r: RAD[l], t: 0, T: .4, c: p ? "#9F9DA2" : COLOR[l], to: nb});
   }
   g.balls = g.balls.filter(b => !gone.has(b)).concat(made);
+  if (made.length) G.sound.play("wu.merge", {n: Math.max(...made.map(b => b.l))});
   if (pairs.length) status();
 }
 function mk(x, y, l, o = {}) { return Object.assign({x, y, px: x, py: y, vx: 0, vy: 0, l, r: RAD[l], a: Math.random() * 6.28, w: 0, age: 0, pop: 1, p: false}, o); }
@@ -414,6 +428,8 @@ function tick(g, dt) {
   while (g.acc >= STEP) {
     g.acc -= STEP;
     for (let s = 0; s < SUB; s++) { const m = step(g, STEP / SUB); if (m.length) mergeAll(g, m); }
+    // a dropped ball's first landing (its fall stopped short), for its thump
+    for (const b of g.balls) { if (b.drop && b.vy < (b.lastVy || 0) - 120) { G.sound.play("wu.land", {v: Math.max(.35, Math.min(1, b.lastVy / 500))}); b.drop = false; } b.lastVy = b.vy; }
     for (const b of g.balls) { b.age += STEP; if (b.pop < 1) b.pop = Math.min(1, b.pop + STEP * .35 / (TUNE.WIND * .9)); if (b.born < 1) b.born += STEP; }
     g.cool = Math.max(0, g.cool - STEP); g.shakeT = Math.max(0, (g.shakeT || 0) - STEP); g.shakeCool = Math.max(0, (g.shakeCool || 0) - STEP);
     for (const f of g.fx) f.t += STEP; g.fx = g.fx.filter(f => f.t < f.T);
@@ -421,6 +437,7 @@ function tick(g, dt) {
     if (hasNet(g)) netTick(g);
     const over = g.balls.some(b => b.age > GRACE && b.y - b.r < g.line);
     g.overT = over ? g.overT + STEP : Math.max(0, g.overT - STEP * 2);
+    const tk = over ? Math.floor(g.overT / .3) : 0; if (tk && tk !== g.tickK) G.sound.play("wu.over", {k: tk}); g.tickK = tk;
     if (g.best >= GOALS[g.level]) return win();
     if (g.overT > LOSE_AFTER) return lose();
   }
@@ -528,7 +545,7 @@ function drop() {
   if (!g || !["ready", "running"].includes(g.state) || g.cool > 0 || $("overlay").classList.contains("show") || document.querySelector(".spot")) return;
   if (g.state === "ready") { if (!g.started) G.track(`Wind Up started level ${g.level}`); g.state = "running"; g.started = true; $("tapgo").hidden = true; }
   const {l, p} = nextOf(g);
-  g.balls.push(mk(clampAim(g.aim), RAD[l] + 2, l, {p, vy: 60, vx: (Math.random() - .5) * TUNE.DROP_NUDGE})); g.i++; g.cool = COOL;
+  g.balls.push(mk(clampAim(g.aim), RAD[l] + 2, l, {p, vy: 60, vx: (Math.random() - .5) * TUNE.DROP_NUDGE, drop: true})); g.i++; g.cool = COOL; G.sound.play("wu.drop");
   status(); paintHud(); save();
 }
 function aimTo(e) {
@@ -560,7 +577,7 @@ function shake() {
   if (!g || !["running", "won"].includes(g.state) || $("overlay").classList.contains("show") || document.querySelector(".spot")) return;
   if (g.shakeCool > 0) { G.note("Give the yarn a moment to settle.", 1800); return; }
   for (const b of g.balls) { const lift = 1050 / Math.sqrt(b.r / 11) * (.55 + Math.random() * .6); b.vy -= lift; b.vx += (Math.random() - .5) * 700; b.w = (Math.random() - .5) * 2 * TUNE.SPIN * 2; b.age = -2.5; }
-  g.overT = 0; g.shakeT = SHAKE_FOR; g.shakeCool = 3;
+  g.overT = 0; g.shakeT = SHAKE_FOR; g.shakeCool = 3; G.sound.play("wu.shake");
   if (g.state === "won") return;   // just for fun: nothing more to win or lose
   helped(g, "Shaken!");
   g.shook = true; status(); save();
@@ -572,7 +589,7 @@ function defluff() {
   const fluff = g.balls.filter(b => b.p);
   if (!fluff.length) { G.note("No fluffballs on the board right now.", 2500); return; }
   for (const b of fluff) g.fx.push({puff: true, l: b.l, x: b.x, y: b.y, r: b.r, a: b.a, t: 0, T: .45});
-  helped(g, "All the fluff is gone.");
+  helped(g, "All the fluff is gone."); G.sound.play("wu.defluff");
   g.balls = g.balls.filter(b => !b.p); g.fluffed = true;
   status(); save();
 }
@@ -613,7 +630,7 @@ function revive(g, how) {
   status(); save();
 }
 function win() {
-  game.state = "won"; G.finishClock(game);
+  game.state = "won"; G.finishClock(game); G.sound.play("wu.goal");
   // a finale: the finished ball pops up and rings of colour spread out from it, before the card
   const top = game.balls.find(b => b.l === GOALS[game.level] && !b.p);
   if (top) { top.pop = .7; top.born = 1; ["#ECA818", "#E16A4A", "#B94588"].forEach((c, k) => game.fx.push({x: top.x, y: top.y, r: top.r, t: -k * .22, T: .9, c, grow: 1.4})); }

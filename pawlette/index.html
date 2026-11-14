@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-14.4";
+  var BUILD = "2026-11-14.5";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-14.4">
+<link rel="stylesheet" href="../games.css?v=2026-11-14.5">
 <style>
 /* Pawlette: Mix to order. A skein of yarn waits to be dyed in one of Yarn's colourways, a colour at a time. Tap the
    pots to drip paint into the cup, mixing like real paint, until it matches the colour for the next stretch; a
@@ -121,8 +121,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-14.4"></script>
-<script src="../colorways.js?v=2026-11-14.4"></script>
+<script src="../games.js?v=2026-11-14.5"></script>
+<script src="../colorways.js?v=2026-11-14.5"></script>
 <script>
 /* ---------- paint (plain functions) ---------- */
 // A mix is drops of each pot: [red, yellow, blue, white, black]. Its colour: the red-yellow-blue part blended
@@ -297,12 +297,27 @@ const NAPPERS = ["c14-36", "c16-5", "c14-34", "c15-6", "c14-35", "c15-5", "c16-3
 let napper = G.load("niptrip.cat").cat;
 if (!NAPPERS.includes(napper)) { napper = NAPPERS[Math.floor(Math.random() * NAPPERS.length)]; G.save("niptrip.cat", {cat: napper}); }
 $("napImg").src = (window.CAT_SRC || {})[napper] || `../cats/${napper}.webp`;
-function purr() {
+/* ---------- sound ---------- */
+// The owner's picks from the listening page (2026-11-14), played through G.sound (games.js; on unless Settings turns it off).
+// The napping cat purrs with Moonpie's own purr (a clip of the owner's recording).
+const SND = G.sound.kit;
+G.sound.clip("purr", "cats/moonpie-purr-short.mp3");
+G.sound.define({
+  "pal.drip": t => SND.tone({fs: [[0, 500], [.05, 1500]], t, dur: .05, vol: .2}),   // plip
+  "pal.empty": t => SND.noise({t, dur: .4, vol: .3, type: "lowpass", fs: [[0, 1500], [.4, 400]], a: .03, hold: .15}),   // pour out
+  "pal.dye": t => { SND.tone({fs: [[0, 300], [.12, 140]], t, dur: .14, vol: .3}); for (let i = 0; i < 3; i++) { const f = SND.rnd(900, 2300); SND.tone({fs: [[0, f], [.05, f * 1.5]], t: t + .05 + SND.rnd(.04, .25), dur: .06, vol: .05}); } },   // dunk
+  "pal.perfect": t => [1319, 1568, 1976].forEach((f, i) => SND.bell({f, t: t + i * .06, dur: .45, vol: .08, ratio: 2.01, index: .6})),   // sparkle
+  "pal.close": t => { SND.tone({f: 1319, type: "triangle", t, dur: .08, vol: .15}); SND.tone({f: 1976, type: "triangle", t: t + .07, dur: .14, vol: .15}); },   // two notes up: So close! or Nice!
+  "pal.notQuite": t => { SND.tone({f: 330, type: "triangle", t, dur: .14, vol: .25}); SND.tone({f: 247, type: "triangle", t: t + .13, dur: .24, vol: .25}); },   // a soft bonk
+  "pal.purr": t => SND.clip("purr", t, .8),
+});
+function purr(after = 0) {
+  G.sound.play("pal.purr", {}, after);
   const n = $("napper"); n.classList.remove("purr"); void n.offsetWidth; n.classList.add("purr");
   setTimeout(() => n.classList.remove("purr"), 1100);
   const f = document.createElement("span"); f.className = "float prr"; f.textContent = "prrr ♥"; n.append(f); setTimeout(() => f.remove(), 2500);
 }
-$("napper").onclick = purr;
+$("napper").onclick = () => purr();
 
 /* ---------- playing ---------- */
 const snap = () => JSON.stringify({at: game.at, cup: game.cup, dyed: game.dyed});
@@ -313,7 +328,7 @@ const undo = G.history({game: () => game, take: snap, back: (h, g) => Object.ass
 function addDrop(i) {
   if (!playing() || !levelSpec(game.level).pots[i]) return;
   game.started = true; undo.push();
-  game.cup[i]++; hints.clear(false);
+  game.cup[i]++; hints.clear(false); G.sound.play("pal.drip");
   // even a perfect mix waits for Dye it, so you see it first
   draw(); save();
 }
@@ -323,7 +338,8 @@ function dye(perfect) {
   const p = pct(closeness()), word = perfect ? "Perfect!" : p >= 90 ? "So close!" : p >= 75 ? "Nice!" : "Not quite", tip = perfect ? "" : advice(p);
   G.note(perfect ? (drops(game.cup) === drops(t.d) ? "Perfect, in the fewest drops!" : "Perfect match!") : `${word.endsWith("!") ? word : word + "."}${tip ? ` ${tip} would have matched it better.` : ""}`, 2600);
   popScore(perfect, p >= 75, word, tip);
-  if (perfect) purr();
+  G.sound.play("pal.dye"); G.sound.play(perfect ? "pal.perfect" : p >= 75 ? "pal.close" : "pal.notQuite", {}, .3);
+  if (perfect) purr(.7);
   // the target and your mix stay on the swatches until the score has gone, then the next colour comes in
   held = {target: t.rgb, cup: cupRGB(), n: drops(game.cup)};
   game.at++; game.cup = [0, 0, 0, 0, 0]; save();
@@ -355,7 +371,7 @@ function advice(p) {
 }
 $("pots").addEventListener("click", e => { const b = e.target.closest(".pot"); if (b) addDrop(+b.dataset.i); });
 $("dyeBtn").onclick = () => { if (!playing() || !drops(game.cup)) return; undo.push(); dye(closeness() < PERFECT); };
-$("emptyBtn").onclick = () => { if (!playing() || !drops(game.cup)) return; undo.push(); game.cup = [0, 0, 0, 0, 0]; draw(); save(); };
+$("emptyBtn").onclick = () => { if (!playing() || !drops(game.cup)) return; undo.push(); game.cup = [0, 0, 0, 0, 0]; draw(); save(); G.sound.play("pal.empty"); };
 // Restart starts the whole strand again (and costs the gold paw), so once anything's dyed it asks first, and offers
 // Empty the cup (free) for just this colour.
 function restartStrand() {

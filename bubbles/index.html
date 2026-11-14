@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-14.4"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-14.5"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -24,7 +24,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-14.4">
+<link rel="stylesheet" href="../games.css?v=2026-11-14.5">
 <style>
 /* Toys in soap bubbles, clinging under a shelf, and a cat at the bottom batting more up. */
 .wrap{height:auto}
@@ -84,7 +84,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-14.4"></script>
+<script src="../games.js?v=2026-11-14.5"></script>
 <script>
 const $ = G.$;
 G.nav("bubbles");
@@ -470,6 +470,21 @@ function goalChip([type, k]) {
 const sleep = s => new Promise(res => setTimeout(res, s * 1000));
 const SPEED = 24;   // bubble widths a second
 const CHEERS = ["Nice!", "Pounce!", "Purr-fect!", "Meow-velous!", "Cat-tastic!", "Paws-itively amazing!"];
+/* ---------- sound ---------- */
+// The owner's picks from the listening page (2026-11-14), played through G.sound (games.js; on unless Settings turns it off).
+const SND = G.sound.kit;
+const bubPop = (t, p, vol) => SND.tone({fs: [[0, 300 * p], [.05, 1200 * p]], t, dur: .06, vol});
+G.sound.define({
+  "bub.bat": t => SND.tone({fs: [[0, 260], [.14, 620]], t, dur: .14, vol: .2, a: .01}),   // a soft boing
+  "bub.bounce": t => SND.modal({t, parts: [[2100, 1, .05], [4700, .4, .03]], vol: .14, click: 3500}),   // a tink off the side
+  "bub.stick": t => SND.tone({fs: [[0, 600], [.08, 250]], t, dur: .08, vol: .2}),   // a soft plop
+  "bub.pop": (t, o) => { for (let i = 0; i < (o.n || 4); i++) bubPop(t + i * .035, SND.rnd(.9, 1.5), .16); },   // bubble pops, one for each
+  "bub.fall": (t, o) => { for (let i = 0; i < (o.n || 4); i++) SND.tick(t + i * .05, .1, 2600 - i * 250); },   // a patter down
+  "bub.kitten": t => SND.voice({t, fs: [[0, 420], [.07, 380], [.2, 620]], dur: .24, vol: .5, trem: [32, .45], formants: [[800, 5], [1500, 6]]}),   // mrrp!
+  "bub.shelf": t => SND.thump(t, .4, 90),   // a low thunk
+  "bub.powered": t => [1319, 1568, 1976].forEach((f, i) => SND.bell({f, t: t + i * .06, dur: .45, vol: .08, ratio: 2.01, index: .6})),   // sparkle: a zoomies or bouncy bubble earned
+  "bub.tangle": t => { SND.tone({f: 330, type: "triangle", t, dur: .15, vol: .15}); SND.tone({f: 660, t, dur: .08, vol: .05}); },   // a pluck
+});
 async function bat() {
   if (busy || !S || S.over || fly) return;
   const f = flight(S.d.B, aim); if (!f) return;
@@ -477,6 +492,8 @@ async function bat() {
   const game = S, d = S.d, shot = d.queue[0];
   let len = 0; for (let i = 1; i < f.path.length; i++) len += Math.hypot(f.path[i][0] - f.path[i - 1][0], f.path[i][1] - f.path[i - 1][1]);
   fly = {shot, path: f.path, t0: now, len};
+  G.sound.play("bub.bat");
+  let so = 0; for (let i = 1; i < f.path.length - 1; i++) { so += Math.hypot(f.path[i][0] - f.path[i - 1][0], f.path[i][1] - f.path[i - 1][1]); G.sound.play("bub.bounce", {}, so / SPEED); }   // each bounce off a side
   await sleep(len / SPEED);
   if (S !== game) return;   // a new level was started meanwhile
   fly = null;
@@ -490,11 +507,16 @@ async function bat() {
   for (const [r, c, k] of res.pop) if (k === KIT) { const [x, y] = at(r, c); effects.push({type: "freed", cat: kitten(r, c), x, y, t0: now + 0.1, dur: 1.3}); }
   tally(d, res);
   const ev = afterBat(d, res);
+  if (res.pop.length) G.sound.play("bub.pop", {n: Math.min(8, res.pop.length)}, .06); else G.sound.play("bub.stick");
+  if (res.fall.length) G.sound.play("bub.fall", {n: Math.min(6, res.fall.length)}, .15);
+  if (res.pop.some(x => x[2] === YARN)) G.sound.play("bub.tangle", {}, .1);
+  if (res.pop.concat(res.fall).some(x => x[2] === KIT)) G.sound.play("bub.kitten", {}, .3);
+  if (ev.earned) G.sound.play("bub.powered", {}, .4);
   const n = res.pop.length + res.fall.length;
   if (n >= 10 || res.fall.length >= 4) effects.push({type: "cheer", text: CHEERS[Math.min(Math.floor(n / 6), CHEERS.length - 1)], t0: now + 0.2, dur: 1.1});
   if (ev.earned === ZOOM) G.note("Three pops in a row: your next bubble has the zoomies! It clears the row it sticks in.", 5000);
   if (ev.earned === BOUNCY) G.note("Big drop! Your next bubble is bouncy: it pops everything round about where it sticks.", 5000);
-  if (ev.lowered) { shelfFrom = shelf; shelfT0 = now + 0.3; G.note("The shelf came down a row.", 2500); }
+  if (ev.lowered) { G.sound.play("bub.shelf", {}, .3); shelfFrom = shelf; shelfT0 = now + 0.3; G.note("The shelf came down a row.", 2500); }
   if (ev.pushed) { wob = new Map(); G.note(ev.pushed > 1 ? "More bubbles!" : "", 1500); }
   hud(); save();
   await sleep(0.35);
@@ -861,7 +883,7 @@ function aimAt(x, y) { if (y < SY - 0.2) aim = Math.min(PI - MIN_AIM, Math.max(M
 const onNext = (x, y) => Math.hypot(x - 1.25, y - SY - 0.1) < 0.75;
 function swap() {
   if (!S || S.over || busy || fly) return;
-  const q = S.d.queue; [q[0], q[1]] = [q[1], q[0]]; save();
+  const q = S.d.queue; [q[0], q[1]] = [q[1], q[0]]; save(); G.sound.play("tap");
 }
 canvas.addEventListener("pointerdown", e => {
   if (!S || S.over) return;

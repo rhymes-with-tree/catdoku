@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-14.4"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-14.5"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -24,7 +24,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-14.4">
+<link rel="stylesheet" href="../games.css?v=2026-11-14.5">
 <style>
 /* A quilted play mat in a wooden frame, covered in toys. */
 .wrap canvas{display:block;width:100%;height:100%;border:3px solid #5C3A22;border-radius:12px;touch-action:none;
@@ -82,7 +82,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-14.4"></script>
+<script src="../games.js?v=2026-11-14.5"></script>
 <script>
 const $ = G.$;
 G.nav("pounce");
@@ -366,11 +366,26 @@ const sleep = s => new Promise(res => setTimeout(res, s * 1000));
 function slide(t, i, dur, fall) { t.fx = t.x; t.fy = t.y; t.tx = i % N; t.ty = Math.floor(i / N); t.t0 = now; t.dur = dur; t.fall = fall; }
 function neighbours(a, b) { return Math.abs(a - b) === N || (Math.abs(a - b) === 1 && Math.floor(a / N) === Math.floor(b / N)); }
 
+/* ---------- sound ---------- */
+// The owner's picks from the listening page (2026-11-14), played through G.sound (games.js; on unless Settings turns it off).
+const SND = G.sound.kit;
+G.sound.define({
+  "p3.swap": t => SND.whoosh(t, 1200, 2200, .1, .15),   // a soft swish
+  "p3.match": t => SND.tone({fs: [[0, 300], [.05, 1200]], t, dur: .06, vol: .25}),   // pop
+  "p3.chain": (t, o) => SND.mallet({f: SND.PENTA[Math.min(13, 4 + (o.n || 1))], t, dur: .3, vol: .15}),   // each match after the first a note higher
+  "p3.fall": t => { for (let i = 0; i < 3; i++) SND.noise({t: t + i * .05, dur: .03, vol: .08, type: "lowpass", f: 900}); },   // a soft patter
+  "p3.special": t => [1319, 1568, 1976].forEach((f, i) => SND.bell({f, t: t + i * .06, dur: .45, vol: .08, ratio: 2.01, index: .6})),   // sparkle
+  "p3.zoomies": t => SND.whoosh(t, 300, 2500, .5, .3),   // a rising whoosh
+  "p3.bouncy": t => { SND.boing(t, 150, 450, .4, .25); SND.thump(t, .3, 120); },   // a boing burst
+  "p3.catnip": t => { SND.tone({f: 600, t, dur: .8, vol: .1, a: .08, hold: .4, vib: [7, 80]}); [1319, 1568, 1976].forEach((f, i) => SND.bell({f, t: t + .1 + i * .06, dur: .45, vol: .08, ratio: 2.01, index: .6})); },   // a wobbly sparkle
+  "p3.shuffle": t => { for (let i = 0; i < 18; i++) SND.tick(t + SND.rnd(0, .6), .16, SND.rnd(1800, 4000)); },   // rattle
+  "p3.crunch": t => { SND.chirp(t, .45); SND.chirp(t + .22, .45, 1.15); },   // two chirps: Crunch cheers a chain
+});
 async function trySwap(a, b) {
   if (busy || !S || S.over || !neighbours(a, b)) return;
   busy = true; picked = -1; hint = null; made = [];
   const game = S, g = S.g;
-  swapCells(g, a, b); slide(g[a], a, 0.16); slide(g[b], b, 0.16);
+  swapCells(g, a, b); slide(g[a], a, 0.16); slide(g[b], b, 0.16); G.sound.play("p3.swap");
   await sleep(0.17);
   if (S !== game) return;   // a new level was started meanwhile
   const plan = swapPlan(g, a, b);
@@ -378,7 +393,7 @@ async function trySwap(a, b) {
     swapCells(g, a, b); slide(g[a], a, 0.16); slide(g[b], b, 0.16);
     await sleep(0.17);
     if (S !== game) return;
-    G.note("That swap doesn't line up three.", 2000);
+    G.note("That swap doesn't line up three.", 2000); G.sound.play("wrong");
     busy = false; hintAt = now + 4; return;
   }
   if (S.level) S.d.moves--;
@@ -401,6 +416,10 @@ async function settle(plan) {
     const keep = new Set(plan.make.map(m => m.i));
     const fx = blast(g, plan.clear, keep);
     for (const f of fx) effects.push({type: f.sp, i: f.i, k: f.k, t0: now, dur: 0.4});
+    G.sound.play("p3.match"); if (round >= 2) G.sound.play("p3.chain", {n: round - 1}, .02);
+    for (const sp of new Set(fx.map(f => f.sp))) G.sound.play(sp === NIP ? "p3.catnip" : sp === BOMB ? "p3.bouncy" : "p3.zoomies", {}, .03);
+    if (plan.make.length) G.sound.play("p3.special", {}, .1);
+    if (round === 2) G.sound.play("p3.crunch", {}, .3);
     for (const i of plan.clear) {
       const t = g[i];
       for (const gl of S.d.goals) if (gl.k === t.k && gl.got < gl.need) gl.got++;
@@ -420,6 +439,7 @@ async function settle(plan) {
       const dist = Math.floor(i / N) - t.y;
       if (dist > 0.01) { const dur = 0.1 + 0.07 * Math.sqrt(dist * 6); longest = Math.max(longest, dur); slide(t, i, dur, true); }
     });
+    if (longest) G.sound.play("p3.fall", {}, longest * .7);
     await sleep(longest + 0.05);
     if (S !== game) return false;
     plan = planMatches(g, []);
@@ -431,7 +451,7 @@ function afterMove() {
   if (S.level && S.d.goals.every(gl => !left(gl))) return win();
   if (S.level && !S.d.moves) return outOfMoves();
   if (!findMove(S.g)) {
-    G.note("No swaps left, so the toys get a shake.", 3000);
+    G.note("No swaps left, so the toys get a shake.", 3000); G.sound.play("p3.shuffle");
     S.g = remix(S.g, S.d.kinds);
     S.g.forEach((t, i) => { if (t.x === undefined) { t.x = i % N; t.y = Math.floor(i / N) - N; } slide(t, i, 0.45); });
     save();
