@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-14.3"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-14.4"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-14.3">
+<link rel="stylesheet" href="../games.css?v=2026-11-14.4">
 <style>
 /* Three tall windows side by side, each with three panes. Birds land outside a pane for a moment: tap it to have
    Bugsy or Bowtie spot one. Squirrels and falling leaves go past too; leave
@@ -91,7 +91,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-14.3"></script>
+<script src="../games.js?v=2026-11-14.4"></script>
 <script>
 /* ---------- levels ---------- */
 // Level n: [birds in the flock, how long a bird stays (ms), time between arrivals (ms), most things at the windows
@@ -314,9 +314,19 @@ function draw() {
 
 /* ---------- tapping a window ---------- */
 const isBird = th => BIRDS.some(b => b.k === th.k);
+/* ---------- sound ---------- */
+// The owner's picks from the listening page (2026-11-14), played through G.sound (games.js; on unless Settings turns it off).
+// A leaf, a squirrel or empty glass gets every game's low buzz. Nothing yet for the human stirring or waking.
+const S = G.sound.kit;
+G.sound.define({
+  "bird.glass": t => S.modal({t, parts: [[2100, 1, .05], [4700, .4, .03]], vol: .18, click: 3500}),   // a tink on the glass, every tap
+  "bird.spot": t => { for (const d of [0, .09]) S.tone({fs: [[0, 3000], [.03, 4200], [.06, 3400]], t: t + d, dur: .07, vol: .07}); },   // chirp
+  "bird.away": t => S.noise({t, dur: .28, vol: .1, f: 1400, q: .8, a: .01, trem: [24, .85]}),   // a faint flutter
+  "bird.wipe": t => S.noise({t, dur: .5, vol: .3, fs: [[0, 800], [.25, 2400], [.5, 900]], q: 3, a: .05, hold: .25}),   // squeegee, as in Pawlinko
+});
 // A bird that flew off unspotted. One too many and the level's lost; the last of the flock ends the run.
 function escaped() {
-  game.escaped++; status();
+  game.escaped++; status(); G.sound.play("bird.away");
   if (game.escaped > game.away) lost();
   else if (game.spotted + game.escaped >= game.flock) win();
   else G.note(game.escaped === game.away ? "One got away! Don't let another." : "One got away!", 1800);
@@ -327,7 +337,7 @@ function tap(w) {
   if (game.state === "paused") { resume(); return; }
   if (game.state !== "running") return;
   // every tap makes a noise, bird or no bird
-  game.taps++;
+  game.taps++; G.sound.play("bird.glass");
   const th = game.up[w];
   if (th && isBird(th) && !th.caught) spot(w, th);
   else if (th && !isBird(th)) bump(w, th);
@@ -344,7 +354,7 @@ const SMUDGE = (cx, cy, r) => `<g transform="translate(${cx} ${cy}) rotate(${r})
   <path d="M0 -2 C8 -2 13 6 11 11 C9 15 4 13 0 13 C-4 13 -9 15 -11 11 C-13 6 -8 -2 0 -2 Z"/><ellipse cx="0" cy="4" rx="17" ry="13" opacity=".5"/>
   <ellipse cx="-11" cy="-7" rx="3.6" ry="4.6"/><ellipse cx="-4" cy="-13" rx="3.6" ry="4.6"/><ellipse cx="4" cy="-13" rx="3.6" ry="4.6"/><ellipse cx="11" cy="-7" rx="3.6" ry="4.6"/></g>`;
 function spot(w, th) {
-  th.caught = game.t; game.spotted++;
+  th.caught = game.t; game.spotted++; G.sound.play("bird.spot");
   // a paw on the glass, which leaves a smudge behind
   const b = spotBox(w), paw = wins[w].querySelector(".paw"), x = b.x + b.w / 2 + (Math.random() - .5) * b.w * .4, y = b.y + b.h / 2 + (Math.random() - .5) * b.h * .3;
   paw.innerHTML = PAW(x, y);
@@ -355,6 +365,7 @@ function spot(w, th) {
   if (game.spotted + game.escaped >= game.flock) win();
 }
 function bump(w, th) {
+  G.sound.play("wrong");
   const el = wins[w]; el.classList.remove("bumped"); void el.getBoundingClientRect(); el.classList.add("bumped");
   clearTimeout(el.timer); el.timer = setTimeout(() => el.classList.remove("bumped"), 450);
   G.note(th ? `That's ${th.k === "leaf" ? "a leaf" : "a squirrel"}!` : "No bird there!", 1800);
@@ -435,7 +446,7 @@ $("wipeBtn").onclick = () => {
   if (!game || !game.wipes || !["running", "paused"].includes(game.state)) return;
   game.wipes--; game.helped = true;
   for (const w of wins) { const sm = w.querySelector(".smudge"); sm.classList.add("wiped"); clearTimeout(sm.timer); sm.timer = setTimeout(() => { sm.innerHTML = ""; sm.classList.remove("wiped"); status(); }, 420); }
-  G.note("Squeaky clean!", 1800); status();
+  G.note("Squeaky clean!", 1800); status(); G.sound.play("bird.wipe");
 };
 function goldPic() { const im = new Image(); im.className = "goldpic"; im.src = catSrc("bugsy-bowtie-window"); im.alt = "Bugsy and Bowtie up at the window together"; return im; }
 function win() {

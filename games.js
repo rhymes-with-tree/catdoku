@@ -1702,12 +1702,14 @@ const G = (() => {
       if (vib) vibrato(o.frequency, t, dur, vib[0], vib[1], vib[2]);
       env(g.gain, t, a, vol, dur, hold); o.connect(g); g.connect(out); o.start(t); o.stop(t + dur + .05);
     }
-    function noise({t, dur, vol = .3, a = .003, hold = 0, type = "bandpass", f = 1000, fs, q = 1, out = master}) {
+    function noise({t, dur, vol = .3, a = .003, hold = 0, type = "bandpass", f = 1000, fs, q = 1, out = master, trem}) {
       const r = shorter(dur); dur *= r; a *= r; hold *= r; fs = squeeze(r, fs);
       const s = ctx.createBufferSource(), b = ctx.createBiquadFilter(), g = ctx.createGain();
       s.buffer = noiseBuf; b.type = type; b.Q.value = q;
       if (fs) path(b.frequency, t, fs); else b.frequency.setValueAtTime(f, t);
-      env(g.gain, t, a, vol, dur, hold); s.connect(b); b.connect(g); g.connect(out);
+      env(g.gain, t, a, vol, dur, hold); s.connect(b); b.connect(g);
+      if (trem) { const tg = ctx.createGain(); tg.gain.value = 1 - trem[1]; vibrato(tg.gain, t, dur, trem[0], trem[1]); g.connect(tg); tg.connect(out); }   // a flutter: [rate, depth]
+      else g.connect(out);
       s.start(t, rnd(0, 1.5)); s.stop(t + dur + .05);
     }
     // something struck: a few partials, each dying away at its own rate, and a tick of noise for the hit
@@ -1734,7 +1736,8 @@ const G = (() => {
     function voice({t, fs, dur, vol = .5, formants = [[700, 5], [1250, 6]], trem, type = "sawtooth", a = .02}) {
       const r = shorter(dur); dur *= r; a *= r; fs = squeeze(r, fs);
       const o = ctx.createOscillator(), sum = ctx.createGain(), g = ctx.createGain(); o.type = type; path(o.frequency, t, fs);
-      for (const [f, q] of formants) { const b = ctx.createBiquadFilter(); b.type = "bandpass"; b.frequency.value = f; b.Q.value = q; o.connect(b); b.connect(sum); }
+      // each vowel filter [f, q], or [f, q, f1] gliding from f to f1 (a meow's "mi-ow")
+      for (const [f, q, f1] of formants) { const b = ctx.createBiquadFilter(); b.type = "bandpass"; b.frequency.setValueAtTime(f, t); if (f1) b.frequency.exponentialRampToValueAtTime(f1, t + dur); b.Q.value = q; o.connect(b); b.connect(sum); }
       env(g.gain, t, a, vol, dur);
       if (trem) { const tg = ctx.createGain(); tg.gain.value = 1 - trem[1]; vibrato(tg.gain, t, dur, trem[0], trem[1]); sum.connect(tg); tg.connect(g); }
       else sum.connect(g);
@@ -1747,8 +1750,9 @@ const G = (() => {
     const chirp = (t, vol = .5, up = 1) => voice({t, fs: [[0, 420 * up], [.07, 380 * up], [.2, 620 * up]], dur: .24, vol, trem: [32, .45], formants: [[800, 5], [1500, 6]]});
     const hiss = (t, dur = .55, vol = .35) => { noise({t, dur, vol, a: .04, hold: dur * .4, type: "highpass", f: 2600}); noise({t, dur, vol: vol * .6, a: .04, hold: dur * .4, f: 5200, q: 2}); };
     const slideDown = (t, f0 = 1100, f1 = 330, dur = .65, vol = .18) => tone({fs: [[0, f0], [dur, f1]], t, dur, vol, a: .03, hold: dur * .6, vib: [6, 14]});
+    const mrrp = (t, vol = .55) => voice({t, fs: [[0, 380], [.08, 330], [.26, 480]], dur: .3, vol, trem: [30, .4]});   // "mrrp?": tape, everywhere (the owner, 2026-11-14)
     const PENTA = [523, 587, 659, 784, 880, 1047, 1175, 1319, 1568, 1760, 2093, 2349, 2637, 3136];
-    const kit = {tone, noise, modal, bell, mallet, musicBox, voice, whoosh, thump, tick, boing, chirp, hiss, slideDown, filt, vibrato, rnd, pick, PENTA};
+    const kit = {tone, noise, modal, bell, mallet, musicBox, voice, whoosh, thump, tick, boing, chirp, mrrp, hiss, slideDown, filt, vibrato, rnd, pick, PENTA};
 
     // the moments every game shares (the owner's picks)
     const SOUNDS = {
@@ -1756,14 +1760,14 @@ const G = (() => {
       put: t => thump(t, .4, 200),   // felt thump
       wrong: t => tone({f: 110, type: "square", t, dur: .2, vol: .12, out: filt("lowpass", 650)}),   // a low buzz
       hint: t => [1319, 1568, 1976].forEach((f, i) => bell({f, t: t + i * .06, dur: .45, vol: .08, ratio: 2.01, index: .6})),   // sparkle
-      win: t => { [392, 523, 659].forEach((f, i) => mallet({f, t: t + i * .1, dur: .35, vol: .2})); [523, 659, 784, 1047].forEach(f => mallet({f, t: t + .36, dur: 1.1, vol: .13})); },   // marimba ta-da
+      win: t => [1047, 1319, 1568, 2093].forEach((f, i) => musicBox({f, t: t + i * .13, dur: i === 3 ? 1.6 : .8})),   // music box (the marimba ta-da until 2026-11-14)
       gold: t => [523, 784, 1047, 1319].forEach((f, i) => bell({f, t: t + i * .02, dur: 2.6, vol: .08, ratio: 3.5, index: 1.6})),   // big bells
       lose: t => { mallet({f: 659, t, dur: .4, vol: .18}); mallet({f: 523, t: t + .22, dur: .7, vol: .18}); },   // oh well
     };
     function play(name, o = {}, delay = 0) {
       const f = SOUNDS[name];
       if (!f || !on() || document.hidden || !ctx || ctx.state !== "running") return;
-      try { f(ctx.currentTime + .01 + delay, o); } catch (e) {}
+      try { f(ctx.currentTime + .01 + delay, o); } catch (e) { console.error("sound", name, e); }
     }
     function set(v) {
       const slug = here(), all = load(SOUND); if (v) delete all[slug]; else all[slug] = false; save(SOUND, all);

@@ -157,7 +157,8 @@ page and a Sound switch in every game's menu, the shared win, gold-paw, lose and
 own, Swap-a-Pom's purr moved onto it, and a new What's new card. Every sound is the owner's pick from the listening page,
 https://claude.ai/artifact/AiHXuVwvwB5CJSBPvgGNKS (the owner's own; its source is the page itself). Still to do:
 - **Library sounds** for the moments the owner wants from a sound library rather than code (silent until then):
-  Pawlinko's spill and Wake a cat, and Pounce Up's glass knocked over. The owner may want others swapped too. Sources,
+  Pawlinko's spill and Wake a cat, and Pounce Up's glass knocked over. Bird Watch's human stirring and waking were
+  left with none too (2026-11-14): maybe these, maybe silence. The owner may want others swapped too. Sources,
   all free to use in a public game site (and an app later), so long as each sound's own licence is checked:
   - **Pixabay** (pixabay.com, files on cdn.pixabay.com): the Pixabay Content License, free in apps and websites, no credit needed.
   - **Freesound** (freesound.org, cdn.freesound.org): use only sounds marked CC0. CC BY needs a credit on the site; skip
@@ -171,12 +172,9 @@ https://claude.ai/artifact/AiHXuVwvwB5CJSBPvgGNKS (the owner's own; its source i
 - **Pawlinko's hold sound:** the owner picked Rope thud for "hits a hold" and a sound of its own for every thing, so
   every knock plays the thing's own and the rope thud plays nowhere (it isn't in the page). If the holds should thud
   under each thing's sound, or the plainer things (yarn, fluffball, feather) should thud instead, say so.
-- **The other games:** the shared tap, put-down and not-allowed sounds (`tap`, `put`, `wrong`) are ready but not yet
-  played by any game. Add them a shelf at a time, quick and action games first, each game's own sounds where the
+- **The other games:** On the Prowl is done (2026-11-14). The shared tap, put-down and not-allowed sounds (`tap`, `put`,
+  `wrong`) are for the rest. Add them a shelf at a time, quick and action games first, each game's own sounds where the
   shared ones don't fit (the listening page can be extended for each shelf, so the owner picks as before).
-- **Pounce Up's walking** is silent for now (the owner, 2026-11-14): the pitter-patter was too much and the tiny ticks
-  not enough. Three in-between ones are on the listening page (Soft pads, Two soft steps, Ticks with a pad) for when
-  it comes back, or a library sound.
 - **On a phone:** the owner hears it all on an iPhone: the length (`LENGTH` in `games.js`, 55% since the sounds went on too long; the listening page's Length slider tries others), the loudness (`VOLUME` in `games.js`, .47, matching the
   listening page at the 59 the owner last used), and whether Pawlinko gets too busy with several things falling.
 - **The Settings page's Every game Sound** sets the games on the front page; a beta game (Swap-a-Pom now) has only its

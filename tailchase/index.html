@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-14.3"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-14.4"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-14.3">
+<link rel="stylesheet" href="../games.css?v=2026-11-14.4">
 <style>
 /* A cat chases toys round a rug, a strand of yarn trailing behind it that grows with every toy. Don't run into
    the edge of the rug, the yarn, or anything left lying about. */
@@ -77,8 +77,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-14.3"></script>
-<script src="../tablethings.js?v=2026-11-14.3"></script>
+<script src="../games.js?v=2026-11-14.4"></script>
+<script src="../tablethings.js?v=2026-11-14.4"></script>
 <script>
 /* ---------- levels ---------- */
 // Level n: [squares across the rug, toys to catch, milliseconds per step at the start and at the end, things in
@@ -156,7 +156,17 @@ ART.l = `${SHADOW(28)}<path d="M50 30 C44 22 52 14 60 16 C58 24 56 28 50 30 Z" f
   <g fill="#D9B21C"><circle cx="58" cy="52" r="1.6"/><circle cx="66" cy="60" r="1.6"/><circle cx="48" cy="64" r="1.6"/><circle cx="36" cy="60" r="1.6"/><circle cx="62" cy="70" r="1.6"/></g>`;
 const {TAPE, CATNIP} = TABLE;   // tape and catnip, as Knock It Off draws them (tablethings.js)
 const NIP_PIC = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">${CATNIP}</svg>`);
-const THINGS = {l: "a lemon", b: "a pile of books", t: "the tape", T: "the tape"};  // t: tape across, T: up and down
+const THINGS = {l: "a lemon", b: "a pile of books", t: "the tape", T: "the tape"};
+/* ---------- sound ---------- */
+// The owner's picks from the listening page (2026-11-14), played through G.sound (games.js; on unless Settings turns it off).
+const S = G.sound.kit;
+G.sound.define({
+  "tail.turn": t => S.tick(t, .1, 2200),   // a soft tick
+  "tail.catch": t => S.tone({fs: [[0, 300], [.05, 1200]], t, dur: .06, vol: .25}),   // pop
+  "tail.catnip": t => S.tone({f: 600, t, dur: 1.0, vol: .12, a: .1, hold: .5, vib: [7, 80]}),   // a wobbly slide, as in Pounce Up
+  "tail.tangle": t => S.mrrp(t),   // "mrrp?", tangled (and tape, as everywhere)
+  "tail.lemon": t => S.hiss(t),   // a hiss, as in Pounce Up
+});  // t: tape across, T: up and down
 const thingPic = k => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">${k === "t" ? TAPE : k === "T" ? `<g transform="rotate(90 50 50)">${TAPE}</g>` : ART[k]}</svg>`);
 const pics = {};
 const pic = src => { if (!pics[src]) { const im = new Image(); im.onload = () => game && paint(); im.src = src; pics[src] = im; } return pics[src]; };
@@ -236,7 +246,7 @@ function steer(d) {
   if (game.state === "paused") { resume(); }
   if (dx === -lx && dy === -ly) return;
   if (d === last || game.queue.length >= 2) return;
-  game.queue.push(d);
+  game.queue.push(d); G.sound.play("tail.turn");
 }
 function start() { game.state = "running"; game.started = true; $("tapgo").hidden = true; status(); tick(); G.track(`Tail Chase started level ${game.level}`); }
 function tick() {
@@ -252,9 +262,9 @@ function tick() {
   if (!eats) game.snake.pop();   // the end of the yarn moves on, so the cat can follow its own tail
   if (!free(nx, ny)) { if (!eats) game.snake.push(game.snake[game.snake.length - 1]); tangle(nx, ny); return; }
   game.snake.unshift([nx, ny]);
-  if (game.nip.some(([a, b]) => a === nx && b === ny)) { game.roll = 2; G.note("Catnip! Jan Brady stops to roll about.", 2000); }
+  if (game.nip.some(([a, b]) => a === nx && b === ny)) { game.roll = 2; G.sound.play("tail.catnip"); G.note("Catnip! Jan Brady stops to roll about.", 2000); }
   if (eats) {
-    game.caught++;
+    game.caught++; G.sound.play("tail.catch");
     if (game.caught >= game.target) { game.toy = null; status(); paint(); win(); return; }
     placeToy();
   }
@@ -356,12 +366,13 @@ function tangle(x, y) {
   settings.tries[game.level] = (settings.tries[game.level] || 0) + 1; save();
   const what = x < 0 || y < 0 || x >= game.N || y >= game.N ? "ran off the rug" : game.sleepers.some(([a, b]) => a === x && b === y) ? (k => k === "t" || k === "T" ? "accidentally touched tape" : `bumped into ${THINGS[k]}`)(game.sleepers.find(([a, b]) => a === x && b === y)[2]) : "got tangled in the yarn";
   G.track(`Tail Chase tangled on level ${game.level}`);
+  G.sound.play(what === `bumped into ${THINGS.l}` ? "tail.lemon" : "tail.tangle");   // in place of the lose card's
   const g = game;
   setTimeout(() => {
     if (game !== g) return;
     G.loseCard(what === "accidentally touched tape" ? "Oh no! Sticky Paws!" : "Tangled!", `Jan Brady ${what}, after ${game.caught} of ${game.target} toys.`,
       [["Try again", () => { bump = null; G.closeCard(); newRun(game.level, rugOf()); }, true], ["Admire the mess", () => { G.closeCard(); G.note("Tap Restart to try again.", 0); }], G.homeBtn()],
-      null, G.otherSize($("levelSel"), game.level, startLevel, "Or play a different level:"), {result: {n: game.level}});
+      null, G.otherSize($("levelSel"), game.level, startLevel, "Or play a different level:"), {result: {n: game.level}, sound: false});
   }, 700);
 }
 // a gold paw gets Jan Brady, leaping, in place of the random cat photo

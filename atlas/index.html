@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-14.3"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-14.4"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-14.3">
+<link rel="stylesheet" href="../games.css?v=2026-11-14.4">
 <style>
 /* The map is the board: the country to name is lit in coral, and a gold ring goes round it when it's too small
    to see. Under it, the cat to find and the answer, given the way the player picks: four names (Pick), typing with
@@ -143,7 +143,7 @@ body.typing .list{max-height:var(--list-h,108px)}
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-14.3"></script>
+<script src="../games.js?v=2026-11-14.4"></script>
 <script>
 /* ---------- countries and their cats ---------- */
 // The 200 countries a trip can ask: the 193 UN members plus Vatican City, Palestine, Taiwan, Kosovo,
@@ -274,8 +274,18 @@ function catCard(code, title, lines, places) {
   });
 }
 // Next cat clears the card and moves on.
+/* ---------- sound ---------- */
+// The owner's picks from the listening page (2026-11-14), played through G.sound (games.js; on unless Settings turns it off).
+// A name picked or sent taps (every game's tap), then right or wrong; the place shown after two misses is every game's miss.
+const S = G.sound.kit;
+G.sound.define({
+  "atlas.right": t => { S.tone({f: 1319, type: "triangle", t, dur: .08, vol: .15}); S.tone({f: 1976, type: "triangle", t: t + .07, dur: .14, vol: .15}); },   // two notes up
+  "atlas.bonus": t => [1047, 1319, 1568].forEach((f, i) => S.bell({f, t: t + i * .08, dur: .6, vol: .08, ratio: 2.01, index: .7})),   // a ding run
+  "atlas.next": t => S.whoosh(t, 400, 1400, .3, .2),   // the map swooshes to the next place
+});
+const said = (what, also) => { G.sound.play("tap"); G.sound.play(what, {}, .05); if (also) G.sound.play(also, {}, .35); };
 function nextCat() {
-  G.closeCard(); cardFor = null;
+  G.closeCard(); cardFor = null; if (game && !game.won && game.card.seen && !busy) G.sound.play("atlas.next");
   if (game && !game.won && game.card.seen && !busy) game.mode === "disputed" ? dzNext() : advance();
 }
 // Countries never offered as each other's wrong answer on Pick, however close: both claim land the map stripes as
@@ -779,16 +789,17 @@ function answer(c, btn) {
     if (!card.wrong.includes(c)) card.wrong.push(c);
     if (card.wrong.length >= TRIES) {
       game.res.push({c: code, first: false, found: false, hinted: card.hints > 0});
-      G.note(`Sorry! It's ${nameOf(code)}.`, 2600);
+      G.note(`Sorry! It's ${nameOf(code)}.`, 2600); said("lose");
       busy = true; save(); show();
       setTimeout(() => { busy = false; seeCat(); }, 1200);
       return;
     }
-    G.note(`Not ${nameOf(c)}. One more try!`, 2500);
+    G.note(`Not ${nameOf(c)}. One more try!`, 2500); said("wrong");
     save(); show(); if (style() !== "pick") $("guess").focus();
     return;
   }
   const given = card.bonus === "given";
+  said("atlas.right", given && "atlas.bonus");
   game.res.push({c, first: !card.wrong.length && !card.hints, found: true, hinted: card.hints > 0, ...(DEPS[c] ? {bonus: given} : {})});
   if (btn) btn.className = "right";
   const name = given ? `${nameOf(c)} (${nameOf(DEPS[c][1])})` : nameOf(c);
@@ -807,7 +818,7 @@ function answerBonus(o, btn) {
   const code = current(), owner = DEPS[code][1], got = o === owner;
   game.res[game.res.length - 1].bonus = got; game.card.bonus = "done";
   if (btn) btn.className = got ? "right" : "wrong";
-  G.note(got ? `${nameOf(owner)}! Bonus!` : `Sorry! It belongs to ${nameOf(owner)}.`, 2200);
+  G.note(got ? `${nameOf(owner)}! Bonus!` : `Sorry! It belongs to ${nameOf(owner)}.`, 2200); said(got ? "atlas.bonus" : "wrong");
   busy = true; save();
   setTimeout(() => { busy = false; seeCat(); }, got ? 900 : 1600);
 }
@@ -974,10 +985,10 @@ function dzGuess(text) {
   const t = game.trip[game.i], d = dzOf(t.c), card = game.card, n = norm(text);
   if (card.bonus === "ask") {
     const g = dzGroup(d, n), alt = g && g[0];
-    if (alt && !card.alts.includes(alt)) { card.alts.push(alt); G.note(`${alt}! Bonus!`, 1600); game.res[game.res.length - 1].bonus = card.alts.length; }
+    if (alt && !card.alts.includes(alt)) { card.alts.push(alt); G.note(`${alt}! Bonus!`, 1600); said("atlas.bonus"); game.res[game.res.length - 1].bonus = card.alts.length; }
     else if (alt) G.note(norm(alt) === n ? "You've named that one." : `That's another way of saying ${alt}.`);
     else if (d.same.some(a => norm(a) === n) || norm(d.name) === n) G.note(`That's another way of saying ${d.name}.`);
-    else { G.note(`${d.name} isn't also called “${text.trim()}”.`, 2000); if (style() === "pick" && !card.wrong.includes(text)) card.wrong.push(text); }
+    else { G.note(`${d.name} isn't also called “${text.trim()}”.`, 2000); said("wrong"); if (style() === "pick" && !card.wrong.includes(text)) card.wrong.push(text); }
     $("guess").value = "";
     if (card.alts.length === d.aka.length) { save(); busy = true; return setTimeout(() => { busy = false; seeCat(); }, 900); }
     save(); show(); return;
@@ -991,13 +1002,13 @@ function dzGuess(text) {
     if (card.wrong.length >= DZ_TRIES) {
       card.filled = [...dzBlanks(d).keys()];
       game.res.push({c: t.c, first: false, found: false, hinted: card.hints > 0});
-      G.note("Sorry! Here's the whole sentence.", 2600); busy = true; save(); show();
+      G.note("Sorry! Here's the whole sentence.", 2600); said("lose"); busy = true; save(); show();
       return setTimeout(() => { busy = false; seeCat(); }, 2600);
     }
-    G.note(`“${text.trim()}” doesn't fit this one. ${DZ_TRIES - card.wrong.length} more ${DZ_TRIES - card.wrong.length === 1 ? "try" : "tries"}.`, 2500);
+    said("wrong"); G.note(`“${text.trim()}” doesn't fit this one. ${DZ_TRIES - card.wrong.length} more ${DZ_TRIES - card.wrong.length === 1 ? "try" : "tries"}.`, 2500);
     save(); show(); focusTyping(); return;
   }
-  card.filled.push(i);
+  card.filled.push(i); said("atlas.right");
   if (i === 0) { const g = dzGroup(d, n); if (g) card.alts.push(g[0]); }
   if (card.filled.length < dzBlanks(d).length) { G.note("Yes!", 1200); save(); show(); focusTyping(); return; }
   game.res.push({c: t.c, first: !card.wrong.length && !card.hints, found: true, hinted: card.hints > 0, bonus: card.alts.length});
