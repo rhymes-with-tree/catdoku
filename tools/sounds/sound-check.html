@@ -61,6 +61,10 @@ h3{margin:14px 0 0;font-size:15px;font-weight:600;letter-spacing:.06em;text-tran
 .chip .k{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--line);font-size:13px;font-weight:800;flex:none}
 .chip[aria-pressed="true"]{border-color:var(--c);background:color-mix(in srgb,var(--c) 20%,var(--chip))}
 .chip[aria-pressed="true"] .k{background:var(--c);color:var(--paper)}
+/* a row nobody has tapped: its pick is only the default, so it's dashed and says so */
+.row.dflt .chip[aria-pressed="true"]{border-style:dashed;background:var(--chip)}
+.row.dflt .chip[aria-pressed="true"] .k{background:transparent;color:var(--c);border:1.5px dashed var(--c)}
+.row.dflt .name::after{content:"Default, not picked";display:block;font-size:.75em;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:var(--c)}
 .chip.none{padding-left:12px;color:var(--ink-soft)}
 .chip.rec .k{background:color-mix(in srgb,var(--accent) 30%,transparent)}
 .chip.ping{animation:ping .35s ease-out}
@@ -139,7 +143,7 @@ textarea{font-family:inherit;font-size:15px;width:100%;min-height:96px;border:2p
   <span class="eyebrow">Catdoku</span>
   <h1>Sound Check</h1>
   <div class="stripe" aria-hidden="true"></div>
-  <p class="now"><strong>Every shelf is picked and in the games.</strong> Tap a sound to hear it; the last one you tap in each row is your pick. To change one, pick again and <strong>Send</strong>.<strong>Send</strong>.</p>
+  <p class="now"><strong>Now: Objects and actions, again.</strong> A row you haven't tapped says <strong>Default, not picked</strong> and its choice is dashed; Send lists it as DEFAULT, NOT PICKED, so only what you tap counts. Tap a sound to hear it; the last one you tap in each row is your pick. When you're done, <strong>Send</strong>.</p>
 </header>
 
 <nav class="newnav" id="newNav" aria-label="To hear"></nav>
@@ -1068,7 +1072,7 @@ SECTIONS.unshift(...CURIOUS); SECTIONS.unshift(...SPELLS);
 // the games it's in; the pick here becomes that moment's sound in all of them. A different action is a different row.
 const O = (id, name, uses, ch) => ({id, name, uses, ch});
 const OBJECTS = [
-{id: "objects", cls: "objects", current: false, title: "Objects and actions", scenes: [], groups: [
+{id: "objects", cls: "objects", current: true, title: "Objects and actions", scenes: [], groups: [
  {title: "Things", rows: [
   O("springBounce", "A spring: something bounces off it", "Pawlinko, Pounce Up", [["Cartoon boing", t => boing(t)], ["Launch", t => tone({fs: [[0, 180], [.45, 1400]], t, dur: .5, vol: .18, a: .01, hold: .3, vib: [14, 40, 0]})], ["Metal sproing", t => { tone({fs: [[0, 600], [.4, 900]], t, dur: .4, vol: .12, vib: [30, 60, 0]}); modal({t, parts: [[1900, .5, .25], [4100, .3, .15]], vol: .12, click: 0}); }]]),
   O("springSet", "A spring: put down", "Pawlinko (setting up)", [["Little sproing", t => boing(t, 300, 520, .3, .16)], ["Wood clack", t => woodClack(t)]]),
@@ -1132,7 +1136,7 @@ const IN_GAME = {"every.tap": 1, "every.put": 0, "every.wrong": 1, "every.hint":
   "yarn.step": 2, "yarn.ball": 2, "yarn.back": 0, "tangle.pick": 1, "tangle.drop": 1, "tangle.uncross": 2, "catwalk.build": 0, "catwalk.remove": 0, "catwalk.perch": 1, "tunnelrun.turn": 2, "tunnelrun.join": 0, "tunnelrun.run": 0, "unravel.peg": 0, "unravel.back": 0, "laserpointer.tip": 0, "laserpointer.sees": 1, "laserpointer.toys": 1, "zoomies.join": 0, "zoomies.unjoin": 0};
 // Choices taken off the page (the owner, 2026-11-14): the mrrp everywhere, and Moonpie's own recordings outside the
 // Moonpie games (they're hers, and distinctive). A row whose sound in the games was one of them is to pick again.
-const DROPPED = c => /^Mrrp/.test(c[0]) || c[2] === true;
+const DROPPED = c => /^Mrrp/.test(c[0]) || /big yawn/i.test(c[0]) || c[2] === true;   // the owner took out the mrrp and the big yawn (2026-11-14)
 const ROWS = {};   // section id + row id -> row
 for (const s of SECTIONS) for (const g of s.groups) for (const r of g.rows) {
   r.key = s.id + "." + r.id; r.sec = s; ROWS[r.key] = r;
@@ -1153,7 +1157,9 @@ let picks = store.get("sc.picks2", null);
 if (!picks) { picks = {}; for (const r of allRows()) if (r.oldPick && (r.oldPick === "None" || r.ch.some(c => c[0] === r.oldPick))) picks[r.key] = r.oldPick === "None" ? {none: true} : {c: r.oldPick}; store.set("sc.picks2", picks); }
 let adj = store.get("sc.adj", {});    // a row's own volume and length, in %: {v, l}
 const savePicks = () => store.set("sc.picks2", picks), saveAdj = () => store.set("sc.adj", adj);
-const pickOf = r => picks[r.key] || (r.inGame === "None" ? {none: true} : r.inGame ? {c: r.inGame} : {c: r.ch[0][0]});
+// a pick or default whose choice was taken out (the big yawn) counts as None
+const pickOf = r => { const p = picks[r.key] || (r.inGame === "None" ? {none: true} : r.inGame && r.ch.some(c => c[0] === r.inGame) ? {c: r.inGame} : r.ch[0] ? {c: r.ch[0][0]} : {none: true});
+  return p.c !== undefined && !r.ch.some(c => c[0] === p.c) ? {none: true} : p; };
 const choiceOf = (key, name) => { const r = ROWS[key]; return r && r.ch.find(c => c[0] === name); };
 const refOf = p => { const [k, n] = p.use.split("#"); return {r: ROWS[k], c: choiceOf(k, n)}; };
 const pickName = (r, p = pickOf(r)) => p.none ? "None" : p.other !== undefined ? `Something else: ${p.other || "(not said)"}` : p.use ? (o => o.c ? `Another sound: ${o.r.sec.title} › ${o.r.name} › ${o.c[0]}` : "Another sound (gone)")(refOf(p))
@@ -1294,6 +1300,7 @@ function rowEl(r) {
   const play = () => { const c = audio(); if (!c) return; curSec = r.sec.id; try { playPick(r, c.currentTime + .03); } catch (e) { console.error(e); } };
   const sync = () => {
     const p = pickOf(r);
+    row.classList.toggle("dflt", !picks[r.key]);   // nothing tapped: the pick shown is only the default
     chips.querySelectorAll(".chip").forEach(x => x.setAttribute("aria-pressed", String(x.dataset.c === (p.c ?? (p.none ? "\u0000none" : p.other !== undefined ? "\u0000other" : "")))));
     other.hidden = p.other === undefined; if (!other.hidden && document.activeElement !== other) other.value = p.other;
     useBtn.textContent = p.use ? `Another sound: ${(refOf(p).c || ["gone"])[0]}` : "Another sound…"; useBtn.classList.toggle("on", !!p.use);
@@ -1397,7 +1404,7 @@ addEventListener("keydown", e => { if (e.key === "Escape" && !$("lib").hidden) $
 // What's sent: the shelf to pick, every row picked again, and every change from what's in the games (another choice,
 // None, Something else, another row's sound, or the row's own volume and length).
 function picksText() {
-  const cur = SECTIONS.filter(s => s.current), line = r => { const v = adj[r.key]; return `- ${r.name}: ${pickName(r)}${v ? ` · volume ${v.v}% · length ${v.l}%` : ""}`; };
+  const cur = SECTIONS.filter(s => s.current), line = r => { const v = adj[r.key]; return `- ${r.name}: ${picks[r.key] ? "" : "DEFAULT, NOT PICKED: "}${pickName(r)}${v ? ` · volume ${v.v}% · length ${v.l}%` : ""}`; };
   const lines = [`Catdoku sound picks${cur.length ? `: ${[...new Set(cur.map(x => x.shelf))].join(" and ")}` : ""}${$("who").value.trim() ? ` from ${$("who").value.trim()}` : ""}`];
   for (const s of cur) { lines.push("", s.title); for (const r of rowsOf(s)) lines.push(line(r)); }
   const again = allRows().filter(r => r.repick && !r.sec.current);

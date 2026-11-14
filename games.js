@@ -1853,7 +1853,7 @@ const G = (() => {
       box: (t, o = {}) => { const p = o.p ?? 1; noise({t, dur: .07, vol: .35, f: 420 * p, q: 1, a: .005}); thump(t, .12, 140 * p); },   // a cardboard box opened: a flap
       mirror: t => modal({t, parts: [[2600, 1, .08], [5200, .3, .05]], vol: .12, click: 0}),   // a mirror tipped: a tink
       magnet: t => { tick(t, .3, 1800); tone({fs: [[0, 140], [.1, 70]], t, dur: .12, vol: .1}); noise({t, dur: .08, vol: .05, type: "lowpass", f: 400}); },   // a magnet put on: a click
-      catWakes: t => yawn(t),   // a cat wakes up: a big yawn
+      catWakes: t => { chirp(t, .45); chirp(t + .22, .45, 1.15); },   // a cat wakes up: two chirps (the big yawn is out: the owner hates it, 2026-11-14)
       catSettles: t => purr(t),   // a cat settles in to nap: a soft purr
       catCheers: t => { chirp(t, .45); chirp(t + .22, .45, 1.15); },   // a cat cheers: two chirps
       catFound: t => meow(t),   // a cat found or freed: a meow
