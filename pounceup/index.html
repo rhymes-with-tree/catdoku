@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-14.7"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-14.8"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-14.7">
+<link rel="stylesheet" href="../games.css?v=2026-11-14.8">
 <style>
 /* Rayla pounces from shelf to shelf up a tall bookcase: tap where she should go and she bounces off every shelf she
    lands on, swatting things off as she goes. Springs throw her higher; lemons, candles and tape she keeps clear of;
@@ -76,8 +76,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-14.7"></script>
-<script src="../tablethings.js?v=2026-11-14.7"></script>
+<script src="../games.js?v=2026-11-14.8"></script>
+<script src="../tablethings.js?v=2026-11-14.8"></script>
 <script>
 /* ---------- the world ---------- */
 // The bookcase is 300 units across; the window onto it is 400 tall and only ever moves up. y counts up from the floor.
@@ -244,7 +244,8 @@ function build(g, upto) {
     g.shelves.push(s);
     if (s.books) {   // the books are solid: their tops are a little shelf of their own, riding along with this one
       const up = s.books.filter(b => !b.lean), a = Math.min(...s.books.map(b => b.dx - b.w / 2)), z = Math.max(...s.books.map(b => b.dx + b.w / 2));
-      g.shelves.push(s.pile = {id: g.n++, kind: "books", base: s, dx: (a + z) / 2, y: y + Math.max(...up.map(b => b.h)), w: z - a, things: []});
+      s.pileId = g.n;   // shelf and books know each other by id, not by object, so the game stays plain data (a JSON copy of it still works)
+      g.shelves.push({id: g.n++, kind: "books", baseId: s.id, dx: (a + z) / 2, y: y + Math.max(...up.map(b => b.h)), w: z - a, things: []});
     }
     // in between: a cracked shelf that gives way, or (low down, on the easy levels) a spare shelf to help
     const mid = (g.genY + y) / 2, mw = Math.round(60 + R() * 30), mx = SIDE + mw / 2 + R() * (W - 2 * SIDE - mw);
@@ -279,7 +280,8 @@ function planTask(n, seed) {
   return {...t, n: Math.max(1, Math.min(t.n, Math.floor(have * .5)))};
 }
 // Where a shelf is now (the sliding ones go to and fro; the top of a row of books goes with its shelf)
-const shelfX = (g, s) => s.kind === "books" ? shelfX(g, s.base) + s.dx : s.kind === "slide" ? s.x + s.range * Math.sin(s.phase + g.t * s.speed / s.range) : s.x;
+const shelfById = (g, id) => g.shelves.find(s => s.id === id);
+const shelfX = (g, s) => s.kind === "books" ? shelfX(g, shelfById(g, s.baseId)) + s.dx : s.kind === "slide" ? s.x + s.range * Math.sin(s.phase + g.t * s.speed / s.range) : s.x;
 
 /* ---------- game ---------- */
 // game: {level, seed, r (the random maker's state), t (seconds played), shelves, items, falling (things swatted off),
@@ -386,7 +388,8 @@ function walk(s, dir, h) {
   if (s.kind === "books") { lo = -s.w / 2 - 3; hi = s.w / 2 + 3; }   // off the top of the books, she hops down beside them
   for (const t of s.things) if (t.k === "l") { if (t.dx < c.off) lo = Math.max(lo, t.dx + 24); else hi = Math.min(hi, t.dx - 24); }
   if (s.tape) { const r = s.tape.w / 2 + 6; if (s.tape.dx < c.off) lo = Math.max(lo, s.tape.dx + r); else hi = Math.min(hi, s.tape.dx - r); }
-  if (s.pile) { const a = s.pile.dx - s.pile.w / 2, z = s.pile.dx + s.pile.w / 2; if (z <= c.off) lo = Math.max(lo, z + 15); else hi = Math.min(hi, a - 15); }   // books won't budge
+  const pile = s.pileId != null && shelfById(g, s.pileId);
+  if (pile) { const a = pile.dx - pile.w / 2, z = pile.dx + pile.w / 2; if (z <= c.off) lo = Math.max(lo, z + 15); else hi = Math.min(hi, a - 15); }   // books won't budge
   const off = c.off + want * WALK * h;
   if (off < lo || off > hi) {
     if ((off < lo && lo > -s.w / 2) || (off > hi && hi < s.w / 2)) { c.walking = false; c.walkTo = null; return; }   // tape, a lemon or books: she stops
@@ -490,7 +493,7 @@ function step(h) {
   for (const m of g.smoke) { m.y += 45 * h; m.x += m.vx * h; m.r += 9 * h; }
   if (g.smoke.length) g.smoke = g.smoke.filter(m => g.t - m.born < 3.5);
   // shelves and things left far below are put away; new ones are made above
-  if (g.shelves.length > 60) g.shelves = g.shelves.filter(s => s.y > g.cam - 200);
+  if (g.shelves.length > 60) g.shelves = g.shelves.filter(s => (s.kind === "books" ? shelfById(g, s.baseId) : s).y > g.cam - 200);   // books go with their shelf
   if (g.items.length > 30) g.items = g.items.filter(it => it.y > g.cam - 200);
   build(g, g.cam + VH + 200);
   noticeNew();
@@ -521,8 +524,9 @@ function land(s, sx) {
     if (kindOf(g) === "loose") { g.touched++; status(); }
     return false;
   }
-  if (s.pile) {   // coming down beside the books (off the top of them, or after a fright), not in them: she lands just clear
-    const a = s.pile.dx - s.pile.w / 2, z = s.pile.dx + s.pile.w / 2, o = c.x - sx;
+  const pile = s.pileId != null && shelfById(g, s.pileId);
+  if (pile) {   // coming down beside the books (off the top of them, or after a fright), not in them: she lands just clear
+    const a = pile.dx - pile.w / 2, z = pile.dx + pile.w / 2, o = c.x - sx;
     if (o > a - 15 && o < z + 15) {
       const to = o - a < z - o ? a - 15 : z + 15;
       if (Math.abs(to) > s.w / 2 + 2) return false;   // on the far side of them, past the end of the shelf: down she goes
