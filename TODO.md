@@ -174,6 +174,9 @@ https://claude.ai/artifact/AiHXuVwvwB5CJSBPvgGNKS (the owner's own; its source i
 - **The other games:** the shared tap, put-down and not-allowed sounds (`tap`, `put`, `wrong`) are ready but not yet
   played by any game. Add them a shelf at a time, quick and action games first, each game's own sounds where the
   shared ones don't fit (the listening page can be extended for each shelf, so the owner picks as before).
+- **Pounce Up's walking** is silent for now (the owner, 2026-11-14): the pitter-patter was too much and the tiny ticks
+  not enough. Three in-between ones are on the listening page (Soft pads, Two soft steps, Ticks with a pad) for when
+  it comes back, or a library sound.
 - **On a phone:** the owner hears it all on an iPhone: the loudness (`VOLUME` in `games.js`, .47, matching the
   listening page at the 59 the owner last used), and whether Pawlinko gets too busy with several things falling.
 - **The Settings page's Every game Sound** sets the games on the front page; a beta game (Swap-a-Pom now) has only its
