@@ -85,7 +85,8 @@ cats that point their own way are Day Light (`daylight/`, in beta).
 ## Star cats decided, waiting for pictures
 
 Pangur Bán (Pangur) for Cat Burglar and Fitzwilliam Darcy (Fitz) for Pawlette (the owner, 2026-11-12; `ARTWORK.md`,
-"Stars decided"). Once their pictures are in `cats/`, put each into its game.
+"Stars decided"). Once their pictures are in `cats/`, put each into its game. Crow (like Ferguson, only much sleeker)
+will star in Crow's Drawers, not made yet (`IDEAS.md`); add Crow's poses to `ARTWORK.md` when they come.
 
 ## Pounce Up: tune the goals
 
@@ -150,6 +151,19 @@ Send feedback went into every game's menu on 2026-11-11 (the card in `games.js`,
 - the front page, which has no menu row for it;
 - whether a beta's win and miss cards should ask a one-tap "How was that level?" (sent as a GoatCounter event: no
   words, so nothing new leaves the device, and it shows how hard each level feels).
+
+## Sound effects: where they can come from
+
+The owner is thinking about sound effects across the site, not only Moonpie's (2026-11-14). Sources the environment
+allows, all free to use in a public game site (and an app later), so long as each sound's own licence is checked:
+- **The owner's own recordings** first, for any cat (Moonpie's purrs and snores are in `cats/`; `ARTWORK.md`).
+- **Pixabay** (pixabay.com, files on cdn.pixabay.com): the Pixabay Content License, free in apps and websites, no credit needed.
+- **Freesound** (freesound.org, cdn.freesound.org): use only sounds marked CC0. CC BY needs a credit on the site; skip
+  anything marked NC (non-commercial), in case the app is ever sold.
+- **Kenney** (kenney.nl): game sound packs, all CC0.
+Not **Epidemic Sound** (www.epidemicsound.com, also allowed): its FAQ says "royalty-free" means nothing owed on top of a
+subscription, and "there is no separate free tier". A sound downloaded without logging in isn't licensed for the site.
+Keep a line for each sound used (where from, its licence, and a link) in `ARTWORK.md`, as for the pictures.
 
 ## Pawlinko: sound effects
 

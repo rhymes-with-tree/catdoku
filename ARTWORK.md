@@ -33,7 +33,11 @@ anywhere, but keep track of who they are, because they'll be featured in games o
 **Stars decided, pictures still to come** (the owner, 2026-11-12): **Pangur Bán** (Pangur for short) will be the star of
 Cat Burglar, and **Fitzwilliam Darcy** (Fitz) the star of Pawlette. Neither has pictures in `cats/` yet; when they
 arrive, add each to the list below with what they look like, and give the game its title cat, gold-paw card,
-tagline and front-page icon as Bowtie has in Tunnel Run.
+tagline and front-page icon as Bowtie has in Tunnel Run. **Crow**, the shop cat at a witch's supply shop (The Raven's Wing Magical Co-Op in Portland, Oregon,
+https://theravenswing.com/; the shop wants the publicity, so name it and link to it; the game's shop is the site's own version, drawn in the
+site's colours, not the shop's), is to star
+in Crow's Drawers, dowsing for things hidden in the shop's apothecary drawers (the owner, 2026-11-13; see `IDEAS.md`).
+Crow looks like Ferguson (a black cat with yellow eyes) but much sleeker, not fluffy; the owner will have pictures soon.
 
 Purrfect Square puts one of 24 general cats, picked at random each visit, beside its title: those sitting up and facing out
 (`c14-63`, `c18-6`, `-7`, `-17`, `-19`, `-21`, `-26`, `-27`, `-32`, `-40`, `c19-1`, `-5`, `-6`, `-14`, `-16`, `-17`, `-28`, `-32`, `-37`, `-40`,
@@ -93,6 +97,13 @@ Bed Hog has no star cat yet: `c14-29` (a ginger cat on its back) sleeps beside i
   (the owner, 2026-11-11: she looked to hover).
 - **Moonpie** (`moonpie-…`, brown and white with blue eyes; she's a she) has seven poses from the same sheet, named as Rayla's are:
   `moonpie-sit`, `-crouch`, `-leap`, `-dive`, `-bound`, `-low` and `-crouch2`. Not for Pounce Up (the owner, 2026-11-11).
+  **Her nose is NOT white, and she has a bobtail** (the owner, 2026-11-13). Her face is brown down to the nose, with a little
+  white blaze between the eyes that stops above it, and her tail is a short round pompom. Any picture of her with a white
+  nose or a long tail is wrong: check every new one, and say so if the owner missed it ("I will gladly be corrected").
+  Three of the seven came off the sheet wrong and were fixed by hand on 2026-11-13: `-low`, `-bound` and `-dive` had the
+  blaze running down to a white muzzle and pink nose, now painted brown from the fur around them (her nose a rosy brown,
+  as in `-sit`), and `-dive` had a long tail, now cut off at the rump and replaced with `-crouch2`'s bobtail. The
+  originals are in the git history if a fix ever needs redoing.
   **Her personality:** she cuddles you and keeps you company while you play games (the owner, 2026-11-13: very sweet; have
   that come through). So she's a companion, never a cat who bats things away or chases: she purrs, blinks slowly, leans on
   you and is proud of you. She's the star of Swap-a-Pom (in beta): `moonpie-sit` beside the title; `moonpie-low` lying along
@@ -100,7 +111,19 @@ Bed Hog has no star cat yet: `c14-29` (a ginger cat on its back) sleeps beside i
   bouncing: the owner's call); and `moonpie-crouch2`, looking up at you, on the gold-paw card. **Her purr** is in `cats/` too,
   `moonpie-purr.mp3`: the owner's own recording of her (2026-11-03), only trimmed, made into a 13.8-second loop and turned
   up. There's a fan in the background, but the owner liked it better than every cleaned-up version (noise removal made her
-  sound watery), so it stays as recorded. Any game can use it.
+  sound watery), so it stays as recorded. Any game can use it. Its source recording came again with the ones below
+  (`Purrs.m4a`, 15 s), so it isn't added twice.
+  **More of her purrs and her snores** (the owner's recordings, 2026-11-13, for Moonpurrs; any game can use them), in
+  `cats/` as mp3 (64 kbps, mono), each only trimmed and turned up so its loudest moment is at -1.5 dB, nothing cleaned:
+  - `moonpie-purrs-1.mp3`, 32.6 s (from `Purrs.m4a`): a steady purr with a dip at every breath, about one a second.
+  - `moonpie-purrs-2.mp3`, 22.9 s (`Moonpurrs.m4a`): the loudest and most even; a broader hiss comes in at 7 s.
+  - `moonpie-purrs-3.mp3`, 19.6 s (a Signal voice message from 2026-11-02, so lower quality): a breath about every 1.6 s,
+    and a steady tone near 700 Hz under it.
+  - `moonpie-snores-1.mp3`, 12.1 s (`Moonpie_snores.m4a`): four clear snores, one every 2.7 s or so.
+  - `moonpie-snores-2.mp3`, 24.6 s (`Moonsnores.m4a`): about 8 s of something steady, then softer snores every 3.5 s or
+    so. Whether the start is her purr sputtering out into the snores, or a fan, is the owner's to say.
+  The snores were very quiet (turned up 28 to 34 dB), so the room's hum is turned up with them; a game plays them softly.
+  The purrs' rumble is 26 to 30 Hz, too fast to tap to: a rhythm game's beat is her breathing.
 - **Ferguson** (`ferguson-…`, a fluffy black cat with yellow eyes) has nine poses from the same sheet, the same set
   as Rayla's: `ferguson-sit`, `-crouch`, `-startled`, `-leap`, `-basket`, `-dive`, `-low`, `-bound` and `-crouch2`. Not
   for Pounce Up. Ferguson is to be the star of Boing! (the owner, 2026-11-13; the game isn't on the site yet, see `TODO.md`): in
