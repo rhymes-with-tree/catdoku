@@ -1654,6 +1654,12 @@ const G = (() => {
   const sound = (() => {
     let ctx = null, master = null, noiseBuf = null;
     const VOLUME = .47;   // as loud as the listening page was when the owner picked (59 of 100)
+    // How long each note, thump or swoosh lasts, as a share of how long it was when the owner picked it: they went on
+    // too long (the owner, 2026-11-14). A sound's notes still start when they did; each one is shorter (its attack,
+    // hold, glide and fade together). The shortest, 0.06 s or less (clicks, ticks), stay as they are.
+    const LENGTH = .55;
+    const shorter = dur => dur <= .06 ? 1 : (.06 + (dur - .06) * LENGTH) / dur;
+    const squeeze = (r, fs) => fs && fs.map(([x, v]) => [x * r, v]);
     const subs = [], Z = .0001;
     const here = () => CURRENT || SLUG;
     const on = () => soundOn(here());
@@ -1690,12 +1696,14 @@ const G = (() => {
     }
     function filt(type, f, q = 1, to = master) { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; b.connect(to); return b; }
     function tone({f, fs, type = "sine", t, dur, vol = .3, a = .005, hold = 0, out = master, vib}) {
+      const r = shorter(dur); dur *= r; a *= r; hold *= r; fs = squeeze(r, fs);
       const o = ctx.createOscillator(), g = ctx.createGain(); o.type = type;
       if (fs) path(o.frequency, t, fs); else o.frequency.setValueAtTime(f, t);
       if (vib) vibrato(o.frequency, t, dur, vib[0], vib[1], vib[2]);
       env(g.gain, t, a, vol, dur, hold); o.connect(g); g.connect(out); o.start(t); o.stop(t + dur + .05);
     }
     function noise({t, dur, vol = .3, a = .003, hold = 0, type = "bandpass", f = 1000, fs, q = 1, out = master}) {
+      const r = shorter(dur); dur *= r; a *= r; hold *= r; fs = squeeze(r, fs);
       const s = ctx.createBufferSource(), b = ctx.createBiquadFilter(), g = ctx.createGain();
       s.buffer = noiseBuf; b.type = type; b.Q.value = q;
       if (fs) path(b.frequency, t, fs); else b.frequency.setValueAtTime(f, t);
@@ -1708,6 +1716,7 @@ const G = (() => {
       if (click) noise({t, dur: .012, vol: clickVol * vol * 2, f: click, q: 1.2, a: .001});
     }
     function bell({f, t, dur = 1.2, vol = .15, ratio = 3.5, index = 2}) {
+      dur *= shorter(dur);
       const c = ctx.createOscillator(), m = ctx.createOscillator(), mg = ctx.createGain(), g = ctx.createGain();
       c.frequency.value = f; m.frequency.value = f * ratio;
       mg.gain.setValueAtTime(f * index, t); mg.gain.exponentialRampToValueAtTime(f * .02, t + dur);
@@ -1723,6 +1732,7 @@ const G = (() => {
     }
     // a cat-ish voice: a buzzy tone through two vowel filters, with a rolled "rr" (trem: [rate, depth])
     function voice({t, fs, dur, vol = .5, formants = [[700, 5], [1250, 6]], trem, type = "sawtooth", a = .02}) {
+      const r = shorter(dur); dur *= r; a *= r; fs = squeeze(r, fs);
       const o = ctx.createOscillator(), sum = ctx.createGain(), g = ctx.createGain(); o.type = type; path(o.frequency, t, fs);
       for (const [f, q] of formants) { const b = ctx.createBiquadFilter(); b.type = "bandpass"; b.frequency.value = f; b.Q.value = q; o.connect(b); b.connect(sum); }
       env(g.gain, t, a, vol, dur);
