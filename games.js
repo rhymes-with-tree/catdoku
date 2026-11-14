@@ -1776,6 +1776,15 @@ const G = (() => {
       win: t => [1047, 1319, 1568, 2093].forEach((f, i) => musicBox({f, t: t + i * .13, dur: i === 3 ? 1.6 : .8})),   // music box (the marimba ta-da until 2026-11-14)
       gold: t => [523, 784, 1047, 1319].forEach((f, i) => bell({f, t: t + i * .02, dur: 2.6, vol: .08, ratio: 3.5, index: 1.6})),   // big bells
       lose: t => { mallet({f: 659, t, dur: .4, vol: .18}); mallet({f: 523, t: t + .22, dur: .7, vol: .18}); },   // oh well
+      // the logic games' moments (the owner's picks for Cat Logic, 2026-11-14), for any game that has them: putting
+      // something in is put (above), a rule broken (Auto check's red) is wrong
+      mark: t => { noise({t, dur: .02, vol: .12, type: "highpass", f: 4000}); noise({t: t + .01, dur: .03, vol: .08, f: 2500, q: 2}); },   // a pencil tick: a note, a dot, a paw
+      erase: t => tone({fs: [[0, 900], [.05, 500]], t, dur: .05, vol: .15}),   // a soft pop out
+      life: t => { tone({f: 330, type: "triangle", t, dur: .14, vol: .25}); tone({f: 247, type: "triangle", t: t + .13, dur: .24, vol: .25}); },   // a soft bonk: a life lost (G.lives)
+      undo: t => tone({fs: [[0, 900], [.08, 500]], type: "triangle", t, dur: .08, vol: .12}),   // a rewind blip (G.history)
+      bookmark: t => noise({t, dur: .08, vol: .2, fs: [[0, 2000], [.08, 3500]], q: .8, a: .01}),   // a page flick (G.guesser)
+      back: t => whoosh(t, 2400, 600, .3, .2),   // a rewind swoosh: Return to Bookmark
+      line: t => mallet({f: pick(PENTA.slice(5, 10)), t, dur: .35, vol: .1}),   // a soft note: a row, column or region done
     };
     function play(name, o = {}, delay = 0) {
       const f = SOUNDS[name];
@@ -2464,6 +2473,7 @@ const G = (() => {
     const shelved = () => !!o.shelf && !!gm() && o.shelf.has(gm());
     function undo() {
       if (!can() || !(size() || shelved())) return false;
+      if (!rewinding) sound.play("undo");
       const g = gm(); if (size()) o.back(list(g).pop(), g); else o.shelf.undo(g);
       if (o.after) o.after(); return true;
     }
@@ -2498,6 +2508,7 @@ const G = (() => {
   // ("toy", "number"…: for the note line), over (() => true once the puzzle's finished; game.won if not given),
   // moves (the Undo list, if it isn't game.history), history (a G.history: its undo and list stand in for undo and moves)}. Call before(i) just before the move that fills square i goes on the Undo
   // list; draw the glow on each of list(); clear() on Restart; sync() wherever the buttons are brought up to date.
+  let rewinding = false;   // Return to Bookmark is undoing, step by step
   function guesser(o) {
     if (o.history) { o.undo = o.undo || o.history.undo; o.moves = o.moves || (gm => o.history.list(gm)); }
     let armed = false;
@@ -2512,13 +2523,14 @@ const G = (() => {
     };
     btn.onclick = () => {
       const gm = g(); if (!gm || (o.over ? o.over() : gm.won)) return;
-      armed = !armed; sync(); if (armed) note(`Bookmarked: the next ${o.what || "one"} you put in glows, and Return to Bookmark returns here`, 3500); else note("");
+      armed = !armed; sync(); if (armed) sound.play("bookmark"); if (armed) note(`Bookmarked: the next ${o.what || "one"} you put in glows, and Return to Bookmark returns here`, 3500); else note("");
     };
     back.onclick = () => {
       const gm = g(), gs = list(); if (!gm || (o.over ? o.over() : gm.won) || !gs.length) return;
       const to = gs[gs.length - 1].at;
-      while (hist(gm).length > to) { const n = hist(gm).length; o.undo(); if (hist(gm).length >= n) break; }
-      armed = false; list(); o.draw(); note("Back at your bookmark.", 3000);
+      rewinding = true;   // one swoosh, not an Undo blip a step
+      try { while (hist(gm).length > to) { const n = hist(gm).length; o.undo(); if (hist(gm).length >= n) break; } } finally { rewinding = false; }
+      sound.play("back"); armed = false; list(); o.draw(); note("Back at your bookmark.", 3000);
     };
     return {
       before(i) { const gm = g(); if (!armed || !gm) return; armed = false; list().push({i, at: hist(gm).length}); },
@@ -2598,13 +2610,17 @@ const G = (() => {
       if (!(noting && v) && v && gm.grid[i] !== v && o.before) o.before(i);
       if (o.changing) o.changing();
       o.push();
-      const was = gm.grid[i];
-      if (noting && v) { if (gm.grid[i]) gm.grid[i] = 0; gm.notes[i] ^= 1 << v; }
+      const was = gm.grid[i], broke = o.broken ? o.broken() : 0;
+      if (noting && v) { if (gm.grid[i]) gm.grid[i] = 0; gm.notes[i] ^= 1 << v; sound.play("mark"); }
       else {
         gm.grid[i] = v && gm.grid[i] !== v ? v : 0;
         if (gm.grid[i]) for (const p of [i, ...o.peers(i)]) gm.notes[p] &= ~(1 << v);   // a digit put in comes off the notes round it
         else if (!v) gm.notes[i] = 0;
         if (was && gm.grid[i] !== was) back(i, was);
+        // a digit in (o.sound: the game's own sound for it, else every game's put-down) or out; o.broken() counts what Auto
+        // check shows red, so a digit that breaks a rule gets every game's low buzz too
+        if (gm.grid[i]) { sound.play(o.sound || "put"); if (o.broken && o.broken() > broke) sound.play("wrong", {}, .12); }
+        else if (was) sound.play("erase");
       }
       return true;
     }
@@ -2722,7 +2738,8 @@ const G = (() => {
       o.el.innerHTML = Array.from({length: Math.max(per, u)}, (_, k) => k < h ? "♥" : '<span class="lost">♥</span>').join("");
       o.el.setAttribute("aria-label", say(h));
     }
-    function lose(n = 1) { const g = o.of(); g[key] = Math.max(0, g[key] - n); return g[key]; }
+    // o.sound false: the game plays its own sound for a life lost (Cat Burglar's wrong tap, Hide & Seek's woken cat)
+    function lose(n = 1) { const g = o.of(); g[key] = Math.max(0, g[key] - n); if (o.sound !== false) sound.play("life"); return g[key]; }
     function refill() { const g = o.of(); g[key] = per; g.livesUsed = per; }   // back to the first three, as a restart after running out does
     const canRevive = () => used() < max;
     function revive() {

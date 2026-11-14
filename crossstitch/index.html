@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-14.5"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-14.6"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-14.5">
+<link rel="stylesheet" href="../games.css?v=2026-11-14.6">
 <style>
 /* A cross-stitch sampler: aida cloth held in a wooden embroidery hoop, with a chart's grid on it (a darker line every
    five squares), and the counts for each row down the left and each column along the top. Stitches are crosses in one
@@ -115,7 +115,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-14.5"></script>
+<script src="../games.js?v=2026-11-14.6"></script>
 <script>
 /* ---------- the patterns ---------- */
 // Each pattern is a picture square by square: "." is bare cloth, a letter a stitch in that thread. The bigger ones are
@@ -372,6 +372,15 @@ const goal = from => markTool.on() ? (from === 2 ? 0 : 2) : (from === 1 ? 0 : 1)
 const undo = G.history({game: () => game, take: () => game.grid.join(""), back: (h, g) => { g.grid = h.split("").map(Number); }, cap: 400,
   can: playing, after: () => { draw(); save(); }, restart: true, started: () => game.grid.some(Boolean)});
 const snapshot = () => undo.push();
+/* ---------- sound ---------- */
+// The owner's picks from the listening page (2026-11-14), played through G.sound (games.js; on unless Settings turns it off).
+// A stitch is a needle, a dot the logic games' pencil tick (mark), either taken out their pop out (erase); a row or
+// column whose counts are met a soft note (line), and one that can't be right any more (Auto check) every game's low buzz.
+const SND = G.sound.kit;
+G.sound.define({"cs.stitch": t => { SND.noise({t, dur: .02, vol: .2, f: 3200, q: 3, a: .001}); SND.tone({fs: [[0, 1800], [.03, 1400]], t: t + .01, dur: .03, vol: .04}); }});
+const stitchSound = v => G.sound.play(v === 1 ? "cs.stitch" : v === 2 ? "mark" : "erase");
+const lines = () => { let done = 0, broken = 0; for (const isRow of [true, false]) for (let a = 0; a < game.N; a++) { if (lineDone(isRow, a)) done++; if (lineBroken(isRow, a)) broken++; } return {done, broken}; };
+let linesBefore = null;   // how many were done and broken before this move
 let stroke = null;
 const board = $("board");
 board.addEventListener("pointerdown", e => {
@@ -380,7 +389,8 @@ board.addEventListener("pointerdown", e => {
   e.preventDefault();
   try { board.setPointerCapture(e.pointerId); } catch (_) {}
   game.started = true;
-  stroke = {start: i, from: game.grid[i], to: goal(game.grid[i]), before: game.grid.slice(), axis: null};
+  stroke = {start: i, from: game.grid[i], to: goal(game.grid[i]), before: game.grid.slice(), axis: null, n: 1};
+  linesBefore = lines(); stitchSound(stroke.to);
   snapshot(); game.grid[i] = stroke.to; draw();
 });
 board.addEventListener("pointermove", e => {
@@ -394,6 +404,9 @@ board.addEventListener("pointermove", e => {
     const j = stroke.axis === "row" ? sy * N + q : q * N + sx;
     if (stroke.before[j] === stroke.from) game.grid[j] = stroke.to;
   }
+  const n = game.grid.filter((v, j) => v !== stroke.before[j]).length;
+  if (n > stroke.n) stitchSound(stroke.to);   // a stitch for each square the drag reaches
+  stroke.n = n;
   draw();
 });
 function endStroke() {
@@ -405,10 +418,11 @@ function endStroke() {
 board.addEventListener("pointerup", endStroke);
 board.addEventListener("pointercancel", endStroke);
 function afterMove() {
+  if (linesBefore) { const now = lines(); if (now.done > linesBefore.done) G.sound.play("line", {}, .1); if (now.broken > linesBefore.broken) G.sound.play("wrong", {}, .12); linesBefore = null; }
   if (plan.sol.every((v, i) => v ? game.grid[i] === 1 : game.grid[i] !== 1)) { win(); return; }
   draw(); save();
 }
-function setCell(i, v) { if (game.grid[i] === v) return; game.started = true; snapshot(); game.grid[i] = v; afterMove(); }
+function setCell(i, v) { if (game.grid[i] === v) return; game.started = true; linesBefore = lines(); stitchSound(v); snapshot(); game.grid[i] = v; afterMove(); }
 // Keys: the arrows move a cursor; Space or Enter stitches, X or . puts a dot, Backspace clears. Shift with an arrow
 // carries the square's stitch, dot or bare cloth on to the next.
 const keys = G.gridKeys({on: playing, size: () => [game.N, game.N], keys: ["x", ".", "backspace", "delete"],

@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-14.5"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-14.6"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-14.5">
+<link rel="stylesheet" href="../games.css?v=2026-11-14.6">
 <style>
 /* A row of shut boxes, each with a toy the cat has stashed inside. Every guess is a row of toys on cushions,
    with paw prints beside it: a dark paw for a toy in the right box, a light paw for a right toy in another box. */
@@ -119,8 +119,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-14.5"></script>
-<script src="../boxes.js?v=2026-11-14.5"></script>
+<script src="../games.js?v=2026-11-14.6"></script>
+<script src="../boxes.js?v=2026-11-14.6"></script>
 <script>
 /* ---------- levels ---------- */
 // [boxes, kinds of toy, whether a toy can be in more than one box, par]. There's no limit on guesses; par is the most
@@ -288,6 +288,15 @@ addEventListener("resize", () => { if (game) size(); });
 const undo = G.history({game: () => game, list: g => g.undo, take: () => ({cur: game.cur.slice(), sel: game.sel}), cap: 60, can: playing,
   back: (u, g) => { g.cur = u.cur; g.sel = u.sel; }, after: () => { draw(); save(); }, restart: true,
   started: () => !!(game.rows.length || game.undo.length || game.cur.some(t => t !== null))});
+/* ---------- sound ---------- */
+// The owner's picks from the listening page (2026-11-14), played through G.sound (games.js; on unless Settings turns it off).
+// A toy into a box is every game's put-down, out again the logic games' pop out (erase); Check is one soft chime; a toy
+// crossed out on the tray is a pencil scratch.
+const SND = G.sound.kit;
+G.sound.define({
+  "mm.check": t => SND.bell({f: 1319, t, dur: .5, vol: .08, ratio: 2.01, index: .6}),   // one chime
+  "mm.nope": t => SND.noise({t, dur: .12, vol: .15, type: "highpass", f: 3500, a: .01}),   // a pencil scratch
+});
 function change(fn) {
   undo.push();
   fn(); game.started = true; draw(); save();
@@ -297,25 +306,26 @@ const nextEmpty = from => { for (let k = 0; k < game.P; k++) { const i = (from +
 function put(t) {
   if (!playing()) return;
   const i = game.sel;
+  G.sound.play("put");
   change(() => { game.cur[i] = t; fresh.add(i); game.sel = nextEmpty((i + 1) % game.P); if (game.cur[game.sel] !== null) game.sel = (i + 1) % game.P; });
 }
 // Tap a box in the row: pick it, or take out its toy if it's picked already.
 function tapSlot(i) {
   if (!playing()) return;
-  if (i === game.sel && game.cur[i] !== null) change(() => { game.cur[i] = null; });
+  if (i === game.sel && game.cur[i] !== null) { G.sound.play("erase"); change(() => { game.cur[i] = null; }); }
   else { game.sel = i; draw(); save(); }
 }
 function takeOut() {
   if (!playing()) return;
   let i = game.cur[game.sel] !== null ? game.sel : game.cur.map((t, k) => t !== null ? k : -1).filter(k => k >= 0).pop();
   if (i === undefined) return;
-  change(() => { game.cur[i] = null; game.sel = i; });
+  G.sound.play("erase"); change(() => { game.cur[i] = null; game.sel = i; });
 }
 function check() {
   if (!playing()) return;
   if (game.cur.includes(null)) { G.note("Put a toy in every box first.", 2500); return; }
   const guess = game.cur.slice(), p = paws(game.code, guess, game.K);
-  game.rows.push({guess, paws: p}); game.started = true;
+  game.rows.push({guess, paws: p}); game.started = true; G.sound.play("mm.check");
   game.cur = Array(game.P).fill(null); game.sel = 0; game.undo = [];
   if (p[0] === game.P) { win(); return; }
   draw(); save();
@@ -330,6 +340,7 @@ function nope(t) {
   if (!playing()) return;
   const k = game.nope.indexOf(t);
   if (k >= 0) game.nope.splice(k, 1); else game.nope.push(t);
+  G.sound.play(k >= 0 ? "erase" : "mm.nope");
   draw(); save();
 }
 $("tray").addEventListener("pointerdown", e => {

@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-14.5"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-14.6"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-14.5">
+<link rel="stylesheet" href="../games.css?v=2026-11-14.6">
 <style>
 /* Bugsy, the star, peeking beside the title */
 .title{display:flex;align-items:flex-end;gap:8px}
@@ -100,8 +100,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-14.5"></script>
-<script src="../colorways.js?v=2026-11-14.5"></script>
+<script src="../games.js?v=2026-11-14.6"></script>
+<script src="../colorways.js?v=2026-11-14.6"></script>
 <script>
 /* ---------- blanket puzzles (plain functions, also run in a background worker) ---------- */
 // The blanket is N × N squares with k cats under it. A feather wand goes in at one of 4N slots round the edge:
@@ -482,6 +482,18 @@ function wandAt(p, out) {
   if (out) w.setAttribute("transform", "rotate(180)");   // coming out, the feather leads the way out
   return w;
 }
+/* ---------- sound ---------- */
+// The owner's picks from the listening page (2026-11-14), played through G.sound (games.js; on unless Settings turns it off).
+// A lump is every game's put-down, a dot the logic games' pencil tick (mark), either taken off their pop out (erase), and
+// slots that turn red for your lumps every game's low buzz. A cat grabbing the feather has no sound (the owner's pick).
+const SND = G.sound.kit;
+G.sound.define({
+  "ub.feather": t => SND.whoosh(t, 600, 1400, .2, .18),   // a soft whoosh: the feather slides in
+  "ub.out": t => SND.tone({fs: [[0, 330], [.05, 1320]], t, dur: .06, vol: .18}),   // a pop: out at another slot
+  "ub.back": t => SND.boing(t, 200, 500, .35, .2),   // boing: sent back
+  "ub.lift": t => SND.whoosh(t, 300, 900, .6, .3),   // a big swoosh
+});
+const redSlots = () => document.querySelectorAll(".slot.bad").length;
 function fire(p) {
   if (!playing()) return;
   const k = known();
@@ -494,6 +506,8 @@ function fire(p) {
   game.shots.push(p); game.started = true; hints.clear(false);
   const o = game.res[p], g0 = game;
   const said = o < 0 ? "Grabbed! A cat's got the feather." : o === p ? "It came straight back out." : `It popped out at the other ${known()[p].n}.`;
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  G.sound.play("ub.feather"); if (o === p) G.sound.play("ub.back", {}, still ? .1 : .42); else if (o >= 0) G.sound.play("ub.out", {}, still ? .1 : .84);
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) { update(); save(); G.note(said, 2500); return; }
   busy = true;
   const done = () => { busy = false; if (game !== g0) return; $("wands").innerHTML = ""; update(); save(); G.note(said, 2500); };
@@ -516,7 +530,9 @@ function mark(i, dot) {
   if (to === 1 && lumps().length >= game.k) { G.note(`There are only ${game.k} cats. Take a lump off first.`, 3000); return; }
   game.marks[i] = to; undo.push([i, was]); game.started = true;
   if (!(to === 1 && lumps().length === game.k)) G.note("");
+  const red = redSlots();
   update(); save();
+  G.sound.play(to === 1 ? "put" : to === 2 ? "mark" : "erase"); if (redSlots() > red) G.sound.play("wrong", {}, .12);
 }
 
 /* ---------- playing ---------- */
@@ -621,7 +637,9 @@ $("hintBtn").onclick = () => {
 $("liftBtn").onclick = () => {
   if (!playing() || lumps().length !== game.k) return;
   const h = has(), wrong = lumps().filter(i => !h[i]);
+  G.sound.play("ub.lift");
   if (!wrong.length) return win();
+  G.sound.play("wrong", {}, .5);   // rumpled blanket, not a cat
   // a peek: the blanket's put back, and the lumps that were just rumpled blanket show red
   game.peeked = true; game.started = true; save();
   hints.show({cells: wrong, bad: true}, wrong.length === 1 ? "That one's just rumpled blanket. Look again!" : `${wrong.length} of those are just rumpled blanket. Look again!`, {uncounted: true});
