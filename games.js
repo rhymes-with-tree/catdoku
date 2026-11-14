@@ -2,7 +2,7 @@
    saved progress, background puzzle building, and the win card. */
 const G = (() => {
   // What's new (whatsNew, below): anything saved on this device before this page loaded means they've played before.
-  const NEWS = "catdoku.news.v1";
+  const NEWS = "catdoku.news.v2";
   const RETURNING = (() => { try { for (let i = 0; i < localStorage.length; i++) if (localStorage.key(i) !== NEWS) return true; } catch (e) {} return false; })();
   // Every game: name, folder, one line about it, its colour in the games menu, its shelf (see GROUPS),
   // words to find it by in search (the puzzle it's based on and what it's like), and for games added from
@@ -321,6 +321,7 @@ const G = (() => {
       b.onclick = () => feedbackCard(); betaTag.replaceWith(b);
     }
     head.append(menu);
+    setTimeout(soundSwitch);   // after the page's own switches
 
     function sync() {
       const done = dailyDoneToday(), k = dailyStreak();
@@ -704,6 +705,7 @@ const G = (() => {
   // next puzzle, as the win card's next-puzzle button does. See reopen.
   function winCard(text, onNext, admire = "Admire my board", result, o = {}) {
     if (reopening) { reopening = false; setTimeout(onNext); return; }
+    if (o.sound !== false) sound.play(o.gold ? "gold" : "win");
     const media = document.createElement("div"); media.className = "winmedia";
     // what earned the gold paw ("No hints or restarts!"), under the paw
     if (o.gold) { countGold(result, text, o.top); media.append(goldPaw()); if (o.goldWhy) { const g = document.createElement("p"); g.className = "goldwhy"; g.textContent = o.goldWhy; media.append(g); } }
@@ -763,6 +765,7 @@ const G = (() => {
     const sel = $("levelSel") || $("size"), r = o.result || (sel ? {n: +sel.value} : null);
     const own = btns.filter(b => b && b[0] !== HOME_LABEL);
     if (!openCard(title, text, [...own, [SHARE_LABEL, e => shareResult(r, false, e.currentTarget, title)], homeBtn()], media, after)) return;
+    if (o.sound !== false) sound.play("lose");
     const small = w => w === HOME_LABEL || w === SHARE_LABEL || [AGAIN, FRESH, BACK, /^(Admire|Look at)/].some(re => re.test(w));
     smallButtons(b => !b.classList.contains("primary") && small(b.textContent));
   }
@@ -1637,6 +1640,137 @@ const G = (() => {
     return () => d[slug] ? 1.5 : 1;
   }
 
+  /* ---------- sound ---------- */
+  // Sound effects (the owner's call, 2026-11-14: on by default; turned off on the Settings page, for every game at once
+  // or game by game, or with Sound in a game's own ☰ Menu). Every sound is made as it plays (Web Audio: oscillators,
+  // noise and filters, no files), each the owner's pick from a listening page of candidates. A browser plays nothing
+  // until the first tap or key, so the sound starts then. The page tells Safari it's background sound ("ambient"), so it
+  // plays alongside someone's music and an iPhone's silent switch mutes it.
+  // G.sound.play(name, o) plays one: the shared ones below (tap, put, wrong, hint, win, gold, lose; the win, gold-paw and
+  // lose cards and the hint play theirs themselves) or a game's own, added with G.sound.define({name: (t, o) => ...})
+  // from the pieces in G.sound.kit. Kept on this device: catdoku.sound.v2, {slug: false} for a game turned off.
+  const SOUND = "catdoku.sound.v2";
+  const soundOn = slug => load(SOUND)[slug] !== false;
+  const sound = (() => {
+    let ctx = null, master = null, noiseBuf = null;
+    const VOLUME = .47;   // as loud as the listening page was when the owner picked (59 of 100)
+    const subs = [], Z = .0001;
+    const here = () => CURRENT || SLUG;
+    const on = () => soundOn(here());
+    function context() {
+      if (!ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null;
+        try { if (navigator.audioSession) navigator.audioSession.type = "ambient"; } catch (e) {}
+        try { ctx = new AC(); } catch (e) { return null; }
+        const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -12; comp.knee.value = 8; comp.ratio.value = 4;
+        master = ctx.createGain(); master.gain.value = VOLUME; master.connect(comp); comp.connect(ctx.destination);
+        noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+        const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      }
+      if (ctx.state !== "running" && !document.hidden) ctx.resume().catch(() => {});
+      return ctx;
+    }
+    // the first tap or key (and every one after, in case the phone suspended it) starts the sound, if it's on
+    const wake = () => { if (on()) context(); };
+    addEventListener("pointerdown", wake, true); addEventListener("keydown", wake, true);
+    document.addEventListener("visibilitychange", () => { if (!ctx) return; if (document.hidden) ctx.suspend().catch(() => {}); else if (on()) ctx.resume().catch(() => {}); });
+
+    /* the pieces every sound is made of (t: when, in the context's seconds) */
+    const rnd = (a, b) => a + Math.random() * (b - a), pick = a => a[Math.floor(Math.random() * a.length)];
+    function path(param, t, fs) { param.setValueAtTime(fs[0][1], t + fs[0][0]); for (let i = 1; i < fs.length; i++) param.exponentialRampToValueAtTime(fs[i][1], t + fs[i][0]); }
+    function env(param, t, a, peak, dur, hold = 0) {
+      param.setValueAtTime(Z, t); param.exponentialRampToValueAtTime(Math.max(peak, Z * 2), t + a);
+      if (hold) param.setValueAtTime(Math.max(peak, Z * 2), t + a + hold);
+      param.exponentialRampToValueAtTime(Z, t + Math.max(dur, a + hold + .01));
+    }
+    function vibrato(param, t, dur, rate, depth, depthEnd) {
+      const l = ctx.createOscillator(), lg = ctx.createGain(); l.frequency.value = rate;
+      lg.gain.setValueAtTime(depth, t); if (depthEnd !== undefined) lg.gain.linearRampToValueAtTime(depthEnd, t + dur);
+      l.connect(lg); lg.connect(param); l.start(t); l.stop(t + dur + .05);
+    }
+    function filt(type, f, q = 1, to = master) { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; b.connect(to); return b; }
+    function tone({f, fs, type = "sine", t, dur, vol = .3, a = .005, hold = 0, out = master, vib}) {
+      const o = ctx.createOscillator(), g = ctx.createGain(); o.type = type;
+      if (fs) path(o.frequency, t, fs); else o.frequency.setValueAtTime(f, t);
+      if (vib) vibrato(o.frequency, t, dur, vib[0], vib[1], vib[2]);
+      env(g.gain, t, a, vol, dur, hold); o.connect(g); g.connect(out); o.start(t); o.stop(t + dur + .05);
+    }
+    function noise({t, dur, vol = .3, a = .003, hold = 0, type = "bandpass", f = 1000, fs, q = 1, out = master}) {
+      const s = ctx.createBufferSource(), b = ctx.createBiquadFilter(), g = ctx.createGain();
+      s.buffer = noiseBuf; b.type = type; b.Q.value = q;
+      if (fs) path(b.frequency, t, fs); else b.frequency.setValueAtTime(f, t);
+      env(g.gain, t, a, vol, dur, hold); s.connect(b); b.connect(g); g.connect(out);
+      s.start(t, rnd(0, 1.5)); s.stop(t + dur + .05);
+    }
+    // something struck: a few partials, each dying away at its own rate, and a tick of noise for the hit
+    function modal({t, parts, vol = .3, click = 2500, clickVol = .25}) {
+      for (const [f, amp, decay] of parts) tone({f, t, dur: decay, vol: vol * amp, a: .002});
+      if (click) noise({t, dur: .012, vol: clickVol * vol * 2, f: click, q: 1.2, a: .001});
+    }
+    function bell({f, t, dur = 1.2, vol = .15, ratio = 3.5, index = 2}) {
+      const c = ctx.createOscillator(), m = ctx.createOscillator(), mg = ctx.createGain(), g = ctx.createGain();
+      c.frequency.value = f; m.frequency.value = f * ratio;
+      mg.gain.setValueAtTime(f * index, t); mg.gain.exponentialRampToValueAtTime(f * .02, t + dur);
+      m.connect(mg); mg.connect(c.frequency); env(g.gain, t, .003, vol, dur); c.connect(g); g.connect(master);
+      c.start(t); m.start(t); c.stop(t + dur + .05); m.stop(t + dur + .05);
+    }
+    function mallet({f, t, dur = .5, vol = .2}) {   // a marimba's note
+      tone({f, t, dur, vol, a: .003}); tone({f: f * 3.93, t, dur: dur * .22, vol: vol * .3, a: .002});
+      noise({t, dur: .01, vol: vol * .3, f: f * 6, q: 2, a: .001});
+    }
+    function musicBox({f, t, dur = 1, vol = .14}) {
+      tone({f, t, dur, vol, a: .002}); tone({f: f * 2, t, dur: dur * .5, vol: vol * .35, a: .002}); tone({f: f * 5.04, t, dur: .12, vol: vol * .2, a: .001});
+    }
+    // a cat-ish voice: a buzzy tone through two vowel filters, with a rolled "rr" (trem: [rate, depth])
+    function voice({t, fs, dur, vol = .5, formants = [[700, 5], [1250, 6]], trem, type = "sawtooth", a = .02}) {
+      const o = ctx.createOscillator(), sum = ctx.createGain(), g = ctx.createGain(); o.type = type; path(o.frequency, t, fs);
+      for (const [f, q] of formants) { const b = ctx.createBiquadFilter(); b.type = "bandpass"; b.frequency.value = f; b.Q.value = q; o.connect(b); b.connect(sum); }
+      env(g.gain, t, a, vol, dur);
+      if (trem) { const tg = ctx.createGain(); tg.gain.value = 1 - trem[1]; vibrato(tg.gain, t, dur, trem[0], trem[1]); sum.connect(tg); tg.connect(g); }
+      else sum.connect(g);
+      g.connect(master); o.start(t); o.stop(t + dur + .05);
+    }
+    const whoosh = (t, f0, f1, dur, vol) => noise({t, dur, vol, a: dur * .35, fs: [[0, f0], [dur, f1]], q: 1.3});
+    const thump = (t, vol = .45, f = 130) => { tone({fs: [[0, f], [.08, f * .55]], t, dur: .1, vol}); noise({t, dur: .06, vol: vol * .6, type: "lowpass", f: 500}); };
+    const tick = (t, vol = .2, f = 3000) => noise({t, dur: .015, vol, f, q: 3, a: .001});
+    const boing = (t, low = 140, high = 420, dur = .55, vol = .3) => tone({fs: [[0, low], [.05, high], [dur, high * .9]], t, dur, vol, vib: [11, high * .2, 0]});
+    const chirp = (t, vol = .5, up = 1) => voice({t, fs: [[0, 420 * up], [.07, 380 * up], [.2, 620 * up]], dur: .24, vol, trem: [32, .45], formants: [[800, 5], [1500, 6]]});
+    const hiss = (t, dur = .55, vol = .35) => { noise({t, dur, vol, a: .04, hold: dur * .4, type: "highpass", f: 2600}); noise({t, dur, vol: vol * .6, a: .04, hold: dur * .4, f: 5200, q: 2}); };
+    const slideDown = (t, f0 = 1100, f1 = 330, dur = .65, vol = .18) => tone({fs: [[0, f0], [dur, f1]], t, dur, vol, a: .03, hold: dur * .6, vib: [6, 14]});
+    const PENTA = [523, 587, 659, 784, 880, 1047, 1175, 1319, 1568, 1760, 2093, 2349, 2637, 3136];
+    const kit = {tone, noise, modal, bell, mallet, musicBox, voice, whoosh, thump, tick, boing, chirp, hiss, slideDown, filt, vibrato, rnd, pick, PENTA};
+
+    // the moments every game shares (the owner's picks)
+    const SOUNDS = {
+      tap: t => modal({t, parts: [[880, 1, .05], [2200, .4, .03]], vol: .3, click: 3000}),   // wood block
+      put: t => thump(t, .4, 200),   // felt thump
+      wrong: t => tone({f: 110, type: "square", t, dur: .2, vol: .12, out: filt("lowpass", 650)}),   // a low buzz
+      hint: t => [1319, 1568, 1976].forEach((f, i) => bell({f, t: t + i * .06, dur: .45, vol: .08, ratio: 2.01, index: .6})),   // sparkle
+      win: t => { [392, 523, 659].forEach((f, i) => mallet({f, t: t + i * .1, dur: .35, vol: .2})); [523, 659, 784, 1047].forEach(f => mallet({f, t: t + .36, dur: 1.1, vol: .13})); },   // marimba ta-da
+      gold: t => [523, 784, 1047, 1319].forEach((f, i) => bell({f, t: t + i * .02, dur: 2.6, vol: .08, ratio: 3.5, index: 1.6})),   // big bells
+      lose: t => { mallet({f: 659, t, dur: .4, vol: .18}); mallet({f: 523, t: t + .22, dur: .7, vol: .18}); },   // oh well
+    };
+    function play(name, o = {}, delay = 0) {
+      const f = SOUNDS[name];
+      if (!f || !on() || document.hidden || !ctx || ctx.state !== "running") return;
+      try { f(ctx.currentTime + .01 + delay, o); } catch (e) {}
+    }
+    function set(v) {
+      const slug = here(), all = load(SOUND); if (v) delete all[slug]; else all[slug] = false; save(SOUND, all);
+      if (v) { context(); play("tap"); }
+      subs.forEach(f => f(v));
+    }
+    return {play, set, on, kit, context, define: map => Object.assign(SOUNDS, map),
+      out: () => master, onChange: f => subs.push(f), get ctx() { return ctx; }};
+  })();
+  // Sound in a game's own ☰ Menu (added after the page's own switches)
+  function soundSwitch() {
+    const d = {sound: sound.on()};
+    makeSwitch({id: "soundTgl", label: "Sound", line: "Sound effects (Settings turns them off for every game)", key: "sound", of: d,
+      save: () => sound.set(d.sound)});
+    sound.onChange(v => { d.sound = v; const b = $("soundTgl"); if (b) b.checked = v; });
+  }
+
   /* ---------- every game's settings, for the Settings page ---------- */
   // The Settings page (settings/) doesn't run the games' scripts, so this says where each game keeps each setting:
   // SETTINGS[slug] is a list of {key, name, line, def (its value when nothing's saved), row (one of ROWS, for a setting
@@ -1662,6 +1796,7 @@ const G = (() => {
     {id: "decor", name: "Reduce visual clutter", words: ["On", "By game", "Off"], on: 2},   // on: the games' own switches (Fabric patterns, Junk…) off
     {id: "check", name: "Auto check", words: ["On", "By game", "Off"], on: 0},
     {id: "notes", name: "Auto Notes", words: ["On", "By game", "Off"], on: 0},
+    {id: "sound", name: "Sound", words: ["On", "By game", "Off"], on: 0},
   ];
   const STORES = {catdoku: "catdoku.v1", atlas: "catdoku.catlas.v1"};
   const storeOf = slug => STORES[slug] || `catdoku.${slug}.v1`;
@@ -1707,6 +1842,8 @@ const G = (() => {
       get: () => !!load(SLOWER)[slug], set: v => { const all = load(SLOWER); all[slug] = v; save(SLOWER, all); }});
     if (!UNTIMED.includes(slug)) list.unshift({slug, key: "timer", name: "Timer", line: "", def: true, row: "timers",
       get: () => !timerHidden(slug), set: v => { const all = load(TIMERS); all[slug] = !v; save(TIMERS, all); }});
+    list.push({slug, key: "sound", name: "Sound", line: "Sound effects", def: true, row: "sound",
+      get: () => soundOn(slug), set: v => { const all = load(SOUND); if (v) delete all[slug]; else all[slug] = false; save(SOUND, all); }});
     SETTINGS[slug] = list;
   }
   const whereOf = e => e.at || [storeOf(e.slug), "settings." + e.key];
@@ -1885,6 +2022,7 @@ const G = (() => {
         clearTimeout(timer);
         if (!same()) shown = 0;
         mark = m; at = o.key(); of = o.game(); if (!uncounted) shown++;
+        sound.play("hint");
         o.draw(); if (say && quiet) readOut(say); else if (say) { hintSay(say, ms); said = say; }
         if (ms) timer = setTimeout(() => { if (mark === m) { mark = null; o.draw(); } }, ms);
       },
@@ -2208,9 +2346,10 @@ const G = (() => {
     });
   }
   setInterval(() => { if (!document.hidden) checkPaw(); }, 1000);
-  // What's new: the first time someone who played before the November 2026 redesign opens a game, a card says where
-  // things went, once (NEWS; a later change can use .v2). It waits for any walkthrough, tip or card to close. New
-  // visitors get the walkthrough instead and are marked as having seen it.
+  // What's new: the first time someone who's played before opens a game after a change worth telling them about, a
+  // card says what's new, once (NEWS: v1 was the November 2026 redesign, its card taken down on 2026-11-14 as every
+  // tester had seen it; v2 is sound, on by default, and the settings that have come since). It waits for any
+  // walkthrough, tip or card to close. New visitors get the walkthrough instead and are marked as having seen it.
   function whatsNew(tries = 0) {
     if (!RETURNING || load(NEWS).seen || !GAMES.some(g => g[1] === SLUG) || !$("menuBtn") || !$("card")) return;
     if (document.hidden || document.querySelector(".spot") || ($("overlay") && $("overlay").classList.contains("show"))) {
@@ -2218,14 +2357,13 @@ const G = (() => {
     }
     save(NEWS, {seen: Date.now()});
     const list = document.createElement("ul"); list.className = "news";
-    for (const t of ["☰ Menu, top left, now holds Share, Best times, How to play, Keys and Settings (the switches that were under the board).",
-      "Undo and Bookmark are free: they never cost the gold paw.",
-      "Tools in dark red (Hint, Audit, helpers and Restart) cost the gold paw. Once it's gone for a puzzle, they turn plain.",
-      "Where a tap can mark instead of fill, a row under the board picks which (Mark, Dot, Keep, Erase)."]) {
+    for (const t of ["Sound! Every game plays a sound for a win, a gold paw, a miss and a hint, and Pawlinko and Pounce Up have lots of their own. It starts with your first tap.",
+      "To turn sound off, go to Settings: for every game at once, or one game at a time. A game's ☰ Menu has its own Sound switch too.",
+      "More new options in Settings: hide the timer, slow the action games down, reduce the clutter round the boards, and turn Auto check and Auto Notes on or off.",
+      "On an iPhone, the silent switch keeps the games quiet."]) {
       const li = document.createElement("li"); li.textContent = t; list.append(li);
     }
-    // Show me the menu: the tap mustn't go on to the page, where a tap outside the menu shuts it again at once
-    openCard("What's new", "", [["Show me the menu", e => { e.stopPropagation(); closeCard(); $("menuBtn").click(); }, true], ["Got it", closeCard]], list);
+    openCard("What's new", "", [["Open Settings", () => { location.href = `${HOME}settings/#${CURRENT || SLUG}`; }, true], ["Got it", closeCard]], list);
   }
   if (!RETURNING) save(NEWS, {seen: Date.now(), firstVisit: true});
   setTimeout(whatsNew, 1500);
@@ -2692,6 +2830,6 @@ const G = (() => {
     }
   }
 
-  return {ladder, ANOTHER, CHANGE, MAGNET, tally, emoText, radios, pawLost, pieces, GAMES, BETA, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, loseCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText, breakable,
+  return {sound, ladder, ANOTHER, CHANGE, MAGNET, tally, emoText, radios, pawLost, pieces, GAMES, BETA, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, loseCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText, breakable,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, feedbackCard, feedbackFor, toyPicker, pickLook};
 })();

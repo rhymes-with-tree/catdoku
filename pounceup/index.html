@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-13.1"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-14.1"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-13.1">
+<link rel="stylesheet" href="../games.css?v=2026-11-14.1">
 <style>
 /* Rayla pounces from shelf to shelf up a tall bookcase: tap where she should go and she bounces off every shelf she
    lands on, swatting things off as she goes. Springs throw her higher; lemons, candles and tape she keeps clear of;
@@ -76,8 +76,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-13.1"></script>
-<script src="../tablethings.js?v=2026-11-13.1"></script>
+<script src="../games.js?v=2026-11-14.1"></script>
+<script src="../tablethings.js?v=2026-11-14.1"></script>
 <script>
 /* ---------- the world ---------- */
 // The bookcase is 300 units across; the window onto it is 400 tall and only ever moves up. y counts up from the floor.
@@ -86,6 +86,29 @@ const W = 300, VH = 400, SIDE = 10, FT = 30;
 // A pounce clears about 4⅓ feet (a spring about 12½); she lands, crouches a moment (SETTLE seconds), then pounces again.
 const GRAV = 800, POUNCE = 456, SPRING = 780, ZOOM = 650, RUN = 210, SETTLE = .45, WALK = 120;
 const ENDLESS = 12;
+/* ---------- sound ---------- */
+// The owner's picks from the listening page (2026-11-14), played through G.sound (games.js; on unless Settings turns it
+// off). Knocking over a glass of water has none of its own yet: it's to come from a sound library (TODO.md).
+const S = G.sound.kit;
+G.sound.define({
+  "pounce.pounce": t => S.tone({fs: [[0, 260], [.14, 620]], t, dur: .14, vol: .2, a: .01}),   // a soft boing
+  "pounce.land": t => S.thump(t, .4, 140),   // soft paws
+  "pounce.walk": t => { for (let i = 0; i < 4; i++) S.thump(t + i * .11, .12, 180 + (i % 2) * 20); },   // pitter-patter
+  "pounce.swat": t => S.whoosh(t, 900, 2600, .1, .25),   // the swipe...
+  "pounce.tumble": t => { S.modal({t, parts: [[600, 1, .08], [1500, .3, .04]], vol: .18}); S.modal({t: t + .18, parts: [[520, 1, .06], [1300, .3, .03]], vol: .1}); },   // ...and the tumble, as it lands far below
+  "pounce.spring": t => S.tone({fs: [[0, 180], [.45, 1400]], t, dur: .5, vol: .18, a: .01, hold: .3, vib: [14, 40, 0]}),   // launch
+  "pounce.fish": t => { S.tone({f: 1319, type: "triangle", t, dur: .08, vol: .15}); S.tone({f: 1976, type: "triangle", t: t + .07, dur: .14, vol: .15}); },   // two notes up
+  "pounce.tape": t => { for (let i = 0; i < 7; i++) S.noise({t: t + i * .025 + S.rnd(0, .01), dur: .02, vol: .25, f: S.rnd(1200, 2600), q: 1}); },   // sticky thhp
+  "pounce.loose": t => { S.noise({t, dur: .03, vol: .6, type: "highpass", f: 1500, a: .001}); S.modal({t, parts: [[200, 1, .15], [520, .4, .1]], vol: .3, click: 0}); S.noise({t: t + .05, dur: .3, vol: .2, type: "lowpass", fs: [[0, 600], [.3, 150]]}); },   // crack
+  "pounce.lemon": t => S.hiss(t),   // a hiss
+  "pounce.candle": t => S.hiss(t, .35, .3),   // a short hiss
+  "pounce.nip": t => S.tone({f: 600, t, dur: 1.0, vol: .12, a: .1, hold: .5, vib: [7, 80]}),   // rolling in catnip: a wobbly slide
+  "pounce.zoomies": (t, o) => S.whoosh(t, 300, o.big ? 4000 : 2500, o.big ? .9 : .6, .35),   // a rising whoosh
+  "pounce.mellow": t => S.slideDown(t, 700, 350, 1.0, .12),   // too mellow: a slow slide down
+  "pounce.miss": t => [659, 523, 440].forEach((f, i) => S.mallet({f, t: t + i * .16, dur: .4, vol: .16})),   // notes down
+  "pounce.basket": t => [784, 659, 523].forEach((f, i) => S.musicBox({f, t: t + i * .35, dur: 1.2, vol: .12})),   // a lullaby
+  "pounce.best": t => [1047, 1319, 1568].forEach((f, i) => S.bell({f, t: t + i * .08, dur: .6, vol: .08, ratio: 2.01, index: .7})),   // past your best, on Endless
+});
 const BASKET_X = W / 2 + 70;   // where the basket stands on top of the bookcase
 // Level n: the height of the bookcase in feet, and from which level each new thing turns up
 const GOALS = [null, 40, 55, 70, 85, 100, 120, 140, 160, 185, 210, 240];
@@ -296,7 +319,7 @@ function status() {
 }
 function start() {
   if (game.state !== "ready") return;
-  game.state = "running"; game.started = true; game.cat.vy = POUNCE; game.cat.landed = game.t; showTap(""); status();
+  game.state = "running"; game.started = true; game.cat.vy = POUNCE; game.cat.landed = game.t; showTap(""); status(); G.sound.play("pounce.pounce");
   G.track(`Pounce Up started ${levelName(game.level).split(" ·")[0]}`);
 }
 function pause() { if (game && game.state === "running") { game.state = "paused"; showTap("Paused · tap to go on"); status(); } }
@@ -319,6 +342,7 @@ const CAUSES = {
 function fright(away, vy, vx, time, say, why) {
   const c = game.cat; game.cause = why;
   c.scared = time; c.vy = vy; c.vx = away * vx; c.face = away; c.zoom = 0; c.on = null; aim = null;
+  G.sound.play("pounce." + why);   // a hiss at a lemon or a candle, a sticky thhp off tape
   G.note(say, 1800);
 }
 // Walking along a shelf: to where you tapped on it (or dragged), or while an arrow key's held. She won't walk onto tape
@@ -342,6 +366,7 @@ function walk(s, dir, h) {
     return;
   }
   c.off = off;
+  if (g.t - (c.patter || -9) > .44) { c.patter = g.t; G.sound.play("pounce.walk"); }
   if (s.kind === "top" && Math.abs(shelfX(g, s) + off - BASKET_X) < 14) { intoBasket(); return; }
   // walking into something she can knock off swats it
   for (const t of s.things) if (!t.off && SWATS.includes(t.k) && Math.abs(t.dx - c.off) < 22 && Math.sign(t.dx - c.off) === want) swat(s, shelfX(g, s), t);
@@ -350,6 +375,7 @@ function walk(s, dir, h) {
 function swat(s, sx, t) {
   const g = game, c = g.cat, away = Math.sign(sx + t.dx - c.x) || (t.dx < 0 ? -1 : 1);
   t.off = true; g.knocked++; if (t.k === "g") g.water++;
+  G.sound.play("pounce.swat");
   g.falling.push({k: t.k, x: sx + t.dx, y: s.y, vx: away * (140 + 60 * Math.random()), vy: 180, a: 0, spin: away * (4 + 4 * Math.random())});
   c.face = away; status();
   if (kindOf(g) === "tidy") missed("Crash!", "Rayla knocked something off, and on this bookcase she mustn't knock anything off.");
@@ -375,7 +401,7 @@ function step(h) {
   if (c.x < lo) { c.x = lo; c.vx = c.scared > 0 ? -c.vx : 0; }
   if (c.x > hi) { c.x = hi; c.vx = c.scared > 0 ? -c.vx : 0; }
   // things swatted off fall away
-  for (const f of g.falling) { f.vy -= GRAV * h; f.x += f.vx * h; f.y += f.vy * h; f.a += f.spin * h; if (!f.crash && f.y < g.cam - 20) { f.crash = g.t; f.cx = f.x; } }
+  for (const f of g.falling) { f.vy -= GRAV * h; f.x += f.vx * h; f.y += f.vy * h; f.a += f.spin * h; if (!f.crash && f.y < g.cam - 20) { f.crash = g.t; f.cx = f.x; G.sound.play("pounce.tumble"); } }
   if (g.falling.length > 12) g.falling = g.falling.filter(f => !f.crash || g.t - f.crash < .5);
   if (g.state === "ready") { c.y = 0; c.vy = 0; noticeNew(); return; }   // crouched on the floor, waiting to pounce
   if (on && c.roll > 0) {   // rolling about in catnip, then whatever the catnip decides
@@ -385,7 +411,7 @@ function step(h) {
   if (on && c.on != null) {   // then up she goes (not while she's walking)
     c.y = on.y; c.vy = 0; c.settle -= h;
     if (c.walking) c.settle = Math.max(c.settle, tapMode() ? 0 : SETTLE);
-    if (c.settle <= 0 && ((!tapMode() && on.kind !== "top") || c.queued)) { c.on = null; c.vy = POUNCE; c.queued = false; }
+    if (c.settle <= 0 && ((!tapMode() && on.kind !== "top") || c.queued)) { c.on = null; c.vy = POUNCE; c.queued = false; G.sound.play("pounce.pounce"); }
     else if (on.kind === "top" && c.settle < -4 && !c.walking && !g.toldBasket) { g.toldBasket = true; G.note("Tap the basket and Rayla walks over for a snooze.", 3500); }
     else if (tapMode() && on.kind !== "top" && c.settle < -2.5 && !g.toldTap) { g.toldTap = true; G.note("Tap where she should pounce.", 3000); }
   }
@@ -417,13 +443,14 @@ function step(h) {
   // picking things up
   for (const it of g.items) if (!it.got && Math.abs(it.x - c.x) < 22 && Math.abs(it.y - (c.y + 18)) < 26 && (it.kind === "fish" || (c.on != null && !c.roll))) {
     it.got = g.t;
-    if (it.kind === "fish") { g.fish++; status(); }
-    else { c.roll = 1.3; c.walking = false; c.walkTo = null; aim = null; g.nips++; status(); G.note("Rolling in the catnip…", 1400); }   // see catnipDice
+    if (it.kind === "fish") { g.fish++; status(); G.sound.play("pounce.fish"); }
+    else { G.sound.play("pounce.nip"); c.roll = 1.3; c.walking = false; c.walkTo = null; aim = null; g.nips++; status(); G.note("Rolling in the catnip…", 1400); }   // see catnipDice
   }
   // the window follows her up, never down
   g.cam = Math.max(g.cam, g.cam + (c.y - VH * .42 - g.cam) * Math.min(1, h * 9));
   if (g.level !== ENDLESS) g.cam = Math.min(g.cam, GOALS[g.level] * FT - 120);   // and stops with the top of the bookcase in view
   if (c.y > g.top) { const before = Math.floor(g.top / FT); g.top = c.y; if (Math.floor(g.top / FT) !== before) status(); }
+  if (g.level === ENDLESS && settings.best && !g.passedBest && g.top / FT > settings.best) { g.passedBest = true; G.sound.play("pounce.best"); G.note("Past your best!", 2000); }
   if (c.y < g.cam - 60) fell();
   if (g.task && g.task.kind === "time" && g.state === "running") {
     if (g.t >= g.task.s) missed("Too slow!", `Rayla didn't reach the basket in ${g.task.s} seconds.`);
@@ -464,8 +491,9 @@ function warnLemon(from, away) {
 function catnipDice() {
   const c = game.cat, r = Math.random();
   c.roll = 0;
-  if (r < .2) { G.note("Ahh… Rayla's too mellow for zoomies.", 2000); return; }
+  if (r < .2) { G.sound.play("pounce.mellow"); G.note("Ahh… Rayla's too mellow for zoomies.", 2000); return; }
   c.on = null; c.scared = 0; c.zoom = r < .8 ? .9 + Math.random() * .7 : 2.4;
+  G.sound.play("pounce.zoomies", {big: r >= .8});
   G.note(r < .8 ? "Zoomies!" : "ZOOOOOOMIES!", 1600);
 }
 // Rayla climbs into her basket on top of the bookcase (walking in, or landing in it) and that's the climb done, if
@@ -480,7 +508,7 @@ function intoBasket() {
 function land(s, sx) {
   const g = game, c = g.cat;
   if (s.kind === "loose") {
-    s.gone = g.t; g.cause = "loose";
+    s.gone = g.t; g.cause = "loose"; G.sound.play("pounce.loose");
     if (kindOf(g) === "loose") missed("Crack!", "Rayla landed on a cracked shelf, and on this bookcase she mustn't land on a single one.");
     return false;
   }
@@ -506,7 +534,8 @@ function land(s, sx) {
   // a swat at anything in reach
   const reach = kindOf(g) === "tidy" ? 26 : 38;   // on a tidy level, only what she lands right beside
   for (const t of s.things) if (g.state === "running" && !t.off && SWATS.includes(t.k) && Math.abs(sx + t.dx - c.x) < reach) swat(s, sx, t);
-  if (s.spring != null && Math.abs(c.x - (sx + s.spring)) < 16) { c.vy = SPRING; s.boing = g.t; g.springs++; status(); return true; }
+  if (s.spring != null && Math.abs(c.x - (sx + s.spring)) < 16) { c.vy = SPRING; s.boing = g.t; g.springs++; status(); G.sound.play("pounce.spring"); return true; }
+  G.sound.play("pounce.land");
   c.vy = 0; c.on = s.id; c.off = c.x - sx; c.settle = tapMode() ? .2 : SETTLE; c.queued = false; c.walkTo = null; c.walking = false;
   return true;
 }
@@ -790,12 +819,12 @@ function missed(title, text, atTop) {
 }
 function lost(g, title, text, atTop) {
   if (g.level !== ENDLESS) { G.breakStreak(); settings.tries[g.level] = (settings.tries[g.level] || 0) + 1; }
-  save();
+  save(); G.sound.play("pounce.miss");   // the miss's own notes down, in place of the lose card's
   setTimeout(() => {
     if (game !== g) return;
     G.loseCard(title, text, [["Try again", () => { G.closeCard(); newRun(g.level, g.seed); }, true], ["New bookcase", () => { G.closeCard(); newRun(g.level); }], G.homeBtn()],
       atTop ? catPic(RAYLA.basket, "Rayla curled up in her basket") : Object.assign(catPic(RAYLA.feet, "Rayla, standing safe on all four paws"), {className: "pic feet"}),
-      G.otherSize($("levelSel"), g.level, startLevel, "Or play a different level:"), {result: {n: g.level}});
+      G.otherSize($("levelSel"), g.level, startLevel, "Or play a different level:"), {result: {n: g.level}, sound: false});
   }, 600);
 }
 function win() {
@@ -803,6 +832,7 @@ function win() {
   const first = !settings.tries[g.level], next = Math.min(ENDLESS - 1, g.level + 1), got = haul(g);
   settings.tries[g.level] = 0; settings.level = next; $("levelSel").value = next; save();
   G.track(`Pounce Up won level ${g.level}`);
+  G.sound.play("pounce.basket");   // a lullaby as she curls up, then the win card's own
   setTimeout(() => {
     if (game !== g) return;
     const met = !g.task ? "" : g.task.kind === "time" ? ` In ${Math.floor(g.t)} seconds, with ${Math.ceil(g.task.s - g.t)} to spare!`
