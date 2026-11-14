@@ -164,6 +164,19 @@ allows, all free to use in a public game site (and an app later), so long as eac
 Not **Epidemic Sound** (www.epidemicsound.com, also allowed): its FAQ says "royalty-free" means nothing owed on top of a
 subscription, and "there is no separate free tier". A sound downloaded without logging in isn't licensed for the site.
 Keep a line for each sound used (where from, its licence, and a link) in `ARTWORK.md`, as for the pictures.
+Kenney, Freesound and Pixabay are on the environment's allowed hosts, but the sites themselves answer a cloud session
+with 403 (Pixabay behind Cloudflare's bot check), so a library sound has to be downloaded in a browser and added to the repo.
+
+The owner's calls (2026-11-14):
+- **Where from:** most sounds made in code (Web Audio, no files), the cats' own recordings for anything a cat does, and a
+  library only for what code can't do well (a splash, a cheer).
+- **Pawlinko and Pounce Up first.** A listening page of candidates for them and the shared moments (tap, put down, not
+  there, hint, win, gold paw, miss) is at https://claude.ai/artifact/AiHXuVwvwB5CJSBPvgGNKS (the owner's own); its
+  Copy my picks gives the owner's choices, from which the sounds are built.
+- **Sound on by default**, starting on the first tap (browsers allow nothing sooner); turned off on the Settings page.
+- **A new What's new card** for returning players (`whatsNew` in `games.js`, under `catdoku.news.v2`): there are new
+  options, sound among them, and Settings turns them off. It replaces the November 2026 redesign card, which every
+  tester has seen.
 
 ## Pawlinko: sound effects
 
@@ -171,7 +184,7 @@ The owner wants sound effects for Pawlinko, put aside for later (2026-11-02): a 
 boing off a coil spring, a splash when coffee or water spills, a soft thump as it lands in a bed (and a sleepy grumble
 from a napping cat), and a cheer for a tandem. Swap-a-Pom (in beta) has the site's first sound, Moonpie's purr, with
 the start of a shared way to play it (see its section above). It still needs to be shared: a Sound switch in the
-settings (off by default, as browsers only play sound after a tap), quiet enough for a phone, and sounds that follow
+settings (on by default, the owner's call on 2026-11-14, starting on the first tap as browsers allow nothing sooner), quiet enough for a phone, and sounds that follow
 the thing's kind (a bell rings, a mug clunks, a feather makes none).
 
 
