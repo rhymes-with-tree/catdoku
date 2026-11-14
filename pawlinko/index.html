@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-13.1"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-14.1"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -24,7 +24,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-13.1">
+<link rel="stylesheet" href="../games.css?v=2026-11-14.1">
 <style>
 /* Gus and Peanut take turns on the top shelf of a climbing wall, knocking things off (yarn, toys, fluffballs, a mug…) that bounce
    down through sisal posts, perches and springs into the cat beds at the bottom. The score and target sit side by side, and
@@ -122,10 +122,10 @@ body.full .zoombox{width:auto;margin:0;display:flex;grid-column:3;grid-row:4;ali
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-13.1"></script>
-<script src="../colorways.js?v=2026-11-13.1"></script>
-<script src="../cattower.js?v=2026-11-13.1"></script>
-<script src="../tablethings.js?v=2026-11-13.1"></script>
+<script src="../games.js?v=2026-11-14.1"></script>
+<script src="../colorways.js?v=2026-11-14.1"></script>
+<script src="../cattower.js?v=2026-11-14.1"></script>
+<script src="../tablethings.js?v=2026-11-14.1"></script>
 <script>
 /* ---------- the climbing wall (plain functions: the puzzle maker runs them in a worker too) ---------- */
 // World units: the wall is 360 wide and 424 tall. Things knocked off the top shelf bounce down through rows of
@@ -250,6 +250,7 @@ function plinkoStep(t, b, w) {
       const a = (rnd() - .5) * b.wob, c = Math.cos(a), s2 = Math.sin(a), vx = b.vx;
       b.vx = vx * c - b.vy * s2; b.vy = vx * s2 + b.vy * c;
       if (-vn > 220) b.hard = (b.hard || 0) + 1;
+      if (!kick && -vn > 60) { b.knock = (b.knock || 0) + 1; b.kv = -vn; }   // a knock, for its sound (a spring's is the boing)
     }
     return true;
   };
@@ -260,7 +261,7 @@ function plinkoStep(t, b, w) {
     const d = Math.sqrt(d2) || .001, nx = dx / d, ny = dy / d;
     b.x = px + nx * s; b.y = py + ny * s;
     const vn = b.vx * nx + b.vy * ny;
-    if (vn < 0) { b.vx -= (1 + e) * vn * nx; b.vy -= (1 + e) * vn * ny; b.vx *= .995; if (-vn > 220) b.hard = (b.hard || 0) + 1; }
+    if (vn < 0) { b.vx -= (1 + e) * vn * nx; b.vy -= (1 + e) * vn * ny; b.vx *= .995; if (-vn > 220) b.hard = (b.hard || 0) + 1; if (-vn > 60) { b.knock = (b.knock || 0) + 1; b.kv = -vn; } }
     return true;
   };
   if (b.y > C.ROW0 - 22 && b.y < C.BED_TOP) {
@@ -361,13 +362,14 @@ function plinkoNaps(t, w) {
 // is worth 50; otherwise its own points.
 function plinkoBed(t, w, k) { const b = t.beds[k], nap = plinkoNaps(t, w).includes(k); return {v: nap ? 0 : b.nap ? 50 : b.v, nap}; }
 // One step of the whole wall: moves everything in the air, and returns what happened, for the page to show:
-// [{land, bed, v, both, bonus, why}, {stuck}, {loose, bonus}, {boing}, {spill}] (each with the thing). Several things can
+// [{land, bed, v, both, bonus, why}, {stuck}, {loose, bonus}, {boing}, {spill}, {knock, v (how hard)}] (each with the thing). Several things can
 // be in the air at once (the next throw can go before the last one lands); they bump into each other.
 function plinkoTick(t, w) {
   const C = plinkoGeom(), out = [];
   for (const b of w.moving) {
-    const boing = b.boing || 0, hard = b.hard || 0, dry = !b.wet;
+    const boing = b.boing || 0, hard = b.hard || 0, knock = b.knock || 0, dry = !b.wet;
     plinkoStep(t, b, w); b.t += 1 / 240;
+    if ((b.knock || 0) > knock) out.push({knock: b, v: b.kv});
     if (dry && b.wet) out.push({soaked: b});
     if ((b.boing || 0) > boing) out.push({boing: b});
     const spill = plinkoKinds()[b.k].spill;
@@ -481,6 +483,42 @@ function plinkoTargets(t) {
 const C = plinkoGeom(), W = C.W, H = C.H, CAT = 66, M = 8;
 const CATS = [{name: "Gus", pic: "gus-12"}, {name: "Peanut", pic: "peanut-12"}];
 const KINDS = plinkoKinds();
+/* ---------- sound ---------- */
+// The owner's picks from the listening page (2026-11-14), played through G.sound (games.js; on unless Settings turns it
+// off). Each thing has its own sound as it hits a hold, a perch or another thing, softer for a gentler knock. A spill
+// and waking a cat have none yet: they're to come from a sound library (TODO.md).
+const S = G.sound.kit, hit = o => Math.max(.35, Math.min(1, (o.v || 450) / 450));
+G.sound.define({
+  "plinko.yarn": (t, o) => S.noise({t, dur: .08, vol: .4 * hit(o), f: 350, q: 1, a: .01}),   // fluffy thup
+  "plinko.tennis": (t, o) => { S.tone({fs: [[0, 260], [.08, 170]], t, dur: .085, vol: .4 * hit(o)}); S.noise({t, dur: .02, vol: .12 * hit(o), f: 1500, q: 2}); },   // bonk
+  "plinko.fluff": (t, o) => S.noise({t, dur: .07, vol: .35 * hit(o), f: 900, q: 1, a: .008}),   // a higher puff
+  "plinko.bell": (t, o) => S.bell({f: 1760, t, dur: .6, vol: .1 * hit(o), ratio: 2.76, index: 1.2}),   // ding
+  "plinko.mouse": (t, o) => S.tone({fs: [[0, 1800], [.05, 2700], [.12, 2100]], t, dur: .13, vol: .1 * hit(o), vib: [40, 120]}),   // squeak
+  "plinko.wiffle": (t, o) => S.modal({t, parts: [[1600, 1, .03], [3700, .4, .02]], vol: .25 * hit(o)}),   // plastic clack
+  "plinko.feather": (t, o) => S.noise({t, dur: .14, vol: .06 * hit(o), type: "highpass", f: 3000, a: .05}),   // a faint whisper
+  "plinko.spiky": (t, o) => { for (const d of [0, .025, .055]) S.tick(t + d, .2 * hit(o), 3000); },   // rattle
+  "plinko.coil": (t, o) => { S.tone({f: 180, t, dur: .35, vol: .14 * hit(o), vib: [14, 60, 0]}); S.modal({t, parts: [[1200, .5, .2], [3300, .3, .15]], vol: .12 * hit(o), click: 0}); },   // sproing
+  "plinko.mug": (t, o) => { S.modal({t, parts: [[260, 1, .1], [700, .5, .06], [1800, .2, .03]], vol: .32 * hit(o)}); S.thump(t, .25 * hit(o), 100); },   // heavy clunk
+  "plinko.glass": (t, o) => S.modal({t, parts: [[1500, 1, .15], [2600, .4, .08]], vol: .14 * hit(o)}),   // dull glass
+  "plinko.phone": (t, o) => { for (const d of [0, .14]) S.tone({f: 170, type: "square", t: t + d, dur: .1, vol: .1 * hit(o), a: .005, hold: .06, out: S.filt("lowpass", 500)}); },   // buzz buzz
+  "plinko.plant": (t, o) => { S.modal({t, parts: [[300, 1, .08], [820, .6, .05], [1900, .2, .03]], vol: .32 * hit(o)}); S.noise({t, dur: .1, vol: .07 * hit(o), type: "highpass", f: 2000}); },   // pot clunk
+  "plinko.swat": t => S.whoosh(t, 600, 2400, .16, .35),   // knocked off the shelf: a whoosh
+  "plinko.spring": t => S.boing(t),   // off a spring: a cartoon boing
+  "plinko.bed": t => { S.tone({fs: [[0, 110], [.15, 55]], t, dur: .16, vol: .5}); S.noise({t, dur: .08, vol: .3, type: "lowpass", f: 300}); },   // a soft thump
+  "plinko.points": (t, o) => { const n = Math.min(12, Math.round((o.v || 0) / 5)); for (let i = 0; i < n; i++) S.tick(t + i * .05 + S.rnd(0, .02), .16, S.rnd(2500, 4200)); },   // kibble in the bowl, more for more points
+  "plinko.nap": t => S.voice({t, fs: [[0, 170], [.5, 115]], dur: .55, vol: .6, trem: [26, .5], formants: [[500, 4], [950, 5]]}),   // a sleepy grumble
+  "plinko.tandem": t => { S.chirp(t, .45); S.chirp(t + .22, .45, 1.15); },   // two chirps
+  "plinko.loose": t => S.tone({fs: [[0, 300], [.05, 1200]], t, dur: .06, vol: .25}),   // pop
+  "plinko.place": t => S.modal({t, parts: [[700, 1, .06], [1800, .4, .03]], vol: .3}),   // a perch placed: wood clack
+  "plinko.flip": t => { S.tick(t, .3, 2600); S.tick(t + .06, .25, 3200); },   // two clicks
+  "plinko.placeSpring": t => S.boing(t, 300, 520, .3, .16),   // a little sproing
+  "plinko.shake": t => S.tone({f: 160, type: "triangle", t, dur: .6, vol: .2, a: .02, hold: .3, vib: [9, 50]}),   // wobble
+  "plinko.wind": t => S.tone({fs: [[0, 80], [.6, 170]], type: "sawtooth", t, dur: .65, vol: .12, a: .04, hold: .4, out: S.filt("lowpass", 900)}),   // reel whir
+  "plinko.wipe": t => S.noise({t, dur: .5, vol: .3, fs: [[0, 800], [.25, 2400], [.5, 900]], q: 3, a: .05, hold: .25}),   // squeegee
+});
+// a thing's knocks come no closer together than this (seconds), so one rattling against a hold doesn't buzz; longer
+// sounds wait longer
+const KNOCK_GAP = {bell: .1, mouse: .1, coil: .12, phone: .25};
 // yarn comes in Wind Up's colours; the toys are from the toy library, and the mug, glass, phone and succulent from Knock It Off's table
 const YARN = ["#ECA818", "#4E577D", "#E16A4A", "#73A7AE", "#B94588", "#B3B94B", "#7885BA", "#6AA673"];
 const TOY = {tennis: "tennis", bell: "bell-purple", mouse: "mouse", wiffle: "wiffle-red", feather: "feather-rainbow", spiky: "spiky-lime"};
@@ -655,6 +693,8 @@ function tick(g, dt) {
     g.acc -= STEP;
     if (busy(g)) {
       for (const e of plinkoTick(g.wall, g.w)) {
+        if (e.knock) { const b = e.knock, now = performance.now() / 1000; if (now - (b.heard || 0) > (KNOCK_GAP[b.k] || .06)) { b.heard = now; G.sound.play("plinko." + b.k, {v: e.v}); } }
+        if (e.boing) G.sound.play("plinko.spring");
         if (e.boing) { const b = e.boing, s = (g.w.springs.length ? g.wall.springs.concat(g.w.springs) : g.wall.springs).reduce((a, s) => Math.hypot(s.x - b.x, s.y - b.y) < Math.hypot(a.x - b.x, a.y - b.y) ? s : a); g.fx.push({spring: s, t: 0, T: .35}); }
         // coffee and water spill the first time they're knocked hard, leaving a splat on the wall
         if (e.spill) splash(g, e.x, e.y, KINDS[e.spill.k].spill);   // its splat is on the wall now (g.w.wet)
@@ -663,7 +703,7 @@ function tick(g, dt) {
         if (e.stuck) G.note(e.tangled ? `The ${nameOf(e.stuck)} got tangled in the yarn. Knock it loose!` : `The ${nameOf(e.stuck)} is stuck on the wall. Knock it loose!`, 3000);
         if (e.goal) { G.note(`Goal met! +${e.bonus}`, 3000); g.fx.push({text: `Goal +${e.bonus}`, x: W / 2, y: C.BED_TOP - 40, t: 0, T: 1.8, c: "#B94588"}); status(); }
         if (e.moved) { const to = plinkoBed(g.wall, g.w, e.moved.from).v; g.fx.push({moved: e.moved, t: 0, T: 1.2}); G.note(`A cat got up and crawled into another bed! The bed it left is worth ${to} now.`, 3500); status(); }
-        if (e.loose) { G.note(`Knocked the ${nameOf(e.loose)} loose! +${e.bonus}`, 2500); g.fx.push({text: `+${e.bonus}`, x: e.loose.x, y: e.loose.y - 10, t: 0, T: 1.3, c: "#B94588"}); status(); }
+        if (e.loose) { G.sound.play("plinko.loose"); G.note(`Knocked the ${nameOf(e.loose)} loose! +${e.bonus}`, 2500); g.fx.push({text: `+${e.bonus}`, x: e.loose.x, y: e.loose.y - 10, t: 0, T: 1.3, c: "#B94588"}); status(); }
         if ((e.land || e.stuck) && e[e.land ? "land" : "stuck"].k === "yarn" && !g.strandNote) { g.strandNote = true; G.note("The yarn left a strand: things catch on it now.", 3500); }
       }
       if (!busy(g)) settled(g);
@@ -678,6 +718,9 @@ function tick(g, dt) {
 function land(g, e) {
   const b = e.land, bed = Object.assign({}, g.wall.beds[e.bed], plinkoBed(g.wall, g.w, e.bed)), mid = (bed.x1 + bed.x2) / 2, spill = KINDS[b.k].spill;
   if (spill) splat(g, b.x, H - 12, spill);   // whatever's left splashes into the bed
+  G.sound.play("plinko.bed");
+  if (bed.nap) G.sound.play("plinko.nap", {}, .15);
+  else { G.sound.play("plinko.points", {v: e.v + (e.bonus || 0)}, .12); if (e.both) G.sound.play("plinko.tandem", {}, .35); }
   g.fx.push({text: bed.nap ? "Zzz" : `+${e.v}`, x: mid, y: C.BED_TOP - 4, t: 0, T: 1.3, c: bed.nap ? "#8D78AD" : e.both ? "#B94588" : INK});
   const extra = e.bonus ? ` Plus ${e.bonus}: ${G.listed(e.why)}!` : "";
   if (e.bonus) g.fx.push({text: `+${e.bonus}`, x: mid, y: C.BED_TOP - 26, t: -.35, T: 1.3, c: "#B94588"});
@@ -907,6 +950,7 @@ function drop() {
   if (g.mode) setMode(null);
   if (inSetup(g)) endSetup(g);
   g.w.moving.push(plinkoBall(g.wall, clampAim(g.aim), g.i)); g.i++;
+  G.sound.play("plinko.swat");
   hints.clear(false);
   status(); save();
 }
@@ -931,7 +975,7 @@ addEventListener("keydown", e => {
   if (inSetup(game) && !game.mode) {   // setting up: the arrows move the next piece, Enter places it, R flips a perch; Space throws
     if (/^Arrow/.test(k)) { e.preventDefault(); const q = game.ghost, d = e.shiftKey ? 20 : 6; q.x += k === "ArrowLeft" ? -d : k === "ArrowRight" ? d : 0; q.y += k === "ArrowUp" ? -d : k === "ArrowDown" ? d : 0; clampGhost(); return; }
     if (k === "Enter") { if (e.target.closest("button")) return; e.preventDefault(); setupPlace([game.ghost.x, game.ghost.y], true); return; }
-    if (k === "r" || k === "R") { e.preventDefault(); game.ghost.flip = !game.ghost.flip; return; }
+    if (k === "r" || k === "R") { e.preventDefault(); game.ghost.flip = !game.ghost.flip; G.sound.play("plinko.flip"); return; }
     if (k === " ") { if (e.target.closest("button")) return; e.preventDefault(); drop(); return; }
   }
   if ((k === "x" || k === "X") && !game.mode) { e.preventDefault(); swap(); return; }
@@ -939,7 +983,7 @@ addEventListener("keydown", e => {
     if (k === "Escape") { e.preventDefault(); setMode(null); G.note(""); }
     else if (k === "Enter" || k === " ") { if (e.target.closest("button")) return; e.preventDefault(); modeDone(); }
     else if (game.mode === "perch" && /^Arrow/.test(k)) { e.preventDefault(); const q = game.ghost, d = e.shiftKey ? 20 : 6; q.x += k === "ArrowLeft" ? -d : k === "ArrowRight" ? d : 0; q.y += k === "ArrowUp" ? -d : k === "ArrowDown" ? d : 0; clampGhost(); }
-    else if (game.mode === "perch" && (k === "r" || k === "R")) { e.preventDefault(); game.ghost.flip = !game.ghost.flip; }
+    else if (game.mode === "perch" && (k === "r" || k === "R")) { e.preventDefault(); game.ghost.flip = !game.ghost.flip; G.sound.play("plinko.flip"); }
     else if (game.mode === "reel" && (k === "ArrowLeft" || k === "ArrowRight" || k === "ArrowUp" || k === "ArrowDown")) { e.preventDefault(); const live = strandsLeft(); const at = live.indexOf(game.pick); game.pick = live[(at + (k === "ArrowLeft" || k === "ArrowUp" ? live.length - 1 : 1)) % live.length]; }
     return;
   }
@@ -964,11 +1008,12 @@ function setupPlace([x, y], keys) {
   const g = game; if (!inSetup(g)) return;
   // a tap on a perch you've placed flips it
   const mineAt = keys ? null : g.w.perches.find(q => q.setup && Math.hypot((q.x1 + q.x2) / 2 - x, (q.y1 + q.y2) / 2 - y) < 18);
-  if (mineAt) { [mineAt.y1, mineAt.y2] = [mineAt.y2, mineAt.y1]; hints.clear(false); save(); G.note("Flipped.", 1500); return; }
+  if (mineAt) { [mineAt.y1, mineAt.y2] = [mineAt.y2, mineAt.y1]; hints.clear(false); save(); G.sound.play("plinko.flip"); G.note("Flipped.", 1500); return; }
   if (!g.setup.length) { G.note("All placed. Throw from the shelf to start.", 2500); return; }
   const k = g.setup.shift();
   if (k === "perch") g.w.perches.push({...perchAt(g.ghost), mine: true, setup: true});
   else g.w.springs.push({x: Math.round(g.ghost.x), y: Math.round(g.ghost.y), mine: true});
+  G.sound.play(k === "perch" ? "plinko.place" : "plinko.placeSpring");
   if (g.setup.length) G.note(`${pieceWords(g.setup)} to go. Tap a perch to flip it.`, 0);
   else G.note("All set! Tap a perch to flip it, or throw.", 0);
   status(); save();
@@ -1037,10 +1082,10 @@ function modeMove(e) {
 }
 function modeDone() {
   const g = game;
-  if (g.mode === "perch") { g.w.perches.push({...perchAt(g.ghost), mine: true}); g.ghost = null; setMode(null); used("A new perch on the wall."); }
-  else if (g.mode === "reel" && g.pick != null) { const q = g.w.strands[g.pick]; q.gone = true; q.pts = []; setMode(null); used("Wound up that strand."); }
+  if (g.mode === "perch") { g.w.perches.push({...perchAt(g.ghost), mine: true}); g.ghost = null; setMode(null); G.sound.play("plinko.place"); used("A new perch on the wall."); }
+  else if (g.mode === "reel" && g.pick != null) { const q = g.w.strands[g.pick]; q.gone = true; q.pts = []; setMode(null); G.sound.play("plinko.wind"); used("Wound up that strand."); }
 }
-$("perchBtn").onclick = () => { if (!game) return; if (game.mode === "perch") { game.ghost.flip = !game.ghost.flip; return; } if (!canUse("perchBtn")) return; setMode("perch"); G.note("Tap the wall where the perch goes (Flip it to slope it the other way).", 0); };
+$("perchBtn").onclick = () => { if (!game) return; if (game.mode === "perch") { game.ghost.flip = !game.ghost.flip; G.sound.play("plinko.flip"); return; } if (!canUse("perchBtn")) return; setMode("perch"); G.note("Tap the wall where the perch goes (Flip it to slope it the other way).", 0); };
 $("reelBtn").onclick = () => { if (!game) return; if (game.mode === "reel") { setMode(null); G.note(""); return; } if (!canUse("reelBtn")) return; if (strandsLeft().length === 1) { game.mode = "reel"; game.pick = strandsLeft()[0]; modeDone(); return; } setMode("reel"); G.note("Tap the strand to wind up.", 0); };
 // Wake a cat: one of the napping cats, whichever it is, wakes and wanders off; its bed is worth 50 after that. Only while
 // two or more are napping, so you never get to pick which.
@@ -1050,14 +1095,14 @@ $("wakeBtn").onclick = () => {
   const naps = plinkoNaps(game.wall, game.w), cat = naps.indexOf(k); naps.splice(cat, 1); game.w.awake.push(k); game.fx.push({woke: k, cat, t: 0, T: 1.2});
   used("A cat woke up and wandered off: its bed's worth 50 now.");
 };
-$("mopBtn").onclick = () => { if (!canUse("mopBtn")) return; game.w.wet = []; used("All wiped up."); };
+$("mopBtn").onclick = () => { if (!canUse("mopBtn")) return; game.w.wet = []; G.sound.play("plinko.wipe"); used("All wiped up."); };
 // Shake: the wall jolts while something's falling: everything in the air is thrown about, and anything stuck is shaken loose.
 $("shakeBtn").onclick = () => {
   if (!canUse("shakeBtn")) return;
   const w = game.w, j = () => (Math.random() < .5 ? -1 : 1) * (120 + Math.random() * 120);
   for (const b of w.moving) { b.vx += j(); b.vy -= 100 + Math.random() * 150; b.still = 0; }
   for (const o of w.stuck) { o.loose = true; o.vx = j() * .6; o.vy = -60 - Math.random() * 80; }
-  game.shakeT = .6; used("Shaken!");
+  game.shakeT = .6; G.sound.play("plinko.shake"); used("Shaken!");
 };
 
 /* ---------- hint ---------- */

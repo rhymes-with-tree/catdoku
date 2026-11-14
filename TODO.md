@@ -122,13 +122,11 @@ Swap-a-Pom went up as an unlisted beta on 2026-11-13 (`swapapom/`, in `BETA` in 
 the front page):
 - the owner plays it, and the level goals are tuned from that (they were set with simulated players, who never make a
   swap with no word, which the owner's rule now allows);
-- **Sound, for the whole site.** Moonpie's purr is the site's first sound. Its switch is the page's own (Sound, in the
-  game's Settings, or a tap on Moonpie), kept under `catdoku.sound.v1`, a name meant for every game. Make it one setting
-  on the Settings page and move the playing (`wake`, `hum`, `swell` in `swapapom/index.html`: Web Audio, a loop with its
-  ends copied past each other) into `games.js`, ready for Pawlinko's sound effects below;
 - the owner hears the purr on a phone: whether the soft purr while playing is too loud or too quiet (`purring.base`), and
   whether Moonpie should tremble a little the whole time it's on (offered, not asked for yet). On an iPhone the silent
-  switch mutes it;
+  switch mutes it. Since sound went on by default for the whole site (2026-11-14) she purrs softly the whole time you
+  play, unless it's turned off: the owner to say whether that's right, or whether the steady purr should wait for a tap
+  on her;
 - then move its row from `BETA` to `GAMES` (with the date it joins) and take out its `noindex` line.
 
 ## Boing!: the preview, waiting to be made
@@ -152,29 +150,34 @@ Send feedback went into every game's menu on 2026-11-11 (the card in `games.js`,
 - whether a beta's win and miss cards should ask a one-tap "How was that level?" (sent as a GoatCounter event: no
   words, so nothing new leaves the device, and it shows how hard each level feels).
 
-## Sound effects: where they can come from
+## Sound effects: what's left
 
-The owner is thinking about sound effects across the site, not only Moonpie's (2026-11-14). Sources the environment
-allows, all free to use in a public game site (and an app later), so long as each sound's own licence is checked:
-- **The owner's own recordings** first, for any cat (Moonpie's purrs and snores are in `cats/`; `ARTWORK.md`).
-- **Pixabay** (pixabay.com, files on cdn.pixabay.com): the Pixabay Content License, free in apps and websites, no credit needed.
-- **Freesound** (freesound.org, cdn.freesound.org): use only sounds marked CC0. CC BY needs a credit on the site; skip
-  anything marked NC (non-commercial), in case the app is ever sold.
-- **Kenney** (kenney.nl): game sound packs, all CC0.
-Not **Epidemic Sound** (www.epidemicsound.com, also allowed): its FAQ says "royalty-free" means nothing owed on top of a
-subscription, and "there is no separate free tier". A sound downloaded without logging in isn't licensed for the site.
-Keep a line for each sound used (where from, its licence, and a link) in `ARTWORK.md`, as for the pictures.
-
-## Pawlinko: sound effects
-
-The owner wants sound effects for Pawlinko, put aside for later (2026-11-02): a knock as each thing hits a hold, a
-boing off a coil spring, a splash when coffee or water spills, a soft thump as it lands in a bed (and a sleepy grumble
-from a napping cat), and a cheer for a tandem. Swap-a-Pom (in beta) has the site's first sound, Moonpie's purr, with
-the start of a shared way to play it (see its section above). It still needs to be shared: a Sound switch in the
-settings (off by default, as browsers only play sound after a tap), quiet enough for a phone, and sounds that follow
-the thing's kind (a bell rings, a mug clunks, a feather makes none).
-
-
+Sound went in on 2026-11-14 (README, "Sound"): `G.sound` in `games.js`, on by default, a Sound column on the Settings
+page and a Sound switch in every game's menu, the shared win, gold-paw, lose and hint sounds, Pawlinko's and Pounce Up's
+own, Swap-a-Pom's purr moved onto it, and a new What's new card. Every sound is the owner's pick from the listening page,
+https://claude.ai/artifact/AiHXuVwvwB5CJSBPvgGNKS (the owner's own; its source is the page itself). Still to do:
+- **Library sounds** for the moments the owner wants from a sound library rather than code (silent until then):
+  Pawlinko's spill and Wake a cat, and Pounce Up's glass knocked over. The owner may want others swapped too. Sources,
+  all free to use in a public game site (and an app later), so long as each sound's own licence is checked:
+  - **Pixabay** (pixabay.com, files on cdn.pixabay.com): the Pixabay Content License, free in apps and websites, no credit needed.
+  - **Freesound** (freesound.org, cdn.freesound.org): use only sounds marked CC0. CC BY needs a credit on the site; skip
+    anything marked NC (non-commercial), in case the app is ever sold.
+  - **Kenney** (kenney.nl): game sound packs, all CC0.
+  - Not **Epidemic Sound**: "royalty-free" there means nothing owed on top of a subscription, and there's no free tier.
+  The hosts are on the environment's allowed list, but the sites answer a cloud session with 403 (Pixabay behind
+  Cloudflare's bot check), so the owner downloads each one in a browser and adds it to the repo (a short mp3, as
+  Moonpie's are), and it gets a line in `ARTWORK.md` (where from, its licence, a link). `G.sound` plays only made
+  sounds so far: a file needs loading and decoding first (as Swap-a-Pom's purr does).
+- **Pawlinko's hold sound:** the owner picked Rope thud for "hits a hold" and a sound of its own for every thing, so
+  every knock plays the thing's own and the rope thud plays nowhere (it isn't in the page). If the holds should thud
+  under each thing's sound, or the plainer things (yarn, fluffball, feather) should thud instead, say so.
+- **The other games:** the shared tap, put-down and not-allowed sounds (`tap`, `put`, `wrong`) are ready but not yet
+  played by any game. Add them a shelf at a time, quick and action games first, each game's own sounds where the
+  shared ones don't fit (the listening page can be extended for each shelf, so the owner picks as before).
+- **On a phone:** the owner hears it all on an iPhone: the loudness (`VOLUME` in `games.js`, .47, matching the
+  listening page at the 59 the owner last used), and whether Pawlinko gets too busy with several things falling.
+- **The Settings page's Every game Sound** sets the games on the front page; a beta game (Swap-a-Pom now) has only its
+  menu's switch until it joins.
 
 ## Cross Stitch: a star cat
 

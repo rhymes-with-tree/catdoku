@@ -10,7 +10,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-13.1"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-14.1"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -26,7 +26,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-13.1">
+<link rel="stylesheet" href="../games.css?v=2026-11-14.1">
 <style>
 /* A craft tray of letter pompoms, one in each round well. Swap two side by side to spell a word across or down.
    Moonpie lies along the top of the tray keeping you company: she purrs at every word and gathers the pompoms up. */
@@ -105,11 +105,10 @@
     <label>Level <select id="levelSel" aria-label="Level"></select></label>
     <button id="newBtn" class="primary">New tray</button>
   </div>
-  <div class="bar toggles"><div class="opt"><label class="toggle"><input type="checkbox" id="soundTgl"><span class="sw"></span><span class="swName">Sound</span></label></div></div>
   <section class="found" id="found" hidden><h2>Moonpie's keeping these for you</h2><p id="foundList"></p></section>
 </main>
 
-<script src="../games.js?v=2026-11-13.1"></script>
+<script src="../games.js?v=2026-11-14.1"></script>
 <script>
 const $ = G.$;
 
@@ -452,48 +451,49 @@ const BIG_PURRS = ["Moonpie headbutts your hand. What a word!", "Moonpie kneads 
 const NUDGES = ["Moonpie nudges your hand.", "Moonpie blinks at you: no rush.", "Moonpie snuggles a bit closer.", "Moonpie's still purring."];
 /* ---------- Moonpie's purr ---------- */
 // Moonpie's own purr (the owner's recording, as recorded: only made into a loop and turned up): a seamless loop, with a little of each end copied past the other so the
-// loop points sit inside real sound whatever the mp3 decoder does at the start. Off until it's turned on (Sound, or a
-// tap on Moonpie), as a browser only plays sound after a tap. While you play she purrs softly; a word makes her purr
-// louder for a moment (longer for a longer word), and a win gets a long contented purr.
-const SOUND = "catdoku.sound.v1", PURR_SRC = window.PURR_SRC || "../cats/moonpie-purr.mp3", PURR_PAD = .15, PURR_LOOP = 13.78;
-const purring = {on: !!G.load(SOUND).on, ctx: null, gain: null, base: .45};
+// loop points sit inside real sound whatever the mp3 decoder does at the start. It plays through the site's sound
+// (G.sound in games.js: on unless it's turned off, in Settings, the menu's Sound or a tap on Moonpie; a browser plays
+// nothing until a tap), on its own loudness rather than the sound effects'. While you play she purrs softly; a word
+// makes her purr louder for a moment (longer for a longer word), and a win gets a long contented purr.
+const PURR_SRC = window.PURR_SRC || "../cats/moonpie-purr.mp3", PURR_PAD = .15, PURR_LOOP = 13.78;
+const purring = {ctx: null, gain: null, base: .45};
+const soundOn = () => G.sound.on();
 function purrBytes() {
   if (!PURR_SRC.startsWith("data:")) return fetch(PURR_SRC).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); });
   const b = atob(PURR_SRC.split(",")[1]), a = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i);
   return Promise.resolve(a.buffer);
 }
-function wake() {   // from a tap or a key: start the sound, if it's on
-  const AC = window.AudioContext || window.webkitAudioContext;
-  if (!purring.on || !AC) return;
+function wake() {   // from a tap or a key: start the purr, if the sound's on
+  if (!soundOn()) return;
+  const c = G.sound.context(); if (!c) return;
   if (!purring.ctx) {
-    const c = purring.ctx = new AC(); purring.gain = c.createGain(); purring.gain.gain.value = 0; purring.gain.connect(c.destination);
+    purring.ctx = c; purring.gain = c.createGain(); purring.gain.gain.value = 0; purring.gain.connect(c.destination);
     purrBytes().then(b => new Promise((ok, bad) => c.decodeAudioData(b, ok, bad))).then(buf => {
       const s = c.createBufferSource(); s.buffer = buf; s.loop = true; s.loopStart = PURR_PAD; s.loopEnd = PURR_PAD + PURR_LOOP;
       s.connect(purring.gain); s.start(0, PURR_PAD); swell(.9, 1.6);   // a hello purr as she starts
     }).catch(() => G.note("Moonpie's purr didn't load.", 3000));
   }
-  if (purring.ctx.state !== "running") purring.ctx.resume();
   hum();
 }
 // How loud she purrs now: softly while you play; not at all with the sound off, the page hidden or the tray done.
-const quietNow = () => !purring.on || document.hidden || !game || game.over;
+const quietNow = () => !soundOn() || document.hidden || !game || game.over;
 function hum() {
   const c = purring.ctx; if (!c) return;
   const g = purring.gain.gain; g.cancelScheduledValues(c.currentTime); g.setTargetAtTime(quietNow() ? 0 : purring.base, c.currentTime, .35);
 }
 function swell(peak, secs) {
-  const c = purring.ctx; if (!c || !purring.on) return;
+  const c = purring.ctx; if (!c || !soundOn()) return;
   const g = purring.gain.gain, t = c.currentTime;
   g.cancelScheduledValues(t); g.setTargetAtTime(peak, t, .08); g.setTargetAtTime(quietNow() ? 0 : purring.base, t + secs, .6);
 }
-function setSound(on, say = true) {
-  purring.on = on; G.save(SOUND, {on}); $("soundTgl").checked = on; $("lounge").setAttribute("aria-pressed", on);
+// the sound turned on or off (here, by a tap on Moonpie, or the menu's Sound switch)
+G.sound.onChange(on => {
+  $("lounge").setAttribute("aria-pressed", on);
   if (on) { wake(); swell(.9, 1.6); } else hum();
-  if (say) G.note(on ? "Moonpie purrs for you. (Sound on)" : "Moonpie purrs quietly to herself. (Sound off)", 3000);
-}
-$("soundTgl").checked = purring.on; $("lounge").setAttribute("aria-pressed", purring.on);
-$("soundTgl").onchange = e => setSound(e.target.checked);
-$("lounge").onclick = () => { purr(3); setSound(!purring.on); };
+  G.note(on ? "Moonpie purrs for you. (Sound on)" : "Moonpie purrs quietly to herself. (Sound off)", 3000);
+});
+$("lounge").setAttribute("aria-pressed", soundOn());
+$("lounge").onclick = () => { purr(3); G.sound.set(!soundOn()); };
 addEventListener("pointerdown", wake, true); addEventListener("keydown", wake, true);
 document.addEventListener("visibilitychange", hum);
 function purr(longest) {

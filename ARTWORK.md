@@ -19,6 +19,14 @@ Not part of this repository: the cat photos on the "Solved!" cards come from
 TheCatAPI and Cataas while you play, and the Baloo 2 font is loaded from Google Fonts
 under the SIL Open Font License.
 
+## Sounds
+
+Every sound effect is made in the browser as it plays, from code (Web Audio: oscillators, noise and filters), so there
+are no sound files and nothing to credit: the shared ones in `games.js` (`G.sound`), and Pawlinko's and Pounce Up's in
+their own pages (2026-11-14, the owner's picks from a listening page of candidates). The only recordings are Moonpie's
+purrs and snores in `cats/` (below), the owner's own, covered with the pictures above. A sound from a library
+(Kenney, Freesound CC0 or Pixabay; `TODO.md`) gets a line here: where from, its licence, and a link.
+
 ## Who's who in `cats/`
 
 **Who gets along:** Fred and Jan Brady are friends, and Gus, Peanut, Marmalade and Willow are all friends with each other. Fred, Dottie, Jan Brady and

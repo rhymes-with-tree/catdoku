@@ -39,6 +39,9 @@ the reason they don't apply.
   rather than adding its own (which Apple's Settings page asks for).
 - ⚠️ **Game Center, iCloud saves, haptics, Spatial Audio:** not available to a web page (Safari on iPhone has no
   vibration; saves are per device).
+- ✅ **Playing audio (sound effects):** since 2026-11-14 every game has sound, on unless it's turned off (Settings, for
+  every game or one at a time, or Sound in a game's menu). It's ambient: it mixes with whatever else is playing rather
+  than stopping it, the silent switch mutes it, and it stops while the page is hidden (`G.sound` in `games.js`).
 
 ### Accessibility
 - 🔧 **Support larger text sizes / Dynamic Type:** text follows the iPhone's text size setting, now up to 1.6 times
