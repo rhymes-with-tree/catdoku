@@ -66,7 +66,7 @@ h3{margin:14px 0 0;font-size:15px;font-weight:600;letter-spacing:.06em;text-tran
 .chip.ping{animation:ping .35s ease-out}
 @keyframes ping{40%{transform:scale(1.06)}}
 @media (prefers-reduced-motion:reduce){.chip.ping{animation:none}}
-/* finding your way: the new games at the top, Jump to in the bar, older games folded away, a dot on rows not heard yet */
+/* finding your way: the new games at the top, Jump to in the bar, older games folded away */
 section,details.old,.row{scroll-margin-top:72px}
 .newnav{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-radius:14px;background:var(--panel);border:2px solid var(--line)}
 .newnav h2{margin:0;font-size:18px;font-weight:800}
@@ -147,7 +147,7 @@ textarea{font-family:inherit;font-size:15px;width:100%;min-height:96px;border:2p
 <details class="howto">
   <summary>How this page works</summary>
   <p>Each row is one moment in a game. Tap a choice to hear it and pick it. <strong>None</strong> keeps that moment quiet; <strong>Something else</strong> says none of these fit (write what would); <strong>Another sound…</strong> picks any sound on the page instead. <strong>Volume · Length</strong> makes that row's sound louder, softer, longer or shorter.</p>
-  <p>A dot marks a row you haven't heard yet, and <strong>Next</strong> in the bar goes to the next one. <strong>Hear it in play</strong> plays a few seconds of a game with your picks. Picks stay on this device until you send them.</p>
+  <p><strong>Hear it in play</strong> plays a few seconds of a game with your picks. Picks stay on this device until you send them.</p>
   <p><strong>On an iPhone, turn the silent switch off</strong>: these play the way the games will, so silent mode mutes them. Every sound is made in the browser as it plays.</p>
 </details>
 
@@ -159,7 +159,6 @@ textarea{font-family:inherit;font-size:15px;width:100%;min-height:96px;border:2p
 
 <div class="bar" role="region" aria-label="Find your way">
   <select id="jump" aria-label="Jump to a game"></select>
-  <button class="btn ghost" id="nextBtn" type="button">Next ↓</button>
   <button class="btn" id="copyTop" type="button">Send</button>
 </div>
 
@@ -1190,7 +1189,7 @@ function pounceClimb(t) {
 const $ = id => document.getElementById(id);
 let heard = new Set(store.get("sc.heard", []));
 const heardKey = r => r.key + (r.updated ? "@2" : "");
-const isFresh = r => (r.sec.current || r.repick || r.updated) && !heard.has(heardKey(r));
+const isFresh = r => false;   // what's been heard differs by person, so the page doesn't show it
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"})[c]);
 const pct = x => `${x}%`;
 let shelfShown = null;
@@ -1209,7 +1208,7 @@ function draw() {
     if (s.inGame) {
       outer = document.createElement("details"); outer.className = "old " + s.cls; outer.style.setProperty("--c", `var(--${s.cls || "every"})`);
       const k = rowsOf(s).length, fresh = rowsOf(s).filter(isFresh).length, sm = document.createElement("summary");
-      sm.innerHTML = `${s.title} <small>${k} ${k === 1 ? "sound" : "sounds"}${fresh ? ` · <b>${fresh} to hear</b>` : ""}</small>`;
+      sm.innerHTML = `${s.title} <small>${k} ${k === 1 ? "sound" : "sounds"}</small>`;
       outer.append(sm, sec);
     }
     outer.id = s.id;
@@ -1237,7 +1236,7 @@ function draw() {
 function rowEl(r) {
   const row = document.createElement("div"); row.className = "row" + (isFresh(r) ? " fresh" : ""); row.id = "row-" + r.key.replace(".", "-");
   const nm = document.createElement("div"); nm.className = "name"; nm.title = r.when || "";
-  nm.innerHTML = esc(r.name) + (r.repick ? `<span class="flag">Pick again: was ${esc(r.repick)}</span>` : r.updated && r.sec.inGame ? '<span class="flag">Better sounds to hear</span>' : "");
+  nm.innerHTML = esc(r.name);
   const body = document.createElement("div"); body.className = "rowbody";
   const chips = document.createElement("div"); chips.className = "chips"; chips.setAttribute("role", "group"); chips.setAttribute("aria-label", r.name);
   const other = document.createElement("input"); other.type = "text"; other.className = "other"; other.placeholder = "What would fit better?"; other.setAttribute("aria-label", `${r.name}: what would fit better`);
@@ -1307,13 +1306,10 @@ function drawLibrary() {
 /* ---------- finding your way ---------- */
 function drawNav() {
   const cur = SECTIONS.filter(s => s.current), again = allRows().filter(r => r.repick), better = allRows().filter(r => r.updated && r.sec.inGame), nav = $("newNav");
-  const link = (label, n, of, cls, go1) => { const a = document.createElement("a"); a.href = "#"; a.className = cls + (n === of ? " all" : ""); a.innerHTML = `${esc(label)} <small>${n === of ? "all heard" : `${n} of ${of} heard`}</small>`; a.onclick = e => { e.preventDefault(); go1(); }; return a; };
+  const link = (label, n, of, cls, go1) => { const a = document.createElement("a"); a.href = "#"; a.className = cls; a.textContent = label; a.onclick = e => { e.preventDefault(); go1(); }; return a; };
   const part = (title, list) => { if (!list.length) return; const h = document.createElement("h2"); h.textContent = title; const d = document.createElement("div"); d.className = "links"; d.append(...list); nav.append(h, d); };
   nav.innerHTML = "";
   part(cur.length ? `New to pick: ${[...new Set(cur.map(x => x.shelf))].join(" and ")}` : "", cur.map(s => link(s.title, rowsOf(s).filter(r => !isFresh(r)).length, rowsOf(s).length, s.cls, () => go(s.id))));
-  part("Pick again (the mrrp and Moonpie's purr are gone)", again.map(r => link(`${r.sec.title}: ${r.name}`, isFresh(r) ? 0 : 1, 1, r.sec.cls, () => goRow(r))));
-  const games = [...new Set(better.map(r => r.sec))];
-  part("Better sounds to hear (hiss, scratching, chirps, water, meow, yawn)", games.map(s => { const rs = better.filter(r => r.sec === s); return link(s.title, rs.filter(r => !isFresh(r)).length, rs.length, s.cls, () => goRow(rs.find(isFresh) || rs[0])); }));
   nav.hidden = !nav.children.length;
   const sel = $("jump");
   sel.innerHTML = '<option value="">Jump to a game…</option>' + SHELVES.map(([name, list]) => `<optgroup label="${name}${list.some(x => x.current) ? " (new)" : ""}">` +
@@ -1323,7 +1319,7 @@ const smooth = () => matchMedia("(prefers-reduced-motion: reduce)").matches ? "a
 function go(id) { const el = $(id); if (!el) return; if (el.tagName === "DETAILS") el.open = true; el.scrollIntoView({block: "start", behavior: smooth()}); }
 function goRow(r) { const el = $("row-" + r.key.replace(".", "-")); if (!el) return; const d = el.closest("details"); if (d) d.open = true; el.scrollIntoView({block: "start", behavior: smooth()}); }
 $("jump").onchange = e => { const id = e.target.value; e.target.value = ""; if (id) go(id); };
-$("nextBtn").onclick = () => { const r = allRows().find(isFresh); if (r) goRow(r); else $("nextBtn").textContent = "All heard ✓"; };
+
 
 // Sounds used in more than one place, as the games have them now (with your changes): so one sound isn't doing two
 // different jobs.
