@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-14.4"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-14.5"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -24,7 +24,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-14.4">
+<link rel="stylesheet" href="../games.css?v=2026-11-14.5">
 <style>
 /* A quilted blanket in nine cushions. Clumps of napping cats are dragged onto it from the tray below; a full
    row, column or cushion wakes its cats and they wander off, taking any toys they were lying on. */
@@ -110,7 +110,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-14.4"></script>
+<script src="../games.js?v=2026-11-14.5"></script>
 <script>
 const $ = G.$;
 G.nav("catpile");
@@ -576,6 +576,14 @@ function turn(t, replay) {
   return true;
 }
 // Put tray clump t with its top-left at square `at`.
+/* ---------- sound ---------- */
+// The owner's picks from the listening page (2026-11-14), played through G.sound (games.js; on unless Settings turns it off).
+// Picking up and putting down are every game's tap and put-down, and a clump that won't fit every game's low buzz.
+const SND = G.sound.kit;
+G.sound.define({
+  "cp.clear": t => { SND.chirp(t, .45); SND.chirp(t + .22, .45, 1.15); },   // chirp chirp: the cats wake up
+  "cp.combo": (t, o) => { for (let i = 0; i < (o.n || 2); i++) SND.mallet({f: SND.PENTA[5 + i * 2], t: t + i * .1, dur: .3, vol: .14}); },   // notes up the scale, one a line
+});
 function drop(t, at) {
   if (!S || S.over || !S.d.tray[t] || !fitsAt(filledOf(S.d), {cells: S.d.tray[t]}, at)) return false;
   const before = JSON.stringify(S.d);
@@ -586,6 +594,7 @@ function drop(t, at) {
   S.d.moves.push([t, at]);
   if (S.timed && !S.started) S.started = true;
   picked = -1; ghost = null;
+  G.sound.play("put"); if (res.lines.length) G.sound.play("cp.clear", {}, .1); if (res.lines.length >= 2) G.sound.play("cp.combo", {n: Math.min(5, res.lines.length)}, .35);
   // the cats in cleared lines wake and wander off; toys they were on go to the goals
   for (const c of res.gone) {
     const k = catEls.get(c.id); if (k) { catEls.delete(c.id); k.remove(); }
@@ -764,7 +773,7 @@ trayEl.addEventListener("pointerdown", e => {
   const t = +b.dataset.t; if (!S.d.tray[t]) return;
   e.preventDefault();
   try { b.setPointerCapture(e.pointerId); } catch (_) {}
-  drag = {t, x: e.clientX, y: e.clientY, moved: false, lift: e.pointerType === "touch" ? 1 : 0, id: e.pointerId};
+  drag = {t, x: e.clientX, y: e.clientY, moved: false, lift: e.pointerType === "touch" ? 1 : 0, id: e.pointerId}; G.sound.play("tap");
   if (S.timed && !S.started) S.started = true;
   cursor = -1;
 });
@@ -791,7 +800,7 @@ function endDrag(e, cancel) {
   if (dragEl) { dragEl.remove(); dragEl = null; }
   if (!moved) { picked = picked === t ? -1 : t; ghost = null; drawTray(); drawGhost(); if (picked >= 0) G.note("Now tap the blanket where it should go.", 2500); return; }
   const g = ghost; ghost = null;
-  if (cancel || !g || !drop(t, g.at)) { drawTray(); drawGhost(); if (!cancel && g) G.note("That doesn't fit there.", 1800); }
+  if (cancel || !g || !drop(t, g.at)) { drawTray(); drawGhost(); if (!cancel && g) { G.note("That doesn't fit there.", 1800); G.sound.play("wrong"); } }
 }
 trayEl.addEventListener("pointerup", e => endDrag(e));
 trayEl.addEventListener("pointercancel", e => endDrag(e, true));
@@ -800,7 +809,7 @@ board.addEventListener("pointerdown", e => {
   if (!S || S.over || picked < 0) return;
   e.preventDefault();
   const at = anchorFor(picked, e.clientX, e.clientY);
-  if (at < 0 || !drop(picked, at)) G.note("That doesn't fit there. Tap somewhere else, or tap the clump to put it back.", 2500);
+  if (at < 0 || !drop(picked, at)) { G.note("That doesn't fit there. Tap somewhere else, or tap the clump to put it back.", 2500); G.sound.play("wrong"); }
 });
 // Keys: the arrows move a cursor on the blanket, 1 to 3 pick a clump (shown at the cursor), Space puts it down.
 const keys = G.gridKeys({
@@ -808,9 +817,9 @@ const keys = G.gridKeys({
   show(i) { cursor = i; ghost = i >= 0 && picked >= 0 ? {t: picked, at: i} : null; drawGhost(); drawMarks(); },
   act(i, key) {
     if (key === "r") { if (picked >= 0) turn(picked); this.show(i); return; }
-    if (key !== " ") { const t = +key - 1; if (!S.d.tray[t]) return; picked = t; drawTray(); this.show(i); return; }
+    if (key !== " ") { const t = +key - 1; if (!S.d.tray[t]) return; picked = t; drawTray(); this.show(i); G.sound.play("tap"); return; }
     if (picked < 0) { picked = S.d.tray.findIndex(c => c && fitsAnywhere(filledOf(S.d), {cells: c})); if (picked < 0) return; drawTray(); this.show(i); return; }
-    if (!drop(picked, i)) G.note("That doesn't fit there.", 1800); else this.show(i);
+    if (!drop(picked, i)) { G.note("That doesn't fit there.", 1800); G.sound.play("wrong"); } else this.show(i);
   },
   escape() { picked = -1; ghost = null; drawTray(); drawGhost(); },
 });

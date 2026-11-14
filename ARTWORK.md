@@ -24,7 +24,7 @@ under the SIL Open Font License.
 Every sound effect is made in the browser as it plays, from code (Web Audio: oscillators, noise and filters), so there
 are no sound files and nothing to credit: the shared ones in `games.js` (`G.sound`), and Pawlinko's and Pounce Up's in
 their own pages (2026-11-14, the owner's picks from a listening page of candidates). The only recordings are Moonpie's
-purrs and snores in `cats/` (below), the owner's own, covered with the pictures above. A sound from a library
+purrs and snores in `cats/` (below; Pawlette's napping cat purrs with one), the owner's own, covered with the pictures above. A sound from a library
 (Kenney, Freesound CC0 or Pixabay; `TODO.md`) gets a line here: where from, its licence, and a link.
 
 ## Who's who in `cats/`
@@ -130,6 +130,8 @@ Bed Hog has no star cat yet: `c14-29` (a ginger cat on its back) sleeps beside i
   - `moonpie-snores-1.mp3`, 12.1 s (`Moonpie_snores.m4a`): four clear snores, one every 2.7 s or so.
   - `moonpie-snores-2.mp3`, 24.6 s (`Moonsnores.m4a`): about 8 s of something steady, then softer snores every 3.5 s or
     so. Whether the start is her purr sputtering out into the snores, or a fan, is the owner's to say.
+  - `moonpie-purr-short.mp3`, 3.2 s: the start of `moonpie-purr.mp3` with a fade in and out (64 kbps), for Pawlette's
+    napping cat (2026-11-14).
   The snores were very quiet (turned up 28 to 34 dB), so the room's hum is turned up with them; a game plays them softly.
   The purrs' rumble is 26 to 30 Hz, too fast to tap to: a rhythm game's beat is her breathing.
 - **Ferguson** (`ferguson-…`, a fluffy black cat with yellow eyes) has nine poses from the same sheet, the same set

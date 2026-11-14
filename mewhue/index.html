@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-14.4"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-14.5"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-14.4">
+<link rel="stylesheet" href="../games.css?v=2026-11-14.5">
 <style>
 /* Blocks of paint, each with a mark: red a bar down, yellow a bar across, blue a ring. Drag a row
    or column and its blocks slide to that end. Two different marks mix, and the mix carries both (orange is a
@@ -101,7 +101,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-14.4"></script>
+<script src="../games.js?v=2026-11-14.5"></script>
 <script>
 /* ---------- marks, colours and rules (plain functions) ---------- */
 // Colours by number: 0 red (a bar down), 1 orange (bar down and across), 2 yellow (a bar across), 3 green (across
@@ -368,13 +368,27 @@ function say() {
 }
 
 /* ---------- playing ---------- */
+/* ---------- sound ---------- */
+// The owner's picks from the listening page (2026-11-14), played through G.sound (games.js; on unless Settings turns it off).
+// A slide that can't move is every game's low buzz.
+const SND = G.sound.kit;
+const mhPop = (t, p, vol) => SND.tone({fs: [[0, 300 * p], [.05, 1200 * p]], t, dur: .06, vol});
+G.sound.define({
+  "mh.slide": t => SND.whoosh(t, 1200, 2200, .1, .15),   // a soft swish
+  "mh.join": t => SND.tone({fs: [[0, 720], [.08, 300]], t, dur: .08, vol: .2}),   // a plop: two of a primary join
+  "mh.mix": t => { mhPop(t, 1, .16); mhPop(t + .06, 1.3, .14); },   // bubbly: two primaries mix
+  "mh.stone": t => SND.modal({t, parts: [[180, 1, .12], [420, .5, .07], [1100, .2, .03]], vol: .35, click: 1500}),   // a stone clunk
+  "mh.clear": t => [1047, 1319, 1568].forEach((f, i) => SND.bell({f, t: t + i * .08, dur: .6, vol: .08, ratio: 2.01, index: .7})),   // a chime run
+  "mh.crumble": t => { SND.noise({t, dur: .03, vol: .5, type: "highpass", f: 1500, a: .001}); SND.modal({t, parts: [[200, 1, .12]], vol: .2, click: 0}); },   // crack
+  "mh.new": t => SND.tone({fs: [[0, 780], [.08, 325]], t, dur: .08, vol: .1}),   // a quiet plop
+});
 function slideMove(ax, l, back) {
   if (!playing()) return;
   const after = game.grid.slice(), r = slideLine(after, lineOf(ax, l, back));
-  if (!r.moves.length) { G.note("Nothing in that line can move that way.", 1800); return; }
+  if (!r.moves.length) { G.note("Nothing in that line can move that way.", 1800); G.sound.play("wrong"); return; }
   game.started = true;
   undo.push();
-  clearGhost(); hints.clear(false);
+  clearGhost(); hints.clear(false); G.sound.play("mh.slide");
   for (const m of r.moves) { const el = blocks[m.from]; if (el) place(el, m.to); }
   busy = true;
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches, spec = levelSpec(game.level);
@@ -382,6 +396,7 @@ function slideMove(ax, l, back) {
     game.grid = after; draw(); busy = true;
     r.merged.forEach(i => blocks[i] && blocks[i].classList.add("pop"));
     const made = r.merged.map(i => after[i]);
+    if (made.includes(6)) G.sound.play("mh.stone"); else if (made.some(c => c % 2)) G.sound.play("mh.mix"); else if (made.length || r.vanish.length) G.sound.play("mh.join");
     if (game.demo) {}   // the walkthrough says it
     else if (r.vanish.length) G.note("Black wipes them both out!", 2000);
     else if (made.includes(6)) G.note("All three marks: it's set into stone!", 2200);
@@ -397,12 +412,13 @@ function slideMove(ax, l, back) {
       if (spec.stone && c.lines.length && !counted) G.note("This level only counts lines of stone.", 2500);
       if (goalDone(game)) { busy = false; draw(); win(); return; }
       const i = drop(game);
-      busy = false; draw(); if (i >= 0 && blocks[i]) blocks[i].classList.add("fresh");
+      busy = false; draw(); if (i >= 0 && blocks[i]) blocks[i].classList.add("fresh"); if (i >= 0) G.sound.play("mh.new");
       if (!slides(game.grid).length) lose();
       save();
     };
     if (!c.lines.length) { finish(); return; }
     new Set([...c.lines.flatMap(x => x.cells), ...c.crumble]).forEach(i => blocks[i] && blocks[i].classList.add("gone"));
+    G.sound.play("mh.clear"); if (c.crumble.length) G.sound.play("mh.crumble", {}, .2);
     // Willow's face rises over the middle of each line that clears
     for (const ln of c.lines) {
       const [x, y] = xyOf(ln.cells[2]), im = new Image(); im.className = "peek"; im.alt = ""; im.src = catSrc("willow-7");
