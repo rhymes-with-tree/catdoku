@@ -1832,6 +1832,41 @@ const G = (() => {
       bookmark: t => noise({t, dur: .08, vol: .2, fs: [[0, 2000], [.08, 3500]], q: .8, a: .01}),   // a page flick (G.guesser)
       back: t => whoosh(t, 2400, 600, .3, .2),   // a rewind swoosh: Return to Bookmark
       line: t => mallet({f: pick(PENTA.slice(5, 10)), t, dur: .35, vol: .1}),   // a soft note: a row, column or region done
+      // Objects and actions (the owner's picks, 2026-11-14): one thing doing one thing sounds the same in every game; a
+      // game points its own moment at one of these (G.sound.get). o.k scales the loudness (Pawlinko's harder hits).
+      spring: (t, o = {}) => boing(t, 140, 420, .55, .3 * (o.k ?? 1)),   // something bounces off a spring: a cartoon boing
+      springSet: t => boing(t, 300, 520, .3, .16),   // a spring put down: a little sproing
+      yarnLand: (t, o = {}) => thump(t, .3 * (o.k ?? 1), 130),   // yarn lands or bumps: a soft thump
+      yarnGrow: (t, o = {}) => noise({t, dur: .03, vol: .08 * (o.k ?? 1), type: "lowpass", f: 900}),   // a strand of yarn grows: a soft pad
+      yarnWind: t => whoosh(t, 2200, 1200, .1, .12),   // yarn wound back: a swish down
+      pompomLand: (t, o = {}) => noise({t, dur: .08, vol: .4 * (o.k ?? 1), f: 350, q: 1, a: .01}),   // a pompom or fluffball lands: a fluffy thup
+      glassKnock: (t, o = {}) => modal({t, parts: [[1500, 1, .15], [2600, .4, .08]], vol: .14 * (o.k ?? 1)}),   // dull glass
+      glassOver: t => splash(t, .8),   // a glass of water knocked over: a splash
+      mugKnock: (t, o = {}) => { modal({t, parts: [[260, 1, .1], [700, .5, .06], [1800, .2, .03]], vol: .32 * (o.k ?? 1)}); thump(t, .25 * (o.k ?? 1), 100); },   // a heavy clunk
+      offTable: t => whoosh(t, 900, 2600, .073, .25),   // off a table or shelf: the swipe, and nothing as it lands (at 40% length)
+      tape: t => tone({fs: [[0, 500], [.08, 900]], t, dur: .09, vol: .15}),   // a paw on tape: a hop
+      lemon: t => hiss(t),   // a lemon: a hiss
+      candle: t => hiss(t, .35, .3),   // too close to a candle: a short hiss
+      catnip: t => tone({f: 600, t, dur: 1.0, vol: .12, a: .1, hold: .5, vib: [7, 80]}),   // rolling in catnip: a wobbly slide
+      bell: (t, o = {}) => bell({f: 1760, t, dur: .6, vol: .1 * (o.k ?? 1), ratio: 2.76, index: 1.2}),   // a bell knocked: ding
+      fish: t => { tone({f: 1319, type: "triangle", t, dur: .08, vol: .15}); tone({f: 1976, type: "triangle", t: t + .07, dur: .14, vol: .15}); },   // a fish treat: two notes up
+      box: (t, o = {}) => { const p = o.p ?? 1; noise({t, dur: .07, vol: .35, f: 420 * p, q: 1, a: .005}); thump(t, .12, 140 * p); },   // a cardboard box opened: a flap
+      mirror: t => modal({t, parts: [[2600, 1, .08], [5200, .3, .05]], vol: .12, click: 0}),   // a mirror tipped: a tink
+      magnet: t => { tick(t, .3, 1800); tone({fs: [[0, 140], [.1, 70]], t, dur: .12, vol: .1}); noise({t, dur: .08, vol: .05, type: "lowpass", f: 400}); },   // a magnet put on: a click
+      catWakes: t => yawn(t),   // a cat wakes up: a big yawn
+      catSettles: t => purr(t),   // a cat settles in to nap: a soft purr
+      catCheers: t => { chirp(t, .45); chirp(t + .22, .45, 1.15); },   // a cat cheers: two chirps
+      catFound: t => meow(t),   // a cat found or freed: a meow
+      catRuns: t => { for (let i = 0; i < 10; i++) thump(t + i * .07, .1, 170 + (i % 2) * 25); },   // a pitter-patter run
+      catPounce: t => tone({fs: [[0, 260], [.14, 620]], t, dur: .14, vol: .2, a: .01}),   // a soft boing
+      catLands: t => thump(t, .4, 140),   // soft paws
+      shake: t => tone({f: 160, type: "triangle", t, dur: .6, vol: .2, a: .02, hold: .3, vib: [9, 50]}),   // wobble
+      wipe: t => noise({t, dur: .5, vol: .3, fs: [[0, 800], [.25, 2400], [.5, 900]], q: 3, a: .05, hold: .25}),   // squeegee
+      // the word games' moments (Cat Spells and Curious Cat, 2026-11-14)
+      key: t => modal({t, parts: [[1800, 1, .03], [4000, .3, .02]], vol: .2, click: 3500}),   // a letter typed or changed: a key tap
+      word: t => [1047, 1319, 1568].forEach((f, i) => mallet({f, t: t + i * .07, dur: .3, vol: .12})),   // a word found: a run of notes
+      chime: t => bell({f: 1568, t, dur: .5, vol: .07, ratio: 2.01, index: .6}),   // a piece in its place: a soft chime
+      swish: t => whoosh(t, 1200, 2200, .1, .15),   // a soft swish
     };
     function play(name, o = {}, delay = 0) {
       const f = SOUNDS[name];
@@ -1843,7 +1878,7 @@ const G = (() => {
       if (v) { context(); play("tap"); }
       subs.forEach(f => f(v));
     }
-    return {play, set, on, kit, context, define: map => Object.assign(SOUNDS, map),
+    return {play, set, on, kit, context, define: map => Object.assign(SOUNDS, map), get: name => SOUNDS[name],
       clip: (name, file) => { wanted[name] = file; if (ctx) fetchClip(name); },
       out: () => master, onChange: f => subs.push(f), get ctx() { return ctx; }};
   })();

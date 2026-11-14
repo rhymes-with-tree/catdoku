@@ -157,7 +157,7 @@ page and a Sound switch in every game's menu, the shared win, gold-paw, lose and
 own, Swap-a-Pom's purr moved onto it, and a new What's new card. Every sound is the owner's pick from the listening page,
 https://claude.ai/artifact/AiHXuVwvwB5CJSBPvgGNKS (the owner's own; its source is the page itself). Still to do:
 - **Library sounds** for the moments the owner wants from a sound library rather than code (silent until then):
-  Pawlinko's spill and Wake a cat, and Pounce Up's glass knocked over. Bird Watch's human stirring and waking were
+  Pawlinko's coffee spill (a glass of water splashes now: Objects and actions). Bird Watch's human stirring and waking were
   left with none too (2026-11-14): maybe these, maybe silence. The owner may want others swapped too. Sources,
   all free to use in a public game site (and an app later), so long as each sound's own licence is checked:
   - **Pixabay** (pixabay.com, files on cdn.pixabay.com): the Pixabay Content License, free in apps and websites, no credit needed.
@@ -172,15 +172,21 @@ https://claude.ai/artifact/AiHXuVwvwB5CJSBPvgGNKS (the owner's own; its source i
 - **Pawlinko's hold sound:** the owner picked Rope thud for "hits a hold" and a sound of its own for every thing, so
   every knock plays the thing's own and the rope thud plays nowhere (it isn't in the page). If the holds should thud
   under each thing's sound, or the plainer things (yarn, fluffball, feather) should thud instead, say so.
-- **The other games:** On the Prowl, Kitten Play, Cat Logic, Cat Math and Cat Trails are done (2026-11-14); Undo,
-  Bookmark and a life lost sound in every game that has them. Left: Cat Spells and Curious Cat.
-- **To pick again:** Tail Chase's Tangled and Tape were a mrrp, which the owner took out (2026-11-14); until they're
-  picked again they have the lose card's own sound. The listening page lists them under Pick again.
+- **Every shelf is done** (2026-11-14), Cat Spells and Curious Cat last; Undo, Bookmark and a life lost sound in every
+  game that has them.
+- **Objects and actions** (2026-11-14): the owner wants one thing doing one thing to sound the same in every game, so
+  those sounds are shared ones in `games.js` (`spring`, `yarnLand`, `glassOver`, `offTable`, `catWakes`,
+  `catSettles`…), and each game points its moment at one with `G.sound.get`. A new game with one of those moments uses
+  the shared sound; a thing doing something different gets a row of its own on the listening page first. Where a game's
+  own pick and the object's differed, the object's won: L-M-N-O-Pom's pompom lands with the fluffy thup, Kitten
+  Caboodle's kitten wakes with the big yawn, Knock It Off's things go off the table with the swipe (a glass splashes),
+  Unravel's strand grows with the soft pad, and Cat Pile's cats wake with the big yawn. Tail Chase's Tape was picked
+  as the sticky thhp there and as the hop for tape everywhere; it's the hop, until the owner says otherwise.
 - **The better sounds** (hiss, scratching, chirps, water, meow, big yawn, fabric rustle, crinkle; 2026-11-14) are in the
   games wherever those sounds were picked; the owner is to hear them on the listening page (Better sounds to hear).
-- **Per-row volume and length:** the listening page gives every row its own (Volume · Length); `G.sound` doesn't yet
-  take a sound's own volume or length, so the first picks that change one need that added (a multiplier for each name,
-  set by `G.sound.define`'s caller or a table in `games.js`).
+- **Per-row volume and length:** the listening page gives every row its own (Volume · Length). The only pick so far
+  to change one (off a table: length 40%) is made shorter in the sound itself; if more come, `G.sound` could take a
+  multiplier for each name.
 - **Testers:** the listening page can go to testers (shared from its Share menu); Send opens the site's feedback form
   with their picks in its last field (the link field) and their name in the contact field. The shared tap, put-down and not-allowed sounds (`tap`, `put`,
   `wrong`) are for the rest. Add them a shelf at a time, quick and action games first, each game's own sounds where the
