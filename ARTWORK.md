@@ -40,7 +40,6 @@ ones no game uses yet). A sound from another library gets a line here too: where
 - `sounds/chirp-purr-05.mp3`: "Cat purr chirp" by dreamstobecome, https://freesound.org/s/535318/ (10.63–11.21 s), CC0
 - `sounds/fabric-grab-07.mp3`: "Clothes/fabric grab" by takimeko, https://freesound.org/s/846612/ (15.66–15.97 s), CC0
 - `sounds/hiss-2.mp3`: "Cat hissing" by ken788, https://freesound.org/s/386738/ (101.19–102.33 s), CC0
-- `sounds/mew.mp3`: "Cat purr chirp" by dreamstobecome, https://freesound.org/s/535318/ (3.66–4.32 s), CC0
 - `sounds/purr-kitty.mp3`: "Kitty purr" by xoiziox, https://freesound.org/s/553375/ (0–6.95 s), CC0
 - `sounds/purr-soundmary.mp3`: "Cat purr" by soundmary, https://freesound.org/s/194926/ (1.28–3.03 s), CC0
 - `sounds/splash-01.mp3`: "Splash 3" by rombart, https://freesound.org/s/186746/ (0–0.36 s), CC0
