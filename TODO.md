@@ -92,9 +92,11 @@ cats that point their own way are Day Light (`daylight/`, in beta).
     fast ball (the toys ride in spaces that all move together, so it would be stuck behind the toy in front), Laya
     asleep on the track, a basket with a lid that opens after a lap, a gate on the track that holds toys back until
     it's tapped, a side pocket that keeps one toy off the track, and a reverse switch.
-  - Twirl: levels 21 to 24 built 2026-11-15: ribbons pointed at both ends, ribbons crossing over and under, knots,
-    then all three (README, Twirl). The owner to play them on a phone: whether the knots and crossings show well enough
-    at Fit on the big mats, and how hard 24 is. Not now (the owner, 2026-11-15): the sleeping cat that moves and the
+  - Twirl: levels 21 to 27 and Endless built 2026-11-15: ribbons pointed at both ends, crossing over and under, knots,
+    all three, tiny ribbons, a mat bigger than the screen, one colour, and a mat that keeps unrolling (README, Twirl).
+    The owner to play them on a phone: whether the knots and crossings show well enough at Fit on the big mats, whether
+    level 25's tiny ribbons need zooming to tap, and how hard 24 and 27 are. Endless could later take in crossings,
+    knots and both-ended ribbons, or speed up as it goes. Not now (the owner, 2026-11-15): the sleeping cat that moves and the
     kitten who bats a ribbon. Not picked: bows, shaped mats.
 - [ ] **Zen:** look for more games that could have one (Pounce on Three and Bubbles do).
 
