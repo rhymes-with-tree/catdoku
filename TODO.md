@@ -93,9 +93,9 @@ cats that point their own way are Day Light (`daylight/`, in beta).
     another spot each time a set is carried off, a gift-wrapped toy whose kind shows only once it's in a basket, and a
     reverse switch that sends the track the other way, once a level.
   - Twirl, picked (2026-11-15): knotted ribbons (two tied together slide only once both are free), ribbons that cross
-    over and under (the top one goes first), ribbons pointed at both ends (tap an end to pick the way), and a kitten
-    who bats a ribbon part of the way along every few taps. Not picked: the sleeping cat that moves (the kitten does
-    something like it), bows, shaped mats.
+    over and under (the top one goes first), ribbons pointed at both ends (tap an end to pick the way), a sleeping cat
+    in the way who moves to a new spot every few ribbons, and a kitten who bats a ribbon part of the way along every
+    few taps. Not picked: bows, shaped mats.
 - [ ] **Zen:** look for more games that could have one (Pounce on Three and Bubbles do).
 
 ## Star cats decided, waiting for pictures
