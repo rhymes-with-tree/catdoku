@@ -84,13 +84,14 @@ cats that point their own way are Day Light (`daylight/`, in beta).
     robot vacuum that moves each turn. The tray (it carries what's on it) is still being considered. Not picked: the
     puddle, laundry basket, sleeping dog, stack of cups, the human coming home.
   - Toy Box, picked (2026-11-15): a catnip mouse that matches any toy, a basket with a picture on it that takes only
-    that toy, and a fork in the track that switches sides each time a toy goes through. Not picked: an endless run (each
-    new basket would need a mix that can still be won, which the solver can't promise) and a fast ball (the toys ride
-    in spaces that all move together, so it would be stuck behind the toy in front). Explained to the owner, not yet
-    decided: a basket with a lid that opens after a lap, and Laya asleep on a space of the track (toys go round her,
-    so it's one space fewer, and she moves now and then). More for the owner: a gate on the track that holds toys
-    back until it's tapped, a side pocket that keeps one toy off the track until it's tapped, a basket that moves to
-    another spot each time a set is carried off, a gift-wrapped toy whose kind shows only once it's in a basket, and a
+    that toy, a fork in the track that switches sides each time a toy goes through, a basket that moves to another spot
+    each time a set is carried off, a gift-wrapped toy whose kind shows only once it's in a basket, and (the owner's
+    idea) waiting baskets: a level deals one more basket of mixed toys than there's room for, and it comes in to the
+    spot of the first basket carried off. It's dealt at the start, so the solver can still check the level can be won
+    (unlike an endless run, where each new basket would have to be made up as you go). Not picked: an endless run, a
+    fast ball (the toys ride in spaces that all move together, so it would be stuck behind the toy in front), Laya
+    asleep on the track, and a basket with a lid that opens after a lap (unsure). Not answered yet: a gate on the track
+    that holds toys back until it's tapped, a side pocket that keeps one toy off the track until it's tapped, and a
     reverse switch that sends the track the other way, once a level.
   - Twirl, picked (2026-11-15): knotted ribbons (two tied together slide only once both are free), ribbons that cross
     over and under (the top one goes first), ribbons pointed at both ends (tap an end to pick the way), a sleeping cat
