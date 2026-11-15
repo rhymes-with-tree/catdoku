@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-15.12"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-15.13"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -24,7 +24,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-15.12">
+<link rel="stylesheet" href="../games.css?v=2026-11-15.13">
 <style>
 /* A play mat covered in satin ribbons; each one slides off the way its pointed end points, along its own path.
    Big mats zoom, and scroll inside their frame. */
@@ -120,8 +120,8 @@ body.full .peek{display:none}   /* Bugsy's corner of the mat moves about in full
 
 </main>
 
-<script src="../games.js?v=2026-11-15.12"></script>
-<script src="../colorways.js?v=2026-11-15.12"></script>
+<script src="../games.js?v=2026-11-15.13"></script>
+<script src="../colorways.js?v=2026-11-15.13"></script>
 <script>
 const $ = G.$;
 G.nav("twirl");
@@ -136,7 +136,7 @@ G.nav("twirl");
 // pairs (`knots`, how many), and 24 all three. Then (the owner's picks, 2026-11-15) 25 tiny ribbons, 2 to 4 squares
 // long; 26 a mat bigger than the screen (40 × 60, which never zooms out far enough to show it all, so you scroll round
 // it); 27 every ribbon in one colour; 28 thin ribbons, drawn as pointed lines; and 29 very long ribbons (most 30 to
-// 160 squares), with crossings and knots, so you have to keep track of which is which.
+// 160 squares), with crossings and knots, all in shades of one colour family, so you have to keep track of which is which.
 // ROLL (100) is a band of Endless: 18 across and 9 down, no ribbon pointing down (see "Endless" below).
 function params(n) {
   if (n === 0) return {W: 9, H: 14, shapes: 0.35, minLen: 3, maxLen: 8, straight: 0.5, ease: 0.6};
@@ -144,7 +144,7 @@ function params(n) {
   if (n > 20) {
     const e = [{W: 22, both: 0.3}, {W: 24, cross: 24}, {W: 26, knots: 14}, {W: 28, both: 0.15, cross: 16, knots: 10},
                {W: 28, minLen: 2, maxLen: 4, shapes: 0, straight: 0.5}, {W: 40}, {W: 28, one: true}, {W: 28, thin: true},
-               {W: 28, minLen: 40, maxLen: 160, shapes: 0, straight: 0.15, join: true, cross: 20, knots: 6}][n - 21];
+               {W: 28, minLen: 40, maxLen: 160, shapes: 0, straight: 0.15, join: true, cross: 20, knots: 6, similar: true}][n - 21];
     return {...params(20), both: 0, cross: 0, knots: 0, ...e, H: Math.round(e.W * 1.5)};
   }
   const t = (n - 1) / 19, W = Math.round(18 + 10 * t);
@@ -347,7 +347,7 @@ function makeTwirl(n) {
     if (o.join && ++tries < 8) { if (!pick || s.rb.length < pick.rb.length) pick = s; continue; }
     if (o.join && pick && pick.rb.length < s.rb.length) Object.assign(s, pick);
     if (o.roll && s.rb.some(r => r.dir === 2)) continue;
-    const d = {n, W, H, ribbons: s.rb, cross: s.cross.map(x => [x.cell, x.top, x.under]), knots: [], ...(o.one ? {one: true} : {}), ...(o.thin ? {thin: true} : {})};
+    const d = {n, W, H, ribbons: s.rb, cross: s.cross.map(x => [x.cell, x.top, x.under]), knots: [], ...(o.one ? {one: true} : {}), ...(o.thin ? {thin: true} : {}), ...(o.similar ? {similar: true} : {})};
     if (o.both) for (const r of d.ribbons) if (r.cells.length >= 3 && Math.random() < o.both) r.both = true;
     if (o.knots) tie(d, o.knots);
     const order = playOrder(d);   // played through once more, from scratch, as the player would
@@ -418,12 +418,15 @@ function dress(d, from = 0) {
   const tops = new Set((d.cross || []).map(x => x[1]));
   const one = d.one && (d.oneLook || (d.oneLook = (() => { const ramp = Math.floor(Math.random() * RAMPS.length); return {ramp, solid: rampAt(RAMPS[ramp], 0.55)}; })()));
   if (!from) d.looks = [];
+  // Level 29 (d.similar): every ribbon a shade of one of the close colourways (Lavender, Ocean, Moss…), so colour
+  // doesn't tell them apart
+  const close = Object.values(COLORWAYS), family = d.similar && (d.family ?? (d.family = RAMPS.indexOf(close[Math.floor(Math.random() * close.length)])));
   // a colourway as different as can be from the ribbons already dressed that it touches
   const pickColour = k => {
     const near = new Set(ribbons[k].cells.flatMap(i => [i - W, i + W, i % W ? i - 1 : -1, (i + 1) % W ? i + 1 : -1]).map(j => owner.get(j)).filter(o => o !== undefined && o < k));
     let best = null, bestD = -1;
     for (let t = 0; t < 10; t++) {
-      const ramp = Math.floor(Math.random() * RAMPS.length), at = 0.35 + Math.random() * 0.5, solid = rampAt(RAMPS[ramp], at);
+      const ramp = d.similar ? family : Math.floor(Math.random() * RAMPS.length), at = d.similar ? 0.1 + Math.random() * 0.8 : 0.35 + Math.random() * 0.5, solid = rampAt(RAMPS[ramp], at);
       const dist = Math.min(9, ...[...near].map(o => labDist(solid, d.looks[o].solid)));
       if (dist > bestD) { bestD = dist; best = {ramp, solid}; }
     }
@@ -435,7 +438,7 @@ function dress(d, from = 0) {
     // level 28's thin ribbons are pointed lines, never twisty
     if (d.thin) { d.looks[k] = {...pickColour(k), ombre: Math.random() < ombre, twist: false, thin: true, phase: 0, both: !!r.both}; return; }
     // a ribbon lying across another is flat, so it reads as on top (a twist would narrow to nothing just there)
-    d.looks[k] = {...pickColour(k), ombre: Math.random() < ombre, twist: !tops.has(k) && (Math.random() < other ? !mainTwist : mainTwist), phase: Math.random() * 6, both: !!r.both};
+    d.looks[k] = {...pickColour(k), ombre: !d.similar && Math.random() < ombre, twist: !tops.has(k) && (Math.random() < other ? !mainTwist : mainTwist), phase: Math.random() * 6, both: !!r.both};
   });
 }
 
