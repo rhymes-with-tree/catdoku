@@ -83,15 +83,9 @@ cats that point their own way are Day Light (`daylight/`, in beta).
     each time the cat steps on it), a spray bottle that watches a row (the cat can't end a move in its line), and the
     robot vacuum that moves each turn. The tray (it carries what's on it) is still being considered. Not picked: the
     puddle, laundry basket, sleeping dog, stack of cups, the human coming home.
-  - Toy Box, picked (2026-11-15): a catnip mouse that matches any toy, a basket with a picture on it that takes only
-    that toy, a fork in the track that switches sides each time a toy goes through, a basket that moves to another spot
-    each time a set is carried off, a gift-wrapped toy whose kind shows only once it's in a basket, and (the owner's
-    idea) waiting baskets: a level deals one more basket of mixed toys than there's room for, and it comes in to the
-    spot of the first basket carried off. It's dealt at the start, so the solver can still check the level can be won
-    (unlike an endless run, where each new basket would have to be made up as you go). Not picked: an endless run, a
-    fast ball (the toys ride in spaces that all move together, so it would be stuck behind the toy in front), Laya
-    asleep on the track, a basket with a lid that opens after a lap, a gate on the track that holds toys back until
-    it's tapped, a side pocket that keeps one toy off the track, and a reverse switch.
+  - Toy Box: levels 22 to 27 built 2026-11-15 (catnip mice, picture baskets, a fork, a basket on wheels, gifts, a
+    waiting basket; README, Toy Box). The owner to play them; level 23's picture baskets sometimes take a few seconds
+    to deal (the solver searches longer), which the page hides by dealing the next level ahead.
   - Twirl: levels 21 to 27 and Endless built 2026-11-15: ribbons pointed at both ends, crossing over and under, knots,
     all three, tiny ribbons, a mat bigger than the screen, one colour, thin ribbons (level 28), very long ribbons with
     crossings and knots (level 29), and a mat that keeps unrolling (README, Twirl).
