@@ -21,11 +21,34 @@ under the SIL Open Font License.
 
 ## Sounds
 
-Every sound effect is made in the browser as it plays, from code (Web Audio: oscillators, noise and filters), so there
-are no sound files and nothing to credit: the shared ones in `games.js` (`G.sound`), and Pawlinko's and Pounce Up's in
-their own pages (2026-11-14, the owner's picks from a listening page of candidates). The only recordings are Moonpie's
-purrs and snores in `cats/` (below), kept for the Moonpie games (the owner, 2026-11-14), the owner's own, covered with the pictures above. A sound from a library
-(Kenney, Freesound CC0 or Pixabay; `TODO.md`) gets a line here: where from, its licence, and a link.
+Most sound effects are made in the browser as they play, from code (Web Audio: oscillators, noise and filters): the
+shared ones in `games.js` (`G.sound`) and each game's own in its page (2026-11-14 on, the owner's picks from a listening
+page of candidates). Moonpie's purrs and snores in `cats/` (below) are the owner's own recordings, kept for the Moonpie
+games and covered with the pictures above.
+
+The recordings in `sounds/` are the owner's picks from Freesound, all CC0 (no credit needed; listed so it's clear where
+each came from), cut on Clip Bench (2026-11-15; `tools/sounds/kept.json` has every cut kept, `tools/sounds/kept/` the
+ones no game uses yet). A sound from another library gets a line here too: where from, its licence, and a link.
+
+- `sounds/chirp-01.mp3`: "Cat chirps" by tyler31898, https://freesound.org/s/634174/ (0.24–1.14 s), CC0
+- `sounds/chirp-02.mp3`: "Cat chirps" by tyler31898, https://freesound.org/s/634174/ (2.25–2.74 s), CC0
+- `sounds/chirp-06.mp3`: "Cat chirps" by tyler31898, https://freesound.org/s/634174/ (13.14–13.95 s), CC0
+- `sounds/chirp-09.mp3`: "Cat chirps" by tyler31898, https://freesound.org/s/634174/ (18.63–19.91 s), CC0
+- `sounds/chirp-purr-02.mp3`: "Cat chirps" by tyler31898, https://freesound.org/s/634174/ (10.47–11.45 s), CC0
+- `sounds/chirp-purr-03.mp3`: "Cat chirps" by tyler31898, https://freesound.org/s/634174/ (11.46–12.99 s), CC0
+- `sounds/chirp-purr-04.mp3`: "Cat purr chirp" by dreamstobecome, https://freesound.org/s/535318/ (4.51–5.7 s), CC0
+- `sounds/chirp-purr-05.mp3`: "Cat purr chirp" by dreamstobecome, https://freesound.org/s/535318/ (10.63–11.21 s), CC0
+- `sounds/fabric-grab-07.mp3`: "Clothes/fabric grab" by takimeko, https://freesound.org/s/846612/ (15.66–15.97 s), CC0
+- `sounds/hiss-2.mp3`: "Cat hissing" by ken788, https://freesound.org/s/386738/ (101.19–102.33 s), CC0
+- `sounds/mew.mp3`: "Cat purr chirp" by dreamstobecome, https://freesound.org/s/535318/ (3.66–4.32 s), CC0
+- `sounds/mrrow-01.mp3`: "Cat purr chirp" by dreamstobecome, https://freesound.org/s/535318/ (5.08–5.69 s), CC0
+- `sounds/purr-kitty.mp3`: "Kitty purr" by xoiziox, https://freesound.org/s/553375/ (0–6.95 s), CC0
+- `sounds/purr-soundmary.mp3`: "Cat purr" by soundmary, https://freesound.org/s/194926/ (1.28–3.03 s), CC0
+- `sounds/splash-01.mp3`: "Splash 3" by rombart, https://freesound.org/s/186746/ (0–0.36 s), CC0
+- `sounds/squeak.mp3`: "Cat chirps" by tyler31898, https://freesound.org/s/634174/ (34.91–36.04 s), CC0
+- `sounds/toy-jingle-02.mp3`: "Cat toy" by tripjazz, https://freesound.org/s/676536/ (2.03–2.49 s), CC0
+- `sounds/toy-jingle-08.mp3`: "Cat toy" by tripjazz, https://freesound.org/s/676536/ (8.22–9.12 s), CC0
+- `sounds/yawn-snore.mp3`: "Cat purring and yawning" by daphne_in_wonderland, https://freesound.org/s/383473/ (59.15–64.74 s), CC0
 
 ## Who's who in `cats/`
 

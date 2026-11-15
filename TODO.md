@@ -156,31 +156,30 @@ Sound went in on 2026-11-14 (README, "Sound"): `G.sound` in `games.js`, on by de
 page and a Sound switch in every game's menu, the shared win, gold-paw, lose and hint sounds, Pawlinko's and Pounce Up's
 own, Swap-a-Pom's purr moved onto it, and a new What's new card. Every sound is the owner's pick from the listening page,
 https://claude.ai/artifact/AiHXuVwvwB5CJSBPvgGNKS (the owner's own; its source is the page itself). Still to do:
-- **Library sounds** for the moments the owner wants from a sound library rather than code (silent until then):
-  Pawlinko's spill and Wake a cat, and Pounce Up's glass knocked over. Bird Watch's human stirring and waking were
-  left with none too (2026-11-14): maybe these, maybe silence. The owner may want others swapped too. Sources,
-  all free to use in a public game site (and an app later), so long as each sound's own licence is checked:
-  - **Pixabay** (pixabay.com, files on cdn.pixabay.com): the Pixabay Content License, free in apps and websites, no credit needed.
-  - **Freesound** (freesound.org, cdn.freesound.org): use only sounds marked CC0. CC BY needs a credit on the site; skip
-    anything marked NC (non-commercial), in case the app is ever sold.
-  - **Kenney** (kenney.nl): game sound packs, all CC0.
-  - Not **Epidemic Sound**: "royalty-free" there means nothing owed on top of a subscription, and there's no free tier.
-  The hosts are on the environment's allowed list, but the sites answer a cloud session with 403 (Pixabay behind
-  Cloudflare's bot check), so the owner downloads each one in a browser and adds it to the repo (a short mp3, as
-  Moonpie's are), and it gets a line in `ARTWORK.md` (where from, its licence, a link). `G.sound` plays only made
-  sounds so far: a file needs loading and decoding first (as Swap-a-Pom's purr does).
+- **Recordings** (2026-11-15): the owner found CC0 sounds on Freesound (the site refuses this cloud session, API key or
+  not, so the owner downloads them), sorted and cut them on Clip Bench (https://claude.ai/artifact/2tqPsC8VEQdJu67RDYZDzE;
+  its cuts live in the page's database), and the Keeps (98) went to the listening page as Your recordings. The 19 the
+  games use are in `sounds/` (`G.sound.kit.rec(name, vol)`; `ARTWORK.md` lists each); the rest wait in
+  `tools/sounds/kept/`. Picked for no moment yet: Cat rub, Fabric grab 4, Knitting stitch, Hard slide up (the owner liked
+  them on their rows). The shared recordings load in every game (about 380 KB in all, once per visit, fetched only
+  once sound starts); if that's too much on a phone, load each game's own only.
 - **Pawlinko's hold sound:** the owner picked Rope thud for "hits a hold" and a sound of its own for every thing, so
   every knock plays the thing's own and the rope thud plays nowhere (it isn't in the page). If the holds should thud
   under each thing's sound, or the plainer things (yarn, fluffball, feather) should thud instead, say so.
-- **The other games:** On the Prowl, Kitten Play, Cat Logic, Cat Math and Cat Trails are done (2026-11-14); Undo,
-  Bookmark and a life lost sound in every game that has them. Left: Cat Spells and Curious Cat.
-- **To pick again:** Tail Chase's Tangled and Tape were a mrrp, which the owner took out (2026-11-14); until they're
-  picked again they have the lose card's own sound. The listening page lists them under Pick again.
+- **Every shelf is done** (2026-11-14), Cat Spells and Curious Cat last; Undo, Bookmark and a life lost sound in every
+  game that has them.
+- **Objects and actions** (picked 2026-11-15): the shared sounds are in `games.js` (`spring`, `yarnLand`, `glassOver`,
+  `offTable`, `catWakes`…), and a game's moment points at one with `G.sound.get`. Where a game's own row was picked
+  differently, the game's pick won (more specific): the lemon is the hiss at a tenth in Pounce Up and Tail Chase (half on
+  the object row), Pounce Up's candle the same hiss (a fwoomp on the object row), Tail Chase's tape the sticky thhp (a
+  hop for tape elsewhere), a cat waking a chirp or mew per game (Yawn and snore on the object row, which no game plays
+  now), L-M-N-O-Pom's pompom the soft plop, Knock It Off's things a crash, Unravel's wind-back the Undo blip,
+  Pawlinko's bell Toy jingle 2 (Toy jingle 8 on the row) and its Shake the shaker. If those should match, the owner
+  says which way.
 - **The better sounds** (hiss, scratching, chirps, water, meow, big yawn, fabric rustle, crinkle; 2026-11-14) are in the
   games wherever those sounds were picked; the owner is to hear them on the listening page (Better sounds to hear).
-- **Per-row volume and length:** the listening page gives every row its own (Volume · Length); `G.sound` doesn't yet
-  take a sound's own volume or length, so the first picks that change one need that added (a multiplier for each name,
-  set by `G.sound.define`'s caller or a table in `games.js`).
+- **Per-row volume and length:** `ADJ` in `games.js` holds the owner's own (cat settles: 200%, 130%; Shake: 90%,
+  200%), and a recording takes its volume in `rec` (the lemon's hiss at a tenth, Twirl's swish at a fifth).
 - **Testers:** the listening page can go to testers (shared from its Share menu); Send opens the site's feedback form
   with their picks in its last field (the link field) and their name in the contact field. The shared tap, put-down and not-allowed sounds (`tap`, `put`,
   `wrong`) are for the rest. Add them a shelf at a time, quick and action games first, each game's own sounds where the

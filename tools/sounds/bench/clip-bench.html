@@ -1,0 +1,338 @@
+<title>Catdoku Clip Bench</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: one column of recordings; each is a waveform you cut on, with its cuts listed under it. */
+:root{
+  --bg:#F6F4F8; --panel:#FFFFFF; --fg:#2A2530; --muted:#6E6677; --line:#E2DCE7; --wave:#9C93A6; --wavebg:#F1EDF4;
+  --accent:#B94588; --keep:#3E8A55; --recut:#C07A12; --toss:#B0434A; --new:#5B6FB0; --play:#2A2530;
+  --display:"Space Grotesk",system-ui,sans-serif; --body:Inter,system-ui,-apple-system,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#1C1920; --panel:#26222B; --fg:#EEE9F2; --muted:#A79FB0; --line:#3A3440; --wave:#8E85A0; --wavebg:#211D26;
+  --accent:#E58BBF; --keep:#7CC48F; --recut:#E6B04F; --toss:#E8858B; --new:#9DAEE6; --play:#EEE9F2; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#1C1920; --panel:#26222B; --fg:#EEE9F2; --muted:#A79FB0; --line:#3A3440; --wave:#8E85A0; --wavebg:#211D26;
+  --accent:#E58BBF; --keep:#7CC48F; --recut:#E6B04F; --toss:#E8858B; --new:#9DAEE6; --play:#EEE9F2; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 60px}
+*,*::before,*::after{box-sizing:border-box}
+.wrap{max-width:1100px;margin:0 auto;display:grid;gap:18px}
+.list{display:grid;gap:18px;min-width:0}
+h1{font-family:var(--display);font-size:1.7rem;margin:0;text-wrap:balance}
+h2{font-family:var(--display);font-size:1.1rem;margin:0}
+p{margin:0}
+.lede{color:var(--muted);max-width:68ch}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.pill{border:1.5px solid var(--line);background:var(--panel);color:var(--fg);border-radius:999px;padding:6px 12px;font:inherit;font-size:.88rem;cursor:pointer;min-height:36px}
+.pill[aria-pressed="true"]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,var(--panel))}
+.pill:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.count{font-variant-numeric:tabular-nums;color:var(--muted);margin-left:4px}
+.status{font-size:.85rem;color:var(--muted)}
+.src{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:10px;min-width:0}
+.srchead{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:baseline;justify-content:space-between}
+.meta{color:var(--muted);font-size:.85rem}
+.tools{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.tools button,.btn{border:1.5px solid var(--line);background:var(--panel);color:var(--fg);border-radius:8px;padding:5px 10px;font:inherit;font-size:.85rem;cursor:pointer;min-height:34px}
+.scroller{overflow-x:auto;border-radius:8px;background:var(--wavebg);touch-action:pan-x}
+canvas{display:block;height:120px;cursor:crosshair}
+.hint{font-size:.8rem;color:var(--muted)}
+.cuts{display:grid;gap:8px}
+.cut{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 10px;padding:10px;border-radius:10px;border:1.5px solid var(--line);border-left:6px solid var(--c,var(--new))}
+.cut.sel{border-color:var(--c,var(--new));box-shadow:0 0 0 2px color-mix(in srgb,var(--c,var(--new)) 30%,transparent)}
+.cut[data-s="keep"]{--c:var(--keep)} .cut[data-s="recut"]{--c:var(--recut)} .cut[data-s="toss"]{--c:var(--toss)} .cut[data-s="new"]{--c:var(--new)}
+.cut[data-s="toss"] .name{text-decoration:line-through;opacity:.7}
+.playbtn{width:40px;height:40px;border-radius:50%;border:none;background:var(--c,var(--new));color:var(--panel);font-size:1rem;cursor:pointer;align-self:start}
+.fields{display:grid;gap:8px;min-width:0}
+.row1{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.row1 input{font:inherit;border:1.5px solid var(--line);background:var(--bg);color:var(--fg);border-radius:8px;padding:6px 8px;min-width:0}
+.name{flex:2 1 180px} .tag{flex:1 1 110px}
+.times{display:flex;gap:6px;align-items:center;font-size:.85rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.times input{width:6.2em}
+.seg{display:flex;gap:4px;flex-wrap:wrap}
+.seg button{border:1.5px solid var(--line);background:var(--panel);color:var(--fg);border-radius:999px;padding:4px 11px;font:inherit;font-size:.82rem;cursor:pointer;min-height:32px}
+.seg button[aria-pressed="true"][data-v="keep"]{background:var(--keep);border-color:var(--keep);color:var(--panel)}
+.seg button[aria-pressed="true"][data-v="recut"]{background:var(--recut);border-color:var(--recut);color:var(--panel)}
+.seg button[aria-pressed="true"][data-v="toss"]{background:var(--toss);border-color:var(--toss);color:var(--panel)}
+.note{width:100%;font:inherit;border:1.5px solid var(--line);background:var(--bg);color:var(--fg);border-radius:8px;padding:6px 8px}
+.del{margin-left:auto}
+.empty{color:var(--muted);font-size:.9rem}
+/* sorted cuts fold to one line; a recording whose cuts are all sorted folds to its heading */
+.cut.mini{grid-template-columns:auto minmax(0,1fr) auto;align-items:center;padding:6px 10px}
+.cut.mini .playbtn{width:32px;height:32px;font-size:.8rem}
+.mini .line{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;min-width:0}
+.mini .nm{font-weight:600;overflow-wrap:anywhere}
+.mini .sub{color:var(--muted);font-size:.82rem;font-variant-numeric:tabular-nums}
+.badge{font-size:.75rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--c)}
+.mini .notetext{flex-basis:100%;color:var(--muted);font-size:.82rem}
+.src.folded .scroller,.src.folded .hint,.src.folded .cuts,.src.folded .zoom{display:none}
+.summary{font-size:.85rem;font-variant-numeric:tabular-nums}
+.summary b{font-weight:700}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:8px">
+    <h1>Clip Bench</h1>
+    <p class="lede">Your Freesound finds, each with the cuts made from it. Keeps move to the listening page once Claude has cut them, so a recording with nothing left to sort folds away (Show opens it, to make more cuts). Tap a cut to hear it. Drag its edges on the waveform to re-cut it, or drag across a new spot to add one. Name and tag each cut, then mark it <b>Keep</b>, <b>Re-cut</b> (say what to change) or <b>Toss</b>. Everything saves as you go, and Claude reads it from here.</p>
+  </header>
+  <div class="bar" id="filters" role="group" aria-label="Show cuts"></div>
+  <div class="bar"><span class="status" id="status">Loading your cuts…</span></div>
+  <div id="list" class="list"></div>
+</div>
+<datalist id="tags"><option value="hiss"><option value="meow"><option value="chirp"><option value="purr-chirp"><option value="purr"><option value="yawn"><option value="toy"><option value="splash"><option value="rustle"><option value="slide"><option value="knit"><option value="other"></datalist>
+
+<script>
+// Each recording: Freesound number, who made it, its name, how long, and where the page's copy starts in it (the hiss's
+// first 96 s are silent, so its copy starts there). Cut times are seconds into the original recording.
+const SOURCES = [
+  {fid: "386738", by: "ken788", name: "Cat hissing", dur: 103.31, offset: 96},
+  {fid: "845517", by: "steprock", name: "Cat meow, annoyed", dur: 2.26},
+  {fid: "851329", by: "owenklash", name: "Grumpy cat meows", dur: 25.1},
+  {fid: "634174", by: "tyler31898", name: "Cat chirps", dur: 36.07},
+  {fid: "451250", by: "dreamstobecome", name: "Cat chirp", dur: 7.82},
+  {fid: "535318", by: "dreamstobecome", name: "Cat purr chirp", dur: 15.95},
+  {fid: "517896", by: "butchhiggs", name: "Monique purring", dur: 79.46},
+  {fid: "194926", by: "soundmary", name: "Cat purr", dur: 3.74},
+  {fid: "553375", by: "xoiziox", name: "Kitty purr", dur: 6.95},
+  {fid: "383473", by: "daphne_in_wonderland", name: "Cat purring and yawning", dur: 105.97},
+  {fid: "594132", by: "kianoow", name: "Cat playing with toy", dur: 14.61},
+  {fid: "676536", by: "tripjazz", name: "Cat toy", dur: 13.51},
+  {fid: "186747", by: "rombart", name: "Splash 2", dur: .6},
+  {fid: "186746", by: "rombart", name: "Splash 3", dur: .36},
+  {fid: "427865", by: "leonelmail", name: "Clothing rustle, nylon", dur: 53.18},
+  {fid: "846612", by: "takimeko", name: "Clothes/fabric grab", dur: 18.77},
+  {fid: "552515", by: "joao_janz", name: "Small hard slide up 04", dur: 1.25},
+  {fid: "863335", by: "alexarje", name: "Knitting a beanie", dur: 13.99},
+];
+const STATUS = [["new", "Not sorted"], ["keep", "Keep"], ["recut", "Re-cut"], ["toss", "Toss"]];
+const $ = id => document.getElementById(id);
+const store = {get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }};
+
+let cuts = {};
+const open = store.get("bench.open", {});   // what the viewer opened or folded by hand: cut id, or "src:"+number
+const setOpen = (k, v) => { open[k] = v; store.set("bench.open", open); };
+const cutOpen = (id, c) => open[id] ?? c.status === "new";
+const srcOpen = s => { const l = Object.values(cuts).filter(c => c.src === s.fid); return open["src:" + s.fid] ?? l.some(c => c.status === "new"); };   // folded once nothing on it is left to sort          // id -> {src, start, end, name, tag, status, note}
+let db = null, col = null, filter = store.get("bench.filter", "all"), selected = null;
+const buffers = {}, peaks = {}, zoom = {};
+let ctx = null, playing = null;
+
+/* ---------- saving: the page's database (Claude reads it), else this browser ---------- */
+const timers = {};
+function setStatus(t) { $("status").textContent = t; }
+function save(id) {
+  clearTimeout(timers[id]);
+  timers[id] = setTimeout(async () => {
+    const c = cuts[id];
+    if (!db) { store.set("bench.cuts", cuts); setStatus("Saved in this browser only (the page's database isn't available here)."); return; }
+    try { if (c) await col.doc(id).set(c); else await col.doc(id).delete(); setStatus("Saved."); }
+    catch (e) { store.set("bench.cuts", cuts); setStatus("Couldn't save to the page just now; kept in this browser. Try again in a moment."); }
+  }, 400);
+}
+
+/* ---------- audio ---------- */
+function audio() { if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)(); if (ctx.state !== "running") ctx.resume(); return ctx; }
+async function load(s) {
+  if (buffers[s.fid]) return buffers[s.fid];
+  const b = await (await fetch(`src/${s.fid}.mp3`)).arrayBuffer();
+  const off = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 1, 44100);
+  buffers[s.fid] = await new Promise((ok, bad) => off.decodeAudioData(b, ok, bad));
+  return buffers[s.fid];
+}
+function stop() { if (playing) { try { playing.node.stop(); } catch (e) {} const p = playing; playing = null; drawSrc(p.s); } }
+async function play(s, from, to) {
+  stop(); const c = audio(), buf = await load(s), off = s.offset || 0;
+  const a = Math.max(0, from - off), d = Math.max(.02, (to ?? s.dur) - Math.max(from, off));
+  const n = c.createBufferSource(); n.buffer = buf; n.connect(c.destination); n.start(0, a, d);
+  const me = playing = {s, node: n, t0: c.currentTime, from: Math.max(from, off), to: Math.max(from, off) + d};
+  n.onended = () => { if (playing === me) { playing = null; drawSrc(s); } };
+  const tick = () => { if (playing !== me) return; drawSrc(s); requestAnimationFrame(tick); }; tick();
+}
+
+/* ---------- the waveform: time <-> pixels, peaks, cuts drawn over it ---------- */
+const H = 120, css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const v0 = s => s.offset || 0, span = s => s.dur - v0(s);
+const pps = s => { const box = document.querySelector(`[data-fid="${s.fid}"] .scroller`); const w = box ? box.clientWidth : 800; return w / span(s) * (zoom[s.fid] || 1); };
+function drawSrc(s) {
+  const cv = document.querySelector(`[data-fid="${s.fid}"] canvas`); if (!cv) return;
+  const W = Math.max(cv.parentElement.clientWidth, Math.round(span(s) * pps(s))), dpr = devicePixelRatio || 1;
+  if (cv.width !== W * dpr) { cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + "px"; }
+  const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  const k = pps(s), off = v0(s), X = t => (t - off) * k;
+  // cuts under the wave
+  for (const [id, c] of Object.entries(cuts)) {
+    if (c.src !== s.fid || !shown(c)) continue;
+    const col = css("--" + c.status) || css("--new"), x0 = X(c.start), x1 = X(c.end);
+    g.globalAlpha = id === selected ? .32 : .18; g.fillStyle = col; g.fillRect(x0, 0, x1 - x0, H);
+    g.globalAlpha = 1; g.fillStyle = col; g.fillRect(x0, 0, 2, H); g.fillRect(x1 - 2, 0, 2, H);
+    g.font = "600 11px Inter, system-ui"; g.fillStyle = css("--fg"); g.fillText((c.name || "").slice(0, Math.max(0, Math.floor((x1 - x0 - 6) / 6.5))), x0 + 4, 13);
+  }
+  const buf = buffers[s.fid];
+  if (buf) {
+    const d = buf.getChannelData(0), sr = buf.sampleRate; g.fillStyle = css("--wave");
+    for (let x = 0; x < W; x++) {
+      const i0 = Math.floor(x / k * sr), i1 = Math.floor((x + 1) / k * sr); let m = 0;
+      for (let i = Math.max(0, i0); i < Math.min(d.length, i1); i += 4) { const v = Math.abs(d[i]); if (v > m) m = v; }
+      const h = Math.max(1, Math.sqrt(m) * (H - 22)); g.fillRect(x, (H + 10) / 2 - h / 2, 1, h);
+    }
+  }
+  // seconds along the bottom
+  g.fillStyle = css("--muted"); g.font = "10px Inter, system-ui"; const step = k > 300 ? .1 : k > 80 ? .5 : k > 20 ? 1 : k > 6 ? 5 : 10;
+  for (let t = Math.ceil(off / step) * step; t <= s.dur; t += step) { const x = X(t); g.fillRect(x, H - 4, 1, 4); if (x > 2 && x < W - 20) g.fillText((Math.round(t * 10) / 10) + "", x + 2, H - 6); }
+  if (playing && playing.s === s) { const t = Math.min(playing.to, playing.from + (ctx.currentTime - playing.t0)); g.fillStyle = css("--accent"); g.fillRect(X(t), 0, 2, H); }
+}
+
+/* ---------- pointer on the waveform: grab a cut's edge, tap a cut to play it, drag across to make a new one, tap empty wave to play from there ---------- */
+function bindCanvas(s, cv) {
+  let drag = null;
+  const tAt = e => { const r = cv.getBoundingClientRect(); return Math.max(v0(s), Math.min(s.dur, v0(s) + (e.clientX - r.left) / pps(s))); };
+  cv.addEventListener("pointerdown", e => {
+    const t = tAt(e), k = pps(s), tol = 8 / k; let hit = null;
+    for (const [id, c] of Object.entries(cuts)) { if (c.src !== s.fid || !shown(c)) continue;
+      if (Math.abs(t - c.start) < tol) hit = {id, edge: "start"}; else if (Math.abs(t - c.end) < tol) hit = {id, edge: "end"};
+      else if (!hit && t > c.start && t < c.end) hit = {id, edge: null}; }
+    drag = {t0: t, hit, moved: false, id: null}; cv.setPointerCapture(e.pointerId);
+  });
+  cv.addEventListener("pointermove", e => {
+    if (!drag) return; const t = tAt(e);
+    if (Math.abs(t - drag.t0) * pps(s) > 4) drag.moved = true;
+    if (!drag.moved) return;
+    if (drag.hit && drag.hit.edge) { const c = cuts[drag.hit.id]; c[drag.hit.edge] = +t.toFixed(2); if (c.end - c.start < .03) c[drag.hit.edge] = drag.hit.edge === "start" ? c.end - .03 : c.start + .03; select(drag.hit.id, false); }
+    else { if (!drag.id) { drag.id = "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+        cuts[drag.id] = {src: s.fid, start: drag.t0, end: drag.t0, name: "New cut", tag: "", status: "new", note: ""}; }
+      const c = cuts[drag.id]; c.start = +Math.min(drag.t0, t).toFixed(2); c.end = +Math.max(drag.t0, t).toFixed(2); selected = drag.id; }
+    drawSrc(s);
+  });
+  const up = () => {
+    if (!drag) return; const d = drag; drag = null;
+    if (d.moved && d.hit && d.hit.edge) { save(d.hit.id); renderCuts(s); const c = cuts[d.hit.id]; play(s, c.start, c.end); return; }
+    if (d.moved && d.id) { if (cuts[d.id].end - cuts[d.id].start < .03) { delete cuts[d.id]; drawSrc(s); return; } save(d.id); renderCuts(s); select(d.id); const c = cuts[d.id]; play(s, c.start, c.end); return; }
+    if (d.hit) { select(d.hit.id); const c = cuts[d.hit.id]; play(s, c.start, c.end); }
+    else play(s, d.t0);
+  };
+  cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", () => { drag = null; });
+}
+
+/* ---------- the page ---------- */
+const shown = c => filter === "all" || c.status === filter;
+function select(id, scroll = true) {
+  selected = id; document.querySelectorAll(".cut").forEach(el => el.classList.toggle("sel", el.dataset.id === id));
+  if (scroll) document.querySelector(`.cut[data-id="${id}"]`)?.scrollIntoView({block: "nearest", behavior: "smooth"});
+  const c = cuts[id]; if (c) drawSrc(SOURCES.find(s => s.fid === c.src));
+}
+function renderFilters() {
+  const n = {all: Object.keys(cuts).length}; for (const c of Object.values(cuts)) n[c.status] = (n[c.status] || 0) + 1;
+  $("filters").innerHTML = [["all", "All"], ...STATUS].map(([v, l]) => `<button class="pill" data-v="${v}" aria-pressed="${filter === v}">${l}<span class="count">${n[v] || 0}</span></button>`).join("");
+}
+$("filters").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; filter = b.dataset.v; store.set("bench.filter", filter); render(); });
+
+function miniEl(id, c, s) {
+  const el = document.createElement("div"); el.className = "cut mini" + (id === selected ? " sel" : ""); el.dataset.id = id; el.dataset.s = c.status;
+  const lab = (STATUS.find(x => x[0] === c.status) || [, ""])[1];
+  el.innerHTML = `<button class="playbtn" aria-label="Play">▶</button><div class="line"><span class="nm"></span><span class="sub"></span><span class="badge">${lab}</span>${c.note ? '<span class="notetext"></span>' : ""}</div><button class="btn">Edit</button>`;
+  el.querySelector(".nm").textContent = c.name || "Untitled";
+  el.querySelector(".sub").textContent = `${c.tag || "no tag"} · ${(+c.start).toFixed(2)}–${(+c.end).toFixed(2)} s`;
+  if (c.note) el.querySelector(".notetext").textContent = c.note;
+  el.querySelector(".playbtn").onclick = () => { select(id, false); play(s, c.start, c.end); };
+  el.querySelector(".btn").onclick = () => { setOpen(id, true); renderCuts(s); };
+  return el;
+}
+function cutEl(id, c, s) {
+  if (!cutOpen(id, c)) return miniEl(id, c, s);
+  const el = document.createElement("div"); el.className = "cut" + (id === selected ? " sel" : ""); el.dataset.id = id; el.dataset.s = c.status;
+  el.innerHTML = `<button class="playbtn" aria-label="Play ${c.name}">▶</button>
+  <div class="fields">
+    <div class="row1"><input class="name" id="n-${id}" aria-label="Name" value=""><input class="tag" id="t-${id}" list="tags" aria-label="Tag" placeholder="tag" value="">
+      <span class="times"><input type="number" step="0.01" min="0" id="a-${id}" aria-label="Start, seconds"> to <input type="number" step="0.01" min="0" id="b-${id}" aria-label="End, seconds"> s</span></div>
+    <div class="row1"><div class="seg" role="group" aria-label="Decision">${STATUS.slice(1).map(([v, l]) => `<button data-v="${v}" aria-pressed="${c.status === v}">${l}</button>`).join("")}</div>
+      ${c.status !== "new" ? '<button class="btn fold">Fold</button>' : ""}<button class="btn del">Delete</button></div>
+    <input class="note" id="o-${id}" aria-label="Note" placeholder="${c.status === "recut" ? "What to change: start later, end before the second chirp…" : "Note (optional)"}">
+  </div>`;
+  const q = sel => el.querySelector(sel);
+  q(".name").value = c.name || ""; q(".tag").value = c.tag || ""; q(".note").value = c.note || "";
+  q(`#a-${id}`).value = c.start; q(`#b-${id}`).value = c.end;
+  const upd = (k, v) => { c[k] = v; save(id); drawSrc(s); };
+  q(".name").oninput = e => upd("name", e.target.value);
+  q(".tag").oninput = e => upd("tag", e.target.value.trim());
+  q(".note").oninput = e => upd("note", e.target.value);
+  q(`#a-${id}`).onchange = e => { const v = +e.target.value; if (v >= 0 && v < c.end) upd("start", v); else e.target.value = c.start; };
+  q(`#b-${id}`).onchange = e => { const v = +e.target.value; if (v > c.start && v <= s.dur) upd("end", v); else e.target.value = c.end; };
+  q(".playbtn").onclick = () => { select(id, false); play(s, c.start, c.end); };
+  q(".seg").onclick = e => { const b = e.target.closest("button"); if (!b) return; c.status = c.status === b.dataset.v ? "new" : b.dataset.v;
+    setOpen(id, c.status === "new" || c.status === "recut");   // Keep and Toss fold the cut away; Re-cut stays open for its note
+    save(id); renderFilters(); renderCuts(s); drawSrc(s); updateHead(s); };
+  q(".fold")?.addEventListener("click", () => { setOpen(id, false); renderCuts(s); updateHead(s); });
+  q(".del").onclick = e => { const b = e.target;
+    if (b.dataset.sure) { delete cuts[id]; save(id); renderFilters(); renderCuts(s); drawSrc(s); return; }
+    b.dataset.sure = "1"; b.textContent = "Delete for good?"; setTimeout(() => { if (b.isConnected) { delete b.dataset.sure; b.textContent = "Delete"; } }, 3000); };
+  el.addEventListener("pointerdown", () => { if (selected !== id) select(id, false); });
+  return el;
+}
+function renderCuts(s) {
+  const box = document.querySelector(`[data-fid="${s.fid}"] .cuts`); if (!box) return;
+  const list = Object.entries(cuts).filter(([, c]) => c.src === s.fid && shown(c)).sort((a, b) => a[1].start - b[1].start);
+  box.replaceChildren(...list.map(([id, c]) => cutEl(id, c, s)));
+  if (!list.length) box.innerHTML = `<p class="empty">${filter === "all" ? "No cuts yet. Drag across the waveform to make one." : "None here with this filter."}</p>`;
+}
+// the heading's tally and Show/Hide; a recording with every cut sorted folds to its heading until opened
+function updateHead(s) {
+  const el = document.querySelector(`[data-fid="${s.fid}"]`); if (!el) return;
+  const l = Object.values(cuts).filter(c => c.src === s.fid), n = k => l.filter(c => c.status === k).length, o = srcOpen(s);
+  el.classList.toggle("folded", !o);
+  el.querySelector(".summary").innerHTML = l.length ? STATUS.filter(([k]) => n(k)).map(([k, lab]) => `<b style="color:var(--${k})">${n(k)}</b> ${lab.toLowerCase()}`).join(" · ") : "All moved to the listening page";
+  el.querySelector(".foldbtn").textContent = o ? "Hide" : "Show";
+  el.querySelector(".foldbtn").setAttribute("aria-expanded", String(o));
+}
+function render() {
+  renderFilters();
+  const list = $("list"); list.replaceChildren();
+  // recordings with cuts still to sort come first; the finished ones gather at the bottom
+  const todo = s => Object.values(cuts).some(c => c.src === s.fid && c.status === "new") ? 0 : 1;
+  for (const s of [...SOURCES].sort((a, b) => todo(a) - todo(b))) {
+    const n = Object.values(cuts).filter(c => c.src === s.fid).length;
+    const el = document.createElement("section"); el.className = "src"; el.dataset.fid = s.fid;
+    el.innerHTML = `<div class="srchead"><div><h2>${s.name}</h2><p class="meta">Freesound ${s.fid} · ${s.by} · ${s.dur.toFixed(1)} s${s.offset ? ` (silent until ${s.offset} s; the wave starts there)` : ""} · ${n} cut${n === 1 ? "" : "s"}</p></div>
+      <p class="summary"></p></div>
+      <div class="tools"><button data-a="fold" class="foldbtn"></button><button data-a="all">▶ Whole clip</button><button data-a="stop">■ Stop</button>
+      <span class="zoom tools"><button data-a="out" aria-label="Zoom out">−</button><button data-a="in" aria-label="Zoom in">+</button></span></div></div>
+      <div class="scroller"><canvas aria-label="Waveform of ${s.name}. Tap a cut to play it; drag its edges to re-cut it; drag across the wave to make a new cut."></canvas></div>
+      <p class="hint">Tap the wave to play from there. Drag a cut's edge to move it. Drag across empty wave for a new cut.</p>
+      <div class="cuts"></div>`;
+    list.append(el);
+    el.querySelector(".tools").onclick = e => { const a = e.target.closest("button")?.dataset.a; if (!a) return;
+      if (a === "fold") { setOpen("src:" + s.fid, !srcOpen(s)); updateHead(s); drawSrc(s); return; }
+      if (a === "all") play(s, s.offset || 0); else if (a === "stop") stop();
+      else { zoom[s.fid] = Math.max(1, Math.min(64, (zoom[s.fid] || 1) * (a === "in" ? 2 : .5))); drawSrc(s); } };
+    bindCanvas(s, el.querySelector("canvas")); renderCuts(s); updateHead(s); drawSrc(s);
+    load(s).then(() => drawSrc(s)).catch(() => {});
+  }
+}
+addEventListener("resize", () => SOURCES.forEach(drawSrc));
+matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => SOURCES.forEach(drawSrc));
+
+/* ---------- start: the cuts come from the page's database (Claude put the first ones there) ---------- */
+render();
+(async () => {
+  const give = setTimeout(() => { if (!col) setStatus("Couldn't reach the page's database. Changes will stay in this browser."); }, 10000);
+  db = window.claude ? await window.claude.use("db") : null;
+  if (!db) { clearTimeout(give); cuts = store.get("bench.cuts", {}); setStatus(Object.keys(cuts).length ? "Saved in this browser only." : "The page's database isn't available here, so there are no cuts to show. Open it on claude.ai."); render(); return; }
+  col = db.collection("cuts"); let first = true;
+  col.onSnapshot(snap => {
+    clearTimeout(give);
+    const next = {}; snap.docs.forEach(d => { next[d.id] = {...d.data()}; });   // snapshots are frozen: copy to edit
+    // keep what's being typed in a cut that has a save waiting
+    for (const id in timers) if (cuts[id]) next[id] = cuts[id];
+    // redraw only the recordings whose cuts really changed (your own saves come back unchanged), so the page stays put
+    const of = (m, fid) => JSON.stringify(Object.entries(m).filter(([, c]) => c.src === fid).sort());
+    const wasFirst = first, changed = first ? SOURCES : SOURCES.filter(s => of(cuts, s.fid) !== of(next, s.fid));
+    cuts = next;
+    if (first) { first = false; setStatus(Object.keys(cuts).length ? `${Object.keys(cuts).length} cuts. Changes save as you go.` : "No cuts yet. Drag across a waveform to make one."); }
+    if (wasFirst) { render(); return; }
+    renderFilters();
+    const typing = document.activeElement && document.activeElement.closest(".cut");
+    for (const s of changed) { if (!typing || !typing.closest(`[data-fid="${s.fid}"]`)) renderCuts(s); updateHead(s); drawSrc(s); }
+  }, () => { setStatus("Couldn't load the cuts. Reload the page to try again."); });
+})();
+</script>

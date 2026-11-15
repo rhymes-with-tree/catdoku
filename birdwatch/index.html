@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-14.8"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-15.1"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-14.8">
+<link rel="stylesheet" href="../games.css?v=2026-11-15.1">
 <style>
 /* Three tall windows side by side, each with three panes. Birds land outside a pane for a moment: tap it to have
    Bugsy or Bowtie spot one. Squirrels and falling leaves go past too; leave
@@ -91,7 +91,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-14.8"></script>
+<script src="../games.js?v=2026-11-15.1"></script>
 <script>
 /* ---------- levels ---------- */
 // Level n: [birds in the flock, how long a bird stays (ms), time between arrivals (ms), most things at the windows
@@ -320,9 +320,12 @@ const isBird = th => BIRDS.some(b => b.k === th.k);
 const S = G.sound.kit;
 G.sound.define({
   "bird.glass": t => S.modal({t, parts: [[2100, 1, .05], [4700, .4, .03]], vol: .18, click: 3500}),   // a tink on the glass, every tap
-  "bird.spot": t => { for (const d of [0, .09]) S.tone({fs: [[0, 3000], [.03, 4200], [.06, 3400]], t: t + d, dur: .07, vol: .07}); },   // chirp
+  "bird.spot": G.sound.kit.rec("squeak"),   // spotted: a squeak (a recording)
+  "bird.decoy": t => Math.random() < .5 ? S.rustle(t) : (() => { for (let i = 0; i < 5; i++) S.tone({f: 2600 * S.rnd(.95, 1.05), t: t + i * .045, dur: .025, vol: .07, vib: [60, 200]}); })(),   // a leaf or a squirrel: a rustle or a chitter
+  "bird.stir": t => { S.tone({fs: [[0, 600], [.4, 900]], t, dur: .4, vol: .12, vib: [30, 60, 0]}); S.modal({t, parts: [[1900, .5, .25], [4100, .3, .15]], vol: .12, click: 0}); },   // the human stirs: a metal sproing
+  "bird.woke": t => S.tone({fs: [[0, 180], [.45, 1400]], t, dur: .5, vol: .18, a: .01, hold: .3, vib: [14, 40, 0]}),   // the human woke up: a launch
   "bird.away": t => S.noise({t, dur: .28, vol: .1, f: 1400, q: .8, a: .01, trem: [24, .85]}),   // a faint flutter
-  "bird.wipe": t => S.noise({t, dur: .5, vol: .3, fs: [[0, 800], [.25, 2400], [.5, 900]], q: 3, a: .05, hold: .25}),   // squeegee, as in Pawlinko
+  "bird.wipe": G.sound.get("wipe"),
 });
 // A bird that flew off unspotted. One too many and the level's lost; the last of the flock ends the run.
 function escaped() {
@@ -337,7 +340,7 @@ function tap(w) {
   if (game.state === "paused") { resume(); return; }
   if (game.state !== "running") return;
   // every tap makes a noise, bird or no bird
-  game.taps++; G.sound.play("bird.glass");
+  game.taps++; G.sound.play("bird.glass"); { const left = game.budget - game.taps; if (left > 0 && left <= SPARE) G.sound.play("bird.stir", {}, .1); }   // the last taps: the human stirs
   const th = game.up[w];
   if (th && isBird(th) && !th.caught) spot(w, th);
   else if (th && !isBird(th)) bump(w, th);
@@ -365,7 +368,7 @@ function spot(w, th) {
   if (game.spotted + game.escaped >= game.flock) win();
 }
 function bump(w, th) {
-  G.sound.play("wrong");
+  G.sound.play("bird.decoy");
   const el = wins[w]; el.classList.remove("bumped"); void el.getBoundingClientRect(); el.classList.add("bumped");
   clearTimeout(el.timer); el.timer = setTimeout(() => el.classList.remove("bumped"), 450);
   G.note(th ? `That's ${th.k === "leaf" ? "a leaf" : "a squirrel"}!` : "No bird there!", 1800);
@@ -393,7 +396,7 @@ addEventListener("keydown", e => {
 /* ---------- endings ---------- */
 // Out of taps: the human wakes up.
 function woke() {
-  game.state = "woke"; cancelAnimationFrame(frame); G.breakStreak(); status(); keepBest();
+  game.state = "woke"; cancelAnimationFrame(frame); G.breakStreak(); status(); keepBest(); G.sound.play("bird.woke");
   settings.tries[game.level] = (settings.tries[game.level] || 0) + 1; save();
   G.track(`Bird Watch woke the human on level ${game.level}`);
   const g = game;
@@ -401,7 +404,7 @@ function woke() {
     if (game !== g) return;
     G.loseCard("The human woke up!", `That was tap ${game.budget}, after ${game.spotted} of the ${game.flock} birds. Too much tapping on the glass!`,
       [["Restart", () => { G.closeCard(); newRun(game.level, game.seed, true); }, true], ["New flock", () => { G.closeCard(); newRun(game.level); }], G.homeBtn()],
-      null, G.otherSize($("levelSel"), game.level, startLevel, "Or play a different level:"), {result: {n: game.level}});
+      null, G.otherSize($("levelSel"), game.level, startLevel, "Or play a different level:"), {result: {n: game.level}, sound: false});   // the launch played as they woke
   }, 700);
 }
 // Too many birds got away: the level's lost.
