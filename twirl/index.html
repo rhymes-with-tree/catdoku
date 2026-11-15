@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-15.9"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-15.10"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -24,7 +24,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-15.9">
+<link rel="stylesheet" href="../games.css?v=2026-11-15.10">
 <style>
 /* A play mat covered in satin ribbons; each one slides off the way its pointed end points, along its own path.
    Big mats zoom, and scroll inside their frame. */
@@ -118,8 +118,8 @@ body.full .peek{display:none}   /* Bugsy's corner of the mat moves about in full
 
 </main>
 
-<script src="../games.js?v=2026-11-15.9"></script>
-<script src="../colorways.js?v=2026-11-15.9"></script>
+<script src="../games.js?v=2026-11-15.10"></script>
+<script src="../colorways.js?v=2026-11-15.10"></script>
 <script>
 const $ = G.$;
 G.nav("twirl");
@@ -132,14 +132,15 @@ G.nav("twirl");
 // and winding, then all three on the biggest mat: 21 ribbons pointed at both ends (`both`, a share of the ribbons), 22
 // ribbons crossing over and under (`cross`, how many crossings), 23 ribbons tied together in
 // pairs (`knots`, how many), and 24 all three. Then (the owner's picks, 2026-11-15) 25 tiny ribbons, 2 to 4 squares
-// long; 26 a mat bigger than the screen (40 × 60, which opens zoomed in); and 27 every ribbon in one colour.
+// long; 26 a mat bigger than the screen (40 × 60, which never zooms out far enough to show it all, so you scroll round
+// it); 27 every ribbon in one colour; and 28 thin ribbons, drawn as pointed lines.
 // ROLL (100) is a band of Endless: 18 across and 9 down, no ribbon pointing down (see "Endless" below).
 function params(n) {
   if (n === 0) return {W: 9, H: 14, shapes: 0.35, minLen: 3, maxLen: 8, straight: 0.5, ease: 0.6};
   if (n === 100) return {W: 18, H: 9, shapes: 0.2, minLen: 3, maxLen: 10, straight: 0.45, ease: 0.3, roll: true, both: 0, cross: 0, knots: 0};
   if (n > 20) {
     const e = [{W: 22, both: 0.3}, {W: 24, cross: 24}, {W: 26, knots: 14}, {W: 28, both: 0.15, cross: 16, knots: 10},
-               {W: 28, minLen: 2, maxLen: 4, shapes: 0, straight: 0.5}, {W: 40}, {W: 28, one: true}][n - 21];
+               {W: 28, minLen: 2, maxLen: 4, shapes: 0, straight: 0.5}, {W: 40}, {W: 28, one: true}, {W: 28, thin: true}][n - 21];
     return {...params(20), both: 0, cross: 0, knots: 0, ...e, H: Math.round(e.W * 1.5)};
   }
   const t = (n - 1) / 19, W = Math.round(18 + 10 * t);
@@ -322,7 +323,7 @@ function makeTwirl(n) {
   for (;;) {
     const s = settle(cover()); if (!s) continue;
     if (o.roll && s.rb.some(r => r.dir === 2)) continue;
-    const d = {n, W, H, ribbons: s.rb, cross: s.cross.map(x => [x.cell, x.top, x.under]), knots: [], ...(o.one ? {one: true} : {})};
+    const d = {n, W, H, ribbons: s.rb, cross: s.cross.map(x => [x.cell, x.top, x.under]), knots: [], ...(o.one ? {one: true} : {}), ...(o.thin ? {thin: true} : {})};
     if (o.both) for (const r of d.ribbons) if (r.cells.length >= 3 && Math.random() < o.both) r.both = true;
     if (o.knots) tie(d, o.knots);
     const order = playOrder(d);   // played through once more, from scratch, as the player would
@@ -393,23 +394,29 @@ function dress(d, from = 0) {
   const tops = new Set((d.cross || []).map(x => x[1]));
   const one = d.one && (d.oneLook || (d.oneLook = (() => { const ramp = Math.floor(Math.random() * RAMPS.length); return {ramp, solid: rampAt(RAMPS[ramp], 0.55)}; })()));
   if (!from) d.looks = [];
-  ribbons.forEach((r, k) => {
-    if (k < from) return;
-    if (one) { d.looks[k] = {...one, ombre: false, twist: !tops.has(k) && mainTwist, phase: Math.random() * 6, both: !!r.both}; return; }
-    const near = new Set(r.cells.flatMap(i => [i - W, i + W, i % W ? i - 1 : -1, (i + 1) % W ? i + 1 : -1]).map(j => owner.get(j)).filter(o => o !== undefined && o < k));
+  // a colourway as different as can be from the ribbons already dressed that it touches
+  const pickColour = k => {
+    const near = new Set(ribbons[k].cells.flatMap(i => [i - W, i + W, i % W ? i - 1 : -1, (i + 1) % W ? i + 1 : -1]).map(j => owner.get(j)).filter(o => o !== undefined && o < k));
     let best = null, bestD = -1;
     for (let t = 0; t < 10; t++) {
       const ramp = Math.floor(Math.random() * RAMPS.length), at = 0.35 + Math.random() * 0.5, solid = rampAt(RAMPS[ramp], at);
       const dist = Math.min(9, ...[...near].map(o => labDist(solid, d.looks[o].solid)));
       if (dist > bestD) { bestD = dist; best = {ramp, solid}; }
     }
+    return best;
+  };
+  ribbons.forEach((r, k) => {
+    if (k < from) return;
+    if (one) { d.looks[k] = {...one, ombre: false, twist: !tops.has(k) && mainTwist, phase: Math.random() * 6, both: !!r.both}; return; }
+    // level 28's thin ribbons are pointed lines, never twisty
+    if (d.thin) { d.looks[k] = {...pickColour(k), ombre: Math.random() < ombre, twist: false, thin: true, phase: 0, both: !!r.both}; return; }
     // a ribbon lying across another is flat, so it reads as on top (a twist would narrow to nothing just there)
-    d.looks[k] = {...best, ombre: Math.random() < ombre, twist: !tops.has(k) && (Math.random() < other ? !mainTwist : mainTwist), phase: Math.random() * 6, both: !!r.both};
+    d.looks[k] = {...pickColour(k), ombre: Math.random() < ombre, twist: !tops.has(k) && (Math.random() < other ? !mainTwist : mainTwist), phase: Math.random() * 6, both: !!r.both};
   });
 }
 
 /* ---------- playing ---------- */
-const STORE = "catdoku.twirl.v2", MAX_LEVEL = 27, ROLL = 100, HEARTS = 3, MAX_LIVES = 9;
+const STORE = "catdoku.twirl.v2", MAX_LEVEL = 28, ROLL = 100, HEARTS = 3, MAX_LIVES = 9;
 // Lives (G.lives): three at a time, up to nine on one mat
 const lives = G.lives({el: $("hearts"), of: () => S.d, per: HEARTS, max: MAX_LIVES, on: "level", sound: false, revived: () => { S.over = false; hud(); save(); }});
 // Turning off Twisty ribbons draws every ribbon flat, on every level. It's kept on this device.
@@ -433,7 +440,7 @@ function start(level, d) {
   S = {level, N: level, ...G.freshClock(), d, over: false};
   drawOrder = d.order.slice().reverse();   // a ribbon that goes later lies lower: one on top always goes before the one under it
   if (d.ms) { S.ms = d.ms; S.started = true; }
-  moving = []; tugs = []; zoom = d.W >= 40 ? 2.5 : 1;   // the huge mat opens zoomed in, at its middle
+  moving = []; tugs = []; zoom = 1;   // (the huge mat is held zoomed in by layout, and opens at its middle)
   $("levelSel").value = level;
   layout(); save(); hud(); G.note("");
   if (zoom > 1) { scroller.scrollLeft = (scroller.scrollWidth - scroller.clientWidth) / 2; scroller.scrollTop = (scroller.scrollHeight - scroller.clientHeight) / 2; }
@@ -447,7 +454,7 @@ function startLevel(level) {
   G.track(`Twirl level ${level} started`);
   return build.take(level).then(d => { loading = false; start(level, d); build.prefetch(Math.min(MAX_LEVEL, level + 1)); });
 }
-const NEW_AT = {21: "pointed both ways", 22: "crossing", 23: "tied together", 24: "all three", 25: "tiny ribbons", 26: "huge mat", 27: "one colour"};
+const NEW_AT = {21: "pointed both ways", 22: "crossing", 23: "tied together", 24: "all three", 25: "tiny ribbons", 26: "huge mat", 27: "one colour", 28: "thin ribbons"};
 for (let n = 0; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(n === 0 ? "0 (biggest ribbons)" : NEW_AT[n] ? `${n} (${NEW_AT[n]})` : String(n), n));
 $("levelSel").append(new Option("∞ Endless", ROLL));
 $("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
@@ -713,7 +720,7 @@ function samples(pts, step) {
 function drawRibbon(g, pts, look, flash) {
   if (pts.length < 2) return;
   if (look.twist && !prefs.twisty) look = {...look, twist: false};
-  const w = U * 0.4, P = samples(pts, look.twist || look.ombre ? 1.5 : 3), n = P.length, ramp = RAMPS[look.ramp];
+  const w = U * (look.thin ? 0.12 : 0.4), P = samples(pts, look.twist || look.ombre ? 1.5 : 3), n = P.length, ramp = RAMPS[look.ramp];
   let colAt = i => look.ombre ? rampAt(ramp, 0.12 + 0.85 * (look.rev ? n - 1 - i : i) / Math.max(1, n - 1)) : look.solid;
   if (flash) { const base = colAt; colAt = i => mix(base(i), "#FFFFFF", 0.55); }
   g.lineJoin = "round";
@@ -751,9 +758,9 @@ function drawRibbon(g, pts, look, flash) {
   }
   // the tip, cut to a point (and the tail too, on a ribbon pointed both ways)
   const point = (e, f) => {
-    const [hx, hy] = P[e], [qx, qy] = P[f], l = Math.hypot(hx - qx, hy - qy) || 1, fx = (hx - qx) / l, fy = (hy - qy) / l, half = w / 2;
-    const col = colAt(e);
-    g.beginPath(); g.moveTo(hx - fy * half, hy + fx * half); g.lineTo(hx + fx * w * 1.3, hy + fy * w * 1.3); g.lineTo(hx + fy * half, hy - fx * half); g.closePath();
+    const [hx, hy] = P[e], [qx, qy] = P[f], l = Math.hypot(hx - qx, hy - qy) || 1, fx = (hx - qx) / l, fy = (hy - qy) / l;
+    const half = Math.max(w / 2, U * 0.14), long = Math.max(w * 1.3, U * 0.34), col = colAt(e);   // a thin ribbon still gets a proper point
+    g.beginPath(); g.moveTo(hx - fy * half, hy + fx * half); g.lineTo(hx + fx * long, hy + fy * long); g.lineTo(hx + fy * half, hy - fx * half); g.closePath();
     g.fillStyle = col; g.fill(); g.strokeStyle = mix(col, "#2A2530", 0.45); g.lineWidth = 1; g.stroke();
   };
   point(n - 1, Math.max(0, n - 3));
@@ -850,12 +857,19 @@ function room() {
   if (G.sideways()) return [scroller.parentElement.clientWidth - 6, window.innerHeight - 12 - scroller.offsetTop - 6 - zb];
   return [scroller.parentElement.clientWidth - 6, window.innerHeight * 0.78 - 6 - zb];
 }
+// Level 26's huge mat never zooms out to show it all: its squares stay at least 26 pixels (zMin), so you scroll round
+// it, and it has no Fit.
+let zMin = 1, zMax = 4;
 function layout(keep) {
   if (!S) return;
   const [aw, ah] = room(), was = side;
   side = full() && Math.min(aw / matH(), ah / matW()) > Math.min(aw / matW(), ah / matH()) * 1.05;
   if (side !== was) { zoom = 1; keep = null; keys.hide(); }
-  const cssW = Math.min(aw, ah * shownW() / shownH()) * zoom, cssH = cssW * shownH() / shownW();
+  const fitW = Math.min(aw, ah * shownW() / shownH()), huge = S.d.W >= 40;
+  zMin = huge ? Math.max(1, 26 / (fitW / shownW())) : 1; zMax = Math.max(4, zMin * 1.8);
+  zoom = Math.max(zMin, Math.min(zMax, zoom));
+  const fitBtn = zoomer.el.querySelector("button.word"); if (fitBtn) fitBtn.style.display = huge ? "none" : "";
+  const cssW = fitW * zoom, cssH = cssW * shownH() / shownW();
   const before = keep && canvas.clientWidth && {fx: (scroller.scrollLeft + keep.x) / canvas.clientWidth, fy: (scroller.scrollTop + keep.y) / canvas.clientHeight};
   scroller.style.height = `${Math.min(cssH, ah) + 6}px`;
   scroller.style.width = zoomer.el.style.width = full() ? `${Math.min(cssW, aw) + 6}px` : "";
@@ -865,10 +879,10 @@ function layout(keep) {
   scale = canvas.width / (shownW() * U);
   if (before) { scroller.scrollLeft = before.fx * cssW - keep.x; scroller.scrollTop = before.fy * cssH - keep.y; }
   paintStill();
-  zoomer.can(zoom < 4, zoom > 1, zoom !== 1);
+  zoomer.can(zoom < zMax - 0.01, zoom > zMin + 0.01, zoom > zMin + 0.01);
 }
 function setZoom(z, at) {
-  z = Math.max(1, Math.min(4, z));
+  z = Math.max(zMin, Math.min(zMax, z));
   if (!S || Math.abs(z - zoom) < 0.01) return;
   zoom = z; layout(at || {x: scroller.clientWidth / 2, y: scroller.clientHeight / 2});
 }
@@ -877,7 +891,7 @@ window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer
 // zoom and full screen under the mat's corner (G.zoom), as the mat at Fit can't be moved from under them, with Hint
 // in the middle of that line (decided 2026-11-08), to take less room
 zoomer = G.zoom({at: $("wrap"), below: true, mid: $("hintBtn"), zoomIn: () => setZoom(zoom * 1.5), zoomOut: () => setZoom(zoom / 1.5),
-  more: {label: "Fit", name: "Fit the whole mat", fn: () => setZoom(1)}, full: {name: "Twirl", change: () => layout()}});
+  more: {label: "Fit", name: "Fit the whole mat", fn: () => setZoom(zMin)}, full: {name: "Twirl", change: () => layout()}});
 zoomer.can(true, false, false);
 $("wrap").insertBefore(zoomer.el, $("overlay"));
 // A square as shown (x across, y down) and on the mat, which differ when the mat lies sideways; and a point
