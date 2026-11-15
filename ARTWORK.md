@@ -41,12 +41,10 @@ ones no game uses yet). A sound from another library gets a line here too: where
 - `sounds/fabric-grab-07.mp3`: "Clothes/fabric grab" by takimeko, https://freesound.org/s/846612/ (15.66–15.97 s), CC0
 - `sounds/hiss-2.mp3`: "Cat hissing" by ken788, https://freesound.org/s/386738/ (101.19–102.33 s), CC0
 - `sounds/mew.mp3`: "Cat purr chirp" by dreamstobecome, https://freesound.org/s/535318/ (3.66–4.32 s), CC0
-- `sounds/mrrow-01.mp3`: "Cat purr chirp" by dreamstobecome, https://freesound.org/s/535318/ (5.08–5.69 s), CC0
 - `sounds/purr-kitty.mp3`: "Kitty purr" by xoiziox, https://freesound.org/s/553375/ (0–6.95 s), CC0
 - `sounds/purr-soundmary.mp3`: "Cat purr" by soundmary, https://freesound.org/s/194926/ (1.28–3.03 s), CC0
 - `sounds/splash-01.mp3`: "Splash 3" by rombart, https://freesound.org/s/186746/ (0–0.36 s), CC0
 - `sounds/squeak.mp3`: "Cat chirps" by tyler31898, https://freesound.org/s/634174/ (34.91–36.04 s), CC0
-- `sounds/toy-jingle-02.mp3`: "Cat toy" by tripjazz, https://freesound.org/s/676536/ (2.03–2.49 s), CC0
 - `sounds/toy-jingle-08.mp3`: "Cat toy" by tripjazz, https://freesound.org/s/676536/ (8.22–9.12 s), CC0
 - `sounds/yawn-snore.mp3`: "Cat purring and yawning" by daphne_in_wonderland, https://freesound.org/s/383473/ (59.15–64.74 s), CC0
 
