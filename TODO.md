@@ -45,7 +45,7 @@ Knock It Off's forgiving first two levels, and Pounce saving while toys fall):
   moves on level N"). Look again with a few weeks of it.
 - [ ] **Weak level 1s to watch** (small samples): Cat Pile 16 → 7, Scratch That 17 → 8, Window Ledges 11 → 5, Kitten
   Caboodle 10 → 5.
-- [ ] **Somewhere to go past the hardest level.** Toy Box's level 21 is a fifth of its starts; Twirl and Knock It Off
+- [ ] **Somewhere to go past the hardest level.** (Twirl has levels 21 to 24 since 2026-11-15.) Toy Box's level 21 is a fifth of its starts; Twirl and Knock It Off
   at 20 are the same.
 
 ### The owner's notes on the list, and what was decided (2026-11-12)
@@ -92,10 +92,10 @@ cats that point their own way are Day Light (`daylight/`, in beta).
     fast ball (the toys ride in spaces that all move together, so it would be stuck behind the toy in front), Laya
     asleep on the track, a basket with a lid that opens after a lap, a gate on the track that holds toys back until
     it's tapped, a side pocket that keeps one toy off the track, and a reverse switch.
-  - Twirl, picked (2026-11-15): knotted ribbons (two tied together slide only once both are free), ribbons that cross
-    over and under (the top one goes first), ribbons pointed at both ends (tap an end to pick the way), a sleeping cat
-    in the way who moves to a new spot every few ribbons, and a kitten who bats a ribbon part of the way along every
-    few taps. Not picked: bows, shaped mats.
+  - Twirl: levels 21 to 24 built 2026-11-15: ribbons pointed at both ends, ribbons crossing over and under, knots,
+    then all three (README, Twirl). The owner to play them on a phone: whether the knots and crossings show well enough
+    at Fit on the big mats, and how hard 24 is. Not now (the owner, 2026-11-15): the sleeping cat that moves and the
+    kitten who bats a ribbon. Not picked: bows, shaped mats.
 - [ ] **Zen:** look for more games that could have one (Pounce on Three and Bubbles do).
 
 ## Star cats decided, waiting for pictures
