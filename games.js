@@ -1965,14 +1965,14 @@ const G = (() => {
     atlas: [["style", "Answer", "How you answer", "list", {icon: "chat", opts: [["pick", "Pick from 4 names"], ["list", "Type, with a list to choose from"], ["type", "Type it, no help"]],
       short: {pick: "4 Choices", list: "Full List", type: "Just Type"}}]],
   };
-  const SLOWS = ["birdwatch", "tailchase", "windup", "lmnopom", "pounceup"], UNTIMED = ["keyboardcat"];
+  const SLOWS = ["birdwatch", "tailchase", "windup", "lmnopom", "pounceup"];
   const timerHidden = slug => { const t = load(TIMERS)[slug]; return t === undefined ? !!load(PREFS).hideTimer : !!t; };
   const SETTINGS = {};
   for (const [, slug] of GAMES) {
     const list = (SET_LIST[slug] || []).map(([key, name, line, def, more]) => Object.assign({slug, key, name, line, def}, more));
     if (SLOWS.includes(slug)) list.unshift({slug, key: "slower", name: "Slower", line: "Everything moves at two-thirds speed", def: false, row: "speed",
       get: () => !!load(SLOWER)[slug], set: v => { const all = load(SLOWER); all[slug] = v; save(SLOWER, all); }});
-    if (!UNTIMED.includes(slug)) list.unshift({slug, key: "timer", name: "Timer", line: "", def: true, row: "timers",
+    list.unshift({slug, key: "timer", name: "Timer", line: "", def: true, row: "timers",
       get: () => !timerHidden(slug), set: v => { const all = load(TIMERS); all[slug] = !v; save(TIMERS, all); }});
     list.push({slug, key: "sound", name: "Sound", line: "Sound effects", def: true, row: "sound",
       get: () => soundOn(slug), set: v => { const all = load(SOUND); if (v) delete all[slug]; else all[slug] = false; save(SOUND, all); }});
