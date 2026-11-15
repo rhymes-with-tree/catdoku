@@ -1863,7 +1863,7 @@ const G = (() => {
       magnet: t => { tick(t, .3, 1800); tone({fs: [[0, 140], [.1, 70]], t, dur: .12, vol: .1}); noise({t, dur: .08, vol: .05, type: "lowpass", f: 400}); },   // a magnet put on: a click
       catWakes: later("yawn-snore"),   // a cat wakes up: a yawn and a snore (a recording; the made big yawn is out: the owner hates it)
       catSettles: t => purr(t),   // a cat settles in to nap: a soft purr
-      catCheers: later("chirp-purr-04"),   // a cat cheers: a chirp-purr (a recording)
+      catCheers: later("chirp-purr-02"),   // a cat cheers: Chirp-purr 2 (a recording; Chirp-purr 4 until the owner swapped it, 2026-11-15)
       catFound: later("chirp-06"),   // a cat found or freed: a chirp (a recording)
       catRuns: t => { for (let i = 0; i < 10; i++) thump(t + i * .07, .1, 170 + (i % 2) * 25); },   // a pitter-patter run
       catPounce: t => tone({fs: [[0, 260], [.14, 620]], t, dur: .14, vol: .2, a: .01}),   // a soft boing
