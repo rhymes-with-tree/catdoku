@@ -102,7 +102,8 @@ cats that point their own way are Day Light (`daylight/`, in beta).
 - [ ] **Wind Up: levels 13 to 20** built 2026-11-15 (catnip, rubber balls, loose yarn, springs, sticky tape, a tipping
   basket, no peeking, hurry; README, Wind Up). The owner to play them: whether springs tangle too often or too seldom
   (`TANGLE`, one in eight), how fast yarn unravels (`UNRAVEL`, 7 seconds a size), how far the basket tips (`TIP`), and
-  whether 3 seconds is the right hurry. Balanced so far only with a bot that never uses helpers.
+  whether 3 seconds is the right hurry. Balanced so far only with a bot that never uses helpers. Also Endless (zoom
+  out each time the top size is wound): whether one Shake a run is right, and whether its basket should be deeper.
 - [ ] **Zen:** look for more games that could have one (Pounce on Three and Bubbles do).
 
 ## Star cats decided, waiting for pictures

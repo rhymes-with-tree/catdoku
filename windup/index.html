@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-15.14"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-15.15"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -24,7 +24,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-15.14">
+<link rel="stylesheet" href="../games.css?v=2026-11-15.15">
 <style>
 /* Gus sits on the rim of a basket and drops balls of yarn into it; two of a kind that touch wind into one bigger
    ball. Peanut watches from the corner with the next ball. Don't let the yarn pile up over the line. */
@@ -111,8 +111,8 @@ body.full .zoombox{width:auto;margin:0;display:flex;grid-column:3;grid-row:5;ali
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-15.14"></script>
-<script src="../colorways.js?v=2026-11-15.14"></script>
+<script src="../games.js?v=2026-11-15.15"></script>
+<script src="../colorways.js?v=2026-11-15.15"></script>
 <script>
 /* ---------- the basket ---------- */
 // World units: the basket is W wide and H deep; Gus sits CAT above its rim. Ten sizes of yarn ball, each winding up
@@ -154,13 +154,27 @@ const LV = [null,
   {goal: 10, pool: 5, line: 100, pom: [0, 0], shape: "ledges", net: true, tall: 90, nopeek: true},
   {goal: 10, pool: 5, line: 100, pom: [0, 0], shape: "slope+ledge", net: true, tall: 90, hurry: 3}];
 const GOALS = LV.map(v => v && v.goal), MAX_LEVEL = LV.length - 1;
+// Endless (the owner's idea, 2026-11-15): no top. Each time the biggest ball there's room for is wound (a 10 at first),
+// the basket zooms out a step: every ball keeps its number but is drawn and rolls a size smaller (rad), the smallest
+// shrink away to nothing, and the drops start a size higher (2 to 6, then 3 to 7…), with the next zoom at an 11, then
+// a 12. It ends when the yarn piles over the line; one Shake to keep going is allowed. g.tier counts the zooms.
+const ENDLESS = 99;
+LV[ENDLESS] = {goal: 10, pool: 5, line: 100, pom: [0, 0], shape: "", tall: 60, endless: true};
+const isEndless = g => !!(g && LV[g.level].endless);
+const tierOf = () => (game && game.tier) || 0;
+const rad = l => RAD[Math.max(0, Math.min(MAXL, l - tierOf()))];   // a ball's size on screen and in the basket
+const colorOf = l => COLOR[(l - 1) % MAXL + 1];   // past 10 the colours come round again (the size they share is long gone)
+const pts = l => l * (l + 1) / 2;
+const topL = () => MAXL + tierOf();   // the biggest ball there is now
+const goalOf = g => isEndless(g) ? topL() : GOALS[g.level];
+const aN = n => (/^(8|11|18)/.test(String(n)) ? "an " : "a ") + n;   // "an 11", "a 12"
 // Levels 10 to 12 have a floor that can be dropped: once the yarn in the basket weighs enough, it's a net for a few
 // seconds, the basket is shaken, and the small balls (sizes 1 to 3) fall through. It counts as a helper (see FREE).
 const hasNet = g => !!LV[g.level].net;
 const NET_AT = .36, NET_FOR = 3, NET_HOLE = RAD[3];   // the floor can drop once the basket is this full, is a net this many seconds, and lets balls up to size 3 through
 const SHAPE_WORDS = {slope: "sloped floor", slopeR: "sloped floor", hump: "hump", ledge: "ledge", ledgeR: "ledge", ledges: "ledges", round: "round corners", springs: "springs", tape: "sticky tape"};
 const NEW_WORDS = {nip: "catnip", rub: "rubber balls", unr: "unravelling yarn", tip: "a basket that tips", nopeek: "no peeking", hurry: "hurry!"};
-const levelName = n => { const v = LV[n], bits = [...new Set(v.shape.split("+").filter(Boolean).map(k => SHAPE_WORDS[k]))]; for (const k in NEW_WORDS) if (v[k]) bits.unshift(NEW_WORDS[k]); if (v.pom[0]) bits.push("fluffballs"); if (v.net && n <= 12) bits.push("drop the floor");
+const levelName = n => { if (n === ENDLESS) return "Endless"; const v = LV[n], bits = [...new Set(v.shape.split("+").filter(Boolean).map(k => SHAPE_WORDS[k]))]; for (const k in NEW_WORDS) if (v[k]) bits.unshift(NEW_WORDS[k]); if (v.pom[0]) bits.push("fluffballs"); if (v.net && n <= 12) bits.push("drop the floor");
   return `Level ${n} · size ${v.goal} ball` + (bits.length ? ", " + bits.join(", ") : ""); };
 // The shapes in the basket: a line of points with a half-thickness (a single point is a round peg), and for the corners
 // (net: part of the floor, which turns to net with it when the floor is dropped)
@@ -235,7 +249,7 @@ function sprite(l, p) {
   if (set[l]) return set[l];
   if (p) return fluffSprite(l, set);
   const svg = ballEl("svg", {viewBox: "-1.05 -1.05 2.1 2.1", width: 256, height: 256}); svg.append(ballDefs());
-  const g = yarnBall(COLOR[l], 1); g.removeChild(g.firstChild);   // the ground shadow isn't wanted on a ball that turns
+  const g = yarnBall(colorOf(l), 1); g.removeChild(g.firstChild);   // the ground shadow isn't wanted on a ball that turns
   svg.append(g);
   const im = new Image(); im.onload = () => { im.ok = true; paintHud(); };
   im.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(new XMLSerializer().serializeToString(svg));
@@ -261,6 +275,7 @@ const FREE = 3;
 const pawGone = g => (g.helps || 0) > FREE || !!g.revived;
 // One more helper used: count it, and say what it did (`did`) with how many free ones are left.
 function helped(g, did) {
+  if (isEndless(g)) { G.note(did, 2500); return; }   // no gold paw to lose in Endless
   g.helps = (g.helps || 0) + 1;
   const left = FREE - g.helps;
   G.note(did + (g.revived ? "" : left > 0 ? ` ${left} more helper${left === 1 ? "" : "s"} before it costs the gold paw.` : left === 0 ? " One more helper costs the gold paw." : left === -1 ? " That costs the gold paw this time." : ""), 3500);
@@ -269,10 +284,11 @@ function helped(g, did) {
 const HELPERS = ["shakeBtn", "fluffBtn", "netBtn"];
 G.pawLost(() => !game || !!settings.tries[game.level] || pawGone(game), id => HELPERS.includes(id) && (game.helps || 0) < FREE);
 const cv = $("cv"), ctx = cv.getContext("2d");
-const nextOf = g => dropFor(g.seed, g.i, LV[g.level]);   // the ball Gus is holding
-const afterOf = g => dropFor(g.seed, g.i + 1, LV[g.level]);   // the one after it, beside Peanut
+const shifted = (d, g) => g.tier ? {...d, l: d.l + g.tier} : d;   // Endless: the drops start a size higher with each zoom
+const nextOf = g => shifted(dropFor(g.seed, g.i, LV[g.level]), g);   // the ball Gus is holding
+const afterOf = g => shifted(dropFor(g.seed, g.i + 1, LV[g.level]), g);   // the one after it, beside Peanut
 const save = () => G.save(STORE, {settings, game: game && ["running", "paused"].includes(game.state) ? {
-  level: game.level, seed: game.seed, i: game.i, score: game.score, best: game.best, ms: game.ms, started: game.started, timed: game.timed, shook: !!game.shook, fluffed: !!game.fluffed, dropped: !!game.dropped, helps: game.helps || 0, revived: !!game.revived,
+  level: game.level, seed: game.seed, i: game.i, score: game.score, best: game.best, ms: game.ms, started: game.started, timed: game.timed, shook: !!game.shook, fluffed: !!game.fluffed, dropped: !!game.dropped, helps: game.helps || 0, revived: !!game.revived, tier: game.tier || 0,
   balls: game.balls.map(b => [Math.round(b.x * 10) / 10, Math.round(b.y * 10) / 10, b.l, Math.round(b.a * 100) / 100, b.p ? 1 : 0, flagsOf(b)])} : null});
 // a ball's kind, in one number for saving: catnip 1, rubber 2, unravelling 4, unravelling from tape 8, stuck to tape 16
 const flagsOf = b => (b.nip ? 1 : 0) | (b.rub ? 2 : 0) | (b.unr ? 4 : 0) | (b.tu ? 8 : 0) | (b.stuck && b.tu ? 16 : 0);
@@ -293,13 +309,13 @@ function newGame(n, seed) {
   setTimeout(newThing, 400);
 }
 function closeCard() { G.closeCard(); }
-const aimRange = l => [RAD[l] + 2, W - RAD[l] - 2];
+const aimRange = l => [rad(l) + 2, W - rad(l) - 2];
 const clampAim = x => { const [a, b] = aimRange(nextOf(game).l); return Math.max(a, Math.min(b, x)); };
 
 function status() {
   $("score").textContent = `${game.score} points`;
-  $("goalTxt").textContent = `Wind a size ${GOALS[game.level]} ball`;
-  $("bestTxt").textContent = game.best ? `Biggest so far: ${game.best}` : "";
+  $("goalTxt").textContent = isEndless(game) ? `Wind ${aN(goalOf(game))} to zoom out` : `Wind a size ${GOALS[game.level]} ball`;
+  $("bestTxt").textContent = isEndless(game) ? `Best: ${Math.max(settings.endlessBest || 0, game.score)} points` : game.best ? `Biggest so far: ${game.best}` : "";
   G.relabel($("pauseBtn"), game.state === "paused" ? "Go on" : "Pause", game.state === "paused" ? "play" : "pause");
   $("shakeBtn").disabled = !["running", "won"].includes(game.state);   // a won basket can still be shaken, just for fun
   $("netBtn").hidden = !hasNet(game);
@@ -354,8 +370,8 @@ function dropFloor() {
 // yarn winds one size up), or "wind" (two the same, as ever). Rubber never winds with yarn, nor catnip with catnip.
 function pairing(a, c) {
   if (a.rub || c.rub) return a.rub && c.rub ? "pop" : "";
-  if (a.nip || c.nip) { const y = a.nip ? c : a; return !y.nip && !y.p && y.l < MAXL ? "nip" : ""; }
-  return a.l === c.l && a.p === c.p && a.l < (a.p ? POM_TOP + 1 : MAXL) ? "wind" : "";
+  if (a.nip || c.nip) { const y = a.nip ? c : a; return !y.nip && !y.p && y.l < topL() ? "nip" : ""; }
+  return a.l === c.l && a.p === c.p && a.l < (a.p ? POM_TOP + 1 : topL()) ? "wind" : "";
 }
 const UNRAVEL = 7, SPRING_V = 720, TANGLE = .12, TIP = .1, TIP_T = 9, TIP_FIT = .88;   // seconds a loose ball keeps a size; how hard a spring throws; how often it tangles; the tipping basket's lean (radians) and its swing (seconds)
 const wt = b => b.stuck ? 0 : 1 / (b.r * b.r);   // a stuck ball doesn't move
@@ -469,22 +485,22 @@ function mergeAll(g, pairs) {
     }
     if (how === "nip") {   // catnip: the ball of yarn winds one size up, and the catnip's used up
       const nip = a.nip ? a : c, y = a.nip ? c : a;
-      gone.add(nip); y.l++; y.r = RAD[y.l]; y.pop = .65; y.ut = 0;
-      g.score += PTS[y.l]; g.best = Math.max(g.best, y.l);
-      g.fx.push({x: y.x, y: y.y, r: y.r, t: 0, T: .45, c: "#6AA673", to: y}, {x: y.x, y: y.y, r: y.r, t: 0, T: .4, c: COLOR[y.l], to: y});
+      gone.add(nip); y.l++; y.r = rad(y.l); y.pop = .65; y.ut = 0;
+      g.score += pts(y.l); g.best = Math.max(g.best, y.l);
+      g.fx.push({x: y.x, y: y.y, r: y.r, t: 0, T: .45, c: "#6AA673", to: y}, {x: y.x, y: y.y, r: y.r, t: 0, T: .4, c: colorOf(y.l), to: y});
       made.push(y); continue;
     }
     const l = a.l + 1, x = (a.x + c.x) / 2, y = (a.y + c.y) / 2, p = a.p;
     gone.add(a); gone.add(c);
     const wind = {wind: true, l: a.l, p, x, y, ox: a.x - x, oy: a.y - y, pxo: c.x - x, pyo: c.y - y, a0: a.a, a1: c.a, t: 0, T: TUNE.WIND};
     g.fx.push(wind);
-    if (p && l > POM_TOP) { g.fx.push({x, y, r: RAD[a.l], t: 0, T: .4, c: "#9F9DA2"}); continue; }   // two of the biggest puffballs puff away
+    if (p && l > POM_TOP) { g.fx.push({x, y, r: rad(a.l), t: 0, T: .4, c: "#9F9DA2"}); continue; }   // two of the biggest puffballs puff away
     // winding a ball off the tape (or one wound from one) doesn't save it: the new ball unravels too. Loose yarn
     // (level 15) is saved by winding it.
     const nb = mk(x, y, l, {p, vx: (a.vx + c.vx) / 2 + (Math.random() - .5) * TUNE.MERGE_NUDGE, vy: (a.vy + c.vy) / 2, age: GRACE, pop: .65, born: 0, tu: !!(a.tu || c.tu)});
     made.push(nb); wind.to = nb;   // the swirl follows the new ball as it settles
-    if (!p) { g.score += PTS[l]; g.best = Math.max(g.best, l); }
-    g.fx.push({x, y, r: RAD[l], t: 0, T: .4, c: p ? "#9F9DA2" : COLOR[l], to: nb});
+    if (!p) { g.score += pts(l); g.best = Math.max(g.best, l); }
+    g.fx.push({x, y, r: rad(l), t: 0, T: .4, c: p ? "#9F9DA2" : colorOf(l), to: nb});
   }
   g.balls = g.balls.filter(b => !gone.has(b)).concat(made.filter(b => !g.balls.includes(b)));
   if (made.length) G.sound.play("wu.merge", {n: Math.max(...made.map(b => b.l))});
@@ -498,11 +514,11 @@ function unravelTick(g) {
     if (!b.unr && !b.tu) continue;
     if ((b.ut = (b.ut || 0) + STEP) < UNRAVEL) continue;
     b.ut = 0; lost = true;
-    if (b.l > 1) { b.l--; b.r = RAD[b.l]; b.pop = .8; } else { b.gone = true; g.fx.push({puff: true, l: 1, x: b.x, y: b.y, r: b.r, a: b.a, t: 0, T: .45, yarn: true}); }
+    if (b.l > 1) { b.l--; b.r = rad(b.l); b.pop = .8; } else { b.gone = true; g.fx.push({puff: true, l: 1, x: b.x, y: b.y, r: b.r, a: b.a, t: 0, T: .45, yarn: true}); }
   }
   if (lost) { g.balls = g.balls.filter(b => !b.gone); G.sound.play("wu.unravel"); }
 }
-function mk(x, y, l, o = {}) { return Object.assign({x, y, px: x, py: y, vx: 0, vy: 0, l, r: RAD[l], a: Math.random() * 6.28, w: 0, age: 0, pop: 1, p: false}, o); }
+function mk(x, y, l, o = {}) { return Object.assign({x, y, px: x, py: y, vx: 0, vy: 0, l, r: rad(l), a: Math.random() * 6.28, w: 0, age: 0, pop: 1, p: false}, o); }
 
 function tick(g, dt) {
   g.acc = (g.acc || 0) + Math.min(dt, .05);
@@ -523,7 +539,7 @@ function tick(g, dt) {
     const over = g.balls.some(b => b.age > GRACE && b.y - b.r < g.line);
     g.overT = over ? g.overT + STEP : Math.max(0, g.overT - STEP * 2);
     const tk = over ? Math.floor(g.overT / .3) : 0; if (tk && tk !== g.tickK) G.sound.play("wu.over", {k: tk}); g.tickK = tk;
-    if (g.best >= GOALS[g.level]) return win();
+    if (g.best >= goalOf(g)) return isEndless(g) ? zoomOut(g) : win();
     if (g.overT > LOSE_AFTER) return lose();
   }
 }
@@ -561,7 +577,7 @@ function drawBall(c, l, x, y, r, a, alpha = 1, p = false, k = "") {
   const im = sprite(l, p); if (!im.ok) { c.restore(); return; }
   if (k === "loose") {   // the loose end, trailing off
     c.beginPath(); c.moveTo(r * .55, r * .6); c.bezierCurveTo(r * 1.1, r * .9, r * .9, r * 1.35, r * 1.45, r * 1.4);
-    c.lineWidth = Math.max(2, r * .14); c.lineCap = "round"; c.strokeStyle = COLOR[l]; c.stroke();
+    c.lineWidth = Math.max(2, r * .14); c.lineCap = "round"; c.strokeStyle = colorOf(l); c.stroke();
   }
   const sz = r * 2 * 1.05; c.drawImage(im, -sz / 2, -sz / 2, sz, sz); c.restore();
 }
@@ -620,13 +636,13 @@ function paint() {
   // where the next ball will land
   const nb = nextOf(g), nl = nb.l, ax = clampAim(g.aim);
   if (["ready", "running"].includes(g.state)) {
-    ctx.save(); ctx.strokeStyle = "rgba(42,37,48,.18)"; ctx.lineWidth = 2; ctx.setLineDash([3, 7]); ctx.beginPath(); ctx.moveTo(ax, RAD[nl] * 2 + 2); ctx.lineTo(ax, H); ctx.stroke(); ctx.restore();
+    ctx.save(); ctx.strokeStyle = "rgba(42,37,48,.18)"; ctx.lineWidth = 2; ctx.setLineDash([3, 7]); ctx.beginPath(); ctx.moveTo(ax, rad(nl) * 2 + 2); ctx.lineTo(ax, H); ctx.stroke(); ctx.restore();
   }
   // a ball just wound up fades in as the two balls wind into it
   for (const b of g.balls) { drawBall(ctx, b.l, b.x, b.y, b.r * (.9 + .1 * b.pop), b.a, b.born < 1 ? Math.max(0, Math.min(1, (b.born - TUNE.WIND * .35) / (TUNE.WIND * .55))) : 1, b.p, kindOf(b)); if (!b.nip && !b.rub) drawNumber(ctx, b.l, b.x, b.y, b.r, b.p); }
   // two balls winding into each other: they swing round their middle, closing in and turning, as the bigger one comes up
   for (const f of g.fx) if (f.wind) {
-    const u = f.t / f.T, e = u * u * (3 - 2 * u), th = e * Math.PI * 2 * TUNE.WIND_TURNS, cs = Math.cos(th), sn = Math.sin(th), al = 1 - Math.max(0, (u - .5) / .5), r = RAD[f.l] * (1 - .25 * e);
+    const u = f.t / f.T, e = u * u * (3 - 2 * u), th = e * Math.PI * 2 * TUNE.WIND_TURNS, cs = Math.cos(th), sn = Math.sin(th), al = 1 - Math.max(0, (u - .5) / .5), r = rad(f.l) * (1 - .25 * e);
     const fx = f.to ? f.to.x : f.x, fy = f.to ? f.to.y : f.y;
     for (const [ox, oy, a0] of [[f.ox, f.oy, f.a0], [f.pxo, f.pyo, f.a1]]) drawBall(ctx, f.l, fx + (ox * cs - oy * sn) * (1 - e), fy + (ox * sn + oy * cs) * (1 - e), r, a0 + th * TUNE.WIND_SPIN, al, f.p);
   }
@@ -634,10 +650,10 @@ function paint() {
   for (const f of g.fx) if (!f.wind && !f.puff && f.t >= 0) { ctx.save(); ctx.globalAlpha = 1 - f.t / f.T; ctx.strokeStyle = f.c; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(f.to ? f.to.x : f.x, f.to ? f.to.y : f.y, f.r * (1 + (f.t / f.T) * (f.grow || .44)), 0, 7); ctx.stroke(); ctx.restore(); }
   if (["ready", "running"].includes(g.state)) {
     const nk = nb.k === "unr" ? "loose" : nb.k || "";
-    drawBall(ctx, nl, ax, RAD[nl] + 2, RAD[nl], 0, g.cool > 0 ? .25 : .85, nb.p, nk); if (g.cool <= 0 && !nb.k) drawNumber(ctx, nl, ax, RAD[nl] + 2, RAD[nl], nb.p);
+    drawBall(ctx, nl, ax, rad(nl) + 2, rad(nl), 0, g.cool > 0 ? .25 : .85, nb.p, nk); if (g.cool <= 0 && !nb.k) drawNumber(ctx, nl, ax, rad(nl) + 2, rad(nl), nb.p);
     // Hurry (level 20): a ring round the ball Gus holds runs down until he drops it himself
     const hu = LV[g.level].hurry; if (hu && g.state === "running" && g.cool <= 0) { const f = Math.max(0, 1 - (g.wait || 0) / hu);
-      ctx.save(); ctx.lineWidth = 4; ctx.lineCap = "round"; ctx.strokeStyle = f < .35 ? "#BD5538" : "#E16A4A"; ctx.beginPath(); ctx.arc(ax, RAD[nl] + 2, RAD[nl] + 6, -Math.PI / 2, -Math.PI / 2 + f * Math.PI * 2); ctx.stroke(); ctx.restore(); }
+      ctx.save(); ctx.lineWidth = 4; ctx.lineCap = "round"; ctx.strokeStyle = f < .35 ? "#BD5538" : "#E16A4A"; ctx.beginPath(); ctx.arc(ax, rad(nl) + 2, rad(nl) + 6, -Math.PI / 2, -Math.PI / 2 + f * Math.PI * 2); ctx.stroke(); ctx.restore(); }
   }
   // the basket: woven wicker walls round the sides and floor (gold, a quarter ink), outlined in ink, the tops of the
   // sides rounded off as its rim
@@ -660,15 +676,15 @@ function paint() {
 }
 function paintHud() {
   const af = game ? afterOf(game) : {l: 1, p: false};
-  for (const [id, l, p, k] of [["nextCv", af.l, af.p, af.k === "unr" ? "loose" : af.k || ""], ["goalCv", game ? GOALS[game.level] : 6, false, ""]]) {
-    const c = $(id).getContext("2d"), im = sprite(l, p), s = id === "goalCv" ? 92 : 92 * (RAD[l] / RAD[5]) ** .85;
+  for (const [id, l, p, k] of [["nextCv", af.l, af.p, af.k === "unr" ? "loose" : af.k || ""], ["goalCv", game ? goalOf(game) : 6, false, ""]]) {
+    const c = $(id).getContext("2d"), im = sprite(l, p), s = id === "goalCv" ? 92 : 92 * (rad(l) / RAD[5]) ** .85;
     c.clearRect(0, 0, 92, 92);
     if (id === "nextCv" && game && LV[game.level].nopeek) {   // level 19: no peeking at the next ball
       c.beginPath(); c.arc(46, 46, 30, 0, 7); c.fillStyle = "#EEE6D6"; c.fill(); c.lineWidth = 3; c.strokeStyle = "#2A2530"; c.stroke();
       c.font = '800 34px "Baloo 2", sans-serif'; c.textAlign = "center"; c.textBaseline = "middle"; c.fillStyle = "#2A2530"; c.fillText("?", 46, 49);
       continue;
     }
-    if (im.ok) { const d = Math.min(92, id === "goalCv" ? 92 * (RAD[l] / RAD[MAXL]) ** .5 : s); if (k) drawBall(c, l, 46, 46, d / 2 / 1.05, 0, 1, p, k); else c.drawImage(im, 46 - d / 2, 46 - d / 2, d, d); if (!k || k === "loose") drawNumber(c, l, 46, 46, d / 2, p); }
+    if (im.ok) { const d = Math.min(92, id === "goalCv" ? 92 * (rad(l) / RAD[MAXL]) ** .5 : s); if (k) drawBall(c, l, 46, 46, d / 2 / 1.05, 0, 1, p, k); else c.drawImage(im, 46 - d / 2, 46 - d / 2, d, d); if (!k || k === "loose") drawNumber(c, l, 46, 46, d / 2, p); }
   }
 }
 addEventListener("resize", paint);
@@ -680,7 +696,7 @@ function drop(hurried) {
   g.wait = 0; if (hurried) G.note("Too slow! Gus dropped it.", 1500);
   if (g.state === "ready") { if (!g.started) G.track(`Wind Up started level ${g.level}`); g.state = "running"; g.started = true; $("tapgo").hidden = true; }
   const {l, p, k} = nextOf(g);
-  g.balls.push(mk(clampAim(g.aim), RAD[l] + 2, l, {p, nip: k === "nip", rub: k === "rub", unr: k === "unr", vy: 60, vx: (Math.random() - .5) * TUNE.DROP_NUDGE, drop: true})); g.i++; g.cool = COOL; G.sound.play("wu.drop");
+  g.balls.push(mk(clampAim(g.aim), rad(l) + 2, l, {p, nip: k === "nip", rub: k === "rub", unr: k === "unr", vy: 60, vx: (Math.random() - .5) * TUNE.DROP_NUDGE, drop: true})); g.i++; g.cool = COOL; G.sound.play("wu.drop");
   status(); paintHud(); save();
 }
 function aimTo(e) {
@@ -742,6 +758,7 @@ document.addEventListener("visibilitychange", () => { if (document.hidden) pause
 // Going over the line: a card offers Shake or De-fluff to keep going (either costs the gold paw), or starting again.
 // The try only counts, and a win streak only ends, once the player gives up on this basket.
 function lose() {
+  if (isEndless(game)) return endlessOver(game);
   game.state = "lost"; status();
   G.track(`Wind Up overflowed on level ${game.level}`);
   const g = game;
@@ -755,6 +772,31 @@ function lose() {
       [...keepOn, ["Try again", () => { closeCard(); giveUp(g); newGame(g.level, g.seed); }], ["New basket", () => { closeCard(); giveUp(g); newGame(g.level); }],
        ["Admire the mess", () => { closeCard(); giveUp(g); G.breakStreak(); G.note("Tap Restart to try again.", 0); }], G.homeBtn()],
       null, G.otherSize($("levelSel"), g.level, n => { giveUp(g); startLevel(n); }, "Or play a different level:"), {result: {n: g.level}});
+  }, 700);
+}
+// Endless: a zoom, and the end of a run
+function zoomOut(g) {
+  g.tier = (g.tier || 0) + 1;
+  const top = g.balls.find(b => b.l === g.best && !b.p);
+  for (const b of g.balls.filter(b => b.l <= g.tier)) g.fx.push({puff: true, l: b.l, x: b.x, y: b.y, r: b.r, a: b.a, t: 0, T: .5, yarn: true});   // too small to see now
+  g.balls = g.balls.filter(b => b.l > g.tier);
+  for (const b of g.balls) { b.r = rad(b.l); b.pop = .75; b.age = Math.min(b.age, 0); }
+  if (top) ["#ECA818", "#E16A4A", "#B94588"].forEach((c, k) => g.fx.push({x: top.x, y: top.y, r: top.r, t: -k * .2, T: .9, c, grow: 2}));
+  g.overT = 0; G.sound.play("wu.goal"); G.track(`Wind Up endless zoom ${g.tier}`);
+  G.note(`Zoomed out! A size ${g.best} ball. Drops now start at size ${g.tier + 1}; next zoom at ${aN(goalOf(g))}.`, 4500);
+  status(); paintHud(); save();
+}
+function endlessOver(g) {
+  g.state = "lost"; status();
+  const best = settings.endlessBest = Math.max(settings.endlessBest || 0, g.score); save();
+  G.track(`Wind Up endless over at ${g.tier || 0} zooms`);
+  setTimeout(() => {
+    if (game !== g) return;
+    const btns = [];
+    if (!g.revived) btns.push(["Shake and keep going (once a run)", () => { closeCard(); revive(g, "shake"); }, true]);
+    btns.push(["New run", () => { closeCard(); G.breakStreak(); newGame(ENDLESS); }, !!g.revived], ["Back to the levels", () => { closeCard(); startLevel(settings.lastLevel || 1); }]);
+    G.loseCard("Over the line!", `${g.score} points, up to a size ${g.best || 1} ball${g.tier ? `, zoomed out ${g.tier} time${g.tier > 1 ? "s" : ""}` : ""}. ` + (g.score && g.score >= best ? "Your best yet!" : `Your best is ${best}.`),
+      btns, null, null, {result: {n: null}});
   }, 700);
 }
 function giveUp(g) { if (!g.counted) { g.counted = true; settings.tries[g.level] = (settings.tries[g.level] || 0) + 1; save(); } }
@@ -784,12 +826,12 @@ function win() {
        top: g.level === MAX_LEVEL, onAdmire: () => G.note("Shake the basket all you like now, and watch what winds up.", 0), after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
   }, 1700);
 }
-function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); closeCard(); newGame(n); }
+function startLevel(n) { if (n !== ENDLESS) settings.lastLevel = n; settings.level = n; $("levelSel").value = n; save(); closeCard(); newGame(n); }
 const leave = () => { if (["running", "paused"].includes(game.state)) { settings.tries[game.level] = (settings.tries[game.level] || 0) + 1; save(); } else if (game.state === "lost") giveUp(game); closeCard(); };
 $("restartBtn").onclick = () => { if (game) { leave(); newGame(game.level, game.seed); } };
 $("newBtn").onclick = () => { if (game) { leave(); newGame(game.level); } };
 // Share: the level and the order the yarn comes in, as dealt.
-$("linkBtn").onclick = () => { if (game) { pause(); G.shareCard({name: "Wind Up", what: "basket", won: game.state === "won", puzzle: () => ({g: "windup", N: game.level, s: game.seed})}); } };
+$("linkBtn").onclick = () => { if (game && isEndless(game)) { G.note("An Endless run can't be shared, but any level can.", 3500); return; } if (game) { pause(); G.shareCard({name: "Wind Up", what: "basket", won: game.state === "won", puzzle: () => ({g: "windup", N: game.level, s: game.seed})}); } };
 function openShared(d) {
   if (!(d.N >= 1 && d.N <= MAX_LEVEL) || !Number.isInteger(d.s)) throw new Error("the shared basket doesn't fit the game");
   settings.level = d.N; $("levelSel").value = d.N; save(); newGame(d.N, d.s);
@@ -835,6 +877,7 @@ const slow = G.slower("windup");   // Slower: everything in the basket moves at 
 
 /* ---------- start ---------- */
 for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", "") + (n === MAX_LEVEL ? " (hardest)" : ""), n));
+$("levelSel").append(new Option("∞ Endless: zoom out every time you wind the top size", ENDLESS));
 $("levelSel").onchange = e => { if (game) leave(); startLevel(+e.target.value); $("levelSel").blur(); };
 G.nav("windup");
 // full screen on a line under the basket's corner (G.zoom), where every game has it
@@ -842,15 +885,15 @@ G.zoom({at: $("board"), below: $("board").parentElement, full: {name: "Wind Up",
 G.setupTimer({name: "windup", game: () => game, playing: g => g.state === "running", save, label: levelName, noun: "level",
   emptyText: "Wind the goal ball on a level and your times will show up here. They're kept on this device only."});
 $("bestBtn").onclick = () => { pause(); G.showBests("Best times", game ? game.level : settings.level); };
-if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL) && settings.level !== ENDLESS) settings.level = 1;
 $("levelSel").value = settings.level;
 const shared = G.readShare("windup");
 let openedShare = false;
 if (shared) try { openShared(shared); openedShare = true; G.note("Here's the shared basket. Good luck!", 6000); G.track("Wind Up shared puzzle opened"); } catch (e) { G.note("That share link didn't work.", 5000); }
 if (!openedShare) {
   const s = state.game;
-  if (s && s.level === settings.level && Array.isArray(s.balls) && s.balls.every(b => Array.isArray(b) && b[2] >= 1 && b[2] <= MAXL)) {
-    newGame(s.level, s.seed);
+  if (s && s.level === settings.level && Array.isArray(s.balls) && s.balls.every(b => Array.isArray(b) && b[2] >= 1 && b[2] <= MAXL + (s.tier | 0))) {
+    newGame(s.level, s.seed); game.tier = s.tier | 0;   // before the balls are made, so they come out the right size
     Object.assign(game, {i: s.i, score: s.score, best: s.best, ms: s.ms || 0, started: s.started, timed: s.timed !== false, shook: !!s.shook, fluffed: !!s.fluffed, dropped: !!s.dropped,
       helps: s.helps !== undefined ? s.helps | 0 : s.shook || s.fluffed || s.dropped ? FREE + 1 : 0, revived: !!s.revived,   // (a basket saved before helpers were counted: one used had cost the paw)
       balls: s.balls.map(([x, y, l, a, p, f]) => mk(x, y, l, {a, age: 5, p: !!p, ...kindsOf(f | 0)})), state: "paused"});
