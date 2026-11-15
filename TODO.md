@@ -67,8 +67,6 @@ cats that point their own way are Day Light (`daylight/`, in beta).
   moved with a finger but was far too sensitive, a normal swipe flew most of the way along, and it could stop between
   two shelves. Rebuilt the same day so the page moves the row itself: exactly one shelf a swipe (a quarter of the way
   or a flick), never stopping between two (README, first paragraph). Checked with touch in the headless browser only.
-- [ ] **Tunnel Run: the owner doesn't really like it** (2026-11-12, after trying the Tracks switch). Ask what's missing
-  before changing anything; it may be one for the on-ramp work (one new move a level) or for a rethink.
 - [ ] **One new move a level.** The how-to and the on-ramp are divided in a way that isn't ideal: the walkthrough
   tells the rules up front, and then the levels get harder. Better: each early level brings in one new move, and a
   win on it is the reward. Night Light's and Day Light's new first levels (one tap, then two) are a first go at it.
@@ -79,7 +77,16 @@ cats that point their own way are Day Light (`daylight/`, in beta).
   Under the Blanket (a one-cat level 1, so 11 levels; the U-turn between two cats is a short lesson on the first
   two-cat blanket). Next to look at: which other games teach everything up front.
 - [ ] **Toe Beans:** getting that hard with few wins is disheartening; the moving-down rule above is the fix to try.
-- [ ] **Toy Box, Twirl and Knock It Off need more** past their hardest level.
+- [ ] **Toy Box, Twirl and Knock It Off need more** past their hardest level. Suggestions for the owner to pick from
+  (2026-11-15):
+  - Toy Box: a marathon past level 21 (a new basket of hidden toys comes in each time one's carried off; the score is
+    baskets cleared before the track jams); level 21 again with no helpers; or levels 22 on with one new thing each (a
+    catnip mouse that matches any toy, a basket with a lid that opens after a lap, Laya asleep on a space of the track).
+  - Twirl: knotted ribbons (two tied together slide only once both are free); Bugsy napping on the mat, in the way,
+    moving to a new spot every few ribbons; mats in shapes (a heart, a cat's head) rather than rectangles.
+  - Knock It Off: a par for every table (Hint already knows the shortest way), with a mark for clearing it in par, so
+    every level has more to give; a second cat to switch to (one can stand still for the other's things to stop
+    against); new things (a tray that carries what's on it, a robot vacuum that moves each turn).
 - [ ] **Zen:** look for more games that could have one (Pounce on Three and Bubbles do).
 
 ## Star cats decided, waiting for pictures
@@ -124,9 +131,7 @@ the front page):
   swap with no word, which the owner's rule now allows);
 - the owner hears the purr on a phone: whether the soft purr while playing is too loud or too quiet (`purring.base`), and
   whether Moonpie should tremble a little the whole time it's on (offered, not asked for yet). On an iPhone the silent
-  switch mutes it. Since sound went on by default for the whole site (2026-11-14) she purrs softly the whole time you
-  play, unless it's turned off: the owner to say whether that's right, or whether the steady purr should wait for a tap
-  on her;
+  switch mutes it. She purrs softly the whole time you play, unless sound is off: the owner's call (2026-11-15);
 - then move its row from `BETA` to `GAMES` (with the date it joins) and take out its `noindex` line.
 
 ## Boing!: the preview, waiting to be made
@@ -163,9 +168,6 @@ https://claude.ai/artifact/AiHXuVwvwB5CJSBPvgGNKS (the owner's own; its source i
   `tools/sounds/kept/`. Picked for no moment yet: Cat rub and Fabric grab 4 (the owner wants both used somewhere; Hard
   slide up, meh; Knitting stitch deleted). Each game fetches only the recordings it plays, once sound starts (64 kbps; the most
   any game loads is under 100 KB).
-- **Pawlinko's hold sound:** the owner picked Rope thud for "hits a hold" and a sound of its own for every thing, so
-  every knock plays the thing's own and the rope thud plays nowhere (it isn't in the page). If the holds should thud
-  under each thing's sound, or the plainer things (yarn, fluffball, feather) should thud instead, say so.
 - **Every shelf is done** (2026-11-14), Cat Spells and Curious Cat last; Undo, Bookmark and a life lost sound in every
   game that has them.
 - **Objects and actions** (2026-11-15): the shared sounds are in `games.js` (`spring`, `yarnLand`, `glassOver`, `tape`,
@@ -244,15 +246,6 @@ will recheck this list, and add games 43–52, before any of it is built.
   Bowtie. `bowtie-6` is whole but lies facing you (Tunnel Run's), the rolling Bowtie in `bowtie-7` shares one picture
   with the tunnel, and `bowtie-4` is cut off at the right; `bowtie-8` and `bowtie-9` are faces. So Bowtie keeps
   `bowtie-2` until the owner adds a new picture or picks one of these.
-- Patches: colourways (long term). What it would take: Patches has one set of four fabrics (`FABRICS`: red gingham,
-  blue polka dot, mustard stripe, green zigzag) and their plain colours (`SOLIDS`) for Reduce visual clutter. A
-  colourway is another set of four, each pair differing in pattern as well as colour, so it still reads without
-  colour; the fabrics are stored as numbers 0–3, so saves and share links don't change. Each set needs checking
-  against the white-and-gold hint flash, the red clash stripes, the gold paw, dark mode and colour-blind views, with a
-  matching plain set. Then a Fabrics picker in Patches' Settings (and on the Settings page, through `SET_LIST`), the
-  swatches under the quilt following it. About one session for three or four colourways. For the owner: how many,
-  whether all are open from the start or earned (gold paws, or the Toy chest), and the owner said (2026-11-08) to borrow from
-  Yarn's colourways in `colorways.js` (Berry, Moss, Ocean…).
 
 ### Questions still to answer
 - Answered 2026-11-08 (build .20), for the owner to look over: Laser Pointer's cats never need the dot again once
@@ -266,7 +259,6 @@ will recheck this list, and add games 43–52, before any of it is built.
 ## Settings page: questions left from the grid redesign (2026-11-12)
 
 The owner's grid for the new Settings page differed from the games in a few places; asked, not yet answered:
-- Keyboard Cat has no timer (it's in `UNTIMED` in `games.js`), but the grid gave it one: add one, timing each keyboard?
 - Window Ledges' Show sets (on by default): the owner never asked for it and isn't sure about it. Keep or take out?
 - The grid had "Other Settings" in the Every game row and "Check" on the Cat Logic shelf's row: left out until it's
   clear what they'd do.
