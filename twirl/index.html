@@ -8,7 +8,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-15.7"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-15.8"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -24,7 +24,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-15.7">
+<link rel="stylesheet" href="../games.css?v=2026-11-15.8">
 <style>
 /* A play mat covered in satin ribbons; each one slides off the way its pointed end points, along its own path.
    Big mats zoom, and scroll inside their frame. */
@@ -118,8 +118,8 @@ body.full .peek{display:none}   /* Bugsy's corner of the mat moves about in full
 
 </main>
 
-<script src="../games.js?v=2026-11-15.7"></script>
-<script src="../colorways.js?v=2026-11-15.7"></script>
+<script src="../games.js?v=2026-11-15.8"></script>
+<script src="../colorways.js?v=2026-11-15.8"></script>
 <script>
 const $ = G.$;
 G.nav("twirl");
@@ -128,8 +128,16 @@ G.nav("twirl");
 // Levels run from an 18 × 27 mat of shorter, tidier ribbons to a 28 × 42 mat of long, winding ones that
 // mostly point the long way across, so few can move at once. Level 0 comes first: a 9 × 14 mat, so every square
 // (and every ribbon) shows twice as big as on level 1, with ribbons half as long to match.
+// Past level 20 (since 2026-11-15), one new thing a level, on mats a little smaller than level 20's with ribbons as long
+// and winding, then all three on the biggest mat: 21 ribbons pointed at both ends (`both`, a share of the ribbons), 22
+// ribbons crossing over and under (`cross`, how many crossings), 23 ribbons tied together in
+// pairs (`knots`, how many), and 24 all three.
 function params(n) {
   if (n === 0) return {W: 9, H: 14, shapes: 0.35, minLen: 3, maxLen: 8, straight: 0.5, ease: 0.6};
+  if (n > 20) {
+    const e = [{W: 22, both: 0.3}, {W: 24, cross: 24}, {W: 26, knots: 14}, {W: 28, both: 0.15, cross: 16, knots: 10}][n - 21];
+    return {...params(20), both: 0, cross: 0, knots: 0, ...e, H: Math.round(e.W * 1.5)};
+  }
   const t = (n - 1) / 19, W = Math.round(18 + 10 * t);
   return {W, H: Math.round(W * 1.5), shapes: 0.35 - 0.1 * t, minLen: Math.round(4 + 6 * t), maxLen: Math.round(14 + 26 * t),
           straight: 0.5 - 0.3 * t, ease: 0.6 * (1 - t)};
@@ -152,8 +160,10 @@ function makeTwirl(n) {
     () => { const s = 1 + rand(2), k = 3 + rand(5), m = []; for (let i = 0; i < k; i++) { for (let j = 0; j < s; j++) m.push(1); m.push(2); } return m; },     // staircase
     () => { const k = 3 + rand(5), m = []; for (let i = 0; i < k; i++) m.push(1, i % 2 ? 2 : 0); return m; },     // zigzag
   ];
+  // the square one step from i in direction d, or -1 off the mat
+  const stepTo = (i, d) => { const x = i % W + DX[d], y = ((i / W) | 0) + DY[d]; return x < 0 || y < 0 || x >= W || y >= H ? -1 : y * W + x; };
   function cover() {
-    const own = new Int32Array(N).fill(-1), paths = [], bare = i => own[i] < 0, bareN = i => nb(i).filter(bare).length;
+    const own = new Int32Array(N).fill(-1), paths = [], bare = i => own[i] < 0, bareN = i => nb(i).filter(bare).length, crossed = new Set();
     for (let shapeCells = 0, t = 0; shapeCells < o.shapes * N && t < 600; t++) {
       const moves = SHAPES[rand(4)](), rot = rand(4), flip = Math.random() < 0.5;
       let p = [rand(N)]; if (!bare(p[0])) continue;
@@ -190,14 +200,48 @@ function makeTwirl(n) {
       const q = paths[host]; if (nb(i).includes(q[0])) q.unshift(i); else q.push(i);
       paths.splice(k, 1); k--;
     }
-    return paths;
+    // Crossings (levels 22 and 24): where a ribbon runs straight through a square, the two ribbons on the squares
+    // either side of it are each cut there, and a piece of one joins a piece of the other across it. Nothing's cut
+    // next to a crossing already made, and no cut leaves a one-square scrap.
+    if (o.cross) {
+      paths.forEach((q, k) => q.forEach(i => { own[i] = k; }));
+      const nearCross = q => q.some((c, i) => crossed.has(c) || crossed.has(q[i - 1]) || crossed.has(q[i + 1]));
+      // ribbon A cut at u: [the piece ending at u, what's left], either way round
+      const cutAt = (q, i, last) => {
+        const ways = [[q.slice(0, i + 1), q.slice(i + 1)], [q.slice(i).reverse(), q.slice(0, i)]].map(([a, b]) => last ? [a, b] : [a.slice().reverse(), b]);
+        return ways.filter(([, rest]) => rest.length !== 1).sort(() => Math.random() - 0.5)[0];
+      };
+      for (const j of [...Array(N).keys()].sort(() => Math.random() - 0.5)) {
+        if (crossed.size >= o.cross) break;
+        const q = paths[own[j]], at = q.indexOf(j);
+        if (at < 1 || at >= q.length - 1 || crossed.has(j)) continue;
+        const e = dirOf(q[at - 1], j); if (e !== dirOf(j, q[at + 1])) continue;
+        const u = stepTo(j, (e + 1) % 4), v = stepTo(j, (e + 3) % 4);
+        if (u < 0 || v < 0) continue;
+        const A = own[u], B = own[v];
+        if (A === B || A === own[j] || B === own[j] || crossed.has(u) || crossed.has(v)) continue;
+        const pa = paths[A], pb = paths[B];
+        if (pa.some(i => crossed.has(i) && pb.includes(i))) continue;   // two that already cross: joined, one would cross itself
+        if (nearCross(pa.slice(Math.max(0, pa.indexOf(u) - 1), pa.indexOf(u) + 2)) || nearCross(pb.slice(Math.max(0, pb.indexOf(v) - 1), pb.indexOf(v) + 2))) continue;
+        const ca = cutAt(pa, pa.indexOf(u), true), cb = cutAt(pb, pb.indexOf(v), false);
+        if (!ca || !cb) continue;
+        paths[A] = [...ca[0], j, ...cb[0]]; paths[B] = cb[1];
+        for (const i of cb[0]) if (own[i] === B) own[i] = A;
+        if (ca[1].length) { paths.push(ca[1]); for (const i of ca[1]) if (own[i] === A) own[i] = paths.length - 1; }
+        crossed.add(j);
+      }
+    }
+    return {paths: paths.filter(q => q.length), crossed};
   }
-  function settle(paths) {
-    const occ = new Int32Array(N).fill(-1), clearedAt = new Int32Array(N).fill(-1);
-    const rb = paths.map((cells, k) => { cells.forEach(i => occ[i] = k); return {cells, dir: cells.length > 1 ? dirOf(cells[cells.length - 2], cells[cells.length - 1]) : rand(4)}; });
+  // A crossing is {cell, top, under}: the ribbon underneath can't go while the one on top is still there. `cnt` is how
+  // many ribbons lie on each square (two where they cross).
+  function settle({paths, crossed}) {
+    const cnt = new Int8Array(N), clearedAt = new Int32Array(N).fill(-1);
+    const rb = paths.map(cells => { cells.forEach(i => cnt[i]++); return {cells, dir: cells.length > 1 ? dirOf(cells[cells.length - 2], cells[cells.length - 1]) : rand(4)}; });
+    const cross = [...crossed].map(cell => { const two = []; rb.forEach((r, k) => { if (r.cells.includes(cell)) two.push(k); }); if (Math.random() < 0.5) two.reverse(); return {cell, top: two[0], under: two[1]}; });
     const walk = (h, d, f) => { for (let x = h % W + DX[d], y = ((h / W) | 0) + DY[d]; x >= 0 && y >= 0 && x < W && y < H; x += DX[d], y += DY[d]) if (f(y * W + x) === false) return false; return true; };
     const laneLen = (h, d) => { let k = 0; walk(h, d, () => { k++; }); return k; };
-    const clear = (h, d) => walk(h, d, i => occ[i] < 0);
+    const clear = (h, d) => walk(h, d, i => cnt[i] === 0);
     const late = (h, d) => { let m = -1; walk(h, d, i => { m = Math.max(m, clearedAt[i]); }); return m; };
     const head = r => r.cells[r.cells.length - 1];
     const turn = r => { r.cells.reverse(); r.dir = dirOf(r.cells[r.cells.length - 2], head(r)); };
@@ -206,53 +250,124 @@ function makeTwirl(n) {
       const now = laneLen(head(r), r.dir), back = laneLen(r.cells[0], dirOf(r.cells[1], r.cells[0])), near = Math.random() < o.ease;
       if ((near && back < now) || (!near && back > now)) turn(r);
     }
-    const gone = new Set(); let step = 0;
+    const gone = new Set(); let step = 0, fixes = 0;
+    const pins = k => cross.filter(x => x.under === k && !gone.has(x.top));
+    // a ribbon cut in two: the crossings on the part that became ribbon m go with it
+    const moveCross = (k, m, cells) => { for (const x of cross) for (const role of ["top", "under"]) if (x[role] === k && cells.includes(x.cell)) x[role] = m; };
+    const crossAt = k => new Set(cross.filter(x => x.top === k || x.under === k).map(x => x.cell));
     while (gone.size < rb.length) {
       const live = []; for (let k = 0; k < rb.length; k++) if (!gone.has(k)) live.push(k);
-      const free = live.filter(k => clear(head(rb[k]), rb[k].dir));
+      const free = live.filter(k => !pins(k).length && clear(head(rb[k]), rb[k].dir));
       if (free.length) {
         const k = free[rand(free.length)]; gone.add(k); step++;
-        rb[k].cells.forEach(i => { occ[i] = -1; clearedAt[i] = step; });
+        rb[k].cells.forEach(i => { cnt[i]--; clearedAt[i] = step; });
         continue;
       }
+      if (++fixes > 4 * rb.length) return null;
       // stuck: of every way to turn a ribbon round or cut one in two so an end can get out, take the one
       // whose way out opened latest. Cutting is a last resort, and never leaves a one-square scrap if it can help it.
       let best = null;
       const offer = (score, fn) => { score += Math.random() * 0.5; if (!best || score > best.score) best = {score, fn}; };
       const cutCost = (a, b) => 3 + (a.length < 2 || b.length < 2 ? 40 : a.length < 4 || b.length < 4 ? 6 : 0);
       for (const k of live) {
-        const r = rb[k], c = r.cells;
-        if (c.length === 1) { for (let d = 0; d < 4; d++) if (clear(c[0], d)) offer(late(c[0], d), () => { r.dir = d; }); continue; }
+        const r = rb[k], c = r.cells, pinned = pins(k), xs = crossAt(k);
+        // pinned under another with its way out clear: the crossing can be the other way up
+        if (pinned.length) { if (clear(head(r), r.dir)) for (const x of pinned) offer(late(head(r), r.dir) - 1, () => { [x.top, x.under] = [x.under, x.top]; }); }
+        if (c.length === 1) { if (!pinned.length) for (let d = 0; d < 4; d++) if (clear(c[0], d)) offer(late(c[0], d), () => { r.dir = d; }); continue; }
         const bd = dirOf(c[1], c[0]);
-        if (clear(c[0], bd)) offer(late(c[0], bd), () => turn(r));
+        if (!pinned.length && clear(c[0], bd)) offer(late(c[0], bd), () => turn(r));
+        const pinnedOn = cells => pinned.some(x => cells.includes(x.cell));
         for (let i = 0; i < c.length - 1; i++) {
+          if (xs.has(c[i]) || xs.has(c[i + 1])) continue;   // a crossing never ends up at the end of a ribbon
           const a = c.slice(0, i + 1), b = c.slice(i + 1);
-          if (a.length > 1) { const d = dirOf(a[a.length - 2], a[a.length - 1]); if (clear(a[a.length - 1], d)) offer(late(a[a.length - 1], d) - cutCost(a, b), () => {
-            rb[k] = {cells: b, dir: r.dir}; rb.push({cells: a, dir: d}); a.forEach(j => occ[j] = rb.length - 1); }); }
-          if (b.length > 1) { const d = dirOf(b[1], b[0]); if (clear(b[0], d)) offer(late(b[0], d) - cutCost(a, b), () => {
+          if (a.length > 1 && !pinnedOn(a)) { const d = dirOf(a[a.length - 2], a[a.length - 1]); if (clear(a[a.length - 1], d)) offer(late(a[a.length - 1], d) - cutCost(a, b), () => {
+            rb[k] = {cells: b, dir: r.dir}; rb.push({cells: a, dir: d}); moveCross(k, rb.length - 1, a); }); }
+          if (b.length > 1 && !pinnedOn(b)) { const d = dirOf(b[1], b[0]); if (clear(b[0], d)) offer(late(b[0], d) - cutCost(a, b), () => {
             const back = b.slice().reverse();
             rb[k] = {cells: a, dir: a.length > 1 ? dirOf(a[a.length - 2], a[a.length - 1]) : r.dir};
-            rb.push({cells: back, dir: d}); back.forEach(j => occ[j] = rb.length - 1); }); }
+            rb.push({cells: back, dir: d}); moveCross(k, rb.length - 1, back); }); }
         }
       }
       if (!best) return null;
       best.fn();
     }
-    return rb;
+    return {rb, cross};
   }
-  function solvable(rb) {   // play it through once more, from scratch, as the player would
-    const occ = new Int32Array(N).fill(-1), gone = new Set();
-    rb.forEach((r, k) => r.cells.forEach(i => occ[i] = k));
-    const free = r => { const h = r.cells[r.cells.length - 1]; for (let x = h % W + DX[r.dir], y = ((h / W) | 0) + DY[r.dir]; x >= 0 && y >= 0 && x < W && y < H; x += DX[r.dir], y += DY[r.dir]) if (occ[y * W + x] >= 0) return false; return true; };
-    for (let moved = true; moved;) {
-      moved = false;
-      rb.forEach((r, k) => { if (!gone.has(k) && free(r)) { gone.add(k); r.cells.forEach(i => occ[i] = -1); moved = true; } });
+  // Tie pairs of ribbons that lie side by side (levels 23 and 24), keeping each knot only if the mat can still be cleared.
+  // Never a ribbon pointed both ways, two that cross each other, or a ribbon of one square.
+  function tie(d, want) {
+    const xc = new Set(d.cross.map(([c]) => c)), owner = new Int32Array(N).fill(-1), pairs = new Map();
+    d.ribbons.forEach((r, k) => r.cells.forEach(i => { if (!xc.has(i)) owner[i] = k; }));
+    const crosses = (a, b) => d.cross.some(([, t, u]) => (t === a && u === b) || (t === b && u === a));
+    for (let i = 0; i < N; i++) for (const j of [i % W < W - 1 ? i + 1 : -1, i + W < N ? i + W : -1]) {
+      const a = owner[i], b = j < 0 ? -1 : owner[j];
+      if (a < 0 || b < 0 || a === b) continue;
+      const key = Math.min(a, b) * 100000 + Math.max(a, b);
+      if (!pairs.has(key) || Math.random() < 0.3) pairs.set(key, [a, b, i, j]);
     }
-    return gone.size === rb.length;
+    const ok = k => !d.ribbons[k].both && d.ribbons[k].cells.length > 1;
+    const list = [...pairs.values()].filter(([a, b]) => ok(a) && ok(b) && !crosses(a, b)).sort(() => Math.random() - 0.5), used = new Set();
+    for (const kn of list) {
+      if (d.knots.length >= want) break;
+      if (used.has(kn[0]) || used.has(kn[1])) continue;
+      d.knots.push(kn);
+      if (playOrder(d)) { used.add(kn[0]); used.add(kn[1]); } else d.knots.pop();
+    }
   }
-  for (;;) { const rb = settle(cover()); if (rb && solvable(rb)) return {n, W, H, ribbons: rb}; }
+  for (;;) {
+    const s = settle(cover()); if (!s) continue;
+    const d = {n, W, H, ribbons: s.rb, cross: s.cross.map(x => [x.cell, x.top, x.under]), knots: []};
+    if (o.both) for (const r of d.ribbons) if (r.cells.length >= 3 && Math.random() < o.both) r.both = true;
+    if (o.knots) tie(d, o.knots);
+    const order = playOrder(d);   // played through once more, from scratch, as the player would
+    if (order) return {...d, order};
+  }
 }
-const build = G.builder([params, makeTwirl], "makeTwirl");
+/* ---------- the rules (plain functions, shared with the background worker) ---------- */
+// d.cross: [square, the ribbon on top, the ribbon under it] for each place two ribbons cross. d.knots: [ribbon, ribbon,
+// a square of each where the knot sits]. A ribbon pointed both ways has `both`. `who` lists the ribbons still on each square.
+function wayOf(W, a, b) { return b === a - W ? 0 : b === a + 1 ? 1 : b === a + W ? 2 : 3; }
+function liveAt(d, gone) {
+  const who = Array.from({length: d.W * d.H}, () => []);
+  d.ribbons.forEach((r, k) => { if (!gone.has(k)) for (const i of r.cells) who[i].push(k); });
+  return who;
+}
+// What stops ribbon k going (past its tip, or with `back` past its other end): [ribbon, square], or null. A ribbon lying
+// across it stops it where they cross; otherwise the first ribbon in its way. `skip` is a ribbon to pay no heed to
+// (its knot's partner, which goes with it).
+function stopOf(d, who, gone, k, back, skip) {
+  for (const [cell, top, under] of d.cross || []) if (under === k && top !== skip && !gone.has(top)) return [top, cell];
+  const r = d.ribbons[k], c = r.cells, h = back ? c[0] : c[c.length - 1], dir = back ? wayOf(d.W, c[1], c[0]) : r.dir;
+  const DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
+  for (let x = h % d.W + DX[dir], y = ((h / d.W) | 0) + DY[dir]; x >= 0 && y >= 0 && x < d.W && y < d.H; x += DX[dir], y += DY[dir]) {
+    const i = y * d.W + x, o = who[i].find(j => j !== skip && j !== k);
+    if (o !== undefined) return [o, i];
+  }
+  return null;
+}
+// Can ribbon k go now (that way)? {go: the ribbons that go} (two, tied together, once both are free) or {stop}.
+function goes(d, who, gone, k, back) {
+  let p = -1; for (const [a, b] of d.knots || []) if (a === k) p = b; else if (b === k) p = a;
+  const s = stopOf(d, who, gone, k, back, p) || (p >= 0 ? stopOf(d, who, gone, p, false, k) : null);
+  return s ? {stop: s} : {go: p >= 0 ? [k, p] : [k]};
+}
+// The order every ribbon can go in, each as soon as it can (a ribbon going never stops another), or null if some never can.
+function playOrder(d) {
+  const gone = new Set(), order = [], who = liveAt(d, gone);
+  for (let moved = true; moved;) {
+    moved = false;
+    for (let k = 0; k < d.ribbons.length; k++) {
+      if (gone.has(k)) continue;
+      let m = goes(d, who, gone, k, false);
+      if (!m.go && d.ribbons[k].both) m = goes(d, who, gone, k, true);
+      if (!m.go) continue;
+      for (const j of m.go) { gone.add(j); order.push(j); for (const i of d.ribbons[j].cells) who[i] = who[i].filter(x => x !== j); }
+      moved = true;
+    }
+  }
+  return gone.size === d.ribbons.length ? order : null;
+}
+const build = G.builder([params, makeTwirl, wayOf, liveAt, stopOf, goes, playOrder], "makeTwirl");
 
 /* ---------- how each ribbon looks ---------- */
 // Every ribbon wears its own colourway, as different as can be from the ribbons it touches. As levels go
@@ -266,6 +381,7 @@ const labDist = (a, b) => { const p = hexLab(a), q = hexLab(b); return Math.hypo
 function dress(d) {
   const {W, ribbons} = d, owner = new Map(), ombre = clamp01((d.n - 4) / 12), other = 0.45 * (1 - clamp01((d.n - 1) / 12)), mainTwist = Math.random() < 0.5;
   ribbons.forEach((r, k) => r.cells.forEach(i => owner.set(i, k)));
+  const tops = new Set((d.cross || []).map(x => x[1]));
   d.looks = [];
   ribbons.forEach((r, k) => {
     const near = new Set(r.cells.flatMap(i => [i - W, i + W, i % W ? i - 1 : -1, (i + 1) % W ? i + 1 : -1]).map(j => owner.get(j)).filter(o => o !== undefined && o < k));
@@ -275,12 +391,13 @@ function dress(d) {
       const dist = Math.min(9, ...[...near].map(o => labDist(solid, d.looks[o].solid)));
       if (dist > bestD) { bestD = dist; best = {ramp, solid}; }
     }
-    d.looks[k] = {...best, ombre: Math.random() < ombre, twist: Math.random() < other ? !mainTwist : mainTwist, phase: Math.random() * 6};
+    // a ribbon lying across another is flat, so it reads as on top (a twist would narrow to nothing just there)
+    d.looks[k] = {...best, ombre: Math.random() < ombre, twist: !tops.has(k) && (Math.random() < other ? !mainTwist : mainTwist), phase: Math.random() * 6, both: !!r.both};
   });
 }
 
 /* ---------- playing ---------- */
-const STORE = "catdoku.twirl.v2", MAX_LEVEL = 20, HEARTS = 3, MAX_LIVES = 9;
+const STORE = "catdoku.twirl.v2", MAX_LEVEL = 24, HEARTS = 3, MAX_LIVES = 9;
 // Lives (G.lives): three at a time, up to nine on one mat
 const lives = G.lives({el: $("hearts"), of: () => S.d, per: HEARTS, max: MAX_LIVES, on: "level", sound: false, revived: () => { S.over = false; hud(); save(); }});
 // Turning off Twisty ribbons draws every ribbon flat, on every level. It's kept on this device.
@@ -288,7 +405,7 @@ const PREFS = "catdoku.twirl.prefs.v1", prefs = Object.assign({twisty: true}, G.
 G.switch({id: "twistTgl", label: "Twisty ribbons", line: "Off, every ribbon is drawn flat", key: "twisty", of: prefs, save: () => G.save(PREFS, prefs),
   tip: "Twisty ribbons off: flat ribbons", change: () => paintStill()});
 let saved = G.load(STORE);
-let S = null, loading = false, now = 0, moving = [], tugs = [];
+let S = null, loading = false, now = 0, moving = [], tugs = [], drawOrder = [];
 // The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
 G.pawLost(() => !S || S.over || S.d.helped || S.d.restarted || S.d.hearts < HEARTS || S.d.livesUsed > HEARTS);
 const save = () => { if (S) { S.d.ms = S.ms; G.save(STORE, {level: S.level, d: S.d}); } };
@@ -297,12 +414,16 @@ function start(level, d) {
   if (!d.ribbons || !d.W || (d.ribbons[0] && !d.ribbons[0].cells)) throw new Error("the saved level is from another version of the game");
   if (!d.gone) Object.assign(d, {gone: [], hearts: HEARTS, livesUsed: HEARTS, helped: false});
   if (!d.looks) dress(d);
+  if (!d.cross) Object.assign(d, {cross: [], knots: []});
+  if (!d.order) d.order = playOrder(d) || d.ribbons.map((_, k) => k);   // a mat saved before levels 21 to 24
   S = {level, N: level, ...G.freshClock(), d, over: false};
+  drawOrder = d.order.slice().reverse();   // a ribbon that goes later lies lower: one on top always goes before the one under it
   if (d.ms) { S.ms = d.ms; S.started = true; }
   moving = []; tugs = []; zoom = 1;
   $("levelSel").value = level;
   layout(); save(); hud(); G.note("");
   if (d.hearts <= 0) lost();
+  setTimeout(newThings, 700);
 }
 function startLevel(level) {
   level = Math.min(MAX_LEVEL, Math.max(0, level));
@@ -310,7 +431,8 @@ function startLevel(level) {
   G.track(`Twirl level ${level} started`);
   return build.take(level).then(d => { loading = false; start(level, d); build.prefetch(Math.min(MAX_LEVEL, level + 1)); });
 }
-for (let n = 0; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(n === MAX_LEVEL ? `${n} (hardest)` : n === 0 ? "0 (biggest ribbons)" : String(n), n));
+const NEW_AT = {21: "pointed both ways", 22: "crossing", 23: "tied together", 24: "all three"};
+for (let n = 0; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(n === MAX_LEVEL ? `${n} (hardest, ${NEW_AT[n]})` : n === 0 ? "0 (biggest ribbons)" : NEW_AT[n] ? `${n} (${NEW_AT[n]})` : String(n), n));
 $("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
 // Restarting puts every ribbon back. It only refills lives after running out (which already keeps you
 // at this level), so it isn't a way round them. It costs the gold paw once a ribbon has gone.
@@ -334,9 +456,14 @@ $("linkBtn").onclick = () => { if (S && !loading) G.shareCard({name: "Twirl", wh
       let h = ""; for (let i = 0; i < st.length; i += 2) h += HEX[st[i] * 4 + (st[i + 1] ?? 0)];
       return cells[0].toString(36) + "." + dir + st.length.toString(36) + "." + h;
     }).join(",");
-    return {g: "twirl", N: S.level + 1, W: S.d.W, H: S.d.H, r};   // N is the level plus one, since level 0 is a level
+    const b36 = v => v.toString(36), d = S.d, extra = {};
+    if (d.ribbons.some(r => r.both)) extra.b = d.ribbons.map((r, k) => r.both ? b36(k) : "").filter(Boolean).join(".");
+    if (d.cross.length) extra.c = d.cross.map(x => x.map(b36).join(".")).join(",");
+    if (d.knots.length) extra.k = d.knots.map(x => x.map(b36).join(".")).join(",");
+    return {g: "twirl", N: S.level + 1, W: S.d.W, H: S.d.H, r, ...extra};   // N is the level plus one, since level 0 is a level
   }}); };
-// A shared mat, checked first: every square covered by exactly one ribbon.
+// A shared mat, checked first: every square covered by exactly one ribbon (two where they cross, each going straight
+// through it the other's way), knots between ribbons side by side, and a way to clear it all.
 function openShared(d) {
   const level = d.N - 1, {W, H} = d;
   if (!(level >= 0 && level <= MAX_LEVEL) || !(W >= 4 && W <= 40 && H >= 4 && H <= 60)) throw new Error("the shared mat doesn't fit the game");
@@ -346,9 +473,15 @@ function openShared(d) {
     for (let i = 0; i < n; i++) { const v = HEX.indexOf(h[i >> 1]), s = i % 2 ? v % 4 : v >> 2; cells.push(cells[i] + step[s]); }
     return {cells, dir};
   });
-  for (const r of ribbons) for (const c of r.cells) { if (!(c >= 0 && c < W * H) || seen[c]) throw new Error("the shared mat doesn't fit the game"); seen[c] = 1; }
-  if (seen.some(v => !v) || ribbons.some(r => !(r.dir >= 0 && r.dir <= 3))) throw new Error("the shared mat doesn't fit the game");
-  const m = {n: level, W, H, ribbons}; dress(m); start(level, m);
+  const bad = () => { throw new Error("the shared mat doesn't fit the game"); }, nums = t => String(t || "").split(",").filter(Boolean).map(x => x.split(".").map(v => parseInt(v, 36)));
+  const cross = nums(d.c), knots = nums(d.k), xc = new Map(cross.map(x => [x[0], x]));
+  String(d.b || "").split(".").filter(Boolean).forEach(v => { const r = ribbons[parseInt(v, 36)]; if (!r || r.cells.length < 2) bad(); r.both = true; });
+  for (const r of ribbons) for (const c of r.cells) { if (!(c >= 0 && c < W * H) || seen[c] > (xc.has(c) ? 1 : 0)) bad(); seen[c]++; }
+  if (seen.some((v, c) => v !== (xc.has(c) ? 2 : 1)) || ribbons.some(r => !(r.dir >= 0 && r.dir <= 3))) bad();
+  for (const [c, t, u] of cross) if (t === u || ![t, u].every(k => ribbons[k] && ribbons[k].cells.indexOf(c) > 0 && ribbons[k].cells.indexOf(c) < ribbons[k].cells.length - 1)) bad();
+  for (const [a, b, ca, cb] of knots) if (!ribbons[a] || !ribbons[b] || a === b || !ribbons[a].cells.includes(ca) || !ribbons[b].cells.includes(cb) || ![1, W].includes(Math.abs(ca - cb))) bad();
+  const m = {n: level, W, H, ribbons, cross, knots}; m.order = playOrder(m); if (!m.order) bad();
+  dress(m); start(level, m);
 }
 
 const left = () => S.d.ribbons.length - S.d.gone.length;
@@ -361,38 +494,57 @@ function hud() {
 // What's on each square right now (ribbons already sent off are gone at once, even mid-flight).
 function occupancy() {
   const d = S.d, occ = new Int16Array(d.W * d.H).fill(-1), gone = new Set(d.gone);
-  d.ribbons.forEach((r, k) => { if (!gone.has(k)) for (const i of r.cells) occ[i] = k; });
+  for (const k of drawOrder) if (!gone.has(k)) for (const i of d.ribbons[k].cells) occ[i] = k;   // where two cross, the one on top
   return occ;
 }
 G.sound.define({"tw.slide": t => G.sound.kit.whoosh(t, 1500, 3500, .3, .03)});   // a satin swish, at a fifth (the owner, 2026-11-15)
-function tap(k) {
-  const d = S.d, r = d.ribbons[k], occ = occupancy(), h = r.cells[r.cells.length - 1];
-  const dx = [0, 1, 0, -1][r.dir], dy = [-1, 0, 1, 0][r.dir];
-  let x = h % d.W, y = (h / d.W) | 0, run = 0, blocker = -1;
-  for (x += dx, y += dy; x >= 0 && y >= 0 && x < d.W && y < d.H; x += dx, y += dy, run++) if (occ[y * d.W + x] >= 0) { blocker = occ[y * d.W + x]; break; }
-  if (blocker < 0) {   // free: off it goes
-    d.gone.push(k); moving.push({k, t0: now, out: run + r.cells.length + 2});
+// A ribbon pointed both ways goes from the end nearer the tap (from the middle square, whichever end is free).
+const crosses = k => S.d.cross.some(([, t, u]) => t === k || u === k);
+const flipped = r => ({cells: r.cells.slice().reverse(), dir: wayOf(S.d.W, r.cells[1], r.cells[0])});
+const toEdge = (h, dir) => { const [dx, dy] = DIRS[dir]; let n = 0; for (let x = h % S.d.W + dx, y = ((h / S.d.W) | 0) + dy; x >= 0 && y >= 0 && x < S.d.W && y < S.d.H; x += dx, y += dy) n++; return n; };
+function tap(k, cell) {
+  const d = S.d, r = d.ribbons[k], gone = new Set(d.gone), who = liveAt(d, gone);
+  let back = false;
+  if (r.both) {
+    const at = r.cells.indexOf(cell), mid = (r.cells.length - 1) / 2;
+    back = at < mid || (at === mid && !goes(d, who, gone, k, false).go && !!goes(d, who, gone, k, true).go);
+  }
+  const m = goes(d, who, gone, k, back);
+  if (m.go) {   // free: off it goes (with the one it's tied to)
+    let repaint = false;
+    for (const j of m.go) {
+      const way = j === k && back, rr = way ? flipped(d.ribbons[j]) : d.ribbons[j];
+      d.gone.push(j); moving.push({k: j, back: way, t0: now, out: toEdge(rr.cells[rr.cells.length - 1], rr.dir) + rr.cells.length + 2});
+      if (crosses(j)) repaint = true; else unpaint(j);
+    }
+    if (repaint) paintStill();
     G.sound.play("tw.slide");   // a ribbon slides off: a satin swish (the owner's picks, 2026-11-14)
-    unpaint(k); hud(); save();
+    hud(); save();
     if (!left()) win();
     return;
   }
-  // blocked: it tugs forward to whatever's in the way and springs back, and a life is lost
-  tugs.push({k, t0: now, dist: Math.max(0.15, run - 0.3), blocker});
-  unpaint(k);
+  // blocked: it tugs forward to whatever's in the way (or, pinned under another, gives a little shake) and springs
+  // back, and a life is lost
+  const [blocker, at] = m.stop, rr = back ? flipped(r) : r, h = rr.cells[rr.cells.length - 1];
+  const pinned = rr.cells.includes(at), run = pinned ? 0 : Math.abs(at % d.W - h % d.W) + Math.abs(((at / d.W) | 0) - ((h / d.W) | 0)) - 1;
+  tugs.push({k, back, t0: now, dist: Math.max(0.15, run - 0.3), blocker});
+  if (crosses(k)) paintStill(); else unpaint(k);
   const hearts = lives.lose(); hud(); save(); G.sound.play("wrong");   // in the way: the rule break's low buzz, in place of a life's bonk
   if (hearts <= 0) { S.over = true; setTimeout(lost, 450); }
-  else G.note(`Blocked. ${lives.say(hearts)}.`, 2500);
+  else G.note(pinned ? `Another ribbon lies across it. ${lives.say(hearts)}.` : `Blocked. ${lives.say(hearts)}.`, 2500);
 }
 // Hint: a ribbon that's free to go now glows gold. The player taps it. A hint keeps you on this level and
 // costs the gold paw.
 const hints = G.hinter({game: () => S, key: () => S ? S.d.gone.join() : "", draw: () => {}});   // marks {k}: a ribbon free to go (the mat redraws itself every frame)
 function hint() {
   if (!S || S.over || loading || document.querySelector(".spot")) return;
-  const gone = new Set(S.d.gone), free = S.d.ribbons.map((_, k) => k).filter(k => !gone.has(k) && !blockerOf(k));
+  const d = S.d, gone = new Set(d.gone), who = liveAt(d, gone), free = [];
+  d.ribbons.forEach((r, k) => { if (!gone.has(k)) for (const back of r.both ? [false, true] : [false]) { const m = goes(d, who, gone, k, back); if (m.go) free.push({k, back, both: r.both, with: m.go}); } });
   if (!free.length) { G.note("Every ribbon is blocked. Try Restart.", 4000); return; }
-  S.d.helped = true; save();
-  hints.show({k: free[Math.floor(Math.random() * free.length)]}, "The glowing ribbon is free to go. Tap it.");
+  d.helped = true; save();
+  const f = free[Math.floor(Math.random() * free.length)];
+  hints.show(f, f.with.length > 1 ? "The glowing ribbons are tied together, and both are free. Tap one."
+    : f.both ? "The glowing end is free to go. Tap near it." : "The glowing ribbon is free to go. Tap it.");
 }
 // a gold paw gets Bugsy, dozing in a box, in place of the random cat photo
 function bugsyPic() { const im = new Image(); im.className = "bugsypic"; im.src = "../cats/bugsy-4.webp"; im.alt = "Bugsy dozing in a cardboard box"; return im; }
@@ -429,7 +581,9 @@ const DIRS = [[0, -1], [1, 0], [0, 1], [-1, 0]];
 setInterval(() => {
   if (!S || !S.d) return;
   const d = S.d, gone = new Set(d.gone), left = d.ribbons.map((r, k) => [r, k]).filter(([, k]) => !gone.has(k));
-  const one = ([r]) => `tip at ${G.at(r.cells[r.cells.length - 1], d.W)}, pointing ${["up", "right", "down", "left"][r.dir]}, ${r.cells.length} long`;
+  const under = new Set((d.cross || []).filter(([, t]) => !gone.has(t)).map(([, , u]) => u));
+  const one = ([r, k]) => `tip at ${G.at(r.cells[r.cells.length - 1], d.W)}, pointing ${["up", "right", "down", "left"][r.dir]}${r.both ? " (and the other way at its tail)" : ""}, ${r.cells.length} long`
+    + (under.has(k) ? ", under another" : "") + ((d.knots || []).some(([a, b]) => a === k || b === k) ? ", tied to another" : "");
   G.describe(canvas, `Mat, ${d.W} by ${d.H}, ${left.length} ribbon${left.length === 1 ? "" : "s"} left: ${G.listed(left.map(one), "; ")}. Arrow keys pick a square; Space taps it.`);
 }, 500);
 let scale = 1, zoom = 1, side = false, zoomer = null;   // zoomer: the zoom buttons under the mat's corner (G.zoom)   // side: the mat laid sideways (turned a quarter clockwise), in full screen
@@ -488,7 +642,7 @@ function drawRibbon(g, pts, look, flash) {
   if (pts.length < 2) return;
   if (look.twist && !prefs.twisty) look = {...look, twist: false};
   const w = U * 0.4, P = samples(pts, look.twist || look.ombre ? 1.5 : 3), n = P.length, ramp = RAMPS[look.ramp];
-  let colAt = i => look.ombre ? rampAt(ramp, 0.12 + 0.85 * i / Math.max(1, n - 1)) : look.solid;
+  let colAt = i => look.ombre ? rampAt(ramp, 0.12 + 0.85 * (look.rev ? n - 1 - i : i) / Math.max(1, n - 1)) : look.solid;
   if (flash) { const base = colAt; colAt = i => mix(base(i), "#FFFFFF", 0.55); }
   g.lineJoin = "round";
   if (!look.twist) {   // flat ribbon: an edge and a sheen drawn in one go, and the colour in short overlapping runs
@@ -523,11 +677,25 @@ function drawRibbon(g, pts, look, flash) {
     for (const side of [Lf, Rt]) for (let i = 0; i < n - 1; i++) { g.beginPath(); g.moveTo(...side[i]); g.lineTo(...side[i + 1]); g.strokeStyle = mix(colAt(i), "#2A2530", 0.5); g.stroke(); }
     g.globalAlpha = 1;
   }
-  // the tip, cut to a point
-  const [hx, hy] = P[n - 1], [qx, qy] = P[Math.max(0, n - 3)], l = Math.hypot(hx - qx, hy - qy) || 1, fx = (hx - qx) / l, fy = (hy - qy) / l, half = w / 2;
-  const col = colAt(n - 1);
-  g.beginPath(); g.moveTo(hx - fy * half, hy + fx * half); g.lineTo(hx + fx * w * 1.3, hy + fy * w * 1.3); g.lineTo(hx + fy * half, hy - fx * half); g.closePath();
-  g.fillStyle = col; g.fill(); g.strokeStyle = mix(col, "#2A2530", 0.45); g.lineWidth = 1; g.stroke();
+  // the tip, cut to a point (and the tail too, on a ribbon pointed both ways)
+  const point = (e, f) => {
+    const [hx, hy] = P[e], [qx, qy] = P[f], l = Math.hypot(hx - qx, hy - qy) || 1, fx = (hx - qx) / l, fy = (hy - qy) / l, half = w / 2;
+    const col = colAt(e);
+    g.beginPath(); g.moveTo(hx - fy * half, hy + fx * half); g.lineTo(hx + fx * w * 1.3, hy + fy * w * 1.3); g.lineTo(hx + fy * half, hy - fx * half); g.closePath();
+    g.fillStyle = col; g.fill(); g.strokeStyle = mix(col, "#2A2530", 0.45); g.lineWidth = 1; g.stroke();
+  };
+  point(n - 1, Math.max(0, n - 3));
+  if (look.both) point(0, Math.min(n - 1, 2));
+}
+// A knot tying two ribbons together: a little bow of cream cord across the seam between them.
+function drawKnot(g, ca, cb) {
+  const W = S.d.W, x = ((ca % W + cb % W) / 2 + 0.5) * U, y = ((((ca / W) | 0) + ((cb / W) | 0)) / 2 + 0.5) * U;
+  g.save(); g.translate(x, y); if (Math.abs(ca - cb) !== 1) g.rotate(Math.PI / 2);
+  const bow = () => { g.beginPath(); g.ellipse(-U * 0.2, 0, U * 0.19, U * 0.12, 0.35, 0, 2 * Math.PI); g.moveTo(U * 0.39, 0); g.ellipse(U * 0.2, 0, U * 0.19, U * 0.12, -0.35, 0, 2 * Math.PI); };
+  bow(); g.lineWidth = 3.4; g.strokeStyle = "#2A2530"; g.stroke();
+  bow(); g.lineWidth = 1.8; g.strokeStyle = "#F6F1E7"; g.stroke();
+  g.beginPath(); g.arc(0, 0, U * 0.1, 0, 2 * Math.PI); g.fillStyle = "#F6F1E7"; g.fill(); g.lineWidth = 1.2; g.strokeStyle = "#2A2530"; g.stroke();
+  g.restore();
 }
 // Ribbons lying still are drawn once onto a layer. A ribbon that leaves is wiped off it square by square
 // (ribbons stay inside their own squares), and only a zoom redraws the lot.
@@ -537,7 +705,18 @@ function paintStill() {
   still = document.createElement("canvas"); still.width = canvas.width; still.height = canvas.height;
   stillCtx = still.getContext("2d"); toCanvas(stillCtx);
   const gone = new Set(S.d.gone), tugging = new Set(tugs.map(t => t.k));
-  S.d.ribbons.forEach((r, k) => { if (!gone.has(k) && !tugging.has(k)) drawRibbon(stillCtx, line(r), S.d.looks[k]); });
+  for (const k of drawOrder) if (!gone.has(k) && !tugging.has(k)) { crossShadow(stillCtx, k, gone); drawRibbon(stillCtx, line(S.d.ribbons[k]), S.d.looks[k]); }
+}
+// Where a ribbon lies across another, a soft shadow under it there, so it's plain which is on top.
+function crossShadow(g, k, gone) {
+  const W = S.d.W;
+  for (const [c, top, under] of S.d.cross) if (top === k && !gone.has(under)) {
+    const cs = S.d.ribbons[k].cells, i = cs.indexOf(c), [ax, ay] = [cs[i - 1] % W, (cs[i - 1] / W) | 0], [bx, by] = [cs[i + 1] % W, (cs[i + 1] / W) | 0];
+    g.save(); g.lineCap = "butt"; g.strokeStyle = "rgba(42,37,48,.6)"; g.lineWidth = U * 0.4;   // hidden under the ribbon, all but its blur
+    g.shadowColor = "rgba(42,37,48,.55)"; g.shadowBlur = U * 0.22 * scale; g.shadowOffsetX = U * 0.04 * scale; g.shadowOffsetY = U * 0.07 * scale;
+    g.beginPath(); g.moveTo(((ax + c % W) / 2 + 0.5) * U, ((ay + ((c / W) | 0)) / 2 + 0.5) * U); g.lineTo(((bx + c % W) / 2 + 0.5) * U, ((by + ((c / W) | 0)) / 2 + 0.5) * U); g.stroke();
+    g.restore();
+  }
 }
 function unpaint(k) {
   if (!stillCtx) return;
@@ -549,32 +728,39 @@ function draw() {
   if (!S) return;
   const d = S.d, gone = new Set(d.gone);
   // a blocked ribbon goes back on the layer once it has sprung back
-  for (const t of tugs) if (now >= t.t0 + 0.4 && stillCtx && !gone.has(t.k)) drawRibbon(stillCtx, line(d.ribbons[t.k]), d.looks[t.k]);
+  let repaint = false;
+  for (const t of tugs) if (now >= t.t0 + 0.4 && stillCtx && !gone.has(t.k)) { if (crosses(t.k)) repaint = true; else drawRibbon(stillCtx, line(d.ribbons[t.k]), d.looks[t.k]); }
   tugs = tugs.filter(t => now < t.t0 + 0.4);
+  if (repaint) paintStill();
   if (still) ctx.drawImage(still, 0, 0);
   toCanvas(ctx);
   for (const t of tugs) {   // it tugs forward and springs back, and whatever is in the way flashes
-    const r = d.ribbons[t.k], u = (now - t.t0) / 0.4, s = t.dist * U * (u < 0.45 ? Math.sin(u / 0.45 * Math.PI / 2) : Math.cos((u - 0.45) / 0.55 * Math.PI / 2));
+    const r = t.back ? flipped(d.ribbons[t.k]) : d.ribbons[t.k], u = (now - t.t0) / 0.4, s = t.dist * U * (u < 0.45 ? Math.sin(u / 0.45 * Math.PI / 2) : Math.cos((u - 0.45) / 0.55 * Math.PI / 2));
     const pts = line(r, t.dist + 1);
-    drawRibbon(ctx, slice(pts, s, s + lengthOf(pts) - (t.dist + 1) * U), d.looks[t.k]);
+    drawRibbon(ctx, slice(pts, s, s + lengthOf(pts) - (t.dist + 1) * U), t.back ? {...d.looks[t.k], rev: true} : d.looks[t.k]);
     if (!gone.has(t.blocker) && Math.floor(now * 12) % 2 === 0) drawRibbon(ctx, line(d.ribbons[t.blocker]), d.looks[t.blocker], true);
   }
   // the hint: a free ribbon drawn again over a gold band, for a few seconds or until it's tapped
-  const hm = hints.current(), hintK = hm ? hm.k : -1;
-  if (hm && !gone.has(hintK)) {
-    const pts = line(d.ribbons[hintK]);
-    ctx.beginPath(); ctx.moveTo(...pts[0]); for (const p of pts.slice(1)) ctx.lineTo(...p);
+  // knots, over the ribbons they tie
+  for (const [a, b, ca, cb] of d.knots || []) if (!gone.has(a) && !gone.has(b)) drawKnot(ctx, ca, cb);
+  // the hint: a free ribbon (and the one it's tied to) drawn again over a gold band, for a few seconds or until it's
+  // tapped; on a ribbon pointed both ways, only the half to tap is banded
+  const hm = hints.current();
+  if (hm && !gone.has(hm.k)) for (const k of hm.with || [hm.k]) {
+    const r = d.ribbons[k], pts = line(r), half = k === hm.k && hm.both ? (hm.back ? r.cells.slice(0, r.cells.length >> 1 || 1) : r.cells.slice(r.cells.length >> 1)) : null;
+    const band = half ? half.map(i => [(i % d.W + 0.5) * U, (((i / d.W) | 0) + 0.5) * U]) : pts;
+    ctx.beginPath(); ctx.moveTo(...band[0]); for (const p of band.slice(1)) ctx.lineTo(...p); if (band.length === 1) ctx.lineTo(band[0][0] + 0.01, band[0][1]);
     ctx.lineCap = ctx.lineJoin = "round"; ctx.lineWidth = U * 0.85; ctx.strokeStyle = "rgba(236,168,24,.6)"; ctx.stroke();
     ctx.lineWidth = 3 / scale; ctx.strokeStyle = "#ECA818"; ctx.stroke();
-    drawRibbon(ctx, pts, d.looks[hintK]);
+    drawRibbon(ctx, pts, d.looks[k]);
   }
   if (kbAt >= 0) { ctx.lineWidth = 3 / scale; ctx.strokeStyle = G.CURSOR; ctx.strokeRect(kbAt % d.W * U + 1, Math.floor(kbAt / d.W) * U + 1, U - 2, U - 2); }
   // ribbons on their way out, on top, speeding up as they go
   moving = moving.filter(m => now < m.t0 + 2.5);
   for (const m of moving) {
-    const pts = line(d.ribbons[m.k], m.out), total = lengthOf(pts), len = total - m.out * U, u = now - m.t0, s = (6 * u + 30 * u * u) * U;
+    const pts = line(m.back ? flipped(d.ribbons[m.k]) : d.ribbons[m.k], m.out), total = lengthOf(pts), len = total - m.out * U, u = now - m.t0, s = (6 * u + 30 * u * u) * U;
     if (s >= total - 2) continue;
-    drawRibbon(ctx, slice(pts, s, Math.min(total, s + len)), d.looks[m.k]);
+    drawRibbon(ctx, slice(pts, s, Math.min(total, s + len)), m.back ? {...d.looks[m.k], rev: true} : d.looks[m.k]);
   }
 }
 
@@ -671,7 +857,7 @@ function tapAt(cx, cy) {
   const [x, y] = matXY(Math.floor((cx - r.left) / r.width * shownW() - PAD), Math.floor((cy - r.top) / r.height * shownH() - PAD));
   if (x < 0 || y < 0 || x >= d.W || y >= d.H) return;
   const k = occupancy()[y * d.W + x];
-  if (k >= 0 && !tugs.some(t => t.k === k)) tap(k);
+  if (k >= 0 && !tugs.some(t => t.k === k)) tap(k, y * d.W + x);
 }
 
 // Keys: the arrows move a cursor over the mat (it scrolls along when zoomed), and Space or Enter taps the ribbon
@@ -688,7 +874,7 @@ const keys = G.gridKeys({on: () => S && !S.over && !loading, start: () => Math.f
     if (x < scroller.scrollLeft || x + cw > scroller.scrollLeft + scroller.clientWidth) scroller.scrollLeft = x - scroller.clientWidth / 2;
     if (y < scroller.scrollTop || y + cw > scroller.scrollTop + scroller.clientHeight) scroller.scrollTop = y - scroller.clientHeight / 2;
   },
-  act: i => { const k = occupancy()[i]; if (k >= 0 && !tugs.some(t => t.k === k)) tap(k); }});
+  act: i => { const k = occupancy()[i]; if (k >= 0 && !tugs.some(t => t.k === k)) tap(k, i); }});
 let last = performance.now();
 function loop(t) { now += Math.min(0.05, (t - last) / 1000); last = t; draw(); requestAnimationFrame(loop); }
 
@@ -704,11 +890,7 @@ function helpCard(tries = 0) {
 // go and the way it'll slide, a blocked ribbon and what's in its way, the lives, the mat, and zoom.
 const INTRO = "catdoku.twirl.intro.v1";
 // What a ribbon would hit if tapped now: [the ribbon, the square], or null if it's free.
-function blockerOf(k) {
-  const d = S.d, r = d.ribbons[k], occ = occupancy(), h = r.cells[r.cells.length - 1], [dx, dy] = DIRS[r.dir];
-  for (let x = h % d.W + dx, y = ((h / d.W) | 0) + dy; x >= 0 && y >= 0 && x < d.W && y < d.H; x += dx, y += dy) if (occ[y * d.W + x] >= 0) return [occ[y * d.W + x], y * d.W + x];
-  return null;
-}
+function blockerOf(k) { const d = S.d, gone = new Set(d.gone), m = goes(d, liveAt(d, gone), gone, k, false); return m.stop || null; }
 function intro(again) {
   if (!again && G.load(INTRO).seen) return;
   if (!S || S.over || loading || document.querySelector(".spot")) { if (!again) setTimeout(intro, 400); return; }
@@ -734,7 +916,32 @@ function intro(again) {
              {say: "Stuck? Hint shows a free one", els: [$("hintBtn")]},
              {say: "Clear every ribbon", lit: here.flatMap(cellsOf)},
              {say: "Pinch or + and − to zoom", els: [zoomer.el], later: true});
-  G.spotlight({grid: canvas, w: side ? d.H : d.W, h: side ? d.W : d.H, map, steps, done: () => G.save(INTRO, {seen: true})});
+  G.spotlight({grid: canvas, w: side ? d.H : d.W, h: side ? d.W : d.H, map, steps, done: () => G.save(INTRO, {...G.load(INTRO), seen: true})});
+}
+// The first time each new thing of levels 21 to 24 is on the mat, a step of its own (after the first visit's walkthrough).
+function newThings() {
+  if (!S || S.over || loading || document.querySelector(".spot") || !G.load(INTRO).seen) return;
+  const d = S.d, seen = G.load(INTRO), gone = new Set(d.gone), xy = i => [i % d.W, (i / d.W) | 0], steps = [], fresh = {};
+  const cellsOf = k => d.ribbons[k].cells.map(i => shownXY(...xy(i)));
+  const near = ks => ks.sort((a, b) => dist(a) - dist(b))[0], dist = k => { const [x, y] = xy(d.ribbons[k].cells[d.ribbons[k].cells.length >> 1]); return Math.abs(x - d.W / 2) + Math.abs(y - d.H / 2); };
+  const both = near(d.ribbons.map((r, k) => k).filter(k => d.ribbons[k].both && !gone.has(k)));
+  if (!seen.both && both !== undefined) {
+    fresh.both = true;
+    steps.push({say: "Pointed both ways: tap near the end it should leave by", lit: cellsOf(both)});
+  }
+  const x = d.cross.filter(([, t, u]) => !gone.has(t) && !gone.has(u)).sort((a, b) => dist(a[1]) - dist(b[1]))[0];
+  if (!seen.cross && x) {
+    fresh.cross = true;
+    steps.push({say: "Where two cross, the one on top goes first", lit: [...cellsOf(x[1]), ...cellsOf(x[2])], outline: [cellsOf(x[1])]});
+  }
+  const kn = d.knots.filter(([a, b]) => !gone.has(a) && !gone.has(b)).sort((a, b) => dist(a[0]) - dist(b[0]))[0];
+  if (!seen.knot && kn) {
+    fresh.knot = true;
+    steps.push({say: "Tied together: both go at once, when both are free", lit: [...cellsOf(kn[0]), ...cellsOf(kn[1])]});
+  }
+  if (!steps.length) return;
+  const map = () => { const r = canvas.getBoundingClientRect(); return {ox: r.left + PAD / shownW() * r.width, oy: r.top + PAD / shownH() * r.height, cw: r.width / shownW(), ch: r.height / shownH()}; };
+  G.spotlight({grid: canvas, w: side ? d.H : d.W, h: side ? d.W : d.H, map, steps, done: () => G.save(INTRO, {...G.load(INTRO), ...fresh})});
 }
 $("helpBtn").onclick = () => helpCard();
 $("hintBtn").onclick = hint;
