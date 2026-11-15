@@ -90,9 +90,8 @@ cats that point their own way are Day Light (`daylight/`, in beta).
     spot of the first basket carried off. It's dealt at the start, so the solver can still check the level can be won
     (unlike an endless run, where each new basket would have to be made up as you go). Not picked: an endless run, a
     fast ball (the toys ride in spaces that all move together, so it would be stuck behind the toy in front), Laya
-    asleep on the track, and a basket with a lid that opens after a lap (unsure). Not answered yet: a gate on the track
-    that holds toys back until it's tapped, a side pocket that keeps one toy off the track until it's tapped, and a
-    reverse switch that sends the track the other way, once a level.
+    asleep on the track, a basket with a lid that opens after a lap, a gate on the track that holds toys back until
+    it's tapped, a side pocket that keeps one toy off the track, and a reverse switch.
   - Twirl, picked (2026-11-15): knotted ribbons (two tied together slide only once both are free), ribbons that cross
     over and under (the top one goes first), ribbons pointed at both ends (tap an end to pick the way), a sleeping cat
     in the way who moves to a new spot every few ribbons, and a kitten who bats a ribbon part of the way along every
