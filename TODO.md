@@ -79,21 +79,23 @@ cats that point their own way are Day Light (`daylight/`, in beta).
 - [ ] **Toe Beans:** getting that hard with few wins is disheartening; the moving-down rule above is the fix to try.
 - [ ] **Toy Box, Twirl and Knock It Off need more** past their hardest level. The owner's picks (2026-11-15), and more
   ideas of the same kind to choose from; each would be one new thing a level, from the level after the top one:
-  - Knock It Off, picked: a second cat to switch to, a tray that carries what's on it, and (most of all) a robot
-    vacuum that moves each turn. More: a puddle (a knocked-over glass leaves one; things slide across it until they hit
-    something), a lazy Susan (its four squares turn a quarter each time the cat steps on it), a laundry basket (things
-    pushed in stay put), a dog asleep by one side (knock nothing off that side or it wakes), a spray bottle that
-    watches a row (the cat can't end a move in its line), a stack of cups (pushed, they spill out into a line), and
-    the human coming home in so many moves.
-  - Toy Box, picked: new things rather than an endless run (an endless run needs a new mixed basket that can still be
-    won each time, which the solver can't promise). Already suggested: a catnip mouse that matches any toy, a basket
-    with a lid that opens after a lap, Laya asleep on a space of the track. More: a ball that rolls twice as fast as the
-    other toys, a basket with a picture on it that takes only that toy, a fork in the track that switches sides each
-    time a toy goes through, and a kitten who bats one toy back into a basket every lap.
-  - Twirl, picked: knotted ribbons (two tied together slide only once both are free), and a sleeping cat in the way
-    who moves to a new spot every few ribbons. More: ribbons that cross over and under (the top one goes first),
-    ribbons pointed at both ends (tap the end to pick the way), bows that pin a spot until the ribbons round them have
-    gone, a kitten who bats a ribbon part way along every few taps, and mats in shapes (a heart, a cat's head).
+  - Knock It Off, picked (2026-11-15): a second cat to switch to, the lazy Susan (its four squares turn a quarter
+    each time the cat steps on it), a spray bottle that watches a row (the cat can't end a move in its line), and the
+    robot vacuum that moves each turn. The tray (it carries what's on it) is still being considered. Not picked: the
+    puddle, laundry basket, sleeping dog, stack of cups, the human coming home.
+  - Toy Box, picked (2026-11-15): a catnip mouse that matches any toy, a basket with a picture on it that takes only
+    that toy, and a fork in the track that switches sides each time a toy goes through. Not picked: an endless run (each
+    new basket would need a mix that can still be won, which the solver can't promise) and a fast ball (the toys ride
+    in spaces that all move together, so it would be stuck behind the toy in front). Explained to the owner, not yet
+    decided: a basket with a lid that opens after a lap, and Laya asleep on a space of the track (toys go round her,
+    so it's one space fewer, and she moves now and then). More for the owner: a gate on the track that holds toys
+    back until it's tapped, a side pocket that keeps one toy off the track until it's tapped, a basket that moves to
+    another spot each time a set is carried off, a gift-wrapped toy whose kind shows only once it's in a basket, and a
+    reverse switch that sends the track the other way, once a level.
+  - Twirl, picked (2026-11-15): knotted ribbons (two tied together slide only once both are free), ribbons that cross
+    over and under (the top one goes first), ribbons pointed at both ends (tap an end to pick the way), and a kitten
+    who bats a ribbon part of the way along every few taps. Not picked: the sleeping cat that moves (the kitten does
+    something like it), bows, shaped mats.
 - [ ] **Zen:** look for more games that could have one (Pounce on Three and Bubbles do).
 
 ## Star cats decided, waiting for pictures
