@@ -1660,7 +1660,9 @@ const G = (() => {
     // too long (the owner, 2026-11-14). A sound's notes still start when they did; each one is shorter (its attack,
     // hold, glide and fade together). The shortest, 0.06 s or less (clicks, ticks), stay as they are.
     const LENGTH = .55;
-    const shorter = dur => dur <= .06 ? 1 : (.06 + (dur - .06) * LENGTH) / dur;
+    // gV, gL: the sound playing now's own volume and length, when the owner set one on its row (ADJ, below)
+    let gV = 1, gL = 1;
+    const shorter = dur => dur <= .06 ? 1 : (.06 + (dur - .06) * LENGTH * gL) / dur;
     const squeeze = (r, fs) => fs && fs.map(([x, v]) => [x * r, v]);
     const subs = [], Z = .0001;
     const here = () => CURRENT || SLUG;
@@ -1688,6 +1690,7 @@ const G = (() => {
     const rnd = (a, b) => a + Math.random() * (b - a), pick = a => a[Math.floor(Math.random() * a.length)];
     function path(param, t, fs) { param.setValueAtTime(fs[0][1], t + fs[0][0]); for (let i = 1; i < fs.length; i++) param.exponentialRampToValueAtTime(fs[i][1], t + fs[i][0]); }
     function env(param, t, a, peak, dur, hold = 0) {
+      peak *= gV;
       param.setValueAtTime(Z, t); param.exponentialRampToValueAtTime(Math.max(peak, Z * 2), t + a);
       if (hold) param.setValueAtTime(Math.max(peak, Z * 2), t + a + hold);
       param.exponentialRampToValueAtTime(Z, t + Math.max(dur, a + hold + .01));
@@ -1809,10 +1812,13 @@ const G = (() => {
     }
     function clip(name, t, vol = 1) {
       const buf = clips[name]; if (!buf) return false;
-      const s = ctx.createBufferSource(), g = ctx.createGain(); s.buffer = buf; g.gain.value = vol; s.connect(g); g.connect(master); s.start(t); return true;
+      const s = ctx.createBufferSource(), g = ctx.createGain(); s.buffer = buf; g.gain.value = vol * gV; s.connect(g); g.connect(master); s.start(t); return true;
     }
+    // rec(name, vol): a recording from sounds/ (the owner's Keeps from Clip Bench, CC0 from Freesound: ARTWORK.md), as a
+    // sound; it's fetched once sound starts, and the first play before it's in is silent
+    const rec = (name, vol = 1) => { wanted[name] = `sounds/${name}.mp3`; if (ctx && !clips[name]) fetchClip(name); return (t, o = {}) => { clip(name, t, vol * (o.k ?? 1)); }; };
     const PENTA = [523, 587, 659, 784, 880, 1047, 1175, 1319, 1568, 1760, 2093, 2349, 2637, 3136];
-    const kit = {clip, tone, noise, modal, bell, mallet, musicBox, voice, voice2, whoosh, thump, tick, boing, chirp, hiss, bubble, plip, splash, pour, dunk, meow, yawn, scratching, rustle, crinkle, purr, slideDown, filt, vibrato, rnd, pick, PENTA};
+    const kit = {rec, clip, tone, noise, modal, bell, mallet, musicBox, voice, voice2, whoosh, thump, tick, boing, chirp, hiss, bubble, plip, splash, pour, dunk, meow, yawn, scratching, rustle, crinkle, purr, slideDown, filt, vibrato, rnd, pick, PENTA};
 
     // the moments every game shares (the owner's picks)
     const SOUNDS = {
@@ -1837,30 +1843,30 @@ const G = (() => {
       spring: (t, o = {}) => boing(t, 140, 420, .55, .3 * (o.k ?? 1)),   // something bounces off a spring: a cartoon boing
       springSet: t => boing(t, 300, 520, .3, .16),   // a spring put down: a little sproing
       yarnLand: (t, o = {}) => thump(t, .3 * (o.k ?? 1), 130),   // yarn lands or bumps: a soft thump
-      yarnGrow: (t, o = {}) => noise({t, dur: .03, vol: .08 * (o.k ?? 1), type: "lowpass", f: 900}),   // a strand of yarn grows: a soft pad
-      yarnWind: t => whoosh(t, 2200, 1200, .1, .12),   // yarn wound back: a swish down
+      yarnGrow: (t, o = {}) => noise({t, dur: .04, vol: .14 * (o.k ?? 1), f: 600, q: 1, a: .005}),   // a strand of yarn grows: a yarn tick
+      yarnWind: rec("fabric-grab-07"),   // yarn wound back: a fabric grab (a recording)
       pompomLand: (t, o = {}) => noise({t, dur: .08, vol: .4 * (o.k ?? 1), f: 350, q: 1, a: .01}),   // a pompom or fluffball lands: a fluffy thup
       glassKnock: (t, o = {}) => modal({t, parts: [[1500, 1, .15], [2600, .4, .08]], vol: .14 * (o.k ?? 1)}),   // dull glass
-      glassOver: t => splash(t, .8),   // a glass of water knocked over: a splash
+      glassOver: rec("splash-01"),   // a glass of water knocked over, a spill: a splash (a recording)
       mugKnock: (t, o = {}) => { modal({t, parts: [[260, 1, .1], [700, .5, .06], [1800, .2, .03]], vol: .32 * (o.k ?? 1)}); thump(t, .25 * (o.k ?? 1), 100); },   // a heavy clunk
-      offTable: t => whoosh(t, 900, 2600, .073, .25),   // off a table or shelf: the swipe, and nothing as it lands (at 40% length)
+      offTable: t => whoosh(t, 600, 2400, .16, .35),   // off a table or shelf: a whoosh
       tape: t => tone({fs: [[0, 500], [.08, 900]], t, dur: .09, vol: .15}),   // a paw on tape: a hop
-      lemon: t => hiss(t),   // a lemon: a hiss
-      candle: t => hiss(t, .35, .3),   // too close to a candle: a short hiss
+      lemon: rec("hiss-2", .5),   // a lemon: a hiss (a recording, at half)
+      candle: t => noise({t, dur: .4, vol: .4, type: "lowpass", fs: [[0, 400], [.25, 1500], [.4, 800]], a: .12}),   // too close to a candle: a fwoomp
       catnip: t => tone({f: 600, t, dur: 1.0, vol: .12, a: .1, hold: .5, vib: [7, 80]}),   // rolling in catnip: a wobbly slide
-      bell: (t, o = {}) => bell({f: 1760, t, dur: .6, vol: .1 * (o.k ?? 1), ratio: 2.76, index: 1.2}),   // a bell knocked: ding
+      bell: rec("toy-jingle-08", .6),   // a bell knocked: a toy jingle (a recording)
       fish: t => { tone({f: 1319, type: "triangle", t, dur: .08, vol: .15}); tone({f: 1976, type: "triangle", t: t + .07, dur: .14, vol: .15}); },   // a fish treat: two notes up
       box: (t, o = {}) => { const p = o.p ?? 1; noise({t, dur: .07, vol: .35, f: 420 * p, q: 1, a: .005}); thump(t, .12, 140 * p); },   // a cardboard box opened: a flap
       mirror: t => modal({t, parts: [[2600, 1, .08], [5200, .3, .05]], vol: .12, click: 0}),   // a mirror tipped: a tink
       magnet: t => { tick(t, .3, 1800); tone({fs: [[0, 140], [.1, 70]], t, dur: .12, vol: .1}); noise({t, dur: .08, vol: .05, type: "lowpass", f: 400}); },   // a magnet put on: a click
-      catWakes: t => { chirp(t, .45); chirp(t + .22, .45, 1.15); },   // a cat wakes up: two chirps (the big yawn is out: the owner hates it, 2026-11-14)
+      catWakes: rec("yawn-snore"),   // a cat wakes up: a yawn and a snore (a recording; the made big yawn is out: the owner hates it)
       catSettles: t => purr(t),   // a cat settles in to nap: a soft purr
-      catCheers: t => { chirp(t, .45); chirp(t + .22, .45, 1.15); },   // a cat cheers: two chirps
-      catFound: t => meow(t),   // a cat found or freed: a meow
+      catCheers: rec("chirp-purr-04"),   // a cat cheers: a chirp-purr (a recording)
+      catFound: rec("chirp-06"),   // a cat found or freed: a chirp (a recording)
       catRuns: t => { for (let i = 0; i < 10; i++) thump(t + i * .07, .1, 170 + (i % 2) * 25); },   // a pitter-patter run
       catPounce: t => tone({fs: [[0, 260], [.14, 620]], t, dur: .14, vol: .2, a: .01}),   // a soft boing
       catLands: t => thump(t, .4, 140),   // soft paws
-      shake: t => tone({f: 160, type: "triangle", t, dur: .6, vol: .2, a: .02, hold: .3, vib: [9, 50]}),   // wobble
+      shake: t => { for (let i = 0; i < 4; i++) whoosh(t + i * .1, i % 2 ? 2200 : 1200, i % 2 ? 1200 : 2200, .08, .14); },   // a swish back and forth (90%, twice as long: ADJ)
       wipe: t => noise({t, dur: .5, vol: .3, fs: [[0, 800], [.25, 2400], [.5, 900]], q: 3, a: .05, hold: .25}),   // squeegee
       // the word games' moments (Cat Spells and Curious Cat, 2026-11-14)
       key: t => modal({t, parts: [[1800, 1, .03], [4000, .3, .02]], vol: .2, click: 3500}),   // a letter typed or changed: a key tap
@@ -1868,17 +1874,22 @@ const G = (() => {
       chime: t => bell({f: 1568, t, dur: .5, vol: .07, ratio: 2.01, index: .6}),   // a piece in its place: a soft chime
       swish: t => whoosh(t, 1200, 2200, .1, .15),   // a soft swish
     };
+    // the owner's own volume and length for a sound, from its row on the listening page: [volume, length]
+    const ADJ = {catSettles: [2, 1.3], shake: [.9, 2]};
     function play(name, o = {}, delay = 0) {
       const f = SOUNDS[name];
       if (!f || !on() || document.hidden || !ctx || ctx.state !== "running") return;
-      try { f(ctx.currentTime + .01 + delay, o); } catch (e) { console.error("sound", name, e); }
+      const [v, l] = ADJ[name] || [1, 1]; gV = v; gL = l;
+      try { f(ctx.currentTime + .01 + delay, o); } catch (e) { console.error("sound", name, e); } finally { gV = 1; gL = 1; }
     }
     function set(v) {
       const slug = here(), all = load(SOUND); if (v) delete all[slug]; else all[slug] = false; save(SOUND, all);
       if (v) { context(); play("tap"); }
       subs.forEach(f => f(v));
     }
-    return {play, set, on, kit, context, define: map => Object.assign(SOUNDS, map), get: name => SOUNDS[name],
+    return {play, set, on, kit, context, define: map => Object.assign(SOUNDS, map), adjust: map => Object.assign(ADJ, map), get: name => SOUNDS[name] && ((t, o) => {   // a shared sound for a game's own name, with its own volume and length
+        const [v, l] = ADJ[name] || [1, 1], pv = gV, pl = gL; gV = pv * v; gL = pl * l;
+        try { SOUNDS[name](t, o); } finally { gV = pv; gL = pl; } }),
       clip: (name, file) => { wanted[name] = file; if (ctx) fetchClip(name); },
       out: () => master, onChange: f => subs.push(f), get ctx() { return ctx; }};
   })();
