@@ -77,16 +77,23 @@ cats that point their own way are Day Light (`daylight/`, in beta).
   Under the Blanket (a one-cat level 1, so 11 levels; the U-turn between two cats is a short lesson on the first
   two-cat blanket). Next to look at: which other games teach everything up front.
 - [ ] **Toe Beans:** getting that hard with few wins is disheartening; the moving-down rule above is the fix to try.
-- [ ] **Toy Box, Twirl and Knock It Off need more** past their hardest level. Suggestions for the owner to pick from
-  (2026-11-15):
-  - Toy Box: a marathon past level 21 (a new basket of hidden toys comes in each time one's carried off; the score is
-    baskets cleared before the track jams); level 21 again with no helpers; or levels 22 on with one new thing each (a
-    catnip mouse that matches any toy, a basket with a lid that opens after a lap, Laya asleep on a space of the track).
-  - Twirl: knotted ribbons (two tied together slide only once both are free); Bugsy napping on the mat, in the way,
-    moving to a new spot every few ribbons; mats in shapes (a heart, a cat's head) rather than rectangles.
-  - Knock It Off: a par for every table (Hint already knows the shortest way), with a mark for clearing it in par, so
-    every level has more to give; a second cat to switch to (one can stand still for the other's things to stop
-    against); new things (a tray that carries what's on it, a robot vacuum that moves each turn).
+- [ ] **Toy Box, Twirl and Knock It Off need more** past their hardest level. The owner's picks (2026-11-15), and more
+  ideas of the same kind to choose from; each would be one new thing a level, from the level after the top one:
+  - Knock It Off, picked: a second cat to switch to, a tray that carries what's on it, and (most of all) a robot
+    vacuum that moves each turn. More: a puddle (a knocked-over glass leaves one; things slide across it until they hit
+    something), a lazy Susan (its four squares turn a quarter each time the cat steps on it), a laundry basket (things
+    pushed in stay put), a dog asleep by one side (knock nothing off that side or it wakes), a spray bottle that
+    watches a row (the cat can't end a move in its line), a stack of cups (pushed, they spill out into a line), and
+    the human coming home in so many moves.
+  - Toy Box, picked: new things rather than an endless run (an endless run needs a new mixed basket that can still be
+    won each time, which the solver can't promise). Already suggested: a catnip mouse that matches any toy, a basket
+    with a lid that opens after a lap, Laya asleep on a space of the track. More: a ball that rolls twice as fast as the
+    other toys, a basket with a picture on it that takes only that toy, a fork in the track that switches sides each
+    time a toy goes through, and a kitten who bats one toy back into a basket every lap.
+  - Twirl, picked: knotted ribbons (two tied together slide only once both are free), and a sleeping cat in the way
+    who moves to a new spot every few ribbons. More: ribbons that cross over and under (the top one goes first),
+    ribbons pointed at both ends (tap the end to pick the way), bows that pin a spot until the ribbons round them have
+    gone, a kitten who bats a ribbon part way along every few taps, and mats in shapes (a heart, a cat's head).
 - [ ] **Zen:** look for more games that could have one (Pounce on Three and Bubbles do).
 
 ## Star cats decided, waiting for pictures
