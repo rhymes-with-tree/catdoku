@@ -74,7 +74,7 @@ canvas{display:block;height:120px;cursor:crosshair}
 <div class="wrap">
   <header style="display:grid;gap:8px">
     <h1>Clip Bench</h1>
-    <p class="lede">Your Freesound finds, each with the cuts made from it. Tap a cut to hear it. Drag its edges on the waveform to re-cut it, or drag across a new spot to add one. Name and tag each cut, then mark it <b>Keep</b>, <b>Re-cut</b> (say what to change) or <b>Toss</b>. Everything saves as you go, and Claude reads it from here.</p>
+    <p class="lede">Your Freesound finds, each with the cuts made from it. Keeps move to the listening page once Claude has cut them, so a recording with nothing left to sort folds away (Show opens it, to make more cuts). Tap a cut to hear it. Drag its edges on the waveform to re-cut it, or drag across a new spot to add one. Name and tag each cut, then mark it <b>Keep</b>, <b>Re-cut</b> (say what to change) or <b>Toss</b>. Everything saves as you go, and Claude reads it from here.</p>
   </header>
   <div class="bar" id="filters" role="group" aria-label="Show cuts"></div>
   <div class="bar"><span class="status" id="status">Loading your cuts…</span></div>
@@ -114,7 +114,7 @@ let cuts = {};
 const open = store.get("bench.open", {});   // what the viewer opened or folded by hand: cut id, or "src:"+number
 const setOpen = (k, v) => { open[k] = v; store.set("bench.open", open); };
 const cutOpen = (id, c) => open[id] ?? c.status === "new";
-const srcOpen = s => { const l = Object.values(cuts).filter(c => c.src === s.fid); return open["src:" + s.fid] ?? (!l.length || l.some(c => c.status === "new")); };          // id -> {src, start, end, name, tag, status, note}
+const srcOpen = s => { const l = Object.values(cuts).filter(c => c.src === s.fid); return open["src:" + s.fid] ?? l.some(c => c.status === "new"); };   // folded once nothing on it is left to sort          // id -> {src, start, end, name, tag, status, note}
 let db = null, col = null, filter = store.get("bench.filter", "all"), selected = null;
 const buffers = {}, peaks = {}, zoom = {};
 let ctx = null, playing = null;
@@ -281,14 +281,16 @@ function updateHead(s) {
   const el = document.querySelector(`[data-fid="${s.fid}"]`); if (!el) return;
   const l = Object.values(cuts).filter(c => c.src === s.fid), n = k => l.filter(c => c.status === k).length, o = srcOpen(s);
   el.classList.toggle("folded", !o);
-  el.querySelector(".summary").innerHTML = l.length ? STATUS.filter(([k]) => n(k)).map(([k, lab]) => `<b style="color:var(--${k})">${n(k)}</b> ${lab.toLowerCase()}`).join(" · ") : "";
+  el.querySelector(".summary").innerHTML = l.length ? STATUS.filter(([k]) => n(k)).map(([k, lab]) => `<b style="color:var(--${k})">${n(k)}</b> ${lab.toLowerCase()}`).join(" · ") : "All moved to the listening page";
   el.querySelector(".foldbtn").textContent = o ? "Hide" : "Show";
   el.querySelector(".foldbtn").setAttribute("aria-expanded", String(o));
 }
 function render() {
   renderFilters();
   const list = $("list"); list.replaceChildren();
-  for (const s of SOURCES) {
+  // recordings with cuts still to sort come first; the finished ones gather at the bottom
+  const todo = s => Object.values(cuts).some(c => c.src === s.fid && c.status === "new") ? 0 : 1;
+  for (const s of [...SOURCES].sort((a, b) => todo(a) - todo(b))) {
     const n = Object.values(cuts).filter(c => c.src === s.fid).length;
     const el = document.createElement("section"); el.className = "src"; el.dataset.fid = s.fid;
     el.innerHTML = `<div class="srchead"><div><h2>${s.name}</h2><p class="meta">Freesound ${s.fid} · ${s.by} · ${s.dur.toFixed(1)} s${s.offset ? ` (silent until ${s.offset} s; the wave starts there)` : ""} · ${n} cut${n === 1 ? "" : "s"}</p></div>
@@ -322,9 +324,15 @@ render();
     const next = {}; snap.docs.forEach(d => { next[d.id] = {...d.data()}; });   // snapshots are frozen: copy to edit
     // keep what's being typed in a cut that has a save waiting
     for (const id in timers) if (cuts[id]) next[id] = cuts[id];
+    // redraw only the recordings whose cuts really changed (your own saves come back unchanged), so the page stays put
+    const of = (m, fid) => JSON.stringify(Object.entries(m).filter(([, c]) => c.src === fid).sort());
+    const wasFirst = first, changed = first ? SOURCES : SOURCES.filter(s => of(cuts, s.fid) !== of(next, s.fid));
     cuts = next;
     if (first) { first = false; setStatus(Object.keys(cuts).length ? `${Object.keys(cuts).length} cuts. Changes save as you go.` : "No cuts yet. Drag across a waveform to make one."); }
-    if (!document.activeElement || !document.activeElement.closest(".cut")) render(); else { renderFilters(); SOURCES.forEach(drawSrc); }
+    if (wasFirst) { render(); return; }
+    renderFilters();
+    const typing = document.activeElement && document.activeElement.closest(".cut");
+    for (const s of changed) { if (!typing || !typing.closest(`[data-fid="${s.fid}"]`)) renderCuts(s); updateHead(s); drawSrc(s); }
   }, () => { setStatus("Couldn't load the cuts. Reload the page to try again."); });
 })();
 </script>
