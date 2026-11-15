@@ -1816,7 +1816,10 @@ const G = (() => {
     }
     // rec(name, vol): a recording from sounds/ (the owner's Keeps from Clip Bench, CC0 from Freesound: ARTWORK.md), as a
     // sound; it's fetched once sound starts, and the first play before it's in is silent
-    const rec = (name, vol = 1) => { wanted[name] = `sounds/${name}.mp3`; if (ctx && !clips[name]) fetchClip(name); return (t, o = {}) => { clip(name, t, vol * (o.k ?? 1)); }; };
+    const want = name => { if (wanted[name]) return; wanted[name] = `sounds/${name}.mp3`; if (ctx) fetchClip(name); };
+    const rec = (name, vol = 1) => { want(name); return later(name, vol); };
+    // later(): a shared sound that's a recording, fetched only in a game that uses it (G.sound.get, or play by its name)
+    const later = (name, vol = 1) => Object.assign((t, o = {}) => { want(name); clip(name, t, vol * (o.k ?? 1)); }, {need: name});
     const PENTA = [523, 587, 659, 784, 880, 1047, 1175, 1319, 1568, 1760, 2093, 2349, 2637, 3136];
     const kit = {rec, clip, tone, noise, modal, bell, mallet, musicBox, voice, voice2, whoosh, thump, tick, boing, chirp, hiss, bubble, plip, splash, pour, dunk, meow, yawn, scratching, rustle, crinkle, purr, slideDown, filt, vibrato, rnd, pick, PENTA};
 
@@ -1844,25 +1847,24 @@ const G = (() => {
       springSet: t => boing(t, 300, 520, .3, .16),   // a spring put down: a little sproing
       yarnLand: (t, o = {}) => thump(t, .3 * (o.k ?? 1), 130),   // yarn lands or bumps: a soft thump
       yarnGrow: (t, o = {}) => noise({t, dur: .04, vol: .14 * (o.k ?? 1), f: 600, q: 1, a: .005}),   // a strand of yarn grows: a yarn tick
-      yarnWind: rec("fabric-grab-07"),   // yarn wound back: a fabric grab (a recording)
+      yarnWind: later("fabric-grab-07"),   // yarn wound back: a fabric grab (a recording)
       pompomLand: (t, o = {}) => noise({t, dur: .08, vol: .4 * (o.k ?? 1), f: 350, q: 1, a: .01}),   // a pompom or fluffball lands: a fluffy thup
       glassKnock: (t, o = {}) => modal({t, parts: [[1500, 1, .15], [2600, .4, .08]], vol: .14 * (o.k ?? 1)}),   // dull glass
-      glassOver: rec("splash-01"),   // a glass of water knocked over, a spill: a splash (a recording)
+      glassOver: later("splash-01"),   // a glass of water knocked over, a spill: a splash (a recording)
       mugKnock: (t, o = {}) => { modal({t, parts: [[260, 1, .1], [700, .5, .06], [1800, .2, .03]], vol: .32 * (o.k ?? 1)}); thump(t, .25 * (o.k ?? 1), 100); },   // a heavy clunk
-      offTable: t => whoosh(t, 600, 2400, .16, .35),   // off a table or shelf: a whoosh
-      tape: t => tone({fs: [[0, 500], [.08, 900]], t, dur: .09, vol: .15}),   // a paw on tape: a hop
-      lemon: rec("hiss-2", .5),   // a lemon: a hiss (a recording, at half)
+      tape: t => { for (let i = 0; i < 7; i++) noise({t: t + i * .025 + rnd(0, .01), dur: .02, vol: .25, f: rnd(1200, 2600), q: 1}); },   // a paw on tape: a sticky thhp
+      lemon: later("hiss-2", .15),   // a lemon: a hiss (a recording, at 15%: every hiss is this one, the owner, 2026-11-15)
       candle: t => noise({t, dur: .4, vol: .4, type: "lowpass", fs: [[0, 400], [.25, 1500], [.4, 800]], a: .12}),   // too close to a candle: a fwoomp
       catnip: t => tone({f: 600, t, dur: 1.0, vol: .12, a: .1, hold: .5, vib: [7, 80]}),   // rolling in catnip: a wobbly slide
-      bell: rec("toy-jingle-08", .6),   // a bell knocked: a toy jingle (a recording)
+      bell: later("toy-jingle-08", .6),   // a bell knocked: a toy jingle (a recording)
       fish: t => { tone({f: 1319, type: "triangle", t, dur: .08, vol: .15}); tone({f: 1976, type: "triangle", t: t + .07, dur: .14, vol: .15}); },   // a fish treat: two notes up
       box: (t, o = {}) => { const p = o.p ?? 1; noise({t, dur: .07, vol: .35, f: 420 * p, q: 1, a: .005}); thump(t, .12, 140 * p); },   // a cardboard box opened: a flap
       mirror: t => modal({t, parts: [[2600, 1, .08], [5200, .3, .05]], vol: .12, click: 0}),   // a mirror tipped: a tink
       magnet: t => { tick(t, .3, 1800); tone({fs: [[0, 140], [.1, 70]], t, dur: .12, vol: .1}); noise({t, dur: .08, vol: .05, type: "lowpass", f: 400}); },   // a magnet put on: a click
-      catWakes: rec("yawn-snore"),   // a cat wakes up: a yawn and a snore (a recording; the made big yawn is out: the owner hates it)
+      catWakes: later("yawn-snore"),   // a cat wakes up: a yawn and a snore (a recording; the made big yawn is out: the owner hates it)
       catSettles: t => purr(t),   // a cat settles in to nap: a soft purr
-      catCheers: rec("chirp-purr-04"),   // a cat cheers: a chirp-purr (a recording)
-      catFound: rec("chirp-06"),   // a cat found or freed: a chirp (a recording)
+      catCheers: later("chirp-purr-04"),   // a cat cheers: a chirp-purr (a recording)
+      catFound: later("chirp-06"),   // a cat found or freed: a chirp (a recording)
       catRuns: t => { for (let i = 0; i < 10; i++) thump(t + i * .07, .1, 170 + (i % 2) * 25); },   // a pitter-patter run
       catPounce: t => tone({fs: [[0, 260], [.14, 620]], t, dur: .14, vol: .2, a: .01}),   // a soft boing
       catLands: t => thump(t, .4, 140),   // soft paws
@@ -1877,7 +1879,7 @@ const G = (() => {
     // the owner's own volume and length for a sound, from its row on the listening page: [volume, length]
     const ADJ = {catSettles: [2, 1.3], shake: [.9, 2]};
     function play(name, o = {}, delay = 0) {
-      const f = SOUNDS[name];
+      const f = SOUNDS[name]; if (f && f.need) want(f.need);
       if (!f || !on() || document.hidden || !ctx || ctx.state !== "running") return;
       const [v, l] = ADJ[name] || [1, 1]; gV = v; gL = l;
       try { f(ctx.currentTime + .01 + delay, o); } catch (e) { console.error("sound", name, e); } finally { gV = 1; gL = 1; }
@@ -1887,7 +1889,7 @@ const G = (() => {
       if (v) { context(); play("tap"); }
       subs.forEach(f => f(v));
     }
-    return {play, set, on, kit, context, define: map => Object.assign(SOUNDS, map), adjust: map => Object.assign(ADJ, map), get: name => SOUNDS[name] && ((t, o) => {   // a shared sound for a game's own name, with its own volume and length
+    return {play, set, on, kit, context, define: map => Object.assign(SOUNDS, map), adjust: map => Object.assign(ADJ, map), get: name => SOUNDS[name] && (SOUNDS[name].need && want(SOUNDS[name].need), (t, o) => {   // a shared sound for a game's own name, with its own volume and length
         const [v, l] = ADJ[name] || [1, 1], pv = gV, pl = gL; gV = pv * v; gL = pl * l;
         try { SOUNDS[name](t, o); } finally { gV = pv; gL = pl; } }),
       clip: (name, file) => { wanted[name] = file; if (ctx) fetchClip(name); },
