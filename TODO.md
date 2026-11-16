@@ -45,6 +45,15 @@ Knock It Off's forgiving first two levels, and Pounce saving while toys fall):
   moves on level N"). Look again with a few weeks of it.
 - [ ] **Weak level 1s to watch** (small samples): Cat Pile 16 → 7, Scratch That 17 → 8, Window Ledges 11 → 5, Kitten
   Caboodle 10 → 5.
+- [ ] **Under the Blanket: out of beta again.** Moved to beta on 2026-11-16 (the owner's call) after its first week on
+  the front page: 11 starts at level 1, 6 solves. Still to settle what makes level 1 easier to get into.
+- [ ] **Toe Beans on an iPad:** a number just made by combining two sometimes didn't show until tapped again (feedback,
+  2026-11-14, Safari in Dark Mode). The six number buttons are changed in place since 2026-11-16 rather than made afresh
+  each move; the headless browser never showed it, so check on a real iPad.
+- [ ] **Twirl's sound on an iPhone** (feedback, 2026-11-16): sometimes no sound at all, and sometimes quieter after
+  zooming the mat. Since the same day a tap's sound waits for the sound to wake, and sound stuck after a call or another
+  app restarts itself. Check on an iPhone; the quieter-after-zooming part wasn't found. The silent switch mutes the
+  site's sound on purpose ("ambient", so music keeps playing).
 - [ ] **Somewhere to go past the hardest level.** (Twirl has levels 21 to 24 since 2026-11-15.) Toy Box's level 21 is a fifth of its starts; Twirl and Knock It Off
   at 20 are the same.
 
@@ -86,11 +95,12 @@ cats that point their own way are Day Light (`daylight/`, in beta).
   - Toy Box: levels 22 to 27 built 2026-11-15 (catnip mice, picture baskets, a fork, a basket on wheels, gifts, a
     waiting basket; README, Toy Box). The owner to play them; level 23's picture baskets sometimes take a few seconds
     to deal (the solver searches longer), which the page hides by dealing the next level ahead.
-  - Twirl: levels 21 to 27 and Endless built 2026-11-15: ribbons pointed at both ends, crossing over and under, knots,
-    all three, tiny ribbons, a mat bigger than the screen, one colour, thin ribbons (level 28), very long ribbons with
-    crossings and knots (level 29), and a mat that keeps unrolling (README, Twirl).
-    The owner to play them on a phone: whether the knots and crossings show well enough at Fit on the big mats, whether
-    level 25's tiny ribbons need zooming to tap, and how hard 24 and 27 are. Endless could later take in crossings,
+  - Twirl: levels 21 to 28 and Endless built 2026-11-15: ribbons pointed at both ends, crossing over and under, knots,
+    all three, a mat bigger than the screen (level 25; Fit shows it all since 2026-11-16), one colour, thin ribbons
+    (level 27), very long ribbons with crossings and knots (level 28), and a mat that keeps unrolling (README, Twirl).
+    The tiny-ribbons level went on 2026-11-16 (the owner's call), and a Grid switch came in the same day.
+    The owner to play them on a phone: whether the knots and crossings show well enough at Fit on the big mats, and
+    how hard 24 and 26 are. Endless could later take in crossings,
     knots and both-ended ribbons, or speed up as it goes. Not now (the owner, 2026-11-15): the sleeping cat that moves and the
     kitten who bats a ribbon. Not picked: bows, shaped mats.
 - [ ] **Wind Up: levels 13 to 21** built 2026-11-15 (catnip, rubber balls, loose yarn, springs, sticky tape, a tipping

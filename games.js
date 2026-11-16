@@ -61,13 +61,13 @@ const G = (() => {
     ["Pawlinko", "pawlinko", "Take turns with Gus and Peanut knocking toys down the climbing wall into the cat beds", "#7885BA", "prowl", "plinko pachinko pegs pegboard galton board drop balls bounce plinko physics yarn toys cat climbing wall tree beds springs action", "2026-11-02"],
     ["Cross Stitch", "crossstitch", "Stitch the sampler by the counts to see the picture", "#BD5538", "logic", "nonogram nonograms picross griddlers paint by numbers hanjie pattern pic-a-pix logic pictures cross stitch sampler embroidery", "2026-11-06"],
     ["Zoomies", "zoomies", "Retrace the cat's 3 a.m. zoomies around the house", "#4E577D", "lines", "signpost arrows path numbers jumps queen chain link zoomies", "2026-11-08"],
-    ["Under the Blanket", "blanket", "Find the cats with a feather", "#8D78AD", "logic", "black box blackbox rays atoms deflection reflection hidden balls feather wand blanket bugsy", "2026-11-09"],
     ["Bed Hog", "bedhog", "Slide the sprawled cats until there's room for you", "#E16A4A", "teasers", "klotski rush hour sliding block puzzle unblock slide bed hog huarong sleeping cats", "2026-11-09"],
     ["Pounce Up", "pounceup", "Help Rayla pounce up the tallest bookcase in the house", "#7885BA", "prowl", "doodle jump platform jumping climbing bookcase shelves action springs", "2026-11-12"],
   ];
   // Games in beta: their pages work (open them by their address), but they're left off the front page, the games menu,
   // search, favorites and the daily challenge until they're finished. Same fields as GAMES.
   const BETA = [
+    ["Under the Blanket", "blanket", "Find the cats with a feather", "#8D78AD", "logic", "black box blackbox rays atoms deflection reflection hidden balls feather wand blanket bugsy", "2026-11-09"],
     ["Day Light", "daylight", "Get every cat napping in the sun, though some point their own way", "#ECA818", "teasers", "lights out flip switch spots arrows night light nap", "2026-11-12"],
     ["Swap-a-Pom", "swapapom", "Swap the pompoms to spell words, with Moonpie for company", "#B94588", "words", "gram jam match 3 three words swap letters scrabble pompoms pom poms moonpie purr", "2026-11-13"],
     ["Pawstcards", "pawstcards", "Guess where Pinecone is from her postcards", "#73A7AE", "prowl", "geography countries wikipedia postcards guess the country clues redacted trivia travel pinecone", "2026-11-11"],
@@ -1667,6 +1667,7 @@ const G = (() => {
     const subs = [], Z = .0001;
     const here = () => CURRENT || SLUG;
     const on = () => soundOn(here());
+    let stuck = null, remade = 0;
     function context() {
       if (!ctx) {
         const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null;
@@ -1676,15 +1677,27 @@ const G = (() => {
         master = ctx.createGain(); master.gain.value = VOLUME; master.connect(comp); comp.connect(ctx.destination);
         noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
         const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-        for (const name in wanted) fetchClip(name);
+        for (const name in wanted) if (!clips[name]) fetchClip(name);   // (a recording already in works in any context)
       }
-      if (ctx.state !== "running" && !document.hidden) ctx.resume().catch(() => {});
+      if (ctx.state !== "running" && !document.hidden) {
+        ctx.resume().catch(() => {});
+        // An iPhone can leave the sound stuck after a call, Siri or another app's sound ("interrupted", or suspended
+        // for good), and then it stays silent whatever's tapped (Twirl's feedback, 2026-11-16). If a tap hasn't
+        // got it going within a moment, start afresh (no more than once in 5 seconds).
+        if (!stuck) stuck = setTimeout(() => {
+          stuck = null;
+          if (!ctx || ctx.state === "running" || document.hidden || !on() || Date.now() - remade < 5000) return;
+          remade = Date.now(); const old = ctx; ctx = null; try { old.close(); } catch (e) {}
+          context();
+        }, 600);
+      }
       return ctx;
     }
     // the first tap or key (and every one after, in case the phone suspended it) starts the sound, if it's on
     const wake = () => { if (on()) context(); };
-    addEventListener("pointerdown", wake, true); addEventListener("keydown", wake, true);
+    addEventListener("pointerdown", wake, true); addEventListener("keydown", wake, true); addEventListener("touchend", wake, true);
     document.addEventListener("visibilitychange", () => { if (!ctx) return; if (document.hidden) ctx.suspend().catch(() => {}); else if (on()) ctx.resume().catch(() => {}); });
+    addEventListener("pageshow", e => { if (e.persisted && ctx && on()) ctx.resume().catch(() => {}); });   // back to a page kept in memory
 
     /* the pieces every sound is made of (t: when, in the context's seconds) */
     const rnd = (a, b) => a + Math.random() * (b - a), pick = a => a[Math.floor(Math.random() * a.length)];
@@ -1880,7 +1893,12 @@ const G = (() => {
     const ADJ = {catSettles: [2, 1.3], shake: [.9, 2]};
     function play(name, o = {}, delay = 0) {
       const f = SOUNDS[name]; if (f && f.need) want(f.need);
-      if (!f || !on() || document.hidden || !ctx || ctx.state !== "running") return;
+      if (!f || !on() || document.hidden || !ctx) return;
+      if (ctx.state !== "running") {   // still waking (the tap that wakes it plays its sound once it's up, if that's soon)
+        const asked = Date.now(), c = ctx;
+        c.resume().then(() => { if (c === ctx && c.state === "running" && Date.now() - asked < 400) play(name, o, delay); }).catch(() => {});
+        return;
+      }
       const [v, l] = ADJ[name] || [1, 1]; gV = v; gL = l;
       try { f(ctx.currentTime + .01 + delay, o); } catch (e) { console.error("sound", name, e); } finally { gV = 1; gL = 1; }
     }
@@ -1960,7 +1978,8 @@ const G = (() => {
     pickpile: [["dim", "Dim stuck blocks", "Blocks that can't come off yet are dimmed", true, {row: "decor", inv: true}]],
     tunnelrun: [["tracks", "Tracks", "Rugs where whole rows and columns slide", false, {icon: "swap", words: ["Turning rugs", "Sliding tracks"]}]],
     toebeans: [["rev", "Reverse", "Count back down from the total to the start", false, {icon: "swap", words: ["Match the Paw", "Paw = 0"]}]],
-    twirl: [["twisty", "Twisty ribbons", "Off, every ribbon is drawn flat", true, {row: "decor", at: ["catdoku.twirl.prefs.v1", "twisty"]}]],
+    twirl: [["twisty", "Twisty ribbons", "Off, every ribbon is drawn flat", true, {row: "decor", at: ["catdoku.twirl.prefs.v1", "twisty"]}],
+      ["grid", "Grid", "Faint lines mark out the mat's squares", false, {at: ["catdoku.twirl.prefs.v1", "grid"]}]],
     pounceup: [["autoPounce", "Pounce by herself", "Rayla pounces again each time she lands, without waiting for a tap", false]],
     atlas: [["style", "Answer", "How you answer", "list", {icon: "chat", opts: [["pick", "Pick from 4 names"], ["list", "Type, with a list to choose from"], ["type", "Type it, no help"]],
       short: {pick: "4 Choices", list: "Full List", type: "Just Type"}}]],
