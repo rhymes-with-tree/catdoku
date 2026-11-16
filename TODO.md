@@ -47,13 +47,10 @@ Knock It Off's forgiving first two levels, and Pounce saving while toys fall):
   Caboodle 10 → 5.
 - [ ] **Under the Blanket: out of beta again.** Moved to beta on 2026-11-16 (the owner's call) after its first week on
   the front page: 11 starts at level 1, 6 solves. Still to settle what makes level 1 easier to get into.
-- [ ] **Toe Beans on an iPad:** a number just made by combining two sometimes didn't show until tapped again (feedback,
-  2026-11-14, Safari in Dark Mode). The six number buttons are changed in place since 2026-11-16 rather than made afresh
-  each move; the headless browser never showed it, so check on a real iPad.
-- [ ] **Twirl's sound on an iPhone** (feedback, 2026-11-16): sometimes no sound at all, and sometimes quieter after
-  zooming the mat. Since the same day a tap's sound waits for the sound to wake, and sound stuck after a call or another
-  app restarts itself. Check on an iPhone; the quieter-after-zooming part wasn't found. The silent switch mutes the
-  site's sound on purpose ("ambient", so music keeps playing).
+- [ ] **Twirl's sound on an iPhone** (feedback, 2026-11-16): sometimes no sound at all. Since the same day a tap's sound
+  waits for the sound to wake, and sound stuck after a call or another app restarts itself. Check on an iPhone. (The
+  report also said it went quieter after zooming the mat; the owner couldn't make that happen.) The silent switch mutes
+  the site's sound on purpose ("ambient", so music keeps playing).
 - [ ] **Somewhere to go past the hardest level.** (Twirl has levels 21 to 24 since 2026-11-15.) Toy Box's level 21 is a fifth of its starts; Twirl and Knock It Off
   at 20 are the same.
 
