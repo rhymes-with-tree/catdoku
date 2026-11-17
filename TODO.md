@@ -3,6 +3,22 @@
 Things to come back to, kept here so any chat can pick them up. Add an item when something is put aside; take it out
 (in the same PR) once it's done. Game ideas go in `IDEAS.md`, and work on Apple's guidelines in `HIG.md` ("Still to do").
 
+## The move to lapcatpuzzles.com
+
+The site is moving from GitHub Pages (`rhymes-with-tree.github.io/catdoku/`) to Cloudflare Pages at lapcatpuzzles.com,
+and taking its name, Lap Cat Puzzles, from the domain (2026-11-17). `move.js` carries players' progress across (see
+README, Hosting and the move). In order:
+- [ ] Cloudflare Pages project on this repository, `main`, build `sh tools/build-site.sh`, output `_site`; custom
+  domains lapcatpuzzles.com and www.lapcatpuzzles.com; the site loads at the new address
+- [ ] merge the PR with `move.js`: from then on the old address sends everyone on (only once the new one works)
+- [ ] check on an iPhone: from Safari at the old address, and from an old Home Screen icon (the code and Settings)
+- [ ] testers moved: keep the old address up (the repository public, GitHub Pages on) until they all have, a few weeks
+- [ ] then make the repository private, which turns GitHub Pages off; the old address stops working for good
+- [ ] Email Routing for lapcatpuzzles.com in Cloudflare (the owner's to set up)
+- [ ] after the switch, the Pawprints numbers carry on in one line (the paths keep `/catdoku`); check a day's worth
+- [ ] the Home Screen name: "Lap Cat Puzzles" is cut short under an iPhone icon; a shorter one (in `manifest.webmanifest`
+  and an `apple-mobile-web-app-title` on each page) is the owner's call
+
 ## Catlas: Safari still offers AutoFill Contact in the answer box
 
 On an iPhone, typing an answer in Catlas (Type answers) brings up Safari's AutoFill Contact bar above the keyboard,
