@@ -1907,7 +1907,7 @@ const G = (() => {
       glassKnock: (t, o = {}) => modal({t, parts: [[1500, 1, .15], [2600, .4, .08]], vol: .14 * (o.k ?? 1)}),   // dull glass
       glassOver: later("splash-01"),   // a glass of water knocked over, a spill: a splash (a recording)
       mugKnock: (t, o = {}) => { modal({t, parts: [[260, 1, .1], [700, .5, .06], [1800, .2, .03]], vol: .32 * (o.k ?? 1)}); thump(t, .25 * (o.k ?? 1), 100); },   // a heavy clunk
-      tape: t => { for (let i = 0; i < 7; i++) noise({t: t + i * .025 + rnd(0, .01), dur: .02, vol: .25, f: rnd(1200, 2600), q: 1}); },   // a paw on tape: a sticky thhp
+      tape: () => {},   // a paw or yarn on tape: silent since 2026-11-17 (the owner hated the sticky thhp) until a better one's found
       lemon: later("hiss-2", .15),   // a lemon: a hiss (a recording, at 15%: every hiss is this one, the owner, 2026-11-15)
       candle: t => noise({t, dur: .4, vol: .4, type: "lowpass", fs: [[0, 400], [.25, 1500], [.4, 800]], a: .12}),   // too close to a candle: a fwoomp
       catnip: t => tone({f: 600, t, dur: 1.0, vol: .12, a: .1, hold: .5, vib: [7, 80]}),   // rolling in catnip: a wobbly slide
