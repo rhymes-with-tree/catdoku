@@ -291,3 +291,8 @@ The owner's grid for the new Settings page differed from the games in a few plac
   clear what they'd do.
 - Auto grade (Catdoku, Toydoku, Fridge Magnets) is a heart among each game's own settings, not under Check, so the
   Every game Check never turns lives on; the grid had Catdoku's under Check.
+
+## A sound for tape
+
+The shared `tape` sound (a sticky thhp, in Wind Up, Pounce Up and Tail Chase) was made silent on 2026-11-17: the owner
+hates it. Find something better (perhaps a recording in `sounds/`) and put it back in `games.js`.

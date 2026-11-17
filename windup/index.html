@@ -400,7 +400,7 @@ function pairing(a, c) {
   if (a.nip || c.nip) { const y = a.nip ? c : a; return !y.nip && !y.p && y.l < topL() ? "nip" : ""; }
   return a.l === c.l && a.p === c.p && a.l < (a.p ? pomTop() + 1 : topL()) ? "wind" : "";
 }
-const UNRAVEL = 7, SPRING_V = 820, TANGLE = .12, TIP = .1, TIP_T = 9, TIP_FIT = .88;   // seconds a loose ball keeps a size; how hard a spring throws; how often it tangles; the tipping basket's lean (radians) and its swing (seconds)
+const SPRING_V = 820, TANGLE = .12, TIP = .1, TIP_T = 6, TIP_FIT = .88;   // how hard a spring throws; how often it tangles; the tipping basket's lean (radians) and its swing (seconds)
 const wt = b => b.stuck ? 0 : 1 / (b.r * b.r);   // a stuck ball doesn't move
 // How far the basket leans now: rocking back and forth (level 18), or with the yarn's weight (level 21, g.lean, which
 // follows the weight slowly in tick). Either way it's drawn a little smaller (TIP_FIT) so it stays in its box.
@@ -411,9 +411,9 @@ function weighTick(g) {
   // the yarn's balance point, as a share of half the basket from the middle (right is +), its weight by each ball's area;
   // a basket only partly full leans less
   let m = 0, mx = 0; for (const b of g.balls) { const a = b.r * b.r; m += a; mx += a * (b.x - W / 2); }
-  const off = m ? mx / m / (W / 2) : 0, full = Math.min(1, m * Math.PI / (W * H * .12));
-  const want = -Math.max(-1, Math.min(1, off * 1.6)) * WEIGH_MAX * full;   // heavier on the right: the right side goes down
-  g.lean = (g.lean || 0) + (want - (g.lean || 0)) * Math.min(1, STEP * .9);
+  const off = m ? mx / m / (W / 2) : 0, full = Math.min(1, m * Math.PI / (W * H * .07));
+  const want = -Math.max(-1, Math.min(1, off * 2.6)) * WEIGH_MAX * full;   // heavier on the right: the right side goes down
+  g.lean = (g.lean || 0) + (want - (g.lean || 0)) * Math.min(1, STEP * 2.5);   // more responsive since 2026-11-17 (the owner's call): follows the weight in about half a second, and leans further for less
 }
 // The springs (level 16): a ball caught on top squashes the coil over HOLD seconds, then it's flung off along the coil
 // (with a little wobble to either side) and the coil boings back, wobbling as it settles. comp is how far it's squashed
@@ -475,7 +475,7 @@ function step(g, h) {
       const hit = nearOnShape(a, sh, k); if (!hit || hit.d >= a.r + sh.hr + .4) continue;
       let push = 0;
       // (not a ball poking above the line: stuck there, it would end the game)
-      if (sh.tape && !a.stuck && !a.p && !a.nip && a.y - a.r > g.line + 4) { Object.assign(a, {stuck: true, tu: true, ut: 0, vx: 0, vy: 0, w: 0}); G.sound.play("wu.tape"); }   // stuck to the tape
+      if (sh.tape && !a.stuck && !a.p && !a.nip && a.y - a.r > g.line + 4) { Object.assign(a, {stuck: true, tu: true, vx: 0, vy: 0, w: 0}); G.sound.play("wu.tape"); }   // stuck to the tape
       else if (sh.spring && !a.stuck && !sh.hold && !B.some(o => o.tangle === si)) {
         // landing on the top of the coil: it squashes, holds the ball a moment, then flings it (springTick); now and
         // then the ball tangles in the coil instead. A ball just resting there presses it down a little.
@@ -483,7 +483,11 @@ function step(g, h) {
         if (along > sh.len * .65) {
           if (into > 70 && !(a.springCool > 0)) {
             a.springCool = .6;
-            if (Math.random() < TANGLE) { Object.assign(a, {stuck: true, tangle: si, vx: 0, vy: 0, w: 0}); G.sound.play("wu.tangle"); }   // caught in the coil
+            if (Math.random() < TANGLE) {   // caught in the coil: it sits on the squashed coil's top, with yarn wound round it (drawn with the coil)
+              const top = sh.len * .7 + sh.hr + a.r;   // (a tangled ball squashes it to .3: springTick)
+              Object.assign(a, {stuck: true, tangle: si, x: sh.base[0] + sh.axis[0] * top, y: sh.base[1] + sh.axis[1] * top, vx: 0, vy: 0, w: 0}); G.sound.play("wu.tangle");
+              if (!g.toldTangle) { g.toldTangle = true; G.note("Tangled in the spring! Shake to free it.", 2500); }
+            }
             else sh.hold = {b: a, t: 0};
           } else sh.rest = .12;
         }
@@ -556,7 +560,7 @@ function mergeAll(g, pairs) {
     used.add(a); used.add(c);
     if (how === "nip") {   // catnip: the ball of yarn winds one size up, and the catnip's used up
       const nip = a.nip ? a : c, y = a.nip ? c : a;
-      gone.add(nip); y.l++; y.r = rad(y.l); y.pop = .65; y.ut = 0;
+      gone.add(nip); y.l++; y.r = rad(y.l); y.pop = .65;
       g.score += pts(y.l); g.best = Math.max(g.best, y.l);
       g.fx.push({x: y.x, y: y.y, r: y.r, t: 0, T: .45, c: "#6AA673", to: y}, {x: y.x, y: y.y, r: y.r, t: 0, T: .4, c: colorOf(y.l), to: y});
       made.push(y); continue;
@@ -579,7 +583,8 @@ function mergeAll(g, pairs) {
   if (pairs.length) status();
 }
 // Loose yarn (level 15) and yarn off the tape (level 17) unravel onto a second ball, joined to it by a strand (the
-// owner's idea, 2026-11-15): every UNRAVEL seconds the loose ball loses a size and the one on its tail gains one. Two
+// owner's idea, 2026-11-15): with every drop (every 7 seconds until 2026-11-17, the owner's call) the loose ball loses a
+// size and the one on its tail gains one. Two
 // the same size that touch wind together as ever; otherwise it carries on until all the yarn's on the tail ball,
 // which is then an ordinary ball. b.tail is the ball it's unravelling onto, and that ball's .head points back.
 const ROPE = 26;   // how much slack the strand has, past the two balls' edges
@@ -587,8 +592,7 @@ function unravelTick(g) {
   let moved = false;
   for (const b of g.balls) {
     if ((!b.unr && !b.tu) || b.gone) continue;
-    if ((b.ut = (b.ut || 0) + STEP) < UNRAVEL) continue;
-    b.ut = 0; moved = true;
+    moved = true;
     let t = b.tail && g.balls.includes(b.tail) && !b.tail.gone ? b.tail : null;
     if (!t) {   // the first turn: a little ball starts on the end of the strand, below and to one side
       const side = b.x < W / 2 ? 1 : -1;
@@ -632,7 +636,6 @@ function tick(g, dt) {
     if (hasNet(g)) netTick(g);
     if (has(g, "tip")) g.tt = (g.tt || 0) + STEP;
     if (has(g, "weigh")) weighTick(g);
-    unravelTick(g);
     // Hurry (level 20): wait too long and Gus drops the ball himself
     if (has(g, "hurry") && g.cool <= 0 && (g.wait = (g.wait || 0) + STEP) > has(g, "hurry")) drop(true);
     const over = g.balls.some(b => b.age > GRACE && b.y - b.r < g.line);
@@ -705,6 +708,12 @@ function paint() {
       ctx.save(); ctx.translate(bx, by); ctx.rotate(Math.atan2(ax, -ay));
       if (im) ctx.drawImage(im, -15, -len, 30, len);
       ctx.lineCap = "round"; ctx.lineWidth = 5; ctx.strokeStyle = "#2A2530"; ctx.beginPath(); ctx.moveTo(-14, -len + 1); ctx.lineTo(14, -len + 1); ctx.stroke();   // a cap on top
+      const tb = g.balls.find(b => b.tangle === g.shapes.indexOf(sh));
+      if (tb) {   // a tangled ball's yarn wound round the coil, so it reads as caught rather than floating
+        ctx.lineWidth = 2.5; ctx.strokeStyle = colorOf(tb.l); ctx.beginPath();
+        for (let i = 0; i < 4; i++) { const y = -len * (.15 + i * .22); ctx.moveTo(-16, y + 5); ctx.lineTo(16, y - 5); }
+        ctx.moveTo(0, -len); ctx.lineTo(0, -len - 8); ctx.stroke();
+      }
       ctx.restore(); ctx.fillStyle = ctx.strokeStyle = "#59555E"; ctx.lineWidth = sh.hr * 2;
       continue;
     }
@@ -786,6 +795,7 @@ function drop(hurried) {
   if (!g || !["ready", "running"].includes(g.state) || g.cool > 0 || $("overlay").classList.contains("show") || document.querySelector(".spot")) return;
   g.wait = 0; if (hurried) G.note("Too slow! Gus dropped it.", 1500);
   if (g.state === "ready") { if (!g.started) G.track(`Wind Up started level ${g.level}`); g.state = "running"; g.started = true; $("tapgo").hidden = true; }
+  unravelTick(g);   // loose yarn, and yarn on the tape, loses a size with every drop
   const {l, p, k} = nextOf(g);
   g.balls.push(mk(clampAim(g.aim), rad(l) + 2, l, {p, nip: k === "nip", unr: k === "unr", vy: 60, vx: (Math.random() - .5) * TUNE.DROP_NUDGE, drop: true})); g.i++; g.cool = COOL; G.sound.play("wu.drop");
   status(); paintHud(); save();
