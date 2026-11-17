@@ -163,6 +163,13 @@ page, rules, level maker and drawing, is in it). The owner was happy with it as 
 - Its rooms take up to two seconds to make at the busier levels, so they're made in a Web Worker.
 - Unused so far: the arc pose on the sheet.
 
+## The shape of a visit: read it in a week or two
+
+The visit tally went in on 2026-11-17 (README, "Play counts"): "Visit opened on: …", "First game: …" and "… in a row: N"
+on the GoatCounter dashboard. Read them after a week or two: what visits open on, which game comes first (and whether
+it's the daily challenge), and which games are played again and again. GoatCounter's own export came back empty
+(2026-11-16: it keeps only totals), so this is the only way to see it.
+
 ## Feedback: what's left
 
 Send feedback went into every game's menu on 2026-11-11 (the card in `games.js`, to the owner's Google Form; README,
@@ -170,6 +177,8 @@ Send feedback went into every game's menu on 2026-11-11 (the card in `games.js`,
 - a link to the puzzle in play: only Pounce Up gives one (`G.feedbackFor`); the other games send their level (from the
   level picker) and the page's address. Each game's Share already knows its puzzle, so each can pass the same data;
 - the front page, which has no menu row for it;
+- whether the card should also send if GoatCounter loaded on the page ("counted: yes/no"), to see roughly how many
+  feedback senders a blocker hides from the counts, and on which platforms (offered 2026-11-16, not picked yet);
 - whether a beta's win and miss cards should ask a one-tap "How was that level?" (sent as a GoatCounter event: no
   words, so nothing new leaves the device, and it shows how hard each level feels).
 
