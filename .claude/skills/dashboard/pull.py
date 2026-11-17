@@ -1,24 +1,25 @@
 #!/usr/bin/env python3
 """Pull Catdoku's GoatCounter numbers into the Pawprints dashboard's data files.
 
-Usage: python3 -I pull.py OUT_DIR [--days 28] [--week 7]
+Usage: python3 -I pull.py OUT_DIR
 
-Writes, each as {"rows": [...], "meta": [...]}:
-  daily.json   one row a day: game pages opened, and moments sent (events)
-  games.json   one row a game, the last WEEK days: opens, puzzles started, solved, lost
-  visits.json  the shape of a visit (since 2026-11-17): what visits open on, the first game, puzzles in a row
-  errors.json  the errors the games sent ("Error: ..."), by day
+Writes, each as {"rows": [...], "meta": [...]}, every day GoatCounter has (the dashboard picks the days to show):
+  daily.json      one row a day: game pages opened, and moments sent (events)
+  game_days.json  one row a game a day it was played: opens, puzzles started, solved, lost
+  visits.json     the shape of a visit (since 2026-11-17), a row a day: what visits open on, the first game, puzzles in a row
+  errors.json     the errors the games sent ("Error: ..."), a row a day
 
 GoatCounter counts each page or moment once a visit, so every number is a count of visits. The API key is added by
 the session's proxy (rhymes-with-tree.goatcounter.com is a connected service), so none is needed here. Days are the
 site's own (New York time), as on the GoatCounter dashboard.
 """
 import json, os, re, sys, time, urllib.request
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 API = "https://rhymes-with-tree.goatcounter.com/api/v0"
 TZ = ZoneInfo("America/New_York")
+SINCE = date(2026, 9, 1)   # before the counter's first day, so every day it has is pulled
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 START_RE = re.compile(r"\b(started|new (puzzle|tangle|table|trip|board|floor|tower|round|skein|keyboard))\b", re.I)   # games.js
@@ -62,13 +63,10 @@ def main():
     if len(sys.argv) < 2:
         sys.exit(__doc__)
     out_dir = sys.argv[1]
-    days = int(sys.argv[sys.argv.index("--days") + 1]) if "--days" in sys.argv else 28
-    week = int(sys.argv[sys.argv.index("--week") + 1]) if "--week" in sys.argv else 7
     os.makedirs(out_dir, exist_ok=True)
 
     today = datetime.now(TZ).date()
-    first = today - timedelta(days=days - 1)
-    week_from = today - timedelta(days=week - 1)
+    first = SINCE
     start = datetime.combine(first, datetime.min.time(), TZ).astimezone(timezone.utc)
     end = datetime.combine(today + timedelta(days=1), datetime.min.time(), TZ).astimezone(timezone.utc)
     q = dict(start=start.strftime("%Y-%m-%dT%H:%M:%SZ"), end=end.strftime("%Y-%m-%dT%H:%M:%SZ"), limit=100, daily="true")
@@ -85,21 +83,23 @@ def main():
         time.sleep(0.5)
 
     def by_day(h):
-        return {s["day"]: s.get("daily") or 0 for s in h.get("stats", [])}
-
-    day_list = [(first + timedelta(days=i)).isoformat() for i in range(days)]
-    week_days = set(d for d in day_list if d >= week_from.isoformat())
+        return {s["day"]: s.get("daily") or 0 for s in h.get("stats", []) if s.get("daily")}
 
     # 1. each day: game pages opened (pages under /catdoku/, the front page too) and moments
-    daily = {d: {"day": d, "pages": 0, "moments": 0} for d in day_list}
+    daily = {}
     for h in rows:
         if not h["event"] and not h["path"].startswith("/catdoku"):
             continue   # another site on the same counter
         for d, n in by_day(h).items():
-            if d in daily:
-                daily[d]["moments" if h["event"] else "pages"] += n
+            row = daily.setdefault(d, {"day": d, "pages": 0, "moments": 0})
+            row["moments" if h["event"] else "pages"] += n
+    if daily:   # every day from the first counted one to today, with the quiet days as 0
+        d, last = date.fromisoformat(min(daily)), today
+        while d <= last:
+            daily.setdefault(d.isoformat(), {"day": d.isoformat(), "pages": 0, "moments": 0})
+            d += timedelta(days=1)
 
-    # 2. each game, the last week
+    # 2. each game, each day
     games = games_list()
     by_slug = {g[1]: g for g in games}
     names = sorted(((norm(g[0]), g) for g in games), key=lambda x: -len(x[0]))   # longest first: Pounce Up before Pounce
@@ -117,69 +117,64 @@ def main():
         slugs = [t for t in re.findall(r"([a-z0-9]+)/", p) if t in by_slug]
         return by_slug[slugs[-1]][0] if slugs else ("Every game (games.js)" if "games.js" in p else "")
 
-    stats = {g[1]: {"game": g[0], "slug": g[1], "colour": g[2], "shelf": g[3], "beta": g[4],
-                    "opens": 0, "started": 0, "solved": 0, "lost": 0} for g in games}
-    visits, errors = [], []
+    game_days, visits, errors = {}, {}, []
+
+    def gd(g, d):
+        return game_days.setdefault((g[1], d), {"day": d, "slug": g[1], "game": g[0], "shelf": g[3], "colour": g[2], "beta": g[4],
+                                                "opens": 0, "started": 0, "solved": 0, "lost": 0})
+
     for h in rows:
-        week_n = sum(n for d, n in by_day(h).items() if d in week_days)
-        all_n = sum(by_day(h).values())
-        p = h["path"]
+        p, days = h["path"], by_day(h)
         if not h["event"]:
             m = re.match(r"^/catdoku/([a-z0-9]+)/?$", p)
-            if m and m.group(1) in stats:
-                stats[m.group(1)]["opens"] += week_n
+            if m and m.group(1) in by_slug:
+                for d, n in days.items():
+                    gd(by_slug[m.group(1)], d)["opens"] += n
             continue
         if p.startswith("Error"):
-            for d, n in by_day(h).items():
-                if n:
-                    errors.append({"day": d, "message": p[len("Error: "):] if p.startswith("Error: ") else p, "count": n,
-                                   "game": error_game(p)})
+            for d, n in days.items():
+                errors.append({"day": d, "message": p[len("Error: "):] if p.startswith("Error: ") else p, "count": n, "game": error_game(p)})
             continue
         v, r = VISIT_RE.match(p), ROW_RE.match(p)
-        if v and all_n:
-            visits.append({"kind": "Opened on" if v.group(1) == "Visit opened on" else "First game", "label": v.group(2), "run": "", "count": all_n})
-            continue
-        if r and all_n:
-            visits.append({"kind": "In a row", "label": r.group(1), "run": r.group(2), "count": all_n})
+        if v or r:
+            kind = "In a row" if r else ("Opened on" if v.group(1) == "Visit opened on" else "First game")
+            label, run = (r.group(1), r.group(2)) if r else (v.group(2), "")
+            for d, n in days.items():
+                key = (d, kind, label, run)
+                visits[key] = {"day": d, "kind": kind, "label": label, "run": run, "count": visits.get(key, {}).get("count", 0) + n}
             continue
         g = game_of(p)
-        if not g or not week_n or p.startswith("Daily challenge") or "feedback sent" in p or "Favorited" in p:
+        if not g or p.startswith("Daily challenge") or "feedback sent" in p or "Favorited" in p:
             continue
-        s = stats[g[1]]
-        if START_RE.search(p):
-            s["started"] += week_n
-        elif SOLVED_RE.search(p):
-            s["solved"] += week_n
-        elif LOST_RE.search(p):
-            s["lost"] += week_n
-
-    game_rows = sorted((s for s in stats.values() if s["opens"] or s["started"]), key=lambda s: (-s["opens"], -s["started"], s["game"]))
-    for s in game_rows:
-        s["solve_rate"] = round(s["solved"] / s["started"], 2) if s["started"] else None
-    visits.sort(key=lambda v: (v["kind"], -v["count"], v["label"]))
-    errors.sort(key=lambda e: (e["day"], e["message"]), reverse=True)
+        f = "started" if START_RE.search(p) else "solved" if SOLVED_RE.search(p) else "lost" if LOST_RE.search(p) else None
+        if f:
+            for d, n in days.items():
+                gd(g, d)[f] += n
 
     code = open(__file__, encoding="utf-8").read()
-    window = f"{first.isoformat()} to {today.isoformat()}"
-    week_window = f"{week_from.isoformat()} to {today.isoformat()}"
+    window = f"{min(daily) if daily else first.isoformat()} to {today.isoformat()}"
     pulled = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
-    def meta(what, win):
+    def meta(what):
         return [{"label": "pull.py", "value": code, "type": "code", "lang": "python"},
-                {"label": "Input", "value": f"GoatCounter API, /stats/hits, {win} (New York days)"},
+                {"label": "Input", "value": f"GoatCounter API, /stats/hits, {window} (New York days)"},
                 {"label": "Counts", "value": what}, {"label": "Pulled", "value": pulled}]
 
     files = {
-        "daily.json": ([daily[d] for d in day_list], meta("Visits that opened a game page or the front page (pages), and moments the games sent (moments), each once a visit", window)),
-        "games.json": (game_rows, meta("Visits that opened each game, and its moments: started (a new puzzle or level), solved (solved, won, done, finished) and lost (fell, out of moves, stuck, overflowed, gave up)", week_window)),
-        "visits.json": (visits, meta("The visit tally's moments, since they began on 2026-11-17", window)),
-        "errors.json": (errors, meta("Moments named 'Error: ...', which the games send when something throws", window)),
+        "daily.json": (sorted(daily.values(), key=lambda r: r["day"]),
+                       meta("Each day: visits that opened a game page or the front page (pages), and moments the games sent (moments), each once a visit")),
+        "game_days.json": (sorted(game_days.values(), key=lambda r: (r["day"], r["slug"])),
+                           meta("Each game, each day it was played: visits that opened it, and its moments: started (a new puzzle or level), solved (solved, won, done, finished, cleared…) and lost (fell, out of moves, stuck, overflowed, gave up…)")),
+        "visits.json": (sorted(visits.values(), key=lambda r: (r["day"], r["kind"], r["label"], r["run"])),
+                        meta("Each day: the visit tally's moments, which began on 2026-11-17")),
+        "errors.json": (sorted(errors, key=lambda e: (e["day"], e["message"]), reverse=True),
+                        meta("Each day: moments named 'Error: ...', which the games send when something throws")),
     }
     for name, (rws, mt) in files.items():
-        with open(os.path.join(out_dir, name), "w", encoding="utf-8") as f:
-            json.dump({"rows": rws, "meta": mt}, f, ensure_ascii=False)
-        print(f"{name}: {len(rws)} rows")
-    print(f"window {window}, week {week_window}")
+        with open(os.path.join(out_dir, name), "w", encoding="utf-8") as fh:
+            json.dump({"rows": rws, "meta": mt}, fh, ensure_ascii=False, separators=(",", ":"))
+        print(f"{name}: {len(rws)} rows, {os.path.getsize(os.path.join(out_dir, name)) // 1024} KB")
+    print(f"window {window}")
 
 
 if __name__ == "__main__":
