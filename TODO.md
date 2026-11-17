@@ -8,17 +8,14 @@ Things to come back to, kept here so any chat can pick them up. Add an item when
 The site is moving from GitHub Pages (`rhymes-with-tree.github.io/catdoku/`) to Cloudflare Workers at lapcatpuzzles.com,
 and taking its name, Lap Cat Puzzles, from the domain (2026-11-17). `move.js` carries players' progress across (see
 README, Hosting and the move). It waits for the new site to answer, so it's on `main` already. In order:
-- [ ] Cloudflare Workers project on this repository, named `lapcatpuzzles` (as in `wrangler.jsonc`), build command
-  `sh tools/build-site.sh`, deploy command `npx wrangler deploy`; check it at its workers.dev address; then custom
-  domains lapcatpuzzles.com and www.lapcatpuzzles.com. The moment the new site loads, the old one sends everyone on
+- [x] Cloudflare Workers project `lapcatpuzzles` on this repository, with lapcatpuzzles.com and www; live 2026-11-17
 - [ ] check on an iPhone: from Safari at the old address, and from an old Home Screen icon (the code and Settings);
   and on Android and in DuckDuckGo, which testers use too
 - [ ] testers moved: keep the old address up (the repository public, GitHub Pages on) until they all have, a few weeks
 - [ ] then make the repository private, which turns GitHub Pages off; the old address stops working for good
-- [ ] Email Routing for lapcatpuzzles.com in Cloudflare (the owner's to set up)
+- [ ] Email Routing for lapcatpuzzles.com in Cloudflare (Compute, Email Service): domain onboarded 2026-11-17; the
+  destination address and a hello@ rule are the owner's to finish
 - [ ] after the switch, the Pawprints numbers carry on in one line (the paths keep `/catdoku`); check a day's worth
-- [ ] the Home Screen name: "Lap Cat Puzzles" is cut short under an iPhone icon; a shorter one (in `manifest.webmanifest`
-  and an `apple-mobile-web-app-title` on each page) is the owner's call
 
 ## Catlas: Safari still offers AutoFill Contact in the answer box
 
