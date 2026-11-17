@@ -1,6 +1,7 @@
-# Catdoku
+# Lap Cat Puzzles
 
-A site of cat-themed puzzle games; `README.md` describes every game and what they share.
+A site of cat-themed puzzle games at lapcatpuzzles.com (called Catdoku until November 2026, as this repository still
+is); `README.md` describes every game and what they share, and how the site is hosted.
 
 - **To do:** open items put aside for later are in `TODO.md`. Check it when starting work, add to it when something is
   put aside, and take an item out in the same PR that finishes it.

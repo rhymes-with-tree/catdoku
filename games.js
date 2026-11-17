@@ -2,7 +2,7 @@
    saved progress, background puzzle building, and the win card. */
 const G = (() => {
   // What's new (whatsNew, below): anything saved on this device before this page loaded means they've played before.
-  const NEWS = "catdoku.news.v2";
+  const NEWS = "catdoku.news.v3";
   const RETURNING = (() => { try { for (let i = 0; i < localStorage.length; i++) if (localStorage.key(i) !== NEWS) return true; } catch (e) {} return false; })();
   // Every game: name, folder, one line about it, its colour in the games menu, its shelf (see GROUPS),
   // words to find it by in search (the puzzle it's based on and what it's like), and for games added from
@@ -2552,19 +2552,20 @@ const G = (() => {
   setInterval(() => { if (!document.hidden) checkPaw(); }, 1000);
   // What's new: the first time someone who's played before opens a game after a change worth telling them about, a
   // card says what's new, once (NEWS: v1 was the November 2026 redesign, its card taken down on 2026-11-14 as every
-  // tester had seen it; v2 is sound, on by default, and the settings that have come since). It waits for any
+  // tester had seen it; v2 was sound, on by default, and the settings that came with it; v3 is the new name and
+  // address, lapcatpuzzles.com, shown to everyone whose progress move.js carried over, and never at the old
+  // address, where it would be news too soon). It waits for any
   // walkthrough, tip or card to close. New visitors get the walkthrough instead and are marked as having seen it.
   function whatsNew(tries = 0) {
-    if (!RETURNING || load(NEWS).seen || !GAMES.some(g => g[1] === SLUG) || !$("menuBtn") || !$("card")) return;
+    if (!RETURNING || load(NEWS).seen || (window.LCP && LCP.move && LCP.move.atOld) || !GAMES.some(g => g[1] === SLUG) || !$("menuBtn") || !$("card")) return;
     if (document.hidden || document.querySelector(".spot") || ($("overlay") && $("overlay").classList.contains("show"))) {
       if (tries < 30) setTimeout(() => whatsNew(tries + 1), 2000); return;
     }
     save(NEWS, {seen: Date.now()});
     const list = document.createElement("ul"); list.className = "news";
-    for (const t of ["Sound! Every game plays a sound for a win, a gold paw, a miss and a hint, and Pawlinko and Pounce Up have lots of their own. It starts with your first tap.",
-      "To turn sound off, go to Settings: for every game at once, or one game at a time. A game's ☰ Menu has its own Sound switch too.",
-      "More new options in Settings: hide the timer, slow the action games down, reduce the clutter round the boards, and turn Auto check and Auto Notes on or off.",
-      "On an iPhone, the silent switch keeps the games quiet."]) {
+    for (const t of ["Catdoku is now Lap Cat Puzzles, at lapcatpuzzles.com. (Catdoku the game keeps its name.)",
+      "Your scores, streaks and games in progress came with you. If anything's missing, Settings has a place to bring it over.",
+      "Playing from your Home Screen? Add lapcatpuzzles.com to it, then you can delete the old icon."]) {
       const li = document.createElement("li"); li.textContent = t; list.append(li);
     }
     openCard("What's new", "", [["Open Settings", () => { location.href = `${HOME}settings/#${CURRENT || SLUG}`; }, true], ["Got it", closeCard]], list);

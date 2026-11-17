@@ -1,6 +1,24 @@
-# Catdoku
+# Lap Cat Puzzles
 
-A family of cat-themed puzzle games, each a single HTML page. The first, Catdoku (in `catdoku/`), is a logic puzzle: place one 🐱 in every row, every column, and every color region — and no two cats may touch, not even diagonally.
+A family of cat-themed puzzle games, each a single HTML page, at [lapcatpuzzles.com](https://lapcatpuzzles.com). The
+site was called Catdoku, after its first game, until November 2026, and this repository still is; saved data keeps its
+`catdoku.` keys. The first game, Catdoku (in `catdoku/`), is a logic puzzle: place one 🐱 in every row, every column, and every color region — and no two cats may touch, not even diagonally.
+
+## Hosting and the move
+
+The site is served by Cloudflare Pages from this repository's `main` branch: build command `sh tools/build-site.sh`,
+output directory `_site` (everything but the notes, `tools/` and `.claude/`; `_headers` sets its headers). The domain, lapcatpuzzles.com, and its
+email forwarding are in the same Cloudflare account.
+
+It used to be GitHub Pages, at `rhymes-with-tree.github.io/catdoku/`. A browser keeps saved data apart for each
+address, so `move.js`, loaded first by every page, carries players' progress across. At the old address, once the new
+site answers (it reads the new `version.txt`, which `_headers` lets any page read), a page goes on to the same page at
+the new one with everything saved packed into the link after `#move=` (which never reaches a server), and the new site
+unpacks it before anything else runs. Until then the old site carries on as it was. An iPhone or iPad Home Screen app
+keeps its own saved data, so it goes to `moved.html` instead: a note with a progress code to paste into Settings (Bring
+over your progress). Android's Home Screen apps share the browser's, so they go straight on. GoatCounter is told each
+page's path with `/catdoku` in front, as before, so the numbers carry on. The What's new card (news v3) tells movers
+about the new name, at the new address only.
 
 ## Play
 
