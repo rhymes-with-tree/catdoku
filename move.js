@@ -2,22 +2,27 @@
    browser keeps saved games, bests, streaks and settings apart for each address, so players' progress has to be
    carried across. Every page loads this first, before anything reads or writes saved data.
 
-   At the old address: a page goes straight on to the same page at the new one, with everything saved (the keys
-   starting "catdoku.", and GoatCounter's "skipgc") packed into the link after #move=. The part after # never
-   leaves the device: browsers don't send it to the server.
-   Except in a home-screen app, which keeps its own saved data apart from Safari's, so a link opened from it may
-   land somewhere the new icon can't see. There, and at ?progress (for anyone else who needs it), the page shows
-   a note about the move instead, with a progress code to copy and paste into the new site's Settings.
+   At the old address: once the new site answers (its version.txt, which Cloudflare lets any page read: _headers),
+   a page goes on to the same page at the new one, with everything saved (the keys starting "catdoku.", and
+   GoatCounter's "skipgc") packed into the link after #move=. The part after # never leaves the device: browsers
+   don't send it to a server. Until the new site answers, the old one carries on as it was, so this can go live
+   before the new site does. Nothing saved at the old address is ever deleted.
+   Except in an iPhone or iPad Home Screen app (navigator.standalone), which keeps its own saved data apart from
+   the browser's, so a link opened from it may land where the new icon can't see. That goes to moved.html, a note
+   about the move with a progress code to copy and paste into the new site's Settings. (Android's Home Screen apps
+   share the browser's saved data, so they go straight on like everyone else, in Chrome, DuckDuckGo or any other.)
 
    At the new address: a #move= link is unpacked into this device's saved data and taken off the address before
    the page's own scripts run. The first time anything is brought over, it replaces what's here (a few minutes on
    the new site is worth less than everything played before); later links only fill in what's missing. A code
-   pasted into Settings (LCP.move.bring) always replaces. GoatCounter is told each page's path with /catdoku in
-   front, as at the old address, so the numbers carry on in one line. */
+   pasted into Settings (LCP.move.bring) always replaces. www. goes to the bare address, which keeps its own saved
+   data. GoatCounter is told each page's path with /catdoku in front, as at the old address, so the numbers carry
+   on in one line. */
 (function () {
-  var OLD_HOST = "rhymes-with-tree.github.io", OLD_BASE = "/catdoku", NEW = "https://lapcatpuzzles.com";
+  var OLD_HOST = "rhymes-with-tree.github.io", OLD_BASE = "/catdoku", NEW_HOST = "lapcatpuzzles.com", NEW = "https://" + NEW_HOST;
   var MOVED = "catdoku.moved.v1";
   var mine = function (k) { return k === "skipgc" || k.indexOf("catdoku.") === 0; };
+  var here = location.hostname, atOld = here === OLD_HOST;
 
   function pack() {
     var d = {}, n = 0;
@@ -50,70 +55,40 @@
     localStorage.setItem(MOVED, new Date().toISOString());
     return n;
   }
+  // from the old address to the same page at the new one, bringing everything saved (path: the new one's)
+  function go(path) {
+    if (path == null) path = location.pathname.indexOf(OLD_BASE) === 0 ? location.pathname.slice(OLD_BASE.length) || "/" : "/";
+    var data = pack(), hash = location.hash.replace(/^#/, ""), tail = "";
+    if (data) tail = "#move=" + data + (hash ? "&then=" + encodeURIComponent(hash) : "");
+    else if (hash) tail = "#" + hash;
+    location.replace(NEW + path + location.search + tail);
+  }
+  // calls back only if the new site is up and is this site (a parked or half-set-up domain doesn't count)
+  function whenNewSiteUp(then) {
+    if (!window.fetch) return;
+    var ctl = window.AbortController ? new AbortController() : null;
+    if (ctl) setTimeout(function () { ctl.abort(); }, 4000);
+    fetch(NEW + "/version.txt?t=" + Date.now(), {cache: "no-store", signal: ctl ? ctl.signal : undefined})
+      .then(function (r) { return r.ok ? r.text() : ""; })
+      .then(function (v) { if (/^\d{4}-\d\d-\d\d\.\d+\s*$/.test(v)) then(); })
+      .catch(function () {});
+  }
   window.LCP = window.LCP || {};
-  window.LCP.move = {unpack: unpack, bring: bring, OLD: "https://" + OLD_HOST + OLD_BASE + "/?progress"};
-
-  var here = location.hostname;
+  window.LCP.move = {pack: pack, unpack: unpack, bring: bring, go: go, atOld: atOld, NEW: NEW,
+    NOTE: "https://" + OLD_HOST + OLD_BASE + "/moved.html"};
 
   /* ---------- at the old address ---------- */
-  if (here === OLD_HOST) {
-    var path = location.pathname.indexOf(OLD_BASE) === 0 ? location.pathname.slice(OLD_BASE.length) || "/" : "/";
-    var go = function () {
-      var data = pack(), hash = location.hash.replace(/^#/, ""), tail = "";
-      if (data) tail = "#move=" + data + (hash ? "&then=" + encodeURIComponent(hash) : "");
-      else if (hash) tail = "#" + hash;
-      location.replace(NEW + path + location.search.replace(/[?&]progress\b[^&]*/, "").replace(/^&/, "?") + tail);
-    };
-    var homeScreen = navigator.standalone === true || (window.matchMedia && matchMedia("(display-mode: standalone)").matches);
-    if (!homeScreen && !/[?&]progress\b/.test(location.search)) { go(); return; }
-
-    // the note about the move, in place of the page
-    if (window.stop) window.stop();
-    var code = pack();
-    document.documentElement.innerHTML =
-      '<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">' +
-      '<title>Lap Cat Puzzles has moved</title><style>' +
-      ':root{--bg:#ECEEE7;--card:#fff;--ink:#3B2A44;--soft:#6B5E70;--btn:#3B2A44;--btnInk:#fff;--line:#D6D8CF}' +
-      '@media (prefers-color-scheme: dark){:root{--bg:#1F1C24;--card:#2A2630;--ink:#F0EAF2;--soft:#B9AEBE;--btn:#F0EAF2;--btnInk:#1F1C24;--line:#3E3946}}' +
-      'body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.45 -apple-system,system-ui,sans-serif;' +
-      'padding:max(24px,env(safe-area-inset-top)) 16px 40px}' +
-      'main{max-width:520px;margin:0 auto}h1{font-size:28px;margin:8px 0 4px}p,li{color:var(--soft)}b{color:var(--ink)}' +
-      '.card{background:var(--card);border-radius:16px;padding:16px;margin:16px 0}' +
-      'button,a.btn{display:block;width:100%;box-sizing:border-box;min-height:48px;border:0;border-radius:12px;font-family:inherit;font-size:17px;font-weight:600;line-height:1;' +
-      'background:var(--btn);color:var(--btnInk);text-align:center;text-decoration:none;padding:15px;margin:10px 0;cursor:pointer}' +
-      'a.btn.alt{background:transparent;color:var(--ink);border:2px solid var(--line)}' +
-      'textarea{width:100%;box-sizing:border-box;height:84px;font:12px/1.3 ui-monospace,monospace;border:1px solid var(--line);' +
-      'border-radius:10px;padding:8px;background:var(--bg);color:var(--ink)}ol{padding-left:22px}#said{min-height:1.4em;font-weight:600;color:var(--ink)}' +
-      '</style></head><body><main>' +
-      '<h1>🐾 We’ve moved!</h1>' +
-      '<p>Catdoku is now <b>Lap Cat Puzzles</b>, at <b>lapcatpuzzles.com</b>. Your scores, streaks and games in progress can come too.</p>' +
-      (code ?
-        '<div class="card"><p><b>Playing from your Home Screen?</b> Your progress is kept inside this icon, so bring it over like this:</p><ol>' +
-        '<li>Tap <b>Copy my progress code</b>.</li>' +
-        '<li>Open <b>lapcatpuzzles.com</b> in Safari and add it to your Home Screen (Share, then Add to Home Screen).</li>' +
-        '<li>Open the new icon, go to <b>Settings</b>, and paste the code under <b>Bring over your progress</b>.</li></ol>' +
-        '<button id="copy">Copy my progress code</button><p id="said" aria-live="polite"></p>' +
-        '<textarea id="code" readonly aria-label="Your progress code">' + code + '</textarea>' +
-        '<p>Once it’s there, you can delete this old icon.</p></div>' +
-        '<a class="btn alt" id="go" href="#">Or just open the new site here</a>'
-      : '<a class="btn" id="go" href="#">Go to lapcatpuzzles.com</a>') +
-      '</main></body>';
-    var btn = document.getElementById("copy"), box = document.getElementById("code"), said = document.getElementById("said");
-    document.getElementById("go").onclick = function (e) { e.preventDefault(); go(); };
-    if (btn) btn.onclick = function () {
-      var done = function () { said.textContent = "Copied! Now open lapcatpuzzles.com."; };
-      var fallback = function () {
-        box.focus(); box.select(); box.setSelectionRange(0, code.length);
-        try { if (document.execCommand("copy")) return done(); } catch (e) {}
-        said.textContent = "Select all the text in the box below and copy it.";
-      };
-      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(done, fallback);
-      else fallback();
-    };
+  if (atOld) {
+    if (/\/moved\.html$/.test(location.pathname)) return;   // the note does its own thing
+    whenNewSiteUp(function () {
+      if (navigator.standalone === true) location.replace(OLD_BASE + "/moved.html");
+      else go();
+    });
     return;
   }
 
   /* ---------- at the new address ---------- */
+  if (here === "www." + NEW_HOST) { location.replace(NEW + location.pathname + location.search + location.hash); return; }
   var m = location.hash.match(/^#move=([A-Za-z0-9_-]+)(?:&then=(.*))?$/);
   if (m) {
     try { bring(unpack(m[1]), false); } catch (e) {}

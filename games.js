@@ -2553,10 +2553,11 @@ const G = (() => {
   // What's new: the first time someone who's played before opens a game after a change worth telling them about, a
   // card says what's new, once (NEWS: v1 was the November 2026 redesign, its card taken down on 2026-11-14 as every
   // tester had seen it; v2 was sound, on by default, and the settings that came with it; v3 is the new name and
-  // address, lapcatpuzzles.com, shown to everyone whose progress move.js carried over). It waits for any
+  // address, lapcatpuzzles.com, shown to everyone whose progress move.js carried over, and never at the old
+  // address, where it would be news too soon). It waits for any
   // walkthrough, tip or card to close. New visitors get the walkthrough instead and are marked as having seen it.
   function whatsNew(tries = 0) {
-    if (!RETURNING || load(NEWS).seen || !GAMES.some(g => g[1] === SLUG) || !$("menuBtn") || !$("card")) return;
+    if (!RETURNING || load(NEWS).seen || (window.LCP && LCP.move && LCP.move.atOld) || !GAMES.some(g => g[1] === SLUG) || !$("menuBtn") || !$("card")) return;
     if (document.hidden || document.querySelector(".spot") || ($("overlay") && $("overlay").classList.contains("show"))) {
       if (tries < 30) setTimeout(() => whatsNew(tries + 1), 2000); return;
     }
