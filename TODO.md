@@ -5,10 +5,11 @@ Things to come back to, kept here so any chat can pick them up. Add an item when
 
 ## The move to lapcatpuzzles.com
 
-The site is moving from GitHub Pages (`rhymes-with-tree.github.io/catdoku/`) to Cloudflare Pages at lapcatpuzzles.com,
+The site is moving from GitHub Pages (`rhymes-with-tree.github.io/catdoku/`) to Cloudflare Workers at lapcatpuzzles.com,
 and taking its name, Lap Cat Puzzles, from the domain (2026-11-17). `move.js` carries players' progress across (see
 README, Hosting and the move). It waits for the new site to answer, so it's on `main` already. In order:
-- [ ] Cloudflare Pages project on this repository, `main`, build `sh tools/build-site.sh`, output `_site`; custom
+- [ ] Cloudflare Workers project on this repository, named `lapcatpuzzles` (as in `wrangler.jsonc`), build command
+  `sh tools/build-site.sh`, deploy command `npx wrangler deploy`; check it at its workers.dev address; then custom
   domains lapcatpuzzles.com and www.lapcatpuzzles.com. The moment the new site loads, the old one sends everyone on
 - [ ] check on an iPhone: from Safari at the old address, and from an old Home Screen icon (the code and Settings);
   and on Android and in DuckDuckGo, which testers use too

@@ -6,9 +6,10 @@ site was called Catdoku, after its first game, until November 2026, and this rep
 
 ## Hosting and the move
 
-The site is served by Cloudflare Pages from this repository's `main` branch: build command `sh tools/build-site.sh`,
-output directory `_site` (everything but the notes, `tools/` and `.claude/`; `_headers` sets its headers). The domain, lapcatpuzzles.com, and its
-email forwarding are in the same Cloudflare account.
+The site is served by Cloudflare Workers (static assets, no Worker code) from this repository's `main` branch: on
+every push Cloudflare runs `sh tools/build-site.sh`, which puts everything but the notes, `tools/` and `.claude/` in
+`_site`, then `npx wrangler deploy`, which serves `_site` as `wrangler.jsonc` says (`_headers` sets its headers). The
+domain, lapcatpuzzles.com, and its email forwarding are in the same Cloudflare account.
 
 It used to be GitHub Pages, at `rhymes-with-tree.github.io/catdoku/`. A browser keeps saved data apart for each
 address, so `move.js`, loaded first by every page, carries players' progress across. At the old address, once the new
