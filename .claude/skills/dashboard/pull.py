@@ -8,6 +8,7 @@ Writes, each as {"rows": [...], "meta": [...]}, every day GoatCounter has (the d
   game_days.json  one row a game a day it was played: opens, puzzles started, solved, lost
   visits.json     the shape of a visit (since 2026-11-17), a row a day: what visits open on, the first game, puzzles in a row
   errors.json     the errors the games sent ("Error: ..."), a row a day
+  levels.json     one row a game a level a day: started, solved, lost
 
 GoatCounter counts each page or moment once a visit, so every number is a count of visits. The API key is added by
 the session's proxy (rhymes-with-tree.goatcounter.com is a connected service), so none is needed here. Days are the
@@ -24,9 +25,13 @@ REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")
 
 START_RE = re.compile(r"\b(started|new (puzzle|tangle|table|trip|board|floor|tower|round|skein|keyboard))\b", re.I)   # games.js
 # what each game sends on a win and on a loss (their G.track calls; a moment that's neither isn't counted)
-SOLVED_RE = re.compile(r"\b(solved|won|done|finished|complete|dyed|cleared|untangled|genius)\b", re.I)
-LOST_RE = re.compile(r"\b(fell|out of (moves|swaps)|stuck|overflowed|gave up|lost|over|missed|caught|woke the human|piled up|tangled|put out)\b", re.I)
-VISIT_RE = re.compile(r"^(Visit opened on|First game): (.+)$")
+# (Cat Burglar: "caught" is a win, "got away" a loss; its "round over …: 2 caught" is neither)
+SOLVED_RE = re.compile(r"\b(solved|won|done|finished|complete|dyed|cleared|untangled|genius|caught)\b", re.I)
+LOST_RE = re.compile(r"\b(fell|out of (moves|swaps)|stuck|overflowed|gave up|got away|lost|over|missed|woke the human|piled up|tangled|put out)\b", re.I)
+NEITHER_RE = re.compile(r"\bround over\b", re.I)
+LEVEL_RE = re.compile(r"\blevel (\d+)\b", re.I)
+VISIT_RE = re.compile(r"^(Visit opened on|First game|Visit length|Games in a visit): (.+)$")
+AFTER_RE = re.compile(r"^After (.+): (.+)$")
 ROW_RE = re.compile(r"^(.+) in a row: (.+)$")
 
 
@@ -117,7 +122,7 @@ def main():
         slugs = [t for t in re.findall(r"([a-z0-9]+)/", p) if t in by_slug]
         return by_slug[slugs[-1]][0] if slugs else ("Every game (games.js)" if "games.js" in p else "")
 
-    game_days, visits, errors = {}, {}, []
+    game_days, visits, errors, levels = {}, {}, [], {}
 
     def gd(g, d):
         return game_days.setdefault((g[1], d), {"day": d, "slug": g[1], "game": g[0], "shelf": g[3], "colour": g[2], "beta": g[4],
@@ -135,10 +140,17 @@ def main():
             for d, n in days.items():
                 errors.append({"day": d, "message": p[len("Error: "):] if p.startswith("Error: ") else p, "count": n, "game": error_game(p)})
             continue
-        v, r = VISIT_RE.match(p), ROW_RE.match(p)
-        if v or r:
-            kind = "In a row" if r else ("Opened on" if v.group(1) == "Visit opened on" else "First game")
-            label, run = (r.group(1), r.group(2)) if r else (v.group(2), "")
+        v, r, a = VISIT_RE.match(p), ROW_RE.match(p), AFTER_RE.match(p)
+        if v or r or a:
+            # kinds: Opened on, First game, In a row (label the game, run how many), Played next (label the game
+            # before, run the game after), Visit length, Games in a visit
+            if r:
+                kind, label, run = "In a row", r.group(1), r.group(2)
+            elif a:
+                kind, label, run = "Played next", a.group(1), a.group(2)
+            else:
+                kind = {"Visit opened on": "Opened on"}.get(v.group(1), v.group(1))
+                label, run = v.group(2), ""
             for d, n in days.items():
                 key = (d, kind, label, run)
                 visits[key] = {"day": d, "kind": kind, "label": label, "run": run, "count": visits.get(key, {}).get("count", 0) + n}
@@ -146,10 +158,16 @@ def main():
         g = game_of(p)
         if not g or p.startswith("Daily challenge") or "feedback sent" in p or "Favorited" in p:
             continue
-        f = "started" if START_RE.search(p) else "solved" if SOLVED_RE.search(p) else "lost" if LOST_RE.search(p) else None
+        f = None if NEITHER_RE.search(p) else "started" if START_RE.search(p) else "solved" if SOLVED_RE.search(p) else "lost" if LOST_RE.search(p) else None
         if f:
             for d, n in days.items():
                 gd(g, d)[f] += n
+            lv = LEVEL_RE.search(p)
+            if lv and "endless" not in p.lower():   # each numbered level, for where people stop
+                for d, n in days.items():
+                    key = (d, g[1], int(lv.group(1)))
+                    row = levels.setdefault(key, {"day": d, "slug": g[1], "game": g[0], "shelf": g[3], "level": int(lv.group(1)), "started": 0, "solved": 0, "lost": 0})
+                    row[f] += n
 
     code = open(__file__, encoding="utf-8").read()
     window = f"{min(daily) if daily else first.isoformat()} to {today.isoformat()}"
@@ -166,7 +184,9 @@ def main():
         "game_days.json": (sorted(game_days.values(), key=lambda r: (r["day"], r["slug"])),
                            meta("Each game, each day it was played: visits that opened it, and its moments: started (a new puzzle or level), solved (solved, won, done, finished, cleared…) and lost (fell, out of moves, stuck, overflowed, gave up…)")),
         "visits.json": (sorted(visits.values(), key=lambda r: (r["day"], r["kind"], r["label"], r["run"])),
-                        meta("Each day: the visit tally's moments, which began on 2026-11-17")),
+                        meta("Each day: the visit tally's moments, which began on 2026-11-17 (Played next, Visit length and Games in a visit on 2026-11-18)")),
+        "levels.json": (sorted(levels.values(), key=lambda r: (r["day"], r["slug"], r["level"])),
+                        meta("Each game's numbered levels, each day: visits that started, solved and lost each level (Endless left out)")),
         "errors.json": (sorted(errors, key=lambda e: (e["day"], e["message"]), reverse=True),
                         meta("Each day: moments named 'Error: ...', which the games send when something throws")),
     }

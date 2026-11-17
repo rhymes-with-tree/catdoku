@@ -10,12 +10,18 @@ Data type, private to the owner until they share it). It looks like the site (Ba
 stripe, tiles with their shelf's colour along the top). A timeline at the top (7 days, 14 days, 28 days, All) sets
 the days every section below covers, each figure against as many days just before. It shows:
 
-- **To look at**: players' feedback and the games' errors, each with a status (Open, To check, Fixed, Done, Not ours)
-  and a suggested fix, or what happened for one that's done. The ones to look at come first; the rest are folded away.
+- **To look at**: players' feedback and the games' errors, each with a status (Open, To check, Fixed, Done, Not ours,
+  Dismissed) and a suggested fix, or what happened for one that's done. The ones to look at come first; the rest are
+  folded away. The owner can minimize a note or the whole section, and dismiss a note, which lasts while they look
+  (the page's `dismissed` setting, a list of note ids); one they ask to dismiss for good gets the status Dismissed.
 - **The tiles**: visits that opened a page (against the period before), puzzles started and solved, notes waiting.
 - **Days**: visits each day.
 - **Games**: each game's visits, puzzles started, solved, solved as a share of started, and lost.
-- **Visits**: what visits open on, the first game played, and puzzles in a row (the visit tally, since 2026-11-17).
+- **Visits**: what visits open on, the first game played, puzzles in a row (the visit tally, since 2026-11-17), and
+  the game played next, visit length and games in a visit (since 2026-11-18).
+- **Levels**: where people stop: levels that 5 or more visits started and fewer than 45% won ("Hard to win"), or that
+  4 or more won and fewer than half of those went on ("Won, then left", or "The last level so far" when nobody has
+  gone past it), then every level of a game picked from a list.
 - **Errors**: the "Error: …" moments the games send.
 
 Its numbers are attached files, not live queries: GoatCounter is a service connected to this environment's proxy, not
@@ -26,11 +32,11 @@ owner can ask for one any time.
 ## Updating it
 
 1. **Pull the numbers.** `python3 -I .claude/skills/dashboard/pull.py <scratchpad>/pawprints` writes `daily.json`,
-   `game_days.json`, `visits.json` and `errors.json` (each `{rows, meta}`, a row a day, every day GoatCounter has, the
+   `game_days.json`, `visits.json`, `levels.json` and `errors.json` (each `{rows, meta}`, a row a day, every day GoatCounter has, the
    script's own text in `meta`); the page adds up the days the timeline picks. It takes a
    minute or two: GoatCounter allows a few requests a second and the script waits when it's refused. The game names
    and shelves come from `games.js`, so a new game shows up by itself; a game whose win or loss moment uses a new verb
-   needs it added to `SOLVED_RE` or `LOST_RE`.
+   needs it added to `SOLVED_RE` or `LOST_RE` (Cat Burglar's "caught" is a win and "got away" a loss).
 2. **Read the feedback.** The Google Drive connector's `read_file_content` on the sheet "Website Feedback Form
    (Responses)" (`1uOKFrs2O5aLL4sAZhFbTwMQ6yWZjVyqGH55RUpl4PiE`, tab Form Responses 1). Columns: Timestamp, Kind,
    Message, Game, Details, Contact, Build, Browser, Device (the page's address), Text. The connector can cut a long
@@ -40,7 +46,8 @@ owner can ask for one any time.
    each new feedback row, and one for each new error in `errors.json` (one note for an error that repeats). For each,
    find out where it stands from the repository (pull the default branch first, so fixes merged since count): `git log`, `TODO.md`, the game's code. Then give it:
    - `status`: Open (a real problem, not fixed), To check (unclear, or fixed but unconfirmed), Fixed (a commit or PR
-     fixed it), Done (not a problem, handled), Not ours (a test row, a browser extension, "Script error.").
+     fixed it), Done (not a problem, handled), Not ours (a test row, a browser extension, "Script error."),
+     Dismissed (the owner asked to put it away; keep it so, and don't raise the same error again as new).
    - `suggestion`: for an Open or To check note, the fix in a sentence or three: what's wrong and where, and what to
      change. Base it on the code, not a guess; say "probably" where it's a reading. For a done one, what happened.
    - `ref`: the commit, PR or TODO item, or the file to look in.
@@ -52,7 +59,7 @@ owner can ask for one any time.
    The site's own house style applies to the words (plain, the owner's terms: Dark Mode, level, the game's own name).
 4. **Upload and point the datasets at the new files.** Upload each file (`Artifact`, `url` the dashboard's, `asset:
    true`, one `file_path` per call). Then one `ArtifactData` `batch` that `update`s each `datasets/<id>` (ids `daily`,
-   `game_days`, `visits`, `errors`, `notes`) with the new `source.url` and `updated: {at, by}`, each pinned with the
+   `game_days`, `visits`, `levels`, `errors`, `notes`) with the new `source.url` and `updated: {at, by}`, each pinned with the
    `if_version` you read. Then delete the old blobs (`Artifact` `delete`, `url` and `path` the old blob id), which are
    nothing's now.
 5. **Look at how it ran.** `ArtifactData` `get` `data/users/me` `check` (and `runs` if it exists) until `check` says
@@ -68,6 +75,6 @@ typeface, embedded). `page.html` here is a copy for the repository's history. Th
 place, so read the store's `files/index.html` before changing it, change that, and copy the result back to
 `page.html`. The page follows the Data type's rules (its `artifact-type/reference/one-writer.md`): words in the HTML,
 what the data decides drawn by `dash.draw` into elements stored empty or with a `—`. The timeline is the page's
-`range` setting (`dash/params`, default `"7"`); the calcs `days_r`, `period`, `games`, `totals`, `visits_r` and
-`errors_r` cut the files to it, so a pick redraws without fetching anything. Its colours are the site's
+`range` setting (`dash/params`, default `"7"`); the calcs `days_r`, `period`, `games`, `totals`, `visits_r`,
+`levels_r` and `errors_r` cut the files to it, so a pick redraws without fetching anything. Its colours are the site's
 (`games.css`), with the site's Dark Mode colours.
