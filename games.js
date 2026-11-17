@@ -774,13 +774,55 @@ const G = (() => {
   // Count a moment in the game (a puzzle started or solved) on the GoatCounter dashboard.
   // Nothing about the player is sent. Waits a few seconds for the counter script to load.
   function track(name) {
+    send(name);
+    if (START_RE.test(name)) puzzleStarted();
+  }
+  function send(name) {
     let tries = 0;
-    (function send() {
+    (function go() {
       const gc = window.goatcounter;
       if (gc && gc.count) gc.count({path: name, title: name, event: true});
-      else if (tries++ < 20) setTimeout(send, 500);
+      else if (tries++ < 20) setTimeout(go, 500);
     })();
   }
+
+  /* ---------- the shape of a visit ---------- */
+  // GoatCounter counts each page or moment once a visit and keeps only the totals, so it can't say what a visit
+  // opened on, which game came first or how many puzzles were played in a row (the owner's questions, 2026-11-16).
+  // The page keeps that tally itself on the device (catdoku.visit.v1) and sends it as three more kinds of moment:
+  //   "Visit opened on: Front page" (or a game, Settings, Launch history), as a visit's first page opens;
+  //   "First game: Tangle", at the visit's first puzzle;
+  //   "Tangle in a row: 3", once that run ends: the next puzzle is another game's, or the next visit starts (so a
+  //   visit's last run is counted when the device comes back).
+  // A visit ends after 30 minutes with no page opened and no puzzle started. A puzzle "started" is any moment a game
+  // already counts as one (a name with "new …" or "started"). Nothing about the player goes with it.
+  const VISIT = "catdoku.visit.v1", VISIT_GAP = 30 * 60e3;
+  const START_RE = /\b(started|new (puzzle|tangle|table|trip|board|floor|tower|round|skein|keyboard))\b/i;
+  const gameName = slug => (GAMES.find(g => g[1] === slug) || BETA.find(g => g[1] === slug) || [slug])[0];
+  const runs = n => n >= 10 ? "10+" : n >= 6 ? "6-9" : String(n);
+  function visit() {   // this visit's record, starting a new one (and sending the last one's run) after a gap
+    const v = load(VISIT), now = Date.now();
+    if (v.at && now - v.at < VISIT_GAP) { v.at = now; return v; }
+    if (v.run) send(`${gameName(v.run.slug)} in a row: ${runs(v.run.n)}`);
+    return {at: now, fresh: true};
+  }
+  function puzzleStarted() {
+    const slug = CURRENT; if (!slug) return;
+    const v = visit(); opened(v);
+    if (!v.first) { v.first = slug; send(`First game: ${gameName(slug)}`); }
+    if (v.run && v.run.slug === slug) v.run.n++;
+    else { if (v.run) send(`${gameName(v.run.slug)} in a row: ${runs(v.run.n)}`); v.run = {slug, n: 1}; }
+    save(VISIT, v);
+  }
+  // the page this visit opened on, once the page's own script has said which game it is (nav)
+  // (a game that deals its first puzzle as the page loads gets here first, from puzzleStarted)
+  function opened(v) {
+    if (!v.fresh) return;
+    delete v.fresh;
+    const slug = CURRENT, p = location.pathname;
+    send(`Visit opened on: ${slug ? gameName(slug) : /\/settings\/?$/.test(p) ? "Settings" : /\/calendar\/?$/.test(p) ? "Launch history" : "Front page"}`);
+  }
+  addEventListener("DOMContentLoaded", () => { const v = visit(); opened(v); save(VISIT, v); });
 
 
   /* ---------- timer and personal best times ---------- */
