@@ -8,3 +8,5 @@ A site of cat-themed puzzle games; `README.md` describes every game and what the
 - **Apple's guidelines:** the review and its own "Still to do" list are in `HIG.md`.
 - **Pictures:** who's who among the cats, and which game uses which picture, is in `ARTWORK.md`.
 - **New games:** use the new-game skill (`.claude/skills/new-game/SKILL.md`).
+- **Pawprints:** the owner's dashboard of GoatCounter numbers and players' feedback, with suggested fixes, is updated
+  with the dashboard skill (`.claude/skills/dashboard/SKILL.md`).
