@@ -699,6 +699,16 @@ const G = (() => {
     if (top ?? (result && result.n != null && result.n === topLevel())) tops[CURRENT] = true;
     save(GOLD, {counts, top: tops, levels, seen: [...seen, sig].slice(-30)});
   }
+  // The owner's Buy Me a Coffee page (2026-11-18): a link at the foot of the front page and a quiet line at the foot of
+  // every win card, never in the way of play. A tap opens it in a new tab and counts "Buy me a coffee: front page" or
+  // "Buy me a coffee: win card (tangle)" on GoatCounter, so the game stays as it was.
+  const COFFEE = "https://buymeacoffee.com/lapcatpuzzles";
+  function coffeeLink(where) {
+    const a = document.createElement("a");
+    a.href = COFFEE; a.target = "_blank"; a.rel = "noopener"; a.textContent = "☕ Buy me a coffee";
+    a.onclick = () => track(`Buy me a coffee: ${where}`);
+    return a;
+  }
   // The win cards' way out to every game.
   const HOME_LABEL = "Back to the front page", SHARE_LABEL = "Share my result", homeBtn = () => [HOME_LABEL, () => { location.href = HOME; }];
   // A win reopened (coming back to a game after winning, however you left it) isn't shown again: the game deals the
@@ -732,6 +742,8 @@ const G = (() => {
     // one big Next, and the rest as small icon buttons in a row under it, each with its word small underneath
     // (decided 2026-11-08); the other sizes (o.after, G.otherSize) show as a small link under them (games.css)
     smallButtons((b, i) => i > 0);
+    const cf = document.createElement("p"); cf.className = "coffee";
+    cf.append("Enjoying these? ", coffeeLink(`win card (${CURRENT || "?"})`)); $("card").append(cf);
   }
   // The open card's buttons that pass test(button, i) move to a row of small icon buttons under the big ones.
   function smallButtons(test) {
@@ -3043,6 +3055,6 @@ const G = (() => {
     }
   }
 
-  return {sound, ladder, ANOTHER, CHANGE, MAGNET, tally, emoText, radios, pawLost, pieces, GAMES, BETA, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, loseCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText, breakable,
+  return {COFFEE, coffeeLink, sound, ladder, ANOTHER, CHANGE, MAGNET, tally, emoText, radios, pawLost, pieces, GAMES, BETA, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, loseCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText, breakable,
           setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, feedbackCard, feedbackFor, toyPicker, pickLook};
 })();
