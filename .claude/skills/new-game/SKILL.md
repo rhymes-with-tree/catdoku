@@ -328,7 +328,8 @@ revive keeps the player on the same level and costs the gold paw.
   find it.
 - **Icon:** add a function to `tools/make-icons.py` and to its `ICONS` dict, then run
   `python3 tools/make-icons.py` (writes `icons/<slug>.svg`). Front-page icons load lazily, so a
-  full-page screenshot can show a tile blank; check the SVG on its own.
+  full-page screenshot can show a tile blank; check the SVG on its own. For outlined letters use `halo()`, never
+  `paint-order`: Canva won't upload an SVG that has it, and the owner edits icons there.
 - **README:** a section after the last game, starting "A <nth> game in `<slug>/`, a cat-themed
   <genre>: …": rules, controls, how puzzles are made, levels, hint/Undo/gold paw, timer, share link and
   cat photo. Add the game to the Gold paw, Share and Keys lists under "Across every game", to the Hints list
