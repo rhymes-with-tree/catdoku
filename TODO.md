@@ -60,8 +60,10 @@ Knock It Off's forgiving first two levels, and Pounce saving while toys fall):
 - [ ] **Weak level 1s to watch** (small samples): Cat Pile 16 → 7, Scratch That 17 → 8, Window Ledges 11 → 5, Kitten
   Caboodle 10 → 5.
 - [ ] **Mewstermind: make it more of a Clue.** Moved to beta on 2026-11-19 (the owner's call). Still worked out by
-  elimination, but the question becomes which cat had which toy, and perhaps where, when and why. Still being figured
-  out with the owner; it leaves beta once it's rebuilt.
+  elimination, but the question becomes which cat had which toy, and where, and when. Settled with the owner
+  (2026-11-19): you still guess and get feedback (not a list of clues); level 1 is cats and toys, then where is added,
+  then when. Why is out (it doesn't make sense); in its place, later levels let two cats share one toy, or one cat play
+  with more than one. Still open: what the feedback says, and which cats. It leaves beta once it's rebuilt.
 - [ ] **Under the Blanket: out of beta again.** Moved to beta on 2026-11-16 (the owner's call) after its first week on
   the front page: 11 starts at level 1, 6 solves. Still to settle what makes level 1 easier to get into.
 - [ ] **Twirl's sound on an iPhone** (feedback, 2026-11-16): sometimes no sound at all. Since the same day a tap's sound
