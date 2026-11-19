@@ -228,10 +228,10 @@ https://claude.ai/artifact/AiHXuVwvwB5CJSBPvgGNKS (the owner's own; its source i
   shared ones don't fit (the listening page can be extended for each shelf, so the owner picks as before).
 - **On a phone:** the owner hears it all on an iPhone: the length (`LENGTH` in `games.js`, 55% since the sounds went on too long; the listening page's Length slider tries others), the loudness (`VOLUME` in `games.js`, .47, matching the
   listening page at the 59 the owner last used), and whether Pawlinko gets too busy with several things falling.
-- **Toy Box's sounds aren't right** (the owner, 2026-11-19). Today a basket tipped is Fabric grab 7 (`tb.tip`), its toys
-  onto the track six rolling ticks (`tb.roll`), a full track the shared `wrong`, and a basket filled the shared `word`
-  (`toybox/index.html`, the `G.sound.define` line). Ask the owner which are wrong and what they should sound like, and
-  let them pick new ones on the listening page as before.
+- **Toy Box's sounds** (the owner, 2026-11-19): the basket tipped (Fabric grab 7) is at 30% now, the rolling ticks are
+  gone, and a soft music-box waltz plays a note a beat while toys go round the track, like a carousel (`ROUND`,
+  `ROUND_BEAT` and `ROUND_VOL` in `toybox/index.html`). The owner to hear it on a phone: whether it's fun, too loud or
+  too quiet, and whether it gets tiresome over a long level.
 - **The Settings page's Every game Sound** sets the games on the front page; a beta game (Swap-a-Pom now) has only its
   menu's switch until it joins.
 
