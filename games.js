@@ -66,7 +66,7 @@ const G = (() => {
   // Games in beta: their pages work (open them by their address), but they're left off the front page, the games menu,
   // search, favorites and the daily challenge until they're finished. Same fields as GAMES.
   const BETA = [
-    ["Mewstermind", "stash", "Work out which toys the cat stashed in the boxes", "#7885BA", "logic", "toy stash mastermind guess code breaker codebreaker bulls and cows deduction colours colors hidden", "2026-10-26"],
+    ["Mewstermind", "stash", "Work out which cat had which toy, and where", "#7885BA", "logic", "clue cluedo whodunnit mystery mastermind guess code breaker codebreaker deduction elimination toys rooms cats", "2026-10-26"],
     ["Under the Blanket", "blanket", "Find the cats with a feather", "#8D78AD", "logic", "black box blackbox rays atoms deflection reflection hidden balls feather wand blanket bugsy", "2026-11-09"],
     ["Day Light", "daylight", "Get every cat napping in the sun, though some point their own way", "#ECA818", "teasers", "lights out flip switch spots arrows night light nap", "2026-11-12"],
     ["Swap-a-Pom", "swapapom", "Swap the pompoms to spell words, with Moonpie for company", "#B94588", "words", "gram jam match 3 three words swap letters scrabble pompoms pom poms moonpie purr", "2026-11-13"],
