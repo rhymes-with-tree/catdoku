@@ -59,15 +59,13 @@ Knock It Off's forgiving first two levels, and Pounce saving while toys fall):
   moves on level N"). Look again with a few weeks of it.
 - [ ] **Weak level 1s to watch** (small samples): Cat Pile 16 → 7, Scratch That 17 → 8, Window Ledges 11 → 5, Kitten
   Caboodle 10 → 5.
-- [ ] **Mewstermind: make it more of a Clue.** Moved to beta on 2026-11-19 (the owner's call). Still worked out by
-  elimination, but the question becomes which cat had which toy, and where, and when. Settled with the owner
-  (2026-11-19): you still guess and get feedback (not a list of clues); level 1 is cats and toys, then where is added,
-  then when. Why is out (it doesn't make sense); in its place, later levels let two cats share one toy, or one cat play
-  with more than one. Feedback is paws (dark: a cat all right; light: a cat partly right), and Hint is Clue's witness
-  telling you one thing that's wrong; the cats are the household's own. Built 2026-11-19: levels 1 to 4 (cats and toys,
-  then rooms), for the owner to play. Still to do: when (the order they played), shared toys or a cat with two, the
-  rooms drawn rather than emoji, the witness's picture beside the hint, perhaps a notepad as in Clue to cross things
-  off, and a new front-page icon (`tools/make-icons.py` still draws boxes). It leaves beta once it's rebuilt.
+- [ ] **Mewstermind: make it more of a Clue.** Moved to beta on 2026-11-19 (the owner's call). Settled with the
+  owner: one cat had one toy (and was in one room); each guess names one cat and one toy (and room), and paws say how
+  many are right; Hint is Clue's witness ruling one thing out; the cats are the household's own; why is out. Built
+  2026-11-19, levels 1 to 4 (cats and toys, then rooms), for the owner to play (preview:
+  https://claude.ai/artifact/LD21RccB3Yg2dk66XGUih3). Still to do: when (the time it happened), the rooms drawn rather
+  than emoji, the witness's picture beside the hint, and a new front-page icon (`tools/make-icons.py` still draws
+  boxes). It leaves beta once it's rebuilt.
 - [ ] **Under the Blanket: out of beta again.** Moved to beta on 2026-11-16 (the owner's call) after its first week on
   the front page: 11 starts at level 1, 6 solves. Still to settle what makes level 1 easier to get into.
 - [ ] **Twirl's sound on an iPhone** (feedback, 2026-11-16): sometimes no sound at all. Since the same day a tap's sound
