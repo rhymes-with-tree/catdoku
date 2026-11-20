@@ -62,9 +62,9 @@ Knock It Off's forgiving first two levels, and Pounce saving while toys fall):
 - [ ] **Mewstermind: make it more of a Clue.** Moved to beta on 2026-11-19 (the owner's call). Settled with the
   owner: one cat had one toy (and was in one room); each guess names one cat and one toy (and room), and paws say how
   many are right; Hint is Clue's witness ruling one thing out; the cats are the household's own; why is out. Built
-  2026-11-19, levels 1 to 4 (cats and toys, then rooms), for the owner to play (preview:
-  https://claude.ai/artifact/LD21RccB3Yg2dk66XGUih3). Still to do: when (the time it happened), the rooms drawn rather
-  than emoji, the witness's picture beside the hint, and a new front-page icon (`tools/make-icons.py` still draws
+  2026-11-19 and 2026-11-20, levels 1 to 6 (cats and toys, then rooms, then a time of day: dawn, noon, evening,
+  midnight, 3 a.m.), for the owner to play (preview: https://claude.ai/artifact/LD21RccB3Yg2dk66XGUih3). Still to do:
+  the rooms and times drawn rather than emoji, the witness's picture beside the hint, and a new front-page icon (`tools/make-icons.py` still draws
   boxes). It leaves beta once it's rebuilt.
 - [ ] **Under the Blanket: out of beta again.** Moved to beta on 2026-11-16 (the owner's call) after its first week on
   the front page: 11 starts at level 1, 6 solves. Still to settle what makes level 1 easier to get into.

@@ -32,7 +32,8 @@
 <link rel="stylesheet" href="../games.css?v=2026-11-19.1">
 <style>
 /* Mewstermind, since 2026-11-19 a Clue worked out like a Mastermind (in beta): one of the household's cats had one of
-   the toys (and, from level 3, in one of the rooms). Each guess names a cat and a toy (and a room), and paw prints
+   the toys (from level 3 in one of the rooms, and from level 5 at one time of day). Each guess names a cat and a toy
+   (and a room and a time), and paw prints
    beside it say how many of those are right, never which. */
 .wrap.stashwrap{height:auto}
 @media (orientation:landscape) and (max-height:500px){
@@ -98,7 +99,7 @@
 </head>
 <body>
 <main>
-  <header><div class="title"><h1>Mewster&shy;mind</h1><span class="beta" title="Still being made: things may change">Beta</span></div><div class="stripe"></div><p class="tagline">Work out which cat had the toy, and where</p></header>
+  <header><div class="title"><h1>Mewster&shy;mind</h1><span class="beta" title="Still being made: things may change">Beta</span></div><div class="stripe"></div><p class="tagline">Work out which cat had the toy, where and when</p></header>
   <nav class="games" id="games" aria-label="Games"></nav>
 
   <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
@@ -125,20 +126,20 @@
 <script src="../games.js?v=2026-11-19.1"></script>
 <script>
 /* ---------- levels ---------- */
-// [cats, toys, rooms (0: none), par]. One cat had one toy (and was in one room). There's no limit on guesses; par is
-// the most for a gold paw: one more than a player who only ever guesses answers that fit every clue so far needs nine
-// times in ten (simulated, 2026-11-19). When comes in later levels (TODO.md).
-const LEVELS = [null, [4, 4, 0, 6], [5, 6, 0, 7], [4, 4, 4, 7], [5, 6, 5, 8]];
+// [cats, toys, rooms (0: none), times of day (0: none), par]. One cat had one toy (in one room, at one time of day).
+// There's no limit on guesses; par is the most for a gold paw: one more than a player who only ever guesses answers
+// that fit every clue so far needs nine times in ten (simulated, 2026-11-19 and 2026-11-20).
+const LEVELS = [null, [4, 4, 0, 0, 6], [5, 6, 0, 0, 7], [4, 4, 4, 0, 7], [5, 6, 5, 0, 8], [4, 4, 4, 4, 8], [5, 6, 5, 5, 9]];
 const MAX_LEVEL = LEVELS.length - 1;
-const levelName = n => { const [C, T, R] = LEVELS[n]; return `Level ${n} · ${C} cats, ${T} toys${R ? `, ${R} rooms` : ""}`; };
-const PARTS = ["cat", "toy", "room"];
+const levelName = n => { const [C, T, R, W] = LEVELS[n]; return `Level ${n} · ${C} cats, ${T} toys${R ? `, ${R} rooms` : ""}${W ? `, ${W} times` : ""}`; };
+const PARTS = ["cat", "toy", "room", "time"];
 
 /* ---------- the logic ---------- */
 // An answer is [cat, toy] or [cat, toy, room], each an index into the mystery's lists, and so is a guess. The paws
 // for a guess: how many of its parts are right.
 const paws = (code, guess) => code.reduce((n, v, d) => n + (v === guess[d]), 0);
-const sizes = g => [g.cats.length, g.toys.length, g.rooms.length].slice(0, g.D);
-// Every answer that fits every row so far (at most 5 × 6 × 5 = 150 to try).
+const sizes = g => [g.cats.length, g.toys.length, g.rooms.length, g.times.length].slice(0, g.D);
+// Every answer that fits every row so far (at most 5 × 6 × 5 × 5 = 750 to try).
 function fitting(dims, rows) {
   let all = [[]];
   for (const n of dims) all = all.flatMap(a => [...Array(n).keys()].map(v => [...a, v]));
@@ -174,6 +175,10 @@ function pickCats(N) {
 /* ---------- rooms ---------- */
 const ROOMS = [["🍳", "kitchen"], ["🛏️", "bedroom"], ["🛋️", "living room"], ["🛁", "bathroom"], ["📚", "study"], ["🧺", "laundry"]];
 const pickRooms = N => shuffle([...ROOMS.keys()]).slice(0, N);
+/* ---------- times of day (from level 5; the owner's pick, 2026-11-20) ---------- */
+// [emoji, name, how a sentence says it], in the order of the day: a mystery's times stay in that order on the tray.
+const TIMES = [["🌅", "dawn", "at dawn"], ["☀️", "noon", "at noon"], ["🌇", "evening", "in the evening"], ["🌙", "midnight", "at midnight"], ["🌌", "3 a.m.", "at 3 a.m."]];
+const pickTimes = N => shuffle([...TIMES.keys()]).slice(0, N).sort((a, b) => a - b);
 
 /* ---------- toys ---------- */
 const KINDS = [
@@ -199,8 +204,8 @@ function pickToys(K) {
 }
 
 /* ---------- game ---------- */
-// game: {level, D (parts: 2 cat and toy, 3 with a room), cats (ids), toys (pictures), rooms (ROOMS indexes), code
-//        ([cat, toy, room?]), rows ([{guess, paws}]), cur (the row being guessed: an index or null per part),
+// game: {level, D (parts: 2 cat and toy, 3 with a room, 4 with a time), cats (ids), toys (pictures), rooms (ROOMS
+//        indexes), times (TIMES indexes), code ([cat, toy, room?, time?]), rows ([{guess, paws}]), cur (the row being guessed: an index or null per part),
 //        nope (per part, the ones crossed off on the tray), undo, hinted, restarted, won}
 const STORE = "catdoku.stash.v3";   // v1 was the Mastermind of boxes, v2 a cat-to-toy match (both 2026-11-19)
 const $ = G.$;
@@ -213,10 +218,10 @@ const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !$("overlay").classList.contains("show");
 
 function deal(n, keep) {
-  const [C, T, R] = LEVELS[n], D = R ? 3 : 2;
+  const [C, T, R, W] = LEVELS[n], D = W ? 4 : R ? 3 : 2;
   keep = keep || {};
-  const g = {level: n, D, cats: keep.cats || pickCats(C), toys: keep.toys || pickToys(T), rooms: keep.rooms || (R ? pickRooms(R) : []),
-             rows: [], cur: Array(D).fill(null), nope: [[], [], []].slice(0, D), undo: [], hinted: false, restarted: false, won: false, ...G.freshClock()};
+  const g = {level: n, D, cats: keep.cats || pickCats(C), toys: keep.toys || pickToys(T), rooms: keep.rooms || (R ? pickRooms(R) : []), times: keep.times || (W ? pickTimes(W) : []),
+             rows: [], cur: Array(D).fill(null), nope: [[], [], [], []].slice(0, D), undo: [], hinted: false, restarted: false, won: false, ...G.freshClock()};
   g.code = keep.code || sizes(g).map(rnd);
   return g;
 }
@@ -226,13 +231,14 @@ function newPuzzle() {
   G.track(`Mewstermind new puzzle level ${game.level}`);
 }
 function startLevel(n) { settings.level = n; $("levelSel").value = n; newPuzzle(); }
-const par = () => LEVELS[game.level][3];
+const par = () => LEVELS[game.level][4];
 const catName = c => catOf(game.cats[c])[1];
 const toyName = t => nameOf(game.toys[t]);
 const roomName = r => ROOMS[game.rooms[r]][1];
-const partName = (d, v) => d === 0 ? catName(v) : d === 1 ? `the ${toyName(v)}` : `the ${roomName(v)}`;
-// "Gus, with the mouse, in the kitchen"
-const guessSay = g => g.map((v, d) => v === null ? "" : d === 0 ? catName(v) : d === 1 ? `with the ${toyName(v)}` : `in the ${roomName(v)}`).filter(Boolean).join(", ");
+const timeName = w => TIMES[game.times[w]][1];
+const partName = (d, v) => d === 0 ? catName(v) : d === 1 ? `the ${toyName(v)}` : d === 2 ? `the ${roomName(v)}` : timeName(v);
+// "Gus, with the mouse, in the kitchen, at 3 a.m."
+const guessSay = g => g.map((v, d) => v === null ? "" : d === 0 ? catName(v) : d === 1 ? `with the ${toyName(v)}` : d === 2 ? `in the ${roomName(v)}` : TIMES[game.times[v]][2]).filter(Boolean).join(", ");
 
 /* ---------- drawing ---------- */
 let fresh = -1;   // the part that just went in, to drop it in
@@ -245,14 +251,14 @@ function partHTML(d, v, drop) {
   const cls = drop ? " drop" : "";
   if (d === 0) return `<img class="cat${cls}" src="${catSrc(catOf(game.cats[v])[2])}" alt="">`;
   if (d === 1) return `<img class="toy${cls}" src="${toySrc(game.toys[v])}" alt="">`;
-  return `<span class="room${cls}" aria-hidden="true">${ROOMS[game.rooms[v]][0]}</span>`;
+  return `<span class="room${cls}" aria-hidden="true">${(d === 2 ? ROOMS[game.rooms[v]] : TIMES[game.times[v]])[0]}</span>`;
 }
 const pawsHTML = (p, D) => [...Array(p).fill("right"), ...Array(D - p).fill("none")].map(pawSVG).join("");
 function draw() {
   const {D, rows, cur} = game, done = game.won, hm = hints.current(), T = Math.max(par(), rows.length + (done ? 0 : 1));
   size();
   // the case: who, with what, where
-  const WHAT = ["Who?", "Toy?", "Where?"];
+  const WHAT = ["Who?", "Toy?", "Where?", "When?"];
   let h = `<div class="line case"><span class="num"></span><div class="slots">`;
   for (let d = 0; d < D; d++) h += done ? `<div class="slot open" style="--d:${d * 0.15}s" aria-label="${partName(d, game.code[d])}">${partHTML(d, game.code[d])}</div>`
     : `<div class="slot" aria-label="${WHAT[d]}"><span class="q">?</span><span class="what">${WHAT[d].replace("?", "")}</span></div>`;
@@ -269,17 +275,17 @@ function draw() {
   $("board").innerHTML = h;
   fresh = -1;
   // the tray: the cats, the toys, the rooms, then Check
-  const tray = $("tray"), sig = [game.cats, game.toys, game.rooms].map(a => a.join()).join("|");
+  const tray = $("tray"), sig = [game.cats, game.toys, game.rooms, game.times].map(a => a.join()).join("|");
   if (tray.dataset.sig !== sig) {
     tray.dataset.sig = sig; tray.innerHTML = "";
-    const lists = [game.cats, game.toys, game.rooms].slice(0, D);
+    const lists = [game.cats, game.toys, game.rooms, game.times].slice(0, D);
     lists.forEach((list, d) => {
       const row = document.createElement("div"); row.className = "row"; tray.append(row);
       list.forEach((x, v) => {
         const b = document.createElement("button"); b.className = "pick " + PARTS[d]; b.dataset.d = d; b.dataset.v = v;
         if (d === 0) { const c = catOf(x); b.innerHTML = `<img src="${catSrc(c[2])}" alt=""><span class="w">${c[1]}</span>`; }
         else if (d === 1) { b.innerHTML = `<img src="${toySrc(x)}" alt="">`; b.title = nameOf(x)[0].toUpperCase() + nameOf(x).slice(1); }
-        else b.innerHTML = `<span class="e" aria-hidden="true">${ROOMS[x][0]}</span><span class="w">${ROOMS[x][1]}</span>`;
+        else { const [e, w] = (d === 2 ? ROOMS : TIMES)[x]; b.className = "pick room" + (d === 3 ? " time" : ""); b.innerHTML = `<span class="e" aria-hidden="true">${e}</span><span class="w">${w}</span>`; }
         row.append(b);
       });
     });
@@ -291,7 +297,7 @@ function draw() {
     b.classList.toggle("on", !done && cur[d] === v);
     b.classList.toggle("nope", no);
     b.classList.toggle("hintcell", !!lit); b.classList.toggle("bad", !!(lit && hm.bad));
-    b.setAttribute("aria-label", `${d === 0 ? catName(v) : d === 1 ? toyName(v) : roomName(v)}${no ? ", crossed off" : ""}`);
+    b.setAttribute("aria-label", `${d === 0 ? catName(v) : d === 1 ? toyName(v) : d === 2 ? roomName(v) : timeName(v)}${no ? ", crossed off" : ""}`);
   });
   $("checkBtn").disabled = done || cur.includes(null);
   const g = rows.length + (done ? 0 : 1);
@@ -323,7 +329,7 @@ function takeOut(d) {
 }
 function check() {
   if (!playing()) return;
-  if (game.cur.includes(null)) { G.note(game.D > 2 ? "Pick a cat, a toy and a room first." : "Pick a cat and a toy first.", 2500); return; }
+  if (game.cur.includes(null)) { G.note(["", "", "Pick a cat and a toy first.", "Pick a cat, a toy and a room first.", "Pick a cat, a toy, a room and a time first."][game.D], 2500); return; }
   const guess = game.cur.slice(), p = paws(game.code, guess);
   game.rows.push({guess, paws: p}); game.started = true; G.sound.play("mm.check");
   game.cur = Array(game.D).fill(null); game.undo = [];
@@ -356,11 +362,12 @@ $("tray").addEventListener("click", e => {
   else if (heldFired) heldFired = false;
   else put(+b.dataset.d, +b.dataset.v);
 });
-// Keys: 1 to 9 pick a cat, Shift with 1 to 9 a toy, Alt with 1 to 9 a room; Backspace takes the last out; Enter checks.
+// Keys: 1 to 9 pick a cat, Shift with 1 to 9 a toy, Alt with 1 to 9 a room, Alt and Shift with 1 to 9 a time;
+// Backspace takes the last out; Enter checks.
 document.addEventListener("keydown", e => {
   if (!playing() || document.querySelector(".spot") || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
   if (e.ctrlKey || e.metaKey) return;
-  const n = /^Digit[1-9]$/.test(e.code) ? +e.code[5] : 0, d = e.altKey ? 2 : e.shiftKey ? 1 : 0;
+  const n = /^Digit[1-9]$/.test(e.code) ? +e.code[5] : 0, d = (e.altKey ? 2 : 0) + (e.shiftKey ? 1 : 0);
   if (n && d < game.D && n <= sizes(game)[d]) { e.preventDefault(); put(d, n - 1); }
   else if (e.key === "Backspace" || e.key === "Delete") { e.preventDefault(); const k = game.cur.map((v, i) => v !== null ? i : -1).filter(i => i >= 0).pop(); if (k !== undefined) takeOut(k); }
   else if (e.key === "Enter" && (e.target.tagName !== "BUTTON" || e.target.closest("#tray .pick"))) { e.preventDefault(); check(); }
@@ -379,7 +386,7 @@ function hint() {
   const {D, code, cur, rows} = game, who = WITNESSES[game.level % 2][1];
   const fit = fitting(sizes(game), rows);
   const open = d => [...new Set(fit.map(c => c[d]))].filter(v => v !== code[d]);   // still possible, and wrong
-  const said = (d, v) => d === 0 ? `it wasn't ${catName(v)}` : d === 1 ? `it wasn't the ${toyName(v)}` : `it wasn't in the ${roomName(v)}`;
+  const said = (d, v) => d === 0 ? `it wasn't ${catName(v)}` : d === 1 ? `it wasn't the ${toyName(v)}` : d === 2 ? `it wasn't in the ${roomName(v)}` : `it wasn't ${TIMES[game.times[v]][2]}`;
   let pick = null;
   const wrongNow = [...Array(D).keys()].filter(d => cur[d] !== null && cur[d] !== code[d]);
   if (wrongNow.length) { const d = wrongNow[rnd(wrongNow.length)]; pick = [d, cur[d]]; }
@@ -417,20 +424,21 @@ function finishCard() {
 const scramble = (code, dims) => code.map((v, d) => (v + 2 * d + 1) % dims[d]);
 const unscramble = (s, dims) => s.map((v, d) => ((v - 2 * d - 1) % dims[d] + dims[d] * 4) % dims[d]);
 $("linkBtn").onclick = () => { if (game) G.shareCard({name: "Mewstermind", won: game.won,
-  puzzle: () => ({g: "stash3", N: game.level, cats: game.cats, toys: game.toys, rooms: game.rooms, s: scramble(game.code, sizes(game))}),
+  puzzle: () => ({g: "stash3", N: game.level, cats: game.cats, toys: game.toys, rooms: game.rooms, times: game.times, s: scramble(game.code, sizes(game))}),
   progress: () => ({rows: game.rows.map(r => r.guess)})}); };
 function openShared(d) {
-  const lv = LEVELS[d.N], [C, T, R] = lv || [];
+  const lv = LEVELS[d.N], [C, T, R, W] = lv || [], times = d.times || [];
   const uniq = a => new Set(a).size === a.length;
   const ok = lv && d.g === "stash3" && Array.isArray(d.cats) && d.cats.length === C && d.cats.every(c => CATS.some(x => x[0] === c)) && uniq(d.cats) &&
     Array.isArray(d.toys) && d.toys.length === T && d.toys.every(f => ALL_LOOKS.includes(f)) && uniq(d.toys) &&
     Array.isArray(d.rooms) && d.rooms.length === R && d.rooms.every(k => Number.isInteger(k) && k >= 0 && k < ROOMS.length) && uniq(d.rooms) &&
-    Array.isArray(d.s) && d.s.length === (R ? 3 : 2);
-  const dims = ok && [C, T, R].slice(0, d.s.length);
+    Array.isArray(times) && times.length === W && times.every(k => Number.isInteger(k) && k >= 0 && k < TIMES.length) && uniq(times) &&
+    Array.isArray(d.s) && d.s.length === (W ? 4 : R ? 3 : 2);
+  const dims = ok && [C, T, R, W].slice(0, d.s.length);
   const inRange = g => Array.isArray(g) && g.length === dims.length && g.every((v, k) => Number.isInteger(v) && v >= 0 && v < dims[k]);
   if (!ok || !inRange(d.s)) { G.note("That share link didn't work.", 5000); return; }
   const code = unscramble(d.s, dims);
-  game = deal(d.N, {cats: d.cats, toys: d.toys, rooms: d.rooms, code});
+  game = deal(d.N, {cats: d.cats, toys: d.toys, rooms: d.rooms, times: times.slice().sort((a, b) => a - b), code});
   if (d.p && Array.isArray(d.p.rows) && d.p.rows.length <= 99 && d.p.rows.every(inRange)) {
     game.rows = d.p.rows.map(guess => ({guess, paws: paws(code, guess)})); game.timed = false;
     const k = game.rows.findIndex(r => r.paws === dims.length);
@@ -456,8 +464,8 @@ function helpOnFirstVisit() {
   const {D} = game, T = Math.max(par(), game.rows.length + 1), row = [...Array(D).keys()].map(i => [i, 0]);
   const pawsEl = () => $("board").querySelector('.line[data-r="0"] .paws');
   const steps = [
-    {say: D > 2 ? "One cat had a toy, somewhere" : "One cat had one of the toys", els: [() => $("board").querySelector(".line.case .slots")]},
-    {say: D > 2 ? "Pick a cat, a toy and a room" : "Pick a cat and a toy", lit: [...Array(D).keys()].map(i => [i, game.rows.length]), els: [$("tray")],
+    {say: D > 3 ? "One cat had a toy, somewhere, sometime" : D > 2 ? "One cat had a toy, somewhere" : "One cat had one of the toys", els: [() => $("board").querySelector(".line.case .slots")]},
+    {say: D > 3 ? "Pick a cat, toy, room and time" : D > 2 ? "Pick a cat, a toy and a room" : "Pick a cat and a toy", lit: [...Array(D).keys()].map(i => [i, game.rows.length]), els: [$("tray")],
      try: {done: () => !game.cur.includes(null) || game.rows.length > 0}},
     {say: "Then tap Check", els: [() => $("checkBtn")], try: {done: () => game.rows.length > 0, yes: "Paws tell you how close"}},
     {say: "A dark paw for each one right", lit: row, els: [pawsEl]},
@@ -495,7 +503,8 @@ const shared = G.readShare("stash");
 const hadSave = !!(game && Array.isArray(game.rows));
 if (hadSave) G.reopen(() => {
     const lv = LEVELS[game.level];
-    if (!lv || game.cats.length !== lv[0] || game.toys.length !== lv[1] || game.rooms.length !== lv[2] || game.code.length !== game.D) throw new Error("the saved mystery doesn't fit its level");
+    if (!Array.isArray(game.times)) game.times = [];
+    if (!lv || game.cats.length !== lv[0] || game.toys.length !== lv[1] || game.rooms.length !== lv[2] || game.times.length !== lv[3] || game.code.length !== game.D) throw new Error("the saved mystery doesn't fit its level");
     if (!Array.isArray(game.undo)) game.undo = [];
     draw();
     if (game.won) finishCard(); else helpOnFirstVisit();
