@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Bubbles</title>
-<script src="../move.js?v=2026-11-20.13"></script>
+<script src="../move.js?v=2026-11-20.14"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-20.13"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-20.14"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -26,7 +26,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-20.13">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.14">
 <style>
 /* Toys in soap bubbles, clinging under a shelf, and a cat at the bottom batting more up. */
 .wrap{height:auto}
@@ -86,7 +86,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-20.13"></script>
+<script src="../games.js?v=2026-11-20.14"></script>
 <script>
 const $ = G.$;
 G.nav("bubbles");
@@ -537,30 +537,34 @@ function ripple(r, c) {
   const B = S.d.B, x0 = cellX(B, r, c), y0 = cellY(B, r);
   cellsOf(B).forEach(([y, x]) => { const dist = Math.hypot(cellX(B, y, x) - x0, cellY(B, y) - y0); if (dist < 3.2) wob.set(y * COLS + x, {t0: now + dist * 0.05, amp: 0.16 / (1 + dist * 1.2)}); });
 }
+// Three clean wins at a level move you up and three that weren't (a helper, or the bubbles reaching the cat) move you down: G.ladder, counted once a
+// deal as it ends (a revive and then a win count once).
+const steps = G.ladder("bubbles", MAX_LEVEL);
 function win() {
   S.over = true;
   G.track(`Bubbles level ${S.level} done`);
-  const result = G.finishClock(S), helped = S.d.helped, next = helped ? S.level : Math.min(MAX_LEVEL, S.level + 1);
+  const result = G.finishClock(S), helped = S.d.helped, c = steps.end(S.d, S.level, helped, {none: "You had a helper, so it doesn't count toward moving up."}), next = c.next;
   climb = next; G.save(STORE, {level: next, climb});
-  const text = helped ? `Level ${S.level} done. Next up: another level ${next}.`
-    : next > S.level ? `Level ${S.level} done. Next up: level ${next}.` : `Level ${S.level} done. That's the hardest level; next up is another one.`;
+  const text = `Level ${S.level} done. ${c.line}`;
   // Everything still up there comes down to celebrate.
   const B = S.d.B;
   cellsOf(B).forEach(([r, c, k]) => { if (k !== PEG) { effects.push({type: "fall", k, x: cellX(B, r, c), y: cellY(B, r), vx: (Math.random() - 0.5) * 2, vy: -2 * Math.random(), t0: now + Math.random() * 0.4, dur: 2.4}); B.rows[r][c] = EMPTY; } });
   const game = S;
-  setTimeout(() => S === game && G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my board", result, {title: "Purr-fect!", gold: !!S.level && !helped && !S.d.restarted, goldWhy: "No helpers or restarts!", next: next > S.level ? `Next: level ${next}` : "Next board",
-    after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")}), 900);
+  setTimeout(() => S === game && G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my board", result, {title: "Purr-fect!", gold: !!S.level && !helped && !S.d.restarted, goldWhy: "No helpers or restarts!", next: G.ANOTHER,
+    after: G.otherSize($("levelSel"), next, startLevel, G.CHANGE)}), 900);
 }
 function lost() {
   G.breakStreak();   // losing ends the win streak
   S.over = true;
+  const c = S.level ? steps.end(S.d, S.level, true) : {next: S.level}; if (S.level) climb = c.next;
   const btns = [];
   if (S.d.extra < 1) btns.push(["Push the shelf back up", () => { G.closeCard(); S.over = false; pushUp(); }, true]);
-  btns.push(["Try again", () => { G.closeCard(); start(S.level, dealt(Object.assign(deal(S.level), {helped: S.d.helped}))); }, !btns.length]);
+  btns.push(c.down ? [`Try level ${c.next}`, () => { G.closeCard(); startLevel(c.next); }, !btns.length]
+    : ["Try again", () => { G.closeCard(); start(S.level, dealt(Object.assign(deal(S.level), {helped: S.d.helped}))); }, !btns.length]);
   const d = S.d, still = d.goal === "kittens" ? `${d.kits.need - d.kits.got} kittens still to free.` : d.goal === "clear" ? `${bubblesLeft(d)} bubbles still to pop.`
     : `Still to catch: ${d.goals.filter(gl => gl.got < gl.need).map(gl => toyName(gl.need - gl.got, gl.k)).join(" and ")}.`;
   btns.push(G.homeBtn());
-  setTimeout(() => G.loseCard("The bubbles reached the cat!", still, btns, null, G.otherSize($("levelSel"), S.level, startLevel, "Or play a different level:"), {result: {n: S.level}}), 500);
+  setTimeout(() => G.loseCard("The bubbles reached the cat!", still + (c.down ? " " + c.line : ""), btns, null, G.otherSize($("levelSel"), c.next, startLevel, G.CHANGE), {result: {n: S.level}}), 500);
 }
 
 /* ---------- helpers ---------- */

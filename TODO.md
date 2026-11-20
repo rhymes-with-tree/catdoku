@@ -101,9 +101,10 @@ cats that point their own way are Day Light (`daylight/`, in beta).
   Junk Drawer, Kitten Caboodle, Knit Pick, Laser Pointer, Pawlette, Purrmutation, Shelf Life, Unravel, Up a Tree and
   the beta games Under the Blanket, Tape Trap, Swap-a-Pom and Boing!
   (each was one clean win up, a hint keeping you put). Still to do, each moving up some other way today:
-  - Lost on lives or moves, so a real loss counts too: Catdoku, Toydoku, Hide & Seek, Fuzzy Spelling, Mew Hue,
-    Fridge Magnets, Cat Mat, Fish Bones, Pick of the Pile, L-M-N-O-Pom, Pounce, Bubbles, Cat Pile, Toy Box, Twirl,
-    Knock It Off
+  - Done 2026-11-20, counted as the puzzle ends (G.ladder's `end`): the games lost on lives or moves, Catdoku, Toydoku,
+    Hide & Seek, Spelling String, Mew Hue, Fridge Magnets, Cat Mat, Fish Bones, Pick of the Pile, L-M-N-O-Pom, Pounce,
+    Bubbles, Cat Pile, Toy Box, Twirl and Knock It Off. Each game's own README section still has its old words
+    ("a hint keeps you on the same level"); README's "Moving up and down" says it overrides them. Tidy them some time.
   - By size: Patches, Sunbeams, Yarn, Tangle, Catwalk, Tunnel Run, Zoomies
   - Action games, up after the first try or on a score: Tail Chase, Wind Up, Bird Watch, Pawlinko, Pounce Up, Cat
     Burglar, Catlas, Moving Day
