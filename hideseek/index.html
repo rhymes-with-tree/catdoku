@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Hide &amp; Seek</title>
-<script src="../move.js?v=2026-11-20.13"></script>
+<script src="../move.js?v=2026-11-20.14"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-20.13";
+  var BUILD = "2026-11-20.14";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&family=Permanent+Marker&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-20.13">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.14">
 <style>
 /* A wooden floor covered in cardboard boxes. Checked boxes get a number written on them in marker, like a
    labelled box; marked ones get a cat doodled on; a startled cat's box gets HISS scrawled across it. */
@@ -116,7 +116,7 @@ body.full .actions > :not(#hintBtn,#markBtn),body.full .bar{display:none}
 
 </main>
 
-<script src="../games.js?v=2026-11-20.13"></script>
+<script src="../games.js?v=2026-11-20.14"></script>
 <script>
 /* ---------- sizes ---------- */
 // Width, height and cats, from Minesweeper's beginner board up to its expert one stood on end (16 across, 30 down),
@@ -301,11 +301,14 @@ function chord(i) {
 
 /* ---------- endings ---------- */
 // Any win without a hint moves up; one without a cat startled as well earns a gold paw.
+// Three clean wins at a size move you up and three that weren't (a hint, or running out of lives) move you down:
+// G.ladder, counted once a floor as it ends.
+const steps = G.ladder("hideseek", SIZES.length - 1, 0, sizeLabel);
 const clean = () => !game.hinted, gold = () => game.lives === 3 && !game.hinted && !game.restarted;
 function checkWin() {
   for (let i = 0; i < W * H; i++) if (!cat[i] && !open.has(i)) return;
   game.won = true; G.finishClock(game);
-  settings.size = clean() ? G.sizeUp(game.N, $("size")) : game.N; $("size").value = settings.size;
+  settings.size = steps.end(game, game.N, !clean(), {what: "hints or floors run out of lives", none: "You had a hint, so it doesn't count toward moving up."}).next; $("size").value = settings.size;
   save(); draw();
   G.track(`Hide & Seek cleared ${sizeLabel(game.N)}`);
   const done = game;   // two seconds to see the sleepy cats first
@@ -316,13 +319,15 @@ function janPic() { const im = new Image(); im.className = "janpic"; im.src = ".
 function winCard() {
   const next = settings.size, startled = game.caught.length;
   let text = `All ${game.C} cats found${startled ? `, with ${startled} startled` : ""}.`;
-  text += next > game.N ? ` Next up: ${sizeLabel(next)}.` : clean() ? " That's the biggest floor; here's another." : ` Next up: another ${sizeLabel(next)}.`;
+  text += " " + (game.climbed ? game.climbed.line : "");
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the sleepy cats", game.result,
-    {title: "Found them all!", gold: gold(), goldWhy: "No cats startled, no hints and no restarts!", goldTitle: "Found you, Jan Brady!", goldPic: [janPic()], next: `Next: ${sizeLabel(next)}`, after: G.otherSize($("size"), next, startLevel)});
+    {title: "Found them all!", gold: gold(), goldWhy: "No cats startled, no hints and no restarts!", goldTitle: "Found you, Jan Brady!", goldPic: [janPic()], next: G.ANOTHER, after: G.otherSize($("size"), next, startLevel, G.CHANGE)});
 }
 function outOfLives() {
   G.breakStreak();   // losing ends the win streak
-  game.lost = true; save(); draw();
+  game.lost = true;
+  const c = steps.end(game, game.N, true, {what: "hints or floors run out of lives"}); settings.size = c.next; $("size").value = c.next;
+  save(); draw();
   G.track(`Hide & Seek out of lives ${sizeLabel(game.N)}`);
   const done = game;   // two seconds to see where the cats were first
   setTimeout(() => { if (game === done) livesCard(); }, 2000);
@@ -330,10 +335,11 @@ function outOfLives() {
 // Out of lives, as in Catdoku: try the floor again, a new one, or come back with three more lives (up to nine on
 // one floor). Any of these keeps you at this size.
 function livesCard() {
-  lives.outCard({text: "Three cats were startled awake. Pick how you want to keep going.",
+  const c = game.climbed || {};
+  lives.outCard({text: "Three cats were startled awake. " + (c.down ? c.line + " " : "") + "Pick how you want to keep going.",
     btns: [["Try this floor again", tryAgain, true], ["New floor", () => { G.closeCard(); newFloor(); }]],
     more: [["Look at the floor", () => { G.closeCard(); G.note("Tap the floor when you're ready to go again.", 0); }]],
-    after: G.otherSize($("size"), game.N, startLevel), result: {n: game.N}});
+    after: G.otherSize($("size"), settings.size, startLevel, G.CHANGE), result: {n: game.N}});
 }
 // Restart: the same cats, back to the first box checked, with three lives (it costs the gold paw).
 function restart() {

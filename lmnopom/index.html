@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>L-M-N-O-Pom</title>
-<script src="../move.js?v=2026-11-20.13"></script>
+<script src="../move.js?v=2026-11-20.14"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-20.13"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-20.14"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -26,7 +26,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-20.13">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.14">
 <style>
 /* Marmalade has knocked the pompoms out of the craft basket, and they tumble down into a pile, each with a letter.
    Any word spelled across or down, he pounces on and bats away, and the pompoms above fall into the gap. Reach the
@@ -105,7 +105,7 @@
   <section class="found" id="found" hidden><h2>Marmalade pounced on</h2><p id="foundList"></p></section>
 </main>
 
-<script src="../games.js?v=2026-11-20.13"></script>
+<script src="../games.js?v=2026-11-20.14"></script>
 <script>
 /* ---------- the pile ---------- */
 // The pile is COLS pompoms across and ROWS down. Pieces are one pompom or a pair on a string, dealt from shuffled bags
@@ -581,16 +581,20 @@ document.addEventListener("visibilitychange", () => { if (document.hidden) pause
 /* ---------- endings ---------- */
 // The pile reaching the top: a card offers Swat to keep going (once, and it costs the gold paw), or starting again.
 // The try only counts, and a win streak only ends, once the player gives up on this pile.
+// Three clean wins at a level move you up and three that weren't (piled to the top, or a swat) move you down:
+// G.ladder, counted once a pile as it ends (piling up and then swatting to a win counts once, as a miss).
+const steps = G.ladder("lmnopom", MAX_LEVEL);
 function lose() {
-  const g = game; g.state = "lost"; status(); save();
+  const g = game; g.state = "lost";
+  const c = steps.end(g, g.level, true); settings.level = c.next; $("levelSel").value = c.next; status(); save();
   G.track(`L-M-N-O-Pom piled up on level ${g.level}`);
   setTimeout(() => {
     if (game !== g) return;
     const keepOn = g.swatted ? [] : [["Swat and keep going", () => { closeCard(); revive(g); }, true]];
-    G.loseCard("Piled to the top!", `The pompoms reached the top, with ${g.score} of ${LV[g.level].goal} points.` + (g.swatted ? " Start again?" : " Swat the bottom two rows to keep going, or start again."),
-      [...keepOn, ["Try again", () => { closeCard(); giveUp(g); newGame(g.level, g.seed); }, !keepOn.length], ["New pile", () => { closeCard(); giveUp(g); newGame(g.level); }],
+    G.loseCard("Piled to the top!", `The pompoms reached the top, with ${g.score} of ${LV[g.level].goal} points.` + (g.swatted ? " Start again?" : " Swat the bottom two rows to keep going, or start again.") + (c.down ? " " + c.line : ""),
+      [...keepOn, ["Try again", () => { closeCard(); giveUp(g); newGame(g.level, g.seed); }, !keepOn.length], [c.down ? `Level ${c.next}` : "New pile", () => { closeCard(); giveUp(g); newGame(c.next); }],
        ["Admire the pile", () => { closeCard(); giveUp(g); G.breakStreak(); G.note("Tap Restart to try again.", 0); }], G.homeBtn()],
-      null, G.otherSize($("levelSel"), g.level, n => { giveUp(g); startLevel(n); }, "Or play a different level:"), {result: {n: g.level}});
+      null, G.otherSize($("levelSel"), c.next, n => { giveUp(g); startLevel(n); }, G.CHANGE), {result: {n: g.level}});
   }, 700);
 }
 function giveUp(g) { if (!g.counted) { g.counted = true; settings.tries[g.level] = (settings.tries[g.level] || 0) + 1; save(); } }
@@ -600,7 +604,7 @@ function revive(g) {
 }
 function win() {
   const g = game; g.state = "won"; g.phase = "fall"; G.finishClock(g);
-  const first = !settings.tries[g.level], next = Math.min(MAX_LEVEL, g.level + 1);
+  const first = !settings.tries[g.level], c = steps.end(g, g.level, g.swatted, {none: "You swatted, so it doesn't count toward moving up."}), next = c.next;
   settings.tries[g.level] = 0; settings.level = next; $("levelSel").value = next; save(); status();
   G.track(`L-M-N-O-Pom won level ${g.level}`);
   setTimeout(() => {
@@ -608,10 +612,10 @@ function win() {
     const im = new Image(); im.className = "pic"; im.src = catSrc("marmalade-6"); im.alt = "Marmalade rolling on his back, batting at a pompom";
     const best = g.words.reduce((b, w) => w[1] > b[1] ? w : b, ["", 0]);
     const text = `${g.score} points from ${g.words.length} word${g.words.length === 1 ? "" : "s"}` + (best[1] ? `, best of all ${best[0].toUpperCase()} for ${best[1]}.` : ".") +
-      (g.level === MAX_LEVEL ? " That's the top level; here it is again." : ` Next up: level ${next}.`);
+      " " + c.line;
     G.winCard(text, () => { closeCard(); startLevel(next); }, "Admire the pile", g.result,
-      {title: "Pounced!", gold: first && !g.swatted, goldWhy: "First try, no swat!", goldTitle: "Marmalade rolls in the pompoms!", goldPic: [im], next: next > g.level ? `Next: level ${next}` : "Next pile",
-       after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+      {title: "Pounced!", gold: first && !g.swatted, goldWhy: "First try, no swat!", goldTitle: "Marmalade rolls in the pompoms!", goldPic: [im], next: G.ANOTHER,
+       after: G.otherSize($("levelSel"), next, startLevel, G.CHANGE)});
   }, 900);
 }
 function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); closeCard(); newGame(n); }
