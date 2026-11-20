@@ -7,6 +7,15 @@ RED, ORANGE, TEAL, YELLOW, LIME, GREEN, PLUM, PERI = "#BD5538", "#E16A4A", "#73A
 FONT = "font-family=\"'Baloo 2',ui-rounded,system-ui,sans-serif\" font-weight=\"800\" text-anchor=\"middle\" dominant-baseline=\"central\""
 
 
+# A letter with an outline drawn under it: the outlined letter first, then the plain letter on top. Not paint-order="stroke",
+# which browsers draw but Canva won't upload (magnets, lmnopom, fuzzyspelling and swapapom were refused, 2026-11-18).
+def halo(x, y, size, fill, ring, width, ch, round_join=True):
+    join = ' stroke-linejoin="round"' if round_join else ""
+    at = f'x="{x}" y="{y}" font-size="{size}" fill="{fill}"'
+    return (f'<text {at} stroke="{ring}" stroke-width="{width}"{join} {FONT}>{ch}</text>'
+            f'<text {at} {FONT}>{ch}</text>')
+
+
 def frame(bg, body):
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
             f'<rect x="4" y="4" width="92" height="92" rx="20" fill="{bg}" stroke="{INK}" stroke-width="3"/>{body}</svg>\n')
@@ -523,7 +532,7 @@ def fuzzyspelling():
         for y, letter in balls:
             out += f'<circle cx="{cx}" cy="{y}" r="9.5" fill="{col}" stroke="{INK}" stroke-width="1.4"/>'
             if letter:   # ink with a white halo, as on the game's pompoms
-                out += f'<text x="{cx}" y="{y + 1}" font-size="12" fill="{INK}" stroke="#fff" stroke-width="2.4" paint-order="stroke" stroke-linejoin="round" {FONT}>{letter}</text>'
+                out += halo(cx, y + 1, 12, INK, "#fff", 2.4, letter)
             elif y == 33:   # the head's googly eyes
                 out += "".join(f'<circle cx="{cx + dx}" cy="{y - 1}" r="2.6" fill="#fff" stroke="{INK}" stroke-width=".8"/><circle cx="{cx + dx + .5}" cy="{y}" r="1.2" fill="{INK}"/>' for dx in (-3.5, 3.5))
         tail = balls[-1][0] + 10
@@ -669,8 +678,7 @@ def magnets():
             x, y = x0 + c * s, y0 + r * s
             out += f'<rect x="{x}" y="{y}" width="{s-1.5}" height="{s-1.5}" rx="1.5" fill="{"#FFF0C2" if ch == "_" else "#FBFAF5"}"/>'
             if ch != "_":
-                out += (f'<text x="{x+s/2-.7}" y="{y+s/2}" font-size="13" fill="{colours[ch]}" stroke="{INK}" stroke-width="1.3" '
-                        f'paint-order="stroke" {FONT}>{ch}</text>')
+                out += halo(x + s/2 - .7, y + s/2, 13, colours[ch], INK, 1.3, ch, round_join=False)
     return frame("#ECEEE7", out)
 
 
@@ -769,28 +777,33 @@ def fishbones():
     return frame(PAPER, out)
 
 
-# Mewstermind: three shut boxes along the top, two guesses of toys under them, and paw prints beside each guess
-# (dark for a right toy in the right box, light for a right toy in another box).
+# Mewstermind (a Clue since 2026-11-19): the case along the top, shut (who, where, what), and two guesses under it, each a
+# cat, a room and a toy, with a dark paw print beside it for each part that's right and a dot for each that's wrong.
 def pawprint(x, y, s, fill):
     toes = "".join(f'<ellipse cx="{x+dx*s}" cy="{y+dy*s}" rx="{s*.2}" ry="{s*.24}" fill="{fill}" stroke="{INK}" stroke-width="1"/>'
                    for dx, dy in ((-.5, -.22), (-.18, -.5), (.18, -.5), (.5, -.22)))
     return toes + f'<ellipse cx="{x}" cy="{y+s*.25}" rx="{s*.42}" ry="{s*.34}" fill="{fill}" stroke="{INK}" stroke-width="1"/>'
 
 
+def house(x, y, s, fill):
+    return (f'<path d="M{x-s} {y-s*.1}L{x} {y-s}L{x+s} {y-s*.1}V{y+s*.8}H{x-s}Z" fill="{fill}" stroke="{INK}" stroke-width="2" stroke-linejoin="round"/>'
+            f'<rect x="{x-s*.25}" y="{y+s*.15}" width="{s*.5}" height="{s*.65}" fill="{INK}" opacity=".7"/>')
+
+
 def stash():
     out = ""
     for i in range(3):
-        x = 12 + i * 19
-        out += (f'<rect x="{x}" y="14" width="16" height="16" rx="2" fill="#D9A86C" stroke="{INK}" stroke-width="2"/>'
-                f'<line x1="{x}" y1="22" x2="{x+16}" y2="22" stroke="{INK}" stroke-width="1.2" opacity=".45"/>'
-                f'<rect x="{x+6}" y="14" width="4" height="16" fill="#F3D7AE" opacity=".6"/>')
-    out += f'<path d="M10 39H90" stroke="{INK}" stroke-width="1.6" stroke-dasharray="3 3" opacity=".45"/>'
-    for r, (balls, paws) in enumerate((((PLUM, YELLOW, TEAL), (INK, "#fff", None)), ((YELLOW, PLUM, RED), (INK, INK, None)))):
-        y = 55 + r * 24
-        for i, c in enumerate(balls): out += yarnball(20 + i * 19, y, 8, c)
-        for k, f in enumerate(paws):
-            px, py = 74 + (k % 2) * 10, y - 4.5 + (k // 2) * 10
-            out += pawprint(px, py, 6.5, f) if f else f'<circle cx="{px}" cy="{py}" r="1.8" fill="{INK}" opacity=".25"/>'
+        x = 13 + i * 20
+        out += (f'<rect x="{x}" y="11" width="17" height="19" rx="3" fill="{PAPER}" stroke="{INK}" stroke-width="1.8" stroke-dasharray="3 2"/>'
+                + text(x + 8.5, 21, "?", 14, INK))
+    out += f'<path d="M10 37H90" stroke="{INK}" stroke-width="1.6" stroke-dasharray="3 3" opacity=".45"/>'
+    rows = ((("#9A8A78", ORANGE, PERI), 1), (("#221E26", YELLOW, "#E3B9A9"), 2))
+    for r, ((cat, toy, room), right) in enumerate(rows):
+        y = 52 + r * 25
+        out += catface(21.5, y, 8, cat) + house(41.5, y, 8, room) + yarnball(61.5, y, 8, toy)
+        for k in range(3):
+            py = y - 8.5 + k * 8.5
+            out += pawprint(82, py, 4.2, INK) if k < right else f'<circle cx="82" cy="{py}" r="1.8" fill="{INK}" opacity=".25"/>'
     return frame(tint(TEAL, .3), out)
 
 
@@ -916,7 +929,7 @@ def windup():
 def lmnopom():
     def pom(x, y, col, ch):
         return (f'<circle cx="{x}" cy="{y}" r="10.5" fill="{col}" stroke="{INK}" stroke-width="1.6"/>'
-                f'<text x="{x}" y="{y + 1}" font-size="13" fill="{INK}" stroke="#fff" stroke-width="2.6" paint-order="stroke" stroke-linejoin="round" {FONT}>{ch}</text>')
+                + halo(x, y + 1, 13, INK, "#fff", 2.6, ch))
     marm = (catface(25, 30, 11, ORANGE).split("<circle")[0]
             + f'<circle cx="{25-11*.38}" cy="{30+11*.1}" r="{11*.16}" fill="{GREEN}"/><circle cx="{25+11*.38}" cy="{30+11*.1}" r="{11*.16}" fill="{GREEN}"/>')
     out = f'<path d="M50 40H72" stroke="{YELLOW}" stroke-width="2.6"/>' + pom(50, 40, PLUM, "P") + pom(72, 40, YELLOW, "O")
@@ -932,7 +945,7 @@ def swapapom():
     BROWN = "#824235"   # brick, a shade towards the ink
     def pom(x, y, col, ch):
         return (f'<circle cx="{x}" cy="{y}" r="9.5" fill="{col}" stroke="{INK}" stroke-width="1.5"/>'
-                f'<text x="{x}" y="{y + 1}" font-size="12" fill="{INK}" stroke="#fff" stroke-width="2.4" paint-order="stroke" stroke-linejoin="round" {FONT}>{ch}</text>')
+                + halo(x, y + 1, 12, INK, "#fff", 2.4, ch))
     face = catface(26, 27, 11, "#fff").split("<circle")[0]
     face += (f'<ellipse cx="21.6" cy="27.6" rx="3.6" ry="3" fill="{BROWN}"/><ellipse cx="30.4" cy="27.6" rx="3.6" ry="3" fill="{BROWN}"/>'
              f'<path d="M15 29.2L16.1 15.5L22.2 21Q18 24 15 29.2ZM37 29.2L35.9 15.5L29.8 21Q34 24 37 29.2Z" fill="{BROWN}" stroke="{INK}" stroke-width="2" stroke-linejoin="round"/>'

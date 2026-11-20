@@ -59,6 +59,11 @@ Knock It Off's forgiving first two levels, and Pounce saving while toys fall):
   moves on level N"). Look again with a few weeks of it.
 - [ ] **Weak level 1s to watch** (small samples): Cat Pile 16 → 7, Scratch That 17 → 8, Window Ledges 11 → 5, Kitten
   Caboodle 10 → 5.
+- [ ] **Mewstermind: out of beta.** Moved to beta on 2026-11-19 (the owner's call) and rebuilt as a Clue: one cat had
+  one toy, in one room, at one time of day; each guess names one of each, paws say how many are right; Higgins is the
+  witness Hint. Levels 1 to 6 built 2026-11-19 and 2026-11-20, with its new icon (preview:
+  https://claude.ai/artifact/LD21RccB3Yg2dk66XGUih3). Rooms and times stay emoji (the owner's call). For the owner to
+  play, then back to the front page.
 - [ ] **Under the Blanket: out of beta again.** Moved to beta on 2026-11-16 (the owner's call) after its first week on
   the front page: 11 starts at level 1, 6 solves. Still to settle what makes level 1 easier to get into.
 - [ ] **Twirl's sound on an iPhone** (feedback, 2026-11-16): sometimes no sound at all. Since the same day a tap's sound
@@ -228,6 +233,10 @@ https://claude.ai/artifact/AiHXuVwvwB5CJSBPvgGNKS (the owner's own; its source i
   shared ones don't fit (the listening page can be extended for each shelf, so the owner picks as before).
 - **On a phone:** the owner hears it all on an iPhone: the length (`LENGTH` in `games.js`, 55% since the sounds went on too long; the listening page's Length slider tries others), the loudness (`VOLUME` in `games.js`, .47, matching the
   listening page at the 59 the owner last used), and whether Pawlinko gets too busy with several things falling.
+- **Toy Box: a fun sound while toys go round the track** (the owner, 2026-11-19). The basket tipped (Fabric grab 7)
+  is at 30% now and the rolling ticks are gone, so nothing plays while toys roll. A music-box carousel waltz, a note a
+  beat while toys are on the track, was tried on https://claude.ai/artifact/MvyMY1LTpCW5gvqH4Ljz7S (the owner's own)
+  and put aside: not now (the owner, 2026-11-19). Find something else, or come back to it.
 - **The Settings page's Every game Sound** sets the games on the front page; a beta game (Swap-a-Pom now) has only its
   menu's switch until it joins.
 
