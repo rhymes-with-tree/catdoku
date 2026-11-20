@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Scratch That</title>
-<script src="../move.js?v=2026-11-20.10"></script>
+<script src="../move.js?v=2026-11-20.11"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-20.10"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-20.11"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-20.10">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.11">
 <style>
 /* Dottie, the star, beside the title */
 .title{display:flex;align-items:flex-end;gap:8px}
@@ -104,8 +104,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-20.10"></script>
-<script src="../cattower.js?v=2026-11-20.10"></script>
+<script src="../games.js?v=2026-11-20.11"></script>
+<script src="../cattower.js?v=2026-11-20.11"></script>
 <script>
 /* ---------- rooms ---------- */
 // A room is N × N squares, each floor (-1), furniture (-2) or furniture with a number (0 to 4).
@@ -438,7 +438,7 @@ $("board").addEventListener("keydown", e => {
   e.preventDefault(); keyed = true; draw();
 });
 
-$("restartBtn").onclick = () => { if (undo.restart(g => { g.s = g.g.map(() => -1); guesses.clear(); })) G.note("An empty room again.", 3000); };
+$("restartBtn").onclick = () => { if (undo.restart(g => { g.s = g.g.map(() => -1); guesses.clear(); })) { slip(); G.note("An empty room again.", 3000); } };
 
 /* ---------- hints ---------- */
 // First a mistake (a post where none goes, or a dot where one does), in red. Otherwise the next thing the
@@ -472,7 +472,7 @@ function hint() {
       cells = [missing]; say = "A post goes here.";
     }
   }
-  game.hinted = true; save();
+  game.hinted = true; slip(); save();
   // the first time, just where to look; asked again, what goes there and why
   hints.show({cells, bad}, bad || hints.level() ? say : cells.length > 1 ? "The two gold squares settle something: look at them together." : "The gold square can be settled now. Ask again to see how.");
 }
@@ -480,9 +480,21 @@ $("hintBtn").onclick = hint;
 
 /* ---------- winning ---------- */
 const goldOK = () => !game.hinted && !game.restarted;
+// Three wins at a level move you up and three slips (a hint, or a Restart after working on it) move you down: G.ladder.
+const climb = G.ladder("scratchthat", MAX_LEVEL);
+// A slip counts once a puzzle, and that puzzle no longer counts as a win toward moving up.
+function slip() {
+  if (game.slipped || game.won) return;
+  game.slipped = true;
+  const r = climb.lost(game.level);
+  if (r.down) { game.down = r.next; settings.level = r.next; $("levelSel").value = r.next; rooms.prefetch(r.next); }
+  save();
+}
 function win() {
   game.won = true; G.finishClock(game); G.note(""); G.sound.play("st.scratch", {}, .3);
-  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  // a room with a hint or a restart was counted when that happened; a clean one is a win toward moving up
+  let next = game.down || game.level;
+  if (!game.slipped) { const r = climb.won(game.level); next = r.next; game.climbLine = climb.say(r); }
   settings.level = next; $("levelSel").value = next; save(); draw();
   rooms.prefetch(next);
   G.track(`Scratch That solved level ${game.level}`);
@@ -493,10 +505,11 @@ function dottiePic() { const im = new Image(); im.className = "dottiepic"; im.sr
 function finishCard() {
   const next = settings.level, n = game.s.filter(v => v === 1).length;
   let text = `${n} posts, all scratched up, and not a scratch on the furniture.`;
-  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the biggest room; here's another." : ` Next up: level ${next}.`;
+  text += " " + (game.down ? `That's 3 hints or restarts at level ${game.level}, so next comes level ${game.down}.`
+    : game.slipped ? "A room with a hint or a restart doesn't count toward moving up." : game.climbLine || "");
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the room", game.result,
-    {title: "Furniture saved!", gold: goldOK(), goldWhy: "No hints or restarts!", goldPic: [dottiePic()], next: next > game.level ? `Next: level ${next}` : "Next board",
-     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+    {title: "Furniture saved!", gold: goldOK(), goldWhy: "No hints or restarts!", goldPic: [dottiePic()], next: G.ANOTHER,
+     after: G.otherSize($("levelSel"), next, startLevel, G.CHANGE)});
 }
 
 /* ---------- sharing ---------- */
