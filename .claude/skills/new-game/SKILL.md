@@ -76,6 +76,43 @@ the same file path so the link stays the same.
   the first SE (320 × 460). Script a playthrough
   to the win card too (step 5 says how to load Playwright).
 
+### Calibrating difficulty
+
+A game you can lose through luck and your own choices (taps, moves, room, a points goal) has its levels set by a
+simulated player while it's still a preview, not by hand. Logic puzzles with one answer don't need this: their
+levels come from the solver's grading. Mew Hue and Moving Day were set this way (README, and `TODO.md`'s "Calibrate
+level ladders" for games still to do).
+
+- **Start from the genre.** Before choosing levels, tell the owner what players of this kind of game expect and how
+  its popular games get harder (Moving Day: longer chains, running out of room, generators that give mixed things).
+  The owner may not play the genre, so say it plainly and recommend a shape.
+- **A plain player.** Write one as plain functions beside the generator: the obvious move each time, with no looking
+  ahead (Moving Day's gives a cat what it wants if it can, else merges a pair it needs, else taps for what's
+  short). Make it no better than a careless person, so what it leaves over is what planning can earn.
+- **Measure every level.** Play 150 to 200 deals a level in Node and print one line each: how often it wins, how
+  much it has left at the end (taps or moves to spare, as a share of the level's allowance; the middle and the least),
+  and how long a deal takes. Show the owner the table, in plain words, whenever the levels change.
+- **The shape.** The first two or three levels are a gentle on-ramp (GoatCounter shows a hard level 1 loses half
+  its players). After that, one new thing a level, never two (a tight room, then two-high boxes, then a cat wanting
+  two things…), with a breather where something new comes in. Make each step about the same size, with no jump
+  between neighbours of more than about 10 points of win rate or spare, and let the share left over fall steadily
+  (Moving Day: about 60% on levels 1–3, 40% on 4–7, 25% on 8–11, 10% at the top).
+- **Every puzzle can be won.** If the plain player can't finish a deal, deal again (with a cap on tries), so a loss
+  is the player's doing, never the deal's. Check the tries stay low at every level: if a level needs many, it's too
+  tight. The plain player can then also set the gold paw for each puzzle as a share of what it kept (Moving Day:
+  three-quarters), stored with the puzzle.
+- **Look at why it loses.** A loss for a reason a person would avoid is a bug in the plain player, not a hard level:
+  fix the player first (Moving Day's counted cobwebbed toys it couldn't give, and spent its taps on the wrong kind).
+  A level it never wins is usually a broken rule rather than a hard one (Moving Day's tightest rooms first started
+  with one free square, where nothing could ever merge).
+- **Free help counts.** Bonuses (things in boxes, cobwebbed gifts, extra pieces) can quietly be worth more than the
+  allowance's spare. Measure how much of what's left over comes from them, and re-run whenever a rule change moves
+  them (Moving Day's food stopped coming out of boxes, and the levels that were mostly treats got much harder
+  until they were given more taps).
+- **Re-run after every change** to the rules or levels, before republishing the preview, and put the final numbers
+  in the game's README section and its `IDEAS.md` row. After launch, the dashboard's started-against-solved counts
+  per level (GoatCounter) say whether people agree.
+
 ## 3. Port
 
 Branch `claude/<slug>` from `main` before changing anything in the repo, unless the session names a branch to use.
@@ -328,7 +365,8 @@ revive keeps the player on the same level and costs the gold paw.
   find it.
 - **Icon:** add a function to `tools/make-icons.py` and to its `ICONS` dict, then run
   `python3 tools/make-icons.py` (writes `icons/<slug>.svg`). Front-page icons load lazily, so a
-  full-page screenshot can show a tile blank; check the SVG on its own.
+  full-page screenshot can show a tile blank; check the SVG on its own. For outlined letters use `halo()`, never
+  `paint-order`: Canva won't upload an SVG that has it, and the owner edits icons there.
 - **README:** a section after the last game, starting "A <nth> game in `<slug>/`, a cat-themed
   <genre>: …": rules, controls, how puzzles are made, levels, hint/Undo/gold paw, timer, share link and
   cat photo. Add the game to the Gold paw, Share and Keys lists under "Across every game", to the Hints list

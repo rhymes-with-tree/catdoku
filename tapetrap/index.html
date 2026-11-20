@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tape Trap</title>
+<script src="../move.js?v=2026-11-20.6"></script>
+<meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
+<!-- In beta: not on the front page yet (games.js, BETA), and kept out of search engines until it's finished -->
+<meta name="robots" content="noindex">
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-11-20.6"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<meta name="theme-color" content="#ECEEE7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1F1C24" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.6">
+<style>
+/* A wooden floor seen from above, with cats sitting on some of its boards. Each cat shows how many steps away its
+   square of masking tape is; lay one tape square for every cat so each walks to its own nearest one and sits in it.
+   The rolls of tape along the right and the bottom count the tape squares in each row and column. */
+.title{display:flex;align-items:flex-end;gap:6px}
+.marm{display:block;height:64px;width:auto;margin-bottom:-6px}
+@media (max-height:760px){.marm{height:46px;margin-bottom:-4px}}
+.floor{--wood:color-mix(in srgb,#BD5538 20%,#F7F8F3); --seam:color-mix(in srgb,#BD5538 42%,#F7F8F3);
+  --tape:color-mix(in srgb,#ECA818 34%,#fff); --tape-edge:color-mix(in srgb,#ECA818 70%,#2A2530);
+  --ok:color-mix(in srgb,#6AA673 75%,#2A2530); --bad:#C8392B; --reach:color-mix(in srgb,#73A7AE 30%,transparent);
+  background:var(--wood);border:3px solid var(--ink);border-radius:10px;overflow:hidden;
+  touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.floor .board{border:none;border-radius:0;gap:0;background:none}
+/* the floorboards: a seam under every row of squares, and the joins of the boards staggered row by row */
+.sq{position:relative;cursor:pointer;border-right:1px solid var(--seam);border-bottom:2px solid var(--seam);
+  background-image:linear-gradient(90deg,transparent 48%,color-mix(in srgb,#BD5538 10%,transparent) 50%,transparent 52%)}
+.sq.r1{background-image:linear-gradient(90deg,transparent 18%,color-mix(in srgb,#BD5538 10%,transparent) 20%,transparent 22%)}
+.sq.r2{background-image:linear-gradient(90deg,transparent 78%,color-mix(in srgb,#BD5538 10%,transparent) 80%,transparent 82%)}
+/* a cat, sitting: its face, and a badge with how many steps away its tape is */
+.sq .face{position:absolute;inset:6%;width:88%;height:88%;object-fit:contain;pointer-events:none;
+  filter:drop-shadow(0 1px 1px rgba(42,37,48,.3))}
+.sq .num{position:absolute;right:3%;bottom:3%;min-width:44%;height:44%;padding:0 4%;border-radius:999px;display:flex;align-items:center;justify-content:center;
+  background:#fff;border:2px solid var(--ink);font-weight:800;font-size:calc(var(--cs) * .32);line-height:1;color:#2A2530;pointer-events:none}
+.sq.catok .num{background:var(--ok);color:#fff;border-color:var(--ok)}
+.sq.catbad .num{background:var(--bad);color:#fff;border-color:var(--bad)}
+/* a square of masking tape: four strips, crossing at the corners */
+.tape{position:absolute;inset:13%;pointer-events:none;transform:rotate(-2deg)}
+.tape i{position:absolute;background:var(--tape);box-shadow:0 0 0 1px var(--tape-edge);opacity:.95}
+.tape i:nth-child(1){left:-6%;right:-6%;top:0;height:22%}
+.tape i:nth-child(2){left:-6%;right:-6%;bottom:0;height:22%;transform:rotate(1.5deg)}
+.tape i:nth-child(3){top:-6%;bottom:-6%;left:0;width:22%}
+.tape i:nth-child(4){top:-6%;bottom:-6%;right:0;width:22%;transform:rotate(-1.5deg)}
+/* a dot: a square that stays bare */
+.sq.dot::after{content:"";position:absolute;left:50%;top:50%;width:16%;height:16%;transform:translate(-50%,-50%);border-radius:50%;background:#2A2530;opacity:.55}
+/* a cat tapped: how far it can see. Nearer than its number (no tape there) is shaded; its number away, ringed. */
+.sq.near{background-color:color-mix(in srgb,#2A2530 12%,transparent)}
+.sq.ring::before{content:"";position:absolute;inset:8%;border:3px dashed color-mix(in srgb,#73A7AE 75%,#2A2530);border-radius:6px;pointer-events:none}
+.sq.look{box-shadow:inset 0 0 0 3px color-mix(in srgb,#73A7AE 75%,#2A2530)}
+/* the counts: a roll of tape at the end of every row and column */
+.count{display:flex;align-items:center;justify-content:center;pointer-events:none}
+.roll{width:72%;aspect-ratio:1;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle,#fff 0 30%,var(--tape-edge) 31% 34%,var(--tape) 35%);border:2px solid var(--tape-edge);
+  font-weight:800;font-size:calc(var(--cs) * .34);line-height:1;color:#2A2530}
+.roll b{background:#fff;border-radius:50%;min-width:1.4em;text-align:center}
+.count.met .roll{border-color:var(--ok);box-shadow:0 0 0 2px var(--ok)}
+.count.met .roll b{color:var(--ok)}
+.count.over .roll{border-color:var(--bad);box-shadow:0 0 0 2px var(--bad)}
+.count.over .roll b{color:var(--bad)}
+/* the win: each cat walks to its tape and sits in it */
+.walkers{position:absolute;inset:0;pointer-events:none;z-index:3}
+.walkers img{position:absolute;object-fit:contain;filter:drop-shadow(0 2px 2px rgba(42,37,48,.35))}
+.sq.sat .face{inset:16%;width:68%;height:68%}
+.card img.marmpic{display:block;width:78%;max-width:280px;height:auto;margin:0 auto 6px}
+@media (prefers-reduced-motion:reduce){.walkers img{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <header><div class="title"><h1>Tape Trap</h1><span class="beta" title="Still being made: things may change">Beta</span><img class="marm" id="marm" src="../cats/marmalade-1.webp" alt="Marmalade, a fluffy orange cat"></div><div class="stripe"></div><p class="tagline">Lay a square of tape for every cat to sit in</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap floor stage" id="wrap"><div class="board" id="board" tabindex="0" role="grid" aria-label="The floor. Tap a square to lay tape there; tap a cat to see how far it can see."></div></div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="dotBtn" aria-pressed="false">Dot</button>
+    <button id="linkBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New floor</button>
+  </div>
+
+</main>
+
+<script src="../games.js?v=2026-11-20.6"></script>
+<script>
+/* ---------- floors (plain functions, also run in a background worker) ---------- */
+// An N × N floor. Some squares have a cat on them, each with a number; the player lays one square of tape for every
+// cat. Each cat walks (up, down, left and right, counting squares) to its nearest tape and sits in it, so its nearest
+// tape must be exactly its number of steps away, with no other just as near, and no two cats may want the same one.
+// Counts along the edges say how many tape squares each row and column holds.
+// Levels: the floor's size and how many cats; `far` leans towards cats further from their tape.
+function levelSpec(n) {
+  return [null, {N: 4, cats: 3, far: 1}, {N: 5, cats: 4, far: 1}, {N: 5, cats: 5, far: 2}, {N: 6, cats: 6, far: 2}, {N: 6, cats: 7, far: 3},
+    {N: 7, cats: 8, far: 3}, {N: 7, cats: 9, far: 4}, {N: 8, cats: 10, far: 4}, {N: 8, cats: 12, far: 5}, {N: 9, cats: 13, far: 5},
+    {N: 10, cats: 16, far: 6}][n];
+}
+function steps(N, a, b) { return Math.abs(a % N - b % N) + Math.abs(Math.floor(a / N) - Math.floor(b / N)); }
+// The squares each cat's tape could be on: exactly its number of steps away; no nearer to any cat than that cat's
+// number (it would stop there first); and on no other cat's ring (that cat would have two just as near, or two cats
+// would want the same tape).
+function ringsOf(N, cats) {
+  const isCat = new Uint8Array(N * N); for (const c of cats) isCat[c.i] = 1;
+  const free = s => !isCat[s] && cats.every(c => steps(N, s, c.i) >= c.d);
+  const on = new Uint8Array(N * N);
+  const rings = cats.map(c => { const r = []; for (let s = 0; s < N * N; s++) if (free(s) && steps(N, s, c.i) === c.d) { r.push(s); on[s]++; } return r; });
+  return rings.map(r => r.filter(s => on[s] === 1));
+}
+// Every answer (a tape square for each cat, in the cats' order), up to `limit`. Each cat takes one square of its ring,
+// cats with the fewest left first, never overfilling a row or column; the counts add up to the cats, so a full set
+// meets every count.
+function solveTape(N, cats, rows, cols, limit) {
+  const n = cats.length, rings = ringsOf(N, cats), pick = new Array(n).fill(-1), out = [];
+  const rc = new Array(N).fill(0), cc = new Array(N).fill(0);
+  (function go() {
+    if (out.length >= limit) return;
+    let best = -1, opts = null;
+    for (let k = 0; k < n; k++) if (pick[k] < 0) {
+      const o = rings[k].filter(s => rc[Math.floor(s / N)] < rows[Math.floor(s / N)] && cc[s % N] < cols[s % N]);
+      if (!opts || o.length < opts.length) { best = k; opts = o; if (!o.length) return; }
+    }
+    if (best < 0) { out.push(pick.slice()); return; }
+    for (const s of opts) { pick[best] = s; rc[Math.floor(s / N)]++; cc[s % N]++; go(); rc[Math.floor(s / N)]--; cc[s % N]--; pick[best] = -1; }
+  })();
+  return out;
+}
+// A floor for a level: the tape scattered at random, then each tape's cat put on a square whose nearest tape is that
+// one (and no other as near), then the counts. Kept if it has one answer (most do: about three in four).
+function makeFloor(n) {
+  const {N, cats: C, far} = levelSpec(n);
+  for (let tries = 0; tries < 400; tries++) {
+    const sq = [...Array(N * N).keys()].sort(() => Math.random() - 0.5), tape = sq.slice(0, C), isTape = new Set(tape), cats = [];
+    for (const t of tape) {
+      const ok = [];
+      for (let s = 0; s < N * N; s++) {
+        if (isTape.has(s) || cats.some(c => c.i === s)) continue;
+        let d = 99, ties = 0, near = -1;
+        for (const u of tape) { const e = steps(N, s, u); if (e < d) { d = e; ties = 0; near = u; } else if (e === d) ties++; }
+        if (near === t && !ties) ok.push({i: s, d});
+      }
+      if (!ok.length) break;
+      ok.sort((a, b) => b.d - a.d || Math.random() - 0.5);
+      cats.push(ok[Math.floor(Math.pow(Math.random(), far) * ok.length)]);
+    }
+    if (cats.length < C) continue;
+    const rows = new Array(N).fill(0), cols = new Array(N).fill(0);
+    for (const t of tape) { rows[Math.floor(t / N)]++; cols[t % N]++; }
+    if (solveTape(N, cats, rows, cols, 2).length === 1) return {N, cats, tape, rows, cols};
+  }
+  return null;
+}
+
+/* ---------- game state ---------- */
+// game: {level, N, cats ([{i (square), d (steps)}], in reading order), tape (the answer: each cat's tape square),
+//        rows and cols (the counts), mark (each square: 0 bare, 1 tape, 2 a dot), history ([square, mark before] pairs,
+//        or {mark} for a Restart), won, hinted, restarted…}
+const STORE = "catdoku.tapetrap.v1", MAX_LEVEL = 11;
+const $ = G.$;
+let state = G.load(STORE);
+let settings = Object.assign({level: 1}, state.settings);
+let game = state.game || null, busy = false, running = false, look = -1, cursorAt = -1;
+// The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
+G.pawLost(() => !game || game.won || game.hinted || game.restarted);
+const save = () => G.save(STORE, {settings, game});
+const markTool = G.pieces({plain: "Tape", mark: "dotBtn", can: () => game && !game.won, change: () => update(),
+  say: "Dot is on: a tap marks a square that stays bare"});   // the plain tap beside Dot, in a row of their own under the board
+const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
+const levelName = n => { const s = levelSpec(n); return `Level ${n} · ${s.N} × ${s.N}, ${s.cats} cats`; };
+const build = G.builder([levelSpec, steps, ringsOf, solveTape, makeFloor], "makeFloor");
+// The cats on the floor: Marmalade and his friends Gus, Peanut and Willow, taking turns.
+const FACES = ["marmalade-7", "gus-1", "peanut-1", "willow-7"], FACE_NAMES = ["Marmalade", "Gus", "Peanut", "Willow"];
+const catSrc = f => (window.CAT_SRC || {})[f] || `../cats/${f}.webp`;
+const TAPE = "<span class=\"tape\"><i></i><i></i><i></i><i></i></span>";
+const dist = (a, b) => steps(game.N, a, b);
+const catAt = i => game.cats.findIndex(c => c.i === i);
+
+/* ---------- how each cat is doing ---------- */
+// For each cat: the tape it would walk to (-1 if none, or two just as near), and what's wrong, if anything:
+// "near" a tape nearer than its number, "tie" two at its number, "share" another cat wants the same one.
+function judge() {
+  const N = game.N, tapes = [];
+  game.mark.forEach((m, i) => { if (m === 1) tapes.push(i); });
+  const out = game.cats.map(c => {
+    let d = 99, n = 0, at = -1;
+    for (const t of tapes) { const e = dist(t, c.i); if (e < d) { d = e; n = 1; at = t; } else if (e === d) n++; }
+    if (d < c.d) return {at, wrong: "near"};
+    if (d === c.d && n > 1) return {at: -1, wrong: "tie"};
+    return {at: d === c.d ? at : -1, wrong: ""};
+  });
+  for (const a of out) if (a.at >= 0 && out.some(b => b !== a && b.at === a.at)) a.wrong = "share";
+  const rc = new Array(N).fill(0), cc = new Array(N).fill(0);
+  for (const t of tapes) { rc[Math.floor(t / N)]++; cc[t % N]++; }
+  return {cats: out, tapes, rc, cc};
+}
+
+/* ---------- drawing ---------- */
+let cells = [], counts = [];
+function draw() {
+  const N = game.N, b = $("board");
+  b.innerHTML = ""; cells = []; counts = [];
+  b.style.gridTemplateColumns = `repeat(${N + 1}, 1fr)`; b.style.gridTemplateRows = `repeat(${N + 1}, 1fr)`;
+  b.style.setProperty("--cs", `calc(var(--board) / ${N + 1})`);
+  const count = want => { const e = document.createElement("div"); e.className = "count"; e.innerHTML = `<span class="roll"><b>${want}</b></span>`; counts.push(e); return e; };
+  for (let r = 0; r <= N; r++) for (let c = 0; c <= N; c++) {
+    if (r < N && c < N) {
+      const i = r * N + c, d = document.createElement("div");
+      d.className = `sq r${r % 3}`; d.dataset.i = i; d.setAttribute("role", "gridcell");
+      cells.push(d); b.append(d);
+    } else if (r < N) b.append(count(game.rows[r]));          // counts 0…N-1: rows
+    else if (c < N) b.append(count(game.cols[c]));            // counts N…2N-1: columns
+    else b.append(document.createElement("div"));
+  }
+  update();
+}
+// Whose face sits where: cat k is one of the four friends, taking turns; once won, each sits in its tape.
+const faceOf = k => FACES[k % FACES.length];
+function update() {
+  const N = game.N, j = judge(), hm = hints.current();
+  const reach = look >= 0 ? game.cats[look] : null;
+  // where each cat sits: on its own square while playing, in its tape once the floor's done
+  const sitter = new Map();
+  game.cats.forEach((c, k) => sitter.set(game.won ? game.tape[k] : c.i, k));
+  cells.forEach((d, i) => {
+    const k = sitter.get(i), cat = game.won ? -1 : catAt(i), m = game.mark[i];
+    let html = m === 1 ? TAPE : "";
+    if (k !== undefined) html += `<img class="face" src="${catSrc(faceOf(k))}" alt="" draggable="false">`;
+    if (cat >= 0) html += `<b class="num">${game.cats[cat].d}</b>`;
+    if (d.dataset.html !== html) { d.innerHTML = html; d.dataset.html = html; }
+    d.classList.toggle("dot", m === 2);
+    d.classList.toggle("sat", game.won && k !== undefined);
+    d.classList.toggle("catok", cat >= 0 && !j.cats[cat].wrong && j.cats[cat].at >= 0);
+    d.classList.toggle("catbad", cat >= 0 && !!j.cats[cat].wrong);
+    d.classList.toggle("look", !!reach && reach.i === i);
+    d.classList.toggle("near", !!reach && catAt(i) < 0 && dist(i, reach.i) < reach.d);
+    d.classList.toggle("ring", !!reach && catAt(i) < 0 && dist(i, reach.i) === reach.d);
+    d.classList.toggle("hintcell", !!(hm && hm.cells.includes(i))); d.classList.toggle("bad", !!(hm && hm.bad && hm.cells.includes(i)));
+    d.classList.toggle("kbcursor", i === cursorAt);
+    // to VoiceOver: what's on each square
+    const what = cat >= 0 ? `${FACE_NAMES[cat % 4]}, ${game.cats[cat].d} step${game.cats[cat].d === 1 ? "" : "s"} from its tape${j.cats[cat].wrong ? ", not right yet" : j.cats[cat].at >= 0 ? ", settled" : ""}`
+      : m === 1 ? "tape" : m === 2 ? "dot" : "bare floor";
+    d.setAttribute("aria-label", `${G.at(i, N)}: ${what}`);
+  });
+  counts.forEach((e, k) => {
+    const have = k < N ? j.rc[k] : j.cc[k - N], want = k < N ? game.rows[k] : game.cols[k - N];
+    e.classList.toggle("met", have === want); e.classList.toggle("over", have > want);
+    e.setAttribute("role", "img"); e.setAttribute("aria-label", `${k < N ? `Row ${k + 1}` : `Column ${k - N + 1}`}: ${want} tape, ${have} laid`);
+  });
+  const settled = j.cats.filter(c => !c.wrong && c.at >= 0).length, n = game.cats.length;
+  // cats settled of all of them, with a tape square (G.tally)
+  if (game.won) $("count").textContent = "Every cat's sitting pretty!";
+  else G.tally($("count"), settled, n, '<rect x="3" y="3" width="10" height="10" fill="none" stroke="#B2811F" stroke-width="3"/>', `${settled} of ${n} cats settled`);
+  undo.sync();
+  $("hintBtn").disabled = game.won; $("dotBtn").disabled = game.won;
+  const solved = settled === n && j.tapes.length === n && game.rows.every((v, r) => j.rc[r] === v) && game.cols.every((v, c) => j.cc[c] === v);
+  return {solved, j};
+}
+
+/* ---------- playing ---------- */
+// What's wrong with a cat, in words, for the line under the board.
+const WHY = {near: "The red cat would stop at a nearer tape.", tie: "The red cat has two tapes just as near: it can't choose.", share: "Two red cats want the same tape."};
+function setMark(i, m) {
+  if (!playing() || game.mark[i] === m || catAt(i) >= 0) return;
+  const before = judge().cats.map(c => c.wrong);
+  undo.push([i, game.mark[i]]); game.mark[i] = m; game.started = true;
+  const {solved, j} = update();
+  if (solved) { win(); return; }
+  const k = j.cats.findIndex((c, k) => c.wrong && c.wrong !== before[k]);
+  if (k >= 0) G.note(WHY[j.cats[k].wrong], 4000);
+  save();
+}
+// A tap on a bare square lays tape (or takes it up); with Dot on, or a long press or right-click, it marks a dot.
+// A tap on a cat shows how far it can see, and again puts that away.
+function tap(i, dot) {
+  if (!playing()) return;
+  const k = catAt(i);
+  if (k >= 0) { look = look === k ? -1 : k; update(); return; }
+  setMark(i, dot ? (game.mark[i] === 2 ? 0 : 2) : (game.mark[i] === 1 ? 0 : 1));
+}
+let press = null;
+$("board").addEventListener("pointerdown", e => {
+  const d = e.target.closest(".sq"); if (!d || !playing()) return;
+  e.preventDefault();
+  const i = +d.dataset.i;
+  press = {i, t: setTimeout(() => { if (press) { if (catAt(i) < 0) tap(i, true); press = null; } }, 450)};
+});
+$("board").addEventListener("pointerup", () => { if (!press) return; clearTimeout(press.t); tap(press.i, markTool.on()); press = null; });
+for (const ev of ["pointercancel", "pointerleave"]) $("board").addEventListener(ev, () => { if (press) { clearTimeout(press.t); press = null; } });
+$("board").addEventListener("contextmenu", e => {
+  e.preventDefault(); if (press) { clearTimeout(press.t); press = null; }
+  const d = e.target.closest(".sq"); if (d && catAt(+d.dataset.i) < 0) tap(+d.dataset.i, true);
+});
+// Keys: arrows move a cursor, Space or Enter taps (lays tape, or shows a cat's reach), X or . marks a dot, Backspace clears.
+G.gridKeys({on: playing, size: () => [game.N, game.N], keys: ["x", ".", "backspace", "delete"],
+  show: i => { cursorAt = i; update(); },
+  act: (i, key) => {
+    if (key === " ") tap(i, markTool.on());
+    else if (key === "x" || key === ".") tap(i, true);
+    else setMark(i, 0);
+  }});
+
+// Undo takes back a tap ([i, mark before]) or a Restart ({mark}), kept in game.history (G.history).
+const undo = G.history({game: () => game, back: (h, g) => { if (Array.isArray(h)) g.mark[h[0]] = h[1]; else g.mark = h.mark; },
+  can: playing, after: () => { update(); save(); }, restart: true});
+$("restartBtn").onclick = () => {
+  if (undo.restart(g => { g.mark = new Array(g.N * g.N).fill(0); }, {mark: game.mark.slice()})) { look = -1; update(); G.note("The floor's bare again. Undo brings your tape back.", 4000); }
+};
+// Hint: first a mistake, in red (tape where none goes, or a dot where tape goes). Otherwise the cat with the fewest
+// squares left for its tape: its squares in gold and why; asked again, the one square.
+const hints = G.hinter({game: () => game, key: () => game ? game.mark.join("") : "", draw: () => update()});   // marks {cells, bad}
+const clearHint = () => hints.clear(false);
+$("hintBtn").onclick = () => {
+  if (!playing()) return;
+  const N = game.N, all = [...Array(N * N).keys()], isTape = new Set(game.tape);
+  const wrong = all.filter(i => (game.mark[i] === 1 && !isTape.has(i)) || (game.mark[i] === 2 && isTape.has(i)));
+  if (wrong.length) {
+    const i = wrong[0];
+    game.hinted = true; game.started = true; save();
+    return hints.show({cells: [i], bad: true}, (game.mark[i] === 1 ? "No tape goes on the red square" : "Tape goes on the red square") + G.andMore(wrong.length - 1) + ".");
+  }
+  // the squares still open to each cat without its tape: its ring, less dots and rows or columns already full
+  const rings = ringsOf(N, game.cats), j = judge();
+  const todo = game.cats.map((c, k) => k).filter(k => game.mark[game.tape[k]] !== 1);
+  if (!todo.length) { G.note("Every tape's down already.", 4000); return; }
+  const open = k => rings[k].filter(s => game.mark[s] !== 2 && j.rc[Math.floor(s / N)] < game.rows[Math.floor(s / N)] && j.cc[s % N] < game.cols[s % N]);
+  const k = todo.reduce((a, b) => open(b).length < open(a).length ? b : a), sq = open(k), c = game.cats[k];
+  game.hinted = true; game.started = true; save();
+  if (!hints.level() && sq.length > 1) {
+    return hints.show({cells: [c.i, ...sq]}, `This cat's tape is ${c.d} step${c.d === 1 ? "" : "s"} away, on a gold square: none of them is nearer another cat, or full up. Which one?`);
+  }
+  hints.show({cells: [c.i, game.tape[k]]}, sq.length === 1 && !hints.level()
+    ? `This cat's tape can only go on the gold square: it's the one ${c.d} step${c.d === 1 ? "" : "s"} away that's nearer no other cat.`
+    : "Lay this cat's tape on the gold square.");
+};
+
+/* ---------- endings ---------- */
+// Every cat settled: each walks to its tape, a square at a time (along, then down or up), and sits in it.
+function win() {
+  game.won = true; G.finishClock(game); cursorAt = -1; look = -1; clearHint();
+  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  settings.level = next; $("levelSel").value = next; save();
+  G.track(`Tape Trap solved level ${game.level}`);
+  build.prefetch(next);
+  running = true;
+  const g = game, done = () => { running = false; if (game === g) { $("wrap").querySelector(".walkers")?.remove(); update(); finishCard(); } };
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) { update(); setTimeout(done, 600); return; }
+  // the cats leave their squares (drawn walking on a layer over the floor) and the faces go from the board
+  game.won = false; const N = game.N;
+  const layer = document.createElement("div"); layer.className = "walkers"; $("wrap").append(layer);
+  const box = $("board").getBoundingClientRect(), wb = $("wrap").getBoundingClientRect(), cs = box.width / (N + 1);
+  const xy = i => [box.left - wb.left + (i % N) * cs, box.top - wb.top + Math.floor(i / N) * cs];
+  cells.forEach(d => { const f = d.querySelector(".face"); if (f) f.style.visibility = "hidden"; });
+  const STEP = 170;
+  let longest = 0;
+  game.cats.forEach((c, k) => {
+    const img = new Image(); img.src = catSrc(faceOf(k)); img.alt = "";
+    Object.assign(img.style, {width: cs * .88 + "px", height: cs * .88 + "px"});
+    layer.append(img);
+    const [x0, y0] = xy(c.i), [x1, y1] = xy(game.tape[k]), n = c.d;
+    const frames = [{transform: `translate(${x0 + cs * .06}px, ${y0 + cs * .06}px)`}];
+    if (x0 !== x1 && y0 !== y1) frames.push({transform: `translate(${x1 + cs * .06}px, ${y0 + cs * .06}px)`, offset: Math.abs(x1 - x0) / cs / n});
+    frames.push({transform: `translate(${x1 + cs * .16}px, ${y1 + cs * .16}px) scale(.77)`});
+    img.style.transformOrigin = "0 0";
+    img.animate(frames, {duration: n * STEP + 150, delay: k * 90, easing: "linear", fill: "forwards"});
+    longest = Math.max(longest, n * STEP + 150 + k * 90);
+  });
+  setTimeout(() => { game.won = true; done(); }, longest + 450);
+}
+function finishCard() {
+  const next = settings.level, gold = !game.restarted && !game.hinted;
+  let text = `All ${game.cats.length} cats walked to their tape and sat down.`;
+  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  // a gold paw: Marmalade stretched out asleep, in place of the random cat photo
+  const pic = new Image(); pic.className = "marmpic"; pic.src = catSrc("marmalade-5"); pic.alt = "Marmalade stretched out asleep";
+  G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my floor", game.result,
+    {title: "Sitting pretty!", gold, goldWhy: "No hints or restarts!", goldTitle: "Gold paw!", goldPic: [pic], next: next > game.level ? `Next: level ${next}` : "Next floor",
+     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+}
+
+/* ---------- new floors ---------- */
+function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); newPuzzle(); }
+function begin(p, level) {
+  game = {level, N: p.N, cats: p.cats, tape: p.tape, rows: p.rows, cols: p.cols, mark: new Array(p.N * p.N).fill(0),
+    history: [], won: false, ...G.freshClock()};
+  // the cats in reading order, each with its tape
+  const order = game.cats.map((c, k) => k).sort((a, b) => game.cats[a].i - game.cats[b].i);
+  game.cats = order.map(k => p.cats[k]); game.tape = order.map(k => p.tape[k]);
+  cursorAt = -1; look = -1; clearHint(); markTool.set(false);
+}
+async function newPuzzle() {
+  if (busy) return;
+  busy = true;
+  const n = settings.level;
+  G.openCard("Laying out the floor…", "", []);
+  const p = await build.take(n);
+  begin(p, n);
+  busy = false; G.closeCard(); G.note("");
+  draw(); save();
+  build.prefetch(n);
+  G.track(`Tape Trap new puzzle level ${n}`);
+  helpOnFirstVisit();
+}
+
+/* ---------- sharing ---------- */
+// Each cat as its square (two base-36 digits) and number, and the answer as each cat's tape square; with progress,
+// each square's mark (0, 1 or 2).
+const sq36 = i => i.toString(36).padStart(2, "0");
+$("linkBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Tape Trap", won: game.won,
+  puzzle: () => ({g: "tapetrap", N: game.level, c: game.cats.map(c => sq36(c.i) + c.d.toString(36)).join(""), t: game.tape.map(sq36).join("")}),
+  progress: () => game.mark.join("")}); };
+function openShared(d) {
+  const spec = levelSpec(d.N), N = spec ? spec.N : 0, C = spec ? spec.cats : 0, fail = () => G.note("That share link didn't work.", 5000);
+  if (!N || typeof d.c !== "string" || typeof d.t !== "string" || d.c.length !== 3 * C || d.t.length !== 2 * C || !/^[0-9a-z]+$/.test(d.c + d.t)) return fail();
+  const cats = [], tape = [];
+  for (let k = 0; k < C; k++) { cats.push({i: parseInt(d.c.slice(3 * k, 3 * k + 2), 36), d: parseInt(d.c[3 * k + 2], 36)}); tape.push(parseInt(d.t.slice(2 * k, 2 * k + 2), 36)); }
+  const used = new Set([...cats.map(c => c.i), ...tape]);
+  if (used.size !== 2 * C || [...used].some(i => i >= N * N) || cats.some(c => !c.d)) return fail();
+  const rows = new Array(N).fill(0), cols = new Array(N).fill(0);
+  for (const t of tape) { rows[Math.floor(t / N)]++; cols[t % N]++; }
+  const sols = solveTape(N, cats, rows, cols, 2);
+  if (sols.length !== 1 || sols[0].some((s, k) => s !== tape[k])) return fail();
+  begin({N, cats, tape, rows, cols}, d.N);
+  if (typeof d.p === "string" && d.p.length === N * N && /^[012]+$/.test(d.p)) { game.mark = [...d.p].map(Number); game.cats.forEach(c => { game.mark[c.i] = 0; }); game.timed = false; }
+  settings.level = d.N; $("levelSel").value = d.N;
+  draw(); save(); build.prefetch(d.N);
+  if (game.timed === false && update().solved) win();
+}
+
+/* ---------- how to play ---------- */
+function showHelp() {
+  settings.seenHelp = false; helpOnFirstVisit();
+  if (!document.querySelector(".spot")) { settings.seenHelp = true; G.helpLater(); }
+}
+// First visit: walk through the floor that's out. Squares are the floor plus the counts on the right and along the bottom.
+function helpOnFirstVisit() {
+  if (!game || !playing() || document.querySelector(".spot") || settings.seenHelp) return;
+  const N = game.N, xy = i => [i % N, Math.floor(i / N)];
+  const catsAt = game.cats.map(c => xy(c.i));
+  // the cat to show: the furthest from its tape, so its reach shows best
+  const k = game.cats.reduce((a, c, b) => c.d > game.cats[a].d ? b : a, 0), cat = game.cats[k];
+  const nearer = [...Array(N * N).keys()].filter(i => catAt(i) < 0 && dist(i, cat.i) < cat.d).map(xy);
+  const ring = [...Array(N * N).keys()].filter(i => catAt(i) < 0 && dist(i, cat.i) === cat.d).map(xy);
+  const countsAt = [...[...Array(N).keys()].map(r => [N, r]), ...[...Array(N).keys()].map(c => [c, N])];
+  // a bare square to lay tape on: one in the cat's ring if it's bare
+  const freeI = [...Array(N * N).keys()].find(i => catAt(i) < 0 && game.mark[i] === 0 && dist(i, cat.i) === cat.d) ?? game.mark.findIndex((m, i) => m === 0 && catAt(i) < 0);
+  const one = xy(Math.max(0, freeI)), oneI = Math.max(0, freeI), turn = G.yourTurn(() => game, g => { game = g; }, draw);
+  let was0 = 0;
+  const steps = [
+    {say: "Each cat walks to its nearest tape", lit: catsAt},
+    {say: `This one's tape: ${cat.d} step${cat.d === 1 ? "" : "s"} away`, lit: [xy(cat.i), ...ring]},
+    ...(nearer.length ? [{say: "None nearer, and no ties", lit: [xy(cat.i), ...nearer]}] : []),
+    // Your turn: lay tape on the real floor (G.yourTurn takes it up again afterwards)
+    {say: "Tap a square to lay tape", lit: [one], try: {done: () => game.mark[oneI] !== was0, yes: "Tape down!"}, ...turn.upTo,
+     enter() { turn.from.enter(); was0 = game.mark[oneI]; }},
+    {say: "Rolls count each line's tape", lit: countsAt},
+    {say: "One tape per cat, never shared", lit: catsAt, tone: "ok"},
+    {say: "Tap a cat to see its reach", lit: [xy(cat.i)], later: true},
+    {say: "Dot: mark squares that stay bare", els: [$("dotBtn")]},
+    {say: "Stuck? Hint shows a cat's squares", els: [$("hintBtn")]},
+  ];
+  G.spotlight({grid: $("board"), w: N + 1, h: N + 1, steps, done: () => { settings.seenHelp = true; save(); }});
+}
+
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", "") + (n === MAX_LEVEL ? " (hardest)" : ""), n));
+$("levelSel").onchange = e => { G.closeCard(); startLevel(+e.target.value); };
+$("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
+$("helpBtn").onclick = showHelp;
+$("marm").src = catSrc("marmalade-1");
+
+G.nav("tapetrap");
+G.checkClock(game);
+G.setupTimer({name: "tapetrap", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
+
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+$("levelSel").value = settings.level;
+const shared = G.readShare("tapetrap");
+const hadSave = !!(game);
+if (hadSave) G.reopen(() => {
+    const spec = levelSpec(game.level);
+    if (!spec || spec.N !== game.N || game.cats.length !== spec.cats || game.tape.length !== spec.cats || game.mark.length !== game.N * game.N) throw new Error("the saved floor doesn't fit its level");
+    draw();
+    if (game.won) finishCard();
+    build.prefetch(settings.level); helpOnFirstVisit();
+  }, why => { game = null; newPuzzle().then(() => G.note(why, 0)); });
+else if (!shared) newPuzzle();
+const shareOpts = () => ({name: "Tape Trap", inProgress: !!(game && !game.won && game.history.length), open: openShared, after: helpOnFirstVisit});
+// a link that doesn't work, opened with no saved puzzle, would leave the board empty: start one
+if (shared) G.offerShare(shared, {...shareOpts(), fresh: hadSave ? null : why => Promise.resolve(newPuzzle()).then(() => { G.note(why, 6000); })});
+window.addEventListener("hashchange", () => { const d = G.readShare("tapetrap"); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>

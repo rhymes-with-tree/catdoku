@@ -4,11 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Patches</title>
+<script src="../move.js?v=2026-11-20.6"></script>
+<meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-09.8";
+  var BUILD = "2026-11-20.6";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-09.8">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.6">
 <style>
 /* The board is a quilt: a stitched binding round the edge, dashed seams between patches. */
 .board{background:#F3EEDF;border:8px solid #853C68;border-radius:12px;outline:2px dashed rgba(255,244,230,.85);outline-offset:-5px}
@@ -122,7 +124,8 @@ main > .stage{margin-top:calc(var(--nw) * .56 - 14px)}
 
 </main>
 
-<script src="../games.js?v=2026-11-09.8"></script>
+<script src="../games.js?v=2026-11-20.6"></script>
+<script src="../colorways.js?v=2026-11-20.6"></script>
 <script>
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 function nbrs(i,N){const r=Math.floor(i/N),c=i%N,o=[];if(r>0)o.push(i-N);if(r<N-1)o.push(i+N);if(c>0)o.push(i-1);if(c<N-1)o.push(i+1);return o;}
@@ -206,6 +209,56 @@ const FABRICS = [
 ];
 // With fabric patterns off: one flat color per fabric.
 const SOLIDS = [{name: "Red", bg: "#BD5538"}, {name: "Blue", bg: "#4E577D"}, {name: "Mustard", bg: "#ECA818"}, {name: "Green", bg: "#6AA673"}];
+// Colourways (since 2026-11-15, the owner's idea): each new quilt is sewn in one of the shared colourways (colorways.js,
+// Yarn's and Twirl's), picked at random, or now and then in the four fabrics above. The four patterns stay, so the
+// fabrics still read apart by pattern; the colours are the four along the colourway that are furthest from each other
+// and clear of the muslin, shuffled onto the patterns. Colourways too close to give four that far apart (Dusty Rose,
+// Slate, Sea Glass and Citrus: closer than .13 in OKLab; the four above are .19 apart) are left out, which keeps 26.
+// A quilt keeps its four colours in game.fab, one for each pattern; one saved before then has none, and keeps the four above.
+const CLASSIC = SOLIDS.map(f => f.bg);
+const labGap = (A, B) => Math.hypot(A[0] - B[0], A[1] - B[1], A[2] - B[2]);
+function fourOf(ramp) {
+  const muslin = hexLab("#F3EEDF");
+  const c = [...Array(13).keys()].map(i => rampAt(ramp, i / 12)).filter(x => labGap(hexLab(x), muslin) >= .12), lab = c.map(hexLab);
+  let best = {gap: 0, cols: null};
+  for (let a = 0; a < c.length; a++) for (let b = a + 1; b < c.length; b++) for (let d = b + 1; d < c.length; d++) for (let e = d + 1; e < c.length; e++) {
+    const k = [a, b, d, e];
+    let gap = 9; for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) gap = Math.min(gap, labGap(lab[k[i]], lab[k[j]]));
+    if (gap > best.gap) best = {gap, cols: k.map(i => c[i])};
+  }
+  return best;
+}
+const WAYS = [COLORWAYS, BLENDS, VARIEGATED].flatMap(o => Object.values(o)).map(fourOf).filter(w => w.gap >= .13).map(w => w.cols);
+const pickFab = () => { const i = Math.floor(Math.random() * (WAYS.length + 1)); return i === WAYS.length ? CLASSIC.slice() : shuffle(WAYS[i].slice()); };
+const isFab = f => Array.isArray(f) && f.length === 4 && f.every(c => /^#[0-9a-f]{6}$/i.test(c)) && new Set(f).size === 4;
+// The four patterns in any colour: on a pale colour the pattern is a deeper shade of it, on the rest a pale one.
+function sewn(c, k) {
+  const pale = hexLab(c)[0] > .74, deep = strandShade(c), lite = rampAt([c, "#FFFFFF"], .8), on = pale ? deep : lite;
+  const rgba = (hex, a) => `rgba(${[1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)).join(", ")}, ${a})`;
+  const f = {...FABRICS[k]};
+  if (k === 0) { const line = rgba(pale ? deep : c, pale ? .35 : .6); f.bg = rampAt([c, "#FFFFFF"], pale ? .4 : .6);
+    f.layers = [`linear-gradient(90deg, ${line} 50%, transparent 50%)`, `linear-gradient(0deg, ${line} 50%, transparent 50%)`]; }
+  else if (k === 1) { f.bg = c; f.layers = [`radial-gradient(circle, ${pale ? deep : "#F4EFE2"} 20%, transparent 23%)`]; }
+  else if (k === 2) { f.bg = c; f.layers = [`linear-gradient(90deg, transparent 0 55%, ${deep} 55% 80%, ${pale ? "#FFFFFF" : lite} 80% 88%, transparent 88%)`]; }
+  else { f.bg = c; f.layers = FABRICS[3].layers.map(l => l.replace("#E1E7D3", on)); }
+  return f;
+}
+// A colour's name for the plain fabrics (with patterns off) and for VoiceOver: a hue, lighter or darker. Two alike
+// in one quilt: the lighter one is called a shade lighter.
+const SHADE = ["Pale ", "Light ", "", "Dark ", "Deep "];
+function colourNames(fab) {
+  const got = fab.map(c => {
+    const [L, a, b] = hexLab(c), C = Math.hypot(a, b), h = (Math.atan2(b, a) * 180 / Math.PI + 360) % 360;
+    let n = C < .035 ? "grey" : h < 15 || h >= 338 ? "pink" : h < 45 ? "red" : h < 70 ? "orange" : h < 115 ? "yellow" : h < 165 ? "green" : h < 235 ? "teal" : h < 282 ? "blue" : h < 318 ? "purple" : "plum";
+    if (L < .5 && (n === "red" || n === "orange" || n === "yellow")) n = "brown"; if (L < .5 && n === "pink") n = "plum";
+    return {L, n, s: L > .86 ? 0 : L > .74 ? 1 : L > .6 ? 2 : L > .4 ? 3 : 4};
+  });
+  const say = x => (SHADE[x.s] + x.n).replace(/^./, ch => ch.toUpperCase());
+  for (const x of got) for (const y of got) if (x !== y && say(x) === say(y)) (x.L > y.L ? x : y).s = Math.max(0, (x.L > y.L ? x : y).s - 1);
+  return got.map(say);
+}
+const fabricsFor = fab => !isFab(fab) || fab.join() === CLASSIC.join() ? FABRICS : fab.map(sewn);
+const solidsFor = fab => !isFab(fab) || fab.join() === CLASSIC.join() ? SOLIDS : colourNames(fab).map((name, k) => ({name, bg: fab[k]}));
 const MUSLIN = {tile: 4, bg: "#F3EEDF", layers: ["linear-gradient(90deg, rgba(120,98,66,.07) 1px, transparent 1px)", "linear-gradient(0deg, rgba(120,98,66,.07) 1px, transparent 1px)"]};
 // Dress an element in a fabric, offset so the pattern runs on unbroken from square to square.
 function fabricOn(el, f, dx = 0, dy = 0) {
@@ -221,8 +274,9 @@ function fabricOn(el, f, dx = 0, dy = 0) {
 const STORE = "catdoku.patches.v1";
 const $ = G.$;
 let state = G.load(STORE);
-let settings = Object.assign({size: 8, fabric: true, autoCheck: true}, state.settings);
-const look = () => settings.fabric ? FABRICS : SOLIDS;
+let settings = Object.assign({size: 6, fabric: true, autoCheck: true}, state.settings);   // a new player's first size: a size or two smaller since 2026-11-12, when GoatCounter showed far fewer solves at the old one (8 × 8: 54%; 6 × 6: 80%)
+// The fabrics this quilt is sewn in (worked out once a quilt, not for every patch)
+const look = () => { const fab = game && game.fab, key = settings.fabric + String(fab); if (look.key !== key) { look.key = key; look.was = settings.fabric ? fabricsFor(fab) : solidsFor(fab); } return look.was; };
 let game = state.game || null, busy = false, brush = 0;
 // The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
 G.pawLost(() => !game || game.won || game.hinted || game.restarted);
@@ -268,10 +322,18 @@ function clearAll() { undo.restart(g => { g.col = g.given.slice(); g.mine = []; 
 // The player's own buttons: just notes, in plum, on patches they want to remember. They don't sew a
 // patch down; it can still be changed. MINE is the brush that puts one on or takes it off.
 const MINE = -2;
+/* ---------- sound ---------- */
+// The owner's picks from the listening page (2026-11-14), played through G.sound (games.js; on unless Settings turns it off).
+// Sewing is a needle stitch, a patch cleared the logic games' pop out (erase), a marker button their pencil tick (mark),
+// and a new clash (with Auto check on) every game's low buzz.
+const SND = G.sound.kit;
+const needle = t => { SND.noise({t, dur: .02, vol: .2, f: 3200, q: 3, a: .001}); SND.tone({fs: [[0, 1800], [.03, 1400]], t: t + .01, dur: .03, vol: .04}); };
+G.sound.define({"patch.sew": G.sound.get("put")});   // sew a patch: the shelf's put in (the owner, 2026-11-15)
 function toggleMine(g) {
   if (game.given[g] >= 0) { G.note("That patch is already sewn."); return false; }
   const m = game.mine || (game.mine = []), at = m.indexOf(g);
   if (at >= 0) m.splice(at, 1); else m.push(g);
+  G.sound.play(at >= 0 ? "erase" : "mark");
   return true;
 }
 // The square nearest the middle of a patch, where its button goes.
@@ -286,7 +348,11 @@ function paint(g, isTap) {
   if (game.given[g] >= 0) { if (isTap) G.note("Patches with a button are already sewn and can't be changed."); return false; }
   const c = isTap && game.col[g] === brush ? -1 : brush;
   if (game.col[g] === c) return false;
-  game.col[g] = c; return true;
+  const before = settings.autoCheck ? clashes().size : 0;
+  game.col[g] = c;
+  G.sound.play(c < 0 ? "erase" : "patch.sew");
+  if (c >= 0 && settings.autoCheck && clashes().size > before) G.sound.play("wrong", {}, .12);
+  return true;
 }
 
 const winText = () => `The quilt is finished: ${game.R} patches, and no matching fabrics side by side. Perfect for a nap.` + (game.hinted ? " You had a hint, so the next one's the same size." : "");
@@ -311,7 +377,7 @@ async function newPuzzle() {
   const N = settings.size;
   G.openCard("Cutting patches…", "", []);
   const p = await build.take(N);
-  game = {N, R: p.R, reg: p.reg, adj: p.adj, given: p.given, col: p.given.slice(), history: [], won: false, ...G.freshClock()};
+  game = {N, R: p.R, reg: p.reg, adj: p.adj, given: p.given, col: p.given.slice(), fab: pickFab(), history: [], won: false, ...G.freshClock()};
   busy = false;
   G.closeCard(); buildBoard(); render(); save(); G.note("");
   G.track(`Patches new puzzle ${N}x${N}`);
@@ -339,7 +405,7 @@ function drawSeams(b, reg, N, W) {
 
 function buildBoard() {
   const N = game.N, b = $("board"), reg = game.reg;
-  b.innerHTML = ""; render.w = 0;
+  b.innerHTML = ""; render.w = 0; buildSwatches();   // the swatches in this quilt's colourway
   b.style.gridTemplateColumns = b.style.gridTemplateRows = `repeat(${N}, minmax(0, 1fr))`;
   // a dot in the most central cell of each pre-painted region
   const pins = new Set();
@@ -528,7 +594,7 @@ $("bestBtn").onclick = () => G.showBests("Best times", game ? game.N : settings.
 
 /* ---------- sharing ---------- */
 $("linkBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Patches", won: game.won,
-  puzzle: () => ({g: "patches", N: game.N, R: game.R, reg: game.reg, given: game.given}),
+  puzzle: () => ({g: "patches", N: game.N, R: game.R, reg: game.reg, given: game.given, f: game.fab}),
   progress: () => ({col: game.col})}); };
 // A puzzle from a share link, with its fabrics so far if they were sent (that isn't timed).
 // A shared quilt is checked before anything changes: a size on the list, every patch used, buttons only in the
@@ -543,7 +609,7 @@ function sharedOK(d) {
 function openShared(d) {
   if (!sharedOK(d)) { G.note("That share link didn't work.", 5000); return; }
   game = {N: d.N, R: d.R, reg: d.reg, adj: adjacency(d.N, d.R, d.reg), given: d.given,
-          col: d.p ? d.p.col : d.given.slice(), history: [], won: false, ...G.freshClock()};
+          col: d.p ? d.p.col : d.given.slice(), fab: isFab(d.f) ? d.f : pickFab(), history: [], won: false, ...G.freshClock()};
   if (d.p) game.timed = false;
   settings.size = d.N; buildBoard(); render(); save(); G.note(""); build.prefetch(d.N);
   if (d.p) checkWin();

@@ -2,7 +2,7 @@
    saved progress, background puzzle building, and the win card. */
 const G = (() => {
   // What's new (whatsNew, below): anything saved on this device before this page loaded means they've played before.
-  const NEWS = "catdoku.news.v1";
+  const NEWS = "catdoku.news.v3";
   const RETURNING = (() => { try { for (let i = 0; i < localStorage.length; i++) if (localStorage.key(i) !== NEWS) return true; } catch (e) {} return false; })();
   // Every game: name, folder, one line about it, its colour in the games menu, its shelf (see GROUPS),
   // words to find it by in search (the puzzle it's based on and what it's like), and for games added from
@@ -13,12 +13,12 @@ const G = (() => {
     ["Patches", "patches", "Sew a four-fabric quilt", "#73A7AE", "logic", "map four colour color quilt"],
     ["Sunbeams", "sunbeams", "Every cat gets a warm spot", "#ECA818", "logic", "shikaku rectangles"],
     ["Toy Box", "toybox", "Help Laya put every toy back in its basket", "#B3B94B", "teasers", "sort ball sort"],
-    ["Pounce", "pounce", "Line up three of a kind for Crunch to pounce on", "#6AA673", "quick", "match 3 match-3 three in a row"],
+    ["Pounce on Three", "pounce", "Line up three of a kind for Crunch to pounce on", "#6AA673", "quick", "match 3 match-3 three in a row"],
     ["Twirl", "twirl", "Clear every ribbon off the mat so Bugsy can nap", "#B94588", "teasers", "ribbons unblock"],
     ["Toe Beans", "toebeans", "Make the number on the big pad", "#DD9DAD", "numbers", "countdown 24 sums arithmetic maths math"],
     ["Knock It Off", "knockitoff", "Help Fred push everything off the table", "#7885BA", "teasers", "push sokoban table"],
     ["Hide & Seek", "hideseek", "Find Jan Brady and friends hiding in the boxes", "#C9A26B", "logic", "minesweeper mines boxes"],
-    ["Pawlette", "pawlette", "Mix paint to dye the yarn", "#9874CA", "teasers", "colour color mixing paint mix to order match colourway colorway dye yarn skein"],
+    ["Pawlette", "pawlette", "Mix paint to dye the yarn", "#9874CA", "quick", "colour color mixing paint mix to order match colourway colorway dye yarn skein"],
     ["Tangle", "tangle", "Untangle the yarn the cat got into", "#3C8681", "lines", "untangle planarity knots"],
     ["Catwalk", "catwalk", "Link the perches of a giant cat tower", "#A98663", "lines", "bridges hashi"],
     ["Fair Play", "tango", "Share two toys out fairly", "#B94588", "logic", "tango binary takuzu unruly"],
@@ -28,7 +28,7 @@ const G = (() => {
     ["Copycat", "copycat", "Find the boxes with matching toys", "#D08A4E", "quick", "memory pairs concentration"],
     ["Night Light", "nightlight", "Help Dottie get every cat to close its eyes", "#3A3358", "teasers", "lights out flip"],
     ["Unravel", "unravel", "Cover every line with one strand of yarn", "#E16A4A", "lines", "one line euler draw"],
-    ["Tail Chase", "tailchase", "Help Jan Brady catch the toys without getting tangled", "#C9773F", "quick", "snake action"],
+    ["Tail Chase", "tailchase", "Help Jan Brady catch the toys without getting tangled", "#C9773F", "prowl", "snake action"],
     ["Keyboard Cat", "keyboardcat", "Make words from the keys that still work", "#8D78AD", "words", "spelling bee"],
     ["If It Fits", "iffits", "Build the box, and Bugsy comes to sit in it", "#C4925C", "teasers", "tangram shapes"],
     ["High Perch", "highperch", "Raise every cat tree to just the right height", "#8E5E3E", "logic", "skyscrapers towers futoshiki sudoku latin square"],
@@ -42,15 +42,14 @@ const G = (() => {
     ["Pick of the Pile", "pickpile", "Help Fred put the toy blocks away in pairs", "#7885BA", "teasers", "mahjong solitaire mahjongg shanghai tile match pairs"],
     ["Fridge Magnets", "magnets", "Help Crunch put every letter back on the fridge", "#BD5538", "words", "unolingo crossword alphabet letters", "2026-10-19"],
     ["Purrfect Square", "purrfect", "Make every row, column and diagonal add up the same", "#ECA818", "numbers", "magic square sums arithmetic maths math", "2026-10-20"],
-    ["Catlas", "atlas", "Name the country where each cat is hiding", "#5FA0C8", "quick", "geography countries world map quiz seterra flags places territories wild cats", "2026-10-22"],
-    ["Cat Burglar", "catburglar", "Catch the cat that's sneaked into the painting", "#4E577D", "quick", "hidden object find spot seek paintings art museum met where's waldo wally", "2026-10-22"],
+    ["Catlas", "atlas", "Name the country where each cat is hiding", "#5FA0C8", "prowl", "geography countries world map quiz seterra flags places territories wild cats", "2026-10-22"],
+    ["Cat Burglar", "catburglar", "Catch the cat that's sneaked into the painting", "#4E577D", "prowl", "hidden object find spot seek paintings art museum met where's waldo wally", "2026-10-22"],
     ["Cat Pile", "catpile", "Pile napping cats on the blanket and clear the lines", "#E16A4A", "quick", "blockudoku block blast woodoku 1010 blocks shapes tetris polyomino sudoku lines", "2026-10-23"],
     ["Fish Bones", "fishbones", "Swap the bones until Bowtie's fish spells words again", "#73A7AE", "words", "waffle swap letters crossword word puzzle fish skeleton", "2026-10-25"],
-    ["Mewstermind", "stash", "Work out which toys the cat stashed in the boxes", "#7885BA", "logic", "toy stash mastermind guess code breaker codebreaker bulls and cows deduction colours colors hidden", "2026-10-26"],
     ["Knit Pick", "knitpick", "Help Laya find the words knitted into her blanket", "#8D78AD", "words", "word search wordsearch wonderword find a word hidden word puzzle", "2026-10-26"],
     ["Junk Drawer", "junkdrawer", "Connect the fridge magnets in Dottie's junk drawer to spell words", "#E16A4A", "words", "boggle squaredle word grid word hunt find words letter grid", "2026-11-06"],
-    ["Bird Watch", "birdwatch", "Help Bugsy and Bowtie spot the birds without waking the human", "#73A7AE", "quick", "whack-a-mole whack a mole birds window tapping action reflexes", "2026-10-26"],
-    ["Shelf Life", "shelflife", "Help Fred put the yarn back in order", "#B94588", "teasers", "i love hue gradient colour color sort shades swap yarn", "2026-10-26"],
+    ["Bird Watch", "birdwatch", "Help Bugsy and Bowtie spot the birds without waking the human", "#73A7AE", "prowl", "whack-a-mole whack a mole birds window tapping action reflexes", "2026-10-26"],
+    ["Shelf Life", "shelflife", "Help Fred put the yarn back in order", "#B94588", "quick", "i love hue gradient colour color sort shades swap yarn", "2026-10-26"],
     ["Meowbile", "meowbile", "Weigh the toys on the cat's mobile", "#7885BA", "numbers", "solveme mobiles mobile balance scales weights weigh algebra equations maths math", "2026-10-27"],
     ["Kitten Caboodle", "kittencaboodle", "Wake the kittens. Spell the words made from the mother's root word.", "#B3B94B", "words", "rootonym word roots prefixes suffixes etymology greek latin vocabulary definitions clues kittens", "2026-10-29"],
     ["Wind Up", "windup", "Drop yarn for Gus and wind two of a kind into a bigger ball", "#B94588", "quick", "suika watermelon game merge drop physics 2048 yarn balls fluffballs pompoms", "2026-10-30"],
@@ -58,12 +57,25 @@ const G = (() => {
     ["Window Ledges", "windowledges", "Add up the windows to match every total", "#B3B94B", "numbers", "kakuro cross sums sums arithmetic maths math", "2026-10-31"],
     ["Purrmutation", "catshuffle", "Put the cat's picture back together", "#9874CA", "teasers", "cat shuffle fifteen 15 puzzle sixteen twiddle sliding tiles slide puzzle picture shuffle scramble rotate turn", "2026-11-01"],
     ["Mew Hue", "mewhue", "Slide paint together and line up the colours", "#B94588", "quick", "colour color mixing paint swipe slide merge lines rows columns 2048 hue pawlette", "2026-11-01"],
-    ["Pawlinko", "pawlinko", "Take turns with Gus and Peanut knocking toys down the climbing wall into the cat beds", "#7885BA", "quick", "plinko pachinko pegs pegboard galton board drop balls bounce plinko physics yarn toys cat climbing wall tree beds springs action", "2026-11-02"],
+    ["Pawlinko", "pawlinko", "Take turns with Gus and Peanut knocking toys down the climbing wall into the cat beds", "#7885BA", "prowl", "plinko pachinko pegs pegboard galton board drop balls bounce plinko physics yarn toys cat climbing wall tree beds springs action", "2026-11-02"],
     ["Cross Stitch", "crossstitch", "Stitch the sampler by the counts to see the picture", "#BD5538", "logic", "nonogram nonograms picross griddlers paint by numbers hanjie pattern pic-a-pix logic pictures cross stitch sampler embroidery", "2026-11-06"],
     ["Zoomies", "zoomies", "Retrace the cat's 3 a.m. zoomies around the house", "#4E577D", "lines", "signpost arrows path numbers jumps queen chain link zoomies", "2026-11-08"],
-    ["Under the Blanket", "blanket", "Find the cats with a feather", "#8D78AD", "logic", "black box blackbox rays atoms deflection reflection hidden balls feather wand blanket bugsy", "2026-11-09"],
     ["Bed Hog", "bedhog", "Slide the sprawled cats until there's room for you", "#E16A4A", "teasers", "klotski rush hour sliding block puzzle unblock slide bed hog huarong sleeping cats", "2026-11-09"],
+    ["Pounce Up", "pounceup", "Help Rayla pounce up the tallest bookcase in the house", "#7885BA", "prowl", "doodle jump platform jumping climbing bookcase shelves action springs", "2026-11-12"],
+    ["Moving Day", "movingday", "Unpack the boxes and find the cats their things", "#ECA818", "quick", "merge game merge mansion travel town gossip harbor merge 2 combine moving boxes unpack treats toys orders", "2026-11-20"],
   ];
+  // Games in beta: their pages work (open them by their address), but they're left off the front page, the games menu,
+  // search, favorites and the daily challenge until they're finished. Same fields as GAMES.
+  const BETA = [
+    ["Mewstermind", "stash", "Work out which cat had the toy, where and when", "#7885BA", "logic", "clue cluedo whodunnit mystery mastermind guess code breaker codebreaker deduction elimination toys rooms times cats", "2026-10-26"],
+    ["Under the Blanket", "blanket", "Find the cats with a feather", "#8D78AD", "logic", "black box blackbox rays atoms deflection reflection hidden balls feather wand blanket bugsy", "2026-11-09"],
+    ["Day Light", "daylight", "Get every cat napping in the sun, though some point their own way", "#ECA818", "teasers", "lights out flip switch spots arrows night light nap", "2026-11-12"],
+    ["Swap-a-Pom", "swapapom", "Swap the pompoms to spell words, with Moonpie for company", "#B94588", "words", "gram jam match 3 three words swap letters scrabble pompoms pom poms moonpie purr", "2026-11-13"],
+    ["Tape Trap", "tapetrap", "Lay a square of tape for every cat to sit in", "#ECA818", "logic", "cat trap tape masking tape nearest distance steps voronoi marmalade", "2026-11-20"],
+    ["Boing!", "boing", "Place springs to bounce the ball to Ferguson", "#7885BA", "teasers", "incredible machine physics springs bounce ball boing trajectory ferguson", "2026-11-20"],
+    ["Pawstcards", "pawstcards", "Guess where Pinecone is from her postcards", "#73A7AE", "prowl", "geography countries wikipedia postcards guess the country clues redacted trivia travel pinecone", "2026-11-11"],
+  ];
+  const rowOf = slug => GAMES.find(g => g[1] === slug) || BETA.find(g => g[1] === slug);
   // The shelves the front page and the games menu sort the games onto, in order: key (also a plain name for it,
   // for search), heading, one line.
   const GROUPS = [
@@ -72,14 +84,16 @@ const G = (() => {
     ["lines", "Cat Trails", "Join, link and route things"],
     ["words", "Cat Spells", "Spell, find and climb words"],
     ["teasers", "Curious Cat", "Moves to plan and shapes to fit"],
-    ["quick", "Kitten Play", "Match, pop, spot and chase"],
+    ["quick", "Kitten Play", "Match, pop and merge"],
+    // the action and looking games, split off Kitten Play on 2026-11-12 once Pawlinko and Pounce Up had arrived (the owner's name)
+    ["prowl", "On the Prowl", "Chase, spot and pounce"],
   ];
   // A shelf's games, A to Z by name (ignoring punctuation, so L-M-N-O-Pom sits among the Ls). GAMES itself keeps its own
   // order, which today's challenge takes its turns from.
   const onShelf = key => GAMES.filter(g => g[4] === key)
     .sort((a, b) => a[0].replace(/[^A-Za-z0-9 ]/g, "").localeCompare(b[0].replace(/[^A-Za-z0-9 ]/g, ""), "en", {sensitivity: "base"}));
   // Each shelf's colour: its games' tiles on the front page and in the games menu, and its label and shortcut.
-  const SHELF_COLOUR = {logic: "#BD5538", numbers: "#ECA818", lines: "#73A7AE", words: "#B94588", teasers: "#7885BA", quick: "#6AA673"};
+  const SHELF_COLOUR = {logic: "#BD5538", numbers: "#ECA818", lines: "#73A7AE", words: "#B94588", teasers: "#7885BA", quick: "#6AA673", prowl: "#E16A4A"};
   const $ = id => document.getElementById(id);
   // Fridge Magnets' alphabet magnets (shared with Junk Drawer, styled by .fmag in games.css): pacific blue, each letter
   // lying at its own tilt
@@ -178,7 +192,7 @@ const G = (() => {
   // A star button that adds a game to the favorites or takes it off; every star for that game on the page follows,
   // and `onChange` runs after (to redraw a Favorites row). `withLabel` adds a word, for a game's own page.
   function favStar(slug, onChange, withLabel, say = withLabel) {
-    const b = document.createElement("button"), name = (GAMES.find(g => g[1] === slug) || [slug])[0];
+    const b = document.createElement("button"), name = (rowOf(slug) || [slug])[0];
     b.type = "button"; b.className = "favStar" + (withLabel ? " labelled" : ""); b.dataset.slug = slug;
     b.onclick = e => {
       e.preventDefault(); e.stopPropagation();
@@ -241,7 +255,7 @@ const G = (() => {
   // game's switches and pickers (moved here from under the board). Share, Best times and How to play are the page's
   // own buttons, kept out of sight (pageTools), so a row here just presses one.
   function gameMenu(head, current, base, o) {
-    const name = (GAMES.find(g => g[1] === current) || [current])[0];
+    const name = (rowOf(current) || [current])[0], beta = BETA.some(g => g[1] === current);
     head.classList.add("withMenu");
     // the cat (or cats) beside the title and the game's line go on a row of their own under the title, and scroll
     const title = head.querySelector(".title"), pics = title ? [...title.querySelectorAll(":scope > img")] : [];
@@ -282,7 +296,7 @@ const G = (() => {
       else toyPicker({kinds: CHEST, off: toysOff(), min: 1, src: f => `${HOME}toys/${f}.webp`,
         save: off => { saveToys(off); note("Saved. The toy games use them from their next board.", 3500); }});
     }, "The toys every game uses");
-    heading(name);
+    heading(beta ? `${name} (beta)` : name);
     const fav = item("star", "", () => {
       const on = toggleFavorite(current);
       document.querySelectorAll(".favStar").forEach(x => x.dataset.slug === current && x.refresh());
@@ -302,7 +316,15 @@ const G = (() => {
     for (const opt of document.querySelectorAll("main .bar .opt")) if (!opt.closest(".card,.overlay")) setList.append(opt);
     for (const bar of document.querySelectorAll("main .bar.toggles")) if (!bar.children.length) bar.remove();
     menu.append(setList, allSet);
+    if (feedbackHere(current)) item("chat", "Send feedback", () => feedbackCard(), beta ? "It's in beta: tell us what you think" : "Tell us what you think");
+    const betaTag = beta && head.querySelector(".title .beta");
+    if (betaTag) {   // the Beta label beside the title opens the feedback card too
+      const b = document.createElement("button"); b.type = "button"; b.className = "beta betaBtn"; b.textContent = betaTag.textContent;
+      b.title = "In beta: things may change. Tap to tell us what you think"; b.setAttribute("aria-label", "Beta: send feedback");
+      b.onclick = () => feedbackCard(); betaTag.replaceWith(b);
+    }
     head.append(menu);
+    setTimeout(soundSwitch);   // after the page's own switches
 
     function sync() {
       const done = dailyDoneToday(), k = dailyStreak();
@@ -311,6 +333,7 @@ const G = (() => {
       daily.classList.toggle("done", done);
       const on = favorites().includes(current);
       set(fav, on ? "In your favorites" : "Add to favorites", on ? "Tap to take it off" : "");
+      fav.hidden = beta;   // a beta game can't be a favorite yet: it isn't on the front page
       fav.querySelector(".ic").classList.toggle("on", on);
       for (const [id, row] of page) { const b = $(id); row.hidden = !b || b.hidden; row.disabled = !!(b && b.disabled); }
       keys.hidden = !(KEYS[current] && keyboardish());
@@ -498,6 +521,30 @@ const G = (() => {
     if (out) { e.preventDefault(); out.click(); }
   });
 
+  // Moving up and down by threes (the owner's call, 2026-11-12, so nobody is carried to a level they can't win): three
+  // wins at a level move you up one, and three losses move you down one; one win changes nothing. A loss is a lost game,
+  // or, in a puzzle that can't be lost, a hint or a Restart after working on it (once a puzzle). The tally is kept on
+  // this device by game (`name`, with a suffix for a second mode) and starts again whenever the level changes, by
+  // itself or by the player's own pick. G.ladder(name, max) gives won(level) and lost(level), each returning
+  // {level, next, up, down, wins, losses, top}, and say(r, what) for the card's line (what: "misses", "hints or restarts").
+  // The win card's main button is G.ANOTHER and its level picker's words are G.CHANGE, in the games that use it:
+  // Night Light, Day Light, Open the Door! and Toe Beans so far (TODO.md has the rest).
+  const LADDER = "catdoku.ladder.v1", ANOTHER = "Give me another!", CHANGE = "Change the difficulty:";
+  function ladder(name, max, min = 1) {
+    const step = (level, win) => {
+      const all = load(LADDER), was = all[name], t = was && was.l === level ? was : {l: level, w: 0, x: 0};
+      if (win) t.w++; else t.x++;
+      const up = win && t.w >= 3 && level < max, down = !win && t.x >= 3 && level > min, next = level + (up ? 1 : down ? -1 : 0);
+      all[name] = up || down ? {l: next, w: 0, x: 0} : t; save(LADDER, all);
+      return {level, next, up, down, wins: t.w, losses: t.x, top: level >= max};
+    };
+    const say = (r, what = "misses") => r.up ? `That's 3 wins at level ${r.level}: up to level ${r.next}!`
+      : r.down ? `That's 3 ${what} at level ${r.level}, so next comes level ${r.next}.`
+      : r.top ? "That's the hardest level." : r.wins === 2 ? `2 of 3 wins at level ${r.level}: one more moves you up.`
+      : r.wins === 1 && !r.losses ? `1 of 3 wins at level ${r.level}.` : r.wins ? `${Math.min(3, r.wins)} of 3 wins at level ${r.level}.` : "";
+    return {won: level => step(level, true), lost: level => step(level, false), say};
+  }
+
   // Moving up: after a clean win the next puzzle is one size bigger, up to the largest the page's size
   // list offers. The finishing cards also offer every other size, so players can always choose.
   const sizeUp = (N, sel) => Math.min(Math.max(...[...sel.options].map(o => +o.value)), N + 1);
@@ -655,12 +702,23 @@ const G = (() => {
     if (top ?? (result && result.n != null && result.n === topLevel())) tops[CURRENT] = true;
     save(GOLD, {counts, top: tops, levels, seen: [...seen, sig].slice(-30)});
   }
+  // The owner's Buy Me a Coffee page (2026-11-18): a link at the foot of the front page and a quiet line at the foot of
+  // every win card, never in the way of play. A tap opens it in a new tab and counts "Buy me a coffee: front page" or
+  // "Buy me a coffee: win card (tangle)" on GoatCounter, so the game stays as it was.
+  const COFFEE = "https://buymeacoffee.com/lapcatpuzzles";
+  function coffeeLink(where) {
+    const a = document.createElement("a");
+    a.href = COFFEE; a.target = "_blank"; a.rel = "noopener"; a.textContent = "☕ Buy me a coffee";
+    a.onclick = () => track(`Buy me a coffee: ${where}`);
+    return a;
+  }
   // The win cards' way out to every game.
   const HOME_LABEL = "Back to the front page", SHARE_LABEL = "Share my result", homeBtn = () => [HOME_LABEL, () => { location.href = HOME; }];
   // A win reopened (coming back to a game after winning, however you left it) isn't shown again: the game deals the
   // next puzzle, as the win card's next-puzzle button does. See reopen.
   function winCard(text, onNext, admire = "Admire my board", result, o = {}) {
     if (reopening) { reopening = false; setTimeout(onNext); return; }
+    if (o.sound !== false) sound.play(o.gold ? "gold" : "win");
     const media = document.createElement("div"); media.className = "winmedia";
     // what earned the gold paw ("No hints or restarts!"), under the paw
     if (o.gold) { countGold(result, text, o.top); media.append(goldPaw()); if (o.goldWhy) { const g = document.createElement("p"); g.className = "goldwhy"; g.textContent = o.goldWhy; media.append(g); } }
@@ -687,6 +745,8 @@ const G = (() => {
     // one big Next, and the rest as small icon buttons in a row under it, each with its word small underneath
     // (decided 2026-11-08); the other sizes (o.after, G.otherSize) show as a small link under them (games.css)
     smallButtons((b, i) => i > 0);
+    const cf = document.createElement("p"); cf.className = "coffee";
+    cf.append("Enjoying these? ", coffeeLink(`win card (${CURRENT || "?"})`)); $("card").append(cf);
   }
   // The open card's buttons that pass test(button, i) move to a row of small icon buttons under the big ones.
   function smallButtons(test) {
@@ -720,6 +780,7 @@ const G = (() => {
     const sel = $("levelSel") || $("size"), r = o.result || (sel ? {n: +sel.value} : null);
     const own = btns.filter(b => b && b[0] !== HOME_LABEL);
     if (!openCard(title, text, [...own, [SHARE_LABEL, e => shareResult(r, false, e.currentTarget, title)], homeBtn()], media, after)) return;
+    if (o.sound !== false) sound.play("lose");
     const small = w => w === HOME_LABEL || w === SHARE_LABEL || [AGAIN, FRESH, BACK, /^(Admire|Look at)/].some(re => re.test(w));
     smallButtons(b => !b.classList.contains("primary") && small(b.textContent));
   }
@@ -728,13 +789,66 @@ const G = (() => {
   // Count a moment in the game (a puzzle started or solved) on the GoatCounter dashboard.
   // Nothing about the player is sent. Waits a few seconds for the counter script to load.
   function track(name) {
+    send(name);
+    if (START_RE.test(name)) puzzleStarted();
+  }
+  function send(name) {
     let tries = 0;
-    (function send() {
+    (function go() {
       const gc = window.goatcounter;
       if (gc && gc.count) gc.count({path: name, title: name, event: true});
-      else if (tries++ < 20) setTimeout(send, 500);
+      else if (tries++ < 20) setTimeout(go, 500);
     })();
   }
+
+  /* ---------- the shape of a visit ---------- */
+  // GoatCounter counts each page or moment once a visit and keeps only the totals, so it can't say what a visit
+  // opened on, which game came first or how many puzzles were played in a row (the owner's questions, 2026-11-16).
+  // The page keeps that tally itself on the device (catdoku.visit.v1) and sends it as more kinds of moment:
+  //   "Visit opened on: Front page" (or a game, Settings, Launch history), as a visit's first page opens;
+  //   "First game: Tangle", at the visit's first puzzle;
+  //   "Tangle in a row: 3", once that run ends: the next puzzle is another game's, or the next visit starts (so a
+  //   visit's last run is counted when the device comes back);
+  //   "After Tangle: Yarn", as a run ends because the next puzzle is another game's (what's played next, 2026-11-17);
+  //   "Visit length: 5-15 min" and "Games in a visit: 3", once the visit is over, so also when the device comes back
+  //   (2026-11-17). A visit's length runs from its first page to the last page opened or puzzle started in it, so the
+  //   time on its last puzzle isn't in it; a visit of one page is "under 1 min".
+  // A visit ends after 30 minutes with no page opened and no puzzle started. A puzzle "started" is any moment a game
+  // already counts as one (a name with "new …" or "started"). Nothing about the player goes with it.
+  const VISIT = "catdoku.visit.v1", VISIT_GAP = 30 * 60e3;
+  const START_RE = /\b(started|new (puzzle|tangle|table|trip|board|floor|tower|round|skein|keyboard))\b/i;
+  const gameName = slug => (GAMES.find(g => g[1] === slug) || BETA.find(g => g[1] === slug) || [slug])[0];
+  const runs = n => n >= 10 ? "10+" : n >= 6 ? "6-9" : String(n);
+  const lasted = ms => { const m = ms / 60e3; return m < 1 ? "under 1 min" : m < 5 ? "1-5 min" : m < 15 ? "5-15 min" : m < 30 ? "15-30 min" : m < 60 ? "30-60 min" : "1 hour or more"; };
+  function visit() {   // this visit's record, starting a new one (and sending what's left of the last one) after a gap
+    const v = load(VISIT), now = Date.now();
+    if (v.at && now - v.at < VISIT_GAP) { v.at = now; return v; }
+    if (v.run) send(`${gameName(v.run.slug)} in a row: ${runs(v.run.n)}`);
+    if (v.at && v.from) send(`Visit length: ${lasted(v.at - v.from)}`);   // a record from before 2026-11-17 has no from
+    if (v.games && v.games.length) send(`Games in a visit: ${v.games.length >= 5 ? "5+" : v.games.length}`);
+    return {at: now, from: now, games: [], fresh: true};
+  }
+  function puzzleStarted() {
+    const slug = CURRENT; if (!slug) return;
+    const v = visit(); opened(v);
+    if (!v.first) { v.first = slug; send(`First game: ${gameName(slug)}`); }
+    if (v.games && !v.games.includes(slug)) v.games.push(slug);
+    if (v.run && v.run.slug === slug) v.run.n++;
+    else {
+      if (v.run) { send(`${gameName(v.run.slug)} in a row: ${runs(v.run.n)}`); send(`After ${gameName(v.run.slug)}: ${gameName(slug)}`); }
+      v.run = {slug, n: 1};
+    }
+    save(VISIT, v);
+  }
+  // the page this visit opened on, once the page's own script has said which game it is (nav)
+  // (a game that deals its first puzzle as the page loads gets here first, from puzzleStarted)
+  function opened(v) {
+    if (!v.fresh) return;
+    delete v.fresh;
+    const slug = CURRENT, p = location.pathname;
+    send(`Visit opened on: ${slug ? gameName(slug) : /\/settings\/?$/.test(p) ? "Settings" : /\/calendar\/?$/.test(p) ? "Launch history" : "Front page"}`);
+  }
+  addEventListener("DOMContentLoaded", () => { const v = visit(); opened(v); save(VISIT, v); });
 
 
   /* ---------- timer and personal best times ---------- */
@@ -758,7 +872,7 @@ const G = (() => {
     .bests .bestnum{text-align:right}
     .bests tr.now td{font-weight:800}
     .card h3{margin:4px 0 6px;font-size:calc(18px*var(--ts))}
-    .spot{position:fixed;inset:0;z-index:9;overflow:hidden;cursor:pointer;animation:spotIn .35s ease-out;-webkit-tap-highlight-color:transparent;touch-action:none}
+    .spot{position:fixed;inset:0;z-index:35;overflow:hidden;cursor:pointer;animation:spotIn .35s ease-out;-webkit-tap-highlight-color:transparent;touch-action:none}
     .spot:focus{outline:none}
     .spot svg{position:absolute;inset:0;display:block}
     .spot .dim{fill:rgba(42,37,48,.66)}
@@ -768,11 +882,14 @@ const G = (() => {
     .spot .arrowLine.back{stroke:var(--ink)}
     .spot .arrowHead{fill:#FFF4D2;stroke:var(--ink);stroke-linejoin:round;paint-order:stroke fill}
     .spot .say{position:absolute;left:4%;right:4%;max-width:100vw;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;pointer-events:none}
-    .spot .say b{font-size:clamp(24px,7vw,36px);font-weight:800;line-height:1.1;color:#FFF4D2;-webkit-text-stroke:6px var(--ink);paint-order:stroke fill;text-wrap:balance}
-    .spot .say small{font-size:15px;font-weight:600;color:#FFF4D2;-webkit-text-stroke:3px var(--ink);paint-order:stroke fill;opacity:.9;animation:spotTap 1.6s ease-in-out infinite}
+    /* the words sit on a card of their own (the owner, 2026-11-12: outlined letters over the board were hard to read) */
+    .spot .say .card{display:flex;flex-direction:column;align-items:center;gap:4px;max-width:100%;box-sizing:border-box;padding:10px 18px 11px;border-radius:18px;
+      background:#2A2530;border:2px solid #FFF4D2;box-shadow:0 6px 20px rgba(0,0,0,.35)}
+    .spot .say b{font-size:calc(clamp(21px,5.8vw,28px)*var(--ts-big,1));font-weight:700;line-height:1.2;letter-spacing:.01em;color:#FFF4D2;text-wrap:balance}
+    .spot .say small{font-size:calc(15px*var(--ts-big,1));font-weight:600;color:#FFF4D2;opacity:.85;animation:spotTap 1.6s ease-in-out infinite}
     .spot .say b .w{white-space:nowrap}
     .spot .say b .emo img{display:inline-block;width:1.15em;height:1.15em;vertical-align:-.2em}
-    .spot .say b .emo{-webkit-text-stroke:0;display:inline-block;background:#FFF4D2;border:3px solid var(--ink);border-radius:999px;padding:0 .12em;margin:0 .04em;line-height:1.15;font-size:.85em;vertical-align:.06em}
+    .spot .say b .emo{display:inline-block;background:#FFF4D2;border:2px solid #FFF4D2;border-radius:999px;padding:0 .12em;margin:0 .04em;line-height:1.15;font-size:.85em;vertical-align:.06em}
     /* the walkthrough's own bar, centred at the bottom of the screen: a dot for each step (Apple's page control) and Skip */
     .spot .spotBar{position:fixed;left:50%;transform:translateX(-50%);max-width:calc(100vw - 24px);bottom:max(14px,env(safe-area-inset-bottom));display:flex;align-items:center;gap:14px;
       padding:4px 6px 4px 16px;border-radius:999px;background:rgba(42,37,48,.82);pointer-events:auto;cursor:default}
@@ -784,7 +901,7 @@ const G = (() => {
     .spot.trying{pointer-events:none}   /* an interactive step: taps go through to what it lights (and nowhere else) */
     .spot.trying .spotBar{pointer-events:auto}
     .spotGo{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;pointer-events:none;animation:spotGo 1.3s ease-out forwards}
-    .spotGo b{font-size:clamp(34px,10vw,52px);font-weight:800;color:#FFF4D2;-webkit-text-stroke:7px var(--ink);paint-order:stroke fill}
+    .spotGo b{font-size:clamp(30px,9vw,46px);font-weight:800;color:#FFF4D2;padding:8px 24px 10px;border-radius:20px;background:#2A2530;border:2px solid #FFF4D2;box-shadow:0 6px 20px rgba(0,0,0,.35)}
     @keyframes spotGo{0%{opacity:0;transform:scale(.7)}18%{opacity:1;transform:scale(1.06)}30%{transform:scale(1)}70%{opacity:1}100%{opacity:0;transform:scale(1.08)}}
     @keyframes spotIn{from{opacity:0}}
     @keyframes spotTap{50%{opacity:.45}}
@@ -814,10 +931,12 @@ const G = (() => {
   function showTime() {
     const g = T && T.game(), btn = $("timer"); if (!btn) return;
     if (!g || !g.timed) { btn.textContent = ""; btn.hidden = true; return; }
-    btn.hidden = false;
+    // A timer switched off (here or on the Settings page) leaves nothing on screen: a stopwatch reading –:–– still
+    // looked like a clock (the owner, 2026-11-12). It comes back from Timers on the Settings page.
     const hide = timerHidden(T.name);
-    btn.textContent = hide ? "⏱ –:––" : "⏱ " + clock(g.ms || 0);
-    btn.setAttribute("aria-label", hide ? "Timer hidden. Tap to show the time." : `Time ${clock(g.ms || 0)}. Tap to hide the time.`);
+    btn.hidden = hide; if (hide) { btn.textContent = ""; return; }
+    btn.textContent = "⏱ " + clock(g.ms || 0);
+    btn.setAttribute("aria-label", `Time ${clock(g.ms || 0)}. Tap to hide the time.`);
   }
   // Fields a new puzzle starts with. Leaving a puzzle you'd started (and not solved) for a new one ends your win streak.
   const freshClock = () => { takePending(); const g = T && T.game(); if (g && g.started && !g.result) breakStreak(); return {ms: 0, timed: true, started: false}; };
@@ -956,7 +1075,7 @@ const G = (() => {
   // Share my result, kept short (decided 2026-11-08): the game, then one line (the level as a fraction of the levels,
   // or the size, the time, the win streak and the gold paw), then the link. Long level names are left out.
   function shareResult(r, gold, btn, lost) {
-    const name = document.querySelector("header h1").textContent, bits = [];
+    const name = document.querySelector("header h1").textContent.replace(/\u00AD/g, ""), bits = [];
     if (r && r.n != null && T) {
       const sel = $("levelSel") || $("size"), l = label(r.n), vals = sel ? [...sel.options].map(o => o.value) : [], i = vals.indexOf(String(r.n));
       bits.push(/^\d+ × \d+$/.test(l) ? l.replace(/ /g, "") : i >= 0 && vals.length > 1 ? `Level ${i + 1}/${vals.length}` : l.split(" · ")[0]);
@@ -984,6 +1103,91 @@ const G = (() => {
       ...(o.progress ? [[won ? "Share my solved board" : "Share with my progress", () => send(Object.assign(o.puzzle(), {p: o.progress()}), "with progress")]] : []),
       ["Cancel", closeCard],
     ]);
+  }
+
+  /* ---------- feedback ---------- */
+  // Send feedback (2026-11-11: the beta games first, then every game the same day): a card to tell us what you think,
+  // from the game's menu (and the Beta label beside a beta game's title). It's sent from the page to the owner's Google Form, whose
+  // answers land in a Google Sheet, so the player stays in the game. Sent with it, to help put things right: the game,
+  // the build, what the page says about the game in play (feedbackFor), a link to this puzzle, the screen and the
+  // browser. Nothing else about the player, and nothing at all until they press Send. The form's questions are all
+  // text and none is required; the Extra ones carry the build, the device and the link.
+  const FEEDBACK_FORM = "https://docs.google.com/forms/d/e/1FAIpQLSd8Jj91hpbI2jH0R23oWbV-CZLogoxftmUdeb25Qmqe8cLryQ/";
+  const FEEDBACK_FIELD = {kind: "entry.1677249528", message: "entry.353537297", game: "entry.278349968", details: "entry.1788484241",
+    contact: "entry.1215492194", build: "entry.1018258034", device: "entry.1596067276", link: "entry.1931990482"};
+  const FEEDBACK_KINDS = ["Love it", "Too hard", "Too easy", "Confusing", "Something's broken", "An idea"];
+  // where it's offered: every game (false would keep it to the games in beta)
+  const FEEDBACK_EVERYWHERE = true;
+  const feedbackHere = slug => FEEDBACK_EVERYWHERE || BETA.some(g => g[1] === slug);
+  // the page's part: {details() (a line about the game in play: level, settings…), share() (the share link's data for
+  // this puzzle, or null), pause()}
+  let feedbackPage = {};
+  const feedbackFor = o => { feedbackPage = o || {}; };
+  const feedbackDraft = {kind: "", message: "", contact: ""};
+  function feedbackInfo() {
+    const slug = CURRENT, name = (rowOf(slug) || [document.querySelector("header h1") ? document.querySelector("header h1").textContent.replace(/\u00AD/g, "") : slug])[0];
+    const sel = $("levelSel") || $("size");
+    let details = "";
+    try {   // the page's own line, else its level or size picker's choice
+      details = feedbackPage.details ? feedbackPage.details() : sel && sel.selectedOptions[0] ? `${sel.id === "size" ? "Size" : "Level"} ${sel.selectedOptions[0].textContent.replace(/^(Level|Size)\s*/i, "")}` : "";
+    } catch (e) {}
+    let link = location.origin + location.pathname, puzzle = false;
+    try { const d = feedbackPage.share && feedbackPage.share(); if (d) { link = shareUrl(d); puzzle = true; } } catch (e) {}
+    const mm = q => matchMedia(q).matches;
+    const device = [`${innerWidth} × ${innerHeight}`, `${devicePixelRatio}×`, mm("(prefers-color-scheme: dark)") ? "dark" : "light",
+      mm("(pointer: coarse)") ? "touch" : "mouse", document.documentElement.classList.contains("bigText") ? "big text" : "",
+      sideways() ? "sideways" : "", navigator.userAgent].filter(Boolean).join(" · ");
+    // the build: the page's BUILD, or (on the older pages, which don't share it) the ?v= that loaded games.js
+    const v = document.querySelector('script[src*="games.js?v="]'), build = window.SITE_BUILD || (v ? v.getAttribute("src").split("?v=")[1] : "");
+    return {slug, name: BETA.some(g => g[1] === slug) ? `${name} (beta)` : name, details, link, puzzle, device, build};
+  }
+  // post it to the form; resolves once it's gone (the form doesn't say whether it took it), rejects if it couldn't go
+  async function sendFeedback(f) {
+    const body = new URLSearchParams();
+    for (const [k, v] of Object.entries(f)) if (FEEDBACK_FIELD[k] && v) body.append(FEEDBACK_FIELD[k], String(v).slice(0, 4000));
+    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 12000);
+    try { await fetch(FEEDBACK_FORM + "formResponse", {method: "POST", mode: "no-cors", body, signal: ctl.signal}); }
+    finally { clearTimeout(t); }
+  }
+  function feedbackCard() {
+    if (feedbackPage.pause) try { feedbackPage.pause(); } catch (e) {}
+    const info = feedbackInfo(), d = feedbackDraft;
+    const box = document.createElement("div"); box.className = "feedback";
+    const kinds = document.createElement("div"); kinds.className = "fbKinds"; kinds.setAttribute("role", "group"); kinds.setAttribute("aria-label", "What kind of feedback");
+    for (const k of FEEDBACK_KINDS) {
+      const b = document.createElement("button"); b.type = "button"; b.textContent = k; b.setAttribute("aria-pressed", String(d.kind === k));
+      b.onclick = () => { d.kind = d.kind === k ? "" : k; for (const x of kinds.children) x.setAttribute("aria-pressed", String(x.textContent === d.kind)); };
+      kinds.append(b);
+    }
+    const field = (label, el, hint) => {
+      const l = document.createElement("label"); l.className = "fbField";
+      const t = document.createElement("span"); t.textContent = label; l.append(t, el);
+      if (hint) { const h = document.createElement("small"); h.textContent = hint; l.append(h); }
+      return l;
+    };
+    const msg = Object.assign(document.createElement("textarea"), {rows: 4, maxLength: 4000, value: d.message, placeholder: "What happened, what you liked, what you'd change…"});
+    msg.oninput = () => { d.message = msg.value; };
+    const contact = Object.assign(document.createElement("input"), {type: "text", maxLength: 200, value: d.contact, autocomplete: "email", placeholder: "Email or name"});
+    contact.oninput = () => { d.contact = contact.value; };
+    const sent = document.createElement("p"); sent.className = "fbSent";
+    sent.textContent = `Sent with it: ${info.name}, build ${info.build || "?"}${info.details ? ", " + info.details : ""}, ${info.puzzle ? "a link to this puzzle" : "the page's address"}, your screen size and your browser's name.`;
+    box.append(kinds, field("Tell us more", msg), field("How can we reach you?", contact, "Only if you'd like a reply."), sent);
+    const send = async () => {
+      if (!d.kind && !d.message.trim()) { msg.focus(); msg.placeholder = "Pick one above, or write a few words here"; return; }
+      const f = {kind: d.kind, message: d.message.trim(), contact: d.contact.trim(), game: info.name, details: info.details, build: info.build, device: info.device, link: info.link};
+      const btn = $("card").querySelector(".btns button.primary"); if (btn) { btn.disabled = true; btn.textContent = "Sending…"; }
+      try {
+        await sendFeedback(f);
+        track(`${info.name} feedback sent${d.kind ? ": " + d.kind : ""}`);
+        Object.assign(d, {kind: "", message: "", contact: ""});
+        openCard("Thank you!", f.contact ? "It's on its way. We'll write back if we can." : "It's on its way. Every note helps make the games better.", [["Close", closeCard, true]]);
+      } catch (e) {
+        // the note stays in feedbackDraft, so Try again (or Send feedback later) has it all back
+        openCard("It didn't send", window.PREVIEW ? "This preview can't send it: on the site it goes straight to us. Your note is kept."
+          : "It may be the connection. Your note is kept, so you can try again in a moment.", [["Try again", feedbackCard, true], ["Cancel", closeCard]]);
+      }
+    };
+    openCard("Send feedback", `What do you think of ${info.name.replace(/ \(beta\)$/, "")}? Tell us anything: we read every note.`, [["Send", send, true], ["Cancel", closeCard]], box);
   }
 
   /* ---------- choosing toys ---------- */
@@ -1117,6 +1321,7 @@ const G = (() => {
     tunnelrun: ["Arrow keys: pick a piece", "Space or Enter: turn it (Shift turns it back)", "Shift with an arrow: slide its track"],
     copycat: ["Arrow keys: pick a box", "Space or Enter: open it"],
     nightlight: ["Arrow keys: pick a cat", "Space or Enter: tap it"],
+    daylight: ["Arrow keys: pick a cat", "Space or Enter: tap it"],
     unravel: ["Arrow keys: go from peg to peg", "Space or Enter: start there, go on to it, or wind back to it"],
     tailchase: ["Arrow keys or WASD: steer", "Space: pause"],
     keyboardcat: ["Letters: type a word", "Enter: try it", "Backspace: take a letter off", "Space: mix the keys"],
@@ -1126,6 +1331,8 @@ const G = (() => {
     catastrophe: ["1 to 9: knock over that pot"],
     laserpointer: ["Arrow keys: pick a mirror", "Space or Enter: tip it"],
     blanket: ["Arrow keys: move over the blanket and round its edge", "Space or Enter: a slot tries the feather; a square gets a lump", "D, X or .: a dot"],
+    boing: ["Arrow keys: along a surface, or up and down to another", "Space or Enter: put a spring there, or turn the one there", "Delete or Backspace: take it back", "G: go"],
+    tapetrap: ["Arrow keys: pick a square", "Space or Enter: lay tape or take it up (on a cat: show its reach)", "X or .: a dot, for a square that stays bare", "Backspace: clear the square"],
     treattime: ["Arrow keys: pick a pile", "Space: put it back or take it out", "K or Enter: mark it to stay"],
     upatree: ["Letters: change the letter picked, or type a whole word", "Enter: climb with the word typed", "Backspace: take a letter off, or with none typed, step back down a perch"],
     toydoku: ["Arrow keys: pick a square", "1 to 9: put in a toy", "Backspace or 0: take it out", "N: notes on or off", "Escape: let go of the square"],
@@ -1134,6 +1341,7 @@ const G = (() => {
     magnets: ["Arrow keys: pick a square", "Letters: put one up", "Backspace: take a letter down", "Space: turn to the other word"],
     purrfect: ["Arrow keys: pick a square", "Digits: type a number (two quickly for 10 and up)", "Backspace: take it out"],
     atlas: ["Arrow keys: move round the map", "Type your answer and press Enter"],
+    pawstcards: ["1 to 7: ask Pinecone about that kind", "Left and Right arrows: go through her postcards", "Type your answer and press Enter"],
     catburglar: ["Arrow keys: move the crosshair", "Space or Enter: tap there"],
     catpile: ["1 to 3: pick a clump", "Arrow keys: move it", "R: turn it", "Space: put it down"],
     fishbones: ["Arrow keys: go from bone to bone", "Space or Enter: pick one up, then put it down on another", "Escape: let go"],
@@ -1148,11 +1356,13 @@ const G = (() => {
     lmnopom: ["Left and right: move", "Up or X: turn", "Down: fall faster", "Space or Enter: drop", "P: pause", "S: swat"],
     windowledges: ["Arrow keys: pick a window", "1 to 9: put in a digit (Shift: a note)", "Backspace or 0: take it out", "N or P: notes on or off", "Escape: let go"],
     bedhog: ["Arrow keys: pick a square", "Space or Enter: pick up the cat there, then put it down", "Arrow keys, holding a cat: slide it", "Escape: put it back"],
+    movingday: ["Arrow keys: pick a square", "Space or Enter: tap the jar or basket, pick a thing up, then put it down on another", "1 to 4: give a cat what it wants", "Escape: let go"],
     catshuffle: ["Arrow keys: pick a square", "Space: slide the piece there, or turn the knob (Shift turns it back)", "Shift with an arrow: shift its row or column"],
     mewhue: ["Arrow keys: pick a square", "Shift with an arrow: slide its row or column that way"],
     zoomies: ["Arrow keys: pick a square", "Space or Enter: pick a square, then another to join the pair (or part it)", "C: the next line colour", "Escape: let go"],
     crossstitch: ["Arrow keys: pick a square", "Space or Enter: stitch it, or take the stitch out", "X or .: a dot, for a square that stays empty", "Backspace: clear the square", "Shift with an arrow: carry what you put down along the row or column"],
     tango: ["Arrow keys: pick a square", "Space or Enter: tap it (one toy, then the other, then empty)"],
+    pounceup: ["Left and right (or tap): steer, or walk along a shelf", "Up, W or Space: pounce (unless Pounce by herself is on)", "P (or Space): pause"],
     pawlinko: ["Setting up: arrows move the next piece, Enter places it, R flips a perch, Space throws", "Left and right: aim (Shift for big steps)", "Down, Space or Enter: knock it off", "X: swap in the next thing", "Placing a perch: arrows move it, R flips it, Enter puts it there", "Winding a strand: arrows pick one, Enter winds it", "Escape: put a helper away"],
   };
   const keyboardish = () => matchMedia("(hover: hover) and (pointer: fine)").matches;
@@ -1167,15 +1377,18 @@ const G = (() => {
     openCard("Keyboard Shortcuts", "", [["Close", closeCard, true]], ul);
   }
   document.addEventListener("keydown", e => {
-    if (e.key !== "?" || e.ctrlKey || e.metaKey || e.altKey || !CURRENT || !KEYS[CURRENT] || document.querySelector(".spot") || $("overlay").classList.contains("show")) return;
+    if (e.key !== "?" || e.ctrlKey || e.metaKey || e.altKey || !CURRENT || !KEYS[CURRENT] || $("overlay").classList.contains("show")) return;
     if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) || e.target.isContentEditable) return;
+    // during a walkthrough (whose last step says "Press ? for the keys"), ? ends it, as Skip does, and opens them
+    if (document.querySelector(".spot")) { if (!endSpot) return; endSpot(); }
     e.preventDefault(); keysCard();
   });
 
+  let endSpot = null;   // the walkthrough that's up: how to end it, as Skip does
   function spotlight(o) {
     const tip = o.finish === false;
-    // on a computer, the whole walkthrough ends by pointing to the keys
-    if (!tip && CURRENT && KEYS[CURRENT] && keyboardish() && !o.steps.some(st => st.keysStep))
+    // on a computer, the whole walkthrough ends by pointing to the keys (not a short lesson on one new thing, o.lesson)
+    if (!tip && !o.lesson && CURRENT && KEYS[CURRENT] && keyboardish() && !o.steps.some(st => st.keysStep))
       o = {...o, steps: [...o.steps, {say: "On a keyboard? Press ? for the keys", keysStep: true, els: [o.grid]}]};
     if (!tip) {   // switches are taught when they're turned on, never in the walkthrough
       const sw = o.steps.filter(isSwitchStep);
@@ -1312,7 +1525,8 @@ const G = (() => {
       // "Tap to go on" only on the first step: after that the dots say there's more, and the fewer words the better
       tap.textContent = st.try && !st.tried ? (st.try.tip || "") : k === 0 && steps().length > 1 ? "Tap to go on" : "";
       if (!tap.textContent) tap.hidden = true;
-      say.append(bw, tap); layer.append(say);
+      const card = document.createElement("span"); card.className = "card"; card.append(bw, tap);
+      say.append(card); layer.append(say);
       // The words go over the board where they cover the least of the lit squares (and, among those,
       // nearest the middle), so they never sit on what the step is pointing at if they can help it.
       const sh = say.offsetHeight, l = say.offsetLeft, r = l + say.offsetWidth;
@@ -1371,10 +1585,11 @@ const G = (() => {
       clearInterval(ticker); removeEventListener("resize", redraw); removeEventListener("scroll", redraw); document.removeEventListener("pointerup", onUp, true); document.removeEventListener("keyup", onUp, true);
       for (const ev of ["pointerdown", "click"]) window.removeEventListener(ev, guard, true);
       for (const f of new Set(o.steps.map(st => st.restore).filter(Boolean))) f();   // Your turn steps: the board as it was
-      holes = []; layer.remove(); if (o.done) o.done();
+      holes = []; layer.remove(); if (endSpot === end) endSpot = null; if (o.done) o.done();
     }
     // Skip (or Escape): the walkthrough ends here, and counts as seen; How to play has it all again.
     function end() { const was = o.steps[k]; if (was && was.leave) was.leave(); k = o.steps.length; close(); }
+    endSpot = end;
     // after a tap on an interactive step's squares: once it's done, say so in green and go on
     // (checked for a moment after each tap, as a move can finish after a short slide or animation)
     function tried(n = 0) {
@@ -1455,6 +1670,12 @@ const G = (() => {
     opt.innerHTML = '<label class="toggle"><input type="checkbox"><span class="sw"></span><span class="swName"></span></label>';
     const box = opt.querySelector("input"); box.id = o.id;
     emoText(opt.querySelector(".swName"), o.label);
+    // a switch that can cost the gold paw (paw in SETTINGS) is drawn as the games draw such tools: its name in brick
+    // red with a small crossed-out paw (the owner, 2026-11-12), as on the Settings page
+    if ((SETTINGS[CURRENT || SLUG] || []).some(e => e.key === o.key && e.paw)) {
+      opt.classList.add("costsPaw"); const m = document.createElement("span"); m.className = "pawMark"; m.title = "Costs the gold paw";
+      m.setAttribute("aria-hidden", "true"); opt.querySelector(".swName").append(m);
+    }
     // the line shows only on a switch that can cost a life or the gold paw (o.warn); on the rest it's read out, not shown
     if (o.line) {
       const s = document.createElement("span"); s.className = o.warn ? "hint" : "hint quiet"; s.id = o.id + "Line"; emoText(s, o.line);
@@ -1490,12 +1711,296 @@ const G = (() => {
     return () => d[slug] ? 1.5 : 1;
   }
 
+  /* ---------- sound ---------- */
+  // Sound effects (the owner's call, 2026-11-14: on by default; turned off on the Settings page, for every game at once
+  // or game by game, or with Sound in a game's own ☰ Menu). Every sound is made as it plays (Web Audio: oscillators,
+  // noise and filters), each the owner's pick from a listening page of candidates. A game can also play a recording
+  // (G.sound.clip, kept for the Moonpie games), loaded once the sound has started. A browser plays nothing
+  // until the first tap or key, so the sound starts then. The page tells Safari it's background sound ("ambient"), so it
+  // plays alongside someone's music and an iPhone's silent switch mutes it.
+  // G.sound.play(name, o) plays one: the shared ones below (tap, put, wrong, hint, win, gold, lose; the win, gold-paw and
+  // lose cards and the hint play theirs themselves) or a game's own, added with G.sound.define({name: (t, o) => ...})
+  // from the pieces in G.sound.kit. Kept on this device: catdoku.sound.v2, {slug: false} for a game turned off.
+  const SOUND = "catdoku.sound.v2";
+  const soundOn = slug => load(SOUND)[slug] !== false;
+  const sound = (() => {
+    let ctx = null, master = null, noiseBuf = null;
+    const clips = {}, wanted = {};   // recordings: name -> decoded sound, and name -> file (from the site's top folder)
+    const VOLUME = .47;   // as loud as the listening page was when the owner picked (59 of 100)
+    // How long each note, thump or swoosh lasts, as a share of how long it was when the owner picked it: they went on
+    // too long (the owner, 2026-11-14). A sound's notes still start when they did; each one is shorter (its attack,
+    // hold, glide and fade together). The shortest, 0.06 s or less (clicks, ticks), stay as they are.
+    const LENGTH = .55;
+    // gV, gL: the sound playing now's own volume and length, when the owner set one on its row (ADJ, below)
+    let gV = 1, gL = 1;
+    const shorter = dur => dur <= .06 ? 1 : (.06 + (dur - .06) * LENGTH * gL) / dur;
+    const squeeze = (r, fs) => fs && fs.map(([x, v]) => [x * r, v]);
+    const subs = [], Z = .0001;
+    const here = () => CURRENT || SLUG;
+    const on = () => soundOn(here());
+    let stuck = null, remade = 0;
+    function context() {
+      if (!ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null;
+        try { if (navigator.audioSession) navigator.audioSession.type = "ambient"; } catch (e) {}
+        try { ctx = new AC(); } catch (e) { return null; }
+        const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -12; comp.knee.value = 8; comp.ratio.value = 4;
+        master = ctx.createGain(); master.gain.value = VOLUME; master.connect(comp); comp.connect(ctx.destination);
+        noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+        const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+        for (const name in wanted) if (!clips[name]) fetchClip(name);   // (a recording already in works in any context)
+      }
+      if (ctx.state !== "running" && !document.hidden) {
+        ctx.resume().catch(() => {});
+        // An iPhone can leave the sound stuck after a call, Siri or another app's sound ("interrupted", or suspended
+        // for good), and then it stays silent whatever's tapped (Twirl's feedback, 2026-11-16). If a tap hasn't
+        // got it going within a moment, start afresh (no more than once in 5 seconds).
+        if (!stuck) stuck = setTimeout(() => {
+          stuck = null;
+          if (!ctx || ctx.state === "running" || document.hidden || !on() || Date.now() - remade < 5000) return;
+          remade = Date.now(); const old = ctx; ctx = null; try { old.close(); } catch (e) {}
+          context();
+        }, 600);
+      }
+      return ctx;
+    }
+    // the first tap or key (and every one after, in case the phone suspended it) starts the sound, if it's on
+    const wake = () => { if (on()) context(); };
+    addEventListener("pointerdown", wake, true); addEventListener("keydown", wake, true); addEventListener("touchend", wake, true);
+    document.addEventListener("visibilitychange", () => { if (!ctx) return; if (document.hidden) ctx.suspend().catch(() => {}); else if (on()) ctx.resume().catch(() => {}); });
+    addEventListener("pageshow", e => { if (e.persisted && ctx && on()) ctx.resume().catch(() => {}); });   // back to a page kept in memory
+
+    /* the pieces every sound is made of (t: when, in the context's seconds) */
+    const rnd = (a, b) => a + Math.random() * (b - a), pick = a => a[Math.floor(Math.random() * a.length)];
+    function path(param, t, fs) { param.setValueAtTime(fs[0][1], t + fs[0][0]); for (let i = 1; i < fs.length; i++) param.exponentialRampToValueAtTime(fs[i][1], t + fs[i][0]); }
+    function env(param, t, a, peak, dur, hold = 0) {
+      peak *= gV;
+      param.setValueAtTime(Z, t); param.exponentialRampToValueAtTime(Math.max(peak, Z * 2), t + a);
+      if (hold) param.setValueAtTime(Math.max(peak, Z * 2), t + a + hold);
+      param.exponentialRampToValueAtTime(Z, t + Math.max(dur, a + hold + .01));
+    }
+    function vibrato(param, t, dur, rate, depth, depthEnd) {
+      const l = ctx.createOscillator(), lg = ctx.createGain(); l.frequency.value = rate;
+      lg.gain.setValueAtTime(depth, t); if (depthEnd !== undefined) lg.gain.linearRampToValueAtTime(depthEnd, t + dur);
+      l.connect(lg); lg.connect(param); l.start(t); l.stop(t + dur + .05);
+    }
+    function filt(type, f, q = 1, to = master) { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; b.connect(to); return b; }
+    function tone({f, fs, type = "sine", t, dur, vol = .3, a = .005, hold = 0, out = master, vib}) {
+      const r = shorter(dur); dur *= r; a *= r; hold *= r; fs = squeeze(r, fs);
+      const o = ctx.createOscillator(), g = ctx.createGain(); o.type = type;
+      if (fs) path(o.frequency, t, fs); else o.frequency.setValueAtTime(f, t);
+      if (vib) vibrato(o.frequency, t, dur, vib[0], vib[1], vib[2]);
+      env(g.gain, t, a, vol, dur, hold); o.connect(g); g.connect(out); o.start(t); o.stop(t + dur + .05);
+    }
+    function noise({t, dur, vol = .3, a = .003, hold = 0, type = "bandpass", f = 1000, fs, q = 1, out = master, trem}) {
+      const r = shorter(dur); dur *= r; a *= r; hold *= r; fs = squeeze(r, fs);
+      const s = ctx.createBufferSource(), b = ctx.createBiquadFilter(), g = ctx.createGain();
+      s.buffer = noiseBuf; b.type = type; b.Q.value = q;
+      if (fs) path(b.frequency, t, fs); else b.frequency.setValueAtTime(f, t);
+      env(g.gain, t, a, vol, dur, hold); s.connect(b); b.connect(g);
+      if (trem) { const tg = ctx.createGain(); tg.gain.value = 1 - trem[1]; vibrato(tg.gain, t, dur, trem[0], trem[1], trem[2]); g.connect(tg); tg.connect(out); }   // a flutter: [rate, depth, depth at the end]
+      else g.connect(out);
+      s.start(t, rnd(0, 1.5)); s.stop(t + dur + .05);
+    }
+    // something struck: a few partials, each dying away at its own rate, and a tick of noise for the hit
+    function modal({t, parts, vol = .3, click = 2500, clickVol = .25}) {
+      for (const [f, amp, decay] of parts) tone({f, t, dur: decay, vol: vol * amp, a: .002});
+      if (click) noise({t, dur: .012, vol: clickVol * vol * 2, f: click, q: 1.2, a: .001});
+    }
+    function bell({f, t, dur = 1.2, vol = .15, ratio = 3.5, index = 2}) {
+      dur *= shorter(dur);
+      const c = ctx.createOscillator(), m = ctx.createOscillator(), mg = ctx.createGain(), g = ctx.createGain();
+      c.frequency.value = f; m.frequency.value = f * ratio;
+      mg.gain.setValueAtTime(f * index, t); mg.gain.exponentialRampToValueAtTime(f * .02, t + dur);
+      m.connect(mg); mg.connect(c.frequency); env(g.gain, t, .003, vol, dur); c.connect(g); g.connect(master);
+      c.start(t); m.start(t); c.stop(t + dur + .05); m.stop(t + dur + .05);
+    }
+    function mallet({f, t, dur = .5, vol = .2}) {   // a marimba's note
+      tone({f, t, dur, vol, a: .003}); tone({f: f * 3.93, t, dur: dur * .22, vol: vol * .3, a: .002});
+      noise({t, dur: .01, vol: vol * .3, f: f * 6, q: 2, a: .001});
+    }
+    function musicBox({f, t, dur = 1, vol = .14}) {
+      tone({f, t, dur, vol, a: .002}); tone({f: f * 2, t, dur: dur * .5, vol: vol * .35, a: .002}); tone({f: f * 5.04, t, dur: .12, vol: vol * .2, a: .001});
+    }
+    // a cat-ish voice: a buzzy tone through two vowel filters, with a rolled "rr" (trem: [rate, depth])
+    function voice({t, fs, dur, vol = .5, formants = [[700, 5], [1250, 6]], trem, type = "sawtooth", a = .02}) {
+      const r = shorter(dur); dur *= r; a *= r; fs = squeeze(r, fs);
+      const o = ctx.createOscillator(), sum = ctx.createGain(), g = ctx.createGain(); o.type = type; path(o.frequency, t, fs);
+      // each vowel filter [f, q], or [f, q, f1] gliding from f to f1 (a meow's "mi-ow")
+      for (const [f, q, f1] of formants) { const b = ctx.createBiquadFilter(); b.type = "bandpass"; b.frequency.setValueAtTime(f, t); if (f1) b.frequency.exponentialRampToValueAtTime(f1, t + dur); b.Q.value = q; o.connect(b); b.connect(sum); }
+      env(g.gain, t, a, vol, dur);
+      if (trem) { const tg = ctx.createGain(); tg.gain.value = 1 - trem[1]; vibrato(tg.gain, t, dur, trem[0], trem[1]); sum.connect(tg); tg.connect(g); }
+      else sum.connect(g);
+      g.connect(master); o.start(t); o.stop(t + dur + .05);
+    }
+    const whoosh = (t, f0, f1, dur, vol) => noise({t, dur, vol, a: dur * .35, fs: [[0, f0], [dur, f1]], q: 1.3});
+    const thump = (t, vol = .45, f = 130) => { tone({fs: [[0, f], [.08, f * .55]], t, dur: .1, vol}); noise({t, dur: .06, vol: vol * .6, type: "lowpass", f: 500}); };
+    const tick = (t, vol = .2, f = 3000) => noise({t, dur: .015, vol, f, q: 3, a: .001});
+    const boing = (t, low = 140, high = 420, dur = .55, vol = .3) => tone({fs: [[0, low], [.05, high], [dur, high * .9]], t, dur, vol, vib: [11, high * .2, 0]});
+    // a voice more alive (the owner's call for a better chirp, meow and yawn, 2026-11-14): the pitch follows a path with a
+    // little wobble, each vowel filter its own path ({fs, q, g}), breath (noise through the same filters) mixes in, and a
+    // rolled "rr" (trem [rate, depth, depth at the end]) can fade as the sound opens up
+    function voice2({t, fs, dur, vol = .5, formants, breath = 0, trem, vib, a = .03}) {
+      const r = shorter(dur); dur *= r; a *= r; fs = squeeze(r, fs);
+      const o = ctx.createOscillator(), sum = ctx.createGain(), g = ctx.createGain(); o.type = "sawtooth"; path(o.frequency, t, fs);
+      if (vib) vibrato(o.frequency, t, dur, vib[0], vib[1]);
+      const src = [o];
+      if (breath) { const s = ctx.createBufferSource(), bg = ctx.createGain(); s.buffer = noiseBuf; bg.gain.value = breath * 6; s.connect(bg); src.push(bg); s.start(t, rnd(0, 1.5)); s.stop(t + dur + .05); }
+      for (const fm of formants) {
+        const b = ctx.createBiquadFilter(), fg = ctx.createGain(); b.type = "bandpass"; b.Q.value = fm.q; fg.gain.value = fm.g ?? 1;
+        path(b.frequency, t, squeeze(r, fm.fs)); for (const x of src) x.connect(b); b.connect(fg); fg.connect(sum);
+      }
+      env(g.gain, t, a, vol, dur);
+      if (trem) { const tg = ctx.createGain(); tg.gain.value = 1 - trem[1]; vibrato(tg.gain, t, dur, trem[0], trem[1], trem[2]); sum.connect(tg); tg.connect(g); }
+      else sum.connect(g);
+      g.connect(master); o.start(t); o.stop(t + dur + .05);
+    }
+    // the better sounds of 2026-11-14, as on the listening page: a cat's chirp ("brrp"), a hiss, water (a bubble is a little
+    // sine that rises as it closes; drops, splashes, pours and dunks are made of them), a meow, a big yawn (low < 1 for a
+    // person's), scratching on sisal, a fabric rustle and a crinkle
+    const chirp = (t, vol = .45, up = 1) => voice2({t, dur: .22, vol, a: .012, fs: [[0, 520 * up], [.08, 800 * up], [.22, 640 * up]],
+      formants: [{fs: [[0, 650], [.22, 950]], q: 4}, {fs: [[0, 1500], [.22, 1950]], q: 6, g: .7}], trem: [34, .75, .1], breath: .06});
+    const hiss = (t, dur = .6, vol = .38) => {
+      noise({t, dur: .05, vol: vol * 1.2, type: "highpass", f: 3500, a: .002});
+      noise({t: t + .01, dur, vol, a: .02, hold: dur * .45, f: 4200, q: .8, trem: [13, .25]});
+      noise({t: t + .01, dur, vol: vol * .5, a: .02, hold: dur * .45, type: "highpass", f: 6500, trem: [17, .2]});
+      noise({t: t + .01, dur: dur * .6, vol: vol * .25, a: .02, f: 1400, q: 1.5}); };
+    const bubble = (t, f, vol = .12) => tone({fs: [[0, f], [.03, f * 2.2]], t, dur: .045, vol, a: .002});
+    const plip = (t, vol = .22) => { bubble(t, 650, vol); bubble(t + .06, 1300, vol * .3); };
+    const splash = (t, size = 1) => {
+      noise({t, dur: .32 * size, vol: .35 * size, type: "lowpass", fs: [[0, 3500], [.32 * size, 800]], a: .004});
+      noise({t, dur: .16, vol: .12 * size, type: "highpass", f: 3200, a: .003});
+      for (let i = 0; i < 10 * size; i++) bubble(t + rnd(.02, .45 * size), rnd(600, 1800), .1); };
+    const pour = (t, dur = .9) => { noise({t, dur, vol: .2, type: "lowpass", f: 900, a: .08, hold: dur * .5, trem: [8, .3]}); for (let i = 0; i < 28; i++) bubble(t + rnd(.03, dur * .9), rnd(500, 1500), .07); };
+    const dunk = (t, size = 1) => {
+      tone({fs: [[0, 180], [.12, 420]], t, dur: .14, vol: .3 * size, a: .005});
+      noise({t, dur: .18, vol: .2 * size, type: "lowpass", fs: [[0, 1600], [.18, 500]], a: .004});
+      for (let i = 0; i < 6; i++) bubble(t + rnd(.06, .35), rnd(500, 1300), .08); };
+    const meow = (t, vol = .5) => voice2({t, dur: .62, vol, a: .05, fs: [[0, 420], [.1, 620], [.3, 700], [.62, 430]], vib: [6, 10],
+      formants: [{fs: [[0, 350], [.15, 800], [.4, 900], [.62, 450]], q: 5}, {fs: [[0, 1900], [.15, 1700], [.4, 1300], [.62, 900]], q: 7}, {fs: [[0, 3000], [.62, 2600]], q: 8, g: .4}], breath: .12});
+    const yawn = (t, vol = .45, low = 1) => voice2({t, dur: 1.2, vol, a: .12, fs: [[0, 560 * low], [.25, 640 * low], [.8, 330 * low], [1.2, 250 * low]], vib: [5, 8],
+      formants: [{fs: [[0, 500], [.35, 950], [.9, 700], [1.2, 400]], q: 4}, {fs: [[0, 1600], [.35, 1350], [1.2, 900]], q: 5}], breath: .25});
+    const scratching = t => { for (let i = 0; i < 7; i++) { const at = t + i * .16 + rnd(0, .03), up = i % 2;
+      noise({t: at, dur: .12, vol: .3, a: .01, fs: [[0, up ? 1400 : 2600], [.12, up ? 2600 : 1300]], q: 1.2, trem: [70 + rnd(0, 30), .7]});
+      noise({t: at, dur: .1, vol: .08, type: "lowpass", f: 500}); } };
+    const rustle = t => { for (let i = 0; i < 3; i++) { const at = t + i * .035 + rnd(0, .015);
+      noise({t: at, dur: .06, vol: .12, a: .012, fs: [[0, rnd(2200, 3200)], [.06, rnd(1400, 2000)]], q: .9, trem: [55 + rnd(0, 25), .55]}); } };
+    const crinkle = (t, n = 9, span = .14) => { for (let i = 0; i < n; i++) noise({t: t + rnd(0, span), dur: .008, vol: rnd(.06, .16), type: "highpass", f: rnd(3500, 6500), a: .001}); };
+    const purr = t => noise({t, dur: 1.2, vol: .3, type: "lowpass", f: 220, a: .15, hold: .6, trem: [26, .8]});   // a soft purr (made, not Moonpie's)
+    const slideDown = (t, f0 = 1100, f1 = 330, dur = .65, vol = .18) => tone({fs: [[0, f0], [dur, f1]], t, dur, vol, a: .03, hold: dur * .6, vib: [6, 14]});
+    // recordings: G.sound.clip(name, file) to have one ready (fetched once the sound starts), kit.clip(name, t, vol) to play
+    // it as it is (not shortened); kit.clip says false if it isn't there yet
+    function fetchClip(name) {
+      fetch(HOME + wanted[name]).then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status))
+        .then(b => new Promise((ok, bad) => ctx.decodeAudioData(b, ok, bad))).then(buf => { clips[name] = buf; }).catch(() => {});
+    }
+    function clip(name, t, vol = 1) {
+      const buf = clips[name]; if (!buf) return false;
+      const s = ctx.createBufferSource(), g = ctx.createGain(); s.buffer = buf; g.gain.value = vol * gV; s.connect(g); g.connect(master); s.start(t); return true;
+    }
+    // rec(name, vol): a recording from sounds/ (the owner's Keeps from Clip Bench, CC0 from Freesound: ARTWORK.md), as a
+    // sound; it's fetched once sound starts, and the first play before it's in is silent
+    const want = name => { if (wanted[name]) return; wanted[name] = `sounds/${name}.mp3`; if (ctx) fetchClip(name); };
+    const rec = (name, vol = 1) => { want(name); return later(name, vol); };
+    // later(): a shared sound that's a recording, fetched only in a game that uses it (G.sound.get, or play by its name)
+    const later = (name, vol = 1) => Object.assign((t, o = {}) => { want(name); clip(name, t, vol * (o.k ?? 1)); }, {need: name});
+    const PENTA = [523, 587, 659, 784, 880, 1047, 1175, 1319, 1568, 1760, 2093, 2349, 2637, 3136];
+    const kit = {rec, clip, tone, noise, modal, bell, mallet, musicBox, voice, voice2, whoosh, thump, tick, boing, chirp, hiss, bubble, plip, splash, pour, dunk, meow, yawn, scratching, rustle, crinkle, purr, slideDown, filt, vibrato, rnd, pick, PENTA};
+
+    // the moments every game shares (the owner's picks)
+    const SOUNDS = {
+      tap: t => modal({t, parts: [[880, 1, .05], [2200, .4, .03]], vol: .3, click: 3000}),   // wood block
+      put: t => thump(t, .4, 200),   // felt thump
+      wrong: t => tone({f: 110, type: "square", t, dur: .2, vol: .12, out: filt("lowpass", 650)}),   // a low buzz
+      hint: t => [1319, 1568, 1976].forEach((f, i) => bell({f, t: t + i * .06, dur: .45, vol: .08, ratio: 2.01, index: .6})),   // sparkle
+      win: t => [1047, 1319, 1568, 2093].forEach((f, i) => musicBox({f, t: t + i * .13, dur: i === 3 ? 1.6 : .8})),   // music box (the marimba ta-da until 2026-11-14)
+      gold: t => [523, 784, 1047, 1319].forEach((f, i) => bell({f, t: t + i * .02, dur: 2.6, vol: .08, ratio: 3.5, index: 1.6})),   // big bells
+      lose: t => { mallet({f: 659, t, dur: .4, vol: .18}); mallet({f: 523, t: t + .22, dur: .7, vol: .18}); },   // oh well
+      // the logic games' moments (the owner's picks for Cat Logic, 2026-11-14), for any game that has them: putting
+      // something in is put (above), a rule broken (Auto check's red) is wrong
+      mark: t => { noise({t, dur: .02, vol: .12, type: "highpass", f: 4000}); noise({t: t + .01, dur: .03, vol: .08, f: 2500, q: 2}); },   // a pencil tick: a note, a dot, a paw
+      erase: t => tone({fs: [[0, 900], [.05, 500]], t, dur: .05, vol: .15}),   // a soft pop out
+      life: t => { tone({f: 330, type: "triangle", t, dur: .14, vol: .25}); tone({f: 247, type: "triangle", t: t + .13, dur: .24, vol: .25}); },   // a soft bonk: a life lost (G.lives)
+      undo: t => tone({fs: [[0, 900], [.08, 500]], type: "triangle", t, dur: .08, vol: .12}),   // a rewind blip (G.history)
+      bookmark: t => noise({t, dur: .08, vol: .2, fs: [[0, 2000], [.08, 3500]], q: .8, a: .01}),   // a page flick (G.guesser)
+      back: t => whoosh(t, 2400, 600, .3, .2),   // a rewind swoosh: Return to Bookmark
+      line: t => mallet({f: pick(PENTA.slice(5, 10)), t, dur: .35, vol: .1}),   // a soft note: a row, column or region done
+      // Objects and actions (the owner's picks, 2026-11-14): one thing doing one thing sounds the same in every game; a
+      // game points its own moment at one of these (G.sound.get). o.k scales the loudness (Pawlinko's harder hits).
+      spring: (t, o = {}) => boing(t, 140, 420, .55, .3 * (o.k ?? 1)),   // something bounces off a spring: a cartoon boing
+      springSet: t => boing(t, 300, 520, .3, .16),   // a spring put down: a little sproing
+      yarnLand: (t, o = {}) => thump(t, .3 * (o.k ?? 1), 130),   // yarn lands or bumps: a soft thump
+      yarnGrow: (t, o = {}) => noise({t, dur: .04, vol: .14 * (o.k ?? 1), f: 600, q: 1, a: .005}),   // a strand of yarn grows: a yarn tick
+      yarnWind: later("fabric-grab-07"),   // yarn wound back: a fabric grab (a recording)
+      pompomLand: (t, o = {}) => noise({t, dur: .08, vol: .4 * (o.k ?? 1), f: 350, q: 1, a: .01}),   // a pompom or fluffball lands: a fluffy thup
+      glassKnock: (t, o = {}) => modal({t, parts: [[1500, 1, .15], [2600, .4, .08]], vol: .14 * (o.k ?? 1)}),   // dull glass
+      glassOver: later("splash-01"),   // a glass of water knocked over, a spill: a splash (a recording)
+      mugKnock: (t, o = {}) => { modal({t, parts: [[260, 1, .1], [700, .5, .06], [1800, .2, .03]], vol: .32 * (o.k ?? 1)}); thump(t, .25 * (o.k ?? 1), 100); },   // a heavy clunk
+      tape: () => {},   // a paw or yarn on tape: silent since 2026-11-17 (the owner hated the sticky thhp) until a better one's found
+      lemon: later("hiss-2", .15),   // a lemon: a hiss (a recording, at 15%: every hiss is this one, the owner, 2026-11-15)
+      candle: t => noise({t, dur: .4, vol: .4, type: "lowpass", fs: [[0, 400], [.25, 1500], [.4, 800]], a: .12}),   // too close to a candle: a fwoomp
+      catnip: t => tone({f: 600, t, dur: 1.0, vol: .12, a: .1, hold: .5, vib: [7, 80]}),   // rolling in catnip: a wobbly slide
+      bell: later("toy-jingle-08", .6),   // a bell knocked: a toy jingle (a recording)
+      fish: t => { tone({f: 1319, type: "triangle", t, dur: .08, vol: .15}); tone({f: 1976, type: "triangle", t: t + .07, dur: .14, vol: .15}); },   // a fish treat: two notes up
+      box: (t, o = {}) => { const p = o.p ?? 1; noise({t, dur: .07, vol: .35, f: 420 * p, q: 1, a: .005}); thump(t, .12, 140 * p); },   // a cardboard box opened: a flap
+      mirror: t => modal({t, parts: [[2600, 1, .08], [5200, .3, .05]], vol: .12, click: 0}),   // a mirror tipped: a tink
+      magnet: t => { tick(t, .3, 1800); tone({fs: [[0, 140], [.1, 70]], t, dur: .12, vol: .1}); noise({t, dur: .08, vol: .05, type: "lowpass", f: 400}); },   // a magnet put on: a click
+      catWakes: later("yawn-snore"),   // a cat wakes up: a yawn and a snore (a recording; the made big yawn is out: the owner hates it)
+      catSettles: t => purr(t),   // a cat settles in to nap: a soft purr
+      catCheers: later("chirp-purr-02"),   // a cat cheers: Chirp-purr 2 (a recording; Chirp-purr 4 until the owner swapped it, 2026-11-15)
+      catFound: later("chirp-06"),   // a cat found or freed: a chirp (a recording)
+      catRuns: t => { for (let i = 0; i < 10; i++) thump(t + i * .07, .1, 170 + (i % 2) * 25); },   // a pitter-patter run
+      catPounce: t => tone({fs: [[0, 260], [.14, 620]], t, dur: .14, vol: .2, a: .01}),   // a soft boing
+      catLands: t => thump(t, .4, 140),   // soft paws
+      shake: t => { for (let i = 0; i < 4; i++) whoosh(t + i * .1, i % 2 ? 2200 : 1200, i % 2 ? 1200 : 2200, .08, .14); },   // a swish back and forth (90%, twice as long: ADJ)
+      wipe: t => noise({t, dur: .5, vol: .3, fs: [[0, 800], [.25, 2400], [.5, 900]], q: 3, a: .05, hold: .25}),   // squeegee
+      // the word games' moments (Cat Spells and Curious Cat, 2026-11-14)
+      key: t => modal({t, parts: [[1800, 1, .03], [4000, .3, .02]], vol: .2, click: 3500}),   // a letter typed or changed: a key tap
+      word: t => [1047, 1319, 1568].forEach((f, i) => mallet({f, t: t + i * .07, dur: .3, vol: .12})),   // a word found: a run of notes
+      chime: t => bell({f: 1568, t, dur: .5, vol: .07, ratio: 2.01, index: .6}),   // a piece in its place: a soft chime
+      swish: t => whoosh(t, 1200, 2200, .1, .15),   // a soft swish
+    };
+    // the owner's own volume and length for a sound, from its row on the listening page: [volume, length]
+    const ADJ = {catSettles: [2, 1.3], shake: [.9, 2]};
+    function play(name, o = {}, delay = 0) {
+      const f = SOUNDS[name]; if (f && f.need) want(f.need);
+      if (!f || !on() || document.hidden || !ctx) return;
+      if (ctx.state !== "running") {   // still waking (the tap that wakes it plays its sound once it's up, if that's soon)
+        const asked = Date.now(), c = ctx;
+        c.resume().then(() => { if (c === ctx && c.state === "running" && Date.now() - asked < 400) play(name, o, delay); }).catch(() => {});
+        return;
+      }
+      const [v, l] = ADJ[name] || [1, 1]; gV = v; gL = l;
+      try { f(ctx.currentTime + .01 + delay, o); } catch (e) { console.error("sound", name, e); } finally { gV = 1; gL = 1; }
+    }
+    function set(v) {
+      const slug = here(), all = load(SOUND); if (v) delete all[slug]; else all[slug] = false; save(SOUND, all);
+      if (v) { context(); play("tap"); }
+      subs.forEach(f => f(v));
+    }
+    return {play, set, on, kit, context, define: map => Object.assign(SOUNDS, map), adjust: map => Object.assign(ADJ, map), get: name => SOUNDS[name] && (SOUNDS[name].need && want(SOUNDS[name].need), (t, o) => {   // a shared sound for a game's own name, with its own volume and length
+        const [v, l] = ADJ[name] || [1, 1], pv = gV, pl = gL; gV = pv * v; gL = pl * l;
+        try { SOUNDS[name](t, o); } finally { gV = pv; gL = pl; } }),
+      clip: (name, file) => { wanted[name] = file; if (ctx) fetchClip(name); },
+      out: () => master, onChange: f => subs.push(f), get ctx() { return ctx; }};
+  })();
+  // Sound in a game's own ☰ Menu (added after the page's own switches)
+  function soundSwitch() {
+    const d = {sound: sound.on()};
+    makeSwitch({id: "soundTgl", label: "Sound", line: "Sound effects (Settings turns them off for every game)", key: "sound", of: d,
+      save: () => sound.set(d.sound)});
+    sound.onChange(v => { d.sound = v; const b = $("soundTgl"); if (b) b.checked = v; });
+  }
+
   /* ---------- every game's settings, for the Settings page ---------- */
   // The Settings page (settings/) doesn't run the games' scripts, so this says where each game keeps each setting:
   // SETTINGS[slug] is a list of {key, name, line, def (its value when nothing's saved), row (one of ROWS, for a setting
   // the page's top rows set for every game at once), warn (it can cost a life or the gold paw, so changed on the page
   // mid-puzzle it waits for the next game), at ([storage key, field]; else the game's own store, field settings.key),
-  // opts ([value, name] for a choice of several), get/set (where games.js keeps it itself: Timer, Slower)}.
+  // inv (a row setting that's on when the row's on end isn't: dimming in the Reduce visual clutter row, where the
+  // other switches add things, so On turns them off and turns the dimming on),
+  // opts ([value, name] for a choice of several), and for the Settings page's grid: icon (its name there), words
+  // ([off, on]: what an on/off setting's button says either way), short (a shorter name, or {value: name} for opts), get/set (where games.js keeps it itself: Timer, Slower)}.
   const TIMERS = "catdoku.timers.v1", COMFORT = "catdoku.comfort.v2", PENDING = "catdoku.pending.v1";
   // Rows at the top of the page, three ways each: words[0] · By game · words[2]; on is the end that turns every switch on.
   // v1 (until build .23) had Decorations' Show all, and Auto check's and Auto Notes' Off, first: v2 turns those three round.
@@ -1508,51 +2013,59 @@ const G = (() => {
   } catch (e) {}
   const ROWS = [   // no line under a row: its name and three words say it all; On (or Show) comes first
     {id: "timers", name: "Timer", words: ["Show", "By game", "Hide"], on: 0},
-    {id: "speed", name: "Action game speed", words: ["Regular", "By game", "Slower"], on: 2},
+    {id: "speed", name: "Action game speed", words: ["Regular", "By game", "Slow"], on: 2},
     {id: "decor", name: "Reduce visual clutter", words: ["On", "By game", "Off"], on: 2},   // on: the games' own switches (Fabric patterns, Junk…) off
     {id: "check", name: "Auto check", words: ["On", "By game", "Off"], on: 0},
     {id: "notes", name: "Auto Notes", words: ["On", "By game", "Off"], on: 0},
+    {id: "sound", name: "Sound", words: ["On", "By game", "Off"], on: 0},
   ];
   const STORES = {catdoku: "catdoku.v1", atlas: "catdoku.catlas.v1"};
   const storeOf = slug => STORES[slug] || `catdoku.${slug}.v1`;
   const CHECK = ["autoCheck", "Auto check", "Rule breaks turn red as you play", true, {row: "check"}];
   const NOTES = ["autoNotes", "Auto Notes 🔢", "Every maybe filled in for you", false, {row: "notes"}];
-  const NUMBERS = line => ["numbers", "Numbers", line, false];
+  const NUMBERS = line => ["numbers", "Numbers", line, false, {icon: "digits", words: ["Hide numbers", "Show numbers"]}];
+  // paw: the setting can cost the gold paw (a life lost costs it too), so the Settings page draws it as the games draw such tools
+  const GRADE = what => ["autoGrade", "Auto grade", `A wrong ${what} turns red and costs a life`, false, {warn: true, paw: true, icon: "heart"}];
   const SET_LIST = {
-    catdoku: [["autoGrade", "Auto grade", "A wrong 🐱 turns red and costs a life", false, {warn: true}],
+    catdoku: [GRADE("🐱"),
       ["autoExclude", "Auto Notes 🐾", "🐾 go round each 🐱 for you", false, {row: "notes"}]],
-    yarn: [["shades", "Colors", "How alike the balls' colors are", "wide", {opts: [["wide", "Wide range"], ["medium", "Medium"], ["veryclose", "Very close"]]}],
-      NUMBERS("Each ball shows its place in the run")],
+    yarn: [NUMBERS("Each ball shows its place in the run")],
     patches: [["fabric", "Fabric patterns", "Each fabric has a pattern as well as a color", true, {row: "decor"}], CHECK],
     sunbeams: [CHECK], tango: [CHECK],
-    scratchthat: [CHECK, ["dotFirst", "Dot first", "A tap puts a dot down first, then a post", false]],
-    highperch: [CHECK, NOTES], opendoor: [NOTES], windowledges: [["sets", "Show sets", "The digits that can make each ledge's total", true], NOTES],
-    toydoku: [["autoGrade", "Auto grade", "A wrong toy turns red and costs a life", false, {warn: true}], CHECK, NUMBERS("Digits in place of toys"), NOTES],
+    scratchthat: [CHECK],
+    highperch: [CHECK, NOTES], opendoor: [NOTES], windowledges: [["sets", "Show sets", "The digits that can make each ledge's total", true, {icon: "sets"}], NOTES],
+    toydoku: [GRADE("toy"), CHECK, ["numbers", "Numbers", "Digits in place of toys", false, {icon: "digits", words: ["Show toys", "Show numbers"]}], NOTES],
     junkdrawer: [["junk", "Junk", "Batteries, keys and coins in the drawer", true, {row: "decor"}],
-      ["autoNotes", "Dim used-up magnets", "Magnets no word left to find needs fade", false, {row: "notes"}]],
+      ["autoNotes", "Dim used-up magnets", "Magnets no word left to find needs fade", false, {row: "decor", inv: true}]],
     blanket: [["autoCheck", "Auto check", "Slots that don't fit your lumps turn red", true, {row: "check"}],
-      ["autoNotes", "Auto Notes 🔢", "A dot on every square the feathers prove has no cat; costs the gold paw", false, {row: "notes", warn: true}]],
-    magnets: [["autoAudit", "Auto-Audit", "Every letter turns olive or coral as it goes up; costs the gold paw", false, {warn: true}]],
+      ["autoNotes", "Auto Notes 🔢", "A dot on every square the feathers prove has no cat; costs the gold paw", false, {row: "notes", warn: true, paw: true}]],
+    crossstitch: [CHECK],
+    magnets: [["autoAudit", "Auto grade", "A wrong letter turns red and costs a life", false, {warn: true, paw: true, icon: "heart"}]],   // (named Auto-Audit until 2026-11)
     shelflife: [["shelf", "Shelf", "The pots stand on a shelf", true, {row: "decor"}]],
     catpile: [["cats", "Cats", "Cats nap on the blanket", true, {row: "decor", at: ["catdoku.catpile.prefs.v1", "cats"]}],
-      ["turns", "Turning", "Toys can be turned as well as moved", false, {at: ["catdoku.catpile.prefs.v1", "turns"]}]],
+      ["turns", "Turning", "Toys can be turned as well as moved; a turn costs the gold paw", false, {warn: true, paw: true, short: "Rotation OK", icon: "rotate", at: ["catdoku.catpile.prefs.v1", "turns"]}]],
     bedhog: [["cats", "Cats", "Cats nap on the bed", true, {row: "decor"}]],
-    catshuffle: [NUMBERS("Each piece shows where it goes")], windup: [NUMBERS("Each toy shows a number too")],
-    pickpile: [["dim", "Dim stuck blocks", "Blocks that can't come off yet are dimmed", true]],
-    toebeans: [["rev", "Reverse", "Count back down from the total to the start", false]],
-    twirl: [["twisty", "Twisty ribbons", "Off, every ribbon is drawn flat", true, {at: ["catdoku.twirl.prefs.v1", "twisty"]}]],
-    atlas: [["style", "Answer", "How you answer", "list", {opts: [["pick", "Pick from 4 names"], ["list", "Type, with a list to choose from"], ["type", "Type it, no help"]]}]],
-    knitpick: [["mode", "Words", "Which words are hidden", "themes", {opts: [["themes", "Cat themes"], ["everyday", "Everyday words"]]}]],
+    catshuffle: [NUMBERS("Each piece shows where it goes")], windup: [NUMBERS("Each toy shows a number too")], movingday: [NUMBERS("Each thing shows its step")],
+    pickpile: [["dim", "Dim stuck blocks", "Blocks that can't come off yet are dimmed", true, {row: "decor", inv: true}]],
+    tunnelrun: [["tracks", "Tracks", "Rugs where whole rows and columns slide", false, {icon: "swap", words: ["Turning rugs", "Sliding tracks"]}]],
+    toebeans: [["rev", "Reverse", "Count back down from the total to the start", false, {icon: "swap", words: ["Match the Paw", "Paw = 0"]}]],
+    twirl: [["twisty", "Twisty ribbons", "Off, every ribbon is drawn flat", true, {row: "decor", at: ["catdoku.twirl.prefs.v1", "twisty"]}],
+      ["grid", "Grid", "Faint lines mark out the mat's squares", false, {at: ["catdoku.twirl.prefs.v1", "grid"]}]],
+    pounceup: [["autoPounce", "Pounce by herself", "Rayla pounces again each time she lands, without waiting for a tap", false]],
+    atlas: [["style", "Answer", "How you answer", "list", {icon: "chat", opts: [["pick", "Pick from 4 names"], ["list", "Type, with a list to choose from"], ["type", "Type it, no help"]],
+      short: {pick: "4 Choices", list: "Full List", type: "Just Type"}}]],
   };
-  const SLOWS = ["birdwatch", "tailchase", "windup", "lmnopom"], UNTIMED = ["keyboardcat"];
+  const SLOWS = ["birdwatch", "tailchase", "windup", "lmnopom", "pounceup"];
   const timerHidden = slug => { const t = load(TIMERS)[slug]; return t === undefined ? !!load(PREFS).hideTimer : !!t; };
   const SETTINGS = {};
   for (const [, slug] of GAMES) {
     const list = (SET_LIST[slug] || []).map(([key, name, line, def, more]) => Object.assign({slug, key, name, line, def}, more));
     if (SLOWS.includes(slug)) list.unshift({slug, key: "slower", name: "Slower", line: "Everything moves at two-thirds speed", def: false, row: "speed",
       get: () => !!load(SLOWER)[slug], set: v => { const all = load(SLOWER); all[slug] = v; save(SLOWER, all); }});
-    if (!UNTIMED.includes(slug)) list.unshift({slug, key: "timer", name: "Timer", line: "", def: true, row: "timers",
+    list.unshift({slug, key: "timer", name: "Timer", line: "", def: true, row: "timers",
       get: () => !timerHidden(slug), set: v => { const all = load(TIMERS); all[slug] = !v; save(TIMERS, all); }});
+    list.push({slug, key: "sound", name: "Sound", line: "Sound effects", def: true, row: "sound",
+      get: () => soundOn(slug), set: v => { const all = load(SOUND); if (v) delete all[slug]; else all[slug] = false; save(SOUND, all); }});
     SETTINGS[slug] = list;
   }
   const whereOf = e => e.at || [storeOf(e.slug), "settings." + e.key];
@@ -1576,9 +2089,9 @@ const G = (() => {
   }
   const pendingOf = e => { const p = load(PENDING)[e.slug]; return p && e.key in p ? p[e.key] : undefined; };
   // A row's games, and which of its three it's on: what was chosen, unless a game's been changed since (By game).
-  const rowGames = id => GAMES.map(g => (SETTINGS[g[1]] || []).find(e => e.row === id)).filter(Boolean);
+  const rowGames = id => GAMES.flatMap(g => (SETTINGS[g[1]] || []).filter(e => e.row === id));   // (Junk Drawer has two in Reduce visual clutter)
   function rowMode(id) {
-    const r = ROWS.find(x => x.id === id), vals = rowGames(id).map(e => { const p = pendingOf(e); return p === undefined ? !!readSetting(e) : !!p; });
+    const r = ROWS.find(x => x.id === id), vals = rowGames(id).map(e => { const p = pendingOf(e); return (p === undefined ? !!readSetting(e) : !!p) !== !!e.inv; });
     const all = vals.every(v => v), none = !vals.some(v => v), m = load(COMFORT)[id];
     const end = on => on ? r.on : 2 - r.on;
     if (m === 1) return 1;
@@ -1587,7 +2100,7 @@ const G = (() => {
   }
   function setRow(id, m) {
     const r = ROWS.find(x => x.id === id), all = load(COMFORT); all[id] = m; save(COMFORT, all);
-    if (m !== 1) for (const e of rowGames(id)) writeSetting(e, m === r.on);
+    if (m !== 1) for (const e of rowGames(id)) writeSetting(e, (m === r.on) !== !!e.inv);
   }
   // a game's own switch changed one of a row's settings: the row goes to By game (the other games keep theirs)
   function byGame(slug, key) {
@@ -1731,6 +2244,7 @@ const G = (() => {
         clearTimeout(timer);
         if (!same()) shown = 0;
         mark = m; at = o.key(); of = o.game(); if (!uncounted) shown++;
+        sound.play("hint");
         o.draw(); if (say && quiet) readOut(say); else if (say) { hintSay(say, ms); said = say; }
         if (ms) timer = setTimeout(() => { if (mark === m) { mark = null; o.draw(); } }, ms);
       },
@@ -1747,6 +2261,10 @@ const G = (() => {
   // A word's meanings from Wiktionary (this needs the internet): up to three, each {pos (noun, verb…), text}, for
   // Keyboard Cat's clues and Fish Bones' word list. Rejects when there are none or Wiktionary can't be reached.
   // Asked again, a word comes from memory.
+  // Where a one-word name may break when it has to go onto two lines (a soft hyphen: "Mewster-" then "mind"),
+  // rather than anywhere or not at all (the owner's call, 2026-11-12: Mewstermind split badly at large text).
+  const BREAKS = {Mewstermind: "Mewster\u00ADmind", Purrmutation: "Purr\u00ADmutation"};
+  const breakable = name => BREAKS[name] || name;
   function plainText(html) { const d = document.createElement("div"); d.innerHTML = html; d.querySelectorAll("sup, .reference, style").forEach(x => x.remove()); return d.textContent.replace(/\s+/g, " ").trim(); }
   const meanings = {};
   function meaning(w) {
@@ -1881,6 +2399,7 @@ const G = (() => {
     reel: '<circle cx="12" cy="18" r="8"/><path d="M6.5 14.5c4 .5 8 3.5 10 9M7 22c3-3 7-5 12-4.5"/><path d="M20 17c3-1.5 5.5-5 7-10"/>',   // winding up a strand
     sponge: '<rect x="4" y="12" width="24" height="13" rx="3.5"/><circle cx="10" cy="18" r="1.2"/><circle cx="16" cy="16" r="1.2"/><circle cx="21" cy="20" r="1.2"/><path d="M9 8c1.2-2 2.4-2 3.6 0M19 8c1.2-2 2.4-2 3.6 0"/>',
     wallshake: '<rect x="10" y="5" width="12" height="22" rx="2"/><path d="M5 10v12M27 10v12M2 13v6M30 13v6"/>',
+    chat: '<path d="M6 7h20a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H14l-6 5v-5H6a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"/><path d="M10 13h12M10 17h8"/>',
     keyboard: '<rect x="3" y="9" width="26" height="15" rx="3"/><path d="M8 14h.2M12 14h.2M16 14h.2M20 14h.2M24 14h.2M10 19h12"/>',
     left: '<path d="M11 9h15M11 16h15M11 23h15"/><path d="M5.5 9h.2M5.5 16h.2M5.5 23h.2"/>',
     pairs: '<path d="M4 25l5-15 5 15M6 20h6"/><path d="M19 10v15"/><circle cx="23" cy="20.5" r="4.5"/>',
@@ -1963,7 +2482,7 @@ const G = (() => {
   // listed. Undo, Bookmark and Return to Bookmark are free everywhere.
   const PAW_COST = {
     hintFree: "hideseek",
-    restartFree: "zoomies",
+    restartFree: "zoomies boing",
     hints: {junkdrawer: "leftBtn"},   // hints by another name: in the red group beside Hint
     helpers: {toybox: "shakeBtn shuffleBtn rainbowBtn basketBtn", bubbles: "sightBtn nipBtn shakeBtn liftBtn", pickpile: "shuffleBtn", mewhue: "shuffleBtn",
       windup: "shakeBtn fluffBtn netBtn", lmnopom: "swatBtn", birdwatch: "wipeBtn", magnets: "fillBtn"},
@@ -2030,38 +2549,44 @@ const G = (() => {
   })();
   // Once the gold paw is lost for this puzzle (a hint taken, a restart, a life lost…), or there's none to win (zen), the
   // tools that cost it go back to the usual colour, with no crossed-out paw: there's nothing left to lose. Each page
-  // says when with G.pawLost(() => true or false), looked at on every save and every second or so.
-  let pawGone = null, pawWas = null;
-  function pawLost(fn) { pawGone = fn; checkPaw(); }
+  // says when with G.pawLost(() => true or false), looked at on every save and every second or so. A page whose
+  // tools are free for a while (Wind Up's first three helpers) passes free(id) too: true while that button costs
+  // nothing yet, so it stays plain until it would cost the paw.
+  let pawGone = null, pawFree = null, pawWas = null;
+  function pawLost(fn, free) { pawGone = fn; pawFree = free || null; checkPaw(); }
   function checkPaw() {
     if (!pawGone) return;
-    let lost = false; try { lost = !!pawGone(); } catch (e) { return; }   // the page's game may not be set up yet
-    if (lost === pawWas) return;
-    pawWas = lost;
-    for (const b of document.querySelectorAll("main button[data-paw]")) {
-      b.classList.toggle("costsPaw", !lost);
-      if (b.dataset.paw !== "own") b.title = lost ? "" : "Costs the gold paw";
-    }
+    const bs = [...document.querySelectorAll("main button[data-paw]")];
+    let lost = false, plain;
+    try { lost = !!pawGone(); plain = bs.map(b => lost || !!(pawFree && pawFree(b.id))); } catch (e) { return; }   // the page's game may not be set up yet
+    const key = plain.join();
+    if (key === pawWas) return;
+    pawWas = key;
+    bs.forEach((b, i) => {
+      b.classList.toggle("costsPaw", !plain[i]);
+      if (b.dataset.paw !== "own") b.title = plain[i] ? "" : "Costs the gold paw";
+    });
   }
   setInterval(() => { if (!document.hidden) checkPaw(); }, 1000);
-  // What's new: the first time someone who played before the November 2026 redesign opens a game, a card says where
-  // things went, once (NEWS; a later change can use .v2). It waits for any walkthrough, tip or card to close. New
-  // visitors get the walkthrough instead and are marked as having seen it.
+  // What's new: the first time someone who's played before opens a game after a change worth telling them about, a
+  // card says what's new, once (NEWS: v1 was the November 2026 redesign, its card taken down on 2026-11-14 as every
+  // tester had seen it; v2 was sound, on by default, and the settings that came with it; v3 is the new name and
+  // address, lapcatpuzzles.com, shown to everyone whose progress move.js carried over, and never at the old
+  // address, where it would be news too soon). It waits for any
+  // walkthrough, tip or card to close. New visitors get the walkthrough instead and are marked as having seen it.
   function whatsNew(tries = 0) {
-    if (!RETURNING || load(NEWS).seen || !GAMES.some(g => g[1] === SLUG) || !$("menuBtn") || !$("card")) return;
+    if (!RETURNING || load(NEWS).seen || (window.LCP && LCP.move && LCP.move.atOld) || !GAMES.some(g => g[1] === SLUG) || !$("menuBtn") || !$("card")) return;
     if (document.hidden || document.querySelector(".spot") || ($("overlay") && $("overlay").classList.contains("show"))) {
       if (tries < 30) setTimeout(() => whatsNew(tries + 1), 2000); return;
     }
     save(NEWS, {seen: Date.now()});
     const list = document.createElement("ul"); list.className = "news";
-    for (const t of ["☰ Menu, top left, now holds Share, Best times, How to play, Keys and Settings (the switches that were under the board).",
-      "Undo and Bookmark are free: they never cost the gold paw.",
-      "Tools in dark red (Hint, Audit, helpers and Restart) cost the gold paw. Once it's gone for a puzzle, they turn plain.",
-      "Where a tap can mark instead of fill, a row under the board picks which (Mark, Dot, Keep, Erase)."]) {
+    for (const t of ["Catdoku is now Lap Cat Puzzles, at lapcatpuzzles.com. (Catdoku the game keeps its name.)",
+      "Your scores, streaks and games in progress came with you. If anything's missing, Settings has a place to bring it over.",
+      "Playing from your Home Screen? Add lapcatpuzzles.com to it, then you can delete the old icon."]) {
       const li = document.createElement("li"); li.textContent = t; list.append(li);
     }
-    // Show me the menu: the tap mustn't go on to the page, where a tap outside the menu shuts it again at once
-    openCard("What's new", "", [["Show me the menu", e => { e.stopPropagation(); closeCard(); $("menuBtn").click(); }, true], ["Got it", closeCard]], list);
+    openCard("What's new", "", [["Open Settings", () => { location.href = `${HOME}settings/#${CURRENT || SLUG}`; }, true], ["Got it", closeCard]], list);
   }
   if (!RETURNING) save(NEWS, {seen: Date.now(), firstVisit: true});
   setTimeout(whatsNew, 1500);
@@ -2134,6 +2659,7 @@ const G = (() => {
     const shelved = () => !!o.shelf && !!gm() && o.shelf.has(gm());
     function undo() {
       if (!can() || !(size() || shelved())) return false;
+      if (!rewinding) sound.play("undo");
       const g = gm(); if (size()) o.back(list(g).pop(), g); else o.shelf.undo(g);
       if (o.after) o.after(); return true;
     }
@@ -2168,6 +2694,7 @@ const G = (() => {
   // ("toy", "number"…: for the note line), over (() => true once the puzzle's finished; game.won if not given),
   // moves (the Undo list, if it isn't game.history), history (a G.history: its undo and list stand in for undo and moves)}. Call before(i) just before the move that fills square i goes on the Undo
   // list; draw the glow on each of list(); clear() on Restart; sync() wherever the buttons are brought up to date.
+  let rewinding = false;   // Return to Bookmark is undoing, step by step
   function guesser(o) {
     if (o.history) { o.undo = o.undo || o.history.undo; o.moves = o.moves || (gm => o.history.list(gm)); }
     let armed = false;
@@ -2182,13 +2709,14 @@ const G = (() => {
     };
     btn.onclick = () => {
       const gm = g(); if (!gm || (o.over ? o.over() : gm.won)) return;
-      armed = !armed; sync(); if (armed) note(`Bookmarked: the next ${o.what || "one"} you put in glows, and Return to Bookmark returns here`, 3500); else note("");
+      armed = !armed; sync(); if (armed) sound.play("bookmark"); if (armed) note(`Bookmarked: the next ${o.what || "one"} you put in glows, and Return to Bookmark returns here`, 3500); else note("");
     };
     back.onclick = () => {
       const gm = g(), gs = list(); if (!gm || (o.over ? o.over() : gm.won) || !gs.length) return;
       const to = gs[gs.length - 1].at;
-      while (hist(gm).length > to) { const n = hist(gm).length; o.undo(); if (hist(gm).length >= n) break; }
-      armed = false; list(); o.draw(); note("Back at your bookmark.", 3000);
+      rewinding = true;   // one swoosh, not an Undo blip a step
+      try { while (hist(gm).length > to) { const n = hist(gm).length; o.undo(); if (hist(gm).length >= n) break; } } finally { rewinding = false; }
+      sound.play("back"); armed = false; list(); o.draw(); note("Back at your bookmark.", 3000);
     };
     return {
       before(i) { const gm = g(); if (!armed || !gm) return; armed = false; list().push({i, at: hist(gm).length}); },
@@ -2268,13 +2796,17 @@ const G = (() => {
       if (!(noting && v) && v && gm.grid[i] !== v && o.before) o.before(i);
       if (o.changing) o.changing();
       o.push();
-      const was = gm.grid[i];
-      if (noting && v) { if (gm.grid[i]) gm.grid[i] = 0; gm.notes[i] ^= 1 << v; }
+      const was = gm.grid[i], broke = o.broken ? o.broken() : 0;
+      if (noting && v) { if (gm.grid[i]) gm.grid[i] = 0; gm.notes[i] ^= 1 << v; sound.play("mark"); }
       else {
         gm.grid[i] = v && gm.grid[i] !== v ? v : 0;
         if (gm.grid[i]) for (const p of [i, ...o.peers(i)]) gm.notes[p] &= ~(1 << v);   // a digit put in comes off the notes round it
         else if (!v) gm.notes[i] = 0;
         if (was && gm.grid[i] !== was) back(i, was);
+        // a digit in (o.sound: the game's own sound for it, else every game's put-down) or out; o.broken() counts what Auto
+        // check shows red, so a digit that breaks a rule gets every game's low buzz too
+        if (gm.grid[i]) { sound.play(o.sound || "put"); if (o.broken && o.broken() > broke) sound.play("wrong", {}, .12); }
+        else if (was) sound.play("erase");
       }
       return true;
     }
@@ -2392,7 +2924,8 @@ const G = (() => {
       o.el.innerHTML = Array.from({length: Math.max(per, u)}, (_, k) => k < h ? "♥" : '<span class="lost">♥</span>').join("");
       o.el.setAttribute("aria-label", say(h));
     }
-    function lose(n = 1) { const g = o.of(); g[key] = Math.max(0, g[key] - n); return g[key]; }
+    // o.sound false: the game plays its own sound for a life lost (Cat Burglar's wrong tap, Hide & Seek's woken cat)
+    function lose(n = 1) { const g = o.of(); g[key] = Math.max(0, g[key] - n); if (o.sound !== false) sound.play("life"); return g[key]; }
     function refill() { const g = o.of(); g[key] = per; g.livesUsed = per; }   // back to the first three, as a restart after running out does
     const canRevive = () => used() < max;
     function revive() {
@@ -2528,6 +3061,6 @@ const G = (() => {
     }
   }
 
-  return {MAGNET, tally, emoText, radios, pawLost, pieces, GAMES, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, loseCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText,
-          setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, toyPicker, pickLook};
+  return {COFFEE, coffeeLink, sound, ladder, ANOTHER, CHANGE, MAGNET, tally, emoText, radios, pawLost, pieces, GAMES, BETA, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, loseCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText, breakable,
+          setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, feedbackCard, feedbackFor, toyPicker, pickLook};
 })();

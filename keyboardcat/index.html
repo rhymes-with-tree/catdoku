@@ -4,11 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Keyboard Cat</title>
+<script src="../move.js?v=2026-11-20.6"></script>
+<meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-09.8"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-20.6"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-09.8">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.6">
 <style>
 /* A cat has walked across the keyboard and broken it. Only seven keys still work. Make words with them, always
    using the gold one. */
@@ -234,6 +236,7 @@
   </section>
   <div class="actions">
     <button id="linkBtn">Share</button>
+    <button id="bestBtn">Best times</button>
     <button id="helpBtn">How to play</button>
   </div>
   <div class="bar">
@@ -245,8 +248,8 @@
   <p class="help">Words from <a href="https://wordlist.aspell.net/">SCOWL</a>, © Kevin Atkinson, and ENABLE.</p>
 </main>
 
-<script src="../games.js?v=2026-11-09.8"></script>
-<script src="../walkcat.js?v=2026-11-09.8"></script>
+<script src="../games.js?v=2026-11-20.6"></script>
+<script src="../walkcat.js?v=2026-11-20.6"></script>
 <script>
 const WORDS_INLINE = null;  // the word list, filled in when the page is bundled into one file
 
@@ -274,7 +277,7 @@ const $ = G.$;
 let state = G.load(STORE);
 let saved = Object.assign({seenHelp: false, games: {}}, state);
 let game = null, typed = "", answers = [], extras = [], max = 0;
-const save = () => { if (game) saved.games[game.id] = {found: game.found, revealed: game.revealed, won: game.won, hinted: game.hinted, hints: game.hints, t: Date.now()}; prune(); G.save(STORE, saved); };
+const save = () => { if (game) saved.games[game.id] = {found: game.found, revealed: game.revealed, won: game.won, hinted: game.hinted, hints: game.hints, ms: game.ms, timed: game.timed, started: game.started, t: Date.now()}; prune(); G.save(STORE, saved); };
 // keep the last 40 keyboards played
 function prune() { const ids = Object.keys(saved.games).sort((a, b) => (saved.games[a].t || 0) - (saved.games[b].t || 0)); for (const id of ids.slice(0, Math.max(0, ids.length - 40))) delete saved.games[id]; }
 // Today's keyboard: the same for everyone on the same date, picked from the list in a scattered order.
@@ -285,7 +288,12 @@ const dailyId = day => ((day * 7919 + 1234) % W.puzzles.length + W.puzzles.lengt
 const lettersFor = id => typeof id === "string" ? id.slice(2) : W.puzzles[id];
 function openKeyboard(id, daily) {
   const p = lettersFor(id), keys = p.slice(0, 7), centre = p[7], was = saved.games[id] || {};
-  game = {id, daily, keys, centre, found: was.found || [], revealed: !!was.revealed, won: !!was.won, hinted: !!was.hinted, hints: Object.assign({}, was.hints)};
+  if (game && game.id !== id && game.started && !game.won && !game.revealed) G.breakStreak();   // leaving a keyboard you'd started, as New does in every game
+  // The timer (since 2026-11-15) runs from the first key pressed to Genius Cat. A keyboard begun before then has no
+  // time to go on, so it isn't timed.
+  const timed = was.timed ?? !(was.found && was.found.length);
+  game = {id, daily, keys, centre, found: was.found || [], revealed: !!was.revealed, won: !!was.won, hinted: !!was.hinted, hints: Object.assign({}, was.hints),
+          level: 1, ms: was.ms || 0, timed, started: !!was.started};
   ({answers, extra: extras} = answersFor(keys, centre));
   COMMON = new Set(answers); EXTRA = new Set(extras);
   max = answers.reduce((s, w) => s + points(w), 0);
@@ -358,6 +366,7 @@ function placeCat(walk) {
     closing = setTimeout(() => { closeUp(); closing = setTimeout(() => { if (walk && walk.done) walk.done(); }, 400); }, wait);
   };
   if (!walk || matchMedia("(prefers-reduced-motion: reduce)").matches) return done(-1);
+  G.sound.play("kc.trot");
   const box = kb.getBoundingClientRect(), len = box.width * 1.5, h = len * 120 / 300, layer = svgEl("svg", {class: "catlayer", "aria-hidden": "true"});
   kb.append(layer);
   const cat = WALKCAT.make(); layer.append(cat.g);
@@ -392,6 +401,9 @@ function closeUp(mixing) {
   }
 }
 
+/* ---------- sound (the owner's picks, 2026-11-14) ---------- */
+G.sound.define({"kc.trot": t => { const K = G.sound.kit; for (let i = 0; i < 10; i++) G.sound.get("key")(t + K.rnd(0, .8)); }});   // the keys knocked off: a clatter
+
 /* ---------- typing ---------- */
 let lastWord = null, flyFrom = null;
 function press(k) {
@@ -400,7 +412,7 @@ function press(k) {
   if (stale !== null) { stale = null; typed = ""; if (k === "del" || k === "enter") { draw(); return; } }
   if (k === "del") typed = typed.slice(0, -1);
   else if (k === "enter") return submit();
-  else if (game.keys.includes(k) && typed.length < 19) typed += k;
+  else if (game.keys.includes(k) && typed.length < 19) { typed += k; G.sound.play("key"); if (!game.won && !game.revealed) game.started = true; }
   else return;
   draw();
 }
@@ -421,7 +433,7 @@ function toast(text) { const t = document.createElement("div"); t.className = "t
 // A word that doesn't count shakes and stays up a moment, then clears (at once, if the next key comes sooner).
 let stale = null;
 function nope(text) {
-  toast(text); const e = $("entry"); e.classList.remove("shake"); void e.offsetWidth; e.classList.add("shake");
+  toast(text); G.sound.play("wrong"); const e = $("entry"); e.classList.remove("shake"); void e.offsetWidth; e.classList.add("shake");
   const word = typed; stale = word; setTimeout(() => { if (stale === word && typed === word) { typed = ""; stale = null; draw(); } }, 700);
 }
 function submit() {
@@ -436,7 +448,7 @@ function submit() {
   // with Words left on, note where the word's blank is, so the word can appear there before it moves into place
   const bb = blanks.indexOf(w), bEl = bb < 0 ? null : $("words").querySelector(`button[data-b="${bb}"]`);
   flyFrom = bEl ? bEl.getBoundingClientRect() : null;
-  game.found.push(w); lastWord = w; typed = "";
+  game.found.push(w); lastWord = w; typed = ""; G.sound.play("word");
   const smash = lettersOf(w).length === 7, p = points(w);
   toast(smash ? `${w.length === 7 ? "Perfect Pounce" : "Full Pounce"}! +${p}` : EXTRA.has(w) ? `A rare one! +${p}` : `${["", "Nice!", "", "", "", "Good!", "Great!", "Purrfect!"][Math.min(7, w.length - 3)] || "Purrfect!"} +${p}`);
   const after = rankAt(score());
@@ -675,13 +687,13 @@ function reveal() {
 // Reaching Genius Cat wins the keyboard (hints or not) with a gold paw; the words left can still be found, on to
 // the Cat's Meow, which gets a card of its own.
 function win() {
-  game.won = true; save(); draw(); G.dailyWon();   // Keyboard Cat has no timer, so it marks today's challenge here
+  game.won = true; const result = G.finishClock(game); save(); draw();   // the time to Genius Cat, and today's challenge marked
   G.track(`Keyboard Cat genius ${game.daily != null ? "daily" : "practice"}`);
   const meowToo = rankAt(score()) === RANKS.length - 1;
   setTimeout(() => {
     const left = answers.length - commonFound();
     const text = meowToo ? `You found all ${answers.length} everyday words.` : `You found ${commonFound()} of the ${answers.length} everyday words. Keep going for the Cat's Meow: ${left} to find.`;
-    G.winCard(text, () => { G.closeCard(); newKeyboard(); }, meowToo ? "Admire my words" : "Keep finding words", null,
+    G.winCard(text, () => { G.closeCard(); newKeyboard(); }, meowToo ? "Admire my words" : "Keep finding words", result,
       {gold: true, goldWhy: meowToo ? (game.hinted ? "You're the Cat's Meow!" : "You're the Cat's Pyjamas! (No hints!)") : game.hinted ? "You're a Genius Cat!" : "Genius Cat, with no hints!", next: "Another keyboard"});
   }, 900);
 }
@@ -787,6 +799,11 @@ function helpOnFirstVisit() {
   G.spotlight({grid: $("board"), w: 10, h: 4, steps, done: () => { saved.seenHelp = true; save(); }});
 }
 $("helpBtn").onclick = showHelp;
+// The timer: optional, as in every game (its switch is in the menu and on the Settings page). Best times are kept
+// for reaching Genius Cat, whichever keyboard it was.
+G.setupTimer({name: "keyboardcat", game: () => game, playing: g => !g.won && !g.revealed, save, label: () => "Genius Cat", noun: "rank",
+  emptyText: "Reach Genius Cat on a keyboard and your time will show up here. Times are kept on this device only."});
+$("bestBtn").onclick = () => G.showBests("Best times", 1);
 
 /* ---------- start ---------- */
 G.nav("keyboardcat");

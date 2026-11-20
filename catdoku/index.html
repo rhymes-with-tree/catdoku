@@ -4,11 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Catdoku</title>
+<script src="../move.js?v=2026-11-20.6"></script>
+<meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-09.8";
+  var BUILD = "2026-11-20.6";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -22,11 +24,10 @@
 <link rel="manifest" href="../manifest.webmanifest">
 <meta name="theme-color" content="#ECEEE7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1F1C24" media="(prefers-color-scheme: dark)">
-<meta name="apple-mobile-web-app-title" content="🐾 Catdoku">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-09.8">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.6">
 <style>
 /* Catdoku's own looks; the rest is games.css. */
 html,body{height:100%}
@@ -110,7 +111,7 @@ main{padding-top:18px}
 
 </main>
 
-<script src="../games.js?v=2026-11-09.8"></script>
+<script src="../games.js?v=2026-11-20.6"></script>
 <script>G.nav("catdoku");</script>
 <script>
 const PALETTE = ["#BD5538","#73A7AE","#ECA818","#6AA673","#B94588","#B3B94B",
@@ -277,7 +278,7 @@ function assignColors(reg, N) {
 const $ = id => document.getElementById(id);
 // autoGrade is the Auto grade switch, and autoExclude the Auto Notes one (its old name, kept so saved settings
 // carry over). Auto Notes starts off, so a first board isn't covered in paws.
-let settings = {autoGrade: false, autoExclude: false, size: 8};
+let settings = {autoGrade: false, autoExclude: false, size: 6};   // a new player's first size: a size or two smaller since 2026-11-12, when GoatCounter showed far fewer solves at the old one (8 × 8: 53%; 6 × 6: 92%); a win moves you up
 let game = null, busy = false, msgTimer = null;
 // The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
 G.pawLost(() => !game || game.status !== "playing" || game.helped || game.restarted || game.hearts < HEARTS || game.livesUsed > HEARTS);
@@ -328,6 +329,12 @@ const livesLeft = h => lives.say(h) + ".";
 
 function snapshot() { undo.push(JSON.stringify(game.cells)); }
 
+/* ---------- sound ---------- */
+// The owner's picks from the listening page (2026-11-14), played through G.sound (games.js; on unless Settings turns it off).
+// A cat put in is every game's put-down, a paw the logic games' pencil tick (mark), taking either out their pop out (erase);
+// a life lost comes from G.lives, Undo and Bookmark from games.js.
+G.sound.define({"cd.audit": t => G.sound.kit.bell({f: 1319, t, dur: .5, vol: .08, ratio: 2.01, index: .6})});   // a soft chime
+
 /* ---------- actions ---------- */
 function tap(i) {
   const cell = game.cells[i];
@@ -335,7 +342,7 @@ function tap(i) {
   const s = show(cell);
   if (markTool.on()) { if (s === "paw") { snapshot(); erasePaw(i); } render(); save(); return; }
   if (markTool.pick() === 1) { if (s === "cat") { snapshot(); removeCat(i); } else placeCat(i); render(); save(); return; }
-  if (s === "empty") { snapshot(); cell.manual = true; }
+  if (s === "empty") { snapshot(); cell.manual = true; G.sound.play("mark"); }
   else if (s === "paw") placeCat(i);
   else { snapshot(); removeCat(i); }
   render(); save();
@@ -351,7 +358,7 @@ function placeCat(i) {
   }
   guesses.before(i);
   snapshot();
-  cell.cat = true; cell.manual = false;
+  cell.cat = true; cell.manual = false; G.sound.play("put");
   if (settings.autoExclude) for (const j of peers(i)) if (!game.cells[j].src.includes(i)) game.cells[j].src.push(i);
   if (settings.autoGrade) {
     const cats = game.cells.map((c, k) => c.cat ? k : -1).filter(k => k >= 0);
@@ -360,11 +367,12 @@ function placeCat(i) {
 }
 
 function removeCat(i) {
+  G.sound.play("erase");
   game.cells[i].cat = false; game.cells[i].manual = false;
   for (const c of game.cells) { const k = c.src.indexOf(i); if (k >= 0) c.src.splice(k, 1); }
 }
 
-function erasePaw(i) { const c = game.cells[i]; c.manual = false; c.src = []; }
+function erasePaw(i) { const c = game.cells[i]; c.manual = false; c.src = []; G.sound.play("erase"); }
 function paintPaw(i, press) {
   if (markTool.on()) {
     if (show(game.cells[i]) !== "paw") return;
@@ -374,7 +382,7 @@ function paintPaw(i, press) {
   const c = game.cells[i];
   if (show(c) !== "empty") return;
   if (!press.snap) { snapshot(); press.snap = true; }
-  c.manual = true;
+  c.manual = true; G.sound.play("mark");
 }
 
 // Undo (G.history): the steps are JSON of the cells before each change, in game.history, the newest 500 kept
@@ -401,7 +409,7 @@ function audit() {
     const isSol = game.sol[Math.floor(k / N)] === k % N, s = show(c);
     return (s === "cat" && !isSol) || (s === "paw" && isSol) ? k : -1;
   }).filter(k => k >= 0);
-  const n = game.wrong.length;
+  const n = game.wrong.length; G.sound.play("cd.audit");
   note(n ? `${n} ${n === 1 ? "square is" : "squares are"} marked wrong.` : "Nothing is marked wrong so far.", 6000);
   render(); save();
 }
@@ -531,16 +539,9 @@ async function newPuzzle() {
 }
 
 /* ---------- UI ---------- */
-// Count a moment in the game (a puzzle started or solved) on the GoatCounter dashboard.
-// Nothing about the player is sent. Waits a few seconds for the counter script to load.
-function track(name) {
-  let tries = 0;
-  (function send() {
-    const gc = window.goatcounter;
-    if (gc && gc.count) gc.count({path: name, title: name, event: true});
-    else if (tries++ < 20) setTimeout(send, 500);
-  })();
-}
+// Count a moment in the game (a puzzle started or solved) on the GoatCounter dashboard (G.track, which also keeps
+// the visit's tally).
+function track(name) { G.track(name); }
 function note(t, ms) {
   clearTimeout(msgTimer);
   $("msg").textContent = t || (settings.autoGrade ? "" : "Press Check once every cat's in place.");

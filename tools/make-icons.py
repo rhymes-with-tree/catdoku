@@ -7,6 +7,15 @@ RED, ORANGE, TEAL, YELLOW, LIME, GREEN, PLUM, PERI = "#BD5538", "#E16A4A", "#73A
 FONT = "font-family=\"'Baloo 2',ui-rounded,system-ui,sans-serif\" font-weight=\"800\" text-anchor=\"middle\" dominant-baseline=\"central\""
 
 
+# A letter with an outline drawn under it: the outlined letter first, then the plain letter on top. Not paint-order="stroke",
+# which browsers draw but Canva won't upload (magnets, lmnopom, fuzzyspelling and swapapom were refused, 2026-11-18).
+def halo(x, y, size, fill, ring, width, ch, round_join=True):
+    join = ' stroke-linejoin="round"' if round_join else ""
+    at = f'x="{x}" y="{y}" font-size="{size}" fill="{fill}"'
+    return (f'<text {at} stroke="{ring}" stroke-width="{width}"{join} {FONT}>{ch}</text>'
+            f'<text {at} {FONT}>{ch}</text>')
+
+
 def frame(bg, body):
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
             f'<rect x="4" y="4" width="92" height="92" rx="20" fill="{bg}" stroke="{INK}" stroke-width="3"/>{body}</svg>\n')
@@ -402,6 +411,25 @@ def nightlight():
     return frame("#221D36", out)
 
 
+# Day Light: Night Light's room by day. Black cats on a sunny floor, most napping, one awake on a spring-blue
+# square with an arrow of its own pointing at the cat diagonally below.
+def daylight():
+    out = f'<rect x="52" y="12" width="36" height="36" rx="6" fill="#73A7AE" opacity=".55"/>'
+    for r in range(2):
+        for c in range(2):
+            x, y = 30 + c * 40, 32 + r * 38
+            awake = (r, c) == (0, 1)
+            out += (f'<path d="M{x-14} {y+8}C{x-16} {y-2} {x-15} {y-8} {x-13} {y-12}L{x-12} {y-22}L{x-5} {y-14}C{x-2} {y-15} {x+2} {y-15} {x+5} {y-14}'
+                    f'L{x+12} {y-22}L{x+13} {y-12}C{x+15} {y-8} {x+16} {y-2} {x+14} {y+8}C{x+10} {y+16} {x-10} {y+16} {x-14} {y+8}Z" fill="{INK}" opacity="{1 if awake else .3}"/>')
+            if awake:
+                out += (f'<ellipse cx="{x-6}" cy="{y}" rx="4.5" ry="3.8" fill="#D4DB5E"/><ellipse cx="{x+6}" cy="{y}" rx="4.5" ry="3.8" fill="#D4DB5E"/>'
+                        f'<ellipse cx="{x-6}" cy="{y}" rx="1.1" ry="3.2" fill="{INK}"/><ellipse cx="{x+6}" cy="{y}" rx="1.1" ry="3.2" fill="{INK}"/>')
+            else:
+                out += f'<path d="M{x-10} {y}Q{x-6} {y+3} {x-2} {y}M{x+2} {y}Q{x+6} {y+3} {x+10} {y}" fill="none" stroke="{INK}" stroke-width="1.8" stroke-linecap="round" opacity=".55"/>'
+    out += f'<path d="M50 60L62 54L56 48Z" fill="#4E577D" stroke="#FFF6D6" stroke-width="1.5" stroke-linejoin="round"/>'
+    return frame("#FBE9B0", out)
+
+
 # Unravel: a strand of yarn along part of a pegboard shape, the ball at its end, an arrow on one line.
 def unravel():
     pts = {(0, 0): (24, 26), (1, 0): (50, 26), (2, 0): (76, 26), (0, 1): (24, 52), (1, 1): (50, 52), (2, 1): (76, 52), (0, 2): (24, 78), (1, 2): (50, 78), (2, 2): (76, 78)}
@@ -504,7 +532,7 @@ def fuzzyspelling():
         for y, letter in balls:
             out += f'<circle cx="{cx}" cy="{y}" r="9.5" fill="{col}" stroke="{INK}" stroke-width="1.4"/>'
             if letter:   # ink with a white halo, as on the game's pompoms
-                out += f'<text x="{cx}" y="{y + 1}" font-size="12" fill="{INK}" stroke="#fff" stroke-width="2.4" paint-order="stroke" stroke-linejoin="round" {FONT}>{letter}</text>'
+                out += halo(cx, y + 1, 12, INK, "#fff", 2.4, letter)
             elif y == 33:   # the head's googly eyes
                 out += "".join(f'<circle cx="{cx + dx}" cy="{y - 1}" r="2.6" fill="#fff" stroke="{INK}" stroke-width=".8"/><circle cx="{cx + dx + .5}" cy="{y}" r="1.2" fill="{INK}"/>' for dx in (-3.5, 3.5))
         tail = balls[-1][0] + 10
@@ -650,8 +678,7 @@ def magnets():
             x, y = x0 + c * s, y0 + r * s
             out += f'<rect x="{x}" y="{y}" width="{s-1.5}" height="{s-1.5}" rx="1.5" fill="{"#FFF0C2" if ch == "_" else "#FBFAF5"}"/>'
             if ch != "_":
-                out += (f'<text x="{x+s/2-.7}" y="{y+s/2}" font-size="13" fill="{colours[ch]}" stroke="{INK}" stroke-width="1.3" '
-                        f'paint-order="stroke" {FONT}>{ch}</text>')
+                out += halo(x + s/2 - .7, y + s/2, 13, colours[ch], INK, 1.3, ch, round_join=False)
     return frame("#ECEEE7", out)
 
 
@@ -750,28 +777,33 @@ def fishbones():
     return frame(PAPER, out)
 
 
-# Mewstermind: three shut boxes along the top, two guesses of toys under them, and paw prints beside each guess
-# (dark for a right toy in the right box, light for a right toy in another box).
+# Mewstermind (a Clue since 2026-11-19): the case along the top, shut (who, where, what), and two guesses under it, each a
+# cat, a room and a toy, with a dark paw print beside it for each part that's right and a dot for each that's wrong.
 def pawprint(x, y, s, fill):
     toes = "".join(f'<ellipse cx="{x+dx*s}" cy="{y+dy*s}" rx="{s*.2}" ry="{s*.24}" fill="{fill}" stroke="{INK}" stroke-width="1"/>'
                    for dx, dy in ((-.5, -.22), (-.18, -.5), (.18, -.5), (.5, -.22)))
     return toes + f'<ellipse cx="{x}" cy="{y+s*.25}" rx="{s*.42}" ry="{s*.34}" fill="{fill}" stroke="{INK}" stroke-width="1"/>'
 
 
+def house(x, y, s, fill):
+    return (f'<path d="M{x-s} {y-s*.1}L{x} {y-s}L{x+s} {y-s*.1}V{y+s*.8}H{x-s}Z" fill="{fill}" stroke="{INK}" stroke-width="2" stroke-linejoin="round"/>'
+            f'<rect x="{x-s*.25}" y="{y+s*.15}" width="{s*.5}" height="{s*.65}" fill="{INK}" opacity=".7"/>')
+
+
 def stash():
     out = ""
     for i in range(3):
-        x = 12 + i * 19
-        out += (f'<rect x="{x}" y="14" width="16" height="16" rx="2" fill="#D9A86C" stroke="{INK}" stroke-width="2"/>'
-                f'<line x1="{x}" y1="22" x2="{x+16}" y2="22" stroke="{INK}" stroke-width="1.2" opacity=".45"/>'
-                f'<rect x="{x+6}" y="14" width="4" height="16" fill="#F3D7AE" opacity=".6"/>')
-    out += f'<path d="M10 39H90" stroke="{INK}" stroke-width="1.6" stroke-dasharray="3 3" opacity=".45"/>'
-    for r, (balls, paws) in enumerate((((PLUM, YELLOW, TEAL), (INK, "#fff", None)), ((YELLOW, PLUM, RED), (INK, INK, None)))):
-        y = 55 + r * 24
-        for i, c in enumerate(balls): out += yarnball(20 + i * 19, y, 8, c)
-        for k, f in enumerate(paws):
-            px, py = 74 + (k % 2) * 10, y - 4.5 + (k // 2) * 10
-            out += pawprint(px, py, 6.5, f) if f else f'<circle cx="{px}" cy="{py}" r="1.8" fill="{INK}" opacity=".25"/>'
+        x = 13 + i * 20
+        out += (f'<rect x="{x}" y="11" width="17" height="19" rx="3" fill="{PAPER}" stroke="{INK}" stroke-width="1.8" stroke-dasharray="3 2"/>'
+                + text(x + 8.5, 21, "?", 14, INK))
+    out += f'<path d="M10 37H90" stroke="{INK}" stroke-width="1.6" stroke-dasharray="3 3" opacity=".45"/>'
+    rows = ((("#9A8A78", ORANGE, PERI), 1), (("#221E26", YELLOW, "#E3B9A9"), 2))
+    for r, ((cat, toy, room), right) in enumerate(rows):
+        y = 52 + r * 25
+        out += catface(21.5, y, 8, cat) + house(41.5, y, 8, room) + yarnball(61.5, y, 8, toy)
+        for k in range(3):
+            py = y - 8.5 + k * 8.5
+            out += pawprint(82, py, 4.2, INK) if k < right else f'<circle cx="82" cy="{py}" r="1.8" fill="{INK}" opacity=".25"/>'
     return frame(tint(TEAL, .3), out)
 
 
@@ -897,7 +929,7 @@ def windup():
 def lmnopom():
     def pom(x, y, col, ch):
         return (f'<circle cx="{x}" cy="{y}" r="10.5" fill="{col}" stroke="{INK}" stroke-width="1.6"/>'
-                f'<text x="{x}" y="{y + 1}" font-size="13" fill="{INK}" stroke="#fff" stroke-width="2.6" paint-order="stroke" stroke-linejoin="round" {FONT}>{ch}</text>')
+                + halo(x, y + 1, 13, INK, "#fff", 2.6, ch))
     marm = (catface(25, 30, 11, ORANGE).split("<circle")[0]
             + f'<circle cx="{25-11*.38}" cy="{30+11*.1}" r="{11*.16}" fill="{GREEN}"/><circle cx="{25+11*.38}" cy="{30+11*.1}" r="{11*.16}" fill="{GREEN}"/>')
     out = f'<path d="M50 40H72" stroke="{YELLOW}" stroke-width="2.6"/>' + pom(50, 40, PLUM, "P") + pom(72, 40, YELLOW, "O")
@@ -905,6 +937,28 @@ def lmnopom():
     out += pom(80, 59, PERI, "M")
     return frame(tint("#8D78AD", .15), marm + out)
 
+
+# Swap-a-Pom: a craft tray of letter pompoms, two of them swapping (the curved arrow over them), reading CTE PIE (the owner's
+# choice, 2026-11-13), the top row lit gold, and Moonpie's face (white, with brick-brown ears and patches round her blue eyes) peeking over
+# the tray's top edge.
+def swapapom():
+    BROWN = "#824235"   # brick, a shade towards the ink
+    def pom(x, y, col, ch):
+        return (f'<circle cx="{x}" cy="{y}" r="9.5" fill="{col}" stroke="{INK}" stroke-width="1.5"/>'
+                + halo(x, y + 1, 12, INK, "#fff", 2.4, ch))
+    face = catface(26, 27, 11, "#fff").split("<circle")[0]
+    face += (f'<ellipse cx="21.6" cy="27.6" rx="3.6" ry="3" fill="{BROWN}"/><ellipse cx="30.4" cy="27.6" rx="3.6" ry="3" fill="{BROWN}"/>'
+             f'<path d="M15 29.2L16.1 15.5L22.2 21Q18 24 15 29.2ZM37 29.2L35.9 15.5L29.8 21Q34 24 37 29.2Z" fill="{BROWN}" stroke="{INK}" stroke-width="2" stroke-linejoin="round"/>'
+             f'<circle cx="21.8" cy="27.8" r="1.8" fill="{TEAL}" stroke="{INK}" stroke-width=".8"/><circle cx="30.2" cy="27.8" r="1.8" fill="{TEAL}" stroke="{INK}" stroke-width=".8"/>'
+             f'<path d="M24.7 31.6L26 32.8L27.3 31.6" fill="none" stroke="{INK}" stroke-width="1.2" stroke-linecap="round"/>')
+    out = f'<rect x="9" y="36" width="82" height="56" rx="11" fill="{tint(TEAL, .35)}" stroke="{PERI}" stroke-width="3"/>'
+    out += f'<rect x="14" y="48" width="72" height="22" rx="11" fill="{tint(YELLOW, .55)}"/>'
+    out += "".join(pom(x, 59, c, ch) for x, c, ch in [(27, GREEN, "C"), (50, PERI, "T"), (73, PLUM, "E")])
+    out += "".join(pom(x, 81, c, ch) for x, c, ch in [(27, LIME, "P"), (50, TEAL, "I"), (73, GREEN, "E")])
+    # the swap: a two-headed arrow arching over T and E
+    out += (f'<path d="M51 46Q61.5 34 72 46" fill="none" stroke="{INK}" stroke-width="2.2" stroke-linecap="round"/>'
+            f'<path d="M50.2 41.2L51 46.2L55.6 44.3M72.8 41.2L72 46.2L67.4 44.3" fill="none" stroke="{INK}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>')
+    return frame(tint("#8D78AD", .15), out + face)
 
 # Window Ledges: a brick wall with arched windows, three of them lit gold with a digit, the rest dark, and two white
 # shutters (the clue squares) with their totals, in the game's colours.
@@ -1068,10 +1122,112 @@ def bedhog():
     return frame(tint(PERI, .12), out)
 
 
-ICONS = {"catdoku": catdoku, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
+def pounceup():
+    """The bookcase from the game: shelves up its back wall, Rayla (a pale silver tabby) mid-pounce, nose up, from one
+    to the top with her path dotted behind her, a gold spring on the low shelf, and her basket on top."""
+    wall, wood = "#E9D3B4", "#C99A62"
+    out = "".join(f'<path d="M{x} 9V91" stroke="#D9BF9C" stroke-width="1.2"/>' for x in (30, 52, 74))
+    out += f'<rect x="7" y="24" width="86" height="7" fill="{wood}" stroke="{INK}" stroke-width="2"/>'   # the top
+    for x, y, w in ((12, 82, 34), (56, 64, 32)):
+        out += f'<rect x="{x}" y="{y}" width="{w}" height="5.5" rx="1.5" fill="{wood}" stroke="{INK}" stroke-width="2"/>'
+    # the spring on the low shelf
+    out += f'<path d="M24 82 l5 -2.5 l-5 -2.5 l5 -2.5 l-5 -2.5 l5 -2.5" fill="none" stroke="{YELLOW}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>'
+    # the basket on top, with its weave
+    out += f'<path d="M60 24 L62 13 H84 L86 24 Z" fill="{wood}" stroke="{INK}" stroke-width="2" stroke-linejoin="round"/>'
+    out += "".join(f'<path d="M{x} 14V23" stroke="#8E6534" stroke-width="1"/>' for x in (66, 70, 74, 78, 82))
+    # her pounce, dotted, from the right-hand shelf
+    out += f'<path d="M72 62 C72 54 66 50 58 48" fill="none" stroke="{PERI}" stroke-width="2.4" stroke-dasharray="1 4.5" stroke-linecap="round"/>'
+    # Rayla mid-leap, nose up and to the left: front legs reaching, back legs trailing, tail up behind
+    fur, stripe, eye = "#E2D6C8", "#8C7B6B", "#4E8FB0"
+    legs = "M26 47 L16 44 M29 49 L19 50 M47 48 L57 52 M49 46 L59 47"
+    out += (f'<g transform="rotate(24 38 46)">'
+            f'<path d="M48 44 C55 42 58 36 57 30" fill="none" stroke="{INK}" stroke-width="5.4" stroke-linecap="round"/>'
+            f'<path d="M48 44 C55 42 58 36 57 30" fill="none" stroke="{fur}" stroke-width="3" stroke-linecap="round"/>'
+            f'<path d="{legs}" stroke="{INK}" stroke-width="4.4" stroke-linecap="round"/>'
+            f'<path d="{legs}" stroke="{fur}" stroke-width="2.4" stroke-linecap="round"/>'
+            f'<ellipse cx="38" cy="47" rx="12.5" ry="6" fill="{fur}" stroke="{INK}" stroke-width="2"/>'
+            f'<path d="M34 41.6 V52 M39 41 V53 M44 41.8 V52" stroke="{stripe}" stroke-width="1.6"/>'
+            f'<path d="M19 41 L18 33 L23.5 37.5 Z M25.5 37.5 L28.5 32 L29.5 39 Z" fill="{fur}" stroke="{INK}" stroke-width="1.6" stroke-linejoin="round"/>'
+            f'<circle cx="24" cy="43" r="6.4" fill="{fur}" stroke="{INK}" stroke-width="2"/>'
+            f'<circle cx="21.6" cy="42" r="1.2" fill="{eye}"/><circle cx="26.4" cy="42" r="1.2" fill="{eye}"/>'
+            f'<path d="M23 45.5 L24 46.5 L25 45.5" fill="none" stroke="{INK}" stroke-width="1"/></g>')
+    return frame(wall, out)
+
+
+def movingday():
+    # a room of moving boxes (Copycat's cardboard colours) with three squares unpacked: two balls of yarn about to
+    # merge, with a sparkle between them, and a fish treat
+    BOX, EDGE, TAPE, FLOOR = "#D9A86C", "#7A4E2C", "#E9C08A", tint(YELLOW, .22)
+    out, s, x0, y0 = "", 26, 11, 11
+    def box(c, r, two=False):
+        x, y = x0 + c * (s + 1), y0 + r * (s + 1)
+        if two:
+            return (f'<rect x="{x+1}" y="{y+1}" width="{s*.68}" height="{s*.68}" rx="2.5" fill="{BOX}" stroke="{EDGE}" stroke-width="2"/>'
+                    f'<rect x="{x+s*.32-1}" y="{y+s*.32-1}" width="{s*.68}" height="{s*.68}" rx="2.5" fill="{BOX}" stroke="{EDGE}" stroke-width="2"/>'
+                    f'<rect x="{x+s*.32-1+s*.27}" y="{y+s*.32-1}" width="{s*.14}" height="{s*.68}" fill="{TAPE}"/>')
+        return (f'<rect x="{x+1}" y="{y+1}" width="{s-2}" height="{s-2}" rx="3" fill="{BOX}" stroke="{EDGE}" stroke-width="2"/>'
+                f'<rect x="{x+s*.42}" y="{y+2}" width="{s*.16}" height="{s-4}" fill="{TAPE}"/><path d="M{x+2} {y+s/2}H{x+s-2}" stroke="#B98549" stroke-width="1.6"/>')
+    def floor(c, r):
+        x, y = x0 + c * (s + 1), y0 + r * (s + 1)
+        return f'<rect x="{x+1}" y="{y+1}" width="{s-2}" height="{s-2}" rx="4" fill="{FLOOR}"/>'
+    out += f'<rect x="{x0-3}" y="{y0-3}" width="{3*s+8}" height="{3*s+8}" rx="8" fill="#B98549" stroke="{EDGE}" stroke-width="2.5"/>'
+    for c, r, two in [(0, 0, True), (1, 0, False), (2, 0, True), (0, 1, False), (0, 2, True), (1, 2, False)]:
+        out += box(c, r, two)
+    for c, r in [(1, 1), (2, 1), (2, 2)]:
+        out += floor(c, r)
+    cx1, cx2, cy = x0 + 1.5 * (s + 1) - 1, x0 + 2.5 * (s + 1) - 1, y0 + 1.5 * (s + 1) - 1
+    out += yarnball(cx1, cy, 9, PLUM) + yarnball(cx2, cy, 9, PLUM)
+    sx, sy = (cx1 + cx2) / 2, cy - 12
+    out += f'<path d="M{sx} {sy-6}L{sx+1.6} {sy-1.6}L{sx+6} {sy}L{sx+1.6} {sy+1.6}L{sx} {sy+6}L{sx-1.6} {sy+1.6}L{sx-6} {sy}L{sx-1.6} {sy-1.6}Z" fill="{YELLOW}" stroke="{INK}" stroke-width="1.4" stroke-linejoin="round"/>'
+    fx, fy = x0 + 2.5 * (s + 1) - 1, y0 + 2.5 * (s + 1) - 1
+    out += (f'<g transform="translate({fx-11} {fy-6.6}) scale(.22)"><path d="M8 30C20 8 52 4 72 22L92 8C88 22 88 38 92 52L72 38C52 56 20 52 8 30Z" fill="#E8B35A" stroke="#B9822E" stroke-width="7" stroke-linejoin="round"/>'
+            f'<circle cx="22" cy="26" r="5" fill="{INK}"/></g>')
+    return frame(tint(YELLOW, .14), out)
+
+
+# Tape Trap: a corner of the wooden floor (a tint of brick, with its seams), a square of masking tape (strips in a tint
+# of gold, edged in a shade of it), and Marmalade's orange face with his number, 3, walking over to it along a dashed
+# path (three steps). All palette colours.
+def tapetrap():
+    out = f'<rect x="12" y="12" width="76" height="76" rx="6" fill="{tint(RED, .2)}" stroke="{INK}" stroke-width="2.5"/>'
+    for v in (37.3, 62.6):
+        out += f'<path d="M12 {v}H88M{v} 12V88" stroke="{tint(RED, .45)}" stroke-width="1.5"/>'
+    out += f'<path d="M25 46V75H40" fill="none" stroke="{INK}" stroke-width="2" stroke-dasharray="3 3" opacity=".5"/>'
+    out += f'<rect x="43" y="68.5" width="14" height="14" fill="none" stroke="{tint(YELLOW, .45)}" stroke-width="5.5"/>'
+    out += f'<rect x="40.2" y="65.7" width="19.6" height="19.6" fill="none" stroke="#B2811F" stroke-width="1"/><rect x="45.8" y="71.3" width="8.4" height="8.4" fill="none" stroke="#B2811F" stroke-width="1"/>'
+    marm = (catface(25, 26, 11, ORANGE).split("<circle")[0]
+            + f'<circle cx="{25-11*.38}" cy="{26+11*.1}" r="{11*.16}" fill="{GREEN}"/><circle cx="{25+11*.38}" cy="{26+11*.1}" r="{11*.16}" fill="{GREEN}"/>')
+    out += marm + circle(35, 38, 7, "#fff", 2) + text(35, 39, 3, 11)
+    return frame(PAPER, out)
+
+
+# Boing!: a room from the side: a ball rolls off the shelf at the top left (its path in dots), comes down on a coil
+# standing on the floor and bounces up and over into a basket on a cupboard, where Ferguson (black, with yellow eyes)
+# is curled up waiting.
+def boing():
+    WOOD = tint(RED, .45)
+    out = f'<path d="M6.5 80H93.5V82Q93.5 93.5 82 93.5H18Q6.5 93.5 6.5 82Z" fill="{tint(YELLOW, .45)}"/><path d="M6.5 80H93.5" stroke="{INK}" stroke-width="2"/>'
+    out += f'<rect x="8" y="28" width="26" height="4" rx="1.5" fill="{WOOD}" stroke="{INK}" stroke-width="1.6"/>'
+    # the ball's path: off the shelf, down onto the spring, up and over into the basket
+    dots = [(36, 25), (40, 31), (43, 40), (45, 50), (46, 60)] + [(50, 52), (55, 40), (61, 32), (67, 30), (73, 33), (77, 40)]
+    out += "".join(f'<circle cx="{x}" cy="{y}" r="1.6" fill="{PLUM}" opacity=".7"/>' for x, y in dots)
+    out += circle(26, 21.5, 5.5, YELLOW, 1.8) + f'<path d="M21.5 19Q26 23 30.5 19" fill="none" stroke="#fff" stroke-width="1.4"/>'
+    # a coil standing on the floor, bouncing
+    out += "".join(f'<ellipse cx="46" cy="{y}" rx="6.5" ry="2.2" fill="none" stroke="{PERI}" stroke-width="2.6"/>' for y in (66, 70, 74, 78))
+    out += "".join(f'<path d="M{x1} {y1}L{x2} {y2}" stroke="{INK}" stroke-width="1.8" stroke-linecap="round"/>' for x1, y1, x2, y2 in [(36, 62, 32, 59), (56, 62, 60, 59), (46, 58, 46, 54)])
+    # the cupboard and the basket, with Ferguson in it
+    out += f'<rect x="66" y="58" width="22" height="22" rx="2" fill="{WOOD}" stroke="{INK}" stroke-width="1.8"/><circle cx="77" cy="69" r="1.4" fill="{YELLOW}"/>'
+    ferg = catface(77, 44, 7.5, INK).split("<circle")[0] + "".join(f'<circle cx="{77 + dx}" cy="45" r="1.5" fill="{YELLOW}"/>' for dx in (-2.8, 2.8))
+    out += ferg
+    out += f'<path d="M64 46H90L87 58H67Z" fill="{tint(YELLOW, .7)}" stroke="{INK}" stroke-width="1.8" stroke-linejoin="round"/>'
+    out += f'<path d="M67 50H87M68 54H86" stroke="{tint(RED, .6)}" stroke-width="1.4"/>'
+    return frame(tint(PERI, .2), out)
+
+
+ICONS = {"catdoku": catdoku, "pounceup": pounceup, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle, "mewhue": mewhue, "pawlinko": pawlinko, "crossstitch": crossstitch, "junkdrawer": junkdrawer, "zoomies": zoomies, "blanket": blanket, "bedhog": bedhog}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "daylight": daylight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle, "mewhue": mewhue, "pawlinko": pawlinko, "crossstitch": crossstitch, "junkdrawer": junkdrawer, "zoomies": zoomies, "blanket": blanket, "bedhog": bedhog, "movingday": movingday, "swapapom": swapapom, "tapetrap": tapetrap, "boing": boing}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")

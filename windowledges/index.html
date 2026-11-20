@@ -4,11 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Window Ledges</title>
+<script src="../move.js?v=2026-11-20.6"></script>
+<meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-09.8"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-20.6"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -25,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-09.8">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.6">
 <style>
 /* Kakuro on a block of flats, at night. The brick is wall; the stone squares in it hold the totals (across at the top
    right, down at the bottom left of the slash); the windows take the numbers 1 to 9, none twice in a run of windows.
@@ -157,16 +159,16 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-09.8"></script>
+<script src="../games.js?v=2026-11-20.6"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // A block of flats on an R × C plan: walls (the top row and left column are always walls, holding the totals) and
 // windows. Every window is in an across run and a down run of 2 or more windows; a run's total is on the wall square
-// before it. Digits 1 to 9, none twice in a run. Levels: [rows, columns, longest run, whether it can be solved without a guess].
+// before it. Digits 1 to 9, none twice in a run. Levels: [rows, columns, longest run, how it can be solved].
 // A puzzle: {R, C, w: array of 0/1 (1 = white), runs: [{cells:[...], sum, dir:"a"|"d"}], sol:[digits]}
 function levelOf(n) {
-  // [rows, cols, longest run, needs no guess]
-  return [null, [6, 6, 4, 1], [7, 7, 5, 1], [8, 8, 5, 1], [9, 9, 6, 1], [10, 10, 6, 0]][n];
+  // [rows, cols, longest run, how it can be solved: 2 a beginner's way (kEasy), 1 without a guess, 0 may need one]
+  return [null, [5, 5, 4, 2], [6, 6, 4, 2], [6, 6, 4, 1], [7, 7, 5, 1], [8, 8, 5, 1], [9, 9, 6, 1], [10, 10, 6, 0]][n];
 }
 // every set of n different digits from 1 to 9, by the sum they make: comboTable()[n][sum] is a list of digit masks
 function comboTable() {
@@ -360,6 +362,33 @@ function kValid(R, C, w, maxRun) {
   while (todo.length) { const i = todo.pop(); for (const j of [i - 1, i + 1, i - C, i + C]) if (w[j] && !seen.has(j) && j >= 0 && j < R * C) { seen.add(j); todo.push(j); } }
   return seen.size === count;
 }
+// A beginner's way through: a run can use the sets of digits that make its total and hold every digit already in it;
+// a window can be what both its runs allow; a window with one digit left, or a digit a run needs that fits only one of
+// its windows, goes in. Gives back the windows still empty when nothing more goes in that way (none: it's solved).
+function kEasy(R, C, runs, w, sol) {
+  const T = comboTable(), N = R * C, g = new Array(N).fill(0), at = new Array(N).fill(null).map(() => []);
+  runs.forEach((r, k) => r.cells.forEach(i => at[i].push(k)));
+  for (;;) {
+    const allow = runs.map(r => {
+      let have = 0, can = 0, need = 0x3FE;
+      for (const i of r.cells) if (g[i]) have |= 1 << g[i];
+      for (const m of T[r.cells.length][r.sum] || []) if ((m & have) === have) { can |= m; need &= m; }
+      return {can: can & ~have, need: need & ~have};
+    });
+    let moved = false;
+    for (let i = 0; i < N; i++) if (w[i] && !g[i]) {
+      let d = 0x3FE; for (const k of at[i]) d &= allow[k].can;
+      if (d && !(d & d - 1)) { g[i] = 31 - Math.clz32(d); moved = true; }
+    }
+    runs.forEach((r, k) => { for (let v = 1; v <= 9; v++) if (allow[k].need >> v & 1) {
+      const fits = r.cells.filter(i => !g[i] && at[i].every(q => allow[q].can >> v & 1));
+      if (fits.length === 1) { g[fits[0]] = v; moved = true; }
+    } });
+    if (!moved) break;
+  }
+  // a digit that isn't the answer's means the totals allow more than one answer; the solver catches that
+  return [...Array(N).keys()].filter(i => w[i] && (!g[i] || (sol && g[i] !== sol[i])));
+}
 function kMake(n) {
   const [R, C, maxRun, logic] = levelOf(n);
   for (;;) {
@@ -367,11 +396,12 @@ function kMake(n) {
     let runs = kRuns(R, C, w), sol = kFill(R, C, w, runs); if (!sol) continue;
     for (let tries = 0; tries < 80; tries++) {
       for (const r of runs) r.sum = r.cells.reduce((a, i) => a + sol[i], 0);
-      const res = kSolve(R, C, runs, w, 2);
-      if (res.count === 1 && !(logic && res.stuck)) return {R, C, w, runs: runs.map(r => ({cells: r.cells, sum: r.sum, dir: r.dir, clue: r.clue})), sol};
+      const res = kSolve(R, C, runs, w, 2), hard = logic === 2 && res.count === 1 ? kEasy(R, C, runs, w, sol) : [];
+      if (res.count === 1 && !(logic && res.stuck) && !hard.length) return {R, C, w, runs: runs.map(r => ({cells: r.cells, sum: r.sum, dir: r.dir, clue: r.clue})), sol};
       if (res.count < 0) break;
       let d;
-      if (res.count === 1) {   // unique but it needs a guess: change a square so it doesn't have to
+      if (hard.length) d = hard[kRand(hard.length)];   // one answer, but not a beginner's way: change a window it got stuck on
+      else if (res.count === 1) {   // unique but it needs a guess: change a square so it doesn't have to
         const open = []; for (let i = 0; i < R * C; i++) if (w[i]) open.push(i);
         d = open[kRand(open.length)];
       } else {
@@ -394,7 +424,7 @@ function kMake(n) {
 
 
 /* ---------- the block ---------- */
-const STORE = "catdoku.windowledges.v1", MAX_LEVEL = 5;
+const STORE = "catdoku.windowledges.v1", MAX_LEVEL = 7;
 const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1, sets: true, autoNotes: false}, state.settings);
@@ -402,9 +432,24 @@ let game = state.game || null, busy = false, sel = -1, running = false;
 // The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
 G.pawLost(() => !game || game.won || game.hinted || game.restarted);
 const save = () => G.save(STORE, {settings, game});
+// The levels moved on 2026-11-20: two beginner's blocks came in as levels 1 and 2, so levels 1 to 5 became 3 to 7.
+// Saves, best times, gold paws by level and share links from before carry the old numbers (settings.levels and a
+// link's L are 7 from then on).
+const movedUp = n => n + 2;
+if (settings.levels !== 7) {
+  if (state.settings) {   // someone who has played before
+    settings.level = movedUp(settings.level);
+    if (game && game.level) game.level = movedUp(game.level);
+    for (const [key, at] of [["catdoku.bests.v1", b => b], ["catdoku.goldpaws.v1", g => g.levels || {}]]) {
+      const box = G.load(key), mine = at(box).windowledges;
+      if (mine) { const moved = {}; for (const n in mine) moved[movedUp(+n)] = mine[n]; at(box).windowledges = moved; G.save(key, box); }
+    }
+  }
+  settings.levels = 7; save();
+}
 const playing = () => game && !game.won && !busy && !running && !$("overlay").classList.contains("show");
-const levelName = n => { const [R, C, , logic] = levelOf(n); return `Level ${n} · ${R - 1} × ${C - 1}${logic ? "" : ", may need a guess"}`; };
-const build = G.builder([levelOf, kRand, kPattern, kRuns, kFill, comboTable, kSolve, kValid, kMake], "kMake");
+const levelName = n => { const [R, C, , logic] = levelOf(n); return `Level ${n} · ${R - 1} × ${C - 1}${logic === 2 ? ", gentle" : logic ? "" : ", may need a guess"}`; };
+const build = G.builder([levelOf, kRand, kPattern, kRuns, kFill, comboTable, kSolve, kValid, kEasy, kMake], "kMake");
 const SITTERS = "c14-63 c18-6 c18-7 c18-17 c18-19 c18-21 c18-26 c18-27 c18-32 c18-40 c19-1 c19-5 c19-6 c19-14 c19-16 c19-17 c19-28 c19-32 c19-37 c19-40 c20-1 c20-17 c20-18 c20-30".split(" ");
 const catSrc = f => (window.CAT_SRC || {})[f] || `../cats/${f}.webp`;
 
@@ -522,10 +567,18 @@ function candidates(i) {
   }
   return can;
 }
-const pad = G.pad({game: () => game, max: () => 9, sel: () => sel, select: i => { sel = i; }, first: () => firstWindow(),
+/* ---------- sound ---------- */
+// The owner's picks from the listening page (2026-11-14), played through G.sound (games.js; on unless Settings turns it off).
+G.sound.define({"wl.lit": G.sound.kit.rec("purr-soundmary")});   // a purr (a recording; 2026-11-15)
+// G.pad plays a number in or out, a note, and every game's low buzz when a number clashes or fills a run wrong; a window
+// lighting up (every run through it adds up) is the logic games' soft note (line).
+const lights = () => { const {right} = check(); return game.w.reduce((n, w, i) => n + (w && plan.at[i].every(k => right[k]) ? 1 : 0), 0); };
+const broken = () => { const c = check(); return c.clash.size + c.wrong.filter(Boolean).length; };
+let litBefore = 0;
+const pad = G.pad({broken, changing: () => { litBefore = lights(); }, game: () => game, max: () => 9, sel: () => sel, select: i => { sel = i; }, first: () => firstWindow(),
   cell: i => !!game.w[i], peers: i => plan.at[i].flatMap(k => plan.runs[k].cells), open: candidates, auto: () => settings.autoNotes, playing,
   push: () => undo.push(), before: i => guesses.before(i), draw, save, noteKeys: ["n", "p"],
-  after: changed => { if (!changed) return; if (check().right.every(Boolean)) { win(); return; } draw(); save(); }});
+  after: changed => { if (!changed) return; if (lights() > litBefore) G.sound.play("line", {}, .1); if (check().right.every(Boolean)) { win(); return; } draw(); save(); }});
 $("cells").addEventListener("click", e => {
   if (!playing()) return;
   const c = e.target.closest(".cell.win"); if (!c) return;
@@ -605,7 +658,7 @@ addEventListener("resize", () => { if (game && plan) draw(); });
 /* ---------- endings ---------- */
 // Every window is lit, so a few cats sit in the windows, then the finishing card.
 function win() {
-  game.won = true; G.finishClock(game); sel = -1; pad.off();
+  game.won = true; G.finishClock(game); sel = -1; pad.off(); G.sound.play("wl.lit");   // every window lit: a purr
   const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
   settings.level = next; $("levelSel").value = next; save();
   pickCats(); $("facade").classList.add("won"); draw();
@@ -662,11 +715,12 @@ async function newPuzzle() {
 
 /* ---------- sharing ---------- */
 $("linkBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Window Ledges", won: game.won,
-  puzzle: () => ({g: "windowledges", N: game.level, r: game.R, c: game.C, w: game.w.join(""), s: game.sums}),
+  puzzle: () => ({g: "windowledges", N: game.level, L: 7, r: game.R, c: game.C, w: game.w.join(""), s: game.sums}),
   progress: () => ({grid: game.grid, notes: game.notes})}); };
 // A puzzle from a share link, with its digits so far if they were sent (that isn't timed). The plan is checked: the
 // right size, every run 2 or more windows, a sensible total for each run, and exactly one answer.
 function openShared(d) {
+  if (d.L !== 7 && Number.isInteger(d.N)) d.N = movedUp(d.N);   // a link from before the levels moved
   const lv = levelOf(d.N), ok = lv && d.r === lv[0] && d.c === lv[1] && typeof d.w === "string" && d.w.length === d.r * d.c && /^[01]+$/.test(d.w) && Array.isArray(d.s);
   let good = false;
   if (ok) {

@@ -39,6 +39,9 @@ the reason they don't apply.
   rather than adding its own (which Apple's Settings page asks for).
 - ⚠️ **Game Center, iCloud saves, haptics, Spatial Audio:** not available to a web page (Safari on iPhone has no
   vibration; saves are per device).
+- ✅ **Playing audio (sound effects):** since 2026-11-14 every game has sound, on unless it's turned off (Settings, for
+  every game or one at a time, or Sound in a game's menu). It's ambient: it mixes with whatever else is playing rather
+  than stopping it, the silent switch mutes it, and it stops while the page is hidden (`G.sound` in `games.js`).
 
 ### Accessibility
 - 🔧 **Support larger text sizes / Dynamic Type:** text follows the iPhone's text size setting, now up to 1.6 times
@@ -174,6 +177,8 @@ the reason they don't apply.
 
 ### Privacy
 - ✅ **Process data on the device:** everything is kept in the browser; GoatCounter counts plays without cookies.
+  Send feedback (in every game's menu) sends only what the player writes, with the game, build, puzzle link, screen and
+  browser, and only when they press Send; the card says what goes with it.
 
 ### Multitasking
 - ✅ **Pause when people switch away:** the clock runs only while the page is showing; action games pause.
@@ -191,7 +196,7 @@ the reason they don't apply.
 - ⚠️ **Toggles:** Apple keeps the switch style for list rows; ours are switches in the settings row, each with just a
   short name (no line under it since 2026-11-07: a switch doesn't change how hard a puzzle counts, so it's safe to
   flip to find out, and its tip says what it does the first time). Left as is.
-- ✅ **Pickers** (level menus); ✅ **segmented control** (Pawlette's Zen and Swipe); ✅ **labels**; ✅ **lists and tables**
+- ✅ **Pickers** (level menus); ✅ **segmented control** (Catlas's Answer pills; Pawlette's Zen and Swipe until November 2026); ✅ **labels**; ✅ **lists and tables**
   (Best times); ✅ **collections** (the front page's tiles); ✅ **page controls** (🔧 the walkthrough's dots);
   ✅ **progress** (counts and the Catdoku streak).
 - ✅ **Alerts:** none at launch; cards only for things that need a choice.

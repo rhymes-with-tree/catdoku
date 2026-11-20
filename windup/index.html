@@ -4,11 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Wind Up</title>
+<script src="../move.js?v=2026-11-20.6"></script>
+<meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-09.8"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-20.6"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -24,7 +26,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-09.8">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.6">
 <style>
 /* Gus sits on the rim of a basket and drops balls of yarn into it; two of a kind that touch wind into one bigger
    ball. Peanut watches from the corner with the next ball. Don't let the yarn pile up over the line. */
@@ -39,7 +41,7 @@
 .goal{display:flex;align-items:center;gap:8px;text-align:right}
 .score{display:inline-flex;align-items:center;height:26px;padding:0 10px;border:2px solid var(--ink);border-radius:999px;
   background:var(--panel);font-variant-numeric:tabular-nums;white-space:nowrap}
-.basket{position:relative;margin:0 auto;aspect-ratio:380/506;width:min(100%, calc((100svh - 330px) * 380 / 506));min-width:250px;max-width:100%;
+.basket{--fit:.751;position:relative;margin:0 auto;aspect-ratio:380/506;width:min(100%, calc((100svh - 330px) * var(--fit)));min-width:calc(333px * var(--fit));max-width:100%;
   touch-action:none;user-select:none;-webkit-user-select:none}
 .basket canvas{display:block;width:100%;height:100%;outline:none}
 .tapgo{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;
@@ -61,10 +63,12 @@ body.full .zoombox{width:auto;margin:0;display:flex;grid-column:3;grid-row:5;ali
   body.full main{grid-template-columns:minmax(0,1fr) 186px;grid-template-rows:auto auto minmax(0,1fr) auto auto;gap:4px 8px}
   /* the basket sized from the window's height, not the column's, and the column kept short: a smaller Peanut and
      next ball, the helpers three to a row, and Pause beside the full screen button */
-  body.full .basket{height:auto;width:min(100%, calc((100svh - 16px) * 380 / 506))}
+  body.full .basket{height:auto;width:min(100%, calc((100svh - 16px) * var(--fit)))}
   body.full .hud .next img{height:36px} body.full .hud canvas{width:34px;height:34px}
   body.full .status{grid-column:2;grid-row:1;flex-direction:column;align-items:flex-start;gap:2px}
-  body.full .msg{flex:none;text-align:left;font-size:14px}
+  /* the note, which ran off the screen and over the helpers in the narrow column, is laid over the foot of the basket */
+  body.full .status.below > .msg{position:fixed;left:16px;right:210px;bottom:max(14px,env(safe-area-inset-bottom));z-index:3;pointer-events:none;
+    padding:6px 12px;border-radius:12px;background:var(--paper);box-shadow:0 0 0 2px var(--ink);text-align:center;font-size:14px;line-height:1.25}
   body.full .hud{grid-column:2;grid-row:2;flex-direction:column;align-items:flex-start;gap:4px}
   body.full .wrap{grid-column:1;grid-row:1 / 6}
   body.full .helpers{grid-column:2;grid-row:3;align-self:end;justify-self:stretch;display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px}
@@ -109,14 +113,17 @@ body.full .zoombox{width:auto;margin:0;display:flex;grid-column:3;grid-row:5;ali
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-09.8"></script>
-<script src="../colorways.js?v=2026-11-09.8"></script>
+<script src="../games.js?v=2026-11-20.6"></script>
+<script src="../colorways.js?v=2026-11-20.6"></script>
 <script>
 /* ---------- the basket ---------- */
 // World units: the basket is W wide and H deep; Gus sits CAT above its rim. Ten sizes of yarn ball, each winding up
 // from two of the one before. Balls are circles with a little physics of their own: gravity, no bounce (yarn is
 // soft), a little friction, and pushing apart when they overlap.
-const W = 360, H = 432, CAT = 64, M = 10, MAXL = 10;   // M: the basket's wicker walls round the sides and floor
+const W = 360, H0 = 432, CAT = 64, M = 10, MAXL = 10;
+// The basket's depth: H0 on the first levels, and deeper on the later ones (LV's `tall`), where it's drawn smaller to fit
+// the same screen, as Tunnel Run's rug is on its bigger levels. Set by setDepth before a basket is dealt.
+let H = H0;   // M: the basket's wicker walls round the sides and floor
 const RAD = [0, 11, 16, 22, 28, 35, 43, 52, 62, 73, 86];
 const PTS = [0, 1, 3, 6, 10, 15, 21, 28, 36, 45, 55];
 const COLOR = ["", "#ECA818", "#4E577D", "#E16A4A", "#73A7AE", "#B94588", "#B3B94B", "#7885BA", "#BD5538", "#8D78AD", "#6AA673"];
@@ -129,20 +136,61 @@ const LV = [null,
   {goal: 8, pool: 5, line: 72, pom: [0, 0], shape: "hump"},
   {goal: 8, pool: 5, line: 100, pom: [.06, 3], shape: "ledge"},
   {goal: 9, pool: 5, line: 100, pom: [.08, 3], shape: "round"},
-  {goal: 9, pool: 5, line: 120, pom: [.1, 4], shape: "ledges"},
-  {goal: 10, pool: 5, line: 90, pom: [.06, 3], shape: "slopeR+ledge"},
-  {goal: 10, pool: 5, line: 100, pom: [.08, 3], shape: "hump+ledgeR"},
-  {goal: 10, pool: 5, line: 125, pom: [.08, 3], shape: "round+hump"},
-  {goal: 10, pool: 5, line: 125, pom: [.0625, 3], shape: "ledges+slope", net: true},
-  {goal: 10, pool: 5, line: 140, pom: [.08, 3], shape: "round+ledges", net: true},
-  {goal: 10, pool: 5, line: 150, pom: [.09, 3], shape: "ledges+slope", net: true}];
+  {goal: 9, pool: 5, line: 100, pom: [.1, 4], shape: "ledges", tall: 30},
+  // Levels 7 to 12's lines, depths and fluffballs were set from a bot (2026-11-20): a simple player using the free helpers
+  // wins about 100% of levels 1 to 5, then 90, 78, 71, 69, 63, 56 and 43% of 6 to 12 (it was 83, 33, 48, 73, 18, 15, 28).
+  // Level 7, the first size 10, is deep and has few fluffballs to ease the step up; fluffballs are the biggest lever.
+  {goal: 10, pool: 5, line: 72, pom: [.03, 3], shape: "slopeR+ledge", tall: 120},
+  {goal: 10, pool: 5, line: 72, pom: [.08, 3], shape: "hump+ledgeR", tall: 80},
+  {goal: 10, pool: 5, line: 105, pom: [.08, 3], shape: "round+hump", tall: 90},
+  {goal: 10, pool: 5, line: 72, pom: [.03, 3], shape: "ledges+slope", net: true, tall: 130},
+  {goal: 10, pool: 5, line: 90, pom: [.03, 3], shape: "round+ledges", net: true, tall: 120},
+  {goal: 10, pool: 5, line: 110, pom: [.05, 3], shape: "ledges+slope", net: true, tall: 130},   // line 120 and fluffballs .09 until 2026-11-16: 4 of 6 baskets piled over (GoatCounter)
+  // Past level 12 (the owner's picks, 2026-11-15), mostly one new thing a level, in a basket as deep as level 9's with the
+  // floor to drop and a few fluffballs (once they've come in at level 4, every level has them: the owner's call, 2026-11-16):
+  // catnip, yarn that unravels, springs, sticky tape, a basket that tips, and Gus in a hurry. Levels 14 and 19 were rubber
+  // balls and no peeking, until the owner found they added nothing (2026-11-16); they're two of the earlier things together
+  // now. Springs and tape ask for a size 9 ball (a bot with no helpers never made a 10 with the tape in 400 drops); the rest for a 10.
+  {goal: 10, pool: 5, line: 100, pom: [.06, 3], shape: "hump", net: true, tall: 90, nip: .06},
+  {goal: 10, pool: 5, line: 100, pom: [.06, 3], shape: "slope+ledge", net: true, tall: 90, nip: .06},
+  {goal: 10, pool: 5, line: 100, pom: [.06, 3], shape: "ledge", net: true, tall: 90, unr: .14},
+  {goal: 9, pool: 5, line: 100, pom: [.06, 3], shape: "springs", net: true, tall: 90},
+  {goal: 9, pool: 5, line: 100, pom: [.06, 3], shape: "tapeFull+hump", net: true, tall: 90},
+  {goal: 10, pool: 5, line: 100, pom: [.06, 3], shape: "hump", net: true, tall: 90, tip: true},
+  {goal: 9, pool: 5, line: 100, pom: [.06, 3], shape: "springs", net: true, tall: 90, tip: true},
+  {goal: 10, pool: 5, line: 100, pom: [.06, 3], shape: "slope+ledge", net: true, tall: 90, hurry: 3},
+  // level 21 (the owner's idea, 2026-11-15): the basket balances on a pivot under its middle and leans with the yarn's weight
+  {goal: 10, pool: 5, line: 100, pom: [.06, 3], shape: "", net: true, tall: 90, weigh: true}];
 const GOALS = LV.map(v => v && v.goal), MAX_LEVEL = LV.length - 1;
+// Endless (the owner's idea, 2026-11-15): no top. Each time the biggest ball there's room for is wound (a 10 at first),
+// the basket zooms out a step: every ball keeps its number but is drawn and rolls a size smaller (rad), the smallest
+// shrink away to nothing, and the drops start a size higher (2 to 6, then 3 to 7…), with the next zoom at an 11, then
+// a 12. It ends when the yarn piles over the line, though the helpers can keep it going as often as you like (the owner's
+// call, 2026-11-16). g.tier counts the zooms.
+const ENDLESS = 99;
+// Now and then (the owner's call: occasionally, not often) a catnip or loose ball comes among the drops, a few fluffballs
+// too, and after a zoom one stretch in two brings springs, tape, a tipping basket, hurry or a leaning basket, until the
+// next zoom. The floor can be dropped, as on every level from 10.
+LV[ENDLESS] = {goal: 10, pool: 5, line: 100, pom: [.05, 3], shape: "", net: true, tall: 60, endless: true, nip: .02, unr: .03};
+const STAGES = ["springs", "tape", "tip", "hurry", "weigh"], STAGE_SAY = {springs: "Springs in the basket", tape: "Sticky tape on the walls",
+  tip: "The basket tips", hurry: "Hurry: Gus drops it after 3 seconds", weigh: "The basket leans with the weight"};
+const isEndless = g => !!(g && LV[g.level].endless);
+// a level's own thing, or (in Endless) the thing this stretch has: has(g, "tip"), "hurry"
+const has = (g, k) => LV[g.level][k] || (g.stage === k ? (k === "hurry" ? 3 : true) : 0);
+const tierOf = () => (game && game.tier) || 0;
+const rad = l => RAD[Math.max(0, Math.min(MAXL, l - tierOf()))];   // a ball's size on screen and in the basket
+const colorOf = l => COLOR[(l - 1) % MAXL + 1];   // past 10 the colours come round again (the size they share is long gone)
+const pts = l => l * (l + 1) / 2;
+const topL = () => MAXL + tierOf();   // the biggest ball there is now
+const goalOf = g => isEndless(g) ? topL() : GOALS[g.level];
+const aN = n => (/^(8|11|18)/.test(String(n)) ? "an " : "a ") + n;   // "an 11", "a 12"
 // Levels 10 to 12 have a floor that can be dropped: once the yarn in the basket weighs enough, it's a net for a few
-// seconds, the basket is shaken, and the small balls (sizes 1 to 3) fall through. It costs the gold paw.
+// seconds, the basket is shaken, and the small balls (sizes 1 to 3) fall through. It counts as a helper (see FREE).
 const hasNet = g => !!LV[g.level].net;
 const NET_AT = .36, NET_FOR = 3, NET_HOLE = RAD[3];   // the floor can drop once the basket is this full, is a net this many seconds, and lets balls up to size 3 through
-const SHAPE_WORDS = {slope: "sloped floor", slopeR: "sloped floor", hump: "hump", ledge: "ledge", ledgeR: "ledge", ledges: "ledges", round: "round corners"};
-const levelName = n => { const v = LV[n], bits = [...new Set(v.shape.split("+").filter(Boolean).map(k => SHAPE_WORDS[k]))]; if (v.pom[0]) bits.push("fluffballs"); if (v.net) bits.push("drop the floor");
+const SHAPE_WORDS = {slope: "sloped floor", slopeR: "sloped floor", hump: "hump", ledge: "ledge", ledgeR: "ledge", ledges: "ledges", round: "round corners", springs: "springs", tape: "sticky tape", tapeFull: "sticky tape"};
+const NEW_WORDS = {nip: "catnip", unr: "unravelling yarn", tip: "a basket that tips", hurry: "hurry!", weigh: "a basket that leans with the weight"};
+const levelName = n => { if (n === ENDLESS) return "Endless"; const v = LV[n], bits = [...new Set(v.shape.split("+").filter(Boolean).map(k => SHAPE_WORDS[k]))]; for (const k in NEW_WORDS) if (v[k]) bits.unshift(NEW_WORDS[k]); if (v.pom[0]) bits.push("fluffballs"); if (v.net && n <= 12) bits.push("drop the floor");
   return `Level ${n} · size ${v.goal} ball` + (bits.length ? ", " + bits.join(", ") : ""); };
 // The shapes in the basket: a line of points with a half-thickness (a single point is a round peg), and for the corners
 // (net: part of the floor, which turns to net with it when the floor is dropped)
@@ -155,10 +203,25 @@ const SHAPE = {
   slope: rnd => { const h = span(rnd, 60, 100); return [{pts: [[0, H - h], [W, H]], hr: 3, fill: [[0, H - h], [W, H], [0, H]], net: true}]; },   // the floor higher on the left, so balls roll right
   slopeR: rnd => { const h = span(rnd, 60, 100); return [{pts: [[W, H - h], [0, H]], hr: 3, fill: [[W, H - h], [0, H], [W, H]], net: true}]; },
   hump: rnd => [{pts: [[W / 2 + span(rnd, -70, 70), H + span(rnd, 6, 20)]], hr: span(rnd, 38, 52)}],
-  ledge: rnd => { const y = span(rnd, 214, 262), len = span(rnd, 70, 100); return [{pts: [[0, y], [len, y + span(rnd, 16, 34)]], hr: 5}]; },
-  ledgeR: rnd => { const y = span(rnd, 228, 276), len = span(rnd, 70, 100); return [{pts: [[W, y], [W - len, y + span(rnd, 16, 34)]], hr: 5}]; },
-  ledges: rnd => { const y1 = span(rnd, 196, 220), y2 = y1 + span(rnd, 70, 92);
+  // Ledges are placed up from the floor (H), so a deeper basket has them lower, not up by the line, where they trapped
+  // the yarn (until 2026-11-20 they were measured down from the top: a bot won level 12 28% of the time, then 40%).
+  // On the 432-deep baskets they're where they always were.
+  ledge: rnd => { const y = H - 218 + span(rnd, 0, 48), len = span(rnd, 70, 100); return [{pts: [[0, y], [len, y + span(rnd, 16, 34)]], hr: 5}]; },
+  ledgeR: rnd => { const y = H - 204 + span(rnd, 0, 48), len = span(rnd, 70, 100); return [{pts: [[W, y], [W - len, y + span(rnd, 16, 34)]], hr: 5}]; },
+  ledges: rnd => { const y1 = H - 236 + span(rnd, 0, 24), y2 = y1 + span(rnd, 70, 92);
     return [[0, y1, 1], [W, y2, -1]].map(([x, y, d]) => { const len = span(rnd, 66, 96); return {pts: [[x, y], [x + d * len, y + span(rnd, 16, 34)]], hr: 5}; }); },
+  // springs (level 16): one on the floor and one up each wall; a ball that lands on one is mostly bounced off, but
+  // now and then it gets tangled in the coil and stays put until a shake or a wind frees it
+  springs: rnd => { const fx = span(rnd, 110, 250), y1 = H - span(rnd, 150, 230), y2 = H - span(rnd, 110, 200);
+    // a coil standing from its base along its axis (into the basket); its top end is what balls land on (see springTick)
+    const coil = (bx, by, ax, ay, len) => ({spring: true, base: [bx, by], axis: [ax, ay], len, hr: 13, comp: 0, pts: [[bx, by], [bx + ax * len, by + ay * len]]});
+    return [coil(fx, H, 0, -1, 50), coil(0, y1, 1, 0, 44), coil(W, y2, -1, 0, 44)]; },
+  // sticky tape (level 17): a strip down each wall that a ball of yarn sticks to; stuck, it unravels a size at a time
+  // level 17's tape runs all the way down both walls, from just under the line to the floor (above the line a ball
+  // stuck to it would count as over the line straight away)
+  tapeFull: rnd => [3, W - 3].map(x => ({pts: [[x, LV[17].line + 12], [x, H - 4]], hr: 4, tape: true})),
+  tape: rnd => { const y1 = H - span(rnd, 150, 260), y2 = H - span(rnd, 120, 230);
+    return [{pts: [[3, y1], [3, y1 + 70]], hr: 4, tape: true}, {pts: [[W - 3, y2], [W - 3, y2 + 70]], hr: 4, tape: true}]; },
   round: rnd => { const R = span(rnd, 46, 74); return [-1, 1].map(side => {   // a curved corner each side of the floor: an arc of radius R, filled in behind
     const pts = Array.from({length: 9}, (_, k) => { const f = Math.PI / 2 * (k / 8), phi = side < 0 ? Math.PI - f : f; return [(side < 0 ? R : W - R) + R * Math.cos(phi), H - R + R * Math.sin(phi)]; });
     return {pts, hr: 3, fill: [...pts, [side < 0 ? 0 : W, H]], net: true};
@@ -171,7 +234,8 @@ function basketFor(seed, v) {
   const fx = ([x, y]) => [W - x, y];
   return shapes.map(sh => ({...sh, pts: sh.pts.map(fx), fill: sh.fill && sh.fill.map(fx)}));
 }
-const POM_TOP = 6;   // puffballs wind up to this size; two of the biggest puff away
+const POM_TOP = 6;   // puffballs wind up to this size; two of the biggest puff away (in Endless, a size higher with each zoom: pomTop)
+const pomTop = () => POM_TOP + tierOf();
 const SHAKE_FOR = .9;   // seconds the basket wobbles after a shake
 const SUB = 6, STEP = 1 / 60, ITER = 4, GRACE = 1.1, LOSE_AFTER = 2.4, COOL = 0.4;
 
@@ -180,6 +244,9 @@ const mulberry = s => () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s
 function dropFor(seed, i, v) {
   const rnd = mulberry(seed ^ Math.imul(i + 1, 0x9E3779B1)), r = rnd();
   if (v.pom[0] && rnd() < v.pom[0]) return {l: 1 + Math.floor(rnd() * v.pom[1]), p: true};
+  // levels 13 to 15's new balls (only these levels draw the extra numbers, so older baskets and links come out the same)
+  if (v.nip && rnd() < v.nip) return {l: 1, p: false, k: "nip"};
+  if (v.unr && rnd() < v.unr) return {l: 1 + Math.floor(r * r * v.pool), p: false, k: "unr"};
   return {l: 1 + Math.floor(r * r * v.pool), p: false};
 }
 
@@ -206,11 +273,22 @@ function sprite(l, p) {
   if (set[l]) return set[l];
   if (p) return fluffSprite(l, set);
   const svg = ballEl("svg", {viewBox: "-1.05 -1.05 2.1 2.1", width: 256, height: 256}); svg.append(ballDefs());
-  const g = yarnBall(COLOR[l], 1); g.removeChild(g.firstChild);   // the ground shadow isn't wanted on a ball that turns
+  const g = yarnBall(colorOf(l), 1); g.removeChild(g.firstChild);   // the ground shadow isn't wanted on a ball that turns
   svg.append(g);
   const im = new Image(); im.onload = () => { im.ok = true; paintHud(); };
   im.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(new XMLSerializer().serializeToString(svg));
   return set[l] = im;
+}
+// The standing coil spring from the owner's sheet (toys/spring-up.webp, grey), tinted gold once it's loaded.
+let springTinted = null;
+function springPic() {
+  if (springTinted) return springTinted;
+  const im = pic("../toys/spring-up.webp"); if (!im.complete || !im.naturalWidth) return null;
+  const c = document.createElement("canvas"); c.width = im.naturalWidth; c.height = im.naturalHeight; const x = c.getContext("2d");
+  x.drawImage(im, 0, 0); x.globalCompositeOperation = "multiply"; x.fillStyle = "#F2C35A"; x.fillRect(0, 0, c.width, c.height);
+  x.globalCompositeOperation = "screen"; x.fillStyle = "rgba(236,168,24,.35)"; x.fillRect(0, 0, c.width, c.height);
+  x.globalCompositeOperation = "destination-in"; x.drawImage(im, 0, 0);
+  return springTinted = c;
 }
 const picCache = {};
 const pic = src => picCache[src] || (picCache[src] = Object.assign(new Image(), {src}));
@@ -225,28 +303,55 @@ let state = G.load(STORE);
 let settings = Object.assign({level: 1, tries: {}, numbers: false}, state.settings);
 let game = null;
 // The gold paw's gone for this puzzle once any of these is true, and the tools that cost it lose their red (games.js).
-G.pawLost(() => !game || !!settings.tries[game.level] || game.shook || game.fluffed || game.dropped);
+// Helpers (Shake, De-fluff, Drop the floor): the first FREE uses on a basket don't cost the gold paw (the owner's call,
+// 2026-11-12: the higher levels couldn't be won without a Shake, so a gold paw there wasn't possible); the next one
+// does, and so does keeping going from the card after the yarn piles over the line (game.revived).
+const FREE = 3;
+const pawGone = g => (g.helps || 0) > FREE || !!g.revived;
+// One more helper used: count it, and say what it did (`did`) with how many free ones are left.
+function helped(g, did) {
+  if (isEndless(g)) { G.note(did, 2500); return; }   // no gold paw to lose in Endless
+  g.helps = (g.helps || 0) + 1;
+  const left = FREE - g.helps;
+  G.note(did + (g.revived ? "" : left > 0 ? ` ${left} more helper${left === 1 ? "" : "s"} before it costs the gold paw.` : left === 0 ? " One more helper costs the gold paw." : left === -1 ? " That costs the gold paw this time." : ""), 3500);
+}
+// The helpers stay plain while they're free (fewer than FREE used), and turn red when the next one would cost the paw.
+const HELPERS = ["shakeBtn", "fluffBtn", "netBtn"];
+G.pawLost(() => !game || !!settings.tries[game.level] || pawGone(game), id => HELPERS.includes(id) && (game.helps || 0) < FREE);
 const cv = $("cv"), ctx = cv.getContext("2d");
-const nextOf = g => dropFor(g.seed, g.i, LV[g.level]);   // the ball Gus is holding
-const afterOf = g => dropFor(g.seed, g.i + 1, LV[g.level]);   // the one after it, beside Peanut
+const shifted = (d, g) => g.tier ? {...d, l: d.l + g.tier} : d;   // Endless: the drops start a size higher with each zoom
+const nextOf = g => shifted(dropFor(g.seed, g.i, LV[g.level]), g);   // the ball Gus is holding
+const afterOf = g => shifted(dropFor(g.seed, g.i + 1, LV[g.level]), g);   // the one after it, beside Peanut
 const save = () => G.save(STORE, {settings, game: game && ["running", "paused"].includes(game.state) ? {
-  level: game.level, seed: game.seed, i: game.i, score: game.score, best: game.best, ms: game.ms, started: game.started, timed: game.timed, shook: !!game.shook, fluffed: !!game.fluffed, dropped: !!game.dropped,
-  balls: game.balls.map(b => [Math.round(b.x * 10) / 10, Math.round(b.y * 10) / 10, b.l, Math.round(b.a * 100) / 100, b.p ? 1 : 0])} : null});
+  level: game.level, seed: game.seed, i: game.i, score: game.score, best: game.best, ms: game.ms, started: game.started, timed: game.timed, shook: !!game.shook, fluffed: !!game.fluffed, dropped: !!game.dropped, helps: game.helps || 0, revived: !!game.revived, tier: game.tier || 0, stage: game.stage || "", extra: game.shapes.filter(sh => isEndless(game) && (sh.spring || sh.tape)).map(({hold, wt, ...sh}) => ({...sh, comp: 0})),
+  balls: game.balls.map(b => [Math.round(b.x * 10) / 10, Math.round(b.y * 10) / 10, b.l, Math.round(b.a * 100) / 100, b.p ? 1 : 0, flagsOf(b), b.head ? game.balls.indexOf(b.head) : -1])} : null});
+// a ball's kind, in one number for saving: catnip 1, unravelling 4, unravelling from tape 8, stuck to tape 16 (2 was a
+// rubber ball, taken out 2026-11-16: one in an old save comes back as plain yarn)
+const flagsOf = b => (b.nip ? 1 : 0) | (b.unr ? 4 : 0) | (b.tu ? 8 : 0) | (b.stuck && b.tu ? 16 : 0);
+const kindsOf = f => ({nip: !!(f & 1), unr: !!(f & 4), tu: !!(f & 8), stuck: !!(f & 16)});
 
+// Make the basket as deep as level n's, and the page's box the same shape (the stage's --aspect is depth over width).
+function setDepth(n) {
+  H = H0 + (LV[n].tall || 0);
+  const w = W + 2 * M, h = CAT + H + M, box = cv.parentElement;
+  box.style.aspectRatio = `${w} / ${h}`; box.style.setProperty("--fit", w / h);
+  const stage = box.closest(".stage"); if (stage) stage.style.setProperty("--aspect", (h / w).toFixed(3));
+}
 function newGame(n, seed) {
-  closeCard();
+  closeCard(); setDepth(n);
   seed = seed || (Math.random() * 2 ** 31) | 0;
   game = {level: n, line: LV[n].line, shapes: basketFor(seed, LV[n]), seed, i: 0, balls: [], score: 0, best: 0, cool: 0, net: 0, netReady: false, fell: 0, shakeT: 0, shakeCool: 0, overT: 0, aim: W / 2, fx: [], state: "ready", ...G.freshClock()};
   $("tapgo").hidden = true; status(); paintHud(); save();
+  setTimeout(newThing, 400);
 }
 function closeCard() { G.closeCard(); }
-const aimRange = l => [RAD[l] + 2, W - RAD[l] - 2];
+const aimRange = l => [rad(l) + 2, W - rad(l) - 2];
 const clampAim = x => { const [a, b] = aimRange(nextOf(game).l); return Math.max(a, Math.min(b, x)); };
 
 function status() {
   $("score").textContent = `${game.score} points`;
-  $("goalTxt").textContent = `Wind a size ${GOALS[game.level]} ball`;
-  $("bestTxt").textContent = game.best ? `Biggest so far: ${game.best}` : "";
+  $("goalTxt").textContent = isEndless(game) ? `Wind ${aN(goalOf(game))} to zoom out` : `Wind a size ${GOALS[game.level]} ball`;
+  $("bestTxt").textContent = isEndless(game) ? `Best: ${Math.max(settings.endlessBest || 0, game.score)} points` : game.best ? `Biggest so far: ${game.best}` : "";
   G.relabel($("pauseBtn"), game.state === "paused" ? "Go on" : "Pause", game.state === "paused" ? "play" : "pause");
   $("shakeBtn").disabled = !["running", "won"].includes(game.state);   // a won basket can still be shaken, just for fun
   $("netBtn").hidden = !hasNet(game);
@@ -288,24 +393,76 @@ function dropFloor() {
   const g = game;
   if (!g || !hasNet(g) || g.state !== "running" || g.net > 0 || $("overlay").classList.contains("show") || document.querySelector(".spot")) return;
   if (!g.netReady) { G.note("Not heavy enough yet: wind and drop more yarn first.", 2500); return; }
-  g.net = NET_FOR; g.shakeT = SHAKE_FOR;
+  g.net = NET_FOR; g.shakeT = SHAKE_FOR; G.sound.play("wu.floor");
   // a sifting shake: the big balls are bounced up and the small ones pushed down, so the small ones slip under them
   for (const b of g.balls) {
     if (b.r <= NET_HOLE + .5) { b.vy += 250; b.vx += (Math.random() - .5) * 200; }
     else { b.vy -= 650 * (.7 + Math.random() * .5); b.vx += (Math.random() - .5) * 300; }
     b.age = Math.min(b.age, 0);
   }
-  G.note(g.dropped ? "The floor drops: it's a net!" : "The floor drops: it's a net! That costs the gold paw this time.", 3000); g.dropped = true; status(); save();
+  helped(g, "The floor drops: it's a net!"); g.dropped = true; status(); save();
+}
+// Which two balls touching wind together, and how: "nip" (catnip and a ball of yarn: the yarn winds one size up), or
+// "wind" (two the same, as ever). Catnip never winds with catnip.
+function pairing(a, c) {
+  if (a.nip || c.nip) { const y = a.nip ? c : a; return !y.nip && !y.p && y.l < topL() ? "nip" : ""; }
+  return a.l === c.l && a.p === c.p && a.l < (a.p ? pomTop() + 1 : topL()) ? "wind" : "";
+}
+const SPRING_V = 820, TANGLE = .12, TIP = .1, TIP_T = 6, TIP_FIT = .88;   // how hard a spring throws; how often it tangles; the tipping basket's lean (radians) and its swing (seconds)
+const wt = b => b.stuck ? 0 : 1 / (b.r * b.r);   // a stuck ball doesn't move
+// How far the basket leans now: rocking back and forth (level 18), or with the yarn's weight (level 21, g.lean, which
+// follows the weight slowly in tick). Either way it's drawn a little smaller (TIP_FIT) so it stays in its box.
+const tipping = g => !!(has(g, "tip") || has(g, "weigh"));
+const tiltOf = g => has(g, "tip") ? TIP * Math.sin(2 * Math.PI * (g.tt || 0) / TIP_T) : has(g, "weigh") ? g.lean || 0 : 0;
+const WEIGH_MAX = .16;   // the most it leans with the weight (radians, about 9°)
+function weighTick(g) {
+  // the yarn's balance point, as a share of half the basket from the middle (right is +), its weight by each ball's area;
+  // a basket only partly full leans less
+  let m = 0, mx = 0; for (const b of g.balls) { const a = b.r * b.r; m += a; mx += a * (b.x - W / 2); }
+  const off = m ? mx / m / (W / 2) : 0, full = Math.min(1, m * Math.PI / (W * H * .07));
+  const want = -Math.max(-1, Math.min(1, off * 2.6)) * WEIGH_MAX * full;   // heavier on the right: the right side goes down
+  g.lean = (g.lean || 0) + (want - (g.lean || 0)) * Math.min(1, STEP * 2.5);   // more responsive since 2026-11-17 (the owner's call): follows the weight in about half a second, and leans further for less
+}
+// The springs (level 16): a ball caught on top squashes the coil over HOLD seconds, then it's flung off along the coil
+// (with a little wobble to either side) and the coil boings back, wobbling as it settles. comp is how far it's squashed
+// (a share of its length; below 0 it's stretched), and its top end moves with it.
+const HOLD = .13;
+function springTick(g, h) {
+  g.shapes.forEach((sh, si) => {
+    if (!sh.spring || !sh.base) return;   // (springs saved by an older build have no axis: they just sit there)
+    const [bx, by] = sh.base, [ax, ay] = sh.axis;
+    if (sh.hold) {
+      const b = sh.hold.b;
+      if (!g.balls.includes(b) || b.stuck) { sh.hold = null; sh.wt = 0; }
+      else {
+        sh.hold.t += h; sh.comp = .45 * Math.min(1, sh.hold.t / HOLD);
+        const top = sh.len * (1 - sh.comp) + sh.hr + b.r;
+        b.x = bx + ax * top; b.y = by + ay * top; b.vx = b.vy = 0;
+        if (sh.hold.t >= HOLD) {
+          const v = SPRING_V * (.85 + .3 * Math.random()), side = (Math.random() - .5) * 220;
+          b.vx = ax * v - ay * side; b.vy = ay * v + ax * side; b.w = (Math.random() - .5) * 2; b.springCool = .6;
+          sh.hold = null; sh.wt = 0; G.sound.play("wu.spring");
+        }
+      }
+    } else if (sh.wt !== undefined) { sh.wt += h; sh.comp = .45 * Math.exp(-4.5 * sh.wt) * Math.cos(26 * sh.wt); if (sh.wt > 1.6) { delete sh.wt; sh.comp = 0; } }
+    if (g.balls.some(b => b.tangle === si)) sh.comp = .3;   // a tangled ball squashes it
+    const c = Math.max(sh.comp || 0, sh.rest || 0); sh.rest = Math.max(0, (sh.rest || 0) - h);
+    sh.pts = [[bx, by], [bx + ax * sh.len * (1 - c), by + ay * sh.len * (1 - c)]];
+  });
 }
 function step(g, h) {
-  const B = g.balls, merges = [], cs = [];
-  for (const b of B) { b.vy += TUNE.GRAV * h * (g.net > 0 && b.r <= NET_HOLE + .5 ? 2.5 : 1);   // small balls sink through a dropped floor
+  springTick(g, h);
+  const B = g.balls, merges = [], cs = [], tilt = tiltOf(g), gx = -Math.sin(tilt), gy = Math.cos(tilt);   // straight down the screen, whichever way the basket leans
+  for (const b of B) { if (b.stuck) { b.vx = b.vy = 0; continue; }
+    const pull = TUNE.GRAV * h * (g.net > 0 && b.r <= NET_HOLE + .5 ? 2.5 : 1); b.vy += pull * gy; b.vx += pull * gx;   // small balls sink through a dropped floor; a tipping basket pulls them sideways
     const sp = Math.hypot(b.vx, b.vy); if (sp > 1400) { b.vx *= 1400 / sp; b.vy *= 1400 / sp; } }
   // contacts: pairs touching (or within a hair), and the walls. n points from A to C (from a wall, into the ball).
   for (const b of B) b.floor = false;
-  const contact = (A, C, nx, ny) => { if (!A && ny < -.5) C.floor = true; const wa = A ? 1 / (A.r * A.r) : 0, wc = 1 / (C.r * C.r); const vn0 = (C.vx - (A ? A.vx : 0)) * nx + (C.vy - (A ? A.vy : 0)) * ny;
-    // a hit harder than BOUNCE_MIN springs back a share of its speed (FLOOR_BOUNCE for fluffballs and YARN_FLOOR_BOUNCE for yarn off the floor, BOUNCE between balls and off the sides); gentler contacts don't bounce, so piles stay calm
-    cs.push({A, C, nx, ny, wa, wc, k: wa + wc, jn: 0, jt: 0, bias: vn0 < -TUNE.BOUNCE_MIN ? -vn0 * (!A && ny < -.5 ? (C.p ? TUNE.FLOOR_BOUNCE : TUNE.YARN_FLOOR_BOUNCE) : TUNE.BOUNCE) : 0}); };
+  const contact = (A, C, nx, ny, push = 0) => { if (!A && ny < -.5) C.floor = true; const wa = A ? wt(A) : 0, wc = wt(C); if (!(wa + wc)) return; const vn0 = (C.vx - (A ? A.vx : 0)) * nx + (C.vy - (A ? A.vy : 0)) * ny;
+    // a hit harder than BOUNCE_MIN springs back a share of its speed (FLOOR_BOUNCE for fluffballs and YARN_FLOOR_BOUNCE for yarn off the floor, BOUNCE between balls and off the sides); gentler contacts don't bounce, so piles stay calm.
+    // A spring (push) throws a ball off at its own speed.
+    const give = !A && ny < -.5 ? (C.p ? TUNE.FLOOR_BOUNCE : TUNE.YARN_FLOOR_BOUNCE) : TUNE.BOUNCE;
+    cs.push({A, C, nx, ny, wa, wc, k: wa + wc, jn: 0, jt: 0, bias: Math.max(push, vn0 < -TUNE.BOUNCE_MIN ? -vn0 * give : 0)}); };
   for (let i = 0; i < B.length; i++) {
     const a = B[i];
     for (let j = i + 1; j < B.length; j++) {
@@ -316,15 +473,35 @@ function step(g, h) {
       // balls that rub as they meet set each other spinning, a bit
       const vt = (c.vx - a.vx) * (-dy / d) + (c.vy - a.vy) * (dx / d);
       if (Math.abs(vt) > TUNE.KICK_MIN && Math.hypot(c.vx - a.vx, c.vy - a.vy) > TUNE.KICK_SPEED) { const m = Math.max(-TUNE.SPIN, Math.min(TUNE.SPIN, vt * TUNE.KICK)); a.w = Math.max(-TUNE.SPIN, Math.min(TUNE.SPIN, a.w + m / a.r)); c.w = Math.max(-TUNE.SPIN, Math.min(TUNE.SPIN, c.w + m / c.r)); }
-      if (a.l === c.l && a.p === c.p && a.l < (a.p ? POM_TOP + 1 : MAXL)) merges.push([a, c]);
+      const how = pairing(a, c); if (how) merges.push([a, c, how]);
     }
     if (a.y >= H - a.r - .4 && !throughNet(g, a)) contact(null, a, 0, -1);
     if (a.x <= a.r + .4) contact(null, a, 1, 0);
     if (a.x >= W - a.r - .4) contact(null, a, -1, 0);
-    for (const sh of g.shapes) for (let k = 0; k < Math.max(1, sh.pts.length - 1); k++) {
+    g.shapes.forEach((sh, si) => { for (let k = 0; k < Math.max(1, sh.pts.length - 1); k++) {
       if (sh.net && throughNet(g, a)) continue;
-      const hit = nearOnShape(a, sh, k); if (hit && hit.d < a.r + sh.hr + .4) contact(null, a, hit.nx, hit.ny);
-    }
+      const hit = nearOnShape(a, sh, k); if (!hit || hit.d >= a.r + sh.hr + .4) continue;
+      let push = 0;
+      // (not a ball poking above the line: stuck there, it would end the game)
+      if (sh.tape && !a.stuck && !a.p && !a.nip && a.y - a.r > g.line + 4) { Object.assign(a, {stuck: true, tu: true, vx: 0, vy: 0, w: 0}); G.sound.play("wu.tape"); }   // stuck to the tape
+      else if (sh.spring && !a.stuck && !sh.hold && !B.some(o => o.tangle === si)) {
+        // landing on the top of the coil: it squashes, holds the ball a moment, then flings it (springTick); now and
+        // then the ball tangles in the coil instead. A ball just resting there presses it down a little.
+        const along = (a.x - sh.base[0]) * sh.axis[0] + (a.y - sh.base[1]) * sh.axis[1], into = -(a.vx * sh.axis[0] + a.vy * sh.axis[1]);
+        if (along > sh.len * .65) {
+          if (into > 70 && !(a.springCool > 0)) {
+            a.springCool = .6;
+            if (Math.random() < TANGLE) {   // caught in the coil: it sits on the squashed coil's top, with yarn wound round it (drawn with the coil)
+              const top = sh.len * .7 + sh.hr + a.r;   // (a tangled ball squashes it to .3: springTick)
+              Object.assign(a, {stuck: true, tangle: si, x: sh.base[0] + sh.axis[0] * top, y: sh.base[1] + sh.axis[1] * top, vx: 0, vy: 0, w: 0}); G.sound.play("wu.tangle");
+              if (!g.toldTangle) { g.toldTangle = true; G.note("Tangled in the spring! Shake to free it.", 2500); }
+            }
+            else sh.hold = {b: a, t: 0};
+          } else sh.rest = .12;
+        }
+      }
+      contact(null, a, hit.nx, hit.ny, push);
+    } });
   }
   for (let it = 0; it < 8; it++) for (const q of cs) {
     const {A, C} = q, tx = -q.ny, ty = q.nx;
@@ -337,16 +514,19 @@ function step(g, h) {
     if (A) { A.vx -= jt * tx * q.wa; A.vy -= jt * ty * q.wa; }
     C.vx += jt * tx * q.wc; C.vy += jt * ty * q.wc;
   }
-  for (const b of B) { b.x += b.vx * h; b.y += b.vy * h; }
-  // ease overlaps apart by moving, not by speed
+  for (const b of B) { if (b.stuck) continue; b.x += b.vx * h; b.y += b.vy * h; if (b.springCool > 0) b.springCool -= h; }
+  // ease overlaps apart by moving, not by speed (and keep tail balls on their strands)
   for (let it = 0; it < 3; it++) {
+    ropeTick(g);
     for (let i = 0; i < B.length; i++) for (let j = i + 1; j < B.length; j++) {
       const a = B[i], c = B[j], dx = c.x - a.x, dy = c.y - a.y, s = a.r + c.r;
       if (dx * dx + dy * dy >= (s - SLOP) * (s - SLOP)) continue;
-      const d = Math.sqrt(dx * dx + dy * dy) || .001, pen = Math.min(s - SLOP - d, 3) * .6, wa = 1 / (a.r * a.r), wc = 1 / (c.r * c.r), t = wa + wc, nx = dx / d, ny = dy / d;
+      const d = Math.sqrt(dx * dx + dy * dy) || .001, pen = Math.min(s - SLOP - d, 3) * .6, wa = wt(a), wc = wt(c), t = wa + wc, nx = dx / d, ny = dy / d;
+      if (!t) continue;
       a.x -= nx * pen * wa / t; a.y -= ny * pen * wa / t; c.x += nx * pen * wc / t; c.y += ny * pen * wc / t;
     }
     for (const b of B) {
+      if (b.stuck) continue;
       for (const sh of g.shapes) for (let k = 0; k < Math.max(1, sh.pts.length - 1); k++) {
         if (sh.net && throughNet(g, b)) continue;
         const hit = nearOnShape(b, sh, k), need = hit && b.r + sh.hr - SLOP;
@@ -358,45 +538,118 @@ function step(g, h) {
   // how they turn, and settling to rest
   for (const b of B) {
     // a ball rolling along the floor turns with it; any other spin dies away in under a second
-    if (b.floor) b.w += (b.vx / b.r - b.w) * TUNE.ROLL; else b.w *= 1 - (b.vx * b.vx + b.vy * b.vy < 36 ? TUNE.STOP_FADE : TUNE.SPIN_FADE) * h;
+    if (b.stuck) b.w = 0; else if (b.floor) b.w += (b.vx / b.r - b.w) * TUNE.ROLL; else b.w *= 1 - (b.vx * b.vx + b.vy * b.vy < 36 ? TUNE.STOP_FADE : TUNE.SPIN_FADE) * h;
     b.w = Math.max(-TUNE.SPIN, Math.min(TUNE.SPIN, b.w));
   }
   for (const b of B) { b.vx *= .9995; b.vy *= .9995; if (b.vx * b.vx + b.vy * b.vy < .25 && b.age > .3) { b.vx *= .9; b.vy *= .9; } b.a += b.w * h; }
   return merges;
 }
+/* ---------- sound ---------- */
+// The owner's picks from the listening page (2026-11-14), played through G.sound (games.js; on unless Settings turns it off).
+const SND = G.sound.kit;
+G.sound.define({
+  "wu.drop": t => SND.whoosh(t, 1400, 700, .15, .075),   // a soft whoosh as Gus lets go (halved, the owner's call, 2026-11-16)
+  "wu.land": (t, o) => G.sound.get("pompomLand")(t, {k: o.v || 1}),   // lands: a fluffy thup, as Pawlinko's yarn (softer for a gentler landing)
+  "wu.merge": (t, o) => { const p = 1.6 / Math.sqrt(o.n || 3); SND.tone({fs: [[0, 300 * p], [.05, 1200 * p]], t, dur: .06, vol: .22}); },   // a pop, lower for a bigger ball
+  "wu.goal": t => [1319, 1568, 1976].forEach((f, i) => SND.bell({f, t: t + i * .06, dur: .45, vol: .08, ratio: 2.01, index: .6})),   // sparkle
+  "wu.over": (t, o) => SND.tick(t, .14, (o.k || 0) % 2 ? 1500 : 2200),   // tick-tock while the yarn's over the line
+  "wu.shake": G.sound.get("shake"),
+  "wu.defluff": G.sound.get("pompomLand"),   // de-fluff: a fluffy thup
+  "wu.floor": t => SND.thump(t, .45, 80),   // a thunk
+  "wu.spring": G.sound.get("spring"),   // springs: the shared spring boing
+  "wu.tangle": G.sound.get("yarnLand"),   // caught in a spring: a soft thud
+  "wu.tape": G.sound.get("tape"),   // stuck to the tape: the sticky thhp
+  "wu.unravel": t => SND.whoosh(t, 2600, 1200, .12, .04),   // a ball loses a size: a little zip
+});
 function mergeAll(g, pairs) {
   const used = new Set(), gone = new Set(), made = [];
-  for (const [a, c] of pairs) {
+  for (const [a, c, how] of pairs) {
     if (used.has(a) || used.has(c)) continue;
     used.add(a); used.add(c);
+    if (how === "nip") {   // catnip: the ball of yarn winds one size up, and the catnip's used up
+      const nip = a.nip ? a : c, y = a.nip ? c : a;
+      gone.add(nip); y.l++; y.r = rad(y.l); y.pop = .65;
+      g.score += pts(y.l); g.best = Math.max(g.best, y.l);
+      g.fx.push({x: y.x, y: y.y, r: y.r, t: 0, T: .45, c: "#6AA673", to: y}, {x: y.x, y: y.y, r: y.r, t: 0, T: .4, c: colorOf(y.l), to: y});
+      made.push(y); continue;
+    }
     const l = a.l + 1, x = (a.x + c.x) / 2, y = (a.y + c.y) / 2, p = a.p;
     gone.add(a); gone.add(c);
     const wind = {wind: true, l: a.l, p, x, y, ox: a.x - x, oy: a.y - y, pxo: c.x - x, pyo: c.y - y, a0: a.a, a1: c.a, t: 0, T: TUNE.WIND};
     g.fx.push(wind);
-    if (p && l > POM_TOP) { g.fx.push({x, y, r: RAD[a.l], t: 0, T: .4, c: "#9F9DA2"}); continue; }   // two of the biggest puffballs puff away
-    const nb = mk(x, y, l, {p, vx: (a.vx + c.vx) / 2 + (Math.random() - .5) * TUNE.MERGE_NUDGE, vy: (a.vy + c.vy) / 2, age: GRACE, pop: .65, born: 0});
+    if (p && l > pomTop()) { g.fx.push({x, y, r: rad(a.l), t: 0, T: .4, c: "#9F9DA2"}); continue; }   // two of the biggest puffballs puff away
+    // winding a ball off the tape (or one wound from one) doesn't save it: the new ball unravels too. Loose yarn
+    // (level 15) is saved by winding it.
+    const nb = mk(x, y, l, {p, vx: (a.vx + c.vx) / 2 + (Math.random() - .5) * TUNE.MERGE_NUDGE, vy: (a.vy + c.vy) / 2, age: GRACE, pop: .65, born: 0, tu: !!(a.tu || c.tu)});
     made.push(nb); wind.to = nb;   // the swirl follows the new ball as it settles
-    if (!p) { g.score += PTS[l]; g.best = Math.max(g.best, l); }
-    g.fx.push({x, y, r: RAD[l], t: 0, T: .4, c: p ? "#9F9DA2" : COLOR[l], to: nb});
+    if (!p) { g.score += pts(l); g.best = Math.max(g.best, l); }
+    g.fx.push({x, y, r: rad(l), t: 0, T: .4, c: p ? "#9F9DA2" : colorOf(l), to: nb});
   }
-  g.balls = g.balls.filter(b => !gone.has(b)).concat(made);
+  g.balls = g.balls.filter(b => !gone.has(b)).concat(made.filter(b => !g.balls.includes(b)));
+  for (const b of g.balls) { if (b.tail && gone.has(b.tail)) b.tail = null; if (b.head && gone.has(b.head)) b.head = null; }   // a strand to a ball wound away is cut
+  if (made.length) G.sound.play("wu.merge", {n: Math.max(...made.map(b => b.l))});
   if (pairs.length) status();
 }
-function mk(x, y, l, o = {}) { return Object.assign({x, y, px: x, py: y, vx: 0, vy: 0, l, r: RAD[l], a: Math.random() * 6.28, w: 0, age: 0, pop: 1, p: false}, o); }
+// Loose yarn (level 15) and yarn off the tape (level 17) unravel onto a second ball, joined to it by a strand (the
+// owner's idea, 2026-11-15): with every drop (every 7 seconds until 2026-11-17, the owner's call) the loose ball loses a
+// size and the one on its tail gains one. Two
+// the same size that touch wind together as ever; otherwise it carries on until all the yarn's on the tail ball,
+// which is then an ordinary ball. b.tail is the ball it's unravelling onto, and that ball's .head points back.
+const ROPE = 26;   // how much slack the strand has, past the two balls' edges
+function unravelTick(g) {
+  let moved = false;
+  for (const b of g.balls) {
+    if ((!b.unr && !b.tu) || b.gone) continue;
+    moved = true;
+    let t = b.tail && g.balls.includes(b.tail) && !b.tail.gone ? b.tail : null;
+    if (!t) {   // the first turn: a little ball starts on the end of the strand, below and to one side
+      const side = b.x < W / 2 ? 1 : -1;
+      t = mk(Math.max(RAD[1], Math.min(W - RAD[1], b.x + side * (b.r + 8))), Math.min(H - RAD[1], b.y + b.r * .6), g.tier + 1, {age: GRACE, pop: .7, born: 1, vx: side * 40});
+      t.l = (g.tier || 0); t.r = 0;   // grows to size 1 just below
+      g.balls.push(t); b.tail = t; t.head = b;
+    }
+    t.l++; t.r = rad(t.l); t.pop = .75;
+    if (b.l - 1 > (g.tier || 0)) { b.l--; b.r = rad(b.l); b.pop = .8; }
+    else { b.gone = true; t.head = null; }   // the last of it: the tail ball has all the yarn now, and is an ordinary ball
+    if (t.l > g.best && !t.p) g.best = t.l;
+  }
+  if (moved) { g.balls = g.balls.filter(b => !b.gone); for (const b of g.balls) { if (b.tail && !g.balls.includes(b.tail)) b.tail = null; if (b.head && !g.balls.includes(b.head)) b.head = null; } G.sound.play("wu.unravel"); }
+}
+// The strand: a tail ball can't wander further than ROPE past its loose ball's edge; it's pulled back along it.
+function ropeTick(g) {
+  for (const t of g.balls) {
+    const h = t.head; if (!h) continue;
+    const dx = t.x - h.x, dy = t.y - h.y, d = Math.hypot(dx, dy) || .001, L = h.r + t.r + ROPE;
+    if (d <= L) continue;
+    const wa = wt(h), wc = wt(t), k = wa + wc; if (!k) continue;
+    const nx = dx / d, ny = dy / d, pen = d - L;
+    h.x += nx * pen * wa / k; h.y += ny * pen * wa / k; t.x -= nx * pen * wc / k; t.y -= ny * pen * wc / k;
+    const vn = (t.vx - h.vx) * nx + (t.vy - h.vy) * ny;   // and they stop moving apart
+    if (vn > 0) { h.vx += nx * vn * wa / k; h.vy += ny * vn * wa / k; t.vx -= nx * vn * wc / k; t.vy -= ny * vn * wc / k; }
+  }
+}
+function mk(x, y, l, o = {}) { return Object.assign({x, y, px: x, py: y, vx: 0, vy: 0, l, r: rad(l), a: Math.random() * 6.28, w: 0, age: 0, pop: 1, p: false}, o); }
 
 function tick(g, dt) {
   g.acc = (g.acc || 0) + Math.min(dt, .05);
   while (g.acc >= STEP) {
     g.acc -= STEP;
     for (let s = 0; s < SUB; s++) { const m = step(g, STEP / SUB); if (m.length) mergeAll(g, m); }
+    // a dropped ball's first landing (its fall stopped short), for its thump
+    for (const b of g.balls) { if (b.drop && b.vy < (b.lastVy || 0) - 120) { G.sound.play("wu.land", {v: Math.max(.35, Math.min(1, b.lastVy / 500))}); b.drop = false; } b.lastVy = b.vy; }
     for (const b of g.balls) { b.age += STEP; if (b.pop < 1) b.pop = Math.min(1, b.pop + STEP * .35 / (TUNE.WIND * .9)); if (b.born < 1) b.born += STEP; }
     g.cool = Math.max(0, g.cool - STEP); g.shakeT = Math.max(0, (g.shakeT || 0) - STEP); g.shakeCool = Math.max(0, (g.shakeCool || 0) - STEP);
     for (const f of g.fx) f.t += STEP; g.fx = g.fx.filter(f => f.t < f.T);
     if (g.state !== "running") continue;   // after a win the balls keep moving, with nothing more to check
     if (hasNet(g)) netTick(g);
+    if (has(g, "tip")) g.tt = (g.tt || 0) + STEP;
+    if (has(g, "weigh")) weighTick(g);
+    // Hurry (level 20): wait too long and Gus drops the ball himself
+    if (has(g, "hurry") && g.cool <= 0 && (g.wait = (g.wait || 0) + STEP) > has(g, "hurry")) drop(true);
     const over = g.balls.some(b => b.age > GRACE && b.y - b.r < g.line);
     g.overT = over ? g.overT + STEP : Math.max(0, g.overT - STEP * 2);
-    if (g.best >= GOALS[g.level]) return win();
+    const tk = over ? Math.floor(g.overT / .3) : 0; if (tk && tk !== g.tickK) G.sound.play("wu.over", {k: tk}); g.tickK = tk;
+    if (g.best >= goalOf(g)) return isEndless(g) ? zoomOut(g) : win();
     if (g.overT > LOSE_AFTER) return lose();
   }
 }
@@ -414,9 +667,22 @@ function size() {
   if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
   return cv.width / (W + 2 * M);
 }
-function drawBall(c, l, x, y, r, a, alpha = 1, p = false) {
-  const im = sprite(l, p); if (!im.ok) return;
-  c.save(); c.globalAlpha = alpha; c.translate(x, y); c.rotate(a); const s = r * 2 * 1.05; c.drawImage(im, -s / 2, -s / 2, s, s); c.restore();
+// k: a ball's kind past level 12: "nip" (catnip: a sage-green felt ball with leaves) or "loose" (yarn that unravels: a
+// loose end trails off it).
+const kindOf = b => b.nip ? "nip" : (b.unr || b.tu) && !b.tail ? "loose" : "";   // (with a tail ball, the strand shows instead of the loose end)
+function drawBall(c, l, x, y, r, a, alpha = 1, p = false, k = "") {
+  c.save(); c.globalAlpha = alpha; c.translate(x, y); c.rotate(a);
+  if (k === "nip") {
+    c.beginPath(); c.arc(0, 0, r, 0, 7); c.fillStyle = "#6AA673"; c.fill(); c.lineWidth = Math.max(1.5, r * .12); c.strokeStyle = "#2A2530"; c.stroke();
+    c.fillStyle = "#3E6A47"; for (let i = 0; i < 3; i++) { c.save(); c.rotate(i * 2.1); c.beginPath(); c.ellipse(r * .35, 0, r * .38, r * .17, .5, 0, 7); c.fill(); c.restore(); }
+    c.restore(); return;
+  }
+  const im = sprite(l, p); if (!im.ok) { c.restore(); return; }
+  if (k === "loose") {   // the loose end, trailing off
+    c.beginPath(); c.moveTo(r * .55, r * .6); c.bezierCurveTo(r * 1.1, r * .9, r * .9, r * 1.35, r * 1.45, r * 1.4);
+    c.lineWidth = Math.max(2, r * .14); c.lineCap = "round"; c.strokeStyle = colorOf(l); c.stroke();
+  }
+  const sz = r * 2 * 1.05; c.drawImage(im, -sz / 2, -sz / 2, sz, sz); c.restore();
 }
 // An optional number on each ball (its size, 1 to 10), for telling sizes apart without relying on colour.
 function drawNumber(c, l, x, y, r, p) {
@@ -429,7 +695,9 @@ function paint() {
   const k = size(), g = game;
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); // the basket jolts and tilts while it's shaken, less as it settles
   const st = g.shakeT || 0, sk = st > 0 && !matchMedia("(prefers-reduced-motion: reduce)").matches ? st / SHAKE_FOR : 0;
+  const tilt = tiltOf(g);   // levels 18 and 21: the basket tips, about its middle, drawn a little smaller (TIP_FIT) so it stays in its box
   ctx.setTransform(k, 0, 0, k, 0, 0); ctx.translate(M + W / 2 + Math.sin(st * 75) * 14 * sk, CAT + H / 2 + Math.cos(st * 61) * 9 * sk); ctx.rotate(Math.sin(st * 47) * .035 * sk); ctx.translate(-W / 2, -H / 2);
+  if (tipping(g)) { ctx.translate(W / 2, H / 2); ctx.scale(TIP_FIT, TIP_FIT); ctx.rotate(-tilt); ctx.translate(-W / 2, -H / 2); }
   // the basket
   // gold at 15% strength on white
   ctx.fillStyle = "#FCF2DC"; ctx.beginPath(); ctx.roundRect(0, 0, W, H, [0, 0, 22, 22]); ctx.fill();
@@ -441,6 +709,26 @@ function paint() {
       ctx.strokeStyle = "#BB871E"; ctx.lineWidth = 2;
       for (let x = -H; x < W + H; x += 14) { ctx.beginPath(); ctx.moveTo(x, H - 90); ctx.lineTo(x + 100, H + 10); ctx.moveTo(x + 100, H - 90); ctx.lineTo(x, H + 10); ctx.stroke(); }
       ctx.restore(); ctx.strokeStyle = "#BB871E"; ctx.lineWidth = sh.hr * 2; ctx.beginPath(); sh.pts.forEach(([x, y], k) => k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke(); ctx.strokeStyle = "#59555E";
+      continue;
+    }
+    if (sh.spring && sh.base) {   // the coil (the owner's spring picture, tinted gold), standing along its axis, squashed or stretched
+      const [bx, by] = sh.base, [ax, ay] = sh.axis, c = Math.max(sh.comp || 0, sh.rest || 0), len = sh.len * (1 - c) + 6, im = springPic();
+      ctx.save(); ctx.translate(bx, by); ctx.rotate(Math.atan2(ax, -ay));
+      if (im) ctx.drawImage(im, -15, -len, 30, len);
+      ctx.lineCap = "round"; ctx.lineWidth = 5; ctx.strokeStyle = "#2A2530"; ctx.beginPath(); ctx.moveTo(-14, -len + 1); ctx.lineTo(14, -len + 1); ctx.stroke();   // a cap on top
+      const tb = g.balls.find(b => b.tangle === g.shapes.indexOf(sh));
+      if (tb) {   // a tangled ball's yarn wound round the coil, so it reads as caught rather than floating
+        ctx.lineWidth = 2.5; ctx.strokeStyle = colorOf(tb.l); ctx.beginPath();
+        for (let i = 0; i < 4; i++) { const y = -len * (.15 + i * .22); ctx.moveTo(-16, y + 5); ctx.lineTo(16, y - 5); }
+        ctx.moveTo(0, -len); ctx.lineTo(0, -len - 8); ctx.stroke();
+      }
+      ctx.restore(); ctx.fillStyle = ctx.strokeStyle = "#59555E"; ctx.lineWidth = sh.hr * 2;
+      continue;
+    }
+    if (sh.tape) {   // a strip of tape down the wall, a little see-through, with its torn ends
+      const [[x1, y1], [, y2]] = sh.pts, w = 9, x = x1 < W / 2 ? 0 : W - w;
+      ctx.save(); ctx.fillStyle = "rgba(236,168,24,.45)"; ctx.fillRect(x, y1, w, y2 - y1);
+      ctx.strokeStyle = "rgba(187,135,30,.8)"; ctx.lineWidth = 1; ctx.setLineDash([2, 3]); ctx.strokeRect(x, y1, w, y2 - y1); ctx.restore();
       continue;
     }
     if (sh.fill) { ctx.beginPath(); sh.fill.forEach(([x, y], k) => k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.fill(); }
@@ -456,19 +744,30 @@ function paint() {
   // where the next ball will land
   const nb = nextOf(g), nl = nb.l, ax = clampAim(g.aim);
   if (["ready", "running"].includes(g.state)) {
-    ctx.save(); ctx.strokeStyle = "rgba(42,37,48,.18)"; ctx.lineWidth = 2; ctx.setLineDash([3, 7]); ctx.beginPath(); ctx.moveTo(ax, RAD[nl] * 2 + 2); ctx.lineTo(ax, H); ctx.stroke(); ctx.restore();
+    ctx.save(); ctx.strokeStyle = "rgba(42,37,48,.18)"; ctx.lineWidth = 2; ctx.setLineDash([3, 7]); ctx.beginPath(); { const tl = tiltOf(g), y0 = rad(nl) * 2 + 2, len = H - y0;   // straight down the screen, as the ball will fall
+      ctx.moveTo(ax, y0); ctx.lineTo(ax - Math.sin(tl) * len, y0 + Math.cos(tl) * len); } ctx.stroke(); ctx.restore();
   }
   // a ball just wound up fades in as the two balls wind into it
-  for (const b of g.balls) { drawBall(ctx, b.l, b.x, b.y, b.r * (.9 + .1 * b.pop), b.a, b.born < 1 ? Math.max(0, Math.min(1, (b.born - TUNE.WIND * .35) / (TUNE.WIND * .55))) : 1, b.p); drawNumber(ctx, b.l, b.x, b.y, b.r, b.p); }
+  for (const t of g.balls) if (t.head) {   // the strand from a loose ball to the ball it's unravelling onto
+    const h = t.head, mx = (h.x + t.x) / 2, my = Math.max(h.y, t.y) + 14;
+    ctx.save(); ctx.lineWidth = 2.5; ctx.lineCap = "round"; ctx.strokeStyle = colorOf(h.l); ctx.beginPath(); ctx.moveTo(h.x, h.y); ctx.quadraticCurveTo(mx, my, t.x, t.y); ctx.stroke(); ctx.restore();
+  }
+  for (const b of g.balls) { drawBall(ctx, b.l, b.x, b.y, b.r * (.9 + .1 * b.pop), b.a, b.born < 1 ? Math.max(0, Math.min(1, (b.born - TUNE.WIND * .35) / (TUNE.WIND * .55))) : 1, b.p, kindOf(b)); if (!b.nip) drawNumber(ctx, b.l, b.x, b.y, b.r, b.p); }
   // two balls winding into each other: they swing round their middle, closing in and turning, as the bigger one comes up
   for (const f of g.fx) if (f.wind) {
-    const u = f.t / f.T, e = u * u * (3 - 2 * u), th = e * Math.PI * 2 * TUNE.WIND_TURNS, cs = Math.cos(th), sn = Math.sin(th), al = 1 - Math.max(0, (u - .5) / .5), r = RAD[f.l] * (1 - .25 * e);
+    const u = f.t / f.T, e = u * u * (3 - 2 * u), th = e * Math.PI * 2 * TUNE.WIND_TURNS, cs = Math.cos(th), sn = Math.sin(th), al = 1 - Math.max(0, (u - .5) / .5), r = rad(f.l) * (1 - .25 * e);
     const fx = f.to ? f.to.x : f.x, fy = f.to ? f.to.y : f.y;
     for (const [ox, oy, a0] of [[f.ox, f.oy, f.a0], [f.pxo, f.pyo, f.a1]]) drawBall(ctx, f.l, fx + (ox * cs - oy * sn) * (1 - e), fy + (ox * sn + oy * cs) * (1 - e), r, a0 + th * TUNE.WIND_SPIN, al, f.p);
   }
-  for (const f of g.fx) if (f.puff) { const u = f.t / f.T; drawBall(ctx, f.l, f.x, f.y, f.r * (1 + .5 * u), f.a, 1 - u, !f.yarn); }
+  for (const f of g.fx) if (f.puff) { const u = f.t / f.T; drawBall(ctx, f.l, f.x, f.y, f.r * (1 + .5 * u), f.a, 1 - u, !f.yarn && !f.k, f.k || ""); }
   for (const f of g.fx) if (!f.wind && !f.puff && f.t >= 0) { ctx.save(); ctx.globalAlpha = 1 - f.t / f.T; ctx.strokeStyle = f.c; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(f.to ? f.to.x : f.x, f.to ? f.to.y : f.y, f.r * (1 + (f.t / f.T) * (f.grow || .44)), 0, 7); ctx.stroke(); ctx.restore(); }
-  if (["ready", "running"].includes(g.state)) { drawBall(ctx, nl, ax, RAD[nl] + 2, RAD[nl], 0, g.cool > 0 ? .25 : .85, nb.p); if (g.cool <= 0) drawNumber(ctx, nl, ax, RAD[nl] + 2, RAD[nl], nb.p); }
+  if (["ready", "running"].includes(g.state)) {
+    const nk = nb.k === "unr" ? "loose" : nb.k || "";
+    drawBall(ctx, nl, ax, rad(nl) + 2, rad(nl), 0, g.cool > 0 ? .25 : .85, nb.p, nk); if (g.cool <= 0 && !nb.k) drawNumber(ctx, nl, ax, rad(nl) + 2, rad(nl), nb.p);
+    // Hurry (level 20): a ring round the ball Gus holds runs down until he drops it himself
+    const hu = has(g, "hurry"); if (hu && g.state === "running" && g.cool <= 0) { const f = Math.max(0, 1 - (g.wait || 0) / hu);
+      ctx.save(); ctx.lineWidth = 4; ctx.lineCap = "round"; ctx.strokeStyle = f < .35 ? "#BD5538" : "#E16A4A"; ctx.beginPath(); ctx.arc(ax, rad(nl) + 2, rad(nl) + 6, -Math.PI / 2, -Math.PI / 2 + f * Math.PI * 2); ctx.stroke(); ctx.restore(); }
+  }
   // the basket: woven wicker walls round the sides and floor (gold, a quarter ink), outlined in ink, the tops of the
   // sides rounded off as its rim
   const wall = () => { ctx.beginPath(); ctx.moveTo(-M / 2, -4); ctx.lineTo(-M / 2, H - 20); ctx.arcTo(-M / 2, H + M / 2, 20, H + M / 2, 22); ctx.lineTo(W - 20, H + M / 2);
@@ -489,26 +788,30 @@ function paint() {
   if (gus.complete && gus.naturalWidth) { const h = CAT + 4, w = h * gus.naturalWidth / gus.naturalHeight, gx = Math.max(w / 2, Math.min(W - w / 2, ax)); ctx.drawImage(gus, gx - w / 2, -CAT + 2, w, h); }
 }
 function paintHud() {
-  for (const [id, l, p] of [["nextCv", game ? afterOf(game).l : 1, game ? afterOf(game).p : false], ["goalCv", game ? GOALS[game.level] : 6, false]]) {
-    const c = $(id).getContext("2d"), im = sprite(l, p), s = id === "goalCv" ? 92 : 92 * (RAD[l] / RAD[5]) ** .85;
+  const af = game ? afterOf(game) : {l: 1, p: false};
+  for (const [id, l, p, k] of [["nextCv", af.l, af.p, af.k === "unr" ? "loose" : af.k || ""], ["goalCv", game ? goalOf(game) : 6, false, ""]]) {
+    const c = $(id).getContext("2d"), im = sprite(l, p), s = id === "goalCv" ? 92 : 92 * (rad(l) / RAD[5]) ** .85;
     c.clearRect(0, 0, 92, 92);
-    if (im.ok) { const d = Math.min(92, id === "goalCv" ? 92 * (RAD[l] / RAD[MAXL]) ** .5 : s); c.drawImage(im, 46 - d / 2, 46 - d / 2, d, d); drawNumber(c, l, 46, 46, d / 2, p); }
+    if (im.ok) { const d = Math.min(92, id === "goalCv" ? 92 * (rad(l) / RAD[MAXL]) ** .5 : s); if (k) drawBall(c, l, 46, 46, d / 2 / 1.05, 0, 1, p, k); else c.drawImage(im, 46 - d / 2, 46 - d / 2, d, d); if (!k || k === "loose") drawNumber(c, l, 46, 46, d / 2, p); }
   }
 }
 addEventListener("resize", paint);
 
 /* ---------- dropping ---------- */
-function drop() {
+function drop(hurried) {
   const g = game;
   if (!g || !["ready", "running"].includes(g.state) || g.cool > 0 || $("overlay").classList.contains("show") || document.querySelector(".spot")) return;
-  if (g.state === "ready") { g.state = "running"; g.started = true; $("tapgo").hidden = true; }
-  const {l, p} = nextOf(g);
-  g.balls.push(mk(clampAim(g.aim), RAD[l] + 2, l, {p, vy: 60, vx: (Math.random() - .5) * TUNE.DROP_NUDGE})); g.i++; g.cool = COOL;
+  g.wait = 0; if (hurried) G.note("Too slow! Gus dropped it.", 1500);
+  if (g.state === "ready") { if (!g.started) G.track(`Wind Up started level ${g.level}`); g.state = "running"; g.started = true; $("tapgo").hidden = true; }
+  unravelTick(g);   // loose yarn, and yarn on the tape, loses a size with every drop
+  const {l, p, k} = nextOf(g);
+  g.balls.push(mk(clampAim(g.aim), rad(l) + 2, l, {p, nip: k === "nip", unr: k === "unr", vy: 60, vx: (Math.random() - .5) * TUNE.DROP_NUDGE, drop: true})); g.i++; g.cool = COOL; G.sound.play("wu.drop");
   status(); paintHud(); save();
 }
 function aimTo(e) {
   if (!game) return;
   const r = cv.getBoundingClientRect(); game.aim = (e.clientX - r.left) / r.width * (W + 2 * M) - M;
+  if (tipping(game)) game.aim = W / 2 + (game.aim - W / 2) / TIP_FIT;   // the tipping basket is drawn smaller
 }
 let down = false;
 cv.addEventListener("pointerdown", e => {
@@ -528,26 +831,27 @@ addEventListener("keydown", e => {
   else if (k === "l" || k === "L") defluff();
   else if (k === "n" || k === "N") dropFloor();
 });
-// Shake: the basket jolts and every ball is thrown up and sideways, so a stuck pile loosens. It costs the gold paw, and the balls
+// Shake: the basket jolts and every ball is thrown up and sideways, so a stuck pile loosens. It counts as a helper (see FREE), and the balls
 // get a few seconds before they count as over the line again. Once the level's won it's free: shake away and watch what winds.
 function shake() {
   const g = game;
   if (!g || !["running", "won"].includes(g.state) || $("overlay").classList.contains("show") || document.querySelector(".spot")) return;
   if (g.shakeCool > 0) { G.note("Give the yarn a moment to settle.", 1800); return; }
-  for (const b of g.balls) { const lift = 1050 / Math.sqrt(b.r / 11) * (.55 + Math.random() * .6); b.vy -= lift; b.vx += (Math.random() - .5) * 700; b.w = (Math.random() - .5) * 2 * TUNE.SPIN * 2; b.age = -2.5; }
-  g.overT = 0; g.shakeT = SHAKE_FOR; g.shakeCool = 3;
+  for (const b of g.balls) if (b.tangle !== undefined) { b.stuck = false; delete b.tangle; b.springCool = 1; }   // a shake shakes the springs loose (not the tape)
+  for (const b of g.balls) { if (b.stuck) continue; const lift = 1050 / Math.sqrt(b.r / 11) * (.55 + Math.random() * .6); b.vy -= lift; b.vx += (Math.random() - .5) * 700; b.w = (Math.random() - .5) * 2 * TUNE.SPIN * 2; b.age = -2.5; }
+  g.overT = 0; g.shakeT = SHAKE_FOR; g.shakeCool = 3; G.sound.play("wu.shake");
   if (g.state === "won") return;   // just for fun: nothing more to win or lose
-  if (!g.shook) G.note("Shaken! That costs the gold paw this time.", 3500);
-  g.shook = true; save();
+  helped(g, "Shaken!");
+  g.shook = true; status(); save();
 }
-// De-fluff: a lint roller that takes every fluffball off the board, as often as there's fluff to take. It costs the gold paw.
+// De-fluff: a lint roller that takes every fluffball off the board, as often as there's fluff to take. It counts as a helper (see FREE).
 function defluff() {
   const g = game;
   if (!g || g.state !== "running" || $("overlay").classList.contains("show") || document.querySelector(".spot")) return;
   const fluff = g.balls.filter(b => b.p);
   if (!fluff.length) { G.note("No fluffballs on the board right now.", 2500); return; }
   for (const b of fluff) g.fx.push({puff: true, l: b.l, x: b.x, y: b.y, r: b.r, a: b.a, t: 0, T: .45});
-  G.note(g.fluffed ? "All the fluff is gone." : "All the fluff is gone. That costs the gold paw this time.", 3000);
+  helped(g, "All the fluff is gone."); G.sound.play("wu.defluff");
   g.balls = g.balls.filter(b => !b.p); g.fluffed = true;
   status(); save();
 }
@@ -563,6 +867,7 @@ document.addEventListener("visibilitychange", () => { if (document.hidden) pause
 // Going over the line: a card offers Shake or De-fluff to keep going (either costs the gold paw), or starting again.
 // The try only counts, and a win streak only ends, once the player gives up on this basket.
 function lose() {
+  if (isEndless(game)) return endlessOver(game);
   game.state = "lost"; status();
   G.track(`Wind Up overflowed on level ${game.level}`);
   const g = game;
@@ -578,17 +883,50 @@ function lose() {
       null, G.otherSize($("levelSel"), g.level, n => { giveUp(g); startLevel(n); }, "Or play a different level:"), {result: {n: g.level}});
   }, 700);
 }
+// Endless: a zoom, and the end of a run
+function zoomOut(g) {
+  g.tier = (g.tier || 0) + 1;
+  const top = g.balls.find(b => b.l === g.best && !b.p);
+  for (const b of g.balls.filter(b => b.l <= g.tier)) g.fx.push({puff: true, l: b.l, x: b.x, y: b.y, r: b.r, a: b.a, t: 0, T: .5, yarn: true});   // too small to see now
+  g.balls = g.balls.filter(b => b.l > g.tier);
+  for (const b of g.balls) { b.r = rad(b.l); b.pop = .75; b.age = Math.min(b.age, 0); }
+  if (top) ["#ECA818", "#E16A4A", "#B94588"].forEach((c, k) => g.fx.push({x: top.x, y: top.y, r: top.r, t: -k * .2, T: .9, c, grow: 2}));
+  g.overT = 0; G.sound.play("wu.goal"); G.track(`Wind Up endless zoom ${g.tier}`);
+  // the stretch until the next zoom: half the time something extra, never the same twice running
+  g.shapes = g.shapes.filter(sh => !sh.spring && !sh.tape);
+  for (const b of g.balls) if (b.stuck) { b.stuck = false; delete b.tangle; }   // what held them has gone (tape's yarn keeps unravelling)
+  g.stage = Math.random() < .5 ? STAGES.filter(k => k !== g.stage)[Math.floor(Math.random() * (STAGES.length - (STAGES.includes(g.stage) ? 1 : 0)))] : "";
+  if (g.stage === "springs" || g.stage === "tape") g.shapes.push(...SHAPE[g.stage](Math.random));
+  g.tt = 0; g.wait = 0;
+  G.note(`Zoomed out! A size ${g.best} ball. Drops now start at size ${g.tier + 1}; next zoom at ${aN(goalOf(g))}.` + (g.stage ? ` ${STAGE_SAY[g.stage]}, until then.` : ""), 5500);
+  status(); paintHud(); save();
+}
+function endlessOver(g) {
+  g.state = "lost"; status();
+  const best = settings.endlessBest = Math.max(settings.endlessBest || 0, g.score); save();
+  G.track(`Wind Up endless over at ${g.tier || 0} zooms`);
+  setTimeout(() => {
+    if (game !== g) return;
+    // keep going as often as you like (the owner's call, 2026-11-16), with any helper that would do something
+    const btns = [["Shake and keep going", () => { closeCard(); revive(g, "shake"); }, true]];
+    if (g.balls.some(b => b.p)) btns.push(["De-fluff and keep going", () => { closeCard(); revive(g, "fluff"); }]);
+    btns.push(["Drop the floor and keep going", () => { closeCard(); revive(g, "net"); }]);
+    btns.push(["New run", () => { closeCard(); G.breakStreak(); newGame(ENDLESS); }], ["Back to the levels", () => { closeCard(); startLevel(settings.lastLevel || 1); }]);
+    G.loseCard("Over the line!", `${g.score} points, up to a size ${g.best || 1} ball${g.tier ? `, zoomed out ${g.tier} time${g.tier > 1 ? "s" : ""}` : ""}. ` + (g.score && g.score >= best ? "Your best yet!" : `Your best is ${best}.`),
+      btns, null, null, {result: {n: null}});
+  }, 700);
+}
 function giveUp(g) { if (!g.counted) { g.counted = true; settings.tries[g.level] = (settings.tries[g.level] || 0) + 1; save(); } }
 function revive(g, how) {
   if (game !== g || g.state !== "lost") return;
-  g.state = "running"; g.overT = 0; $("tapgo").hidden = true;
+  g.state = "running"; g.overT = 0; $("tapgo").hidden = true; g.revived = true;
   if (how === "shake") { g.shakeCool = 0; shake(); }
   else if (how === "net") { g.netReady = true; g.net = 0; dropFloor(); }
   else { defluff(); for (const b of g.balls) b.age = Math.min(b.age, 0); }   // a moment before anything counts as over the line
   status(); save();
 }
 function win() {
-  game.state = "won"; G.finishClock(game);
+  game.state = "won"; G.finishClock(game); G.sound.play("wu.goal");
   // a finale: the finished ball pops up and rings of colour spread out from it, before the card
   const top = game.balls.find(b => b.l === GOALS[game.level] && !b.p);
   if (top) { top.pop = .7; top.born = 1; ["#ECA818", "#E16A4A", "#B94588"].forEach((c, k) => game.fx.push({x: top.x, y: top.y, r: top.r, t: -k * .22, T: .9, c, grow: 1.4})); }
@@ -601,16 +939,16 @@ function win() {
     const im = new Image(); im.className = "pic"; im.src = catSrc("kitten-1"); im.alt = "Gus and Peanut as kittens, sitting side by side";
     const text = `A size ${GOALS[g.level]} ball, with ${g.score} points.` + (g.level === MAX_LEVEL ? " That's the biggest ball there is; here it is again." : ` Next up: level ${next}.`);
     G.winCard(text, () => { closeCard(); startLevel(next); }, "Admire the yarn", g.result,
-      {title: "All wound up!", gold: first && !g.shook && !g.fluffed && !g.dropped, goldWhy: "First try, no helpers!", goldTitle: "Even Peanut is impressed!", goldPic: [im], next: next > g.level ? `Next: level ${next}` : "Next basket",
+      {title: "All wound up!", gold: first && !pawGone(g), goldWhy: g.helps ? "First try, with just a little help!" : "First try, no helpers!", goldTitle: "Even Peanut is impressed!", goldPic: [im], next: next > g.level ? `Next: level ${next}` : "Next basket",
        top: g.level === MAX_LEVEL, onAdmire: () => G.note("Shake the basket all you like now, and watch what winds up.", 0), after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
   }, 1700);
 }
-function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); closeCard(); newGame(n); }
+function startLevel(n) { if (n !== ENDLESS) settings.lastLevel = n; settings.level = n; $("levelSel").value = n; save(); closeCard(); newGame(n); }
 const leave = () => { if (["running", "paused"].includes(game.state)) { settings.tries[game.level] = (settings.tries[game.level] || 0) + 1; save(); } else if (game.state === "lost") giveUp(game); closeCard(); };
 $("restartBtn").onclick = () => { if (game) { leave(); newGame(game.level, game.seed); } };
 $("newBtn").onclick = () => { if (game) { leave(); newGame(game.level); } };
 // Share: the level and the order the yarn comes in, as dealt.
-$("linkBtn").onclick = () => { if (game) { pause(); G.shareCard({name: "Wind Up", what: "basket", won: game.state === "won", puzzle: () => ({g: "windup", N: game.level, s: game.seed})}); } };
+$("linkBtn").onclick = () => { if (game && isEndless(game)) { G.note("An Endless run can't be shared, but any level can.", 3500); return; } if (game) { pause(); G.shareCard({name: "Wind Up", what: "basket", won: game.state === "won", puzzle: () => ({g: "windup", N: game.level, s: game.seed})}); } };
 function openShared(d) {
   if (!(d.N >= 1 && d.N <= MAX_LEVEL) || !Number.isInteger(d.s)) throw new Error("the shared basket doesn't fit the game");
   settings.level = d.N; $("levelSel").value = d.N; save(); newGame(d.N, d.s);
@@ -637,12 +975,27 @@ function helpOnFirstVisit() {
   ];
   G.spotlight({grid: cv, w: cols, h: rows, steps, done: () => { settings.seenHelp = true; save(); }});
 }
+// The first time each of levels 13 to 20 is played, a step of its own says what's new.
+const NEW_SAY = {nip: ["Catnip winds any ball one size up", "nextCv"],
+  unr: ["Loose yarn unravels: wind it to save it", "nextCv"], springs: ["Springs bounce balls, but sometimes tangle", null],
+  tape: ["Tape catches yarn, and it unravels, even wound", null], tip: ["The basket tips back and forth", null],
+  hurry: ["Hurry! Wait too long and Gus drops it", null],
+  weigh: ["The basket leans with the weight: keep it level", null]};
+function newThing() {
+  if (!game || !settings.seenHelp || game.level <= 12 || isEndless(game) || document.querySelector(".spot") || $("overlay").classList.contains("show")) return;
+  const v = LV[game.level], key = Object.keys(NEW_SAY).find(k => v[k] || v.shape.split("+").map(x => x.replace("Full", "")).includes(k));
+  if (!key || (settings.seenNew || {})[key]) return;
+  if (game.state === "running") pause();
+  const [say, el] = NEW_SAY[key];
+  G.spotlight({grid: cv, w: 9, h: 12, steps: [el ? {say, els: [$(el)]} : {say, els: [cv]}], done: () => { settings.seenNew = {...settings.seenNew, [key]: true}; save(); }});
+}
 $("helpBtn").onclick = showHelp;
 G.switch({id: "numTgl", label: "Numbers", line: "Each toy shows a number too", key: "numbers", of: () => settings, save, change: () => paintHud()});
 const slow = G.slower("windup");   // Slower: everything in the basket moves at two-thirds speed
 
 /* ---------- start ---------- */
 for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(levelName(n).replace("Level ", "") + (n === MAX_LEVEL ? " (hardest)" : ""), n));
+$("levelSel").append(new Option("∞ Endless: zoom out every time you wind the top size", ENDLESS));
 $("levelSel").onchange = e => { if (game) leave(); startLevel(+e.target.value); $("levelSel").blur(); };
 G.nav("windup");
 // full screen on a line under the basket's corner (G.zoom), where every game has it
@@ -650,17 +1003,20 @@ G.zoom({at: $("board"), below: $("board").parentElement, full: {name: "Wind Up",
 G.setupTimer({name: "windup", game: () => game, playing: g => g.state === "running", save, label: levelName, noun: "level",
   emptyText: "Wind the goal ball on a level and your times will show up here. They're kept on this device only."});
 $("bestBtn").onclick = () => { pause(); G.showBests("Best times", game ? game.level : settings.level); };
-if (!(settings.level >= 1 && settings.level <= MAX_LEVEL)) settings.level = 1;
+if (!(settings.level >= 1 && settings.level <= MAX_LEVEL) && settings.level !== ENDLESS) settings.level = 1;
 $("levelSel").value = settings.level;
 const shared = G.readShare("windup");
 let openedShare = false;
 if (shared) try { openShared(shared); openedShare = true; G.note("Here's the shared basket. Good luck!", 6000); G.track("Wind Up shared puzzle opened"); } catch (e) { G.note("That share link didn't work.", 5000); }
 if (!openedShare) {
   const s = state.game;
-  if (s && s.level === settings.level && Array.isArray(s.balls) && s.balls.every(b => Array.isArray(b) && b[2] >= 1 && b[2] <= MAXL)) {
-    newGame(s.level, s.seed);
+  if (s && s.level === settings.level && Array.isArray(s.balls) && s.balls.every(b => Array.isArray(b) && b[2] >= 1 && b[2] <= MAXL + (s.tier | 0))) {
+    newGame(s.level, s.seed); game.tier = s.tier | 0;   // before the balls are made, so they come out the right size
+    if (s.stage && STAGES.includes(s.stage)) { game.stage = s.stage; if (Array.isArray(s.extra)) game.shapes.push(...s.extra); }
     Object.assign(game, {i: s.i, score: s.score, best: s.best, ms: s.ms || 0, started: s.started, timed: s.timed !== false, shook: !!s.shook, fluffed: !!s.fluffed, dropped: !!s.dropped,
-      balls: s.balls.map(([x, y, l, a, p]) => mk(x, y, l, {a, age: 5, p: !!p})), state: "paused"});
+      helps: s.helps !== undefined ? s.helps | 0 : s.shook || s.fluffed || s.dropped ? FREE + 1 : 0, revived: !!s.revived,   // (a basket saved before helpers were counted: one used had cost the paw)
+      balls: s.balls.map(([x, y, l, a, p, f]) => mk(x, y, l, {a, age: 5, p: !!p, ...kindsOf(f | 0)})), state: "paused"});
+    s.balls.forEach((b, i) => { const h = game.balls[b[6]]; if (b[6] >= 0 && h && h !== game.balls[i]) { game.balls[i].head = h; h.tail = game.balls[i]; } });   // the strands
     G.checkClock && G.checkClock(game);
     $("tapgo").hidden = false; $("tapgo").textContent = "Paused · tap to go on"; status(); paintHud();
   } else newGame(settings.level);

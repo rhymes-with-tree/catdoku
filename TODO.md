@@ -3,6 +3,20 @@
 Things to come back to, kept here so any chat can pick them up. Add an item when something is put aside; take it out
 (in the same PR) once it's done. Game ideas go in `IDEAS.md`, and work on Apple's guidelines in `HIG.md` ("Still to do").
 
+## The move to lapcatpuzzles.com
+
+The site is moving from GitHub Pages (`rhymes-with-tree.github.io/catdoku/`) to Cloudflare Workers at lapcatpuzzles.com,
+and taking its name, Lap Cat Puzzles, from the domain (2026-11-17). `move.js` carries players' progress across (see
+README, Hosting and the move). It waits for the new site to answer, so it's on `main` already. In order:
+- [x] Cloudflare Workers project `lapcatpuzzles` on this repository, with lapcatpuzzles.com and www; live 2026-11-17
+- [ ] check on an iPhone: from Safari at the old address, and from an old Home Screen icon (the code and Settings);
+  and on Android and in DuckDuckGo, which testers use too
+- [ ] testers moved: keep the old address up (the repository public, GitHub Pages on) until they all have, a few weeks
+- [ ] then make the repository private, which turns GitHub Pages off; the old address stops working for good
+- [ ] Email Routing for lapcatpuzzles.com in Cloudflare (Compute, Email Service): domain onboarded 2026-11-17; the
+  destination address and a hello@ rule are the owner's to finish
+- [ ] after the switch, the Pawprints numbers carry on in one line (the paths keep `/catdoku`); check a day's worth
+
 ## Catlas: Safari still offers AutoFill Contact in the answer box
 
 On an iPhone, typing an answer in Catlas (Type answers) brings up Safari's AutoFill Contact bar above the keyboard,
@@ -21,59 +35,252 @@ Still to try:
 - if none of that works, a `contenteditable` box styled like the input
 Test each on a real iPhone: Safari's AutoFill doesn't show in the headless browser the tests use.
 
-## Shelves: split Kitten Play once its action games arrive
+## Shelves: what's left after the Kitten Play split
 
-Talked through with the owner on 2026-11-02, the reasoning kept so it can be weighed again. That day Toy Box, Night
-Light and Pawlette moved to Curious Cat, Cat Pile to Kitten Play, and Catlas to Kitten Play, retiring Cat Travels.
-Shelves live in `GROUPS` in `games.js` (with their colours in `SHELF_COLOUR`, short names in `SHORT` in `index.html`,
-and colours again in `calendar/index.html`), and a game's shelf is the fifth field of its row in `GAMES`.
+Kitten Play was split on 2026-11-12: it keeps match, pop and merge (Pounce on Three, Bubbles, Cat Pile, Wind Up, Mew
+Hue, and Copycat: matching, not prowling; Pawlette and Shelf Life joined it from Curious Cat the same day, the owner's call), and On the Prowl (the owner's name) has the action and looking games (Tail Chase, Bird Watch, Pawlinko, Pounce
+Up, Cat Burglar, Catlas, and Pawstcards in beta). Its colour is coral.
 
-**The test for Curious Cat and Kitten Play.** Curious Cat ("Moves to plan and shapes to fit") gives you a fixed board
-to plan your way through, and nothing new turns up while you think. Kitten Play ("Match, pop, spot and chase") keeps
-bringing new things (falling toys, the next bubble, birds, the snake moving), so chance and timing count as much as
-planning, and you play for a score or a level's goal rather than solving one set position; its looking games
-(Copycat, Cat Burglar, Catlas) are quick rounds of spotting and finding. Cat Trails ("Join, link and route things")
-holds together: every game there is drawing or routing lines. Yarn, Catwalk and Tunnel Run are logic puzzles with one
-answer, but drawing lines puts them on Trails, and that's on purpose. Borderline on Curious Cat but staying: Pick of
-the Pile (partly spotting pairs, still a fixed board to clear in a good order) and Shelf Life (judged by eye more than
-planned).
+Still open from the earlier notes: Cat Spells stays one shelf (the owner's call), and a colour-games shelf only if
+the colour games crowd a shelf (Cat Mat on Curious Cat; Shelf Life, Pawlette and Mew Hue on Kitten Play).
 
-**Don't add shelves yet.** A phone shows three tiles across, and every shelf adds a label tile and starts a new row,
-so a shelf of two to four games costs a lot of screen for little. Counts on 2026-11-02, games on the site / shortlist
-ideas: Cat Logic 9/3, Cat Math 6/0, Cat Trails 6/1, Cat Spells 8/5, Curious Cat 10/5, Kitten Play 11/2.
+## On-ramps and pacing, from the GoatCounter numbers (2026-11-12)
 
-**Split Kitten Play once its action games arrive.** It's more than one kind of game sharing a shelf. Its ideas fall in
-two groups:
-- match and pop: Onet-style pairs, SameGame groups, a triple-tile tray; with Pounce, Bubbles, Wind Up, Mew Hue and
-  Cat Pile
-- action: Pawlinko (was Kitty Plinko), Paw-ball, Pounce Up, a fling game, kneading in time with the purr; with Tail Chase and Bird
-  Watch, and the looking games (Copycat, Cat Burglar, Catlas) could go with them
-The action group is two to five games today, too few for a shelf. Once a couple of the shortlisted ones (Pawlinko,
-Paw-ball, Pounce Up) are built, split it.
+From GoatCounter's counts, 2026-10-05 to 2026-11-12 ("27 → 11" is a level started 27 times and solved 11). The samples
+are small (10 to 40 a level) and a start includes pressing New, so these are signs, not rates. In order (done so far,
+2026-11-12: Open the Door's and Toe Beans' easier level 1, Tunnel Run's Hint, starts counted in Wind Up, Pawlinko
+and L-M-N-O-Pom, High Perch's trees left standing, smaller first sizes in Catdoku, Patches, Yarn and Sunbeams, 
+Knock It Off's forgiving first two levels, Pounce saving while toys fall, and Window Ledges' two gentle levels):
 
-**Cat Spells stays one shelf.** With its five shortlisted ideas it would have 13 games, but there's no natural split:
-finding words and moving letters to make words are the same kind of game (the owner's call). Cat Math has no ideas
-waiting, but six games is a fine shelf; leave it.
+- [ ] **Toe Beans: levels 9 and 10?** 0 solves in 9 starts, but five of those ended with Close enough, 1 to 6 away,
+  which is the game working as meant. Leave unless the owner finds them too hard.
+- [ ] **Pounce: check level 1.** 23 → 12, though the move limits were tuned for a near-certain win. Running out of
+  moves wasn't counted, so that may be people looking in and leaving; it's counted from 2026-11-12 ("Pounce out of
+  moves on level N"). Look again with a few weeks of it.
+- [ ] **Weak level 1s to watch** (small samples): Cat Pile 16 → 7, Scratch That 17 → 8, Kitten Caboodle 10 → 5. (Window
+  Ledges, 11 → 5, got two gentle levels 1 and 2 on 2026-11-20; see how the new level 1 does.)
+- [ ] **Mewstermind: out of beta.** Moved to beta on 2026-11-19 (the owner's call) and rebuilt as a Clue: one cat had
+  one toy, in one room, at one time of day; each guess names one of each, paws say how many are right; Higgins is the
+  witness Hint. Levels 1 to 6 built 2026-11-19 and 2026-11-20, with its new icon (preview:
+  https://claude.ai/artifact/LD21RccB3Yg2dk66XGUih3). Rooms and times stay emoji (the owner's call). For the owner to
+  play, then back to the front page.
+- [ ] **Under the Blanket: out of beta again.** Moved to beta on 2026-11-16 (the owner's call) after its first week on
+  the front page: 11 starts at level 1, 6 solves. Still to settle what makes level 1 easier to get into.
+- [ ] **Twirl's sound on an iPhone** (feedback, 2026-11-16): sometimes no sound at all. Since the same day a tap's sound
+  waits for the sound to wake, and sound stuck after a call or another app restarts itself. Check on an iPhone. (The
+  report also said it went quieter after zooming the mat; the owner couldn't make that happen.) The silent switch mutes
+  the site's sound on purpose ("ambient", so music keeps playing).
+- [ ] **Somewhere to go past the hardest level.** (Twirl has levels 21 to 24 since 2026-11-15.) Toy Box's level 21 is a fifth of its starts; Twirl and Knock It Off
+  at 20 are the same.
 
-**Colour games, if Curious Cat gets crowded.** Cat Mat (flood fill), Shelf Life (colour gradient), Pawlette (mix
-paint to order), all on Curious Cat, and Mew Hue (slide and mix paint) on Kitten Play are colour games. With its five
-shortlisted ideas built, Curious Cat would be the biggest shelf at 15. If that's too many, split the colour games off
-into a shelf of their own: a colour shelf of 4, leaving Curious Cat with 12. Not decided; weigh it once the shortlist
-is mostly built.
+### The owner's notes on the list, and what was decided (2026-11-12)
 
-With the shortlist built and both splits, the shelves would be (66 games): Cat Logic 12, Cat Math 6, Cat Trails 7,
-Cat Spells 13, Curious Cat 12, colour 4, Kitten Play (match and pop) 5, action 8. Without the colour split, Curious Cat
-15 and no colour shelf.
+Done the same day: Tunnel Run is turning only, with its sliding rugs behind a Tracks switch; Pounce is Pounce on Three; Night Light is plain rooms only, 15 levels from one tap; its rooms with
+cats that point their own way are Day Light (`daylight/`, in beta).
 
-## Pawlinko: sound effects
+- [ ] **Day Light: out of beta.** The owner plays it first. Still to settle: a cat of its own (Dottie stands in), its
+  place on the front page and in the daily challenge, and whether the sunny room reads well. From the owner's first
+  play (2026-11-12): a missing arrow needed marking, so a small red cross now marks each of the plain four ways a cat
+  that points its own way leaves out.
+- [ ] **Moving up and down: the rest of the games.** Three wins at a level move you up and three losses move you
+  down (a loss in a puzzle that can't be lost: a hint, or a Restart after working on it), with Give me another! and
+  Change the difficulty on the win card. It's `G.ladder` in `games.js`, in Night Light, Day Light, Open the Door!
+  and Toe Beans since 2026-11-12 (README, "Moving up and down"). On hold (the owner, 2026-11-12): not until there's
+  data on how it plays in those four. Then bring it to every
+  other game with levels or sizes (each sets its own next level today), and fix each README section's wording.
+- [ ] **Front page carousel: the owner to try it on a phone again.** The owner's first go on a phone (2026-11-12): it
+  moved with a finger but was far too sensitive, a normal swipe flew most of the way along, and it could stop between
+  two shelves. Rebuilt the same day so the page moves the row itself: exactly one shelf a swipe (a quarter of the way
+  or a flick), never stopping between two (README, first paragraph). Checked with touch in the headless browser only.
+- [ ] **One new move a level.** The how-to and the on-ramp are divided in a way that isn't ideal: the walkthrough
+  tells the rules up front, and then the levels get harder. Better: each early level brings in one new move, and a
+  win on it is the reward. Night Light's and Day Light's new first levels (one tap, then two) are a first go at it.
+  Already this way: Knock It Off, High Perch, Laser Pointer, Unravel. Done 2026-11-12: Open the Door! (× and ÷ each
+  get a level, so 8 levels, and each new sign gets a spotlight the first time it turns up; GoatCounter's level 3 and
+  up are the old levels before then). Also done 2026-11-12: Pounce on Three (each special toy
+  shown the first time it's made), Fair Play (no signs at level 1; = and × arrive at level 2 with a spotlight) and
+  Under the Blanket (a one-cat level 1, so 11 levels; the U-turn between two cats is a short lesson on the first
+  two-cat blanket). Next to look at: which other games teach everything up front.
+- [ ] **Toe Beans:** getting that hard with few wins is disheartening; the moving-down rule above is the fix to try.
+- [ ] **Toy Box, Twirl and Knock It Off need more** past their hardest level. The owner's picks (2026-11-15), and more
+  ideas of the same kind to choose from; each would be one new thing a level, from the level after the top one:
+  - Knock It Off, picked (2026-11-15): a second cat to switch to, the lazy Susan (its four squares turn a quarter
+    each time the cat steps on it), a spray bottle that watches a row (the cat can't end a move in its line), and the
+    robot vacuum that moves each turn. The tray (it carries what's on it) is still being considered. Not picked: the
+    puddle, laundry basket, sleeping dog, stack of cups, the human coming home.
+  - Toy Box: levels 22 to 27 built 2026-11-15 (catnip mice, picture baskets, a fork, a basket on wheels, gifts, a
+    waiting basket; README, Toy Box). The owner to play them; level 23's picture baskets sometimes take a few seconds
+    to deal (the solver searches longer), which the page hides by dealing the next level ahead.
+  - Twirl: levels 21 to 28 and Endless built 2026-11-15: ribbons pointed at both ends, crossing over and under, knots,
+    all three, a mat bigger than the screen (level 25; Fit shows it all since 2026-11-16), one colour, thin ribbons
+    (level 27), very long ribbons with crossings and knots (level 28), and a mat that keeps unrolling (README, Twirl).
+    The tiny-ribbons level went on 2026-11-16 (the owner's call), and a Grid switch came in the same day.
+    The owner to play them on a phone: whether the knots and crossings show well enough at Fit on the big mats, and
+    how hard 24 and 26 are. Endless could later take in crossings,
+    knots and both-ended ribbons, or speed up as it goes. Not now (the owner, 2026-11-15): the sleeping cat that moves and the
+    kitten who bats a ribbon. Not picked: bows, shaped mats.
+- [ ] **Wind Up: levels 13 to 21** built 2026-11-15 (catnip, rubber balls, loose yarn, springs, sticky tape, a tipping
+  basket, no peeking, hurry, a basket that leans with the weight; README, Wind Up). The owner to play them: whether springs tangle too often or too seldom
+  (`TANGLE`, one in eight), how fast yarn unravels (`UNRAVEL`, 7 seconds a size), how far the basket tips (`TIP`), and
+  whether 3 seconds is the right hurry. Balanced so far only with a bot that never uses helpers. Also Endless (zoom
+  out each time the top size is wound): whether one Shake a run is right, and whether its basket should be deeper.
+- [ ] **Zen:** look for more games that could have one (Pounce on Three and Bubbles do).
 
-The owner wants sound effects for Pawlinko, put aside for later (2026-11-02): a knock as each thing hits a hold,
-a boing off a coil spring, a splash when coffee or water spills, a soft thump as it lands in a bed (and a sleepy
-grumble from a napping cat), and a cheer for a tandem. No game on the site has sound yet, so this needs a shared way to
-play it first: a Sound switch in the settings (off by default, as browsers only play sound after a tap), quiet enough
-for a phone, and sounds that follow the thing's kind (a bell rings, a mug clunks, a feather makes none).
+## Star cats decided, waiting for pictures
 
+Pangur Bán (Pangur) for Cat Burglar and Fitzwilliam Darcy (Fitz) for Pawlette (the owner, 2026-11-12; `ARTWORK.md`,
+"Stars decided"). Once their pictures are in `cats/`, put each into its game. Crow (like Ferguson, only much sleeker)
+will star in Crow's Drawers, not made yet (`IDEAS.md`); add Crow's poses to `ARTWORK.md` when they come.
 
+## Pounce Up: tune the goals
+
+Pounce Up joined the front page on 2026-11-12. Its level goals (`TASKS` in `pounceup/index.html`: the counts, the
+race's 90 seconds, the candle level's share of candles) were set from an autopilot's play, which is clumsier than a
+person; tune them from the owner's play and the Send feedback notes. The levels were put in a new order on
+2026-11-20 (README, "Pounce Up"), so the goals' counts may want a look on their new levels: the tidy climb is now
+level 3, with nothing but things to knock off around, and catnip is the last level.
+
+Also to check from play (raised 2026-11-11, not decided):
+- a warning on the other don't-touch levels (candles, tape, cracked shelves), as the lemon level has: the first touch
+  drops her safely to a shelf below instead of ending the climb;
+- candles catch her flying past a flame on a shelf she's skipping, not only landing beside one (an autopilot got
+  "Too hot!" on 11 of 15 runs): perhaps only the shelf she lands on should count;
+- a tap on a shelf only a little above her (under 35 units) counts as a tap on her own shelf, so she walks instead of
+  pouncing, and can knock something off on the tidy level.
+
+## Calibrate level ladders with a simulated player, as Mew Hue's were
+
+Mew Hue's 33 levels are in order of how often a simple player (the best-looking slide each time) won each one, with
+no step between neighbours of more than about 10 points and a breather where something new comes in (README,
+"Mew Hue"). How to do it is in the new-game skill, "Calibrating difficulty" (Moving Day was the
+first new game set that way, 2026-11-20). The same is worth doing for games that can be lost through luck plus your own choices (2026-11-20):
+- **Wind Up, levels 13 to 21:** levels 1 to 12 are done (2026-11-20, README "Wind Up"; the bot is
+  `tools/windup/bot.js`). Level 9 now comes out at about 69%; level 14 matches it (68%), but level 15, loose yarn,
+  comes out at about 40% (with the old ledges too), well below it. Run the bot over 13 to 21 and put them in order,
+  breathers where something new comes in. Then watch GoatCounter's overflows on 7 to 12 against the new ladder.
+- **L-M-N-O-Pom:** the points goals (40 to 260) and speeds are by hand. The simulated player needs a fixed thinking
+  time per piece, since speed is part of it.
+- **Toy Box:** a solver checks every level can be won with perfect timing, but the order of 1 to 27 is by hand. A
+  plain player tapping the obvious basket would show whether it gets harder in order (22 to 27 especially).
+- **Pounce on Three, Bubbles, Cat Pile:** simulated already, but tuned only at the two ends. Check the levels between
+  for jumps and order. Ties in with Pounce's and Cat Pile's weak level 1s above.
+- **Swap-a-Pom:** re-run once the owner has played it (under "Swap-a-Pom: finish the beta").
+
+Not needed: Pawlinko and Cat Mat already set each board's target from simulated play; Pounce Up is tuned from the
+owner's play (above); Bird Watch, Tail Chase and Twirl are about reactions or spotting; the logic puzzles have one
+answer and solver-graded levels.
+
+## Pawstcards: finish the beta
+
+Pawstcards went up as an unlisted beta on 2026-11-11 (`pawstcards/`, in `BETA` in `games.js`) with 22 countries; it has 42 since the third batch. Before
+it joins `GAMES` (and the front page):
+- more places, in batches, until it has as many of Catlas's 245 as have good postcards (`tools/pawstcards/NOTES.md`
+  says how a batch is made; the owner wants them picked on Fable). The Easy list first, then Medium and Hard;
+  territories may have too little written about them;
+- then levels: Easy, Medium and Hard trips from Catlas's lists (there's one level until there are enough places);
+- Pinecone's own pictures, when the owner has drawn her (she/her): beside the title, on the win and gold-paw cards,
+  and the front-page icon. A general black cat (`c18-27`, `c19-15`) stands in;
+- the owner's calls on words left showing (not covered by paw prints): England, Scotland, Wales, English, Welsh and
+  Scottish in the United Kingdom's postcards; "Kim" in North Korea's (15 times, nearly a giveaway); and near-names
+  such as Soviet and Siberia (Russia), Africa, Afrikaans and the Cape (South Africa), Iberian and Castile (Spain), Rus'
+  (Ukraine), Mecca and Arab (Saudi Arabia), de Gaulle (France), Java (Indonesia), Almaty (Kazakhstan), Prussia and
+  Reichstag (Germany), Macedonia (Greece). Covering one is a line in `EXTRA` in `tools/pawstcards/build.py`, then
+  `cands.py` and `make.py` (check the picks still resolve);
+- the postcards' file is one script of every place (295 KB for 42): split it by place, loaded as a trip is dealt,
+  before it grows past a few hundred KB;
+- `places.js` is a copy of Catlas's names (written by `tools/pawstcards/make.py`): move them to one shared file
+  that both pages load;
+- Pick's wrong names are any three from the same continent: use Catlas's nearer and look-alike names per level;
+- the owner's calls still open: 5 postcards a place, 20 a trip for the gold paw, and the first hint showing the
+  region on the postmark;
+- the rest of the new-game skill's port: the README section, a front-page icon (`tools/make-icons.py`), its Answer
+  setting on the Settings page, an interactive step in the walkthrough, full screen (probably not: it's reading),
+  and the full test list;
+- then move its row from `BETA` to `GAMES` (with the date it joins) and take the beta label off the page.
+
+## Swap-a-Pom: finish the beta
+
+Swap-a-Pom went up as an unlisted beta on 2026-11-13 (`swapapom/`, in `BETA` in `games.js`). Before it joins `GAMES` (and
+the front page):
+- the owner plays it, and the level goals are tuned from that (they were set with simulated players, who never make a
+  swap with no word, which the owner's rule now allows);
+- the owner hears the purr on a phone: whether the soft purr while playing is too loud or too quiet (`purring.base`), and
+  whether Moonpie should tremble a little the whole time it's on (offered, not asked for yet). On an iPhone the silent
+  switch mutes it. She purrs softly the whole time you play, unless sound is off: the owner's call (2026-11-15);
+- then move its row from `BETA` to `GAMES` (with the date it joins) and take out its `noindex` line.
+
+## Boing!: finish the beta
+
+Boing! went up as an unlisted beta on 2026-11-20 (`boing/`, in `BETA` in `games.js`), from the preview made on 2026-11-13
+and changed the same day on the owner's notes (README, its section). The owner had found it fun but wasn't sure about it.
+Before it joins `GAMES` (and the front page):
+- the owner plays it and decides whether it stays. Ideas offered if it needs more: a faint preview of where the ball would
+  go from each spring, a faster replay of a go, or making Spring Toss (`IDEAS.md`) instead;
+- tune the levels from the owner's play and the dashboard's started-against-solved counts. It can't be lost (you keep
+  trying until the ball lands), so the new-game skill's simulated-player calibration doesn't fit it; what's worth
+  watching is how many goes and hints a level takes;
+- unused so far: the arc pose on the spring sheet (a curved rebound in `IDEAS.md`);
+- the cut springs (`boing/springs/`) show a faint light edge on a dark background, as in the tray's buttons in Dark
+  Mode; clean on the room's pale walls. If it shows, cut them again from `springs-grey.webp` and tint them;
+- then move its row from `BETA` to `GAMES` (with the date it joins) and take out its `noindex` line.
+
+## The shape of a visit: read it in a week or two
+
+The visit tally went in on 2026-11-17 (README, "Play counts"): "Visit opened on: …", "First game: …" and "… in a row: N"
+on the GoatCounter dashboard. Read them after a week or two: what visits open on, which game comes first (and whether
+it's the daily challenge), and which games are played again and again. GoatCounter's own export came back empty
+(2026-11-16: it keeps only totals), so this is the only way to see it.
+
+## Feedback: what's left
+
+Send feedback went into every game's menu on 2026-11-11 (the card in `games.js`, to the owner's Google Form; README,
+"Feedback"). Left for later:
+- a link to the puzzle in play: only Pounce Up gives one (`G.feedbackFor`); the other games send their level (from the
+  level picker) and the page's address. Each game's Share already knows its puzzle, so each can pass the same data;
+- the front page, which has no menu row for it;
+- whether the card should also send if GoatCounter loaded on the page ("counted: yes/no"), to see roughly how many
+  feedback senders a blocker hides from the counts, and on which platforms (offered 2026-11-16, not picked yet);
+- whether a beta's win and miss cards should ask a one-tap "How was that level?" (sent as a GoatCounter event: no
+  words, so nothing new leaves the device, and it shows how hard each level feels).
+
+## Sound effects: what's left
+
+Sound went in on 2026-11-14 (README, "Sound"): `G.sound` in `games.js`, on by default, a Sound column on the Settings
+page and a Sound switch in every game's menu, the shared win, gold-paw, lose and hint sounds, Pawlinko's and Pounce Up's
+own, Swap-a-Pom's purr moved onto it, and a new What's new card. Every sound is the owner's pick from the listening page,
+https://claude.ai/artifact/AiHXuVwvwB5CJSBPvgGNKS (the owner's own; its source is the page itself). Still to do:
+- **Recordings** (2026-11-15): the owner found CC0 sounds on Freesound (the site refuses this cloud session, API key or
+  not, so the owner downloads them), sorted and cut them on Clip Bench (https://claude.ai/artifact/2tqPsC8VEQdJu67RDYZDzE;
+  its cuts live in the page's database), and the Keeps (98) went to the listening page as Your recordings. The 19 the
+  games use are in `sounds/` (`G.sound.kit.rec(name, vol)`; `ARTWORK.md` lists each); the rest wait in
+  `tools/sounds/kept/`. Picked for no moment yet: Cat rub and Fabric grab 4 (the owner wants both used somewhere; Hard
+  slide up, meh; Knitting stitch deleted). Each game fetches only the recordings it plays, once sound starts (64 kbps; the most
+  any game loads is under 100 KB).
+- **Every shelf is done** (2026-11-14), Cat Spells and Curious Cat last; Undo, Bookmark and a life lost sound in every
+  game that has them.
+- **Objects and actions** (2026-11-15): the shared sounds are in `games.js` (`spring`, `yarnLand`, `glassOver`, `tape`,
+  `lemon`, `bell`, `shake`, `catWakes`…), and a game's moment points at one with `G.sound.get`. The owner settled the
+  differences: every hiss is Hiss 2 at 15% (`lemon`: Pounce Up's and Tail Chase's lemon, Hide & Seek's woken cat), tape
+  is the sticky thhp everywhere, Pounce Up's candle the fwoomp, every bell Toy jingle 8, and every Shake the swish back
+  and forth (the universal pick). "Off a table" isn't one thing (a swipe in Pounce Up, a whoosh in Pawlinko, a crash in
+  Knock It Off), so it's off the page and each game keeps its own. Still each game's own: a cat waking (a chirp or a
+  mew; Yawn and snore, the object row's pick, plays nowhere yet), L-M-N-O-Pom's soft plop, Unravel's Undo blip.
+- **The better sounds** (hiss, scratching, chirps, water, meow, big yawn, fabric rustle, crinkle; 2026-11-14) are in the
+  games wherever those sounds were picked; the owner is to hear them on the listening page (Better sounds to hear).
+- **Per-row volume and length:** `ADJ` in `games.js` holds the owner's own (cat settles: 200%, 130%; Shake: 90%,
+  200%), and a recording takes its volume in `rec` (the lemon's hiss at a tenth, Twirl's swish at a fifth).
+- **Testers:** the listening page can go to testers (shared from its Share menu); Send opens the site's feedback form
+  with their picks in its last field (the link field) and their name in the contact field. The shared tap, put-down and not-allowed sounds (`tap`, `put`,
+  `wrong`) are for the rest. Add them a shelf at a time, quick and action games first, each game's own sounds where the
+  shared ones don't fit (the listening page can be extended for each shelf, so the owner picks as before).
+- **On a phone:** the owner hears it all on an iPhone: the length (`LENGTH` in `games.js`, 55% since the sounds went on too long; the listening page's Length slider tries others), the loudness (`VOLUME` in `games.js`, .47, matching the
+  listening page at the 59 the owner last used), and whether Pawlinko gets too busy with several things falling.
+- **Toy Box: a fun sound while toys go round the track** (the owner, 2026-11-19). The basket tipped (Fabric grab 7)
+  is at 30% now and the rolling ticks are gone, so nothing plays while toys roll. A music-box carousel waltz, a note a
+  beat while toys are on the track, was tried on https://claude.ai/artifact/MvyMY1LTpCW5gvqH4Ljz7S (the owner's own)
+  and put aside: not now (the owner, 2026-11-19). Find something else, or come back to it.
+- **The Settings page's Every game Sound** sets the games on the front page; a beta game (Swap-a-Pom now) has only its
+  menu's switch until it joins.
 
 ## Cross Stitch: a star cat
 
@@ -131,15 +338,6 @@ will recheck this list, and add games 43–52, before any of it is built.
   Bowtie. `bowtie-6` is whole but lies facing you (Tunnel Run's), the rolling Bowtie in `bowtie-7` shares one picture
   with the tunnel, and `bowtie-4` is cut off at the right; `bowtie-8` and `bowtie-9` are faces. So Bowtie keeps
   `bowtie-2` until the owner adds a new picture or picks one of these.
-- Patches: colourways (long term). What it would take: Patches has one set of four fabrics (`FABRICS`: red gingham,
-  blue polka dot, mustard stripe, green zigzag) and their plain colours (`SOLIDS`) for Reduce visual clutter. A
-  colourway is another set of four, each pair differing in pattern as well as colour, so it still reads without
-  colour; the fabrics are stored as numbers 0–3, so saves and share links don't change. Each set needs checking
-  against the white-and-gold hint flash, the red clash stripes, the gold paw, dark mode and colour-blind views, with a
-  matching plain set. Then a Fabrics picker in Patches' Settings (and on the Settings page, through `SET_LIST`), the
-  swatches under the quilt following it. About one session for three or four colourways. For the owner: how many,
-  whether all are open from the start or earned (gold paws, or the Toy chest), and the owner said (2026-11-08) to borrow from
-  Yarn's colourways in `colorways.js` (Berry, Moss, Ocean…).
 
 ### Questions still to answer
 - Answered 2026-11-08 (build .20), for the owner to look over: Laser Pointer's cats never need the dot again once
@@ -149,3 +347,17 @@ will recheck this list, and add games 43–52, before any of it is built.
   bounces", and Hint says when to wait). In levels 1–10 a mirror is set once; the dot sometimes bounces off both
   its faces, with the same slant both times. Checked by making 12 rooms a level through the page's own
   `makeRoom`: every moving room had such a mirror, and no still room did. README now says so for levels 1–10.
+
+## Settings page: questions left from the grid redesign (2026-11-12)
+
+The owner's grid for the new Settings page differed from the games in a few places; asked, not yet answered:
+- Window Ledges' Show sets (on by default): the owner never asked for it and isn't sure about it. Keep or take out?
+- The grid had "Other Settings" in the Every game row and "Check" on the Cat Logic shelf's row: left out until it's
+  clear what they'd do.
+- Auto grade (Catdoku, Toydoku, Fridge Magnets) is a heart among each game's own settings, not under Check, so the
+  Every game Check never turns lives on; the grid had Catdoku's under Check.
+
+## A sound for tape
+
+The shared `tape` sound (a sticky thhp, in Wind Up, Pounce Up and Tail Chase) was made silent on 2026-11-17: the owner
+hates it. Find something better (perhaps a recording in `sounds/`) and put it back in `games.js`.
