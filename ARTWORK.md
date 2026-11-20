@@ -238,7 +238,7 @@ each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the 
 - **Marmalade** (`marmalade-…`, a fluffy orange cat: a very long, fluffy coat with a full ruff and a plume of a tail,
   green-gold eyes, large tufted ears, a medium to large build) is a he, and friends with Gus, Peanut and Willow.
   He stars in L-M-N-O-Pom: `marmalade-1` (sitting, front) is beside its title, his face (`marmalade-7`) pops up on every word he
-  pounces on (and when he swats the bottom two rows away), and `marmalade-6` (belly up, playing) rolls in the pompoms on the gold-paw card.
+  pounces on (and when he swats the bottom two rows away), and `marmalade-6` (belly up, playing) rolls in the pompoms on the gold-paw card. He stars in Tape Trap (in beta) too: `marmalade-1` sits beside its title, `marmalade-5` (asleep, stretched out) is on the gold-paw card, and his face, `marmalade-7`, is one of the cats on the floor, taking turns with his friends' faces, `gus-1`, `peanut-1` and `willow-7`; each walks to its tape square and sits in it once the floor is done.
   L-M-N-O-Pom's pompoms are Spelling String's pompom photo (`fuzzyspelling/pompom.webp`), tinted, and its blank is the grey
   fluffball with googly eyes (`fuzzyspelling/eye.webp`). From his sheet, grown up:
   `marmalade-1` sitting (front); `marmalade-2` standing (side); `marmalade-3` from behind; `marmalade-4` lying down,
