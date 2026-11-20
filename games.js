@@ -1758,17 +1758,31 @@ const G = (() => {
         if (!stuck) stuck = setTimeout(() => {
           stuck = null;
           if (!ctx || ctx.state === "running" || document.hidden || !on() || Date.now() - remade < 5000) return;
-          remade = Date.now(); const old = ctx; ctx = null; try { old.close(); } catch (e) {}
-          context();
+          remade = Date.now(); drop(); context();
         }, 600);
+      } else if (!document.hidden && !ticking) {
+        // An iPhone can also say the sound is running when it's silent, its clock stopped: after going back to a
+        // page it kept in memory, or after the feedback card's keyboard (Bed Hog's feedback, 2026-11-17). If the clock
+        // hasn't moved a moment after a tap, start afresh too.
+        const c = ctx, was = c.currentTime;
+        ticking = setTimeout(() => {
+          ticking = null;
+          if (c !== ctx || c.state !== "running" || c.currentTime !== was || document.hidden || !on() || Date.now() - remade < 5000) return;
+          remade = Date.now(); drop(); context();
+        }, 400);
       }
       return ctx;
     }
+    let ticking = null;
+    function drop() { const old = ctx; ctx = null; if (old) try { old.close(); } catch (e) {} }   // the next tap makes a new one
     // the first tap or key (and every one after, in case the phone suspended it) starts the sound, if it's on
     const wake = () => { if (on()) context(); };
     addEventListener("pointerdown", wake, true); addEventListener("keydown", wake, true); addEventListener("touchend", wake, true);
     document.addEventListener("visibilitychange", () => { if (!ctx) return; if (document.hidden) ctx.suspend().catch(() => {}); else if (on()) ctx.resume().catch(() => {}); });
-    addEventListener("pageshow", e => { if (e.persisted && ctx && on()) ctx.resume().catch(() => {}); });   // back to a page kept in memory
+    // Leaving the page (to the front page, Settings or another game) lets the sound go altogether: a page an iPhone
+    // keeps in memory and brings back with Back otherwise came back with its sound silent for good (Bed Hog's feedback,
+    // 2026-11-17). The first tap back makes it afresh.
+    addEventListener("pagehide", () => drop());
 
     /* the pieces every sound is made of (t: when, in the context's seconds) */
     const rnd = (a, b) => a + Math.random() * (b - a), pick = a => a[Math.floor(Math.random() * a.length)];
