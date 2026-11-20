@@ -1185,10 +1185,26 @@ def movingday():
     return frame(tint(YELLOW, .14), out)
 
 
+# Tape Trap: a corner of the wooden floor (a tint of brick, with its seams), a square of masking tape (strips in a tint
+# of gold, edged in a shade of it), and Marmalade's orange face with his number, 3, walking over to it along a dashed
+# path (three steps). All palette colours.
+def tapetrap():
+    out = f'<rect x="12" y="12" width="76" height="76" rx="6" fill="{tint(RED, .2)}" stroke="{INK}" stroke-width="2.5"/>'
+    for v in (37.3, 62.6):
+        out += f'<path d="M12 {v}H88M{v} 12V88" stroke="{tint(RED, .45)}" stroke-width="1.5"/>'
+    out += f'<path d="M25 46V75H40" fill="none" stroke="{INK}" stroke-width="2" stroke-dasharray="3 3" opacity=".5"/>'
+    out += f'<rect x="43" y="68.5" width="14" height="14" fill="none" stroke="{tint(YELLOW, .45)}" stroke-width="5.5"/>'
+    out += f'<rect x="40.2" y="65.7" width="19.6" height="19.6" fill="none" stroke="#B2811F" stroke-width="1"/><rect x="45.8" y="71.3" width="8.4" height="8.4" fill="none" stroke="#B2811F" stroke-width="1"/>'
+    marm = (catface(25, 26, 11, ORANGE).split("<circle")[0]
+            + f'<circle cx="{25-11*.38}" cy="{26+11*.1}" r="{11*.16}" fill="{GREEN}"/><circle cx="{25+11*.38}" cy="{26+11*.1}" r="{11*.16}" fill="{GREEN}"/>')
+    out += marm + circle(35, 38, 7, "#fff", 2) + text(35, 39, 3, 11)
+    return frame(PAPER, out)
+
+
 ICONS = {"catdoku": catdoku, "pounceup": pounceup, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "daylight": daylight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle, "mewhue": mewhue, "pawlinko": pawlinko, "crossstitch": crossstitch, "junkdrawer": junkdrawer, "zoomies": zoomies, "blanket": blanket, "bedhog": bedhog, "movingday": movingday, "swapapom": swapapom}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "daylight": daylight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle, "mewhue": mewhue, "pawlinko": pawlinko, "crossstitch": crossstitch, "junkdrawer": junkdrawer, "zoomies": zoomies, "blanket": blanket, "bedhog": bedhog, "movingday": movingday, "swapapom": swapapom, "tapetrap": tapetrap}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")
