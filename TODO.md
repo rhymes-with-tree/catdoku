@@ -233,6 +233,10 @@ https://claude.ai/artifact/AiHXuVwvwB5CJSBPvgGNKS (the owner's own; its source i
   shared ones don't fit (the listening page can be extended for each shelf, so the owner picks as before).
 - **On a phone:** the owner hears it all on an iPhone: the length (`LENGTH` in `games.js`, 55% since the sounds went on too long; the listening page's Length slider tries others), the loudness (`VOLUME` in `games.js`, .47, matching the
   listening page at the 59 the owner last used), and whether Pawlinko gets too busy with several things falling.
+- **Toy Box: a fun sound while toys go round the track** (the owner, 2026-11-19). The basket tipped (Fabric grab 7)
+  is at 30% now and the rolling ticks are gone, so nothing plays while toys roll. A music-box carousel waltz, a note a
+  beat while toys are on the track, was tried on https://claude.ai/artifact/MvyMY1LTpCW5gvqH4Ljz7S (the owner's own)
+  and put aside: not now (the owner, 2026-11-19). Find something else, or come back to it.
 - **The Settings page's Every game Sound** sets the games on the front page; a beta game (Swap-a-Pom now) has only its
   menu's switch until it joins.
 
