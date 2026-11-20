@@ -157,9 +157,10 @@ Bed Hog has no star cat yet: `c14-29` (a ginger cat on its back) sleeps beside i
   The purrs' rumble is 26 to 30 Hz, too fast to tap to: a rhythm game's beat is her breathing.
 - **Ferguson** (`ferguson-…`, a fluffy black cat with yellow eyes) has nine poses from the same sheet, the same set
   as Rayla's: `ferguson-sit`, `-crouch`, `-startled`, `-leap`, `-basket`, `-dive`, `-low`, `-bound` and `-crouch2`. Not
-  for Pounce Up. Ferguson is to be the star of Boing! (the owner, 2026-11-13; the game isn't on the site yet, see `TODO.md`): in
-  the preview `ferguson-sit` is beside the title, `ferguson-basket` waits on a cupboard for the yarn, and `ferguson-leap`
-  is on the gold-paw card.
+  for Pounce Up. Ferguson is the star of Boing! (the owner's call, 2026-11-13; in beta since 2026-11-20): `ferguson-sit`
+  is beside the title, `ferguson-basket` is the basket on a cupboard that the ball has to land in, and `ferguson-leap` is on
+  the gold-paw card. Boing!'s springs are cut from the owner's spring sheet (`boing/springs/`, see the README's Toy
+  library) and its balls are from `toys/`.
 
 Purrmutation has no star cat: its cats are shuffled too. Each puzzle draws one of 21 big, whole pictures as large as fits on a patchwork quilt and cuts the picture into pieces: the general cats `c14-34`, `c14-35`, `c14-36`, `c15-5`, `c15-6` (curled up), `c15-38` and `c14-63` (sitting), and the named cats `bowtie-6`, `bugsy-4`, `bugsy-6`, `bugsy-bowtie-boxes`, `crunch-4` to `crunch-7`, `dottie-5`, `dottie-22`, `laya-2`, `laya-3`, `laya-4` and `laya-7` (the list `PICS` in `catshuffle/index.html`). The win card names a named cat ("Crunch is back in the picture"), and the gold-paw card shows the finished picture.
 
