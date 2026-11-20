@@ -105,7 +105,7 @@ cats that point their own way are Day Light (`daylight/`, in beta).
     Hide & Seek, Spelling String, Mew Hue, Fridge Magnets, Cat Mat, Fish Bones, Pick of the Pile, L-M-N-O-Pom, Pounce,
     Bubbles, Cat Pile, Toy Box, Twirl and Knock It Off. Each game's own README section still has its old words
     ("a hint keeps you on the same level"); README's "Moving up and down" says it overrides them. Tidy them some time.
-  - By size: Patches, Sunbeams, Yarn, Tangle, Catwalk, Tunnel Run, Zoomies
+  - Done 2026-11-20, a hint counted as the puzzle ends: Patches, Sunbeams, Yarn, Tangle, Catwalk, Tunnel Run, Zoomies
   - Action games, up after the first try or on a score: Tail Chase, Wind Up, Bird Watch, Pawlinko, Pounce Up, Cat
     Burglar, Catlas, Moving Day
   - Only on a gold paw: Mewstermind. A daily keyboard, no levels: Keyboard Cat (probably leave it)
