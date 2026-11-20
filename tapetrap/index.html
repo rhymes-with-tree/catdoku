@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Tape Trap</title>
-<script src="../move.js?v=2026-11-20.12"></script>
+<script src="../move.js?v=2026-11-20.13"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <!-- In beta: not on the front page yet (games.js, BETA), and kept out of search engines until it's finished -->
 <meta name="robots" content="noindex">
@@ -12,7 +12,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-20.12"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-20.13"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -29,7 +29,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-20.12">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.13">
 <style>
 /* A wooden floor seen from above, with cats sitting on some of its boards. Each cat shows how many steps away its
    square of masking tape is; lay one tape square for every cat so each walks to its own nearest one and sits in it.
@@ -112,7 +112,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-20.12"></script>
+<script src="../games.js?v=2026-11-20.13"></script>
 <script>
 /* ---------- floors (plain functions, also run in a background worker) ---------- */
 // An N × N floor. Some squares have a cat on them, each with a number; the player lays one square of tape for every
@@ -332,7 +332,7 @@ G.gridKeys({on: playing, size: () => [game.N, game.N], keys: ["x", ".", "backspa
 const undo = G.history({game: () => game, back: (h, g) => { if (Array.isArray(h)) g.mark[h[0]] = h[1]; else g.mark = h.mark; },
   can: playing, after: () => { update(); save(); }, restart: true});
 $("restartBtn").onclick = () => {
-  if (undo.restart(g => { g.mark = new Array(g.N * g.N).fill(0); }, {mark: game.mark.slice()})) { look = -1; update(); G.note("The floor's bare again. Undo brings your tape back.", 4000); }
+  if (undo.restart(g => { g.mark = new Array(g.N * g.N).fill(0); }, {mark: game.mark.slice()})) { slip(); look = -1; update(); G.note("The floor's bare again. Undo brings your tape back.", 4000); }
 };
 // Hint: first a mistake, in red (tape where none goes, or a dot where tape goes). Otherwise the cat with the fewest
 // squares left for its tape: its squares in gold and why; asked again, the one square.
@@ -344,7 +344,7 @@ $("hintBtn").onclick = () => {
   const wrong = all.filter(i => (game.mark[i] === 1 && !isTape.has(i)) || (game.mark[i] === 2 && isTape.has(i)));
   if (wrong.length) {
     const i = wrong[0];
-    game.hinted = true; game.started = true; save();
+    game.hinted = true; slip(); game.started = true; save();
     return hints.show({cells: [i], bad: true}, (game.mark[i] === 1 ? "No tape goes on the red square" : "Tape goes on the red square") + G.andMore(wrong.length - 1) + ".");
   }
   // the squares still open to each cat without its tape: its ring, less dots and rows or columns already full
@@ -353,7 +353,7 @@ $("hintBtn").onclick = () => {
   if (!todo.length) { G.note("Every tape's down already.", 4000); return; }
   const open = k => rings[k].filter(s => game.mark[s] !== 2 && j.rc[Math.floor(s / N)] < game.rows[Math.floor(s / N)] && j.cc[s % N] < game.cols[s % N]);
   const k = todo.reduce((a, b) => open(b).length < open(a).length ? b : a), sq = open(k), c = game.cats[k];
-  game.hinted = true; game.started = true; save();
+  game.hinted = true; slip(); game.started = true; save();
   if (!hints.level() && sq.length > 1) {
     return hints.show({cells: [c.i, ...sq]}, `This cat's tape is ${c.d} step${c.d === 1 ? "" : "s"} away, on a gold square: none of them is nearer another cat, or full up. Which one?`);
   }
@@ -364,9 +364,21 @@ $("hintBtn").onclick = () => {
 
 /* ---------- endings ---------- */
 // Every cat settled: each walks to its tape, a square at a time (along, then down or up), and sits in it.
+// Three wins at a level move you up and three slips (a hint, or a Restart after working on it) move you down: G.ladder.
+const climb = G.ladder("tapetrap", MAX_LEVEL);
+// A slip counts once a puzzle, and that puzzle no longer counts as a win toward moving up.
+function slip() {
+  if (game.slipped || game.won) return;
+  game.slipped = true;
+  const r = climb.lost(game.level);
+  if (r.down) { game.down = r.next; settings.level = r.next; $("levelSel").value = r.next; build.prefetch(r.next); }
+  save();
+}
 function win() {
   game.won = true; G.finishClock(game); cursorAt = -1; look = -1; clearHint();
-  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  // a floor with a hint or a restart was counted when that happened; a clean one is a win toward moving up
+  let next = game.down || game.level;
+  if (!game.slipped) { const r = climb.won(game.level); next = r.next; game.climbLine = climb.say(r); }
   settings.level = next; $("levelSel").value = next; save();
   G.track(`Tape Trap solved level ${game.level}`);
   build.prefetch(next);
@@ -398,12 +410,13 @@ function win() {
 function finishCard() {
   const next = settings.level, gold = !game.restarted && !game.hinted;
   let text = `All ${game.cats.length} cats walked to their tape and sat down.`;
-  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  text += " " + (game.down ? `That's 3 hints or restarts at level ${game.level}, so next comes level ${game.down}.`
+    : game.slipped ? "A floor with a hint or a restart doesn't count toward moving up." : game.climbLine || "");
   // a gold paw: Marmalade stretched out asleep, in place of the random cat photo
   const pic = new Image(); pic.className = "marmpic"; pic.src = catSrc("marmalade-5"); pic.alt = "Marmalade stretched out asleep";
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my floor", game.result,
-    {title: "Sitting pretty!", gold, goldWhy: "No hints or restarts!", goldTitle: "Gold paw!", goldPic: [pic], next: next > game.level ? `Next: level ${next}` : "Next floor",
-     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+    {title: "Sitting pretty!", gold, goldWhy: "No hints or restarts!", goldTitle: "Gold paw!", goldPic: [pic], next: G.ANOTHER,
+     after: G.otherSize($("levelSel"), next, startLevel, G.CHANGE)});
 }
 
 /* ---------- new floors ---------- */

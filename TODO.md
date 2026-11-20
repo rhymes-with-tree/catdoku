@@ -98,7 +98,8 @@ cats that point their own way are Day Light (`daylight/`, in beta).
   Change the difficulty on the win card: `G.ladder` in `games.js` (README, "Moving up and down"). The owner says it's
   working well (2026-11-20). In Night Light, Day Light, Open the Door! and Toe Beans since 2026-11-12; since
   2026-11-20 also all of Cat Math, Fair Play, High Perch, Scratch That, Cross Stitch, Bed Hog, Copycat, If It Fits,
-  Junk Drawer, Kitten Caboodle, Knit Pick, Laser Pointer, Pawlette, Purrmutation, Shelf Life, Unravel and Up a Tree
+  Junk Drawer, Kitten Caboodle, Knit Pick, Laser Pointer, Pawlette, Purrmutation, Shelf Life, Unravel, Up a Tree and
+  the beta games Under the Blanket, Tape Trap, Swap-a-Pom and Boing!
   (each was one clean win up, a hint keeping you put). Still to do, each moving up some other way today:
   - Lost on lives or moves, so a real loss counts too: Catdoku, Toydoku, Hide & Seek, Fuzzy Spelling, Mew Hue,
     Fridge Magnets, Cat Mat, Fish Bones, Pick of the Pile, L-M-N-O-Pom, Pounce, Bubbles, Cat Pile, Toy Box, Twirl,
@@ -107,7 +108,8 @@ cats that point their own way are Day Light (`daylight/`, in beta).
   - Action games, up after the first try or on a score: Tail Chase, Wind Up, Bird Watch, Pawlinko, Pounce Up, Cat
     Burglar, Catlas, Moving Day
   - Only on a gold paw: Mewstermind. A daily keyboard, no levels: Keyboard Cat (probably leave it)
-  - In beta: Under the Blanket, Tape Trap, Swap-a-Pom, Boing!, Pawstcards (do it as each comes out)
+  - Beta games have it too since 2026-11-20 (Under the Blanket, Tape Trap, Swap-a-Pom, Boing!; Day Light already);
+    Pawstcards has no levels. A new game gets it from the start.
 - [ ] **One new move a level.** The how-to and the on-ramp are divided in a way that isn't ideal: the walkthrough
   tells the rules up front, and then the levels get harder. Better: each early level brings in one new move, and a
   win on it is the reward. Night Light's and Day Light's new first levels (one tap, then two) are a first go at it.

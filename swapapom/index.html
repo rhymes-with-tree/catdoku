@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Swap-a-Pom</title>
-<script src="../move.js?v=2026-11-20.12"></script>
+<script src="../move.js?v=2026-11-20.13"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <!-- In beta: not on the front page yet (games.js, BETA), and kept out of search engines until it's finished -->
 <meta name="robots" content="noindex">
@@ -12,7 +12,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-20.12"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-20.13"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -28,7 +28,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-20.12">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.13">
 <style>
 /* A craft tray of letter pompoms, one in each round well. Swap two side by side to spell a word across or down.
    Moonpie lies along the top of the tray keeping you company: she purrs at every word and gathers the pompoms up. */
@@ -110,7 +110,7 @@
   <section class="found" id="found" hidden><h2>Moonpie's keeping these for you</h2><p id="foundList"></p></section>
 </main>
 
-<script src="../games.js?v=2026-11-20.12"></script>
+<script src="../games.js?v=2026-11-20.13"></script>
 <script>
 const $ = G.$;
 
@@ -367,8 +367,8 @@ function bagFor(seed, level, skip = 0) {
   return f;
 }
 const save = () => { if (!game || busy) return;
-  G.save(STORE, {level: game.level, game: game.over ? null : {level: game.level, seed: game.seed, drawn: next.count(), swaps: game.swaps, pts: game.pts,
-    words: game.words, hinted: game.hinted, restarted: game.restarted, extra: game.extra, ms: game.ms, started: game.started, timed: game.timed,
+  G.save(STORE, {level: game.down || game.level, game: game.over ? null : {level: game.level, seed: game.seed, drawn: next.count(), swaps: game.swaps, pts: game.pts,
+    words: game.words, hinted: game.hinted, restarted: game.restarted, slipped: game.slipped, down: game.down, extra: game.extra, ms: game.ms, started: game.started, timed: game.timed,
     board: game.board.map(t => t.l + t.k)}}); };
 function place(g) { g.forEach((t, i) => { t.x = i % N; t.y = Math.floor(i / N); delete t.t0; }); }
 
@@ -378,7 +378,7 @@ function newGame(level, seed, keep = {}) {
   seed = seed || (Math.random() * 2 ** 31) | 0;
   next = bagFor(seed, level);
   const board = newTray(next, DICT);
-  game = {level, N: level, seed, board, swaps: LV[level].swaps, pts: 0, words: [], hinted: !!keep.hinted, restarted: !!keep.restarted, extra: 0, over: false, ...G.freshClock()};
+  game = {level, N: level, seed, board, swaps: LV[level].swaps, pts: 0, words: [], hinted: !!keep.hinted, restarted: !!keep.restarted, slipped: !!keep.slipped, down: keep.down, extra: 0, over: false, ...G.freshClock()};
   place(board); busy = false; picked = -1; effects = []; hints.clear(false); hum();
   $("levelSel").value = level;
   hud(); listWords(); save();
@@ -389,12 +389,22 @@ function reopenGame(s) {
   if (!LV[s.level] || !Array.isArray(s.board) || s.board.length !== N * N) throw new Error("the saved tray is from another version of the game");
   const board = s.board.map(v => { const m = /^([a-z?]|qu)([012])$/.exec(v); if (!m) throw new Error("bad pompom"); return tile({l: m[1], k: +m[2]}); });
   next = bagFor(s.seed, s.level, s.drawn);
-  game = {level: s.level, N: s.level, seed: s.seed, board, swaps: s.swaps, pts: s.pts, words: s.words || [], hinted: !!s.hinted, restarted: !!s.restarted,
+  game = {level: s.level, N: s.level, seed: s.seed, board, swaps: s.swaps, pts: s.pts, words: s.words || [], hinted: !!s.hinted, restarted: !!s.restarted, slipped: !!s.slipped, down: s.down,
     extra: s.extra || 0, over: false, ...G.freshClock()};
   if (s.ms) { game.ms = s.ms; game.started = true; } if (s.timed === false) game.timed = false;
   G.checkClock(game);
   place(board); $("levelSel").value = s.level; hud(); listWords();
   if (!game.swaps) outOfSwaps();
+}
+// Three wins at a level move you up and three slips (running out of swaps, a hint, 5 more swaps, or a Restart after
+// swapping) move you down: G.ladder. A slip counts once a tray, and that tray no longer counts as a win toward moving up.
+const climb = G.ladder("swapapom", MAX_LEVEL);
+function slip() {
+  if (!game || game.slipped || game.won) return;
+  game.slipped = true;
+  const r = climb.lost(game.level);
+  if (r.down) game.down = r.next;
+  save();
 }
 
 /* ---------- the points, the swaps and the words batted ---------- */
@@ -556,30 +566,32 @@ function afterSwap() {
   meet();
 }
 function win() {
-  game.over = true;
+  game.over = true; game.won = true;
   G.track(`Swap-a-Pom level ${game.level} done`);
   swell(1, 5);
   const result = G.finishClock(game), g = game, helped = g.hinted || g.extra;
-  const nxt = helped ? g.level : Math.min(MAX_LEVEL, g.level + 1);
+  // a tray with a slip was counted when that happened; a clean one is a win toward moving up
+  let nxt = g.down || g.level, line = "";
+  if (!g.slipped) { const r = climb.won(g.level); nxt = r.next; line = climb.say(r); }
   G.save(STORE, {level: nxt});
   const spare = g.swaps ? ` with ${g.swaps} ${g.swaps === 1 ? "swap" : "swaps"} to spare` : " on the very last swap";
-  const text = g.hinted ? `${g.pts} points${spare}. You had a hint, so here's another at level ${nxt}.`
-    : g.extra ? `${g.pts} points${spare}. You had 5 more swaps, so here's another at level ${nxt}.`
-    : nxt > g.level ? `${g.pts} points${spare}. Next up: level ${nxt}.` : `${g.pts} points${spare}. That's the hardest level; next up is another one.`;
+  const text = `${g.pts} points${spare}. ` + (g.down ? `That's 3 misses at level ${g.level}, so next comes level ${g.down}.`
+    : g.slipped ? "A tray with a hint, 5 more swaps or a restart doesn't count toward moving up." : line);
   const im = new Image(); im.className = "pic"; im.src = catSrc("moonpie-crouch2"); im.alt = "Moonpie looking up at you, so proud";
   setTimeout(() => game === g && G.winCard(text, () => newGame(nxt), "Admire my tray", result, {title: "Purr-fect!", gold: !helped && !g.restarted,
-    goldWhy: "No hints or restarts!", goldTitle: "Moonpie's so proud of you!", goldPic: [im], lines: [pickOf(["Moonpie's purring her heart out.", "Moonpie snuggles up beside you.", "Moonpie gives you a slow, happy blink."])], next: nxt > g.level ? `Next: level ${nxt}` : "Next tray",
-    after: G.otherSize($("levelSel"), nxt, newGame, "Or play a different level:")}), 900);
+    goldWhy: "No hints or restarts!", goldTitle: "Moonpie's so proud of you!", goldPic: [im], lines: [pickOf(["Moonpie's purring her heart out.", "Moonpie snuggles up beside you.", "Moonpie gives you a slow, happy blink."])], next: G.ANOTHER,
+    after: G.otherSize($("levelSel"), nxt, newGame, G.CHANGE)}), 900);
 }
 function outOfSwaps() {
   G.breakStreak();
-  game.over = true; save(); hum();
+  slip(); game.over = true; save(); hum();
   G.track(`Swap-a-Pom out of swaps on level ${game.level}`);
   const lv = LV[game.level], btns = [];
   if (!game.extra) btns.push(["5 more swaps", () => { G.closeCard(); game.extra++; game.swaps += 5; game.over = false; hud(); save(); hum(); }, true]);
-  btns.push(["Try again", () => newGame(game.level, 0, {hinted: game.hinted}), !btns.length], G.homeBtn());
-  G.loseCard("Out of swaps!", `${game.pts} of ${lv.goal} points, ${lv.goal - game.pts} short. Moonpie curls up beside you: one more go?`, btns, null,
-    G.otherSize($("levelSel"), game.level, newGame, "Or play a different level:"), {result: {n: game.level}});
+  const to = game.down || game.level;
+  btns.push([game.down ? `Try level ${to}` : "Try again", () => newGame(to), !btns.length], G.homeBtn());
+  G.loseCard("Out of swaps!", `${game.pts} of ${lv.goal} points, ${lv.goal - game.pts} short. ` + (game.down ? `That's 3 misses at level ${game.level}, so next comes level ${to}.` : "Moonpie curls up beside you: one more go?"), btns, null,
+    G.otherSize($("levelSel"), to, newGame, G.CHANGE), {result: {n: game.level}});
 }
 
 /* ---------- drawing ---------- */
@@ -682,7 +694,7 @@ $("hintBtn").onclick = () => {
   if (!game || game.over || busy || document.querySelector(".spot")) return;
   const all = allMoves(game.board, DICT), fam = all.filter(m => m.words.every(w => FAMILIAR.has(w.word))), m = fam[0] || all[0];
   if (!m) { G.note("No word to make here; the tray will get a shake.", 3000); return; }
-  if (!game.hinted) { game.hinted = true; save(); }
+  if (!game.hinted) { game.hinted = true; slip(); save(); }
   const word = m.words.map(w => w.word.toUpperCase());
   hints.show({pair: [m.a, m.b]}, hints.level() ? `Swap the outlined pompoms to spell ${G.listed(word)}.` : "Swap the two outlined pompoms.");
 };
@@ -691,7 +703,11 @@ $("hintBtn").onclick = () => {
 for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(n === MAX_LEVEL ? `${n} (hardest)` : String(n), n));
 $("levelSel").onchange = e => newGame(+e.target.value);
 $("newBtn").onclick = () => newGame(game ? game.level : 1);
-$("restartBtn").onclick = () => { if (game) newGame(game.level, game.seed, {hinted: game.hinted, restarted: game.restarted || game.started || game.over || game.words.length > 0, quiet: true}); };
+$("restartBtn").onclick = () => {
+  if (!game) return;
+  const worked = game.started || game.over || game.words.length > 0; if (worked) slip();
+  newGame(game.level, game.seed, {hinted: game.hinted, restarted: game.restarted || worked, slipped: game.slipped, down: game.down, quiet: true});
+};
 $("linkBtn").onclick = () => { if (game) G.shareCard({name: "Swap-a-Pom", what: "tray", won: game.over && game.pts >= LV[game.level].goal, puzzle: () => ({g: "swapapom", N: game.level, s: game.seed})}); };
 $("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : 1);
 function openShared(d) {

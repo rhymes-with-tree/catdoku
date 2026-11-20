@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Boing!</title>
-<script src="../move.js?v=2026-11-20.12"></script>
+<script src="../move.js?v=2026-11-20.13"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <!-- In beta: not on the front page yet (games.js, BETA), and kept out of search engines until it's finished -->
 <meta name="robots" content="noindex">
@@ -12,7 +12,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-20.12"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-20.13"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -29,7 +29,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-20.12">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.13">
 <style>
 /* A room seen from the side: a toy ball rolls off the shelf at the top left, and Ferguson waits in a basket on the far
    side. Stand the springs from the tray on the floor or on the furniture, turn them, and press Go to watch it bounce. */
@@ -86,7 +86,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-20.12"></script>
+<script src="../games.js?v=2026-11-20.13"></script>
 <script id="rules">
 /* ---------- the room and the ball (plain functions, no drawing) ---------- */
 // The room is RW × RH units, seen from the side, y downwards. A toy ball rolls off the shelf at the top left; springs,
@@ -343,8 +343,8 @@ const codeOf = p => p.kind === "ring" ? RING : p.pose;
 const placed = () => game.pieces.filter(p => p.x !== null);
 const asSpring = p => ({x: p.x, y: p.y, kind: codeOf(p)});
 const springsNow = (but) => placed().filter(p => p !== but).map(asSpring);
-const save = () => { if (!game) return; G.save(STORE, {level: game.level, game: game.over ? null : {level: game.level, seed: game.seed,
-  pieces: game.pieces.map(p => [p.x, p.y, p.pose]), goes: game.goes, hinted: game.hinted, restarted: game.restarted, ms: game.ms, started: game.started, timed: game.timed}}); };
+const save = () => { if (!game) return; G.save(STORE, {level: game.down || game.level, game: game.over ? null : {level: game.level, seed: game.seed,
+  pieces: game.pieces.map(p => [p.x, p.y, p.pose]), goes: game.goes, hinted: game.hinted, restarted: game.restarted, slipped: game.slipped, down: game.down, ms: game.ms, started: game.started, timed: game.timed}}); };
 // Every place a spring could stand, a step apart along each surface (for the keys, the walkthrough and the marks).
 const standSpots = room => surfaces(room).flatMap(([a, b, y]) => { const out = []; for (let x = Math.ceil((a + SR * .6) / STEP) * STEP; x <= b - SR * .6; x += STEP) if (standOK(room, {x, y}, [])) out.push({x, y}); return out; });
 
@@ -371,7 +371,7 @@ async function newGame(level, seed, keep = {}) {
       const p = game.pieces[i]; p.pose = [UP, RIGHT, LEFT, FLAT].includes(pose) ? pose : UP;
       if (Number.isFinite(x) && Number.isFinite(y) && standOK(game.room, {x, y}, springsNow())) { p.x = x; p.y = y; }
     });
-    Object.assign(game, {goes: k.goes || 0, hinted: !!k.hinted, restarted: !!k.restarted});
+    Object.assign(game, {goes: k.goes || 0, hinted: !!k.hinted, restarted: !!k.restarted, slipped: !!k.slipped, down: k.down});
     if (k.ms) { game.ms = k.ms; game.started = true; } if (k.timed === false) game.timed = false;
     G.checkClock(game);
   } else G.track(`Boing! level ${level} started`);
@@ -442,17 +442,30 @@ function playDone() {
   const fired = new Set(run.fired).size, n = springsNow().length;
   G.note(n && !fired ? "The ball missed every spring. Try them where the dots come down." : "So close! Move a spring a little, or turn it, and try again.", 4000);
 }
+// Three wins at a level move you up and three rooms with a hint move you down: G.ladder (a Restart is free here, as
+// the goes still count). A hint counts once a room, and that room no longer counts as a win toward moving up.
+const climb = G.ladder("boing", MAX_LEVEL);
+function slip() {
+  if (!game || game.slipped || game.over) return;
+  game.slipped = true;
+  const r = climb.lost(game.level);
+  if (r.down) game.down = r.next;
+  save();
+}
 function win() {
   game.over = true; save();
   G.track(`Boing! level ${game.level} done`);
-  const result = G.finishClock(game), g = game, nxt = g.hinted ? g.level : Math.min(MAX_LEVEL, g.level + 1);
+  const result = G.finishClock(game), g = game;
+  // a room with a hint was counted when that happened; a clean one is a win toward moving up
+  let nxt = g.down || g.level, line = "";
+  if (!g.slipped) { const r = climb.won(g.level); nxt = r.next; line = climb.say(r); }
   G.save(STORE, {level: nxt});
   const gold = !g.hinted && g.goes <= 3;
-  const text = `Ferguson caught it on go ${g.goes}. ` + (g.hinted ? `You had a hint, so here's another at level ${nxt}.` : nxt > g.level ? `Next up: level ${nxt}.` : "That's the hardest level; next up is another room.");
+  const text = `Ferguson caught it on go ${g.goes}. ` + (g.down ? `That's 3 hints at level ${g.level}, so next comes level ${g.down}.` : g.slipped ? "A room with a hint doesn't count toward moving up." : line);
   const im = new Image(); im.className = "pic"; im.src = catSrc("ferguson-leap"); im.alt = "Ferguson leaping for the ball";
   setTimeout(() => game === g && G.winCard(text, () => newGame(nxt), "Admire my room", result, {title: "Boing!", gold, goldWhy: "No hints, in three goes or fewer!",
-    goldTitle: "Ferguson leaps for joy!", goldPic: [im], next: nxt > g.level ? `Next: level ${nxt}` : "Next room",
-    after: G.otherSize($("levelSel"), nxt, newGame, "Or play a different level:")}), 1000);
+    goldTitle: "Ferguson leaps for joy!", goldPic: [im], next: G.ANOTHER,
+    after: G.otherSize($("levelSel"), nxt, newGame, G.CHANGE)}), 1000);
 }
 
 /* ---------- drawing ---------- */
@@ -633,13 +646,13 @@ $("hintBtn").onclick = () => {
   const free = game.answer.filter(s => !placed().some(p => same(p, s)));
   // springs in the tray are only wrong once they're all out and the answer still needs another
   if (wrong.length && (game.pieces.every(p => p.x !== null) || hints.level())) {
-    game.hinted = true; save();
+    game.hinted = true; slip(); save();
     const w = wrong[0];
     return hints.show({x: w.x, y: w.y, bad: true}, `This spring isn't where the answer has one${G.andMore(wrong.length - 1)}. Move it or take it back.`);
   }
   const s = free[0];
   if (!s) { G.note("Every spring is where the answer has it. Press Go!", 3000); return; }
-  game.hinted = true; save();
+  game.hinted = true; slip(); save();
   const named = s.kind === RING ? "A ring" : `A coil ${POSE_NAME[s.kind]}`;
   hints.show(hints.level() ? {x: s.x, y: s.y, pose: s.kind} : {x: s.x, y: s.y}, hints.level() ? `${named} goes in the gold ring.` : "A spring goes in the gold ring.");
 };

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Under the Blanket</title>
-<script src="../move.js?v=2026-11-20.12"></script>
+<script src="../move.js?v=2026-11-20.13"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <!-- In beta: not on the front page (games.js, BETA), and kept out of search engines until it's finished -->
 <meta name="robots" content="noindex">
@@ -12,7 +12,7 @@
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-20.12"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-20.13"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -29,7 +29,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-20.12">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.13">
 <style>
 /* Bugsy, the star, peeking beside the title */
 .title{display:flex;align-items:flex-end;gap:8px}
@@ -104,8 +104,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-20.12"></script>
-<script src="../colorways.js?v=2026-11-20.12"></script>
+<script src="../games.js?v=2026-11-20.13"></script>
+<script src="../colorways.js?v=2026-11-20.13"></script>
 <script>
 /* ---------- blanket puzzles (plain functions, also run in a background worker) ---------- */
 // The blanket is N × N squares with k cats under it. A feather wand goes in at one of 4N slots round the edge:
@@ -591,8 +591,9 @@ const undo = G.history({game: () => game, can: playing, restart: true, started: 
   back: h => { if (Array.isArray(h)) game.marks[h[0]] = h[1]; else { game.marks = h.marks; game.shots = h.shots; } },
   after: () => { update(); save(); G.note(""); }});
 $("restartBtn").onclick = () => {
-  if (undo.restart(g => { g.marks = g.marks.map(() => 0); g.shots = []; }, {marks: game.marks.slice(), shots: game.shots.slice()}))
-    G.note("The feathers and marks are cleared. Undo brings them back.", 4000);
+  if (undo.restart(g => { g.marks = g.marks.map(() => 0); g.shots = []; }, {marks: game.marks.slice(), shots: game.shots.slice()})) {
+    slip(); G.note("The feathers and marks are cleared. Undo brings them back.", 4000);
+  }
 };
 const dots = G.pieces({plain: "Lump", mark: "dotBtn", say: "Dot: a square with no cat under it", change: () => {}});
 
@@ -616,7 +617,7 @@ $("hintBtn").onclick = () => {
   if (!playing()) return;
   const h = has(), N = game.N, k = known();
   const wrong = game.marks.map((m, i) => (m === 1 && !h[i]) || (m === 2 && h[i]) ? i : -1).filter(i => i >= 0);
-  const give = (m, words) => { game.hinted = true; game.started = true; save(); hints.show(m, words); update(); };
+  const give = (m, words) => { game.hinted = true; slip(); game.started = true; save(); hints.show(m, words); update(); };
   if (wrong.length) {
     const i = wrong[0];
     return give({cells: [i], bad: true}, (game.marks[i] === 1 ? "No cat under this lump." : "There's a cat under this dot.") + G.andMore(wrong.length - 1));
@@ -646,7 +647,7 @@ $("liftBtn").onclick = () => {
   if (!wrong.length) return win();
   G.sound.play("wrong", {}, .5);   // rumpled blanket, not a cat
   // a peek: the blanket's put back, and the lumps that were just rumpled blanket show red
-  game.peeked = true; game.started = true; save();
+  game.peeked = true; slip(); game.started = true; save();
   hints.show({cells: wrong, bad: true}, wrong.length === 1 ? "That one's just rumpled blanket. Look again!" : `${wrong.length} of those are just rumpled blanket. Look again!`, {uncounted: true});
   update();
 };
@@ -693,9 +694,21 @@ function showCats(animate) {
     el("image", {href: catSrc(f), x: -56, y: -56, width: 112, height: 112}, g);
   });
 }
+// Three wins at a level move you up and three slips (a hint, a peek under the blanket with a lump wrong, or a Restart after working on it) move you down: G.ladder.
+const climb = G.ladder("blanket", MAX_LEVEL);
+// A slip counts once a puzzle, and that puzzle no longer counts as a win toward moving up.
+function slip() {
+  if (game.slipped || game.won) return;
+  game.slipped = true;
+  const r = climb.lost(game.level);
+  if (r.down) { game.down = r.next; settings.level = r.next; $("levelSel").value = r.next; build.prefetch(r.next); }
+  save();
+}
 function win() {
   game.won = true; G.finishClock(game); keys.hide(); hints.clear(false); G.note("");
-  const next = game.hinted || game.peeked ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  // a blanket with a hint, a peek or a restart was counted when that happened; a clean one is a win toward moving up
+  let next = game.down || game.level;
+  if (!game.slipped) { const r = climb.won(game.level); next = r.next; game.climbLine = climb.say(r); }
   settings.level = next; $("levelSel").value = next; save();
   G.track(`Under the Blanket solved level ${game.level}`);
   const g = game;
@@ -710,10 +723,11 @@ function finishCard() {
   const next = settings.level, used = game.shots.length, gold = !game.restarted && !game.hinted && !game.peeked && !game.autoNoted && used <= line();
   let text = `You found all ${game.k} cats with ${used} feather${used === 1 ? "" : "s"}.`;
   if (!gold && !game.hinted && !game.peeked && !game.restarted && !game.autoNoted && used > line()) text += ` Use ${line()} or fewer for a gold paw.`;
-  text += game.hinted || game.peeked ? ` You had ${game.hinted ? "a hint" : "a peek"}, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  text += " " + (game.down ? `That's 3 hints, peeks or restarts at level ${game.level}, so next comes level ${game.down}.`
+    : game.slipped ? "A blanket with a hint, a peek or a restart doesn't count toward moving up." : game.climbLine || "");
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Look at the cats", game.result,
-    {title: "Found them!", gold, goldWhy: `No hints, peeks or Auto Notes, in ${used} feather${used === 1 ? "" : "s"}!`, next: next > game.level ? `Next: level ${next}` : "Next blanket",
-     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+    {title: "Found them!", gold, goldWhy: `No hints, peeks or Auto Notes, in ${used} feather${used === 1 ? "" : "s"}!`, next: G.ANOTHER,
+     after: G.otherSize($("levelSel"), next, startLevel, G.CHANGE)});
   if (gold) {
     const img = document.createElement("img"); img.className = "bugsypic"; img.src = catSrc("bugsy-3"); img.alt = "Bugsy, stretched out on the bed";
     const c = $("card"), p = c.querySelector("p"); if (p) p.before(img);
