@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Moving Day</title>
+<script src="../move.js?v=2026-11-20.3"></script>
+<meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-11-20.3"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<meta name="theme-color" content="#ECEEE7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1F1C24" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.3">
+<style>
+/* Moving Day: a room full of moving boxes. Tap the treat jar or the yarn basket for something small; drag two the
+   same together to make the next thing up; a merge beside a box opens it. Give the cats what they ask for. */
+.orders{width:var(--board);display:flex;gap:6px;justify-content:center;margin-bottom:4px}
+.order{flex:1 1 0;max-width:120px;height:70px;padding:0;border:2px solid var(--line);border-radius:16px;background:var(--panel);color:var(--ink);
+  font:inherit;cursor:pointer;position:relative;touch-action:manipulation}
+.order img{position:absolute;left:2px;bottom:2px;width:50px;height:58px;object-fit:contain;object-position:bottom left}
+/* what the cat wants, big beside it */
+.order .want{position:absolute;right:0;top:50%;transform:translateY(-50%);width:58px;height:58px}
+.order .want svg{width:100%;height:100%;display:block}
+/* a cat that wants two things: both a little smaller, one above the other */
+.order .want.two{width:42px;height:42px;transform:none}
+.order .want.two.w0{top:-2px;right:0} .order .want.two.w1{top:26px;right:22px}
+.order .want.got::after{content:"✓";position:absolute;inset:8%;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;color:#2F6B3A;background:rgba(255,255,255,.65);border-radius:50%}
+.order.ready{border-color:#6AA673;background:color-mix(in srgb,#6AA673 16%,var(--panel));box-shadow:0 0 0 2px #6AA673}
+.order.ready::after{content:"Tap to give";position:absolute;left:50%;bottom:-10px;transform:translateX(-50%);white-space:nowrap;padding:0 7px;border-radius:999px;background:#2F6B3A;color:#fff;
+  font-size:calc(12px*var(--ts));font-weight:800;line-height:18px}
+.order.done{opacity:.55;cursor:default}
+.order.hint{box-shadow:0 0 0 4px #ECA818}
+.order:not(.done) .want.got{opacity:1}
+.room{--floor:color-mix(in srgb,#ECA818 13%,#fff);width:var(--board);padding:6px;border-radius:18px;background:#B98549;box-shadow:inset 0 0 0 3px #7A4E2C}
+.room .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;touch-action:none;user-select:none;-webkit-user-select:none}
+.sq{position:relative;aspect-ratio:1;border-radius:10px;background:var(--floor)}
+.sq.boxed{background:transparent}
+.sq > svg{position:absolute;inset:4%;width:92%;height:92%;pointer-events:none}
+.sq .b1,.sq .b2{position:absolute;pointer-events:none}
+.sq .b1{inset:0}
+.sq.two .b1{inset:auto auto 30% 0;width:72%;height:72%}
+.sq.two .b2{inset:30% 0 0 auto;width:72%;height:72%}
+.sq .b1 svg,.sq .b2 svg{width:100%;height:100%;display:block}
+.sq.gen{background:color-mix(in srgb,#ECA818 30%,var(--floor));cursor:pointer}
+.sq.gen.y{background:color-mix(in srgb,#B94588 22%,var(--floor))}
+.sq.webbed > svg.item{opacity:.7}
+.sq .web{position:absolute;inset:0;width:100%;height:100%}
+.sq.sel{box-shadow:0 0 0 3px #2A2530 inset}
+.sq.same{box-shadow:0 0 0 3px #6AA673 inset}
+.sq.lifted > svg.item{opacity:.25}
+.sq.drop{box-shadow:0 0 0 3px #ECA818 inset}
+.sq .tier{position:absolute;right:3px;bottom:1px;font-size:11px;font-weight:800;color:#5E5866;line-height:1}
+.ghost{position:fixed;z-index:50;pointer-events:none;width:64px;height:64px;margin:-40px 0 0 -32px;filter:drop-shadow(0 6px 6px rgba(0,0,0,.25))}
+.ghost svg{width:100%;height:100%}
+@keyframes pop{0%{transform:scale(.4)}60%{transform:scale(1.18)}100%{transform:scale(1)}}
+@keyframes unbox{0%{transform:scale(1) rotate(0)}40%{transform:scale(1.15) rotate(-6deg)}100%{transform:scale(1)}}
+.sq.pop > svg.item{animation:pop .35s ease-out}
+.sq.unbox{animation:unbox .4s ease-out}
+.sq.gen:active{transform:scale(.94)}
+#count b{font-variant-numeric:tabular-nums}
+.paws{color:var(--gold-text);font-weight:700}
+
+/* What's what: both chains in order, under the game */
+.key{--floor:color-mix(in srgb,#ECA818 13%,#fff);width:var(--board);margin-top:10px;padding-top:12px;border-top:2px solid var(--line)}
+.key h2{margin:0;font-size:calc(20px*var(--ts-big))}
+.key h3{margin:14px 0 6px;font-size:calc(16px*var(--ts));color:var(--ink-soft)}
+.key p{margin:2px 0 0;color:var(--ink-soft);font-size:calc(15px*var(--ts))}
+.chain{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.chain li{display:flex;flex-direction:column;align-items:center;text-align:center;padding:4px 2px 6px;min-width:0;overflow-wrap:anywhere;border-radius:12px;background:var(--panel);
+  font-size:calc(13px*var(--ts));line-height:1.2;font-weight:600}
+.chain li .pic{width:min(56px,100%);aspect-ratio:1;border-radius:10px;background:var(--floor)}
+.chain li .pic svg{width:100%;height:100%;display:block}
+.chain li .step{color:var(--ink-soft);font-weight:500;font-size:calc(12px*var(--ts))}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Moving Day</h1><div class="stripe"></div><p class="tagline">Unpack the boxes and find the cats their things</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="orders" id="orders"></div>
+  <div class="wrap stage room" id="board"><div class="grid" id="grid" role="grid" aria-label="The room"></div></div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="linkBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New room</button>
+  </div>
+  <section class="key" id="key" aria-labelledby="keyTitle">
+    <h2 id="keyTitle">What's what</h2>
+    <p>Two the same make the next one along.</p>
+    <h3>From the treat jar</h3><ol class="chain" id="chainT"></ol>
+    <h3>From the toy basket</h3><p>Old boxes and cobwebs only ever hide toys.</p><ol class="chain" id="chainY"></ol>
+  </section>
+</main>
+
+<script src="../games.js?v=2026-11-20.3"></script>
+<script src="../boxes.js?v=2026-11-20.3"></script>
+<script src="../colorways.js?v=2026-11-20.3"></script>
+<script src="../tablethings.js?v=2026-11-20.3"></script>
+<script src="../treats.js?v=2026-11-20.3"></script>
+<script>
+/* ---------- the rules (plain functions in one, so the background worker can have them all) ---------- */
+// Moving Day: a room full of moving boxes. Tap the treat jar or the toy basket for something small (a tap each, from
+// the level's taps); drag two the same together to make the next one along; a merge beside a box opens it. Give the
+// cats what they want before the taps run out.
+function movingRules() {
+  // Moving Day: the rules, as plain functions (tested in Node, then pasted into the page).
+  // A square: cover 0 open, 1 a box, 2 two boxes; item "t3" (treat chain, step 3) or ""; web: the item's under a
+  // cobweb (can't be moved or given; merge a matching one onto it); inside: what's in the box; gen "t" or "y".
+  const MAXT = 7;
+  // The levels: what each cat wants (a list per cat), and what makes the level harder than the one before.
+  //  tight: the room starts with less open floor; inner: two boxes deep close to the middle; mix: how often a tap gives
+  //  the other kind of thing; goodies: how often a box has something in it; spare: taps over what the orders need.
+  const LEVELS = [null,
+    {cats: [["t3"]], goodies: .35, spare: .3},
+    {cats: [["t3"], ["y3"]], goodies: .35, spare: .25},
+    {cats: [["t4"], ["y3"]], goodies: .33, spare: .2},
+    {cats: [["t4"], ["y4"]], tight: 1, goodies: .18, spare: .08},
+    {cats: [["t5"], ["y3"]], tight: 1, inner: .5, goodies: .16, spare: .06},
+    {cats: [["t4", "y4"], ["t3"]], tight: 1, inner: .5, goodies: .15, spare: .06},
+    {cats: [["t5"], ["y5"]], tight: 1, inner: .5, mix: .15, goodies: .12, spare: .04},
+    {cats: [["t6"], ["y4"]], tight: 1, inner: .6, mix: .15, goodies: .14, spare: .13},
+    {cats: [["t5", "y3"], ["y6"]], tight: 1, inner: .6, mix: .2, goodies: 0.13, spare: 0.05},
+    {cats: [["t6"], ["y5"], ["t4", "y4"]], tight: 1, inner: .7, mix: .2, goodies: 0.12, spare: 0.04},
+    {cats: [["t6", "y6"]], tight: 1, inner: .7, mix: .25, goodies: 0.11, spare: 0.04},
+    {cats: [["t7"], ["y6", "t4"]], tight: 1, inner: .8, mix: .25, goodies: .1, spare: .18}];
+  const ORDERS = LEVELS;
+  function rngOf(seed) { return () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+  const val = t => 1 << (t - 1);
+  function makeLevel(n, seed) {
+    const L = LEVELS[n], r = rngOf(seed), W = 7, H = 7, N = W * H;
+    const orders = []; L.cats.forEach((w, cat) => w.forEach(it => orders.push({c: it[0], t: +it[1], done: false, cat})));
+    const chains = [...new Set(orders.map(o => o.c))].sort();   // "t" before "y"
+    const sq = Array.from({length: N}, () => ({cover: 1, item: "", web: false, inside: "", gen: ""}));
+    const gens = chains.length === 1 ? {[chains[0]]: 3 * W + 3} : {t: 3 * W + 2, y: 3 * W + 4};
+    const near = (i, j) => Math.abs(i % W - j % W) + Math.abs((i / W | 0) - (j / W | 0));
+    const cheb = i => Math.max(Math.abs(i % W - 3), Math.abs((i / W | 0) - 3));
+    const opens = Object.values(gens).map(g => g);
+    for (let i = 0; i < N; i++) {
+      const s = sq[i], d = Math.min(...opens.map(g => near(i, g)));
+      // open floor: round the jar and basket; a tight room keeps only the squares beside them in their row
+      const open = !L.tight ? d <= 1 || i === 3 * W + 3 : d === 0 || i === 3 * W + 3 || (d === 1 && (i / W | 0) === 3);
+      if (open) s.cover = 0;
+      else s.cover = cheb(i) >= 3 ? (r() < 0.6 ? 2 : 1) : (r() < (L.inner || 0.15) ? 2 : 1);
+    }
+    for (const c in gens) sq[gens[c]].gen = c;
+    // boxes and cobwebs only hold toys (food packed in a moving box would have gone off), so a level of treats alone has none
+    const toys = chains.includes("y"), pick = () => "y";
+    if (toys) for (const s of sq) if (s.cover && r() < L.goodies) s.inside = pick() + (r() < 0.65 ? 1 : 2);
+    // two or three things under cobwebs, just out of reach
+    const ring = sq.map((s, i) => i).filter(i => cheb(i) === 2 && sq[i].cover);
+    const webs = toys ? 2 + (n >= 7 ? 1 : 0) : 0, top = Math.max(...orders.filter(o => o.c === "y").map(o => o.t), 2);
+    for (let k = 0; k < webs && ring.length; k++) {
+      const i = ring.splice(Math.floor(r() * ring.length), 1)[0];
+      Object.assign(sq[i], {cover: 0, inside: "", item: pick() + Math.min(top - 1, n < 7 || r() < 0.6 ? 2 : 3), web: true});
+    }
+    const need = orders.reduce((a, o) => a + val(o.t), 0);
+    const g = {n, seed, W, H, sq, orders, cats: L.cats.length, mix: L.mix || 0, rs: seed ^ 0x5bd1e995, taps: need + 1 + Math.floor(need * L.spare), won: false};
+    g.tapsStart = g.taps;
+    return g;
+  }
+  const clone = g => JSON.parse(JSON.stringify(g));
+  const free = s => s.item && !s.web && !s.cover;
+  // Each step of a move, for the page to animate: returns {g, did} or null if it can't be done.
+  function canMove(g, i, j) {
+    const a = g.sq[i], b = g.sq[j];
+    if (i === j || !free(a) || b.cover || b.gen) return null;
+    if (!b.item) return "move";
+    if (b.item === a.item && +a.item[1] < MAXT) return "merge";
+    if (!b.web) return "swap";
+    return null;
+  }
+  function nbrs(g, i) { const x = i % g.W, y = i / g.W | 0, out = []; if (x) out.push(i - 1); if (x < g.W - 1) out.push(i + 1); if (y) out.push(i - g.W); if (y < g.H - 1) out.push(i + g.W); return out; }
+  function move(g, i, j) {
+    const how = canMove(g, i, j); if (!how) return null;
+    const a = g.sq[i], b = g.sq[j], opened = [];
+    if (how === "move") { b.item = a.item; a.item = ""; }
+    else if (how === "swap") { [a.item, b.item] = [b.item, a.item]; }
+    else {
+      b.item = b.item[0] + (+b.item[1] + 1); b.web = false; a.item = "";
+      for (const k of nbrs(g, j)) { const s = g.sq[k]; if (!s.cover) continue; s.cover--; if (!s.cover) { s.item = s.inside; s.inside = ""; } opened.push(k); }
+    }
+    return {how, opened};
+  }
+  function spawnAt(g, c) {
+    const gi = g.sq.findIndex(s => s.gen === c); if (gi < 0) return -1;
+    let best = -1, bd = 1e9;
+    for (let i = 0; i < g.sq.length; i++) {
+      const s = g.sq[i]; if (s.cover || s.gen || s.item) continue;
+      const d = Math.abs(i % g.W - gi % g.W) + Math.abs((i / g.W | 0) - (gi / g.W | 0));
+      if (d < bd) { bd = d; best = i; }
+    }
+    return best;
+  }
+  function tapGen(g, c) {
+    if (g.taps <= 0) return "taps";
+    const i = spawnAt(g, c); if (i < 0) return "room";
+    // now and then the jar or basket gives the other kind of thing (the rng's state is kept in the game, so Undo undoes it)
+    let it = c;
+    if (g.mix && g.sq.some(s => s.gen && s.gen !== c)) { const r = rngOf(g.rs); g.rs = Math.floor(r() * 4294967296) | 0; if (r() < g.mix) it = c === "t" ? "y" : "t"; }
+    g.sq[i].item = it + 1; g.taps--; return i;
+  }
+  function canGive(g, k) { const o = g.orders[k]; if (o.done) return -1; return g.sq.findIndex(s => free(s) && s.item === o.c + o.t); }
+  function give(g, k, from) {
+    const i = from !== undefined && from >= 0 && free(g.sq[from]) && g.sq[from].item === g.orders[k].c + g.orders[k].t ? from : canGive(g, k);
+    if (i < 0 || g.orders[k].done) return -1;
+    g.sq[i].item = ""; g.orders[k].done = true; g.won = g.orders.every(o => o.done); return i;
+  }
+  // The fewest more taps that could still fill every order of chain c from what's on the board (boxes and webs
+  // counted as if reachable): -1 never.
+  function tapsWanted(g, c, withBoxes = true) {
+    const want = Array(MAXT + 2).fill(0), have = Array(MAXT + 2).fill(0), web = Array(MAXT + 2).fill(0);
+    for (const o of g.orders) if (!o.done && o.c === c) want[o.t]++;
+    if (!want.some(Boolean)) return 0;
+    for (const s of g.sq) {
+      const it = s.cover ? (withBoxes ? s.inside : "") : s.item;
+      if (it && it[0] === c) (s.web && !s.cover ? web : have)[+it[1]]++;
+    }
+    // a webbed one only counts once a free one the same is merged onto it
+    const ok = x => {
+      let carry = 0;
+      for (let t = 1; t <= MAXT; t++) {
+        let r = have[t] + carry + (t === 1 ? x : 0) - want[t]; if (r < 0) return false;
+        const m = t < MAXT ? Math.min(r, web[t]) : 0; r -= m; carry = m + (t < MAXT ? r >> 1 : 0);
+      }
+      return true;
+    };
+    for (let x = 0; x <= 64; x++) if (ok(x)) return x;
+    return -1;
+  }
+  function stuck(g) {   // out of taps and the orders can't be filled any more
+    if (g.won) return false;
+    let total = 0; for (const c of ["t", "y"]) { const w = tapsWanted(g, c); if (w < 0) return true; total += w; }
+    return total > g.taps;
+  }
+  // A merge worth making: two free alike, or one free onto a webbed alike, not using up one an order wants as it is.
+  function merges(g) {
+    const out = [], wanted = {};
+    for (const o of g.orders) if (!o.done) wanted[o.c + o.t] = (wanted[o.c + o.t] || 0) + 1;
+    const top = {}; for (const o of g.orders) if (!o.done) top[o.c] = Math.max(top[o.c] || 0, o.t);
+    const by = {};
+    g.sq.forEach((s, i) => { if (s.item && !s.cover && +s.item[1] < (top[s.item[0]] || 0)) (by[s.item] = by[s.item] || []).push(i); });
+    for (const it in by) {
+      const L = by[it], fr = L.filter(i => !g.sq[i].web), web = L.filter(i => g.sq[i].web);
+      const spare = fr.length - (wanted[it] || 0), boxes = i => nbrs(g, i).filter(k => g.sq[k].cover).length;
+      if (web.length && spare >= 1) out.push([fr[0], web[0]]);
+      else if (spare >= 2) { fr.sort((a, b) => boxes(a) - boxes(b)); out.push([fr[0], fr[fr.length - 1]]); }
+    }
+    return out;
+  }
+  // A plain player, to set the gold paw: deliver, then merge, then tap for what's short. Returns taps left (-1 lost).
+  function play(g, smart = true) {
+    for (let steps = 0; steps < 500; steps++) {
+      if (g.won) return g.taps;
+      let did = false;
+      for (let k = 0; k < g.orders.length; k++) if (canGive(g, k) >= 0) { give(g, k); did = true; }
+      if (did) continue;
+      const m = merges(g);
+      if (m.length) { move(g, m[0][0], m[0][1]); continue; }
+      if (g.taps <= 0) return -1;
+      const cs = ["t", "y"].filter(c => g.sq.some(s => s.gen === c));
+      const open = c => g.orders.some(o => !o.done && o.c === c);
+      let c = cs.filter(open).map(c => [tapsWanted(g, c, false), c]).sort((a, b) => b[0] - a[0])[0][1];
+      const r = tapGen(g, c);
+      if (r === "room") {   // no room: merge anything alike, even past what's wanted
+        const by = {}; let pair = null;
+        g.sq.forEach((s, i) => { if (free(s) && +s.item[1] < MAXT) { if (by[s.item] !== undefined && !pair) pair = [by[s.item], i]; by[s.item] = i; } });
+        if (!pair) return -2; move(g, pair[0], pair[1]);
+      }
+    }
+    return -3;
+  }
+  // Deal a room the plain player can finish (trying other seeds if not); the gold paw is for keeping 3/4 of what it kept.
+  function deal(n, seed) {
+    for (let k = 0; ; k++) {
+      const g = makeLevel(n, seed + k * 7919), left = play(clone(g));
+      if (left >= 0 || k > 60) { g.goldAt = Math.max(1, Math.floor(left * 0.75)); g.tries = k + 1; return g; }
+    }
+  }
+  return {MAXT, LEVELS, rngOf, makeLevel, clone, free, canMove, move, nbrs, spawnAt, tapGen, canGive, give, tapsWanted, stuck, merges, val, play, deal};
+}
+// A room at level n with a new seed, for the worker (G.builder).
+function dealRandom(n) { return movingRules().deal(n, Math.floor(Math.random() * 1e9)); }
+
+/* ---------- the pictures ---------- */
+// The things on the board, drawn for Moving Day (viewBox 0 0 100 100), in the site's palette.
+const INKS = 'stroke="#2A2530" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"';
+const SHADE = (w = 26) => `<ellipse cx="50" cy="86" rx="${w}" ry="5" fill="#2A2530" opacity=".13"/>`;
+const ART = {
+  t1: `${SHADE(24)}<g fill="#B9805F" ${INKS}><ellipse cx="34" cy="66" rx="12" ry="9"/><ellipse cx="64" cy="68" rx="12" ry="9"/><ellipse cx="49" cy="48" rx="12" ry="9"/></g>
+       <g fill="#D7AE8E"><ellipse cx="30" cy="63" rx="4" ry="2.5"/><ellipse cx="60" cy="65" rx="4" ry="2.5"/><ellipse cx="45" cy="45" rx="4" ry="2.5"/></g>`,
+  t4: `${SHADE(36)}<rect x="12" y="36" width="76" height="44" rx="14" fill="#7885BA" ${INKS}/><rect x="19" y="42" width="62" height="31" rx="9" fill="#C7DCDF" stroke="#4E577D" stroke-width="2.5"/>
+       <g ${INKS} stroke-width="2.5"><path d="M24 51 C34 44 56 44 66 51 C56 58 34 58 24 51 Z" fill="#73A7AE"/><path d="M66 51 L76 45 L76 57 Z" fill="#4E577D"/>
+       <path d="M76 64 C66 57 44 57 34 64 C44 71 66 71 76 64 Z" fill="#73A7AE"/><path d="M34 64 L24 58 L24 70 Z" fill="#4E577D"/></g>
+       <path d="M60 36 C64 20 80 14 90 20 C82 22 76 28 74 36 Z" fill="#B8BFD9" ${INKS} stroke-width="2.5"/><circle cx="84" cy="21" r="3" fill="none" stroke="#2A2530" stroke-width="2.5"/>`,
+  t5: `${SHADE(38)}<path d="M10 52 L90 52 C88 72 72 84 50 84 C28 84 12 72 10 52 Z" fill="#BD5538" ${INKS}/><path d="M16 62 C30 66 70 66 84 62" stroke="#E9967F" stroke-width="3" fill="none"/>
+       <g ${INKS}><path d="M22 52 C22 32 42 22 58 26 C74 30 80 42 78 52 Z" fill="#E16A4A"/></g>
+       <g stroke="#F6C9BA" stroke-width="3.5" fill="none" stroke-linecap="round"><path d="M34 50 C34 40 40 33 48 31"/><path d="M48 50 C48 42 54 36 62 35"/><path d="M62 50 C62 46 66 42 72 42"/></g>
+       <g fill="#6AA673" ${INKS} stroke-width="2.5"><path d="M64 26 C70 14 84 14 86 22 C80 28 70 30 64 26 Z"/></g>`,
+  t6: `${SHADE(42)}<ellipse cx="50" cy="62" rx="44" ry="22" fill="#F7F1E1" ${INKS}/><ellipse cx="50" cy="60" rx="34" ry="14" fill="none" stroke="#ECA818" stroke-width="3"/>
+       <g ${INKS}><path d="M74 56 L90 44 L88 58 L92 70 Z" fill="#4E577D"/><path d="M12 58 C24 40 60 38 76 56 C60 74 24 74 12 58 Z" fill="#73A7AE"/></g>
+       <path d="M18 60 C34 66 58 66 74 58" stroke="#4E577D" stroke-width="3" fill="none"/><circle cx="22" cy="55" r="3.5" fill="#2A2530"/>
+       <g fill="#6AA673" ${INKS} stroke-width="2"><path d="M36 40 C38 30 48 28 50 34 C46 40 40 42 36 40 Z"/><path d="M52 36 C58 28 68 30 66 38 C60 40 56 40 52 36 Z"/></g>`,
+  t7: `${SHADE(36)}<rect x="18" y="52" width="64" height="32" rx="8" fill="#E16A4A" ${INKS}/><path d="M18 66 L82 66" stroke="#F7F1E1" stroke-width="5"/>
+       <path d="M16 54 C16 40 84 40 84 54 C84 60 76 58 72 62 C68 58 62 62 58 58 C54 62 46 62 42 58 C38 62 32 58 28 62 C24 58 16 60 16 54 Z" fill="#F7F1E1" ${INKS}/>
+       <g ${INKS} stroke-width="2.5"><path d="M30 42 C38 32 58 32 66 42 C58 52 38 52 30 42 Z" fill="#73A7AE"/><path d="M66 42 L76 34 L76 50 Z" fill="#4E577D"/></g><circle cx="36" cy="40" r="2.5" fill="#2A2530"/>
+       <rect x="47" y="12" width="6" height="20" rx="2" fill="#B94588" stroke="#2A2530" stroke-width="2"/><path d="M50 3 C55 8 54 12 50 13 C46 12 45 8 50 3 Z" fill="#ECA818" stroke="#2A2530" stroke-width="2"/>`,
+  y6: `${SHADE(42)}<ellipse cx="50" cy="60" rx="42" ry="26" fill="#B94588" ${INKS}/><ellipse cx="50" cy="58" rx="28" ry="14" fill="#8D78AD" ${INKS}/>
+       <g fill="none" stroke="#7E2D5C" stroke-width="2.5" stroke-linecap="round">${[14, 24, 34, 66, 76, 86].map(x => `<path d="M${x} ${x < 50 ? 54 : 54} l3 6 l3 -6"/>`).join("")}<path d="M30 78 l3 5 l3 -5 M46 81 l3 5 l3 -5 M62 78 l3 5 l3 -5"/></g>
+       <path d="M30 56 C40 50 60 50 70 56" stroke="#B4A6CB" stroke-width="3" fill="none"/>`,
+  y7: `${SHADE(34)}<rect x="16" y="80" width="68" height="10" rx="4" fill="#D9A86C" ${INKS}/><rect x="40" y="30" width="20" height="52" fill="#E9C08A" ${INKS}/>
+       <g stroke="#B94588" stroke-width="4">${[38, 46, 54, 62, 70].map(y => `<path d="M41 ${y} L59 ${y - 3}"/>`).join("")}</g><rect x="40" y="30" width="20" height="52" fill="none" ${INKS}/>
+       <ellipse cx="50" cy="26" rx="38" ry="13" fill="#B94588" ${INKS}/><ellipse cx="50" cy="23" rx="26" ry="7" fill="#8D78AD" stroke="#2A2530" stroke-width="2.5"/>
+       <path d="M62 34 C70 46 64 54 70 62" fill="none" stroke="#2A2530" stroke-width="6" stroke-linecap="round"/><path d="M62 34 C70 46 64 54 70 62" fill="none" stroke="#8D78AD" stroke-width="3" stroke-linecap="round"/><circle cx="70" cy="64" r="5" fill="#8D78AD" stroke="#2A2530" stroke-width="2.5"/>`,
+};
+// Pictures the site already has, put into ART once the page has loaded them (see useSiteArt):
+//  t2 Treat Time's fish biscuit (treats.js); t3 Knock It Off's food bowl (without its heart); y1 a scrap of the Yarn game's yarn;
+//  y2 its ball of yarn (yarnBall in colorways.js); y3 Spelling String's pompom photo, tinted; y4 and y5 the toy mouse and
+//  toy fish photos from toys/.
+const PLUM = "#B94588", SAGE = "#6AA673";
+// the pompom photo's light times a colour, as L-M-N-O-Pom tints it (each channel a little brighter, up to full)
+const tintOf = hex => { const m = [1, 3, 5].map(i => Math.min(1, parseInt(hex.slice(i, i + 2), 16) / 255 * 1.22).toFixed(3)); return `${m[0]} 0 0 0 0  0 ${m[1]} 0 0 0  0 0 ${m[2]} 0 0  0 0 0 1 0`; };
+function useSiteArt(pics) {
+  const img = (src, x, y, w, h) => `<image href="${src}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet"/>`;
+  ART.t2 = `${SHADE(30)}<g transform="translate(6 26) scale(.88)" fill="#E8B35A" stroke="#B9822E" stroke-width="3.4" stroke-linejoin="round">${TREAT_FISH.replace('class="fin"', 'class="fin" stroke="none" fill="#B9822E" opacity=".35"').replace('fill="#2A2530"', 'fill="#2A2530" stroke="none"')}</g>`;
+  ART.t3 = TABLE.ART.f.replace(TABLE.HEART, "");
+  const strand = "M14 70 C20 44 38 78 50 54 C60 34 70 66 86 38";
+  ART.y1 = `${SHADE(26)}<path d="${strand}" fill="none" stroke="#2A2530" stroke-opacity=".28" stroke-width="13" stroke-linecap="round"/>
+    <path d="${strand}" fill="none" stroke="${PLUM}" stroke-width="10" stroke-linecap="round"/>
+    <path d="${strand}" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="3" stroke-dasharray="3 3" stroke-linecap="round"/>`;
+  const holder = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  holder.setAttribute("style", "position:absolute;width:0;height:0"); holder.setAttribute("aria-hidden", "true");
+  holder.append(ballDefs());
+  holder.insertAdjacentHTML("beforeend", `<filter id="pomTint" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="${tintOf(SAGE)}"/></filter>`);
+  document.body.append(holder);
+  const g = document.createElementNS("http://www.w3.org/2000/svg", "g"); g.setAttribute("transform", "translate(50 52)"); g.append(yarnBall(PLUM, 30));
+  ART.y2 = `<path d="M70 72 C80 80 90 76 92 66" fill="none" stroke="${PLUM}" stroke-width="5" stroke-linecap="round"/>` + g.outerHTML;
+  ART.y3 = `${SHADE(28)}<g filter="url(#pomTint)">${img(pics.pompom, 14, 14, 72, 72)}</g>`;
+  ART.y4 = `${SHADE(34)}${img(pics.mouse, 4, 8, 92, 84)}`;
+  ART.y5 = `${SHADE(34)}${img(pics.fish, 4, 8, 92, 84)}`;
+}
+const GENART = {
+  t: `${SHADE(30)}<rect x="22" y="28" width="56" height="58" rx="12" fill="#CFE2E5" ${INKS}/><rect x="18" y="16" width="64" height="16" rx="6" fill="#ECA818" ${INKS}/>
+      <g fill="#B9805F" stroke="#2A2530" stroke-width="2"><ellipse cx="36" cy="76" rx="7" ry="5"/><ellipse cx="52" cy="78" rx="7" ry="5"/><ellipse cx="66" cy="75" rx="7" ry="5"/><ellipse cx="44" cy="68" rx="7" ry="5"/><ellipse cx="60" cy="66" rx="7" ry="5"/></g>
+      <rect x="32" y="40" width="36" height="18" rx="4" fill="#F7F1E1" stroke="#2A2530" stroke-width="2"/><path d="M38 49 C44 43 54 43 58 49 C54 55 44 55 38 49 Z M58 49 L64 45 L64 53 Z" fill="#ECA818" stroke="#2A2530" stroke-width="1.5"/>
+      <path d="M28 36 L28 60" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".7"/>`,
+  y: `${SHADE(38)}<circle cx="34" cy="44" r="15" fill="#B94588" ${INKS}/><circle cx="62" cy="40" r="16" fill="#8D78AD" ${INKS}/><circle cx="50" cy="50" r="14" fill="#7885BA" ${INKS}/>
+      <path d="M26 40 C34 44 38 52 36 58 M54 32 C64 38 70 46 70 52" stroke="#2A2530" stroke-width="2" fill="none" opacity=".5"/>
+      <path d="M12 50 L88 50 L80 86 L20 86 Z" fill="#D9A86C" ${INKS}/>
+      <g stroke="#7A4E2C" stroke-width="2.5" fill="none"><path d="M14 60 L86 60"/><path d="M17 72 L83 72"/>${[24, 36, 48, 60, 72].map(x => `<path d="M${x} 50 L${x + (x - 50) * 0.08} 86"/>`).join("")}</g>
+      <path d="M12 50 L88 50 L80 86 L20 86 Z" fill="none" ${INKS}/><path d="M14 50 C14 40 30 36 30 50" fill="none" stroke="#7A4E2C" stroke-width="3"/>`,
+};
+const NAMES_OF = {t1: "kibble", t2: "fish treat", t3: "bowl of food", t4: "tin of sardines", t5: "salmon dinner",
+  t6: "fish feast", t7: "fish birthday cake",
+  y6: "knitted cat bed", y7: "yarn-wrapped cat tree",
+  y1: "scrap of yarn", y2: "ball of yarn", y3: "pompom", y4: "toy mouse", y5: "toy fish"};
+const GEN_NAME = {t: "treat jar", y: "toy basket"};
+const WEB = `<svg class="web" viewBox="0 0 100 100" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="2.2" opacity=".9" stroke-linecap="round">
+  <path d="M2 2 L52 52 M2 40 L52 52 M40 2 L52 52 M2 80 L40 62 M80 2 L62 40"/>
+  <path d="M2 22 C12 22 22 12 22 2 M2 44 C22 42 42 24 44 2 M2 66 C30 62 62 32 66 2 M4 88 C36 80 80 40 88 4"/></g></svg>`;
+const svgOf = (inner, cls = "") => `<svg class="${cls}" viewBox="0 0 100 100" aria-hidden="true">${inner}</svg>`;
+
+/* ---------- the page ---------- */
+const {MAXT, LEVELS, canMove, move, nbrs, spawnAt, tapGen, canGive, give, tapsWanted, stuck, merges, free, deal} = movingRules();
+const $ = G.$, SLUG = "movingday", STORE = "catdoku.movingday.v1", TOP = LEVELS.length - 1;
+// the cats placing orders: general cats sitting up, a different few in each room
+const CATS = ["c18-6", "c18-7", "c18-17", "c18-19", "c18-21", "c19-1", "c19-5", "c19-6"].map(n => `../cats/${n}.webp`);
+useSiteArt({pompom: "../fuzzyspelling/pompom.webp", mouse: "../toys/mouse.webp", fish: "../toys/fish.webp"});
+// rooms are dealt in a background worker (the plain player that checks each one can take a moment on the top levels)
+const build = G.builder([movingRules, dealRandom], "dealRandom");
+let state = G.load(STORE);
+const settings = state.settings || {};
+let game = null, sel = -1, drag = null, fx = {};   // fx: squares to animate on the next draw
+G.pawLost(() => !game || game.won || game.hinted || game.restarted || game.taps < game.goldAt);
+const save = () => G.save(STORE, {settings, game});
+const snap = g => JSON.stringify({sq: g.sq, orders: g.orders, taps: g.taps, won: g.won});
+const levelName = n => `Level ${n}`;
+
+for (let n = 1; n <= TOP; n++) $("levelSel").add(new Option(levelName(n), n));
+$("levelSel").onchange = () => startLevel(+$("levelSel").value);
+
+// A new room at level n (from the worker), or the room a share link names (level and seed).
+function startLevel(n) {
+  settings.level = n; $("levelSel").value = n; busy = true;
+  return build.take(n).then(g => { busy = false; begin(g); build.prefetch(n); });
+}
+function begin(g) {
+  game = Object.assign(g, {level: g.n, start: snap(g), history: [], hinted: false, restarted: false, ...G.freshClock()});
+  settings.level = g.n; $("levelSel").value = g.n; sel = -1; fx = {}; msg("");
+  G.track(`Moving Day new puzzle level ${g.n}`);
+  draw(); save(); helpOnFirstVisit();
+}
+let busy = false;
+const helpOnFirstVisit = () => { if (!settings.seenHelp && game && !game.won) setTimeout(help, 300); };
+function restore(s) { Object.assign(game, JSON.parse(s)); }
+function record() { game.history.push(snap(game)); if (game.history.length > 200) game.history.shift(); }
+
+/* ---------- drawing ---------- */
+const itemSVG = it => svgOf(ART[it], "item");
+function draw() {
+  queueMicrotask(say);
+  const g = game, grid = $("grid"), hint = hints.current();
+  if (grid.children.length !== g.sq.length) {
+    grid.innerHTML = "";
+    g.sq.forEach((_, i) => { const d = document.createElement("div"); d.className = "sq"; d.dataset.i = i; d.setAttribute("role", "gridcell"); grid.append(d); });
+  }
+  const selIt = sel >= 0 ? g.sq[sel].item : drag ? g.sq[drag.from].item : "";
+  g.sq.forEach((s, i) => {
+    const d = grid.children[i];
+    let html = "", cls = "sq";
+    if (s.gen) { cls += " gen " + s.gen; html = svgOf(GENART[s.gen], "item"); }
+    else if (s.cover) { cls += " boxed" + (s.cover === 2 ? " two" : ""); html = `<div class="b1">${BOX}</div>` + (s.cover === 2 ? `<div class="b2">${BOX}</div>` : ""); }
+    else if (s.item) { html = itemSVG(s.item) + (s.web ? WEB : "") + (settings.numbers ? `<span class="tier">${s.item[1]}</span>` : ""); if (s.web) cls += " webbed"; }
+    if (i === sel) cls += " sel";
+    else if (selIt && s.item === selIt && !s.cover && i !== (drag && drag.from) && +selIt[1] < MAXT) cls += " same";
+    if (drag && i === drag.from && drag.moved) cls += " lifted";
+    if (drag && i === drag.over) cls += " drop";
+    if (hint && hint.sq && hint.sq.includes(i)) cls += " hintcell";   // the shared steady hint tint (games.css)
+    if (fx[i]) cls += " " + fx[i];
+    if (i === keys.at()) cls += " kbcursor";
+    if (d.className !== cls || d._html !== html) { d.className = cls; if (d._html !== html) { d.innerHTML = html; d._html = html; } }
+    d.setAttribute("aria-label", labelOf(s, i));
+  });
+  fx = {};
+  drawOrders(hint);
+  const paw = !g.hinted && !g.restarted && g.taps >= g.goldAt;
+  $("count").innerHTML = `Taps <b>${g.taps}</b>` + (g.won ? "" : ` · <span class="paws">🐾 ${paw ? `at ${g.goldAt}+ left` : "gone"}</span>`);
+  $("undoBtn").disabled = !g.history.length || g.won;
+  $("hintBtn").disabled = g.won;
+}
+// one card for each cat, with a bubble for each thing it wants
+function drawOrders(hint) {
+  const box = $("orders"), sig = game.seed + ":" + game.orders.map(o => o.cat).join("");
+  if (box.dataset.sig !== sig) {
+    box.dataset.sig = sig; box.innerHTML = "";
+    for (let k = 0; k < game.cats; k++) {
+      const b = document.createElement("button"); b.className = "order"; b.dataset.k = k;
+      const n = game.orders.filter(o => o.cat === k).length;
+      b.innerHTML = `<img alt="" src="${CATS[(k + game.seed) % CATS.length] || ""}">` + Array.from({length: n}, (_, j) => `<span class="want w${j}${n > 1 ? " two" : ""}"></span>`).join("");
+      b.onclick = () => giveTo(k); box.append(b);
+    }
+  }
+  for (let k = 0; k < game.cats; k++) {
+    const b = box.children[k], mine = game.orders.map((o, i) => [o, i]).filter(([o]) => o.cat === k);
+    const ready = mine.some(([o, i]) => !o.done && canGive(game, i) >= 0), done = mine.every(([o]) => o.done);
+    mine.forEach(([o], j) => { const w = b.querySelectorAll(".want")[j]; w.innerHTML = itemSVG(o.c + o.t); w.classList.toggle("got", o.done); });
+    b.className = "order" + (done ? " done" : ready ? " ready" : "") + (hint && hint.cat === k ? " hint" : "");
+    b.disabled = done;
+    const left = mine.filter(([o]) => !o.done).map(([o]) => NAMES_OF[o.c + o.t]);
+    b.setAttribute("aria-label", done ? "This cat has everything it wanted" : `A cat wants ${G.listed(left.map(x => "a " + x))}${ready ? ". You have one: tap to give it" : ""}`);
+  }
+}
+function labelOf(s, i) {
+  const at = G.at(i, game.W);
+  if (s.gen) return `${at}: the ${GEN_NAME[s.gen]}. Tap for something new`;
+  if (s.cover) return `${at}: ${s.cover === 2 ? "two boxes" : "a box"}`;
+  if (s.item) return `${at}: ${s.web ? "under a cobweb, " : ""}a ${NAMES_OF[s.item]}${settings.numbers ? ` (${s.item[1]})` : ""}`;
+  return `${at}: empty`;
+}
+function say() {
+  if (!game) return;
+  const left = game.orders.filter(o => !o.done).map(o => NAMES_OF[o.c + o.t]);
+  G.describe($("grid"), `A room 7 by 7. ${game.taps} taps left. The cats want: ${G.listed(left) || "nothing more"}.`);
+}
+
+/* ---------- playing ---------- */
+const msg = t => { $("msg").textContent = t; };
+function tapGenAt(i) {
+  const c = game.sq[i].gen;
+  if (game.taps <= 0) { msg("No taps left: merge what you have"); return; }
+  if (spawnAt(game, c) < 0) { msg("No room: merge something or give it away"); return; }
+  record(); const j = tapGen(game, c); fx[j] = "pop"; sel = -1; game.started = true;
+  msg(game.sq[j].item[0] !== c ? `The ${GEN_NAME[c]} gave you a ${NAMES_OF[game.sq[j].item]}!` : ""); after();
+}
+function tryMove(i, j) {
+  const how = canMove(game, i, j);
+  if (!how) return false;
+  record(); const r = move(game, i, j); game.started = true;
+  if (r.how === "merge") { fx[j] = "pop"; for (const k of r.opened) fx[k] = "unbox"; msg(r.opened.length ? (r.opened.some(k => !game.sq[k].cover) ? "A box is open!" : "The top box is off") : ""); G.sound.play("put"); }
+  else msg("");
+  sel = -1; after(); return true;
+}
+function giveTo(cat) {
+  if (!game || game.won) return;
+  const mine = game.orders.map((o, i) => i).filter(i => game.orders[i].cat === cat && !game.orders[i].done);
+  if (!mine.length) return;
+  // the thing picked up, if it's one this cat wants; otherwise any it wants that's on the board
+  const k = mine.find(i => sel >= 0 && game.sq[sel].item === game.orders[i].c + game.orders[i].t && free(game.sq[sel])) ?? mine.find(i => canGive(game, i) >= 0);
+  if (k === undefined) { msg(`This cat wants ${G.listed(mine.map(i => "a " + NAMES_OF[game.orders[i].c + game.orders[i].t]))}`); sel = -1; draw(); return; }
+  record(); give(game, k, sel); sel = -1; game.started = true;
+  msg(game.orders.some(o => o.cat === cat && !o.done) ? "Purr! And the other one?" : "Purr!"); after();
+}
+function after() {
+  save(); draw();
+  if (game.won) return win();
+  if (game.taps === 0 && stuck(game)) lose("Out of taps", "There aren't enough taps left to fill the orders.");
+  else if (noRoom()) lose("No room", "The floor is full and nothing on it matches. Undo a move or two, or start again.");
+}
+function win() {
+  const g = game; if (!g.result) G.finishClock(g);
+  const gold = !g.hinted && !g.restarted && g.taps >= g.goldAt, n = g.level, next = g.hinted ? n : Math.min(TOP, n + 1);
+  G.track(`Moving Day solved level ${n}`);
+  const more = g.hinted ? ` You had a hint, so here's another at level ${n}.` : "";
+  G.winCard(`Every cat has what it wanted, with ${g.taps} tap${g.taps === 1 ? "" : "s"} to spare.${more}`, () => { G.closeCard(); startLevel(next); }, "Admire my room", g.result,
+    {title: "All unpacked!", gold, goldWhy: `${g.goldAt}+ taps to spare, no hints or restarts!`, next: next === n ? "New room" : `Level ${next}`,
+     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+  save();
+}
+// Nothing left to do: no empty square for the jar or basket, no two alike to merge, and nothing a cat wants.
+function noRoom() {
+  if (game.won || game.sq.some(s => !s.cover && !s.gen && !s.item)) return false;
+  const seen = new Set();
+  for (const s of game.sq) if (!s.cover && s.item && +s.item[1] < MAXT) { if (seen.has(s.item) && (!s.web || true)) return false; seen.add(s.item); }
+  return !game.orders.some((o, k) => canGive(game, k) >= 0);
+}
+function lose(title, text) {
+  G.breakStreak();
+  const btns = [];
+  if (game.history.length) btns.push(["Undo", () => { G.closeCard(); $("undoBtn").click(); }]);
+  btns.push(["Restart", () => { G.closeCard(); restart(); }, true], ["New room", () => { G.closeCard(); startLevel(game.level); }], G.homeBtn());
+  G.openCard(title, text, btns);
+}
+function restart() { if (!game || busy) return; G.closeCard(); restore(game.start); game.history = []; game.restarted = true; sel = -1; msg(""); save(); draw(); }
+$("restartBtn").onclick = restart;
+$("undoBtn").onclick = () => { if (!game || !game.history.length || game.won) return; restore(game.history.pop()); sel = -1; msg(""); save(); draw(); };
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z") { e.preventDefault(); $("undoBtn").click(); } });
+$("newBtn").onclick = () => { if (!busy) startLevel(+$("levelSel").value); };
+
+/* ---------- dragging and tapping ---------- */
+const sqAt = (x, y) => { const el = document.elementFromPoint(x, y); const s = el && el.closest(".sq, .order"); return s; };
+let ghost = null;
+// A tap (or Space) on square i: the jar or basket makes something; otherwise pick a thing up, put the one held down
+// there (moving, merging or swapping), or let go.
+function tapAt(i) {
+  const s = game.sq[i];
+  if (s.gen) { tapGenAt(i); return; }
+  if (free(s)) {
+    if (sel === i) sel = -1;
+    else if (sel >= 0 && tryMove(sel, i)) return;
+    else { sel = i; nameIt(i); }
+    hints.clear(false); draw(); return;
+  }
+  if (sel >= 0 && !s.cover) { if (!tryMove(sel, i)) { msg(s.web ? `Bring a ${NAMES_OF[s.item]} here to free it` : "That won't go there"); sel = -1; draw(); } return; }
+  if (s.web) msg(`Bring a ${NAMES_OF[s.item]} here to free it`);
+  else if (s.cover) msg(s.cover === 2 ? "Two boxes: merge beside them twice" : "Merge beside a box to open it");
+}
+$("grid").addEventListener("pointerdown", e => {
+  if (!game || game.won || busy) return;
+  const d = e.target.closest(".sq"); if (!d) return;
+  const i = +d.dataset.i, s = game.sq[i];
+  if (!free(s)) { tapAt(i); return; }
+  e.preventDefault();
+  drag = {from: i, x: e.clientX, y: e.clientY, moved: false, over: -1, id: e.pointerId};
+  $("grid").setPointerCapture(e.pointerId);
+});
+$("grid").addEventListener("pointermove", e => {
+  if (!drag || e.pointerId !== drag.id) return;
+  if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 8) return;
+  if (!drag.moved) { drag.moved = true; nameIt(drag.from); ghost = document.createElement("div"); ghost.className = "ghost"; ghost.innerHTML = itemSVG(game.sq[drag.from].item); document.body.append(ghost); }
+  ghost.style.left = e.clientX + "px"; ghost.style.top = e.clientY + "px";
+  const t = sqAt(e.clientX, e.clientY), over = t && t.classList.contains("sq") ? +t.dataset.i : -1;
+  if (over !== drag.over) { drag.over = over; draw(); }
+});
+function endDrag(e) {
+  if (!drag || e.pointerId !== drag.id) return;
+  const d = drag; drag = null; if (ghost) { ghost.remove(); ghost = null; }
+  if (!d.moved) { tapAt(d.from); return; }   // a tap
+  const t = e.type === "pointerup" ? sqAt(e.clientX, e.clientY) : null;
+  if (t && t.classList.contains("order")) { sel = d.from; giveTo(+t.dataset.k); sel = -1; draw(); return; }
+  if (t && t.classList.contains("sq")) { const j = +t.dataset.i; if (j !== d.from && !tryMove(d.from, j)) msg("That won't go there"); }
+  draw();
+}
+$("grid").addEventListener("pointerup", endDrag);
+$("grid").addEventListener("pointercancel", endDrag);
+
+/* ---------- keys ---------- */
+// Arrow keys pick a square, Space or Enter taps it, 1 to 4 give a cat what it wants, Escape lets go.
+const keys = G.gridKeys({on: () => game && !game.won && !busy, size: () => [game.W, game.H], show: () => draw(), keys: ["1", "2", "3", "4"],
+  start: () => game.sq.findIndex(s => s.gen),
+  act: (i, key) => { if (key === " ") tapAt(i); else { const k = +key - 1; if (k < game.cats) giveTo(k); } },
+  escape: () => { if (sel >= 0) { sel = -1; draw(); } }});
+
+/* ---------- hints ---------- */
+const hints = G.hinter({game: () => game, key: () => game ? snap(game) : "", draw: () => draw()});
+$("hintBtn").onclick = () => {
+  if (!game || game.won) return;
+  let mark = null, words = "";
+  const k = game.orders.findIndex((o, k) => canGive(game, k) >= 0);
+  if (k >= 0) { mark = {cat: game.orders[k].cat, sq: [canGive(game, k)]}; words = `Tap the cat to give it the ${NAMES_OF[game.orders[k].c + game.orders[k].t]}`; }
+  else {
+    const m = merges(game);
+    if (m.length) { mark = {sq: m[0]}; const it = game.sq[m[0][1]]; words = it.web ? `Drag the ${NAMES_OF[it.item]} onto the one under the cobweb` : `Drag one ${NAMES_OF[it.item]} onto the other`; }
+    else {
+      const cs = ["t", "y"].filter(c => game.sq.some(s => s.gen === c) && game.orders.some(o => !o.done && o.c === c));
+      const c = cs.map(c => [tapsWanted(game, c, false), c]).sort((a, b) => b[0] - a[0])[0];
+      if (c && game.taps > 0) { mark = {sq: [game.sq.findIndex(s => s.gen === c[1])]}; words = `Tap the ${GEN_NAME[c[1]]} for more`; }
+    }
+  }
+  if (!mark) { msg("Nothing to merge or give, and no taps left"); return; }
+  game.hinted = true; save(); hints.show(mark, words);
+};
+
+/* ---------- how to play ---------- */
+function help() {
+  if (!game || busy) return;
+  if (game.won) { G.helpLater(); return; }
+  const W = game.W, xy = i => [i % W, i / W | 0];
+  const gens = game.sq.map((s, i) => s.gen ? i : -1).filter(i => i >= 0), c0 = game.sq[gens[0]].gen;
+  const box = game.sq.findIndex((s, i) => s.cover && nbrs(game, i).some(k => !game.sq[k].cover));
+  const web = game.sq.findIndex(s => s.web);
+  const open = game.sq.map((s, i) => i).filter(i => !game.sq[i].cover).map(xy);
+  // on a room not yet started, the first taps and merge are made for real, then put back as they were (G.yourTurn)
+  const fresh = !game.history.length && game.sq.some(s => !s.cover && !s.gen && !s.item);
+  const ones = () => game.sq.filter(s => s.item === c0 + 1).length, ones0 = ones();
+  const turn = G.yourTurn(() => game, g => { game = g; }, draw);
+  const steps = [
+    {say: "Each cat wants something", els: [$("orders")]},
+    ...(fresh ? [
+      {say: `Tap the ${GEN_NAME[c0].split(" ")[1]}: taps are limited`, lit: [xy(gens[0])], try: {done: () => ones() > ones0}, ...turn.from},
+      {say: "Again, then drag one onto the other", lit: open,
+       try: {done: () => game.sq.some(s => s.item === c0 + 2 && !s.web), yes: "Two the same make the next one up"}, ...turn.upTo}] : [
+      {say: `Tap the ${GEN_NAME[c0].split(" ")[1]}: taps are limited`, lit: [xy(gens[0])]},
+      {say: "Drag one onto another the same", lit: open}]),
+    {say: "Glowing green? Tap the cat to give it", els: [$("orders")]},
+    {say: "Merge beside a box to open it", lit: box >= 0 ? [xy(box)] : []},
+    ...(web >= 0 ? [{say: "Merge one the same onto a cobweb", lit: [xy(web)]}] : []),
+    {say: "Some cats want two things", els: [$("orders")], later: true},
+    {say: "Now and then you get the other kind", lit: gens.map(xy), later: true},
+    {say: `Keep ${game.goldAt} taps for a gold paw`, els: [$("count")], later: true},
+    {say: "What's what is under the game", els: [$("key")], later: true},
+    {say: "Stuck? Hint shows a move", els: [$("hintBtn")]},
+  ];
+  G.spotlight({grid: $("grid"), w: W, h: game.H, steps, map, done: () => { settings.seenHelp = true; save(); }});
+}
+function map() {
+  const sq = $("grid").children, n = sq.length, a = sq[0].getBoundingClientRect(), z = sq[n - 1].getBoundingClientRect();
+  const gx = (z.left - a.left) / (game.W - 1) - a.width, gy = (z.top - a.top) / (game.H - 1) - a.height;
+  return {ox: a.left - gx / 2, oy: a.top - gy / 2, cw: a.width + gx, ch: a.height + gy};
+}
+$("helpBtn").onclick = help;
+
+/* ---------- what's what ---------- */
+for (const c of ["t", "y"]) {
+  const ol = $(c === "t" ? "chainT" : "chainY");
+  for (let t = 1; t <= MAXT; t++) {
+    const li = document.createElement("li"), it = c + t, name = NAMES_OF[it];
+    li.innerHTML = `<span class="pic">${svgOf(ART[it])}</span><span>${name[0].toUpperCase() + name.slice(1)}</span><span class="step">Step ${t}</span>`;
+    ol.append(li);
+  }
+}
+// picking something up names it, and what two of them make
+function nameIt(i) {
+  const it = game.sq[i].item, t = +it[1];
+  msg(t < MAXT ? `A ${NAMES_OF[it]}: two make a ${NAMES_OF[it[0] + (t + 1)]}` : `A ${NAMES_OF[it]}: the very top!`);
+}
+
+/* ---------- share and best times ---------- */
+// A link carries the level and the room's seed: the same seed deals the same room.
+$("linkBtn").onclick = () => { if (game && !busy) G.shareCard({name: "Moving Day", won: game.won, what: "room", puzzle: () => ({g: SLUG, N: game.level, s: game.seed})}); };
+function openShared(d) {
+  if (!(Number.isInteger(d.N) && d.N >= 1 && d.N <= TOP) || !Number.isInteger(d.s)) { G.note("That share link didn't work.", 5000); return; }
+  begin(deal(d.N, d.s));
+}
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level || 1);
+
+/* ---------- start ---------- */
+G.nav(SLUG);
+G.switch({id: "numTgl", label: "Numbers", line: "Each thing shows its step", key: "numbers", of: () => settings, save, change: () => { if (game) draw(); }});
+G.setupTimer({name: SLUG, game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
+if (!(settings.level >= 1 && settings.level <= TOP)) settings.level = 1;
+$("levelSel").value = settings.level;
+const shared = G.readShare(SLUG);
+const hadSave = !!(state.game && state.game.sq);
+if (hadSave) G.reopen(() => {
+    const g = state.game;
+    if (!LEVELS[g.level] || g.sq.length !== 49 || !Array.isArray(g.orders) || typeof g.start !== "string") throw new Error("the saved room doesn't fit");
+    game = g; G.checkClock(game); $("levelSel").value = game.level; draw();
+    if (game.won) win(); else helpOnFirstVisit();
+    build.prefetch(game.level);
+  }, why => { game = null; startLevel(settings.level).then(() => G.note(why, 0)); });
+else if (!shared) startLevel(settings.level);
+const shareOpts = () => ({name: "Moving Day", inProgress: !!(game && !game.won && game.history.length), open: openShared, after: helpOnFirstVisit});
+if (shared) G.offerShare(shared, {...shareOpts(), fresh: hadSave ? null : why => startLevel(settings.level).then(() => G.note(why, 6000))});
+window.addEventListener("hashchange", () => { const d = G.readShare(SLUG); if (d) G.offerShare(d, shareOpts()); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>

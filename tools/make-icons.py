@@ -1154,10 +1154,41 @@ def pounceup():
     return frame(wall, out)
 
 
+def movingday():
+    # a room of moving boxes (Copycat's cardboard colours) with three squares unpacked: two balls of yarn about to
+    # merge, with a sparkle between them, and a fish treat
+    BOX, EDGE, TAPE, FLOOR = "#D9A86C", "#7A4E2C", "#E9C08A", tint(YELLOW, .22)
+    out, s, x0, y0 = "", 26, 11, 11
+    def box(c, r, two=False):
+        x, y = x0 + c * (s + 1), y0 + r * (s + 1)
+        if two:
+            return (f'<rect x="{x+1}" y="{y+1}" width="{s*.68}" height="{s*.68}" rx="2.5" fill="{BOX}" stroke="{EDGE}" stroke-width="2"/>'
+                    f'<rect x="{x+s*.32-1}" y="{y+s*.32-1}" width="{s*.68}" height="{s*.68}" rx="2.5" fill="{BOX}" stroke="{EDGE}" stroke-width="2"/>'
+                    f'<rect x="{x+s*.32-1+s*.27}" y="{y+s*.32-1}" width="{s*.14}" height="{s*.68}" fill="{TAPE}"/>')
+        return (f'<rect x="{x+1}" y="{y+1}" width="{s-2}" height="{s-2}" rx="3" fill="{BOX}" stroke="{EDGE}" stroke-width="2"/>'
+                f'<rect x="{x+s*.42}" y="{y+2}" width="{s*.16}" height="{s-4}" fill="{TAPE}"/><path d="M{x+2} {y+s/2}H{x+s-2}" stroke="#B98549" stroke-width="1.6"/>')
+    def floor(c, r):
+        x, y = x0 + c * (s + 1), y0 + r * (s + 1)
+        return f'<rect x="{x+1}" y="{y+1}" width="{s-2}" height="{s-2}" rx="4" fill="{FLOOR}"/>'
+    out += f'<rect x="{x0-3}" y="{y0-3}" width="{3*s+8}" height="{3*s+8}" rx="8" fill="#B98549" stroke="{EDGE}" stroke-width="2.5"/>'
+    for c, r, two in [(0, 0, True), (1, 0, False), (2, 0, True), (0, 1, False), (0, 2, True), (1, 2, False)]:
+        out += box(c, r, two)
+    for c, r in [(1, 1), (2, 1), (2, 2)]:
+        out += floor(c, r)
+    cx1, cx2, cy = x0 + 1.5 * (s + 1) - 1, x0 + 2.5 * (s + 1) - 1, y0 + 1.5 * (s + 1) - 1
+    out += yarnball(cx1, cy, 9, PLUM) + yarnball(cx2, cy, 9, PLUM)
+    sx, sy = (cx1 + cx2) / 2, cy - 12
+    out += f'<path d="M{sx} {sy-6}L{sx+1.6} {sy-1.6}L{sx+6} {sy}L{sx+1.6} {sy+1.6}L{sx} {sy+6}L{sx-1.6} {sy+1.6}L{sx-6} {sy}L{sx-1.6} {sy-1.6}Z" fill="{YELLOW}" stroke="{INK}" stroke-width="1.4" stroke-linejoin="round"/>'
+    fx, fy = x0 + 2.5 * (s + 1) - 1, y0 + 2.5 * (s + 1) - 1
+    out += (f'<g transform="translate({fx-11} {fy-6.6}) scale(.22)"><path d="M8 30C20 8 52 4 72 22L92 8C88 22 88 38 92 52L72 38C52 56 20 52 8 30Z" fill="#E8B35A" stroke="#B9822E" stroke-width="7" stroke-linejoin="round"/>'
+            f'<circle cx="22" cy="26" r="5" fill="{INK}"/></g>')
+    return frame(tint(YELLOW, .14), out)
+
+
 ICONS = {"catdoku": catdoku, "pounceup": pounceup, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "daylight": daylight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle, "mewhue": mewhue, "pawlinko": pawlinko, "crossstitch": crossstitch, "junkdrawer": junkdrawer, "zoomies": zoomies, "blanket": blanket, "bedhog": bedhog, "swapapom": swapapom}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "daylight": daylight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle, "mewhue": mewhue, "pawlinko": pawlinko, "crossstitch": crossstitch, "junkdrawer": junkdrawer, "zoomies": zoomies, "blanket": blanket, "bedhog": bedhog, "movingday": movingday, "swapapom": swapapom}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")
