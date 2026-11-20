@@ -78,6 +78,9 @@ Knock It Off's forgiving first two levels, Pounce saving while toys fall, and Wi
   waits for the sound to wake, and sound stuck after a call or another app restarts itself. Check on an iPhone. (The
   report also said it went quieter after zooming the mat; the owner couldn't make that happen.) The silent switch mutes
   the site's sound on purpose ("ambient", so music keeps playing).
+  Bed Hog's feedback (2026-11-17) is the same kind: sound gone after the front page and back, and after sending
+  feedback. Since 2026-11-20 leaving a page lets its sound go and the first tap back makes it again, and a sound whose
+  clock has stopped starts afresh. Check both on an iPhone: Bed Hog, front page, Back, tap; and send feedback, then tap.
 - [ ] **Somewhere to go past the hardest level.** (Twirl has levels 21 to 24 since 2026-11-15.) Toy Box's level 21 is a fifth of its starts; Twirl and Knock It Off
   at 20 are the same.
 
