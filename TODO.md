@@ -132,33 +132,13 @@ Pangur Bán (Pangur) for Cat Burglar and Fitzwilliam Darcy (Fitz) for Pawlette (
 "Stars decided"). Once their pictures are in `cats/`, put each into its game. Crow (like Ferguson, only much sleeker)
 will star in Crow's Drawers, not made yet (`IDEAS.md`); add Crow's poses to `ARTWORK.md` when they come.
 
-## Pounce Up: put the levels in a sensible order, and tune the goals
+## Pounce Up: tune the goals
 
 Pounce Up joined the front page on 2026-11-12. Its level goals (`TASKS` in `pounceup/index.html`: the counts, the
 race's 90 seconds, the candle level's share of candles) were set from an autopilot's play, which is clumsier than a
-person; tune them from the owner's play and the Send feedback notes.
-
-The levels are in an order that doesn't make sense (the owner, 2026-11-20). Now: 1 swat things off, 2 springs,
-3 lemons, 4 fish treats, 5 candles, 6 glasses of water, 7 sliding shelves, 8 tape, 9 catnip, 10 cracked shelves,
-11 a tidy climb. Candles come before water, yet water (or coffee) is what puts a pushed-off candle out. The owner's
-order for the start: knock things off in general, then knock off water, then knock off (or stay away from) fire.
-The rest isn't settled, but there's a logic to find. A draft for the owner to check:
-- **Knocking things off:** 1 swat things off, 2 glasses of water, 3 candles (knock one off and put it out, or keep
-  clear of the flame).
-- **Things to keep away from:** lemons and tape, after candles, since all three only give her a fright.
-- **Things that move her:** springs, sliding shelves, cracked shelves and catnip. Order them from most help to least
-  control: springs, sliding shelves, cracked shelves, then catnip's dice roll.
-- **Fish treats** early, as an easy collecting goal.
-- **A tidy climb** (knock nothing off) goes right before the first level about something not to touch (the owner,
-  2026-11-20): candles, if they count as one, otherwise lemons. It's the step from "knock things off" to "leave
-  things alone".
-
-Red glitter (the owner, 2026-11-20): things she can knock off have a gold sparkle; things that are dangerous to knock
-off should get a red one. That's the candle (it has no sparkle now, and knocking it off starts the fire). Also worth
-asking the owner: on the tidy climb, should everything that would spoil the goal sparkle red instead of gold?
-
-Renumbering levels moves saves, best times and share links. Map the old numbers to the new ones, as Mew Hue's `OLD`
-and Open the Door! did, and note in the README that GoatCounter's counts by level meant the old order before that day.
+person; tune them from the owner's play and the Send feedback notes. The levels were put in a new order on
+2026-11-20 (README, "Pounce Up"), so the goals' counts may want a look on their new levels: the tidy climb is now
+level 3, with nothing but things to knock off around, and catnip is the last level.
 
 ## Calibrate level ladders with a simulated player, as Mew Hue's were
 
