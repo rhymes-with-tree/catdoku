@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Treat Time</title>
-<script src="../move.js?v=2026-11-20.9"></script>
+<script src="../move.js?v=2026-11-20.10"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-20.9"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-20.10"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-20.9">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.10">
 <style>
 /* A tray of treat piles, each with a number. A tabby from Higgins's gang sits at the end of every row and column
    with a bowl showing how many treats it wants. Tap a pile to put it back in the jar; the piles left in a cat's
@@ -100,8 +100,8 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-20.9"></script>
-<script src="../treats.js?v=2026-11-20.9"></script>
+<script src="../games.js?v=2026-11-20.10"></script>
+<script src="../treats.js?v=2026-11-20.10"></script>
 <script>
 /* ---------- treat puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N tray of treat piles, each with a number. Some piles go back in the jar; the rest stay. The cat at the
@@ -312,7 +312,7 @@ $("board").addEventListener("blur", () => { cursor = -1; showCursor(); });
 const undo = G.history({game: () => game, back: (h, g) => { if (Array.isArray(h)) g.mark[h[0]] = h[1]; else g.mark = h.mark; },
   can: playing, after: () => { update(); save(); }, restart: true});
 $("restartBtn").onclick = () => {
-  if (undo.restart(g => { g.mark = new Array(g.N * g.N).fill(0); }, {mark: game.mark.slice()})) G.note("Every pile's back on the tray. Undo brings your moves back.", 4000);
+  if (undo.restart(g => { g.mark = new Array(g.N * g.N).fill(0); }, {mark: game.mark.slice()})) { slip(); G.note("Every pile's back on the tray. Undo brings your moves back.", 4000); }
 };
 // Hint: first a mistake, in red (a pile put back that should stay, or marked to stay that should go back);
 // otherwise, in gold, the row or column with the fewest piles left to put back, and asked again, one of its piles.
@@ -335,16 +335,28 @@ $("hintBtn").onclick = () => {
     line = {cells: all.filter(k => byRow ? Math.floor(k / N) === Math.floor(i / N) : k % N === i % N),
       say: `This ${byRow ? "row" : "column"} has ${n === 1 ? "one pile" : `${n} piles`} left to put back. Which ${n === 1 ? "one" : "ones"}?`};
   }
-  game.hinted = true; game.started = true; save();
+  game.hinted = true; game.started = true; slip(); save();
   if (line && !hints.level()) return hints.show({cells: line.cells}, line.say);
   hints.show({cells: [i], bad}, say);
 };
 
 /* ---------- endings ---------- */
 // Every cat fed: the piles left on the tray are eaten one by one, and the cats bob as they eat.
+// Three wins at a level move you up and three slips (a hint, or a Restart after working on it) move you down: G.ladder.
+const climb = G.ladder("treattime", MAX_LEVEL);
+// A slip counts once a puzzle, and that puzzle no longer counts as a win toward moving up.
+function slip() {
+  if (game.slipped || game.won) return;
+  game.slipped = true;
+  const r = climb.lost(game.level);
+  if (r.down) { game.down = r.next; settings.level = r.next; $("levelSel").value = r.next; build.prefetch(r.next); }
+  save();
+}
 function win() {
   game.won = true; G.finishClock(game); cursor = -1; clearHint(); G.sound.play("tt.fed", {}, .3);   // every cat fed: a chirp-purr
-  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  // a tray with a hint or a restart was counted when that happened; a clean one is a win toward moving up
+  let next = game.down || game.level;
+  if (!game.slipped) { const r = climb.won(game.level); next = r.next; game.climbLine = climb.say(r); }
   settings.level = next; $("levelSel").value = next; save();
   update();
   G.track(`Treat Time solved level ${game.level}`);
@@ -361,12 +373,13 @@ function win() {
 function finishCard() {
   const next = settings.level, gold = !game.restarted && !game.hinted;
   let text = `All ${2 * game.N} cats got just enough treats.`;
-  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  text += " " + (game.down ? `That's 3 hints or restarts at level ${game.level}, so next comes level ${game.down}.`
+    : game.slipped ? "A tray with a hint or a restart doesn't count toward moving up." : game.climbLine || "");
   // a gold paw: a tabby curled up asleep with a full tummy, in place of the random cat photo
   const pic = new Image(); pic.className = "tabbypic"; pic.src = catSrc("c20-3"); pic.alt = "A tabby curled up asleep";
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my tray", game.result,
-    {title: "All fed!", gold, goldWhy: "No hints or restarts!", goldTitle: "Purr-fect!", goldPic: [pic], next: next > game.level ? `Next: level ${next}` : "Next board",
-     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+    {title: "All fed!", gold, goldWhy: "No hints or restarts!", goldTitle: "Purr-fect!", goldPic: [pic], next: G.ANOTHER,
+     after: G.otherSize($("levelSel"), next, startLevel, G.CHANGE)});
 }
 
 /* ---------- new trays ---------- */

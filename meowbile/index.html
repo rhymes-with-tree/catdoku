@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Meowbile</title>
-<script src="../move.js?v=2026-11-20.9"></script>
+<script src="../move.js?v=2026-11-20.10"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-20.9"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-20.10"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-20.9">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.10">
 <style>
 /* A cat's mobile: rods hang from their middles, with a string of toys or another rod at each end. Every rod
    balances. Tap a toy (or its button in the key) and then a number to say what that kind of toy weighs; a rod
@@ -118,7 +118,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-20.9"></script>
+<script src="../games.js?v=2026-11-20.10"></script>
 <script>
 /* ---------- mobiles (plain functions, also run in a background worker) ---------- */
 // A mobile is a tree: a rod {l, r} hangs from its middle with a branch at each end (both ends the same distance
@@ -495,8 +495,9 @@ const undo = G.history({game: () => game, can: playing, restart: true,
   back: h => { if (h.got) game.got = h.got; else { game.got[h[0]] = h[1]; sel = h[0]; } },
   after: () => { update(); save(); }});
 $("restartBtn").onclick = () => {
-  if (undo.restart(g => { g.got = g.got.map(() => null); }, {got: game.got.slice()}))
-    G.note("Back to how the mobile started. Undo brings your weights back.", 4000);
+  if (undo.restart(g => { g.got = g.got.map(() => null); }, {got: game.got.slice()})) {
+    slip(); G.note("Back to how the mobile started. Undo brings your weights back.", 4000);
+  }
 };
 
 /* ---------- hints ---------- */
@@ -525,7 +526,7 @@ function paintHint() {
 $("hintBtn").onclick = () => {
   if (!playing()) return;
   const K = game.K, wrong = [...Array(K).keys()].filter(k => game.got[k] != null && game.got[k] !== game.w[k] && !given(k));
-  const mark = (m, say) => { game.hinted = true; game.started = true; save(); hints.show(m, say); };
+  const mark = (m, say) => { game.hinted = true; game.started = true; slip(); save(); hints.show(m, say); };
   if (wrong.length) return mark({kinds: [wrong[0]], bad: true}, `The ${nameOf(wrong[0])} don't weigh ${game.got[wrong[0]]}${G.andMore(wrong.length - 1)}.`);
   const known = [...Array(K).keys()].map(k => weightOf(k));
   const r = reason(game, known, true), s = r.steps[0];
@@ -554,10 +555,22 @@ $("hintBtn").onclick = () => {
 };
 
 /* ---------- endings ---------- */
+// Three wins at a level move you up and three slips (a hint, or a Restart after working on it) move you down: G.ladder.
+const climb = G.ladder("meowbile", MAX_LEVEL);
+// A slip counts once a puzzle, and that puzzle no longer counts as a win toward moving up.
+function slip() {
+  if (game.slipped || game.won) return;
+  game.slipped = true;
+  const r = climb.lost(game.level);
+  if (r.down) { game.down = r.next; settings.level = r.next; $("levelSel").value = r.next; build.prefetch(r.next); }
+  save();
+}
 // Every weight right: the mobile hangs level.
 function win() {
   game.won = true; G.finishClock(game); sel = -1; hints.clear(false);
-  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  // a mobile with a hint or a restart was counted when that happened; a clean one is a win toward moving up
+  let next = game.down || game.level;
+  if (!game.slipped) { const r = climb.won(game.level); next = r.next; game.climbLine = climb.say(r); }
   settings.level = next; $("levelSel").value = next; save();
   update();
   G.track(`Meowbile solved level ${game.level}`);
@@ -569,10 +582,11 @@ function leaper() { const im = new Image(); im.className = "leaper"; im.src = ".
 function finishCard() {
   const next = settings.level, gold = !game.restarted && !game.hinted;
   let text = `Every rod on the mobile hangs level.`;
-  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  text += " " + (game.down ? `That's 3 hints or restarts at level ${game.level}, so next comes level ${game.down}.`
+    : game.slipped ? "A mobile with a hint or a restart doesn't count toward moving up." : game.climbLine || "");
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my mobile", game.result,
     {title: "Balanced!", gold, goldWhy: "No hints or restarts!", goldTitle: "What a leap!", goldPic: [leaper()],
-     next: next > game.level ? `Next: level ${next}` : "Next board", after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+     next: G.ANOTHER, after: G.otherSize($("levelSel"), next, startLevel, G.CHANGE)});
 }
 
 /* ---------- new mobiles ---------- */
