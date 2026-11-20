@@ -166,17 +166,20 @@ in its notes.
 - **Saving:** `G.load`/`G.save` under `catdoku.<slug>.v1`. Reopen a save inside `G.reopen(fn, fresh)`;
   if `fn` throws, `fresh(message)` should start a new puzzle and show the message.
 - **Winning:** `G.winCard(text, onNext, admire, result, {title, gold, goldWhy, next, after})`, with
-  `after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")`. When `gold` is
+  `next: G.ANOTHER` and `after: G.otherSize($("levelSel"), next, startLevel, G.CHANGE)`. When `gold` is
   true the card's title is "Gold paw!", so `title` only shows on other wins. A gold paw on the top level or size masters the
   game (its tile gets a gold Mastered label); the win card works that out from `result.n` and the page's level or size picker,
   so pass `top: true` or `false` if the game's levels aren't the picker's values (see `atlas/`). Gold paw rules
   differ by game (README, "Across every game"). For a logic puzzle, follow Tunnel Run and Open the
-  Door!: a hint or Restart costs the gold paw (Undo, Bookmark and Return to Bookmark never do); a hint also keeps the player on the same level, and
-  a win without one moves up. Say so on the win card: "You had a hint, so here's another at level N." Tunnel Run: `gold: !game.restarted && !game.hinted`,
+  Door!: a hint or Restart costs the gold paw (Undo, Bookmark and Return to Bookmark never do). **Moving up and down:** every
+  game with levels uses `G.ladder(slug, MAX_LEVEL)` (README, "Moving up and down"): three clean wins at a level move
+  you up and three slips move you down, a slip being a lost game, or a hint or a Restart after working on it, counted
+  once a puzzle by a `slip()` (copy Open the Door!'s `slip`, `win` and `finishCard`, and Swap-a-Pom's for a game that
+  can be lost). The win card says where you are with `climb.say(r)`. Tunnel Run: `gold: !game.restarted && !game.hinted`,
   `goldWhy: "No hints or restarts!"`. Every Restart costs it, so set `game.restarted = true` there (not in Undo). Say when the paw is gone with
   `G.pawLost(() => !game || game.won || game.hinted || game.restarted)` (plus anything else that loses it for good, such
-  as a life lost), just after `game` is declared, so the red tools go back to the usual colour once there's nothing to lose. An Audit, if the game has one, never costs a life: like a hint, it keeps the
-  player on the same level and costs the gold paw.
+  as a life lost), just after `game` is declared, so the red tools go back to the usual colour once there's nothing to lose. An Audit, if the game has one, never costs a life: like a hint, it's a
+  slip and costs the gold paw.
 - **Share links:** the Share button opens `G.shareCard({name, won, puzzle, progress})`. A game played against
   the clock (Pounce, Bubbles, Tail Chase) leaves out `progress` and passes `what` ("board", "rug"…), so the card
   shares only the level as dealt; keep a copy of it as dealt for that and for Restart (see `pounce/`). A shared
