@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Bird Watch</title>
-<script src="../move.js?v=2026-11-20.15"></script>
+<script src="../move.js?v=2026-11-20.16"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-20.15"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-20.16"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-20.15">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.16">
 <style>
 /* Three tall windows side by side, each with three panes. Birds land outside a pane for a moment: tap it to have
    Bugsy or Bowtie spot one. Squirrels and falling leaves go past too; leave
@@ -93,7 +93,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-20.15"></script>
+<script src="../games.js?v=2026-11-20.16"></script>
 <script>
 /* ---------- levels ---------- */
 // Level n: [birds in the flock, how long a bird stays (ms), time between arrivals (ms), most things at the windows
@@ -396,6 +396,11 @@ addEventListener("keydown", e => {
 });
 
 /* ---------- endings ---------- */
+// Three clean wins at a level move you up and three that weren't (wiping the windows, waking the human, or too many
+// getting away) move you down: G.ladder, counted once a flock as it ends.
+const steps = G.ladder("birdwatch", MAX_LEVEL);
+// A loss: counted, and the card says so if it moves you down, with its New flock going to the level below.
+function lostTo() { const c = steps.end(game, game.level, true, {what: "misses"}); if (c.down) { settings.level = c.next; $("levelSel").value = c.next; save(); } return c; }
 // Out of taps: the human wakes up.
 function woke() {
   game.state = "woke"; cancelAnimationFrame(frame); G.breakStreak(); status(); keepBest(); G.sound.play("bird.woke");
@@ -404,9 +409,10 @@ function woke() {
   const g = game;
   setTimeout(() => {
     if (game !== g) return;
-    G.loseCard("The human woke up!", `That was tap ${game.budget}, after ${game.spotted} of the ${game.flock} birds. Too much tapping on the glass!`,
-      [["Restart", () => { G.closeCard(); newRun(game.level, game.seed, true); }, true], ["New flock", () => { G.closeCard(); newRun(game.level); }], G.homeBtn()],
-      null, G.otherSize($("levelSel"), game.level, startLevel, "Or play a different level:"), {result: {n: game.level}, sound: false});   // the launch played as they woke
+    const c = lostTo();
+    G.loseCard("The human woke up!", `That was tap ${game.budget}, after ${game.spotted} of the ${game.flock} birds. Too much tapping on the glass!` + (c.down ? " " + c.line : ""),
+      [["Restart", () => { G.closeCard(); newRun(game.level, game.seed, true); }, true], [c.down ? `Level ${c.next}` : "New flock", () => { G.closeCard(); newRun(c.next); }], G.homeBtn()],
+      null, G.otherSize($("levelSel"), c.next, startLevel, G.CHANGE), {result: {n: game.level}, sound: false});   // the launch played as they woke
   }, 700);
 }
 // Too many birds got away: the level's lost.
@@ -417,9 +423,10 @@ function lost() {
   const g = game;
   setTimeout(() => {
     if (game !== g) return;
-    G.loseCard("Too many got away!", `${game.escaped} birds flew off before Bugsy and Bowtie spotted them. Only ${game.away} may get away on this level.`,
-      [["Restart", () => { G.closeCard(); newRun(game.level, game.seed, true); }, true], ["New flock", () => { G.closeCard(); newRun(game.level); }], G.homeBtn()],
-      null, G.otherSize($("levelSel"), game.level, startLevel, "Or play a different level:"), {result: {n: game.level}});
+    const c = lostTo();
+    G.loseCard("Too many got away!", `${game.escaped} birds flew off before Bugsy and Bowtie spotted them. Only ${game.away} may get away on this level.` + (c.down ? " " + c.line : ""),
+      [["Restart", () => { G.closeCard(); newRun(game.level, game.seed, true); }, true], [c.down ? `Level ${c.next}` : "New flock", () => { G.closeCard(); newRun(c.next); }], G.homeBtn()],
+      null, G.otherSize($("levelSel"), c.next, startLevel, G.CHANGE), {result: {n: game.level}});
   }, 600);
 }
 // The most birds spotted on each level, kept on this device. Returns whether this run beat the last best.
@@ -456,16 +463,16 @@ $("wipeBtn").onclick = () => {
 function goldPic() { const im = new Image(); im.className = "goldpic"; im.src = catSrc("bugsy-bowtie-window"); im.alt = "Bugsy and Bowtie up at the window together"; return im; }
 function win() {
   game.state = "won"; cancelAnimationFrame(frame); G.finishClock(game);
-  const gold = game.taps === game.flock && game.escaped === 0 && !game.helped && !game.restarted, beat = keepBest(true), next = game.helped ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  const gold = game.taps === game.flock && game.escaped === 0 && !game.helped && !game.restarted, beat = keepBest(true), next = steps.end(game, game.level, game.helped, {none: "You wiped the windows, so it doesn't count toward moving up."}).next;
   settings.tries[game.level] = 0; settings.level = next; $("levelSel").value = next; save(); status();
   G.track(`Bird Watch won level ${game.level}`);
   const g = game;
   setTimeout(() => {
     if (game !== g) return;
     for (const w of wins) w.querySelector(".thing").innerHTML = "";
-    const text = (game.escaped ? `Bugsy and Bowtie spotted ${game.spotted} of the ${game.flock} birds.` : `Bugsy and Bowtie spotted all ${game.flock} birds.`) + (beat ? " That's a new best!" : "") + (game.helped ? ` You wiped the windows, so here's level ${next} again.` : game.level === MAX_LEVEL ? " That's the hardest level; here it is again." : ` Next up: level ${next}.`);
+    const text = (game.escaped ? `Bugsy and Bowtie spotted ${game.spotted} of the ${game.flock} birds.` : `Bugsy and Bowtie spotted all ${game.flock} birds.`) + (beat ? " That's a new best!" : "") + " " + game.climbed.line;
     G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the view", game.result,
-      {title: game.escaped ? "Well spotted!" : "All spotted!", gold, goldWhy: "Every bird, not a tap wasted, no wiping or restart!", goldPic: [goldPic()], next: next > game.level ? `Next: level ${next}` : "Next board", after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+      {title: game.escaped ? "Well spotted!" : "All spotted!", gold, goldWhy: "Every bird, not a tap wasted, no wiping or restart!", goldPic: [goldPic()], next: G.ANOTHER, after: G.otherSize($("levelSel"), next, startLevel, G.CHANGE)});
   }, 600);
 }
 function startLevel(n) { settings.level = n; $("levelSel").value = n; save(); G.closeCard(); newRun(n); }
