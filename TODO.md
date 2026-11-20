@@ -52,6 +52,13 @@ are small (10 to 40 a level) and a start includes pressing New, so these are sig
 and L-M-N-O-Pom, High Perch's trees left standing, smaller first sizes in Catdoku, Patches, Yarn and Sunbeams, 
 Knock It Off's forgiving first two levels, Pounce saving while toys fall, and Window Ledges' two gentle levels):
 
+- [ ] **Did the easier starts help?** Compare level 1 starts and solves against the numbers here: Open the Door!,
+  Toe Beans, High Perch, Knock It Off (levels 1 and 2), Night Light, and the smaller first sizes in Catdoku, Patches,
+  Yarn and Sunbeams. Look again from early December 2026, with a few weeks of the new numbers.
+- [ ] **Wind Up, Pawlinko and L-M-N-O-Pom: judge their levels.** They count starts since 2026-11-12; once there are a
+  few weeks of them, see which levels lose people.
+- [ ] **Leave the /weather page out of totals.** The GoatCounter site also counts a separate /weather page that isn't
+  part of Catdoku.
 - [ ] **Toe Beans: levels 9 and 10?** 0 solves in 9 starts, but five of those ended with Close enough, 1 to 6 away,
   which is the game working as meant. Leave unless the owner finds them too hard.
 - [ ] **Pounce: check level 1.** 23 → 12, though the move limits were tuned for a near-certain win. Running out of
