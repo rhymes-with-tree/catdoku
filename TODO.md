@@ -17,6 +17,19 @@ README, Hosting and the move). It waits for the new site to answer, so it's on `
   destination address and a hello@ rule are the owner's to finish
 - [ ] after the switch, the Pawprints numbers carry on in one line (the paths keep `/catdoku`); check a day's worth
 
+## Junk Drawer: checks not yet run
+
+The new-game skill's tests that weren't run when Junk Drawer was built (rhymes-with-tree/catdoku#234):
+- [ ] open a share link, fresh and with progress
+- [ ] play Fridge Magnets through on the shared magnet style (`.fmag`, `G.MAGNET`)
+- [ ] hint marks with reduce motion on
+- [ ] the 44-point touch-target probe on every control outside the board
+- [ ] VoiceOver: every button's label, the board's description
+- [ ] sideways: the walkthrough lines up, cards cover the column, turning the phone mid-puzzle lays out as a fresh load,
+  and the check at 932 × 430
+- [ ] the 6 × 6 drawer at 320 wide (magnets big enough to tap)
+- [ ] the colours the page and its icon use, against the palette
+
 ## Catlas: Safari still offers AutoFill Contact in the answer box
 
 On an iPhone, typing an answer in Catlas (Type answers) brings up Safari's AutoFill Contact bar above the keyboard,
