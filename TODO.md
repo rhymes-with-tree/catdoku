@@ -144,7 +144,8 @@ level 3, with nothing but things to knock off around, and catnip is the last lev
 
 Mew Hue's 33 levels are in order of how often a simple player (the best-looking slide each time) won each one, with
 no step between neighbours of more than about 10 points and a breather where something new comes in (README,
-"Mew Hue"). The same is worth doing for games that can be lost through luck plus your own choices (2026-11-20):
+"Mew Hue"). How to do it is in the new-game skill, "Calibrating difficulty" (Moving Day was the
+first new game set that way, 2026-11-20). The same is worth doing for games that can be lost through luck plus your own choices (2026-11-20):
 - **Wind Up, levels 1 to 12:** set by hand (level 12 needed easing after GoatCounter showed 4 of 6 lost). The bot
   that checks levels 13 to 20 against level 9 can play the whole ladder. Do this first.
 - **L-M-N-O-Pom:** the points goals (40 to 260) and speeds are by hand. The simulated player needs a fixed thinking
