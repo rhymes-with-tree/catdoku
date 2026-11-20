@@ -542,13 +542,14 @@ const G = (() => {
     const at = n => label(n);
     const say = (r, what = "misses") => r.up ? `That's 3 wins at ${at(r.level)}: up to ${at(r.next)}!`
       : r.down ? `That's 3 ${what} at ${at(r.level)}, so next comes ${at(r.next)}.`
-      : r.top ? `That's the hardest ${/^level/.test(at(r.level)) ? "level" : "size"}.` : r.wins === 2 ? `2 of 3 wins at ${at(r.level)}: one more moves you up.`
+      : r.top ? `That's the hardest ${/^level/.test(at(r.level)) ? "level" : /×/.test(at(r.level)) ? "size" : "one"}.` : r.wins === 2 ? `2 of 3 wins at ${at(r.level)}: one more moves you up.`
       : r.wins ? `${Math.min(3, r.wins)} of 3 wins at ${at(r.level)}.` : "";
     // end(state, level, missed): for a game that counts a puzzle once, when it ends (a win, a win with help or a loss),
     // rather than at each hint. Kept on the state, so a loss, a revive and then a win count once. Gives {next, up,
     // down, missed, line}: line is the card's words, `none` when a missed puzzle didn't move you down.
     const end = (state, level, missed, {what = "misses", none = ""} = {}) => {
       if (!state.climbed) { const r = step(level, !missed); state.climbed = {next: r.next, up: r.up, down: r.down, missed: !!missed, line: r.down || !missed ? say(r, what) : none}; }
+      else if (state.climbed.missed && !state.climbed.line && none) state.climbed.line = none;   // a win after a counted loss says why it didn't count
       return state.climbed;
     };
     return {won: level => step(level, true), lost: level => step(level, false), say, end};

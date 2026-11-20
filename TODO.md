@@ -93,24 +93,11 @@ cats that point their own way are Day Light (`daylight/`, in beta).
   place on the front page and in the daily challenge, and whether the sunny room reads well. From the owner's first
   play (2026-11-12): a missing arrow needed marking, so a small red cross now marks each of the plain four ways a cat
   that points its own way leaves out.
-- [ ] **Moving up and down: the rest of the games.** Three wins at a level move you up and three losses move you
-  down (a loss in a puzzle that can't be lost: a hint, or a Restart after working on it), with Give me another! and
-  Change the difficulty on the win card: `G.ladder` in `games.js` (README, "Moving up and down"). The owner says it's
-  working well (2026-11-20). In Night Light, Day Light, Open the Door! and Toe Beans since 2026-11-12; since
-  2026-11-20 also all of Cat Math, Fair Play, High Perch, Scratch That, Cross Stitch, Bed Hog, Copycat, If It Fits,
-  Junk Drawer, Kitten Caboodle, Knit Pick, Laser Pointer, Pawlette, Purrmutation, Shelf Life, Unravel, Up a Tree and
-  the beta games Under the Blanket, Tape Trap, Swap-a-Pom and Boing!
-  (each was one clean win up, a hint keeping you put). Still to do, each moving up some other way today:
-  - Done 2026-11-20, counted as the puzzle ends (G.ladder's `end`): the games lost on lives or moves, Catdoku, Toydoku,
-    Hide & Seek, Spelling String, Mew Hue, Fridge Magnets, Cat Mat, Fish Bones, Pick of the Pile, L-M-N-O-Pom, Pounce,
-    Bubbles, Cat Pile, Toy Box, Twirl and Knock It Off. Each game's own README section still has its old words
-    ("a hint keeps you on the same level"); README's "Moving up and down" says it overrides them. Tidy them some time.
-  - Done 2026-11-20, a hint counted as the puzzle ends: Patches, Sunbeams, Yarn, Tangle, Catwalk, Tunnel Run, Zoomies
-  - Action games, up after the first try or on a score: Tail Chase, Wind Up, Bird Watch, Pawlinko, Pounce Up, Cat
-    Burglar, Catlas, Moving Day
-  - Only on a gold paw: Mewstermind. A daily keyboard, no levels: Keyboard Cat (probably leave it)
-  - Beta games have it too since 2026-11-20 (Under the Blanket, Tape Trap, Swap-a-Pom, Boing!; Day Light already);
-    Pawstcards has no levels. A new game gets it from the start.
+- [ ] **Moving up and down: tidy each game's README section.** Every game with levels or sizes has `G.ladder` since
+  2026-11-20 (README, "Moving up and down", which says what counts as a miss in each). Many game sections further
+  down still say "a hint keeps you on the same level" or "a clean win moves you up"; the paragraph says it overrides
+  them, but reword them when a section is next touched. Also watch GoatCounter: a level that people now drop back
+  from a lot is too hard a step.
 - [ ] **One new move a level.** The how-to and the on-ramp are divided in a way that isn't ideal: the walkthrough
   tells the rules up front, and then the levels get harder. Better: each early level brings in one new move, and a
   win on it is the reward. Night Light's and Day Light's new first levels (one tap, then two) are a first go at it.
