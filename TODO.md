@@ -59,6 +59,11 @@ Knock It Off's forgiving first two levels, and Pounce saving while toys fall):
   moves on level N"). Look again with a few weeks of it.
 - [ ] **Weak level 1s to watch** (small samples): Cat Pile 16 → 7, Scratch That 17 → 8, Window Ledges 11 → 5, Kitten
   Caboodle 10 → 5.
+- [ ] **Mewstermind: out of beta.** Moved to beta on 2026-11-19 (the owner's call) and rebuilt as a Clue: one cat had
+  one toy, in one room, at one time of day; each guess names one of each, paws say how many are right; Higgins is the
+  witness Hint. Levels 1 to 6 built 2026-11-19 and 2026-11-20, with its new icon (preview:
+  https://claude.ai/artifact/LD21RccB3Yg2dk66XGUih3). Rooms and times stay emoji (the owner's call). For the owner to
+  play, then back to the front page.
 - [ ] **Under the Blanket: out of beta again.** Moved to beta on 2026-11-16 (the owner's call) after its first week on
   the front page: 11 starts at level 1, 6 solves. Still to settle what makes level 1 easier to get into.
 - [ ] **Twirl's sound on an iPhone** (feedback, 2026-11-16): sometimes no sound at all. Since the same day a tap's sound
