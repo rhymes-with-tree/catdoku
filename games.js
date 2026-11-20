@@ -62,6 +62,7 @@ const G = (() => {
     ["Zoomies", "zoomies", "Retrace the cat's 3 a.m. zoomies around the house", "#4E577D", "lines", "signpost arrows path numbers jumps queen chain link zoomies", "2026-11-08"],
     ["Bed Hog", "bedhog", "Slide the sprawled cats until there's room for you", "#E16A4A", "teasers", "klotski rush hour sliding block puzzle unblock slide bed hog huarong sleeping cats", "2026-11-09"],
     ["Pounce Up", "pounceup", "Help Rayla pounce up the tallest bookcase in the house", "#7885BA", "prowl", "doodle jump platform jumping climbing bookcase shelves action springs", "2026-11-12"],
+    ["Moving Day", "movingday", "Unpack the boxes and find the cats their things", "#ECA818", "quick", "merge game merge mansion travel town gossip harbor merge 2 combine moving boxes unpack treats toys orders", "2026-11-20"],
   ];
   // Games in beta: their pages work (open them by their address), but they're left off the front page, the games menu,
   // search, favorites and the daily challenge until they're finished. Same fields as GAMES.
@@ -1351,6 +1352,7 @@ const G = (() => {
     lmnopom: ["Left and right: move", "Up or X: turn", "Down: fall faster", "Space or Enter: drop", "P: pause", "S: swat"],
     windowledges: ["Arrow keys: pick a window", "1 to 9: put in a digit (Shift: a note)", "Backspace or 0: take it out", "N or P: notes on or off", "Escape: let go"],
     bedhog: ["Arrow keys: pick a square", "Space or Enter: pick up the cat there, then put it down", "Arrow keys, holding a cat: slide it", "Escape: put it back"],
+    movingday: ["Arrow keys: pick a square", "Space or Enter: tap the jar or basket, pick a thing up, then put it down on another", "1 to 4: give a cat what it wants", "Escape: let go"],
     catshuffle: ["Arrow keys: pick a square", "Space: slide the piece there, or turn the knob (Shift turns it back)", "Shift with an arrow: shift its row or column"],
     mewhue: ["Arrow keys: pick a square", "Shift with an arrow: slide its row or column that way"],
     zoomies: ["Arrow keys: pick a square", "Space or Enter: pick a square, then another to join the pair (or part it)", "C: the next line colour", "Escape: let go"],
@@ -2039,7 +2041,7 @@ const G = (() => {
     catpile: [["cats", "Cats", "Cats nap on the blanket", true, {row: "decor", at: ["catdoku.catpile.prefs.v1", "cats"]}],
       ["turns", "Turning", "Toys can be turned as well as moved; a turn costs the gold paw", false, {warn: true, paw: true, short: "Rotation OK", icon: "rotate", at: ["catdoku.catpile.prefs.v1", "turns"]}]],
     bedhog: [["cats", "Cats", "Cats nap on the bed", true, {row: "decor"}]],
-    catshuffle: [NUMBERS("Each piece shows where it goes")], windup: [NUMBERS("Each toy shows a number too")],
+    catshuffle: [NUMBERS("Each piece shows where it goes")], windup: [NUMBERS("Each toy shows a number too")], movingday: [NUMBERS("Each thing shows its step")],
     pickpile: [["dim", "Dim stuck blocks", "Blocks that can't come off yet are dimmed", true, {row: "decor", inv: true}]],
     tunnelrun: [["tracks", "Tracks", "Rugs where whole rows and columns slide", false, {icon: "swap", words: ["Turning rugs", "Sliding tracks"]}]],
     toebeans: [["rev", "Reverse", "Count back down from the total to the start", false, {icon: "swap", words: ["Match the Paw", "Paw = 0"]}]],
