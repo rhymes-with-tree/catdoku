@@ -140,6 +140,14 @@ person; tune them from the owner's play and the Send feedback notes. The levels 
 2026-11-20 (README, "Pounce Up"), so the goals' counts may want a look on their new levels: the tidy climb is now
 level 3, with nothing but things to knock off around, and catnip is the last level.
 
+Also to check from play (raised 2026-11-11, not decided):
+- a warning on the other don't-touch levels (candles, tape, cracked shelves), as the lemon level has: the first touch
+  drops her safely to a shelf below instead of ending the climb;
+- candles catch her flying past a flame on a shelf she's skipping, not only landing beside one (an autopilot got
+  "Too hot!" on 11 of 15 runs): perhaps only the shelf she lands on should count;
+- a tap on a shelf only a little above her (under 35 units) counts as a tap on her own shelf, so she walks instead of
+  pouncing, and can knock something off on the tidy level.
+
 ## Calibrate level ladders with a simulated player, as Mew Hue's were
 
 Mew Hue's 33 levels are in order of how often a simple player (the best-looking slide each time) won each one, with
