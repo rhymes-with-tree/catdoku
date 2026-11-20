@@ -93,11 +93,8 @@ cats that point their own way are Day Light (`daylight/`, in beta).
   place on the front page and in the daily challenge, and whether the sunny room reads well. From the owner's first
   play (2026-11-12): a missing arrow needed marking, so a small red cross now marks each of the plain four ways a cat
   that points its own way leaves out.
-- [ ] **Moving up and down: tidy each game's README section.** Every game with levels or sizes has `G.ladder` since
-  2026-11-20 (README, "Moving up and down", which says what counts as a miss in each). Many game sections further
-  down still say "a hint keeps you on the same level" or "a clean win moves you up"; the paragraph says it overrides
-  them, but reword them when a section is next touched. Also watch GoatCounter: a level that people now drop back
-  from a lot is too hard a step.
+- [ ] **Moving up and down: watch GoatCounter.** Every game with levels or sizes has `G.ladder` since 2026-11-20
+  (README, "Moving up and down"). A level that people now drop back from a lot is too hard a step.
 - [ ] **One new move a level.** The how-to and the on-ramp are divided in a way that isn't ideal: the walkthrough
   tells the rules up front, and then the levels get harder. Better: each early level brings in one new move, and a
   win on it is the reward. Night Light's and Day Light's new first levels (one tap, then two) are a first go at it.
