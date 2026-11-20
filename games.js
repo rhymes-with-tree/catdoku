@@ -72,6 +72,7 @@ const G = (() => {
     ["Day Light", "daylight", "Get every cat napping in the sun, though some point their own way", "#ECA818", "teasers", "lights out flip switch spots arrows night light nap", "2026-11-12"],
     ["Swap-a-Pom", "swapapom", "Swap the pompoms to spell words, with Moonpie for company", "#B94588", "words", "gram jam match 3 three words swap letters scrabble pompoms pom poms moonpie purr", "2026-11-13"],
     ["Tape Trap", "tapetrap", "Lay a square of tape for every cat to sit in", "#ECA818", "logic", "cat trap tape masking tape nearest distance steps voronoi marmalade", "2026-11-20"],
+    ["Boing!", "boing", "Place springs to bounce the ball to Ferguson", "#7885BA", "teasers", "incredible machine physics springs bounce ball boing trajectory ferguson", "2026-11-20"],
     ["Pawstcards", "pawstcards", "Guess where Pinecone is from her postcards", "#73A7AE", "prowl", "geography countries wikipedia postcards guess the country clues redacted trivia travel pinecone", "2026-11-11"],
   ];
   const rowOf = slug => GAMES.find(g => g[1] === slug) || BETA.find(g => g[1] === slug);
@@ -1330,6 +1331,7 @@ const G = (() => {
     catastrophe: ["1 to 9: knock over that pot"],
     laserpointer: ["Arrow keys: pick a mirror", "Space or Enter: tip it"],
     blanket: ["Arrow keys: move over the blanket and round its edge", "Space or Enter: a slot tries the feather; a square gets a lump", "D, X or .: a dot"],
+    boing: ["Arrow keys: along a surface, or up and down to another", "Space or Enter: put a spring there, or turn the one there", "Delete or Backspace: take it back", "G: go"],
     tapetrap: ["Arrow keys: pick a square", "Space or Enter: lay tape or take it up (on a cat: show its reach)", "X or .: a dot, for a square that stays bare", "Backspace: clear the square"],
     treattime: ["Arrow keys: pick a pile", "Space: put it back or take it out", "K or Enter: mark it to stay"],
     upatree: ["Letters: change the letter picked, or type a whole word", "Enter: climb with the word typed", "Backspace: take a letter off, or with none typed, step back down a perch"],
@@ -2480,7 +2482,7 @@ const G = (() => {
   // listed. Undo, Bookmark and Return to Bookmark are free everywhere.
   const PAW_COST = {
     hintFree: "hideseek",
-    restartFree: "zoomies",
+    restartFree: "zoomies boing",
     hints: {junkdrawer: "leftBtn"},   // hints by another name: in the red group beside Hint
     helpers: {toybox: "shakeBtn shuffleBtn rainbowBtn basketBtn", bubbles: "sightBtn nipBtn shakeBtn liftBtn", pickpile: "shuffleBtn", mewhue: "shuffleBtn",
       windup: "shakeBtn fluffBtn netBtn", lmnopom: "swatBtn", birdwatch: "wipeBtn", magnets: "fillBtn"},

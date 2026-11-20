@@ -1201,10 +1201,33 @@ def tapetrap():
     return frame(PAPER, out)
 
 
+# Boing!: a room from the side: a ball rolls off the shelf at the top left (its path in dots), comes down on a coil
+# standing on the floor and bounces up and over into a basket on a cupboard, where Ferguson (black, with yellow eyes)
+# is curled up waiting.
+def boing():
+    WOOD = tint(RED, .45)
+    out = f'<path d="M6.5 80H93.5V82Q93.5 93.5 82 93.5H18Q6.5 93.5 6.5 82Z" fill="{tint(YELLOW, .45)}"/><path d="M6.5 80H93.5" stroke="{INK}" stroke-width="2"/>'
+    out += f'<rect x="8" y="28" width="26" height="4" rx="1.5" fill="{WOOD}" stroke="{INK}" stroke-width="1.6"/>'
+    # the ball's path: off the shelf, down onto the spring, up and over into the basket
+    dots = [(36, 25), (40, 31), (43, 40), (45, 50), (46, 60)] + [(50, 52), (55, 40), (61, 32), (67, 30), (73, 33), (77, 40)]
+    out += "".join(f'<circle cx="{x}" cy="{y}" r="1.6" fill="{PLUM}" opacity=".7"/>' for x, y in dots)
+    out += circle(26, 21.5, 5.5, YELLOW, 1.8) + f'<path d="M21.5 19Q26 23 30.5 19" fill="none" stroke="#fff" stroke-width="1.4"/>'
+    # a coil standing on the floor, bouncing
+    out += "".join(f'<ellipse cx="46" cy="{y}" rx="6.5" ry="2.2" fill="none" stroke="{PERI}" stroke-width="2.6"/>' for y in (66, 70, 74, 78))
+    out += "".join(f'<path d="M{x1} {y1}L{x2} {y2}" stroke="{INK}" stroke-width="1.8" stroke-linecap="round"/>' for x1, y1, x2, y2 in [(36, 62, 32, 59), (56, 62, 60, 59), (46, 58, 46, 54)])
+    # the cupboard and the basket, with Ferguson in it
+    out += f'<rect x="66" y="58" width="22" height="22" rx="2" fill="{WOOD}" stroke="{INK}" stroke-width="1.8"/><circle cx="77" cy="69" r="1.4" fill="{YELLOW}"/>'
+    ferg = catface(77, 44, 7.5, INK).split("<circle")[0] + "".join(f'<circle cx="{77 + dx}" cy="45" r="1.5" fill="{YELLOW}"/>' for dx in (-2.8, 2.8))
+    out += ferg
+    out += f'<path d="M64 46H90L87 58H67Z" fill="{tint(YELLOW, .7)}" stroke="{INK}" stroke-width="1.8" stroke-linejoin="round"/>'
+    out += f'<path d="M67 50H87M68 54H86" stroke="{tint(RED, .6)}" stroke-width="1.4"/>'
+    return frame(tint(PERI, .2), out)
+
+
 ICONS = {"catdoku": catdoku, "pounceup": pounceup, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "daylight": daylight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle, "mewhue": mewhue, "pawlinko": pawlinko, "crossstitch": crossstitch, "junkdrawer": junkdrawer, "zoomies": zoomies, "blanket": blanket, "bedhog": bedhog, "movingday": movingday, "swapapom": swapapom, "tapetrap": tapetrap}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "daylight": daylight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle, "mewhue": mewhue, "pawlinko": pawlinko, "crossstitch": crossstitch, "junkdrawer": junkdrawer, "zoomies": zoomies, "blanket": blanket, "bedhog": bedhog, "movingday": movingday, "swapapom": swapapom, "tapetrap": tapetrap, "boing": boing}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")

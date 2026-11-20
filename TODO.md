@@ -195,24 +195,20 @@ the front page):
   switch mutes it. She purrs softly the whole time you play, unless sound is off: the owner's call (2026-11-15);
 - then move its row from `BETA` to `GAMES` (with the date it joins) and take out its `noindex` line.
 
-## Boing!: the preview, on hold
+## Boing!: finish the beta
 
-A preview of Boing! was made on 2026-11-13 (https://claude.ai/artifact/JnemuF5eg6skXE6RLEYADR, the owner's own; the whole
-page, rules, level maker and drawing, is in it, the only copy). Ferguson is the star. After the owner's first plays it
-changed the same day: a bouncy ball from the toy library (tennis, wiffle, bell, lattice, felt or polka-dot, one a room)
-in place of the yarn; springs stand only on the floor or on top of furniture (boxes, chests of drawers, piles of books,
-wall shelves), and each room is built with something under every spring its answer needs, plus false leads; a spring
-goes anywhere along a surface in 5-unit steps (drag it and it drops onto what's beneath, shown before you let go); a
-coil is a springy pad at the end it points to, bouncing the ball off like a mirror with its push added, so the landing
-angle matters, and is solid on its sides; and springs are about twice the ball's size. All 8 levels were checked
-winnable, each answer coil working across about 25 units. The owner's verdict (2026-11-13): "overall fun", then "I'm not
-sure yet about Boing." It's on hold until the owner decides. Ideas offered if it comes back: a faint preview of where
-the ball would go from each spring, a faster replay, or making Spring Toss (`IDEAS.md`) instead.
-- If it's made: the springs are cut from `toys/sheets/springs.webp` (standing, leaning, end-on and lying flat, in eight
-  colours, 96 px). The README says that sheet has coloured fringes round each spring: check the cuts on a dark
-  background, or cut them from `springs-grey.webp` and tint them as the pompoms are.
-- Rooms take at most about 0.3 seconds to make; the preview makes them in a Web Worker and makes the next level's ahead.
-- Unused so far: the arc pose on the sheet.
+Boing! went up as an unlisted beta on 2026-11-20 (`boing/`, in `BETA` in `games.js`), from the preview made on 2026-11-13
+and changed the same day on the owner's notes (README, its section). The owner had found it fun but wasn't sure about it.
+Before it joins `GAMES` (and the front page):
+- the owner plays it and decides whether it stays. Ideas offered if it needs more: a faint preview of where the ball would
+  go from each spring, a faster replay of a go, or making Spring Toss (`IDEAS.md`) instead;
+- tune the levels from the owner's play and the dashboard's started-against-solved counts. It can't be lost (you keep
+  trying until the ball lands), so the new-game skill's simulated-player calibration doesn't fit it; what's worth
+  watching is how many goes and hints a level takes;
+- unused so far: the arc pose on the spring sheet (a curved rebound in `IDEAS.md`);
+- the cut springs (`boing/springs/`) show a faint light edge on a dark background, as in the tray's buttons in Dark
+  Mode; clean on the room's pale walls. If it shows, cut them again from `springs-grey.webp` and tint them;
+- then move its row from `BETA` to `GAMES` (with the date it joins) and take out its `noindex` line.
 
 ## The shape of a visit: read it in a week or two
 

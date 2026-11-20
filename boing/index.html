@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Boing!</title>
+<script src="../move.js?v=2026-11-20.6"></script>
+<meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
+<!-- In beta: not on the front page yet (games.js, BETA), and kept out of search engines until it's finished -->
+<meta name="robots" content="noindex">
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-11-20.6"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<meta name="theme-color" content="#ECEEE7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1F1C24" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.6">
+<style>
+/* A room seen from the side: a toy ball rolls off the shelf at the top left, and Ferguson waits in a basket on the far
+   side. Stand the springs from the tray on the floor or on the furniture, turn them, and press Go to watch it bounce. */
+.title{display:flex;align-items:flex-end;gap:8px}
+.ferg{display:block;height:64px;width:auto;margin-bottom:-4px}
+@media (max-height:760px){.ferg{height:48px}}
+.status .info{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;min-width:0}
+.chip{display:inline-flex;align-items:center;height:26px;padding:0 10px;border:2px solid var(--ink);border-radius:999px;
+  background:var(--panel);font-variant-numeric:tabular-nums;white-space:nowrap}
+.wrap.room{height:calc(var(--board) * .78);--aspect:.78}
+.wrap canvas{display:block;width:100%;height:100%;touch-action:none;user-select:none;-webkit-user-select:none;outline:none;border-radius:12px}
+/* the tray of springs still to place, and Go */
+.tray{width:var(--board);display:flex;align-items:center;gap:8px}
+.springs{flex:1;display:flex;gap:6px;min-height:56px;align-items:center;padding:4px 8px;border:2px dashed var(--line);border-radius:14px;touch-action:none}
+.springs button{width:48px;height:48px;padding:2px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:var(--panel)}
+.springs button img{max-width:100%;max-height:100%;pointer-events:none}
+.springs button.picked{outline:3px solid #ECA818;outline-offset:1px}
+.springs .none{font-size:calc(14px*var(--ts));color:var(--ink-soft);padding:0 4px}
+#goBtn{min-width:88px;height:56px;font-size:calc(20px*var(--ts));font-weight:800;border-radius:16px}
+.drag{position:fixed;z-index:50;pointer-events:none;width:44px;height:44px;transform:translate(-50%,-50%);opacity:.85}
+.card img.pic{display:block;width:70%;max-width:240px;height:auto;margin:0 auto 14px}
+@media (orientation:landscape) and (max-height:500px){ body:not(.full) .tray{flex-wrap:wrap} }
+</style>
+</head>
+<body>
+<main>
+  <header><div class="title"><h1>Boing!</h1><span class="beta" title="Still being made: things may change">Beta</span><img class="ferg" src="../cats/ferguson-sit.webp" alt="Ferguson, a fluffy black cat with yellow eyes, sitting"></div><div class="stripe"></div><p class="tagline">Place springs to bounce the ball to Ferguson</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status">
+    <span class="info"><span class="chip" id="goes"></span><button class="timer" id="timer" hidden></button></span>
+    <span class="msg" id="msg" aria-live="polite"></span>
+  </div>
+
+  <div class="wrap room stage">
+    <canvas id="board" tabindex="0" aria-label="A room seen from the side"></canvas>
+    <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+  </div>
+  <div class="tray">
+    <div class="springs" id="springs" aria-label="Springs to place"></div>
+    <button id="goBtn" class="primary">Go!</button>
+  </div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="restartBtn">Restart</button>
+    <button id="linkBtn">Share</button>
+    <button id="bestBtn">Best times</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <label>Level <select id="levelSel" aria-label="Level"></select></label>
+    <button id="newBtn" class="primary">New room</button>
+  </div>
+</main>
+
+<script src="../games.js?v=2026-11-20.6"></script>
+<script id="rules">
+/* ---------- the room and the ball (plain functions, no drawing) ---------- */
+// The room is RW × RH units, seen from the side, y downwards. A toy ball rolls off the shelf at the top left; springs,
+// the furniture, the walls and the floor send it on its way, and it's caught when it drops into Ferguson's basket.
+// A spring stands on something: the floor, or the top of a box, a chest of drawers, a pile of books or a shelf on the
+// wall, anywhere along it in steps of STEP units. Everything is worked out in fixed steps, so the same springs in the
+// same places always send the ball the same way (the level maker, the hint and the page agree).
+const RW = 400, RH = 300, R = 9, GRAV = 900, DT = 1 / 240, TMAX = 9, STEP = 5;
+// Spring kinds: a coil (turned one of four ways: standing, leaning right, leaning left, lying flat) and an end-on ring,
+// a round bumper. A spring's body is round, SR across from its middle, which is LIFT above what it stands on.
+const UP = 0, RIGHT = 1, LEFT = 2, FLAT = 3, RING = 4;
+const SR = 15, LIFT = 17;
+// A coil is a springy pad at the end it points to: the ball bounces off that end as off a mirror (the landing angle
+// matters), thrown back along the coil at least this fast; across it, the ball keeps most of its speed. Lying flat,
+// it's a springy floor that throws the ball back as fast as it came (at least BOING.flat). A ring sends the ball off
+// the way it bounced, a little faster. Hit on its side, a coil is just something solid.
+const BOING = {up: 520, lean: 480, flat: 230, ring: 330};
+const AXIS = {[UP]: [0, -1], [RIGHT]: [Math.SQRT1_2, -Math.SQRT1_2], [LEFT]: [-Math.SQRT1_2, -Math.SQRT1_2], [FLAT]: [0, -1]};
+const mulberry = s => () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+// The middle of a spring standing at x on a surface at height y.
+const springMid = s => [s.x, s.y - LIFT];
+// The room's solid edges as segments: walls, floor, ceiling, the shelf, each piece of furniture (boxes) and the basket.
+function segmentsOf(room) {
+  const s = [[0, 0, 0, RH], [RW, 0, RW, RH], [0, RH, RW, RH], [0, 0, RW, 0], [0, room.shelf.y, room.shelf.w, room.shelf.y + 3]];
+  for (const b of room.boxes) s.push([b.x, b.y, b.x + b.w, b.y], [b.x + b.w, b.y, b.x + b.w, b.y + b.h], [b.x, b.y + b.h, b.x + b.w, b.y + b.h], [b.x, b.y, b.x, b.y + b.h]);
+  const k = room.basket, h = k.w / 2;
+  s.push([k.x - h, k.y, k.x - h + 4, k.y + 22], [k.x + h, k.y, k.x + h - 4, k.y + 22], [k.x - h + 4, k.y + 22, k.x + h - 4, k.y + 22]);
+  return s;
+}
+// What a spring can stand on: the floor and the top of every piece of furniture but the basket's cupboard, as [from x, to x, y].
+function surfaces(room) {
+  return [[0, RW, RH], ...room.boxes.filter(b => b.kind !== "cupboard").map(b => [b.x, b.x + b.w, b.y])];
+}
+// Whether a spring may stand at {x, y}: on a surface (with room for its foot), clear of the shelf, the furniture, the
+// basket and the walls, and not touching another spring.
+function standOK(room, sp, springs) {
+  const [mx, my] = springMid(sp), foot = SR * .6, k = room.basket;
+  if (!surfaces(room).some(([a, b, y]) => y === sp.y && sp.x >= a + foot && sp.x <= b - foot)) return false;
+  if (mx < SR + 2 || mx > RW - SR - 2 || my < SR + 30) return false;
+  if (mx < room.shelf.w + SR + 6 && my < room.shelf.y + SR + 20) return false;
+  for (const b of room.boxes) if (b.y !== sp.y && mx > b.x - SR && mx < b.x + b.w + SR && my > b.y - SR && my < b.y + b.h + SR) return false;
+  if (Math.abs(mx - k.x) < k.w / 2 + SR + 2 && my > k.y - SR - 24 && my < k.y + 22 + SR) return false;
+  return springs.every(o => o === sp || Math.hypot(o.x - sp.x, o.y - sp.y) >= 2 * SR + 6);
+}
+// Where the ball goes with these springs ([{x, y, kind}]): its path (every few steps), and how it ended: "caught", or
+// "stopped" (it came to rest or ran out of time). Each spring that fired is listed in `fired`, with when in `firedAt`;
+// `bumps` has when the ball hit the floor, a wall or the furniture hard enough to hear, and how hard ([t, speed]).
+function fly(room, springs, keepPath = true) {
+  const segs = segmentsOf(room), k = room.basket, path = [], fired = [], firedAt = [], bumps = [], cool = springs.map(() => -1);
+  let x = R + 4, y = room.shelf.y - R - .01, vx = 110, vy = 0, slow = 0, t = 0;
+  for (let n = 0; t < TMAX; n++, t += DT) {
+    if (keepPath && n % 4 === 0) path.push([x, y]);
+    vy += GRAV * DT; const py = y; x += vx * DT; y += vy * DT;
+    // into the basket: over the opening and going down past the rim
+    if (vy > 0 && py <= k.y + 4 && y > k.y + 4 && Math.abs(x - k.x) < k.w / 2 - R * .6) { path.push([x, y]); return {end: "caught", path, fired, firedAt, bumps, t}; }
+    springs.forEach((sp, j) => {
+      const [sx, sy] = springMid(sp), dx = x - sx, dy = y - sy, d = Math.hypot(dx, dy);
+      if (d >= SR + R || d === 0) return;
+      const nx = dx / d, ny = dy / d;
+      x = sx + nx * (SR + R); y = sy + ny * (SR + R);
+      const fresh = t - cool[j] >= .15;
+      if (sp.kind === RING) {   // a bumper: bounce off it, a little faster
+        const vn = vx * nx + vy * ny; if (vn < 0) { vx -= 2 * vn * nx; vy -= 2 * vn * ny; }
+        const s0 = Math.hypot(vx, vy) || 1, want = Math.max(s0, BOING.ring); vx *= want / s0; vy *= want / s0;
+        if (fresh) { cool[j] = t; fired.push(j); firedAt.push(t); }
+        return;
+      }
+      const [ax, ay] = AXIS[sp.kind];
+      if (nx * ax + ny * ay > .35) {   // on its springy end: thrown back along the coil, keeping most of the speed across it
+        const vn = vx * ax + vy * ay; if (vn > 0 && !fresh) return;
+        const tx = vx - vn * ax, ty = vy - vn * ay, out = sp.kind === FLAT ? Math.max(-vn, BOING.flat) : Math.max(-vn * .8, sp.kind === UP ? BOING.up : BOING.lean);
+        vx = tx * .75 + ax * out; vy = ty * .75 + ay * out;
+        if (fresh) { cool[j] = t; fired.push(j); firedAt.push(t); }
+      } else {   // its side: just something solid
+        const vn = vx * nx + vy * ny; if (vn < 0) { vx -= 1.45 * vn * nx; vy -= 1.45 * vn * ny; }
+      }
+    });
+    // walls, floor and furniture: bounce (a little), and roll along
+    for (const [x1, y1, x2, y2] of segs) {
+      if (x < Math.min(x1, x2) - R || x > Math.max(x1, x2) + R || y < Math.min(y1, y2) - R || y > Math.max(y1, y2) + R) continue;
+      const ex = x2 - x1, ey = y2 - y1, L2 = ex * ex + ey * ey, u = Math.max(0, Math.min(1, ((x - x1) * ex + (y - y1) * ey) / L2));
+      const cx = x1 + ex * u, cy = y1 + ey * u, dx = x - cx, dy = y - cy, d = Math.hypot(dx, dy);
+      if (d >= R || d === 0) continue;
+      const nx = dx / d, ny = dy / d, vn = vx * nx + vy * ny;
+      x = cx + nx * R; y = cy + ny * R;
+      if (vn < 0) {
+        if (keepPath && vn < -150 && !(bumps.length && t - bumps[bumps.length - 1][0] < .08)) bumps.push([t, -vn]);
+        const tx = -ny, ty = nx, vt = vx * tx + vy * ty, bounce = vn < -60 ? .55 : 0;
+        vx = vt * .994 * tx - vn * bounce * nx; vy = vt * .994 * ty - vn * bounce * ny;
+      }
+    }
+    if (x < -20 || x > RW + 20 || y > RH + 20) break;
+    slow = Math.hypot(vx, vy) < 6 ? slow + DT : 0;
+    if (slow > .5) break;
+  }
+  path.push([x, y]);
+  return {end: "stopped", path, fired, firedAt, bumps, t};
+}
+// Something for a spring standing at {x, y} to stand on: near the floor a box, a chest of drawers or a pile of books,
+// higher up a shelf on the wall; 50 to 80 units wide, so the spring also works a little way along. False if there's no room.
+function propUp(room, sp, springs, rnd) {
+  const w = 50 + Math.floor(rnd() * 7) * 5, x0 = Math.round(sp.x - SR - rnd() * (w - 2 * SR)), low = RH - sp.y <= 100;
+  const b = {x: Math.max(0, Math.min(RW - w, x0)), y: sp.y, w, h: low ? RH - sp.y : 8, kind: low ? ["box", "books", "drawers"][Math.floor(rnd() * 3)] : "ledge"};
+  if (b.x < room.shelf.w + 10 && b.y < room.shelf.y + 40) return false;
+  if (room.boxes.some(o => b.x < o.x + o.w + 4 && b.x + b.w > o.x - 4 && b.y < o.y + o.h + 6 && b.y + b.h > o.y - 6)) return false;
+  if (springs.some(s => { const [mx, my] = springMid(s); return mx > b.x - SR && mx < b.x + b.w + SR && my > b.y - SR - 4 && my < b.y + b.h + SR; })) return false;
+  room.boxes.push(b); return true;
+}
+// A level: a room, the springs that get the ball to the basket (the answer, for Hint), and the springs the player is
+// given (coils come standing; the player turns them). Built forwards: each spring goes where the ball comes down onto
+// it (a little off its middle, so the angle tells), with something put under it to stand on if nothing's there; then
+// the basket goes where the ball comes down at the end, on a cupboard, and furniture goes where the ball doesn't. Then
+// it's checked: no springs, or any one left out, and the ball misses; and each coil also works a little way along.
+// lv: {kinds: what each spring is ("coil" or "ring"), poses: the coil poses the answer may use, boxes: furniture}
+function makeLevel(seed, lv) {
+  const rnd = mulberry(seed), pick = a => a[Math.floor(rnd() * a.length)];
+  for (let tries = 0; tries < 300; tries++) {
+    const room = {shelf: {y: 60 + Math.floor(rnd() * 5) * 10, w: 70 + Math.floor(rnd() * 4) * 10}, boxes: [], basket: {x: -999, y: -999, w: 46}};
+    const springs = []; let ok = true, run = fly(room, []);
+    for (const kind0 of lv.kinds) {
+      const kind = kind0 === "ring" ? RING : pick(lv.poses);
+      const after = run.firedAt.length ? run.firedAt[run.firedAt.length - 1] + .2 : 0;
+      const cand = [];
+      run.path.forEach(([x, y], i) => {
+        if (i * 4 * DT < after || i % 2 || !run.path[i + 1] || run.path[i + 1][1] <= y) return;   // the ball coming down
+        const sx = Math.round((x + (rnd() - .5) * 12) / STEP) * STEP, sp = {x: sx, y: Math.round(y + R + SR - 3 + LIFT), kind};
+        if (RH - sp.y < 24 && RH - sp.y >= 0) sp.y = RH;   // near the floor: it stands on the floor
+        if (sp.y > RH) return;
+        const [mx, my] = springMid(sp);
+        // the ball mustn't have come near it before (going up, say), or it would meet the spring then
+        for (let j = 0; j < i - 2; j++) if (Math.hypot(run.path[j][0] - mx, run.path[j][1] - my) < SR + R + 4) return;
+        cand.push([sp, i]);
+      });
+      for (let i = cand.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [cand[i], cand[j]] = [cand[j], cand[i]]; }
+      let placed = false;
+      for (const [sp, reach] of cand.slice(0, 8)) {
+        const had = room.boxes.length;
+        if (!surfaces(room).some(([a, b, y]) => y === sp.y && sp.x >= a + SR * .6 && sp.x <= b - SR * .6)) {
+          if (!propUp(room, sp, springs, rnd)) continue;
+          const b = room.boxes[had], [mx, my] = springMid(sp);
+          if (run.path.slice(0, reach).some(([x, y]) => Math.hypot(x - mx, y - my) > 30 && x > b.x - R - 2 && x < b.x + b.w + R + 2 && y > b.y - R - 2 && y < b.y + b.h + R + 2)) { room.boxes.length = had; continue; }
+        }
+        if (!standOK(room, sp, springs)) { room.boxes.length = had; continue; }
+        springs.push(sp);
+        const next = fly(room, springs);
+        if (next.fired.length < springs.length || next.fired.some((f, k) => f !== k)) { springs.pop(); room.boxes.length = had; continue; }
+        run = next; placed = true; break;
+      }
+      if (!placed) { ok = false; break; }
+    }
+    if (!ok) continue;
+    // the basket: where the ball comes down on the right-hand side of the room, after the last spring
+    const t0 = run.firedAt[run.firedAt.length - 1] + .15, spots = run.path.filter(([x, y], i) => i * 4 * DT > t0 && x > 190 && x < RW - 40 && y > 95 && y < RH - 60 &&
+      run.path[i + 1] && run.path[i + 1][1] > y);
+    if (!spots.length) continue;
+    const [px, py] = pick(spots), k = room.basket;
+    k.x = Math.round(px + (rnd() - .5) * 10); k.y = Math.round(py) + 2;
+    const sw = 46 + Math.floor(rnd() * 3) * 10;
+    room.boxes.push({x: k.x - sw / 2, y: k.y + 22, w: sw, h: RH - k.y - 22, kind: "cupboard"});
+    if (k.x + sw / 2 > RW - 2 || springs.some(s => !standOK(room, s, springs))) continue;
+    if (fly(room, springs, false).end !== "caught") continue;
+    // furniture where the ball doesn't go
+    const path = fly(room, springs).path;
+    for (let n = 0, made = 0; n < 40 && made < lv.boxes; n++) {
+      const w = 45 + Math.floor(rnd() * 8) * 5, h = 20 + Math.floor(rnd() * 16) * 5, onFloor = rnd() < .6;
+      const b = {x: Math.floor(rnd() * (RW - w) / STEP) * STEP, y: onFloor ? RH - h : 75 + Math.floor(rnd() * 31) * 5, w, h: onFloor ? h : 8, kind: onFloor ? pick(["box", "drawers", "books"]) : "ledge"};
+      if (path.some(([x, y]) => x > b.x - R - 8 && x < b.x + b.w + R + 8 && y > b.y - R - 8 && y < b.y + b.h + R + 8)) continue;
+      if (room.boxes.some(o => b.x < o.x + o.w + 10 && b.x + b.w > o.x - 10 && b.y < o.y + o.h + 10 && b.y + b.h > o.y - 10)) continue;
+      if (b.x < room.shelf.w + 10 && b.y < room.shelf.y + 30) continue;
+      if (springs.some(s => { const [mx, my] = springMid(s); return mx > b.x - SR - 4 && mx < b.x + b.w + SR + 4 && my > b.y - SR - 30 && my < b.y + b.h + SR; })) continue;
+      room.boxes.push(b); made++;
+    }
+    if (fly(room, springs, false).end !== "caught") continue;
+    if (fly(room, [], false).end === "caught") continue;
+    if (springs.length > 1 && springs.some((_, j) => fly(room, springs.filter((_, i) => i !== j), false).end === "caught")) continue;
+    // a little give: each coil also works a step or two along (a ring's bounce depends on just where it's hit)
+    const slack = springs.every((sp, j) => sp.kind === RING || [-2 * STEP, -STEP, STEP, 2 * STEP].some(d => {
+      const moved = {...sp, x: sp.x + d}, others = springs.map((o, i) => i === j ? moved : o);
+      return standOK(room, moved, others) && fly(room, others, false).end === "caught";
+    }));
+    if (!slack) continue;
+    return {room, answer: springs, tray: lv.kinds.slice()};
+  }
+  return null;
+}
+// Eight levels, one new thing at a time: a standing coil, then a leaning one (turn it), two coils, a ring, a coil
+// lying flat, then three springs, with more furniture in the way.
+const LV = [null,
+  {kinds: ["coil"], poses: [UP], boxes: 0, name: "one spring"},
+  {kinds: ["coil"], poses: [RIGHT, LEFT], boxes: 1, name: "one spring, turned"},
+  {kinds: ["coil", "coil"], poses: [UP, RIGHT, LEFT], boxes: 1, name: "two springs"},
+  {kinds: ["coil", "ring"], poses: [UP, RIGHT, LEFT], boxes: 1, name: "a spring and a ring"},
+  {kinds: ["coil", "coil"], poses: [FLAT, UP, RIGHT, LEFT], boxes: 2, name: "two springs, one lying flat"},
+  {kinds: ["coil", "ring", "coil"], poses: [UP, RIGHT, LEFT, FLAT], boxes: 2, name: "three springs"},
+  {kinds: ["coil", "coil", "coil"], poses: [UP, RIGHT, LEFT, FLAT], boxes: 2, name: "three springs"},
+  {kinds: ["coil", "coil", "coil"], poses: [UP, RIGHT, LEFT, FLAT], boxes: 4, name: "three springs, a cluttered room"}];
+</script>
+<script>
+const $ = G.$;
+const MAX_LEVEL = LV.length - 1;
+
+/* ---------- making rooms ---------- */
+// Rooms are made in a Web Worker from the rules above (the script itself, so nothing's listed twice); if a worker
+// can't run, here instead. A seed that makes no room moves on to the next one, so the seed kept is the one used.
+let worker = null, jobs = 0;
+const waiting = {};
+try {
+  worker = new Worker(URL.createObjectURL(new Blob([$("rules").textContent + `
+    onmessage = e => { const {id, level, seed} = e.data; let s = seed, L = null; while (!(L = makeLevel(s, LV[level]))) s++; postMessage({id, seed: s, L}); };`], {type: "text/javascript"})));
+  worker.onmessage = e => { const w = waiting[e.data.id]; delete waiting[e.data.id]; if (w) w(e.data); };
+  worker.onerror = () => { worker = null; };
+} catch (e) { worker = null; }
+function roomFor(level, seed) {
+  if (worker) return new Promise(res => { const id = ++jobs; waiting[id] = res; worker.postMessage({id, level, seed}); });
+  let s = seed, L = null; while (!(L = makeLevel(s, LV[level]))) s++;
+  return Promise.resolve({seed: s, L});
+}
+
+/* ---------- pictures ---------- */
+const catSrc = f => (window.CAT_SRC && window.CAT_SRC[f]) || `../cats/${f}.webp`;
+const springSrc = f => (window.SPRING_SRC && window.SPRING_SRC[f]) || `springs/${f}.webp`;
+const picCache = {};
+const pic = src => picCache[src] || (picCache[src] = Object.assign(new Image(), {src}));
+const ok = im => im.complete && im.naturalWidth;
+const INK = "#2A2530";
+const tint = (hex, f) => "#" + [1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * (1 - f) + 255 * f).toString(16).padStart(2, "0")).join("");
+const shade = (hex, f) => "#" + [1, 3, 5].map((i, k) => Math.round(parseInt(hex.slice(i, i + 2), 16) * (1 - f) + [42, 37, 48][k] * f).toString(16).padStart(2, "0")).join("");
+// The springs, cut from the owner's spring sheet (toys/sheets/springs.webp): each colour standing, leaning right,
+// lying flat and end-on (the ring). A coil leaning left is the leaning one turned over.
+const SPRING_COLOURS = ["gold", "coral", "teal", "plum", "periwinkle", "sage", "lime", "lavender"];
+const POSE_FILE = {[UP]: "up", [RIGHT]: "lean", [LEFT]: "lean", [FLAT]: "flat", [RING]: "ring"};
+const POSE_NAME = {[UP]: "standing up", [RIGHT]: "leaning right", [LEFT]: "leaning left", [FLAT]: "lying flat", [RING]: "a ring"};
+// The ball: one of the bouncy balls from the toy library (toys/), picked for each room.
+const BALLS = {"tennis": "tennis ball", "wiffle-red": "red wiffle ball", "wiffle-teal": "teal wiffle ball", "wiffle-yellow": "yellow wiffle ball",
+  "bell-purple": "bell ball", "lattice": "lattice ball", "felt-rainbow": "felt ball", "polka-dot": "spotty ball"};
+const toySrc = f => (window.TOY_SRC && window.TOY_SRC[f]) || `../toys/${f}.webp`;
+
+/* ---------- sounds ---------- */
+// The shared ones where they fit (Objects and actions in games.js: spring, springSet), and two of Boing!'s own: a ring
+// is a quicker, higher boing, and the ball hitting the floor, a wall or the furniture a soft thump, louder for a harder hit.
+G.sound.define({
+  "boing.ring": t => G.sound.kit.boing(t, 320, 680, .28, .18),
+  "boing.bump": (t, o = {}) => G.sound.kit.thump(t, .3 * (o.k ?? 1), 170),
+});
+
+/* ---------- game ---------- */
+// game: {level, seed, room, answer [{x, y, kind}], pieces [{kind ("coil" | "ring"), colour, x and y (where it stands, or
+//        null in the tray), pose}], ball (a toy's name), goes, hinted, restarted, over, trail (where the ball went last go)}
+const STORE = "catdoku.boing.v1", INTRO = "catdoku.boing.intro.v1";
+let game = null, play = null, picked = -1, cursor = -1, now = 0, press = null, dealing = 0, ahead = null, spots = [];
+// The gold paw's gone once there's been a hint or more than three goes (games.js shows Hint as costing it).
+G.pawLost(() => !game || game.over || game.hinted || game.goes >= 3);
+const codeOf = p => p.kind === "ring" ? RING : p.pose;
+const placed = () => game.pieces.filter(p => p.x !== null);
+const asSpring = p => ({x: p.x, y: p.y, kind: codeOf(p)});
+const springsNow = (but) => placed().filter(p => p !== but).map(asSpring);
+const save = () => { if (!game) return; G.save(STORE, {level: game.level, game: game.over ? null : {level: game.level, seed: game.seed,
+  pieces: game.pieces.map(p => [p.x, p.y, p.pose]), goes: game.goes, hinted: game.hinted, restarted: game.restarted, ms: game.ms, started: game.started, timed: game.timed}}); };
+// Every place a spring could stand, a step apart along each surface (for the keys, the walkthrough and the marks).
+const standSpots = room => surfaces(room).flatMap(([a, b, y]) => { const out = []; for (let x = Math.ceil((a + SR * .6) / STEP) * STEP; x <= b - SR * .6; x += STEP) if (standOK(room, {x, y}, [])) out.push({x, y}); return out; });
+
+async function newGame(level, seed, keep = {}) {
+  G.closeCard();
+  level = Math.min(MAX_LEVEL, Math.max(1, level));
+  const my = ++dealing; play = null;
+  $("levelSel").value = level;
+  if (!keep.saved) G.note("Setting up the room…", 0);
+  const job = !seed && ahead && ahead.level === level ? ahead.job : roomFor(level, seed || (Math.random() * 2 ** 31) | 0);
+  if (!seed && ahead && ahead.level === level) ahead = null;
+  const {seed: s, L} = await job;
+  if (my !== dealing) return;
+  const rnd = mulberry(s ^ 0xC01);
+  const cols = SPRING_COLOURS.slice().sort(() => rnd() - .5), names = Object.keys(BALLS);
+  game = {level, N: level, seed: s, room: L.room, answer: L.answer, goes: 0, hinted: !!keep.hinted, restarted: !!keep.restarted, over: false,
+    pieces: L.tray.map((kind, i) => ({kind, colour: cols[i % cols.length], x: null, y: null, pose: UP})), ball: names[Math.floor(rnd() * names.length)], ...G.freshClock()};
+  game.trail = fly(game.room, []).path;
+  spots = standSpots(game.room);
+  if (keep.saved) {
+    const k = keep.saved;
+    if (!Array.isArray(k.pieces) || k.pieces.length !== game.pieces.length) throw new Error("the saved room is from another version of the game");
+    k.pieces.forEach(([x, y, pose], i) => {
+      const p = game.pieces[i]; p.pose = [UP, RIGHT, LEFT, FLAT].includes(pose) ? pose : UP;
+      if (Number.isFinite(x) && Number.isFinite(y) && standOK(game.room, {x, y}, springsNow())) { p.x = x; p.y = y; }
+    });
+    Object.assign(game, {goes: k.goes || 0, hinted: !!k.hinted, restarted: !!k.restarted});
+    if (k.ms) { game.ms = k.ms; game.started = true; } if (k.timed === false) game.timed = false;
+    G.checkClock(game);
+  } else G.track(`Boing! level ${level} started`);
+  picked = -1; cursor = -1; hints.clear(false); G.note("");
+  hud(); tray(); save();
+  // the next level's room is made while this one's played, so the win card's Next is ready at once
+  const nl = Math.min(MAX_LEVEL, level + 1);
+  if (!ahead || ahead.level !== nl) ahead = {level: nl, job: roomFor(nl, (Math.random() * 2 ** 31) | 0)};
+  if (keep.then) keep.then();
+  else setTimeout(() => { intro(); meet(); }, 300);
+}
+function hud() {
+  $("goes").textContent = game.goes ? `Go ${game.goes}` : "Ready";
+  $("goes").setAttribute("aria-label", game.goes ? `${game.goes} ${game.goes === 1 ? "go" : "goes"} so far` : "No goes yet");
+  $("goBtn").disabled = !!play || game.over;
+}
+// The springs still to place, in the tray under the room.
+function tray() {
+  const box = $("springs"), left = game.pieces.map((p, i) => [p, i]).filter(([p]) => p.x === null);
+  box.replaceChildren(...left.map(([p, i]) => {
+    const b = document.createElement("button"); b.dataset.i = i; b.className = picked === i ? "picked" : "";
+    b.setAttribute("aria-label", `${p.kind === "ring" ? "Ring" : "Coil"} spring${picked === i ? ", picked" : ""}`);
+    const im = document.createElement("img"); im.src = springSrc(`${p.colour}-${p.kind === "ring" ? "ring" : "up"}`); im.alt = ""; b.append(im);
+    return b;
+  }));
+  if (!left.length) { const s = document.createElement("span"); s.className = "none"; s.textContent = "All placed: press Go!"; box.append(s); }
+}
+
+/* ---------- placing and turning springs ---------- */
+const TURN = {[UP]: RIGHT, [RIGHT]: FLAT, [FLAT]: LEFT, [LEFT]: UP};
+const canEdit = () => game && !game.over && !play;
+// Where a spring let go of at room point (px, py) ends up: on the highest surface at or below that point, a step at a time along it.
+function dropAt(px, py) {
+  let best = null;
+  for (const [a, b, y] of surfaces(game.room)) {
+    const lo = a + SR * .6, hi = b - SR * .6;
+    if (px < lo - 8 || px > hi + 8 || y < py - 14) continue;
+    if (!best || y < best.y) best = {x: Math.max(Math.ceil(lo / STEP) * STEP, Math.min(Math.floor(hi / STEP) * STEP, Math.round(px / STEP) * STEP)), y};
+  }
+  return best;
+}
+function placeAt(i, at) {
+  const p = game.pieces[i];
+  if (!at || !standOK(game.room, at, springsNow(p).concat([at]))) { G.note(at && springsNow(p).some(s => Math.hypot(s.x - at.x, s.y - at.y) < 2 * SR + 6) ? "Too close to another spring." : "A spring can't stand there.", 2000); return false; }
+  p.x = at.x; p.y = at.y; picked = -1; started(); tray(); save(); G.sound.play("springSet"); return true;
+}
+function turn(p) {
+  if (p.kind === "ring") { G.note("A ring is the same whichever way it's turned.", 2000); return; }
+  p.pose = TURN[p.pose]; started(); save(); G.sound.play("tap");
+  G.note(`Now ${POSE_NAME[p.pose]}.`, 1500);
+}
+function toTray(p) { p.x = p.y = null; tray(); save(); G.sound.play("erase"); }
+function started() { if (!game.started && game.timed !== false) game.started = true; }
+
+/* ---------- Go ---------- */
+// The ball rolls off the shelf with the springs where they are now; each spring boings as the ball meets it.
+function go() {
+  if (!canEdit()) return;
+  started(); hints.clear(false);
+  const run = fly(game.room, springsNow());
+  game.goes++; play = {run, t0: now, si: 0, bi: 0}; picked = -1; tray(); hud(); save();
+  G.sound.play("swish");
+}
+$("goBtn").onclick = go;
+function playDone() {
+  const run = play.run; play = null; game.trail = run.path; hud();
+  if (run.end === "caught") { G.sound.play("catCheers"); return win(); }
+  const fired = new Set(run.fired).size, n = springsNow().length;
+  G.note(n && !fired ? "The ball missed every spring. Try them where the dots come down." : "So close! Move a spring a little, or turn it, and try again.", 4000);
+}
+function win() {
+  game.over = true; save();
+  G.track(`Boing! level ${game.level} done`);
+  const result = G.finishClock(game), g = game, nxt = g.hinted ? g.level : Math.min(MAX_LEVEL, g.level + 1);
+  G.save(STORE, {level: nxt});
+  const gold = !g.hinted && g.goes <= 3;
+  const text = `Ferguson caught it on go ${g.goes}. ` + (g.hinted ? `You had a hint, so here's another at level ${nxt}.` : nxt > g.level ? `Next up: level ${nxt}.` : "That's the hardest level; next up is another room.");
+  const im = new Image(); im.className = "pic"; im.src = catSrc("ferguson-leap"); im.alt = "Ferguson leaping for the ball";
+  setTimeout(() => game === g && G.winCard(text, () => newGame(nxt), "Admire my room", result, {title: "Boing!", gold, goldWhy: "No hints, in three goes or fewer!",
+    goldTitle: "Ferguson leaps for joy!", goldPic: [im], next: nxt > g.level ? `Next: level ${nxt}` : "Next room",
+    after: G.otherSize($("levelSel"), nxt, newGame, "Or play a different level:")}), 1000);
+}
+
+/* ---------- drawing ---------- */
+const canvas = $("board"), ctx = canvas.getContext("2d");
+const VW = RW, VH = RH + 12;   // the room, and the floorboards under it
+let scale = 1;
+const WALL = tint("#7885BA", .8), FLOOR = tint("#ECA818", .45), WOOD = tint("#BD5538", .45), CARD = tint("#ECA818", .55);
+const hints = G.hinter({game: () => game, key: () => game ? game.pieces.map(p => p.x + "," + p.y + "." + p.pose).join() : "", draw: () => {}});   // marks {x, y, bad, pose}
+function box(x, y, w, h, fill, r = 3) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fillStyle = fill; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = shade(fill, .55); ctx.stroke(); }
+function furniture(b) {
+  if (b.kind === "cupboard") {
+    box(b.x, b.y, b.w, b.h, WOOD);
+    ctx.strokeStyle = shade(WOOD, .4); ctx.lineWidth = 1.2;
+    for (let y = b.y + 26; y < b.y + b.h - 10; y += 30) { ctx.strokeRect(b.x + 5, y - 20, b.w - 10, 22); ctx.beginPath(); ctx.arc(b.x + b.w / 2, y - 9, 2, 0, 7); ctx.fillStyle = "#ECA818"; ctx.fill(); }
+  } else if (b.kind === "box") {
+    box(b.x, b.y, b.w, b.h, CARD, 2);
+    ctx.fillStyle = tint("#ECA818", .75); ctx.fillRect(b.x + b.w / 2 - 4, b.y, 8, b.h);
+  } else if (b.kind === "drawers") {
+    const col = tint("#7885BA", .35); box(b.x, b.y, b.w, b.h, col);
+    ctx.strokeStyle = shade(col, .4); ctx.lineWidth = 1.2;
+    for (let y = b.y + 4; y + 10 < b.y + b.h; y += 21) { ctx.strokeRect(b.x + 4, y, b.w - 8, Math.min(17, b.y + b.h - y - 4)); ctx.beginPath(); ctx.arc(b.x + b.w / 2, y + Math.min(17, b.y + b.h - y - 4) / 2, 1.8, 0, 7); ctx.fillStyle = "#ECA818"; ctx.fill(); }
+  } else if (b.kind === "books") {
+    const cols = ["#B94588", "#73A7AE", "#6AA673", "#E16A4A", "#7885BA", "#ECA818"];
+    for (let y = b.y, k = 0; y < b.y + b.h - 1; y += 11, k++) { const inset = (k * 5) % 3; box(b.x + inset, y, b.w - 3, Math.min(11, b.y + b.h - y), cols[(k + b.x) % cols.length], 2); }
+  } else {   // a shelf on the wall, on two brackets
+    ctx.fillStyle = shade(WOOD, .35);
+    for (const bx of [b.x + 8, b.x + b.w - 8]) { ctx.beginPath(); ctx.moveTo(bx - 2, b.y + b.h); ctx.lineTo(bx - 2, b.y + b.h + 12); ctx.lineTo(bx + 8 * Math.sign(b.x + b.w / 2 - bx), b.y + b.h); ctx.fill(); }
+    box(b.x, b.y, b.w, b.h, WOOD, 2);
+  }
+}
+// A spring standing at x on a surface at height y: about twice the ball's size (a ring stands on its rim).
+const SPRING_SIZE = {[UP]: [22, 40], [RIGHT]: [36, 36], [LEFT]: [36, 36], [FLAT]: [42, 20], [RING]: [33, 33]};
+function drawSpring(code, colour, x, y, squash = 0, alpha = 1) {
+  const im = pic(springSrc(`${colour}-${POSE_FILE[code]}`)); if (!ok(im)) return;
+  const [bw, bh] = SPRING_SIZE[code], s = Math.min(bw / im.naturalWidth, bh / im.naturalHeight), w = im.naturalWidth * s, h = im.naturalHeight * s * (1 - squash);
+  ctx.save(); ctx.globalAlpha = alpha; ctx.translate(x, y);
+  if (code === LEFT) ctx.scale(-1, 1);
+  ctx.drawImage(im, -w / 2, -h, w, h);
+  ctx.restore();
+}
+function mark(sp, colour, wide = 2.5) { const [mx, my] = springMid(sp); ctx.beginPath(); ctx.arc(mx, my, SR + 6, 0, 7); ctx.lineWidth = wide; ctx.strokeStyle = colour; ctx.stroke(); }
+function draw() {
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  ctx.fillStyle = WALL; ctx.fillRect(0, 0, VW, VH);
+  // floorboards
+  ctx.fillStyle = FLOOR; ctx.fillRect(0, RH, VW, 12); ctx.strokeStyle = shade(FLOOR, .3); ctx.lineWidth = 1;
+  for (let x = 30; x < VW; x += 60) { ctx.beginPath(); ctx.moveTo(x, RH); ctx.lineTo(x, VH); ctx.stroke(); }
+  ctx.beginPath(); ctx.moveTo(0, RH); ctx.lineTo(VW, RH); ctx.stroke();
+  if (!game) return;
+  const r = game.room, k = r.basket;
+  // the shelf the ball starts on
+  box(0, r.shelf.y, r.shelf.w, 7, WOOD, 2); ctx.fillStyle = shade(WOOD, .35); ctx.beginPath(); ctx.moveTo(10, r.shelf.y + 7); ctx.lineTo(10, r.shelf.y + 22); ctx.lineTo(24, r.shelf.y + 7); ctx.fill();
+  for (const b of r.boxes) furniture(b);
+  // where a spring can stand: a dotted line along the floor and the furniture, while there's placing to do
+  if (canEdit()) { ctx.fillStyle = "rgba(42,37,48,.32)"; for (const s of spots) if (s.x % 10 === 0) { ctx.beginPath(); ctx.arc(s.x, s.y - 2.5, 1.3, 0, 7); ctx.fill(); } }
+  // where the ball went last go, in dots
+  if (game.trail && !play) { ctx.fillStyle = "rgba(185,69,136,.45)"; game.trail.forEach(([x, y], i) => { if (i % 3 === 0) { ctx.beginPath(); ctx.arc(x, y, 1.8, 0, 7); ctx.fill(); } }); }
+  // Ferguson in the basket
+  const fb = pic(catSrc("ferguson-basket"));
+  if (ok(fb)) { const w = k.w + 18, h = w * fb.naturalHeight / fb.naturalWidth; ctx.drawImage(fb, k.x - w / 2, k.y + 24 - h, w, h); }
+  // springs: placed ones, a boing as the ball meets one
+  const tNow = play ? now - play.t0 : -1, live = springsNow();
+  // the sounds of the go, as the ball gets to each moment: a boing off a coil, a ping off a ring, a thump off anything else
+  if (play) {
+    const run = play.run;
+    for (; play.si < run.firedAt.length && run.firedAt[play.si] <= tNow; play.si++) { const s = live[run.fired[play.si]]; G.sound.play(s && s.kind === RING ? "boing.ring" : "spring"); }
+    for (; play.bi < run.bumps.length && run.bumps[play.bi][0] <= tNow; play.bi++) G.sound.play("boing.bump", {k: Math.min(1, run.bumps[play.bi][1] / 450)});
+  }
+  game.pieces.forEach(p => {
+    if (p.x === null || (press && press.drag && press.p === p)) return;
+    let squash = 0;
+    if (play) { const idx = live.findIndex(s => s.x === p.x && s.y === p.y); play.run.firedAt.forEach((t, f) => { if (play.run.fired[f] === idx && tNow > t && tNow < t + .25) squash = Math.sin((tNow - t) / .25 * Math.PI) * .35; }); }
+    drawSpring(codeOf(p), p.colour, p.x, p.y, squash);
+  });
+  // hint, cursor
+  const hm = hints.current();
+  if (hm) { mark(hm, hm.bad ? "#C8392B" : "#ECA818", 3); if (hm.pose !== undefined) drawSpring(hm.pose, "gold", hm.x, hm.y, 0, .5); }
+  if (cursor >= 0 && spots[cursor]) mark(spots[cursor], G.CURSOR, 2.5);
+  // a spring being dragged in the room: where it would land, red if it can't stand there
+  if (press && press.drag && press.at) {
+    const at = press.at, okHere = standOK(r, at, springsNow(press.p).concat([at]));
+    drawSpring(codeOf(press.p), press.p.colour, at.x, at.y, 0, okHere ? .85 : .45);
+    if (!okHere) mark(at, "#C8392B", 2);
+  }
+  // the ball: on the shelf, or flying
+  let yx = R + 4, yy = r.shelf.y - R, rot = 0;
+  if (play) {
+    const path = play.run.path, i = Math.min(path.length - 1, Math.floor(tNow * 60));
+    [yx, yy] = path[i]; for (let j = 1; j <= i; j++) rot += Math.hypot(path[j][0] - path[j - 1][0], path[j][1] - path[j - 1][1]) / R;
+    if (i >= path.length - 1 && tNow > path.length / 60 + .3) playDone();
+  } else if (game.over) yy = -99;
+  const toy = pic(toySrc(game.ball));
+  if (ok(toy) && yy > -50) { ctx.save(); ctx.translate(yx, yy); ctx.rotate(rot); ctx.drawImage(toy, -R - 1.5, -R - 1.5, 2 * R + 3, 2 * R + 3); ctx.restore(); }
+}
+function resize() {
+  const b = canvas.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  if (!b.width) return;
+  canvas.width = Math.round(b.width * dpr); canvas.height = Math.round(b.width * VH / VW * dpr); scale = canvas.width / VW;
+}
+new ResizeObserver(resize).observe(canvas);
+let last = performance.now();
+function loop(t) { now += Math.min(.05, (t - last) / 1000); last = t; draw(); requestAnimationFrame(loop); }
+// The room in words, for VoiceOver.
+const onWhat = sp => { if (sp.y === RH) return "on the floor"; const b = game.room.boxes.find(b => b.y === sp.y && sp.x > b.x && sp.x < b.x + b.w); return b ? `on ${{box: "a box", books: "a pile of books", drawers: "a chest of drawers", ledge: "a shelf"}[b.kind] || "the furniture"}` : ""; };
+const across = x => `${Math.round(x / RW * 10) * 10}% of the way across`;
+setInterval(() => {
+  if (!game) return;
+  const sp = placed().map(p => `${p.kind === "ring" ? "a ring" : `a coil ${POSE_NAME[p.pose]}`} ${onWhat(p)}, ${across(p.x)}`);
+  G.describe(canvas, `A room seen from the side. The ${BALLS[game.ball]} starts on a shelf at the top left; Ferguson's basket is ${across(game.room.basket.x)}, ${game.room.basket.y < RH / 2 ? "high up" : "low down"}. ` +
+    (sp.length ? `Springs: ${G.listed(sp)}. ` : "No springs placed yet. ") + "Springs stand on the floor or on top of the furniture. Arrow keys move along and between surfaces, Space places a spring or turns the one there, Delete takes it back, G goes.");
+}, 500);
+
+/* ---------- input ---------- */
+const roomXY = e => { const b = canvas.getBoundingClientRect(); return [(e.clientX - b.left) / b.width * VW, (e.clientY - b.top) / b.height * VH]; };
+const inRoom = ([x, y]) => x >= 0 && x < RW && y >= 0 && y < RH + 12;
+// the placed spring under a point (a little generous, for fingers)
+const pieceNear = ([x, y]) => { let best = null, bd = SR + 9; for (const p of placed()) { const [mx, my] = springMid(p), d = Math.hypot(x - mx, y - my); if (d < bd) { bd = d; best = p; } } return best; };
+const ghost = document.createElement("img"); ghost.className = "drag"; ghost.alt = "";
+canvas.addEventListener("pointerdown", e => {
+  if (!canEdit()) return;
+  const at = roomXY(e); if (!inRoom(at)) return;
+  e.preventDefault(); cursor = -1;
+  const p = pieceNear(at);
+  if (p) { try { canvas.setPointerCapture(e.pointerId); } catch (_) {} press = {p, x: e.clientX, y: e.clientY, drag: false}; return; }
+  if (picked >= 0) placeAt(picked, dropAt(...at));
+  else { const free = game.pieces.findIndex(p => p.x === null); G.note(free >= 0 ? "Drag a spring in from the tray, or tap one there first." : "Tap a spring to turn it, or drag it somewhere else.", 2500); }
+});
+$("springs").addEventListener("pointerdown", e => {
+  const b = e.target.closest("button"); if (!b || !canEdit()) return;
+  e.preventDefault();
+  try { b.setPointerCapture(e.pointerId); } catch (_) {}
+  press = {p: game.pieces[+b.dataset.i], x: e.clientX, y: e.clientY, drag: false, fromTray: true};
+});
+function pressMove(e) {
+  if (!press) return;
+  if (!press.drag && Math.hypot(e.clientX - press.x, e.clientY - press.y) < 8) return;
+  press.drag = true;
+  const at = roomXY(e), here = inRoom(at);
+  // a finger hides what's under it: the spring is held a little above the touch
+  press.at = here ? dropAt(at[0], at[1] - (e.pointerType === "touch" ? 30 : 0)) : null;
+  if (!here) { ghost.src = springSrc(`${press.p.colour}-${press.p.kind === "ring" ? "ring" : "up"}`); ghost.style.left = e.clientX + "px"; ghost.style.top = e.clientY + "px"; if (!ghost.isConnected) document.body.append(ghost); }
+  else ghost.remove();
+}
+function pressUp(e) {
+  if (!press) return;
+  const p = press, at = p.at; press = null; ghost.remove();
+  const i = game.pieces.indexOf(p.p);
+  if (!p.drag) { if (p.fromTray) { picked = picked === i ? -1 : i; tray(); } else turn(p.p); return; }
+  if (!at) { if (!p.fromTray) toTray(p.p); return; }
+  if (at.x !== p.p.x || at.y !== p.p.y) placeAt(i, at);
+}
+for (const el of [canvas, $("springs")]) { el.addEventListener("pointermove", pressMove); el.addEventListener("pointerup", pressUp); el.addEventListener("pointercancel", () => { press = null; ghost.remove(); }); }
+// Keys: the cursor goes from spot to spot where a spring could stand, a step at a time along a surface (left and
+// right) and to the nearest surface above or below (up and down).
+const spotXY = () => spots.map(s => springMid(s));
+const spotOf = p => spots.findIndex(s => s.x === p.x && s.y === p.y);
+G.gridKeys({on: canEdit, show: i => { cursor = i; }, keys: ["backspace", "delete", "g"],
+  start: () => { const p = placed()[0]; const i = p ? spotOf(p) : spots.findIndex(s => s.y === RH && s.x >= 100); return i >= 0 ? i : 0; },
+  move: (i, dx, dy) => G.nearestThatWay(spotXY(), i, dx, dy),
+  act: (i, key) => {
+    if (key === "g") return go();
+    const s = spots[i]; if (!s) return;
+    const p = placed().find(q => q.x === s.x && q.y === s.y) || pieceNear(springMid(s));
+    if (key === "backspace" || key === "delete") { if (p) toTray(p); return; }
+    if (p) return turn(p);
+    const free = picked >= 0 ? picked : game.pieces.findIndex(q => q.x === null);
+    if (free >= 0) placeAt(free, s); else G.note("Every spring is placed. Press G to go.", 2500);
+  }});
+
+/* ---------- hints ---------- */
+// From the answer the room was made with: first a spring that isn't where the answer has one (in red), then where one
+// goes (in gold); asked again, it says which spring and which way it's turned. A spring a step or two from the
+// answer's counts as there.
+const same = (p, s) => codeOf(p) === s.kind && p.y === s.y && Math.abs(p.x - s.x) <= 2 * STEP;
+$("hintBtn").onclick = () => {
+  if (!canEdit() || document.querySelector(".spot")) return;
+  const wrong = placed().filter(p => !game.answer.some(s => same(p, s)));
+  const free = game.answer.filter(s => !placed().some(p => same(p, s)));
+  // springs in the tray are only wrong once they're all out and the answer still needs another
+  if (wrong.length && (game.pieces.every(p => p.x !== null) || hints.level())) {
+    game.hinted = true; save();
+    const w = wrong[0];
+    return hints.show({x: w.x, y: w.y, bad: true}, `This spring isn't where the answer has one${G.andMore(wrong.length - 1)}. Move it or take it back.`);
+  }
+  const s = free[0];
+  if (!s) { G.note("Every spring is where the answer has it. Press Go!", 3000); return; }
+  game.hinted = true; save();
+  const named = s.kind === RING ? "A ring" : `A coil ${POSE_NAME[s.kind]}`;
+  hints.show(hints.level() ? {x: s.x, y: s.y, pose: s.kind} : {x: s.x, y: s.y}, hints.level() ? `${named} goes in the gold ring.` : "A spring goes in the gold ring.");
+};
+
+/* ---------- buttons ---------- */
+for (let n = 1; n <= MAX_LEVEL; n++) $("levelSel").append(new Option(`${n}: ${LV[n].name}`, n));
+$("levelSel").onchange = e => newGame(+e.target.value);
+$("newBtn").onclick = () => newGame(game ? game.level : 1);
+// Restart: the springs go back in the tray (the goes still count, so it doesn't cost the gold paw).
+$("restartBtn").onclick = () => { if (!canEdit()) return; for (const p of game.pieces) { p.x = p.y = null; p.pose = UP; } game.trail = fly(game.room, []).path; picked = -1; hints.clear(); tray(); save(); };
+$("linkBtn").onclick = () => { if (game) G.shareCard({name: "Boing!", what: "room", won: game.over, puzzle: () => ({g: "boing", N: game.level, s: game.seed})}); };
+$("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : 1);
+function openShared(d) {
+  if (!(d.N >= 1 && d.N <= MAX_LEVEL) || !Number.isInteger(d.s)) throw new Error("the shared room doesn't fit the game");
+  return newGame(d.N, d.s);
+}
+
+/* ---------- how to play ---------- */
+// The walkthrough lights squares of a 25-unit grid laid over the room.
+const GRID = 25, GW = RW / GRID, GH = RH / GRID;
+const sq = (x, y) => [Math.max(0, Math.min(GW - 1, Math.floor(x / GRID))), Math.max(0, Math.min(GH - 1, Math.floor(y / GRID)))];
+const roomMap = () => { const b = canvas.getBoundingClientRect(), s = b.width / VW; return {ox: b.left, oy: b.top, cw: GRID * s, ch: GRID * s}; };
+const turnBack = G.yourTurn(() => game.pieces.map(p => [p.x, p.y, p.pose]), v => { v.forEach(([x, y, pose], i) => { Object.assign(game.pieces[i], {x, y, pose}); }); tray(); save(); });
+function intro(again) {
+  if (!again && G.load(INTRO).seen) return;
+  if (!game || !canEdit() || document.querySelector(".spot")) return;
+  const k = game.room.basket;
+  const trail = [...new Set(game.trail.filter((_, i) => i % 3 === 0).map(([x, y]) => sq(x, y).join()))].map(s => s.split(",").map(Number));
+  // a place on the floor near where the ball first lands, away from the answer's springs, for trying out a spring
+  const land = game.trail.find(([, y]) => y > RH - R - 2) || [120, RH];
+  const tryAt = spots.filter(s => s.y === RH && game.answer.every(a => a.y !== s.y || Math.abs(a.x - s.x) > 40)).sort((a, b) => Math.abs(a.x - land[0]) - Math.abs(b.x - land[0]))[0];
+  const coil = game.pieces.findIndex(p => p.kind === "coil");
+  const lit = [...new Set(spots.filter(s => s.x % 20 === 0).map(s => sq(s.x, s.y - 5).join()))].map(s => s.split(",").map(Number));
+  const steps = [
+    {say: "Bounce the ball to Ferguson", lit: [sq(k.x, k.y - 10), sq(k.x, k.y + 10)]},
+    {say: "Springs stand on the floor or on things", lit},
+    {say: "The dots show where it goes", lit: trail.filter((_, i) => i % 2 === 0)},
+  ];
+  if (coil >= 0 && tryAt) steps.push(
+    {say: "Here's a spring: tap to turn it", lit: [sq(tryAt.x, tryAt.y - LIFT)], ...turnBack.from, enter() { turnBack.from.enter(); const p = game.pieces[coil]; if (p.x === null) { p.x = tryAt.x; p.y = tryAt.y; p.pose = UP; tray(); } },
+      try: {done: () => game.pieces[coil].pose !== UP, yes: "Each tap turns it"}},
+    {say: "Drag springs in, and nudge them along", els: [$("springs")], ...turnBack.upTo});
+  steps.push({say: "Then press Go! and watch", els: [$("goBtn")]},
+    {say: "Where it lands on a spring matters", later: true, els: [canvas]},
+    {say: "A ring bounces the ball off it", later: true, els: [$("springs")]},
+    {say: "Lying flat, a coil bounces back as high", later: true, els: [$("springs")]},
+    {say: "Stuck? Hint shows where one goes", els: [$("hintBtn")]});
+  G.spotlight({grid: canvas, w: GW, h: GH, map: roomMap, steps, done: () => { const d = G.load(INTRO); G.save(INTRO, {...d, seen: true, met: again ? ["ring", "flat"] : d.met || []}); }});
+}
+function helpCard(tries = 0) {
+  if (game && play && !document.querySelector(".spot")) { if (tries < 40) setTimeout(() => helpCard(tries + 1), 250); return; }
+  intro(true);
+  if (!document.querySelector(".spot")) G.helpLater();
+}
+$("helpBtn").onclick = () => helpCard();
+// The first ring in the tray, and the first level whose answer has a coil lying flat, are shown as they come.
+function meet() {
+  const d = G.load(INTRO), met = d.met || [];
+  if (!d.seen || !game || !canEdit() || document.querySelector(".spot")) return;
+  let what = null, say = "";
+  if (!met.includes("ring") && game.pieces.some(p => p.kind === "ring")) { what = "ring"; say = "New: a ring. The ball bounces off it"; }
+  else if (!met.includes("flat") && game.answer.some(s => s.kind === FLAT)) { what = "flat"; say = "Turn a coil to lie flat: a springy floor"; }
+  if (!what) return;
+  G.spotlight({grid: canvas, w: GW, h: GH, map: roomMap, finish: false, steps: [{say, els: [$("springs")]}], done: () => G.save(INTRO, {...G.load(INTRO), met: [...met, what]})});
+}
+
+G.nav("boing");
+G.setupTimer({name: "boing", game: () => game, playing: g => !g.over, save, label: n => `Level ${n}`, noun: "level",
+  emptyText: "Finish a level and your times will show up here. They're kept on this device only."});
+const shareOpts = () => ({name: "Boing!", inProgress: !!(game && !game.over && game.started), open: d => { try { openShared(d); } catch (e) { G.note("That share link didn't work.", 5000); } }});
+window.addEventListener("hashchange", () => { const d = G.readShare("boing"); if (d) G.offerShare(d, shareOpts()); });
+requestAnimationFrame(loop);
+(() => {
+  const saved = G.load(STORE), shared = G.readShare("boing");
+  if (shared) { try { openShared(shared).then(() => G.note("Here's the shared room. Good luck!", 6000)); G.track("Boing! shared puzzle opened"); return; } catch (e) { G.note("That share link didn't work.", 5000); } }
+  const fresh = why => { newGame(saved.level || 1); if (why) setTimeout(() => G.note(why, 0), 600); };
+  if (saved.game) newGame(saved.game.level, saved.game.seed, {saved: saved.game}).catch(e => fresh(`Your saved room couldn't be reopened, so here's a new one. (${e.message})`));
+  else fresh();
+})();
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
