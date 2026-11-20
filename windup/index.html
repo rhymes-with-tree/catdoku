@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Wind Up</title>
-<script src="../move.js?v=2026-11-20.16"></script>
+<script src="../move.js?v=2026-11-20.17"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-20.16"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-20.17"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -26,7 +26,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-20.16">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.17">
 <style>
 /* Gus sits on the rim of a basket and drops balls of yarn into it; two of a kind that touch wind into one bigger
    ball. Peanut watches from the corner with the next ball. Don't let the yarn pile up over the line. */
@@ -36,9 +36,8 @@
 .hud{width:var(--board);display:flex;align-items:center;justify-content:space-between;gap:10px}
 .next{display:flex;align-items:flex-end;gap:6px}
 .next img{display:block;height:50px;width:auto}
-.next canvas,.goal canvas{display:block;width:46px;height:46px}
+.next canvas{display:block;width:46px;height:46px}
 .hud small{display:block;font-size:calc(13px*var(--ts-big));font-weight:600;line-height:1.1;opacity:.75}
-.goal{display:flex;align-items:center;gap:8px;text-align:right}
 .score{display:inline-flex;align-items:center;height:26px;padding:0 10px;border:2px solid var(--ink);border-radius:999px;
   background:var(--panel);font-variant-numeric:tabular-nums;white-space:nowrap}
 .basket{--fit:.751;position:relative;margin:0 auto;aspect-ratio:380/506;width:min(100%, calc((100svh - 330px) * var(--fit)));min-width:calc(333px * var(--fit));max-width:100%;
@@ -86,10 +85,9 @@ body.full .zoombox{width:auto;margin:0;display:flex;grid-column:3;grid-row:5;ali
   <header><div class="title"><h1>Wind Up</h1><img class="gus" src="../cats/gus-12.webp" alt="Gus, a grey tabby, sitting"></div><div class="stripe"></div><p class="tagline">Drop yarn for Gus and wind two of a kind into a bigger ball</p></header>
   <nav class="games" id="games" aria-label="Games"></nav>
 
-  <div class="status"><span class="left"><span class="score" id="score"></span></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+  <div class="status"><span class="left"><span id="goalTally"></span> <span class="score" id="score"></span></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
   <div class="hud">
     <div class="next"><img src="../cats/peanut-12.webp" alt="Peanut, a small black cat, watching"><span><small>Next</small><canvas id="nextCv" width="92" height="92"></canvas></span></div>
-    <div class="goal"><span><small id="goalTxt">Make this</small><small id="bestTxt"></small></span><canvas id="goalCv" width="92" height="92"></canvas></div>
   </div>
 
   <div class="wrap stage" style="height:auto"><div class="basket" id="board"><canvas id="cv" tabindex="0" role="application" aria-label="A basket of yarn. Gus drops the next ball where you point; move him with the left and right arrows and drop with the down arrow or space."></canvas><div class="tapgo" id="tapgo" hidden></div></div></div>
@@ -113,8 +111,8 @@ body.full .zoombox{width:auto;margin:0;display:flex;grid-column:3;grid-row:5;ali
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-20.16"></script>
-<script src="../colorways.js?v=2026-11-20.16"></script>
+<script src="../games.js?v=2026-11-20.17"></script>
+<script src="../colorways.js?v=2026-11-20.17"></script>
 <script>
 /* ---------- the basket ---------- */
 // World units: the basket is W wide and H deep; Gus sits CAT above its rim. Ten sizes of yarn ball, each winding up
@@ -349,9 +347,8 @@ const aimRange = l => [rad(l) + 2, W - rad(l) - 2];
 const clampAim = x => { const [a, b] = aimRange(nextOf(game).l); return Math.max(a, Math.min(b, x)); };
 
 function status() {
-  $("score").textContent = `${game.score} points`;
-  $("goalTxt").textContent = isEndless(game) ? `Wind ${aN(goalOf(game))} to zoom out` : `Wind a size ${GOALS[game.level]} ball`;
-  $("bestTxt").textContent = isEndless(game) ? `Best: ${Math.max(settings.endlessBest || 0, game.score)} points` : game.best ? `Biggest so far: ${game.best}` : "";
+  $("score").textContent = `${game.score} points` + (isEndless(game) ? ` · best ${Math.max(settings.endlessBest || 0, game.score)}` : "");
+  goalTally();
   G.relabel($("pauseBtn"), game.state === "paused" ? "Go on" : "Pause", game.state === "paused" ? "play" : "pause");
   $("shakeBtn").disabled = !["running", "won"].includes(game.state);   // a won basket can still be shaken, just for fun
   $("netBtn").hidden = !hasNet(game);
@@ -787,12 +784,23 @@ function paint() {
   const gus = pic(catSrc("gus-12"));
   if (gus.complete && gus.naturalWidth) { const h = CAT + 4, w = h * gus.naturalWidth / gus.naturalHeight, gx = Math.max(w / 2, Math.min(W - w / 2, ax)); ctx.drawImage(gus, gx - w / 2, -CAT + 2, w, h); }
 }
+// The goal, at the left of the status line under the basket as in every game (the owner, 2026-11-20): the biggest
+// ball so far out of the goal's size, with a small picture of the goal ball ("8/10" and the ball).
+const goalIcons = {};
+function goalTally() {
+  if (!game) return;
+  const l = goalOf(game), im = sprite(l, false);
+  if (!goalIcons[l] && im.ok) { const c = document.createElement("canvas"); c.width = c.height = 32; c.getContext("2d").drawImage(im, 0, 0, 32, 32); goalIcons[l] = c.toDataURL(); }
+  const icon = goalIcons[l] ? `<image href="${goalIcons[l]}" x="0" y="0" width="16" height="16"/>` : `<circle cx="8" cy="8" r="6.5" fill="#ECA818"/>`;
+  G.tally($("goalTally"), game.best || 0, l, icon, isEndless(game) ? `Biggest ball size ${game.best || 0}; zoom out at size ${l}` : `Biggest ball size ${game.best || 0} of the size ${l} to wind`);
+}
 function paintHud() {
   const af = game ? afterOf(game) : {l: 1, p: false};
-  for (const [id, l, p, k] of [["nextCv", af.l, af.p, af.k === "unr" ? "loose" : af.k || ""], ["goalCv", game ? goalOf(game) : 6, false, ""]]) {
-    const c = $(id).getContext("2d"), im = sprite(l, p), s = id === "goalCv" ? 92 : 92 * (rad(l) / RAD[5]) ** .85;
+  goalTally();
+  for (const [id, l, p, k] of [["nextCv", af.l, af.p, af.k === "unr" ? "loose" : af.k || ""]]) {
+    const c = $(id).getContext("2d"), im = sprite(l, p), s = 92 * (rad(l) / RAD[5]) ** .85;
     c.clearRect(0, 0, 92, 92);
-    if (im.ok) { const d = Math.min(92, id === "goalCv" ? 92 * (rad(l) / RAD[MAXL]) ** .5 : s); if (k) drawBall(c, l, 46, 46, d / 2 / 1.05, 0, 1, p, k); else c.drawImage(im, 46 - d / 2, 46 - d / 2, d, d); if (!k || k === "loose") drawNumber(c, l, 46, 46, d / 2, p); }
+    if (im.ok) { const d = Math.min(92, s); if (k) drawBall(c, l, 46, 46, d / 2 / 1.05, 0, 1, p, k); else c.drawImage(im, 46 - d / 2, 46 - d / 2, d, d); if (!k || k === "loose") drawNumber(c, l, 46, 46, d / 2, p); }
   }
 }
 addEventListener("resize", paint);
@@ -972,7 +980,7 @@ function helpOnFirstVisit() {
   const steps = [
     {say: "Aim, then let go", lit: top},
     {say: "Two the same wind bigger", lit: floor},
-    {say: "Wind the goal ball to win", els: [$("goalCv")]},
+    {say: "Wind the goal ball to win", els: [$("goalTally")]},
     ...(LV[game.level].pom[0] ? [{say: "Fluffballs only wind together", els: [$("nextCv")]}] : []),
     {say: "Stay below the line", lit: line, tone: "ok"},
     {say: "Stuck? Shake the basket", els: [$("shakeBtn")]},
