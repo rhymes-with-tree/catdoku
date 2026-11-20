@@ -9,12 +9,12 @@ The site is moving from GitHub Pages (`rhymes-with-tree.github.io/catdoku/`) to 
 and taking its name, Lap Cat Puzzles, from the domain (2026-11-17). `move.js` carries players' progress across (see
 README, Hosting and the move). It waits for the new site to answer, so it's on `main` already. In order:
 - [x] Cloudflare Workers project `lapcatpuzzles` on this repository, with lapcatpuzzles.com and www; live 2026-11-17
-- [ ] check on an iPhone: from Safari at the old address, and from an old Home Screen icon (the code and Settings);
-  and on Android and in DuckDuckGo, which testers use too
+- [x] check on an iPhone: from Safari at the old address, and from an old Home Screen icon (the code and Settings);
+  and on Android and in DuckDuckGo, which testers use too; all checked by the owner, 2026-11-20
 - [ ] testers moved: keep the old address up (the repository public, GitHub Pages on) until they all have, a few weeks
 - [ ] then make the repository private, which turns GitHub Pages off; the old address stops working for good
-- [ ] Email Routing for lapcatpuzzles.com in Cloudflare (Compute, Email Service): domain onboarded 2026-11-17; the
-  destination address and a hello@ rule are the owner's to finish
+- [x] Email Routing for lapcatpuzzles.com in Cloudflare (Compute, Email Service): domain onboarded 2026-11-17; the
+  destination address and a hello@ rule set up by the owner (2026-11-20)
 - [ ] after the switch, the Pawprints numbers carry on in one line (the paths keep `/catdoku`); check a day's worth
 
 ## Junk Drawer: checks not yet run
@@ -98,13 +98,9 @@ cats that point their own way are Day Light (`daylight/`, in beta).
 - [ ] **Moving up and down: the rest of the games.** Three wins at a level move you up and three losses move you
   down (a loss in a puzzle that can't be lost: a hint, or a Restart after working on it), with Give me another! and
   Change the difficulty on the win card. It's `G.ladder` in `games.js`, in Night Light, Day Light, Open the Door!
-  and Toe Beans since 2026-11-12 (README, "Moving up and down"). On hold (the owner, 2026-11-12): not until there's
-  data on how it plays in those four. Then bring it to every
+  and Toe Beans since 2026-11-12 (README, "Moving up and down"). It was on hold until there was data on how it
+  plays in those four; the owner says it's working well (2026-11-20), so it's ready to go further: bring it to every
   other game with levels or sizes (each sets its own next level today), and fix each README section's wording.
-- [ ] **Front page carousel: the owner to try it on a phone again.** The owner's first go on a phone (2026-11-12): it
-  moved with a finger but was far too sensitive, a normal swipe flew most of the way along, and it could stop between
-  two shelves. Rebuilt the same day so the page moves the row itself: exactly one shelf a swipe (a quarter of the way
-  or a flick), never stopping between two (README, first paragraph). Checked with touch in the headless browser only.
 - [ ] **One new move a level.** The how-to and the on-ramp are divided in a way that isn't ideal: the walkthrough
   tells the rules up front, and then the levels get harder. Better: each early level brings in one new move, and a
   win on it is the reward. Night Light's and Day Light's new first levels (one tap, then two) are a first go at it.
@@ -114,7 +110,6 @@ cats that point their own way are Day Light (`daylight/`, in beta).
   shown the first time it's made), Fair Play (no signs at level 1; = and × arrive at level 2 with a spotlight) and
   Under the Blanket (a one-cat level 1, so 11 levels; the U-turn between two cats is a short lesson on the first
   two-cat blanket). Next to look at: which other games teach everything up front.
-- [ ] **Toe Beans:** getting that hard with few wins is disheartening; the moving-down rule above is the fix to try.
 - [ ] **Toy Box, Twirl and Knock It Off need more** past their hardest level. The owner's picks (2026-11-15), and more
   ideas of the same kind to choose from; each would be one new thing a level, from the level after the top one:
   - Knock It Off, picked (2026-11-15): a second cat to switch to, the lazy Susan (its four squares turn a quarter
@@ -374,13 +369,3 @@ The owner's grid for the new Settings page differed from the games in a few plac
 
 The shared `tape` sound (a sticky thhp, in Wind Up, Pounce Up and Tail Chase) was made silent on 2026-11-17: the owner
 hates it. Find something better (perhaps a recording in `sounds/`) and put it back in `games.js`.
-
-## Coming back to a finished game: check on a phone
-
-Since rhymes-with-tree/catdoku#237 (2026-11-07), coming back to a game you'd won or lost deals a new puzzle instead
-of showing the old card again (`G.reopen` with `winCard`/`openCard` in `games.js`). Two things to check on a real phone
-(win, go to the front page, come back; it should be a fresh puzzle with no card):
-- Bird Watch, Keyboard Cat, Nip Trip, Pawlette, Tail Chase and Wind Up don't reopen through `G.reopen`, so the fix
-  doesn't reach them. If any still shows the old card, fix it in that game.
-- Fuzzy Spelling, Laser Pointer and Mew Hue gave odd results in the headless test (most likely the test's fake win,
-  not a real problem).
