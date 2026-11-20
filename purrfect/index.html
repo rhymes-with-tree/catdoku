@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Purrfect Square</title>
-<script src="../move.js?v=2026-11-20.9"></script>
+<script src="../move.js?v=2026-11-20.10"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-20.9"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-20.10"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-20.9">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.10">
 <style>
 /* A magic square of toe beans: every row, column and long diagonal adds up to the same total. Each bean holds a
    number, 1 to N² once each, and each line's total so far is on a main pad at its end (rows on the right, columns
@@ -108,7 +108,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-20.9"></script>
+<script src="../games.js?v=2026-11-20.10"></script>
 <script>
 /* ---------- squares ---------- */
 // A square is N × N (level 1 is 3 × 3, up to 6 × 6 at level 4) holding 1 to N² once each, every row, column and
@@ -398,13 +398,13 @@ document.addEventListener("keydown", e => {
 });
 
 $("restartBtn").onclick = () => {
-  if (undo.restart(g => { g.put = {}; sel = -1; held = 0; guesses.clear(); })) G.note("All your numbers are out. Undo puts them back.", 4000);
+  if (undo.restart(g => { g.put = {}; sel = -1; held = 0; guesses.clear(); })) { slip(); G.note("All your numbers are out. Undo puts them back.", 4000); }
 };
 // Hint: a number in the wrong square gets a red box; otherwise the next square reasoning settles, in gold and picked,
 // and why; asked again, its number too, gold on the pad.
 $("hintBtn").onclick = () => {
   if (!playing()) return;
-  game.hinted = true; game.started = true; save();
+  game.hinted = true; game.started = true; slip(); save();
   const wrong = Object.keys(game.put).map(Number).filter(k => game.put[k] !== game.sol[k]);
   if (wrong.length) {
     sel = wrong[0]; held = 0;
@@ -423,16 +423,28 @@ $("hintBtn").onclick = () => {
 $("auditBtn").onclick = () => {
   if (!playing()) return;
   if (!Object.keys(game.put).length) return G.note("Put some numbers in first, then Audit checks them.", 3500);
-  game.audited = true; game.started = true; save();
+  game.audited = true; game.started = true; slip(); save();
   const wrong = Object.keys(game.put).map(Number).filter(k => game.put[k] !== game.sol[k]);
   if (!wrong.length) { hints.clear(); return G.note("Every number you've put in is in the right square.", 5000); }
   hints.show({sq: wrong.map(k => [k, true])}, `${wrong.length} number${wrong.length > 1 ? "s are" : " is"} in the wrong square.`, {uncounted: true});
 };
 
 /* ---------- endings ---------- */
+// Three wins at a level move you up and three slips (a hint, an audit, or a Restart after putting numbers in) move you down: G.ladder.
+const climb = G.ladder("purrfect", MAX_LEVEL);
+// A slip counts once a puzzle, and that puzzle no longer counts as a win toward moving up.
+function slip() {
+  if (game.slipped || game.won) return;
+  game.slipped = true;
+  const r = climb.lost(game.level);
+  if (r.down) { game.down = r.next; settings.level = r.next; $("levelSel").value = r.next; squares.prefetch(r.next); }
+  save();
+}
 function win() {
   game.won = true; G.finishClock(game); hints.clear(false); sel = -1; held = 0;
-  const helped = game.hinted || game.audited, next = helped ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  // a square with a hint, an audit or a restart was counted when that happened; a clean one is a win toward moving up
+  let next = game.down || game.level;
+  if (!game.slipped) { const r = climb.won(game.level); next = r.next; game.climbLine = climb.say(r); }
   settings.level = next; $("levelSel").value = next; save();
   draw();
   $("board").classList.add("won");
@@ -445,10 +457,11 @@ function win() {
 function finishCard() {
   const next = settings.level, gold = !game.restarted && !game.hinted && !game.audited;
   let text = `Every row, column and diagonal adds up to ${total()}.`;
-  text += game.hinted || game.audited ? ` You had ${game.hinted ? "a hint" : "an audit"}, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the biggest square; here's another." : ` Next up: level ${next}.`;
+  text += " " + (game.down ? `That's 3 hints, audits or restarts at level ${game.level}, so next comes level ${game.down}.`
+    : game.slipped ? "A square with a hint, an audit or a restart doesn't count toward moving up." : game.climbLine || "");
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my square", game.result,
-    {title: "Purrfect!", gold, goldWhy: "No hints, audits or restarts!", next: next > game.level ? `Next: level ${next}` : "Next board",
-     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+    {title: "Purrfect!", gold, goldWhy: "No hints, audits or restarts!", next: G.ANOTHER,
+     after: G.otherSize($("levelSel"), next, startLevel, G.CHANGE)});
 }
 
 /* ---------- new squares ---------- */

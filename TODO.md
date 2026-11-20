@@ -96,7 +96,8 @@ cats that point their own way are Day Light (`daylight/`, in beta).
 - [ ] **Moving up and down: the rest of the games.** Three wins at a level move you up and three losses move you
   down (a loss in a puzzle that can't be lost: a hint, or a Restart after working on it), with Give me another! and
   Change the difficulty on the win card. It's `G.ladder` in `games.js`, in Night Light, Day Light, Open the Door!
-  and Toe Beans since 2026-11-12 (README, "Moving up and down"). It was on hold until there was data on how it
+  and Toe Beans since 2026-11-12, and Meowbile, Purrfect Square, Treat Time and Window Ledges since 2026-11-20, so all
+  of Cat Math (README, "Moving up and down"). It was on hold until there was data on how it
   plays in those four; the owner says it's working well (2026-11-20), so it's ready to go further: bring it to every
   other game with levels or sizes (each sets its own next level today), and fix each README section's wording.
 - [ ] **One new move a level.** The how-to and the on-ramp are divided in a way that isn't ideal: the walkthrough
