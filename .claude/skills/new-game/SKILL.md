@@ -24,6 +24,15 @@ device, not in the session.
 
 ## 1. Theme
 
+**Recommend a model and effort first**, in a line or two, before the theme, so the owner can switch before the
+long part starts. Sonnet at high effort suits a game that mostly reuses code and art already on the site (a new
+board for an existing mechanic, a mode of an existing game). Opus at high suits new physics, a new puzzle generator,
+or rules that still need working out; a game that first looks like a mode of another (Warm Seat, after Bed Hog) is
+Opus if it turns out to be its own game. Fable only for the one part Opus gets stuck on (a level solver, flipper
+collisions, proving a puzzle has one answer); max is rarely worth it. Medium is enough for small follow-ups such as
+tuning a level or fixing a label. These are guesses, not tested: if a game went badly or easily on its model, say so
+and adjust this paragraph.
+
 Check the README's game sections and `G.GAMES`; if an existing game already uses the same mechanic,
 say which. Look the idea up in `IDEAS.md`, the list of every puzzle considered, and use its row (rules,
 what it's close to, theme notes). Offer a few cat themes for the user's idea and recommend one. If the row starts with "Shortlist" and says "Cat theme picked", that theme is decided: use it
