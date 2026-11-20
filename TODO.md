@@ -149,7 +149,13 @@ The rest isn't settled, but there's a logic to find. A draft for the owner to ch
 - **Things that move her:** springs, sliding shelves, cracked shelves and catnip. Order them from most help to least
   control: springs, sliding shelves, cracked shelves, then catnip's dice roll.
 - **Fish treats** early, as an easy collecting goal.
-- **A tidy climb** stays last: it turns level 1's goal round.
+- **A tidy climb** (knock nothing off) goes right before the first level about something not to touch (the owner,
+  2026-11-20): candles, if they count as one, otherwise lemons. It's the step from "knock things off" to "leave
+  things alone".
+
+Red glitter (the owner, 2026-11-20): things she can knock off have a gold sparkle; things that are dangerous to knock
+off should get a red one. That's the candle (it has no sparkle now, and knocking it off starts the fire). Also worth
+asking the owner: on the tidy climb, should everything that would spoil the goal sparkle red instead of gold?
 
 Renumbering levels moves saves, best times and share links. Map the old numbers to the new ones, as Mew Hue's `OLD`
 and Open the Door! did, and note in the README that GoatCounter's counts by level meant the old order before that day.
