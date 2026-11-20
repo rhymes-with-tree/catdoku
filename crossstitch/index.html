@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Cross Stitch</title>
-<script src="../move.js?v=2026-11-20.10"></script>
+<script src="../move.js?v=2026-11-20.11"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-20.10"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-20.11"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-20.10">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.11">
 <style>
 /* A cross-stitch sampler: aida cloth held in a wooden embroidery hoop, with a chart's grid on it (a darker line every
    five squares), and the counts for each row down the left and each column along the top. Stitches are crosses in one
@@ -117,7 +117,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-20.10"></script>
+<script src="../games.js?v=2026-11-20.11"></script>
 <script>
 /* ---------- the patterns ---------- */
 // Each pattern is a picture square by square: "." is bare cloth, a letter a stitch in that thread. The bigger ones are
@@ -442,7 +442,7 @@ const keys = G.gridKeys({on: playing, size: () => [game.N, game.N], keys: ["x", 
   escape: () => { cursor = -1; draw(); }});
 $("restartBtn").onclick = () => {
   if (!undo.restart(g => { g.grid = g.grid.map(() => 0); })) return;
-  G.note("Every stitch is out. Undo puts them back.", 3500);
+  slip(); G.note("Every stitch is out. Undo puts them back.", 3500);
 };
 
 /* ---------- hints ---------- */
@@ -468,14 +468,14 @@ function hint() {
   const g = game.grid, sol = plan.sol;
   const wrong = g.map((v, i) => (v === 1 && !sol[i]) || (v === 2 && sol[i]) ? i : -1).filter(i => i >= 0);
   if (wrong.length) {
-    game.hinted = true; game.started = true; save();
+    game.hinted = true; slip(); game.started = true; save();
     const i = wrong[0];
     hints.show({cells: [i], bad: true}, (g[i] === 1 ? "That stitch shouldn't be there" : "That square needs a stitch, not a dot") + G.andMore(wrong.length - 1) + ".");
     return;
   }
   const s = nextStep();
   if (!s) { G.note("Couldn't find a hint here. Try Undo.", 4000); return; }
-  game.hinted = true; game.started = true; save();
+  game.hinted = true; slip(); game.started = true; save();
   const line = s.isRow ? `Row ${s.a + 1}` : `Column ${s.a + 1}`, counts = (s.isRow ? plan.rows : plan.cols)[s.a].join(" ") || "0";
   if (!hints.level()) hints.show({cells: s.cells, line: (s.isRow ? "r" : "c") + s.a},
     `${line}'s counts (${counts}) settle ${s.on.length ? "a stitch" : "a bare square"} in the gold ${s.isRow ? "row" : "column"}.`);
@@ -486,12 +486,24 @@ $("hintBtn").onclick = hint;
 
 /* ---------- endings ---------- */
 // The last stitch: the chart's grid and the dots go, each stitch takes its colour, then the card.
+// Three wins at a level move you up and three slips (a hint, or a Restart after working on it) move you down: G.ladder.
+const climb = G.ladder("crossstitch", MAX_LEVEL);
+// A slip counts once a puzzle, and that puzzle no longer counts as a win toward moving up.
+function slip() {
+  if (game.slipped || game.won) return;
+  game.slipped = true;
+  const r = climb.lost(game.level);
+  if (r.down) { game.down = r.next; settings.level = r.next; $("levelSel").value = r.next; }
+  save();
+}
 function win() {
   game.won = true; G.finishClock(game); cursor = -1; markTool.set(false); keys.hide();
   const done = settings.seen[game.level] || [];
   if (!done.includes(key(game))) done.push(key(game));
   settings.seen[game.level] = done;
-  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  // a sampler with a hint or a restart was counted when that happened; a clean one is a win toward moving up
+  let next = game.down || game.level;
+  if (!game.slipped) { const r = climb.won(game.level); next = r.next; game.climbLine = climb.say(r); }
   settings.level = next; $("levelSel").value = next; save();
   draw();
   G.track(`Cross Stitch solved level ${game.level}`);
@@ -518,10 +530,11 @@ function samplerPic() {
 function finishCard() {
   const next = settings.level, N = game.N;
   let text = `You've stitched ${plan.name} on the ${N} × ${N} sampler.`;
-  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the biggest; here's another." : ` Next up: level ${next}.`;
+  text += " " + (game.down ? `That's 3 hints or restarts at level ${game.level}, so next comes level ${game.down}.`
+    : game.slipped ? "A sampler with a hint or a restart doesn't count toward moving up." : game.climbLine || "");
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my sampler", game.result,
     {title: "Finished!", gold: !game.restarted && !game.hinted, goldWhy: "No hints or restarts!", pic: samplerPic(),
-     next: next > game.level ? `Next: level ${next}` : "Next sampler", after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+     next: G.ANOTHER, after: G.otherSize($("levelSel"), next, startLevel, G.CHANGE)});
 }
 
 /* ---------- new samplers ---------- */

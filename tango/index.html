@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Fair Play</title>
-<script src="../move.js?v=2026-11-20.10"></script>
+<script src="../move.js?v=2026-11-20.11"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-20.10"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-20.11"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-20.10">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.11">
 <style>
 /* Two toys share out a grid in the toy box: every line holds as many of one as the other, no three alike in a row,
    and = / × signs between squares say whether neighbours match. */
@@ -95,7 +95,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-20.10"></script>
+<script src="../games.js?v=2026-11-20.11"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // A grid of N × N squares, each 0 or 1 (the two toys). Every row and column has N/2 of each, no three the same
@@ -362,7 +362,7 @@ function tap(i) {
 }
 // Keys: the arrows move a cursor over the squares; Space or Enter taps the square as a tap does.
 keys = G.gridKeys({on: () => playing(), size: () => [game.N, game.N], show: () => draw(), act: i => tap(i)});
-$("restartBtn").onclick = () => { if (undo.restart(g => { g.grid = g.givens.slice(); g.notes = []; guesses.clear(); })) { G.note("Back to the start. Undo brings your toys back.", 3500); } };
+$("restartBtn").onclick = () => { if (undo.restart(g => { g.grid = g.givens.slice(); g.notes = []; guesses.clear(); })) { slip(); G.note("Back to the start. Undo brings your toys back.", 3500); } };
 // Bookmark: the next square you fill glows until it's undone. Return to Bookmark undoes everything back to
 // the latest bookmark in one go (free, as Undo is; G.guesser). Bookmarking puts Mark down.
 $("guessBtn").addEventListener("click", () => { if (guesses.armed() && markTool.on()) { markTool.set(false); draw(); } });
@@ -428,7 +428,7 @@ function hint() {
   if (!playing()) return;
   const sol = solution(), g = game.grid;
   if (!sol) { G.note("Couldn't work out a hint for this puzzle. Try Undo, or check for a wrong toy.", 4000); return; }
-  game.hinted = true; guesses.disarm(); markTool.set(false); save();
+  game.hinted = true; slip(); guesses.disarm(); markTool.set(false); save();
   const wrong = g.map((v, i) => v !== -1 && v !== sol[i] ? i : -1).filter(i => i >= 0);
   if (wrong.length) {
     const i = wrong.find(i => !guesses.list().includes(i)) ?? wrong[0];
@@ -447,9 +447,21 @@ $("hintBtn").onclick = hint;
 addEventListener("resize", () => { if (game) draw(); });
 
 /* ---------- endings ---------- */
+// Three wins at a level move you up and three slips (a hint, or a Restart after working on it) move you down: G.ladder.
+const climb = G.ladder("tango", MAX_LEVEL);
+// A slip counts once a puzzle, and that puzzle no longer counts as a win toward moving up.
+function slip() {
+  if (game.slipped || game.won) return;
+  game.slipped = true;
+  const r = climb.lost(game.level);
+  if (r.down) { game.down = r.next; settings.level = r.next; $("levelSel").value = r.next; build.prefetch(r.next); }
+  save();
+}
 function win() {
   game.won = true; G.finishClock(game); markTool.set(false); guesses.disarm();
-  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  // a toy box with a hint or a restart was counted when that happened; a clean one is a win toward moving up
+  let next = game.down || game.level;
+  if (!game.slipped) { const r = climb.won(game.level); next = r.next; game.climbLine = climb.say(r); }
   settings.level = next; $("levelSel").value = next; save();
   $("board").classList.remove("won"); $("board").getBoundingClientRect(); $("board").classList.add("won"); draw();
   G.track(`Fair Play solved level ${game.level}`);
@@ -460,9 +472,10 @@ function win() {
 function finishCard() {
   const next = settings.level, N = game.N;
   let text = `Every row and column of the ${N} × ${N} toy box shares its toys out fairly.`;
-  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  text += " " + (game.down ? `That's 3 hints or restarts at level ${game.level}, so next comes level ${game.down}.`
+    : game.slipped ? "A toy box with a hint or a restart doesn't count toward moving up." : game.climbLine || "");
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my toys", game.result,
-    {title: "Fair and square!", gold: !game.restarted && !game.hinted, goldWhy: "No hints or restarts!", next: next > game.level ? `Next: level ${next}` : "Next board", after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+    {title: "Fair and square!", gold: !game.restarted && !game.hinted, goldWhy: "No hints or restarts!", next: G.ANOTHER, after: G.otherSize($("levelSel"), next, startLevel, G.CHANGE)});
 }
 
 /* ---------- new puzzles ---------- */
