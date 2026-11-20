@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Laser Pointer</title>
-<script src="../move.js?v=2026-11-20.11"></script>
+<script src="../move.js?v=2026-11-20.12"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-20.11"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-20.12"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-20.11">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.12">
 <style>
 /* A room seen from above: a wooden floor inside a wall, with a laser pointer poking in at one edge. Cats sit on
    some squares and mirrors stand on others; tap a mirror to tip it the other way. The red dot runs straight and
@@ -104,7 +104,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-20.11"></script>
+<script src="../games.js?v=2026-11-20.12"></script>
 <script>
 /* ---------- laser puzzles (plain functions, also run in a background worker) ---------- */
 // The room is N × N squares. The laser pointer sits just off one edge and shines in along a row or column.
@@ -667,8 +667,9 @@ const undo = G.history({game: () => game, can: playing, restart: true, started: 
 // Restart: on a moving level the laser goes off and the mirrors go back, ready for another run (the list is emptied).
 $("restartBtn").onclick = () => {
   const live1 = isLive(), reset = g => { g.tilt = g.first.slice(); for (const i in mirrors) setTilt(+i); if (live1) liveReset(); };
-  if (live1 ? undo.restart(reset) : undo.restart(reset, {tilt: game.tilt.slice()}))
-    G.note(live1 ? "Back to how the mirrors started. Tap the room to switch the laser on." : "Back to how the mirrors started. Undo brings your moves back.", live1 ? 0 : 4000);
+  if (live1 ? undo.restart(reset) : undo.restart(reset, {tilt: game.tilt.slice()})) {
+    slip(); G.note(live1 ? "Back to how the mirrors started. Tap the room to switch the laser on." : "Back to how the mirrors started. Undo brings your moves back.", live1 ? 0 : 4000);
+  }
 };
 // Hint: a gold box round the first mirror along the answer's run that's tipped the wrong way. (That's also the
 // first wrong one the dot meets now: up to it, the dot is on the answer's run.) On a moving level it goes by the
@@ -692,14 +693,26 @@ $("hintBtn").onclick = () => {
     wrong = trace(game.N, answer, game.start, game.dir).map(([i]) => i).find(i => game.tilt[i] >= 0 && game.tilt[i] !== game.sol[i]);
     if (wrong === undefined) { G.note("Every mirror the dot meets is right already.", 4000); return; }
   }
-  game.hinted = true; game.started = true; save();
+  game.hinted = true; slip(); game.started = true; save();
   hints.show({i: wrong}, say);
 };
 
 /* ---------- endings ---------- */
+// Three wins at a level move you up and three slips (a hint, or a Restart after working on it) move you down: G.ladder.
+const climb = G.ladder("laserpointer", MAX_LEVEL);
+// A slip counts once a puzzle, and that puzzle no longer counts as a win toward moving up.
+function slip() {
+  if (game.slipped || game.won) return;
+  game.slipped = true;
+  const r = climb.lost(game.level);
+  if (r.down) { game.down = r.next; settings.level = r.next; $("levelSel").value = r.next; build.prefetch(r.next); }
+  save();
+}
 function win() {
   game.won = true; G.finishClock(game); cursor = -1; showCursor(); clearHint();
-  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  // a room with a hint or a restart was counted when that happened; a clean one is a win toward moving up
+  let next = game.down || game.level;
+  if (!game.slipped) { const r = climb.won(game.level); next = r.next; game.climbLine = climb.say(r); }
   settings.level = next; $("levelSel").value = next; save();
   update();
   G.track(`Laser Pointer solved level ${game.level}`);
@@ -772,10 +785,11 @@ function tossToys(done) {
 function finishCard() {
   const next = settings.level, gold = !game.restarted && !game.hinted;
   let text = `The dot ran past all ${catAt.length} cats${order() ? " in order" : ""} in the ${game.N} × ${game.N} room.`;
-  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  text += " " + (game.down ? `That's 3 hints or restarts at level ${game.level}, so next comes level ${game.down}.`
+    : game.slipped ? "A room with a hint or a restart doesn't count toward moving up." : game.climbLine || "");
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my room", game.result,
-    {title: "Got it!", gold, goldWhy: "No hints or restarts!", next: next > game.level ? `Next: level ${next}` : "Next board",
-     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+    {title: "Got it!", gold, goldWhy: "No hints or restarts!", next: G.ANOTHER,
+     after: G.otherSize($("levelSel"), next, startLevel, G.CHANGE)});
   // a word for the humans, just above the buttons
   const psa = document.createElement("p"); psa.className = "psa";
   psa.innerHTML = "<b>Playing laser with a real cat?</b> A dot can never be caught, so finish with a toy they can pounce on and catch.";

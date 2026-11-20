@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Junk Drawer</title>
-<script src="../move.js?v=2026-11-20.11"></script>
+<script src="../move.js?v=2026-11-20.12"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-20.11"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-20.12"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-20.11">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.12">
 <style>
 /* The drawer, seen from above: a wooden frame (brick, shaded with ink) round a pale wooden inside, with the junk
    everyone keeps (batteries, rubber bands, paper clips, a key, a pen, coins…) lying about, and a set of chunky plastic
@@ -118,7 +118,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-20.11"></script>
+<script src="../games.js?v=2026-11-20.12"></script>
 <script>
 /* ---------- levels ---------- */
 // [drawer size, shortest word, longest word to find, fewest words, most words]. Every magnet is in at least one word.
@@ -446,7 +446,7 @@ function hint() {
   if (!playing()) return;
   const o = left()[0]; if (!o) return;
   const p = o.paths[0], L = o.w.length, lv = hints.level();
-  game.hinted = true; save();
+  game.hinted = true; slip(); save();
   if (lv === 0) hints.show({cells: [p[0]]}, `A ${L}-letter word starts on the gold magnet.`);
   else if (lv === 1) { const h = Math.ceil(L / 2); hints.show({cells: p.slice(0, h)}, `A ${L}-letter word starts ${o.w.slice(0, h)}…`); }
   else hints.show({cells: p}, `There's ${o.w}: connect the gold magnets.`);
@@ -456,12 +456,13 @@ $("hintBtn").onclick = hint;
 // gold paw; it lasts for the rest of the puzzle.
 $("leftBtn").onclick = () => {
   if (!playing() || game.showLeft) return;
-  game.showLeft = true; game.hinted = true; save(); draw();
+  game.showLeft = true; game.hinted = true; slip(); save(); draw();
   const n = left().length; sayBelow(`${n} word${n === 1 ? "" : "s"} still to find, shown as blanks in the list.`, true, 4000);
 };
 // Restart: every word to find again. It costs the gold paw.
 $("restartBtn").onclick = () => {
   if (!game || game.won) return;
+  slip();
   Object.assign(game, {found: [], bonus: [], restarted: true, showLeft: false}); chain = []; typed = "";
   hints.clear(false); draw(); save();
   G.note("Every word is to find again.", 3000);
@@ -469,9 +470,21 @@ $("restartBtn").onclick = () => {
 
 /* ---------- winning ---------- */
 const goldOK = () => !game.hinted && !game.restarted;
+// Three wins at a level move you up and three slips (a hint, or a Restart after working on it) move you down: G.ladder.
+const climb = G.ladder("junkdrawer", MAX_LEVEL);
+// A slip counts once a puzzle, and that puzzle no longer counts as a win toward moving up.
+function slip() {
+  if (game.slipped || game.won) return;
+  game.slipped = true;
+  const r = climb.lost(game.level);
+  if (r.down) { game.down = r.next; settings.level = r.next; $("levelSel").value = r.next; }
+  save();
+}
 function win() {
   game.won = true; chain = []; G.finishClock(game);
-  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  // a drawer with a hint or a restart was counted when that happened; a clean one is a win toward moving up
+  let next = game.down || game.level;
+  if (!game.slipped) { const r = climb.won(game.level); next = r.next; game.climbLine = climb.say(r); }
   settings.level = next; $("levelSel").value = next; save(); draw();
   G.track(`Junk Drawer solved level ${game.level}`);
   const g = game;
@@ -481,10 +494,11 @@ function dottiePic() { const im = new Image(); im.className = "dottiepic"; im.sr
 function finishCard() {
   const next = settings.level, n = list.length, b = game.bonus.length;
   let text = `All ${n} words connected${b ? `, and ${b} bonus word${b > 1 ? "s" : ""}` : ""}. Dottie has curled up in the drawer.`;
-  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the biggest drawer; here's another." : ` Next up: level ${next}.`;
+  text += " " + (game.down ? `That's 3 hints or restarts at level ${game.level}, so next comes level ${game.down}.`
+    : game.slipped ? "A drawer with a hint or a restart doesn't count toward moving up." : game.climbLine || "");
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the drawer", game.result,
-    {title: "All found!", gold: goldOK(), goldWhy: "No hints or restarts!", goldTitle: "Gold paw, Dottie!", goldPic: [dottiePic()], next: next > game.level ? `Next: level ${next}` : "Next drawer",
-     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+    {title: "All found!", gold: goldOK(), goldWhy: "No hints or restarts!", goldTitle: "Gold paw, Dottie!", goldPic: [dottiePic()], next: G.ANOTHER,
+     after: G.otherSize($("levelSel"), next, startLevel, G.CHANGE)});
 }
 
 /* ---------- sharing ---------- */

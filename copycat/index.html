@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Copycat</title>
-<script src="../move.js?v=2026-11-20.11"></script>
+<script src="../move.js?v=2026-11-20.12"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-20.11"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-20.12"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-20.11">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.12">
 <style>
 /* Cardboard boxes on a wooden floor, as in Hide & Seek. Each box hides a toy; open two with the same toy
    and a cat climbs in and curls up with them. */
@@ -76,8 +76,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-20.11"></script>
-<script src="../boxes.js?v=2026-11-20.11"></script>
+<script src="../games.js?v=2026-11-20.12"></script>
+<script src="../boxes.js?v=2026-11-20.12"></script>
 <script>
 /* ---------- levels ---------- */
 // Columns × rows of boxes; every level is twice as many boxes as pairs.
@@ -226,7 +226,7 @@ function hint() {
   const open = game.up[0];
   const k = open !== undefined ? game.deal[open] : shuffle(game.found.map((f, k) => f ? -1 : k).filter(k => k >= 0))[0];
   const boxes = game.deal.map((p, i) => p === k && i !== open ? i : -1).filter(i => i >= 0);
-  game.hinted = true; save();
+  game.hinted = true; slip(); save();
   hints.show({boxes}, open !== undefined ? `Its match is the glowing box.` : "Those two glowing boxes match.");
 }
 $("hintBtn").onclick = hint;
@@ -235,7 +235,8 @@ $("restartBtn").onclick = () => {
   if (!game || game.won) return;
   clearTimeout(shut);
   const g = deal(game.level, game.toys);
-  game = Object.assign(g, {hinted: game.hinted, restarted: true, ms: game.ms, started: game.started, timed: game.timed});
+  game = Object.assign(g, {hinted: game.hinted, restarted: true, ms: game.ms, started: game.started, timed: game.timed, slipped: game.slipped, down: game.down});
+  if (game.started) slip();
   draw(); save(); reshuffle();
   G.note("Shuffled. The same toys, in new boxes.", 3000);
 };
@@ -243,9 +244,21 @@ $("restartBtn").onclick = () => {
 /* ---------- winning ---------- */
 // Few misses: no more misses than there are pairs.
 const goldOK = () => !game.hinted && !game.restarted && game.misses <= pairs();
+// Three wins at a level move you up and three slips (a hint, or a Restart after working on it) move you down: G.ladder.
+const climb = G.ladder("copycat", MAX_LEVEL);
+// A slip counts once a puzzle, and that puzzle no longer counts as a win toward moving up.
+function slip() {
+  if (game.slipped || game.won) return;
+  game.slipped = true;
+  const r = climb.lost(game.level);
+  if (r.down) { game.down = r.next; settings.level = r.next; $("levelSel").value = r.next; }
+  save();
+}
 function win() {
   game.won = true; G.finishClock(game);
-  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  // a board with a hint or a restart was counted when that happened; a clean one is a win toward moving up
+  let next = game.down || game.level;
+  if (!game.slipped) { const r = climb.won(game.level); next = r.next; game.climbLine = climb.say(r); }
   settings.level = next; $("levelSel").value = next; save(); draw();
   G.track(`Copycat solved level ${game.level}`);
   const g = game;
@@ -254,10 +267,11 @@ function win() {
 function finishCard() {
   const next = settings.level, P = pairs();
   let text = `${P} pairs found with ${game.misses} miss${game.misses === 1 ? "" : "es"}, and ${P} cats napping.`;
-  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the biggest level; here's another." : ` Next up: level ${next}.`;
+  text += " " + (game.down ? `That's 3 hints or restarts at level ${game.level}, so next comes level ${game.down}.`
+    : game.slipped ? "A board with a hint or a restart doesn't count toward moving up." : game.climbLine || "");
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the cats", game.result,
-    {title: "All paired up!", gold: goldOK(), goldWhy: `${game.misses} miss${game.misses === 1 ? "" : "es"} for ${P} pairs!`, next: next > game.level ? `Next: level ${next}` : "Next board",
-     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+    {title: "All paired up!", gold: goldOK(), goldWhy: `${game.misses} miss${game.misses === 1 ? "" : "es"} for ${P} pairs!`, next: G.ANOTHER,
+     after: G.otherSize($("levelSel"), next, startLevel, G.CHANGE)});
 }
 
 /* ---------- sharing ---------- */

@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>If It Fits</title>
-<script src="../move.js?v=2026-11-20.11"></script>
+<script src="../move.js?v=2026-11-20.12"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-20.11"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-20.12"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-20.11">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.12">
 <style>
 /* A floor with the outline of an odd-shaped box pencilled on it, and seven pieces of cardboard (the tangram
    pieces) to build it from. When it's built, Bugsy (or now and then Bowtie, the guest star) hops in and sits in it. */
@@ -82,7 +82,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-20.11"></script>
+<script src="../games.js?v=2026-11-20.12"></script>
 <script>
 /* ---------- shapes (plain functions, also run in a background worker) ---------- */
 // The seven cats are the seven tangram pieces: two big triangles (L), a middle one (M), two small ones (S),
@@ -474,8 +474,9 @@ $("svg").addEventListener("keydown", e => {
 const undo = G.history({game: () => game, take: snapshot, can: playing, restart: true,
   back: h => { game.pcs = h; }, after: changed});
 $("restartBtn").onclick = () => {
-  if (undo.restart(g => { g.pcs = g.start.map(p => ({...p})); sel = -1; }))
-    G.note("Every piece is back where it started. Undo brings your moves back.", 4000);
+  if (undo.restart(g => { g.pcs = g.start.map(p => ({...p})); sel = -1; })) {
+    slip(); G.note("Every piece is back where it started. Undo brings your moves back.", 4000);
+  }
 };
 // Hint: a gold outline shows where one piece goes, and that piece is outlined in gold too; you move it there.
 // A hint keeps you on the same level and costs the gold paw.
@@ -504,7 +505,7 @@ $("hintBtn").onclick = () => {
   const j = again ? lastPick.j : pool[Math.floor(Math.random() * pool.length)];
   const i = again ? lastPick.i : [0, 1, 2, 3, 4, 5, 6].find(i => SET[i] === SET[j] && !target.some(t => near(polys[i], t)));
   lastPick = {i, j};
-  game.hinted = true; game.started = true; sel = i; toFront(i); update(); save();
+  game.hinted = true; slip(); game.started = true; sel = i; toFront(i); update(); save();
   const inWay = polys.some((p, m) => m !== i && overlapArea(p, target[j]) > 0.02);
   if (!hints.level()) return hints.show({i}, `Place the gold ${PIECENAME[i]} next. Ask again to see where.`);
   hints.show({i, j}, `The gold ${PIECENAME[i]} goes in the gold outline${inWay ? ", once what's in the way is moved" : ""}.`);
@@ -512,9 +513,21 @@ $("hintBtn").onclick = () => {
 const PIECENAME = ["big triangle", "big triangle", "middle triangle", "small triangle", "small triangle", "square", "slanted piece"];
 
 /* ---------- endings ---------- */
+// Three wins at a level move you up and three slips (a hint, or a Restart after working on it) move you down: G.ladder.
+const climb = G.ladder("iffits", MAX_LEVEL);
+// A slip counts once a puzzle, and that puzzle no longer counts as a win toward moving up.
+function slip() {
+  if (game.slipped || game.won) return;
+  game.slipped = true;
+  const r = climb.lost(game.level);
+  if (r.down) { game.down = r.next; settings.level = r.next; $("levelSel").value = r.next; build.prefetch(r.next); }
+  save();
+}
 function win() {
   game.won = true; G.finishClock(game); sel = -1;
-  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  // a box with a hint or a restart was counted when that happened; a clean one is a win toward moving up
+  let next = game.down || game.level;
+  if (!game.slipped) { const r = climb.won(game.level); next = r.next; game.climbLine = climb.say(r); }
   settings.level = next; $("levelSel").value = next; save();
   update();
   G.track(`If It Fits solved level ${game.level}`);
@@ -547,9 +560,10 @@ function finishCard() {
   const who = (game.sitter && game.sitter.who) || "a cat";
   let text = who === "Bowtie" ? "The box is built, and Bowtie dropped in before Bugsy could. It fits, so Bowtie sits."
     : who === "Bugsy" ? "The box is built, and Bugsy came by. It fits, so Bugsy sits." : "The box is built, and a cat came by. It fits, so it sits.";
-  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  text += " " + (game.down ? `That's 3 hints or restarts at level ${game.level}, so next comes level ${game.down}.`
+    : game.slipped ? "A box with a hint or a restart doesn't count toward moving up." : game.climbLine || "");
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my box", game.result,
-    {title: "It fits, so it sits!", gold: !game.restarted && !game.hinted, goldWhy: "No hints or restarts!", goldPic: [boxesPic()], next: next > game.level ? `Next: level ${next}` : "Next board", after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+    {title: "It fits, so it sits!", gold: !game.restarted && !game.hinted, goldWhy: "No hints or restarts!", goldPic: [boxesPic()], next: G.ANOTHER, after: G.otherSize($("levelSel"), next, startLevel, G.CHANGE)});
 }
 
 /* ---------- a new box ---------- */

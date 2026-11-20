@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Pawlette</title>
-<script src="../move.js?v=2026-11-20.11"></script>
+<script src="../move.js?v=2026-11-20.12"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-20.11";
+  var BUILD = "2026-11-20.12";
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-20.11">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.12">
 <style>
 /* Pawlette: Mix to order. A skein of yarn waits to be dyed in one of Yarn's colourways, a colour at a time. Tap the
    pots to drip paint into the cup, mixing like real paint, until it matches the colour for the next stretch; a
@@ -123,8 +123,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-20.11"></script>
-<script src="../colorways.js?v=2026-11-20.11"></script>
+<script src="../games.js?v=2026-11-20.12"></script>
+<script src="../colorways.js?v=2026-11-20.12"></script>
 <script>
 /* ---------- paint (plain functions) ---------- */
 // A mix is drops of each pot: [red, yellow, blue, white, black]. Its colour: the red-yellow-blue part blended
@@ -376,7 +376,7 @@ $("emptyBtn").onclick = () => { if (!playing() || !drops(game.cup)) return; undo
 // Restart starts the whole strand again (and costs the gold paw), so once anything's dyed it asks first, and offers
 // Empty the cup (free) for just this colour.
 function restartStrand() {
-  if (undo.restart(g => { Object.assign(g, {at: 0, cup: [0, 0, 0, 0, 0], dyed: []}); G.closeCard(); })) G.note("Back to the start of the strand. Undo brings it back.", 3500);
+  if (undo.restart(g => { Object.assign(g, {at: 0, cup: [0, 0, 0, 0, 0], dyed: []}); G.closeCard(); })) { slip(); G.note("Back to the start of the strand. Undo brings it back.", 3500); }
 }
 $("restartBtn").onclick = () => {
   if (!playing() || !game.history.length) return;
@@ -403,7 +403,7 @@ $("hintBtn").onclick = () => {
   if (!playing()) return;
   const t = game.targets[game.at].d, c = game.cup;
   const recipe = t.map((n, i) => n ? `${n} ${POTS[i].name}` : "").filter(Boolean).join(", ");
-  game.hinted = true; save();
+  game.hinted = true; slip(); save();
   if (drops(c) && closeness() < PERFECT) { hints.show({}, "That's it: dye it."); return; }
   if (hints.level() >= 1) { hints.show({}, `The recipe: ${recipe}.`); return; }
   const extra = c.findIndex((n, i) => n && !t[i]);
@@ -421,19 +421,32 @@ function ballSVG() {
   cols.forEach((c, k) => { s += `<rect x="0" y="${14 + k * 92 / cols.length}" width="120" height="${92 / cols.length + 1}" fill="${c}"/>`; });
   return s + `</g><path d="M28 50Q60 80 94 52M32 78Q62 56 92 80" fill="none" stroke="#2A2530" stroke-width="2" opacity=".4"/><circle cx="60" cy="60" r="${R}" fill="none" stroke="#2A2530" stroke-width="3"/></svg>`;
 }
+// Three wins at a level move you up and three slips (a hint, or a Restart after working on it) move you down: G.ladder.
+const climb = G.ladder("pawlette", MAX_LEVEL);
+// A slip counts once a puzzle, and that puzzle no longer counts as a win toward moving up.
+function slip() {
+  if (game.slipped || game.won) return;
+  game.slipped = true;
+  const r = climb.lost(game.level);
+  if (r.down) { game.down = r.next; settings.level = r.next; $("levelSel").value = r.next; }
+  save();
+}
 function win() {
   game.won = true; G.finishClock(game); save(); purr();
   const perfect = game.dyed.filter(d => d.perfect).length, fewest = game.dyed.every(d => d.perfect && d.drops === d.par);
-  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  // a skein with a hint or a restart was counted when that happened; a clean one is a win toward moving up
+  let next = game.down || game.level;
+  if (!game.slipped) { const r = climb.won(game.level); next = r.next; game.climbLine = climb.say(r); }
   settings.level = next; $("levelSel").value = next; save();
   G.track(`Pawlette dyed level ${game.level}`);
   const gold = fewest && !game.hinted && !game.restarted;
   let text = `You dyed a skein of ${game.way}: ${perfect} of ${game.targets.length} colours a perfect match.`;
-  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the top level; here's another skein." : ` Next up: level ${next}.`;
+  text += " " + (game.down ? `That's 3 hints or restarts at level ${game.level}, so next comes level ${game.down}.`
+    : game.slipped ? "A skein with a hint or a restart doesn't count toward moving up." : game.climbLine || "");
   const box = document.createElement("div"); box.innerHTML = ballSVG();
   setTimeout(() => G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the skein", game.result,
     {title: "Wound up!", gold, goldWhy: "Every colour perfect, in the fewest drops, with no hint or restart!", goldTitle: "A perfect skein!", goldPic: [box.firstChild],
-     next: next > game.level ? `Next: level ${next}` : "Next skein", after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")}), 200);
+     next: G.ANOTHER, after: G.otherSize($("levelSel"), next, startLevel, G.CHANGE)}), 200);
 }
 
 /* ---------- new skeins ---------- */

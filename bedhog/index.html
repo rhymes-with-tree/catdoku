@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Bed Hog</title>
-<script src="../move.js?v=2026-11-20.11"></script>
+<script src="../move.js?v=2026-11-20.12"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-20.11"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-20.12"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-20.11">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.12">
 <style>
 /* A bed seen from above, the pillows at the top. The human's spot (2 squares across, 3 long, down from one pillow) is
    a turned-down white sheet; the cats sprawl on the quilt, and you slide them about until the sheet's clear. */
@@ -100,7 +100,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-20.11"></script>
+<script src="../games.js?v=2026-11-20.12"></script>
 <script>
 /* ---------- the bed and its cats (plain functions, also run in a background worker) ---------- */
 // The bed is W squares across and H long, the pillows at the top. The human's spot is 2 squares across and S long,
@@ -461,6 +461,7 @@ const undo = G.history({game: () => game, can: playing, restart: true,
   after: () => { placeAll(); update(); save(); }});
 $("restartBtn").onclick = () => {
   if (undo.restart(g => { sel = -1; carry = null; g.cats = g.start.map(x => x.slice()); }, {cats: game.cats.map(x => x.slice())})) {
+    slip();
     placeAll(); update(); save();
     G.note("Back to how the cats started. Undo brings your moves back.", 4000);
   }
@@ -484,14 +485,26 @@ $("hintBtn").onclick = async () => {
     plan = {key, path: r.path};
   }
   const [f, t] = plan.path[0], again = hints.level() > 0, left = plan.path.length;
-  game.hinted = true; game.started = true; sel = -1; save(); update();
+  game.hinted = true; slip(); game.started = true; sel = -1; save(); update();
   hints.show(again ? {f, t} : {f}, again ? "Slide the gold cat to the gold outline." : `Slide the gold cat. ${left === 1 ? "That makes room!" : `${left} moves from here.`}`);
 };
 
 /* ---------- endings ---------- */
+// Three wins at a level move you up and three slips (a hint, or a Restart after working on it) move you down: G.ladder.
+const climb = G.ladder("bedhog", MAX_LEVEL);
+// A slip counts once a puzzle, and that puzzle no longer counts as a win toward moving up.
+function slip() {
+  if (game.slipped || game.won) return;
+  game.slipped = true;
+  const r = climb.lost(game.level);
+  if (r.down) { game.down = r.next; settings.level = r.next; $("levelSel").value = r.next; build.prefetch(r.next); }
+  save();
+}
 function win() {
   game.won = true; G.finishClock(game); keys.hide(); hints.clear(false); sel = -1; carry = null; plan = null;
-  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  // a bed with a hint or a restart was counted when that happened; a clean one is a win toward moving up
+  let next = game.down || game.level;
+  if (!game.slipped) { const r = climb.won(game.level); next = r.next; game.climbLine = climb.say(r); }
   settings.level = next; $("levelSel").value = next; save();
   $("board").classList.add("won"); update(); say();
   G.track(`Bed Hog solved level ${game.level}`);
@@ -502,11 +515,12 @@ function win() {
 function finishCard() {
   const next = settings.level, n = movesMade(), gold = !game.restarted && !game.hinted && n <= game.par;
   let text = `There's room for you, in ${n} move${n === 1 ? "" : "s"}${n <= game.par ? ", as few as it can be done in." : `; it can be done in ${game.par}.`}`;
-  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  text += " " + (game.down ? `That's 3 hints or restarts at level ${game.level}, so next comes level ${game.down}.`
+    : game.slipped ? "A bed with a hint or a restart doesn't count toward moving up." : game.climbLine || "");
   const im = new Image(); im.className = "goldcat"; im.src = catSrc("c14-28"); im.alt = "A tabby cat stretched out asleep on its back";
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the bed", game.result,
     {title: "Room for you!", gold, goldWhy: "Par, with no hints or restarts!", goldPic: [im],
-     next: next > game.level ? `Next: level ${next}` : "Next bed", after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+     next: G.ANOTHER, after: G.otherSize($("levelSel"), next, startLevel, G.CHANGE)});
 }
 
 /* ---------- new beds ---------- */

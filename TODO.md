@@ -95,13 +95,19 @@ cats that point their own way are Day Light (`daylight/`, in beta).
   that points its own way leaves out.
 - [ ] **Moving up and down: the rest of the games.** Three wins at a level move you up and three losses move you
   down (a loss in a puzzle that can't be lost: a hint, or a Restart after working on it), with Give me another! and
-  Change the difficulty on the win card. It's `G.ladder` in `games.js`, in Night Light, Day Light, Open the Door!
-  and Toe Beans since 2026-11-12, and Meowbile, Purrfect Square, Treat Time and Window Ledges since 2026-11-20, so all
-  of Cat Math, and Fair Play, High Perch, Scratch That and Cross Stitch the same day (README, "Moving up and down").
-  Cat Logic's others move up differently: by lives (Catdoku, Toydoku, Hide & Seek), by size (Patches, Sunbeams),
-  only on a gold paw (Mewstermind), or are in beta (Under the Blanket, Tape Trap). It was on hold until there was data on how it
-  plays in those four; the owner says it's working well (2026-11-20), so it's ready to go further: bring it to every
-  other game with levels or sizes (each sets its own next level today), and fix each README section's wording.
+  Change the difficulty on the win card: `G.ladder` in `games.js` (README, "Moving up and down"). The owner says it's
+  working well (2026-11-20). In Night Light, Day Light, Open the Door! and Toe Beans since 2026-11-12; since
+  2026-11-20 also all of Cat Math, Fair Play, High Perch, Scratch That, Cross Stitch, Bed Hog, Copycat, If It Fits,
+  Junk Drawer, Kitten Caboodle, Knit Pick, Laser Pointer, Pawlette, Purrmutation, Shelf Life, Unravel and Up a Tree
+  (each was one clean win up, a hint keeping you put). Still to do, each moving up some other way today:
+  - Lost on lives or moves, so a real loss counts too: Catdoku, Toydoku, Hide & Seek, Fuzzy Spelling, Mew Hue,
+    Fridge Magnets, Cat Mat, Fish Bones, Pick of the Pile, L-M-N-O-Pom, Pounce, Bubbles, Cat Pile, Toy Box, Twirl,
+    Knock It Off
+  - By size: Patches, Sunbeams, Yarn, Tangle, Catwalk, Tunnel Run, Zoomies
+  - Action games, up after the first try or on a score: Tail Chase, Wind Up, Bird Watch, Pawlinko, Pounce Up, Cat
+    Burglar, Catlas, Moving Day
+  - Only on a gold paw: Mewstermind. A daily keyboard, no levels: Keyboard Cat (probably leave it)
+  - In beta: Under the Blanket, Tape Trap, Swap-a-Pom, Boing!, Pawstcards (do it as each comes out)
 - [ ] **One new move a level.** The how-to and the on-ramp are divided in a way that isn't ideal: the walkthrough
   tells the rules up front, and then the levels get harder. Better: each early level brings in one new move, and a
   win on it is the reward. Night Light's and Day Light's new first levels (one tap, then two) are a first go at it.

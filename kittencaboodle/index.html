@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kitten Caboodle</title>
-<script src="../move.js?v=2026-11-20.11"></script>
+<script src="../move.js?v=2026-11-20.12"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-20.11"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-20.12"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-20.11">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.12">
 <style>
 /* A word root is the mother cat; the everyday words built on it are her kittens, asleep until you spell them.
    The mother sits at the top with her root and what it means; under her, a row for each kitten: its picture and
@@ -138,7 +138,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-20.11"></script>
+<script src="../games.js?v=2026-11-20.12"></script>
 <script>
 const $ = G.$;
 
@@ -344,16 +344,28 @@ $("hintBtn").onclick = () => {
   if (game.solved[sel]) nextKitten(1);
   const k = sel, w = game.words[k].w, t = game.typed[k];
   const bad = t.findIndex((c, i) => c && !isGiven(game, k, i) && c !== w[i]);
-  game.hinted = true; game.started = true; save();
+  game.hinted = true; slip(); game.started = true; save();
   if (bad >= 0) return hints.show({k, i: bad, bad: true}, `The red square should be ${aLetter(w[bad])}.`);
   const i = nextSquare(k);
   hints.show({k, i}, `The gold square is ${aLetter(w[i])}.`);
 };
 
 /* ---------- endings ---------- */
+// Three wins at a level move you up and three slips (a hint, or a Restart after working on it) move you down: G.ladder.
+const climb = G.ladder("kittencaboodle", MAX_LEVEL);
+// A slip counts once a puzzle, and that puzzle no longer counts as a win toward moving up.
+function slip() {
+  if (game.slipped || game.won) return;
+  game.slipped = true;
+  const r = climb.lost(game.level);
+  if (r.down) { game.down = r.next; settings.level = r.next; $("levelSel").value = r.next; }
+  save();
+}
 function win() {
   game.won = true; G.finishClock(game); hints.clear(false);
-  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  // a litter with a hint or a restart was counted when that happened; a clean one is a win toward moving up
+  let next = game.down || game.level;
+  if (!game.slipped) { const r = climb.won(game.level); next = r.next; game.climbLine = climb.say(r); }
   settings.level = next; $("levelSel").value = next; save();
   draw(); $("board").classList.add("won");
   G.track(`Kitten Caboodle solved level ${game.level}`);
@@ -364,11 +376,12 @@ function win() {
 function finishCard() {
   const next = settings.level, gold = !game.hinted && !game.restarted;
   let text = `All ${game.words.length} kittens are awake, every one built on ${game.root.toUpperCase()} (${lower(game.meaning)}).`;
-  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  text += " " + (game.down ? `That's 3 hints or restarts at level ${game.level}, so next comes level ${game.down}.`
+    : game.slipped ? "A litter with a hint or a restart doesn't count toward moving up." : game.climbLine || "");
   const pic = new Image(); pic.className = "mompic"; pic.src = catSrc("kitten-7"); pic.alt = "Kitten Gus asleep on kitten Peanut";
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my litter", game.result,
-    {title: "The whole caboodle!", gold, goldWhy: "No hints or restarts!", goldPic: [pic], next: `Next: level ${next}`,
-     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+    {title: "The whole caboodle!", gold, goldWhy: "No hints or restarts!", goldPic: [pic], next: G.ANOTHER,
+     after: G.otherSize($("levelSel"), next, startLevel, G.CHANGE)});
 }
 
 /* ---------- new litters ---------- */
@@ -392,6 +405,7 @@ function newPuzzle() {
 }
 $("restartBtn").onclick = () => {
   if (!playing() || !game.started) return;
+  slip();
   game.typed = game.words.map(x => Array(x.w.length).fill("")); game.solved = game.solved.map(() => false); game.restarted = true;
   sel = 0; hints.clear(false); draw(); save();
   G.note("Every kitten's back asleep.", 3000);
