@@ -11,3 +11,6 @@ is); `README.md` describes every game and what they share, and how the site is h
 - **New games:** use the new-game skill (`.claude/skills/new-game/SKILL.md`).
 - **Pawprints:** the owner's dashboard of GoatCounter numbers and players' feedback, with suggested fixes, is updated
   with the dashboard skill (`.claude/skills/dashboard/SKILL.md`).
+- **Finished chats:** when everything a chat set out to do is done (merged, noted in `TODO.md`, or ruled out) with
+  nothing left to ask, end the reply with "💯 Complete" on a line of its own. The owner uses it to see at a glance
+  which chats are finished; if anything remains, list it instead.
