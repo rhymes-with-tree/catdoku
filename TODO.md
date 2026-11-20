@@ -361,3 +361,13 @@ The owner's grid for the new Settings page differed from the games in a few plac
 
 The shared `tape` sound (a sticky thhp, in Wind Up, Pounce Up and Tail Chase) was made silent on 2026-11-17: the owner
 hates it. Find something better (perhaps a recording in `sounds/`) and put it back in `games.js`.
+
+## Coming back to a finished game: check on a phone
+
+Since rhymes-with-tree/catdoku#237 (2026-11-07), coming back to a game you'd won or lost deals a new puzzle instead
+of showing the old card again (`G.reopen` with `winCard`/`openCard` in `games.js`). Two things to check on a real phone
+(win, go to the front page, come back; it should be a fresh puzzle with no card):
+- Bird Watch, Keyboard Cat, Nip Trip, Pawlette, Tail Chase and Wind Up don't reopen through `G.reopen`, so the fix
+  doesn't reach them. If any still shows the old card, fix it in that game.
+- Fuzzy Spelling, Laser Pointer and Mew Hue gave odd results in the headless test (most likely the test's fake win,
+  not a real problem).
