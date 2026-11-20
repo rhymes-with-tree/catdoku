@@ -180,6 +180,12 @@ it joins `GAMES` (and the front page):
 - then levels: Easy, Medium and Hard trips from Catlas's lists (there's one level until there are enough places);
 - Pinecone's own pictures, when the owner has drawn her (she/her): beside the title, on the win and gold-paw cards,
   and the front-page icon. A general black cat (`c18-27`, `c19-15`) stands in;
+- the owner's calls on words left showing (not covered by paw prints): England, Scotland, Wales, English, Welsh and
+  Scottish in the United Kingdom's postcards; "Kim" in North Korea's (15 times, nearly a giveaway); and near-names
+  such as Soviet and Siberia (Russia), Africa, Afrikaans and the Cape (South Africa), Iberian and Castile (Spain), Rus'
+  (Ukraine), Mecca and Arab (Saudi Arabia), de Gaulle (France), Java (Indonesia), Almaty (Kazakhstan), Prussia and
+  Reichstag (Germany), Macedonia (Greece). Covering one is a line in `EXTRA` in `tools/pawstcards/build.py`, then
+  `cands.py` and `make.py` (check the picks still resolve);
 - the postcards' file is one script of every place (295 KB for 42): split it by place, loaded as a trip is dealt,
   before it grows past a few hundred KB;
 - `places.js` is a copy of Catlas's names (written by `tools/pawstcards/make.py`): move them to one shared file
