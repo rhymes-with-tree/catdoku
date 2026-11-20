@@ -132,11 +132,46 @@ Pangur Bán (Pangur) for Cat Burglar and Fitzwilliam Darcy (Fitz) for Pawlette (
 "Stars decided"). Once their pictures are in `cats/`, put each into its game. Crow (like Ferguson, only much sleeker)
 will star in Crow's Drawers, not made yet (`IDEAS.md`); add Crow's poses to `ARTWORK.md` when they come.
 
-## Pounce Up: tune the goals
+## Pounce Up: put the levels in a sensible order, and tune the goals
 
 Pounce Up joined the front page on 2026-11-12. Its level goals (`TASKS` in `pounceup/index.html`: the counts, the
 race's 90 seconds, the candle level's share of candles) were set from an autopilot's play, which is clumsier than a
 person; tune them from the owner's play and the Send feedback notes.
+
+The levels are in an order that doesn't make sense (the owner, 2026-11-20). Now: 1 swat things off, 2 springs,
+3 lemons, 4 fish treats, 5 candles, 6 glasses of water, 7 sliding shelves, 8 tape, 9 catnip, 10 cracked shelves,
+11 a tidy climb. Candles come before water, yet water (or coffee) is what puts a pushed-off candle out. The owner's
+order for the start: knock things off in general, then knock off water, then knock off (or stay away from) fire.
+The rest isn't settled, but there's a logic to find. A draft for the owner to check:
+- **Knocking things off:** 1 swat things off, 2 glasses of water, 3 candles (knock one off and put it out, or keep
+  clear of the flame).
+- **Things to keep away from:** lemons and tape, after candles, since all three only give her a fright.
+- **Things that move her:** springs, sliding shelves, cracked shelves and catnip. Order them from most help to least
+  control: springs, sliding shelves, cracked shelves, then catnip's dice roll.
+- **Fish treats** early, as an easy collecting goal.
+- **A tidy climb** stays last: it turns level 1's goal round.
+
+Renumbering levels moves saves, best times and share links. Map the old numbers to the new ones, as Mew Hue's `OLD`
+and Open the Door! did, and note in the README that GoatCounter's counts by level meant the old order before that day.
+
+## Calibrate level ladders with a simulated player, as Mew Hue's were
+
+Mew Hue's 33 levels are in order of how often a simple player (the best-looking slide each time) won each one, with
+no step between neighbours of more than about 10 points and a breather where something new comes in (README,
+"Mew Hue"). The same is worth doing for games that can be lost through luck plus your own choices (2026-11-20):
+- **Wind Up, levels 1 to 12:** set by hand (level 12 needed easing after GoatCounter showed 4 of 6 lost). The bot
+  that checks levels 13 to 20 against level 9 can play the whole ladder. Do this first.
+- **L-M-N-O-Pom:** the points goals (40 to 260) and speeds are by hand. The simulated player needs a fixed thinking
+  time per piece, since speed is part of it.
+- **Toy Box:** a solver checks every level can be won with perfect timing, but the order of 1 to 27 is by hand. A
+  plain player tapping the obvious basket would show whether it gets harder in order (22 to 27 especially).
+- **Pounce on Three, Bubbles, Cat Pile:** simulated already, but tuned only at the two ends. Check the levels between
+  for jumps and order. Ties in with Pounce's and Cat Pile's weak level 1s above.
+- **Swap-a-Pom:** re-run once the owner has played it (under "Swap-a-Pom: finish the beta").
+
+Not needed: Pawlinko and Cat Mat already set each board's target from simulated play; Pounce Up is tuned from the
+owner's play (above); Bird Watch, Tail Chase and Twirl are about reactions or spotting; the logic puzzles have one
+answer and solver-graded levels.
 
 ## Pawstcards: finish the beta
 
