@@ -777,8 +777,8 @@ def fishbones():
     return frame(PAPER, out)
 
 
-# Mewstermind (a Clue since 2026-11-19): the case along the top, shut (who, toy, where), and two guesses under it, each a
-# cat, a toy and a room, with a dark paw print beside it for each part that's right and a dot for each that's wrong.
+# Mewstermind (a Clue since 2026-11-19): the case along the top, shut (who, where, what), and two guesses under it, each a
+# cat, a room and a toy, with a dark paw print beside it for each part that's right and a dot for each that's wrong.
 def pawprint(x, y, s, fill):
     toes = "".join(f'<ellipse cx="{x+dx*s}" cy="{y+dy*s}" rx="{s*.2}" ry="{s*.24}" fill="{fill}" stroke="{INK}" stroke-width="1"/>'
                    for dx, dy in ((-.5, -.22), (-.18, -.5), (.18, -.5), (.5, -.22)))
@@ -800,7 +800,7 @@ def stash():
     rows = ((("#9A8A78", ORANGE, PERI), 1), (("#221E26", YELLOW, "#E3B9A9"), 2))
     for r, ((cat, toy, room), right) in enumerate(rows):
         y = 52 + r * 25
-        out += catface(21.5, y, 8, cat) + yarnball(41.5, y, 8, toy) + house(61.5, y, 8, room)
+        out += catface(21.5, y, 8, cat) + house(41.5, y, 8, room) + yarnball(61.5, y, 8, toy)
         for k in range(3):
             py = y - 8.5 + k * 8.5
             out += pawprint(82, py, 4.2, INK) if k < right else f'<circle cx="82" cy="{py}" r="1.8" fill="{INK}" opacity=".25"/>'

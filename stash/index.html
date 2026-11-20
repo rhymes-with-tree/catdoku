@@ -77,7 +77,7 @@
 #hintLine.witness:empty{display:none}
 #hintLine.witness::before{content:"";flex:none;width:40px;height:40px;border-radius:50%;background:var(--panel) var(--witness) center/115% no-repeat;border:2px solid var(--ink)}
 .card img.stashpic{display:block;width:70%;max-width:240px;height:auto;margin:0 auto 14px}
-/* the cats, toys and rooms to pick from, and Check */
+/* the cats, rooms, toys and times to pick from, and Check */
 .tray{width:var(--board);display:flex;flex-direction:column;align-items:center;gap:8px}
 .tray .row{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;width:100%}
 .tray .pick{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;width:56px;height:56px;padding:3px;border-radius:12px;
@@ -137,6 +137,10 @@ const LEVELS = [null, [4, 4, 0, 0, 6], [5, 6, 0, 0, 7], [4, 4, 4, 0, 7], [5, 6, 
 const MAX_LEVEL = LEVELS.length - 1;
 const levelName = n => { const [C, T, R, W] = LEVELS[n]; return `Level ${n} · ${C} cats, ${T} toys${R ? `, ${R} rooms` : ""}${W ? `, ${W} times` : ""}`; };
 const PARTS = ["cat", "toy", "room", "time"];
+// The parts are kept in that order (cat, toy, room, time), but shown who, where, what, when (the owner's order,
+// 2026-11-20): on the board, on the tray and in words.
+const SHOWN = [0, 2, 1, 3];
+const shown = D => SHOWN.filter(d => d < D);
 
 /* ---------- the logic ---------- */
 // An answer is [cat, toy] or [cat, toy, room], each an index into the mystery's lists, and so is a guess. The paws
@@ -244,7 +248,7 @@ const roomName = r => ROOMS[game.rooms[r]][1];
 const timeName = w => TIMES[game.times[w]][1];
 const partName = (d, v) => d === 0 ? catName(v) : d === 1 ? `the ${toyName(v)}` : d === 2 ? `the ${roomName(v)}` : timeName(v);
 // "Gus, with the mouse, in the kitchen, at 3 a.m."
-const guessSay = g => g.map((v, d) => v === null ? "" : d === 0 ? catName(v) : d === 1 ? `with the ${toyName(v)}` : d === 2 ? `in the ${roomName(v)}` : TIMES[game.times[v]][2]).filter(Boolean).join(", ");
+const guessSay = g => shown(g.length).map(d => { const v = g[d]; return v === null ? "" : d === 0 ? catName(v) : d === 1 ? `with the ${toyName(v)}` : d === 2 ? `in the ${roomName(v)}` : TIMES[game.times[v]][2]; }).filter(Boolean).join(", ");
 
 /* ---------- drawing ---------- */
 let fresh = -1;   // the part that just went in, to drop it in
@@ -264,15 +268,15 @@ function draw() {
   const {D, rows, cur} = game, done = game.won, hm = hints.current(), T = Math.max(par(), rows.length + (done ? 0 : 1));
   size();
   // the case: who, with what, where
-  const WHAT = ["Who?", "Toy?", "Where?", "When?"];
+  const WHAT = ["Who?", "What?", "Where?", "When?"];
   let h = `<div class="line case"><span class="num"></span><div class="slots">`;
-  for (let d = 0; d < D; d++) h += done ? `<div class="slot open" style="--d:${d * 0.15}s" aria-label="${partName(d, game.code[d])}">${partHTML(d, game.code[d])}</div>`
-    : `<div class="slot" aria-label="${WHAT[d]}"><span class="q">?</span><span class="what">${WHAT[d].replace("?", "")}</span></div>`;
+  shown(D).forEach((d, k) => h += done ? `<div class="slot open" style="--d:${k * 0.15}s" aria-label="${partName(d, game.code[d])}">${partHTML(d, game.code[d])}</div>`
+    : `<div class="slot" aria-label="${WHAT[d]}"><span class="q">?</span><span class="what">${WHAT[d].replace("?", "")}</span></div>`);
   h += `</div><div class="paws"></div></div>`;
   for (let r = 0; r < T; r++) {
     const row = rows[r], now = !done && r === rows.length, g = row ? row.guess : now ? cur : null;
     h += `<div class="line ${row ? "done" : now ? "now" : "later"}${r + 1 === par() ? " par" : ""}" data-r="${r}"${g ? ` aria-label="Guess ${r + 1}: ${guessSay(g) || "empty"}${row ? `, ${row.paws} right` : ""}"` : ""}><span class="num">${r + 1}</span><div class="slots">`;
-    for (let d = 0; d < D; d++) {
+    for (const d of shown(D)) {
       const v = g ? g[d] : null, mark = now && hm && hm.cells && hm.cells.includes(d) ? ` hintcell${hm.bad ? " bad" : ""}` : "";
       h += `<div class="slot${mark}" data-d="${d}"${now ? ` role="button" aria-label="${v === null ? `No ${PARTS[d]} yet` : `${partName(d, v)}: tap to take out`}"` : ""}>${v !== null && v !== undefined ? partHTML(d, v, now && fresh === d) : ""}</div>`;
     }
@@ -284,8 +288,8 @@ function draw() {
   const tray = $("tray"), sig = [game.cats, game.toys, game.rooms, game.times].map(a => a.join()).join("|");
   if (tray.dataset.sig !== sig) {
     tray.dataset.sig = sig; tray.innerHTML = "";
-    const lists = [game.cats, game.toys, game.rooms, game.times].slice(0, D);
-    lists.forEach((list, d) => {
+    const lists = [game.cats, game.toys, game.rooms, game.times];
+    shown(D).forEach(d => { const list = lists[d];
       const row = document.createElement("div"); row.className = "row"; tray.append(row);
       list.forEach((x, v) => {
         const b = document.createElement("button"); b.className = "pick " + PARTS[d]; b.dataset.d = d; b.dataset.v = v;
@@ -335,7 +339,7 @@ function takeOut(d) {
 }
 function check() {
   if (!playing()) return;
-  if (game.cur.includes(null)) { G.note(["", "", "Pick a cat and a toy first.", "Pick a cat, a toy and a room first.", "Pick a cat, a toy, a room and a time first."][game.D], 2500); return; }
+  if (game.cur.includes(null)) { G.note(["", "", "Pick a cat and a toy first.", "Pick a cat, a room and a toy first.", "Pick a cat, a room, a toy and a time first."][game.D], 2500); return; }
   const guess = game.cur.slice(), p = paws(game.code, guess);
   game.rows.push({guess, paws: p}); game.started = true; G.sound.play("mm.check");
   game.cur = Array(game.D).fill(null); game.undo = [];
@@ -368,7 +372,7 @@ $("tray").addEventListener("click", e => {
   else if (heldFired) heldFired = false;
   else put(+b.dataset.d, +b.dataset.v);
 });
-// Keys: 1 to 9 pick a cat, Shift with 1 to 9 a toy, Alt with 1 to 9 a room, Alt and Shift with 1 to 9 a time;
+// Keys (by what's kept, not what's shown): 1 to 9 pick a cat, Shift with 1 to 9 a toy, Alt with 1 to 9 a room, Alt and Shift with 1 to 9 a time;
 // Backspace takes the last out; Enter checks.
 document.addEventListener("keydown", e => {
   if (!playing() || document.querySelector(".spot") || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
@@ -472,7 +476,7 @@ function helpOnFirstVisit() {
   const pawsEl = () => $("board").querySelector('.line[data-r="0"] .paws');
   const steps = [
     {say: D > 3 ? "One cat had a toy, somewhere, sometime" : D > 2 ? "One cat had a toy, somewhere" : "One cat had one of the toys", els: [() => $("board").querySelector(".line.case .slots")]},
-    {say: D > 3 ? "Pick a cat, toy, room and time" : D > 2 ? "Pick a cat, a toy and a room" : "Pick a cat and a toy", lit: [...Array(D).keys()].map(i => [i, game.rows.length]), els: [$("tray")],
+    {say: D > 3 ? "Pick who, where, what and when" : D > 2 ? "Pick a cat, a room and a toy" : "Pick a cat and a toy", lit: [...Array(D).keys()].map(i => [i, game.rows.length]), els: [$("tray")],
      try: {done: () => !game.cur.includes(null) || game.rows.length > 0}},
     {say: "Then tap Check", els: [() => $("checkBtn")], try: {done: () => game.rows.length > 0, yes: "Paws tell you how close"}},
     {say: "A dark paw for each one right", lit: row, els: [pawsEl]},
