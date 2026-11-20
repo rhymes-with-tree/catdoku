@@ -528,7 +528,7 @@ const G = (() => {
   // itself or by the player's own pick. G.ladder(name, max) gives won(level) and lost(level), each returning
   // {level, next, up, down, wins, losses, top}, and say(r, what) for the card's line (what: "misses", "hints or restarts").
   // The win card's main button is G.ANOTHER and its level picker's words are G.CHANGE, in the games that use it:
-  // Night Light, Day Light, Open the Door!, Toe Beans, the rest of Cat Math and four of Cat Logic so far (TODO.md has the rest).
+  // Night Light, Day Light, Open the Door!, Toe Beans, all of Cat Math and twenty more so far (TODO.md has the rest).
   const LADDER = "catdoku.ladder.v1", ANOTHER = "Give me another!", CHANGE = "Change the difficulty:";
   function ladder(name, max, min = 1) {
     const step = (level, win) => {

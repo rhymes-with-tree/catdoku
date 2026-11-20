@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Shelf Life</title>
-<script src="../move.js?v=2026-11-20.11"></script>
+<script src="../move.js?v=2026-11-20.12"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-20.11"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-20.12"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-20.11">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.12">
 <style>
 /* A pale painted shelf of cubbies in the yarn shop, each holding a skein of yarn. The balls shade smoothly from
    corner to corner, until Fred knocks them about; the balls with a tag stay put. */
@@ -78,8 +78,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-20.11"></script>
-<script src="../colorways.js?v=2026-11-20.11"></script>
+<script src="../games.js?v=2026-11-20.12"></script>
+<script src="../colorways.js?v=2026-11-20.12"></script>
 <script>
 /* ---------- shelves (plain functions, also run in a background worker) ---------- */
 // Levels: [columns, rows, which cubbies have a cat napping in them, how close the colours may get (the least
@@ -411,7 +411,7 @@ const keys = G.gridKeys({on: () => playing(), size: () => [game.W, game.H], show
 const undo = G.history({game: () => game, can: () => !!game && !game.won && !busy, back: () => { pick = -1; spin = null; replay(); },
   after: () => { G.closeCard(); draw(); save(); }, restart: true});
 function restart() {
-  if (undo.restart(() => { pick = -1; spin = null; replay(); })) G.note("Back to the start.", 3000);
+  if (undo.restart(() => { pick = -1; spin = null; replay(); })) { slip(); G.note("Back to the start.", 3000); }
 }
 $("restartBtn").onclick = restart;
 
@@ -426,7 +426,7 @@ function hint() {
   const badSpun = holes.filter(i => game.spun[i] && !right(i));
   if (badSpun.length) return hints.show({cells: [badSpun[0]], bad: true}, `That spun ball isn't quite the right shade${G.andMore(badSpun.length - 1)}. Tap it to spin it again.`);
   const wrong = [...Array(W * H).keys()].filter(i => movable(i) && !right(i));
-  game.hinted = true; save();
+  game.hinted = true; slip(); save();
   if (wrong.length) {
     const c = wrong.map(i => [nb(i).filter(settled).length, Math.random(), i]).sort((a, b) => b[0] - a[0] || a[1] - b[1])[0][2];
     if (!hints.level()) return hints.show({cells: [c]}, "Find the ball that belongs in the gold cubby.");
@@ -440,10 +440,22 @@ function hint() {
 $("hintBtn").onclick = hint;
 
 /* ---------- endings ---------- */
+// Three wins at a level move you up and three slips (a hint, or a Restart after working on it) move you down: G.ladder.
+const climb = G.ladder("shelflife", MAX_LEVEL);
+// A slip counts once a puzzle, and that puzzle no longer counts as a win toward moving up.
+function slip() {
+  if (game.slipped || game.won) return;
+  game.slipped = true;
+  const r = climb.lost(game.level);
+  if (r.down) { game.down = r.next; settings.level = r.next; $("levelSel").value = r.next; build.prefetch(r.next); }
+  save();
+}
 function win() {
   game.won = true; pick = -1; spin = null;
   G.finishClock(game);
-  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  // a shelf with a hint or a restart was counted when that happened; a clean one is a win toward moving up
+  let next = game.down || game.level;
+  if (!game.slipped) { const r = climb.won(game.level); next = r.next; game.climbLine = climb.say(r); }
   settings.level = next; $("levelSel").value = next; save();
   draw();
   G.track(`Shelf Life solved level ${game.level}`);
@@ -455,10 +467,11 @@ function fredPic() { const im = new Image(); im.className = "fredpic"; im.src = 
 function finishCard() {
   const next = settings.level, s = swaps(), f = fewest();
   let text = `Sorted in ${s} swap${s === 1 ? "" : "s"}${s === f ? ", the fewest it could take!" : ` (it could be done in ${f}).`}`;
-  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  text += " " + (game.down ? `That's 3 hints or restarts at level ${game.level}, so next comes level ${game.down}.`
+    : game.slipped ? "A shelf with a hint or a restart doesn't count toward moving up." : game.climbLine || "");
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the shelf", game.result,
-    {title: "All in order!", gold: !game.hinted && !game.restarted, goldWhy: "No hints or restarts!", goldTitle: "Purrfectly sorted, Fred!", goldPic: [fredPic()], next: next > game.level ? `Next: level ${next}` : "Next board",
-     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+    {title: "All in order!", gold: !game.hinted && !game.restarted, goldWhy: "No hints or restarts!", goldTitle: "Purrfectly sorted, Fred!", goldPic: [fredPic()], next: G.ANOTHER,
+     after: G.otherSize($("levelSel"), next, startLevel, G.CHANGE)});
 }
 
 /* ---------- new shelves ---------- */

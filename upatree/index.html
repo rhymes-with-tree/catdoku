@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Up a Tree</title>
-<script src="../move.js?v=2026-11-20.11"></script>
+<script src="../move.js?v=2026-11-20.12"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-20.11"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-20.12"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-20.11">
+<link rel="stylesheet" href="../games.css?v=2026-11-20.12">
 <style>
 /* A cat tree: the start word on the bottom perch, the goal word on the top one, and empty perches between. Each
    word changes one letter of the word below it. Type a word and it goes on the next perch up, and the cat climbs
@@ -105,8 +105,8 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-20.11"></script>
-<script src="../cattower.js?v=2026-11-20.11"></script>
+<script src="../games.js?v=2026-11-20.12"></script>
+<script src="../cattower.js?v=2026-11-20.12"></script>
 <script>
 /* ---------- ladders ---------- */
 // Words come from the shared list (words/words.json): starts and goals are familiar words, par is the shortest
@@ -342,7 +342,7 @@ function enter() {
 const undo = G.history({game: () => game, take: () => game.rungs.slice(), back: (h, g) => { g.rungs = h; g.typing = ""; sel = -1; },
   can: playing, after: () => { draw(); save(); }, restart: true});
 $("restartBtn").onclick = () => {
-  if (undo.restart(g => { g.rungs = []; g.typing = ""; sel = -1; })) G.note("Back to the bottom perch. Undo brings your words back.", 4000);
+  if (undo.restart(g => { g.rungs = []; g.typing = ""; sel = -1; })) { slip(); G.note("Back to the bottom perch. Undo brings your words back.", 4000); }
 };
 // Hint, on the highest word so far: if that word didn't get you any closer to the top (or there's no way up from
 // it at all), its changed letter goes red, to Undo; otherwise a gold box goes on the letter to change next, for the
@@ -359,7 +359,7 @@ const clearHint = () => hints.clear();
 $("hintBtn").onclick = () => {
   if (!playing()) return;
   const w = topWord(), g = GR[game.L], {dist, prev} = climbs(g.all, game.goal);
-  game.hinted = true; game.started = true; save();
+  game.hinted = true; slip(); game.started = true; save();
   const below = game.rungs.length > 1 ? game.rungs[game.rungs.length - 2] : game.start;
   if (game.rungs.length && (!dist.has(w) || dist.get(w) >= dist.get(below))) {
     hints.show({i: [...w].findIndex((c, j) => c !== below[j]), bad: true}, dist.has(w) ? `${w.toUpperCase()} doesn't get Dottie any closer. Undo it and change another letter of ${below.toUpperCase()}.`
@@ -372,9 +372,21 @@ $("hintBtn").onclick = () => {
 
 /* ---------- endings ---------- */
 // The goal word goes on the top perch, and Dottie climbs up and bats the feather.
+// Three wins at a level move you up and three slips (a hint, or a Restart after working on it) move you down: G.ladder.
+const climb = G.ladder("upatree", MAX_LEVEL);
+// A slip counts once a puzzle, and that puzzle no longer counts as a win toward moving up.
+function slip() {
+  if (game.slipped || game.won) return;
+  game.slipped = true;
+  const r = climb.lost(game.level);
+  if (r.down) { game.down = r.next; settings.level = r.next; $("levelSel").value = r.next; }
+  save();
+}
 function win() {
   game.won = true; G.finishClock(game); clearHint(); G.sound.play("word");   // Dottie reaches the top
-  const next = game.hinted ? game.level : Math.min(MAX_LEVEL, game.level + 1);
+  // a tree with a hint or a restart was counted when that happened; a clean one is a win toward moving up
+  let next = game.down || game.level;
+  if (!game.slipped) { const r = climb.won(game.level); next = r.next; game.climbLine = climb.say(r); }
   settings.level = next; $("levelSel").value = next; save();
   draw(game.rungs.length); placeCat(true);   // Dottie climbs from the highest word to the top
   $("board").classList.add("won");
@@ -386,12 +398,13 @@ function win() {
 function finishCard() {
   const next = settings.level, steps = game.rungs.length + 1, gold = !game.restarted && !game.hinted && steps <= game.par;
   let text = `${game.start.toUpperCase()} to ${game.goal.toUpperCase()} in ${steps} step${steps > 1 ? "s" : ""}${steps <= game.par ? ", as few as it can be done in" : `; it can be done in ${game.par}`}.`;
-  text += game.hinted ? ` You had a hint, so here's another at level ${next}.` : game.level === MAX_LEVEL ? " That's the hardest level; here's another." : ` Next up: level ${next}.`;
+  text += " " + (game.down ? `That's 3 hints or restarts at level ${game.level}, so next comes level ${game.down}.`
+    : game.slipped ? "A tree with a hint or a restart doesn't count toward moving up." : game.climbLine || "");
   // a gold paw: Dottie stretched out with her tongue poking out, in place of the random cat photo
   const pic = new Image(); pic.className = "leappic"; pic.src = catSrc("dottie-14"); pic.alt = "Dottie stretched out, her tongue poking out";
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire my tree", game.result,
-    {title: "Top of the tree!", goldTitle: "Top cat, Dottie!", gold, goldWhy: "Fewest steps, no hints or restarts!", goldPic: [pic], next: next > game.level ? `Next: level ${next}` : "Next board",
-     after: G.otherSize($("levelSel"), next, startLevel, "Or play a different level:")});
+    {title: "Top of the tree!", goldTitle: "Top cat, Dottie!", gold, goldWhy: "Fewest steps, no hints or restarts!", goldPic: [pic], next: G.ANOTHER,
+     after: G.otherSize($("levelSel"), next, startLevel, G.CHANGE)});
 }
 
 /* ---------- new trees ---------- */
