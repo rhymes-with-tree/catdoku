@@ -136,7 +136,28 @@ will star in Crow's Drawers, not made yet (`IDEAS.md`); add Crow's poses to `ART
 
 Pounce Up joined the front page on 2026-11-12. Its level goals (`TASKS` in `pounceup/index.html`: the counts, the
 race's 90 seconds, the candle level's share of candles) were set from an autopilot's play, which is clumsier than a
-person; tune them from the owner's play and the Send feedback notes.
+person; tune them from the owner's play and the Send feedback notes. The levels were put in a new order on
+2026-11-20 (README, "Pounce Up"), so the goals' counts may want a look on their new levels: the tidy climb is now
+level 3, with nothing but things to knock off around, and catnip is the last level.
+
+## Calibrate level ladders with a simulated player, as Mew Hue's were
+
+Mew Hue's 33 levels are in order of how often a simple player (the best-looking slide each time) won each one, with
+no step between neighbours of more than about 10 points and a breather where something new comes in (README,
+"Mew Hue"). The same is worth doing for games that can be lost through luck plus your own choices (2026-11-20):
+- **Wind Up, levels 1 to 12:** set by hand (level 12 needed easing after GoatCounter showed 4 of 6 lost). The bot
+  that checks levels 13 to 20 against level 9 can play the whole ladder. Do this first.
+- **L-M-N-O-Pom:** the points goals (40 to 260) and speeds are by hand. The simulated player needs a fixed thinking
+  time per piece, since speed is part of it.
+- **Toy Box:** a solver checks every level can be won with perfect timing, but the order of 1 to 27 is by hand. A
+  plain player tapping the obvious basket would show whether it gets harder in order (22 to 27 especially).
+- **Pounce on Three, Bubbles, Cat Pile:** simulated already, but tuned only at the two ends. Check the levels between
+  for jumps and order. Ties in with Pounce's and Cat Pile's weak level 1s above.
+- **Swap-a-Pom:** re-run once the owner has played it (under "Swap-a-Pom: finish the beta").
+
+Not needed: Pawlinko and Cat Mat already set each board's target from simulated play; Pounce Up is tuned from the
+owner's play (above); Bird Watch, Tail Chase and Twirl are about reactions or spotting; the logic puzzles have one
+answer and solver-graded levels.
 
 ## Pawstcards: finish the beta
 
