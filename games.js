@@ -46,7 +46,6 @@ const G = (() => {
     ["Cat Burglar", "catburglar", "Catch the cat that's sneaked into the painting", "#4E577D", "prowl", "hidden object find spot seek paintings art museum met where's waldo wally", "2026-10-22"],
     ["Cat Pile", "catpile", "Pile napping cats on the blanket and clear the lines", "#E16A4A", "quick", "blockudoku block blast woodoku 1010 blocks shapes tetris polyomino sudoku lines", "2026-10-23"],
     ["Fish Bones", "fishbones", "Swap the bones until Bowtie's fish spells words again", "#73A7AE", "words", "waffle swap letters crossword word puzzle fish skeleton", "2026-10-25"],
-    ["Mewstermind", "stash", "Work out which cat had the toy, where and when", "#7885BA", "logic", "clue cluedo whodunnit mystery mastermind guess code breaker codebreaker deduction elimination toys rooms times cats", "2026-10-26"],
     ["Knit Pick", "knitpick", "Help Laya find the words knitted into her blanket", "#8D78AD", "words", "word search wordsearch wonderword find a word hidden word puzzle", "2026-10-26"],
     ["Junk Drawer", "junkdrawer", "Connect the fridge magnets in Dottie's junk drawer to spell words", "#E16A4A", "words", "boggle squaredle word grid word hunt find words letter grid", "2026-11-06"],
     ["Bird Watch", "birdwatch", "Help Bugsy and Bowtie spot the birds without waking the human", "#73A7AE", "prowl", "whack-a-mole whack a mole birds window tapping action reflexes", "2026-10-26"],
@@ -68,6 +67,7 @@ const G = (() => {
   // Games in beta: their pages work (open them by their address), but they're left off the front page, the games menu,
   // search, favorites and the daily challenge until they're finished. Same fields as GAMES.
   const BETA = [
+    ["Mewstermind", "stash", "Work out which cat had the toy, where and when", "#7885BA", "logic", "clue cluedo whodunnit mystery mastermind guess code breaker codebreaker deduction elimination toys rooms times cats", "2026-10-26"],
     ["Under the Blanket", "blanket", "Find the cats with a feather", "#8D78AD", "logic", "black box blackbox rays atoms deflection reflection hidden balls feather wand blanket bugsy", "2026-11-09"],
     ["Day Light", "daylight", "Get every cat napping in the sun, though some point their own way", "#ECA818", "teasers", "lights out flip switch spots arrows night light nap", "2026-11-12"],
     ["Swap-a-Pom", "swapapom", "Swap the pompoms to spell words, with Moonpie for company", "#B94588", "words", "gram jam match 3 three words swap letters scrabble pompoms pom poms moonpie purr", "2026-11-13"],
