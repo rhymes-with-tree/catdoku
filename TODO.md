@@ -156,10 +156,9 @@ Mew Hue's 33 levels are in order of how often a simple player (the best-looking 
 no step between neighbours of more than about 10 points and a breather where something new comes in (README,
 "Mew Hue"). How to do it is in the new-game skill, "Calibrating difficulty" (Moving Day was the
 first new game set that way, 2026-11-20). The same is worth doing for games that can be lost through luck plus your own choices (2026-11-20):
-- **Wind Up, levels 13 to 21:** levels 1 to 12 are done (2026-11-20, README "Wind Up"; the bot is
-  `tools/windup/bot.js`). Level 9 now comes out at about 69%; level 14 matches it (68%), but level 15, loose yarn,
-  comes out at about 40% (with the old ledges too), well below it. Run the bot over 13 to 21 and put them in order,
-  breathers where something new comes in. Then watch GoatCounter's overflows on 7 to 12 against the new ladder.
+- **Wind Up:** levels 1 to 21 done (2026-11-20 and 21, README "Wind Up"; the bot is `tools/windup/bot.js`). 13 to 21
+  were reordered (old 15 to 20 moved; saves moved with them). Watch GoatCounter's overflows on 7 to 21 against it,
+  and level 19 (hurry), which the bot can't feel.
 - **L-M-N-O-Pom:** the points goals (40 to 260) and speeds are by hand. The simulated player needs a fixed thinking
   time per piece, since speed is part of it.
 - **Toy Box:** a solver checks every level can be won with perfect timing, but the order of 1 to 27 is by hand. A
