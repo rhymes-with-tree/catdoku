@@ -73,8 +73,10 @@ Knock It Off's forgiving first two levels, Pounce saving while toys fall, and Wi
 - [ ] **Weak level 1s to watch** (small samples): Cat Pile 16 → 7, Scratch That 17 → 8, Kitten Caboodle 10 → 5. (Window
   Ledges, 11 → 5, got two gentle levels 1 and 2 on 2026-11-20; see how the new level 1 does.)
 - [ ] **Mewstermind: out of beta again.** Moved back to beta on 2026-11-21 (the owner's call), a day after it
-  returned to the front page, because it isn't fun (the owner). Still to find what would make it fun before
-  it goes back.
+  returned to the front page, because it isn't fun (the owner). Ideas to try (2026-11-21):
+  witnesses after every guess (other cats saying what they saw, as "Peanut was in the kitchen all evening", so each
+  guess feels like asking round, as in Clue, not Mastermind's bookkeeping); paws that say which part is right, or
+  more than a count; a limit on guesses, so a wrong one costs something.
 - [ ] **Under the Blanket: out of beta again.** Moved to beta on 2026-11-16 (the owner's call) after its first week on
   the front page: 11 starts at level 1, 6 solves. Still to settle what makes level 1 easier to get into.
 - [ ] **Twirl's sound on an iPhone** (feedback, 2026-11-16): sometimes no sound at all. Since the same day a tap's sound
