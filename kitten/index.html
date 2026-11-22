@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kit-Ten</title>
+<script src="../move.js?v=2026-11-22.2"></script>
+<meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
+<script>
+// A home-screen app can keep showing an old saved copy of this page. Check for a newer
+// version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
+(function () {
+  var BUILD = "2026-11-22.2"; window.SITE_BUILD = BUILD;
+  fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+    v = v.trim(); var tried = null;
+    try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
+    if (v && v !== BUILD && tried !== v) { try { sessionStorage.setItem("catdoku.reloadedFor", v); } catch (e) {} location.reload(); }
+  }).catch(function () {});
+})();
+</script>
+
+<link rel="icon" href="../favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<meta name="theme-color" content="#ECEEE7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1F1C24" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../games.css?v=2026-11-22.2">
+<style>
+/* Number tiles on a 5 × 5 board. Drag across touching tiles (diagonals too) that add up to 10, 20, 40, 80…: they
+   join into one tile of that total where the chain ends, the rest clear, and the columns fall with new tiles from the top. */
+.tenboard{background:color-mix(in srgb,#2A2530 8%,#F7F8F3);border:3px solid var(--ink);border-radius:12px;overflow:hidden;
+  touch-action:none;user-select:none;-webkit-user-select:none;container-type:inline-size}
+.tenboard .grid{position:absolute;inset:2%;outline:none}
+.slot{position:absolute;width:20%;height:20%;display:grid;place-items:center}
+.slot::before{content:"";width:88%;height:88%;border-radius:16%;background:color-mix(in srgb,#2A2530 6%,transparent)}
+.slot.hintcell::before{background:rgba(236,168,24,.6)}
+.slot.kbcursor{outline-offset:-4px;border-radius:14px}
+.tile{position:absolute;left:0;top:0;width:20%;height:20%;pointer-events:none;transition:transform .2s ease-in}
+.tile .f{position:absolute;inset:6%;border-radius:16%;display:grid;place-items:center;font:800 9.5cqw/1 "Baloo 2",ui-rounded,system-ui,sans-serif;
+  padding-top:.08em;box-shadow:inset 0 -4px 0 rgba(42,37,48,.2),0 2px 3px rgba(42,37,48,.25);transition:transform .1s}
+.tile.d3 .f{font-size:7.4cqw}
+.tile.d4 .f{font-size:5.8cqw}
+.tile.d5 .f{font-size:4.7cqw}
+.tile.on .f{transform:scale(.88);box-shadow:inset 0 0 0 .7cqw #2A2530,inset 0 -4px 0 rgba(42,37,48,.2)}
+.tile.on.good .f{box-shadow:inset 0 0 0 .7cqw #2A2530,0 0 0 .9cqw #ECA818}
+.tile.pop .f{animation:pop .3s ease-out}
+@keyframes pop{50%{transform:scale(1.15)}}
+.chainline{position:absolute;inset:2%;width:96%;height:96%;pointer-events:none;z-index:2;overflow:visible}
+.chainline polyline{fill:none;stroke:#2A2530;stroke-opacity:.55;stroke-linecap:round;stroke-linejoin:round}
+.chainline polyline.good{stroke:#ECA818;stroke-opacity:.95}
+/* the chain's total, over the tile it ends on */
+.total{position:absolute;z-index:3;pointer-events:none;transform:translate(-50%,-100%);min-width:2.2em;padding:.1em .5em 0;border-radius:999px;
+  background:#2A2530;color:#F7F8F3;font:800 clamp(16px,6cqw,26px)/1.5 "Baloo 2",ui-rounded,system-ui,sans-serif;text-align:center;white-space:nowrap}
+.total.good{background:#ECA818;color:#2A2530}
+/* the moves left: a bar of pips under the score */
+#count{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap}
+#count b{font-variant-numeric:tabular-nums}
+.movesbar{display:inline-flex;align-items:center;gap:6px}
+.pips{display:inline-grid;grid-template-columns:repeat(20,1fr);gap:2px;width:min(160px,36vw);height:12px}
+.pips i{border-radius:2px;background:var(--line)}
+.pips i.full{background:#E16A4A}
+.pips i.got{background:#6AA673}
+.movesbar.low .pips i.full{background:#BD5538}
+/* Willow: sitting by the title, her face rising over a big join, asleep on the card at the end */
+.sitter{display:block;height:58px;width:auto;margin-bottom:-4px}
+@media (max-height:760px){.sitter{height:42px;margin-bottom:-3px}}
+.peek{position:absolute;width:30%;height:auto;pointer-events:none;z-index:4;transform:translate(-50%,-50%);animation:peek .9s ease-out forwards}
+@keyframes peek{0%{opacity:0;transform:translate(-50%,-20%) scale(.6)}25%{opacity:1;transform:translate(-50%,-55%) scale(1)}75%{opacity:1}100%{opacity:0;transform:translate(-50%,-70%) scale(1)}}
+.card img.endpic{display:block;width:56%;max-width:220px;height:auto;margin:0 auto 12px}
+@media (prefers-reduced-motion:reduce){.tile,.tile .f{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <header><div class="title"><h1>Kit-Ten</h1><img class="sitter" id="sitter" alt="Willow sitting by the title"></div><div class="stripe"></div><p class="tagline">Join numbers that make 10, then 20, 40, 80…</p></header>
+  <nav class="games" id="games" aria-label="Games"></nav>
+
+  <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
+
+  <div class="wrap tenboard stage" id="board">
+    <div class="grid" id="grid" tabindex="0" role="application" aria-label="Number tiles. Drag across touching tiles that add up to 10, 20, 40 and so on."></div>
+    <svg class="chainline" id="chainline" viewBox="0 0 5 5" aria-hidden="true"></svg>
+  </div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
+
+  <div class="actions">
+    <button id="hintBtn">Hint</button>
+    <button id="undoBtn">Undo</button>
+    <button id="restartBtn">Restart</button>
+    <button id="linkBtn">Share</button>
+    <button id="helpBtn">How to play</button>
+  </div>
+  <div class="bar">
+    <button id="newBtn" class="primary">New game</button>
+  </div>
+
+</main>
+
+<script src="../games.js?v=2026-11-22.2"></script>
+<script>
+/* ---------- rules (plain functions) ---------- */
+// The board: 25 numbers, row by row. A chain is 2 or more tiles, each touching the one before (sideways, up and down
+// or corner to corner), none twice, adding up to 10 × a power of 2. It joins into one tile of that total on its last
+// tile; the others clear, each column falls, and new tiles (1 to 9) drop in at the top.
+const N = 5, MOVES = 20, UNDOS = 3;
+const isTarget = s => s >= 10 && s % 10 === 0 && ((s / 10) & (s / 10 - 1)) === 0;
+const NB = [...Array(N * N)].map((_, i) => { const x = i % N, y = Math.floor(i / N), o = [];
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const X = x + dx, Y = y + dy; if ((dx || dy) && X >= 0 && Y >= 0 && X < N && Y < N) o.push(Y * N + X); }
+  return o; });
+const touching = (a, b) => NB[a].includes(b);
+// Moves: a join uses one, and a tile of 40 or more gives some back: 40 one, 80 two, 160 three, and so on.
+const refund = s => Math.max(0, Math.log2(s / 10) - 1);
+// The totals worth looking for on board g: 10, 20, 40… up to everything on it.
+function targets(g) { const tot = g.reduce((a, b) => a + b, 0), T = []; for (let t = 10; t <= tot; t *= 2) T.push(t); return T; }
+// Every chain of up to L tiles that makes a target: [{p (the squares, in order), T}].
+function shortChains(g, L) {
+  const out = [], tg = new Set(targets(g)), mx = Math.max(10, ...tg);
+  const dfs = (i, mask, s, path) => {
+    if (path.length >= 2 && tg.has(s)) out.push({p: path.slice(), T: s});
+    if (path.length >= L) return;
+    for (const j of NB[i]) { if (mask & (1 << j)) continue; const t = s + g[j]; if (t > mx) continue; path.push(j); dfs(j, mask | (1 << j), t, path); path.pop(); }
+  };
+  for (let i = 0; i < N * N; i++) dfs(i, 1 << i, g[i], [i]);
+  return out;
+}
+// One chain of any length that makes total T, or null (null too if it takes too long to look: budget, shared).
+// Where a half-made chain can go next depends only on where it ends and which squares it's used, so a dead end is kept.
+function chainTo(g, T, budget) {
+  const dead = new Set();
+  const dfs = (i, mask, s, path) => {
+    if (--budget.n < 0) return null;
+    if (s === T) return path.length >= 2 ? path.slice() : null;
+    const key = i * 33554432 + mask; if (dead.has(key)) return null;
+    for (const j of NB[i]) { if (mask & (1 << j)) continue; const t = s + g[j]; if (t > T) continue; path.push(j); const r = dfs(j, mask | (1 << j), t, path); path.pop(); if (r) return r; }
+    if (dead.size < 2e5) dead.add(key);
+    return null;
+  };
+  for (let i = 0; i < N * N; i++) { if (g[i] >= T) continue; const r = dfs(i, 1 << i, g[i], [i]); if (r) return r; if (budget.n < 0) return null; }
+  return null;
+}
+// Is there any join left? Short ones first (quick); then longer ones, smallest total first. If the search runs too
+// long it says yes, so a game is never ended while a join might be there.
+function canJoin(g) {
+  if (shortChains(g, 4).length) return true;
+  const budget = {n: 4e5};
+  for (const T of targets(g)) { if (chainTo(g, T, budget)) return true; if (budget.n < 0) return true; }
+  return false;
+}
+// The new tile that drops in k-th in game seed: the same whatever's been played, so a shared game gets the same tiles.
+function seeded(seed) { return () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const newTile = (seed, k) => 1 + Math.floor(seeded(seed * 7919 + k)() * 9);
+// Join path on grid (from drop number drops): returns {grid, drops, made, at, from} where from[i] is the row the tile
+// now on square i came from (negative for a new one dropping in from above).
+function join(grid, path, seed, drops) {
+  const made = path.reduce((s, i) => s + grid[i], 0), at = path[path.length - 1], gone = new Set(path.slice(0, -1));
+  const g = grid.slice(), from = new Array(N * N).fill(0);
+  g[at] = made;
+  for (let x = 0; x < N; x++) {
+    const kept = [];   // bottom up: [value, old row, square it was on]
+    for (let y = N - 1; y >= 0; y--) { const i = y * N + x; if (!gone.has(i)) kept.push([g[i], y, i]); }
+    const fresh = N - kept.length;
+    for (let y = N - 1, k = 0; y >= 0; y--, k++) {
+      const i = y * N + x;
+      if (k < kept.length) { g[i] = kept[k][0]; from[i] = kept[k][1]; }
+      else { g[i] = newTile(seed, drops++); from[i] = y - fresh; }
+    }
+  }
+  // the joined tile falls by one square for each cleared square under it
+  const below = [...gone].filter(i => i % N === at % N && i > at).length;
+  return {grid: g, drops, made, at: at + below * N, from};
+}
+function deal(seed) { const grid = [...Array(N * N)].map((_, k) => newTile(seed, k)); return grid; }
+
+/* ---------- looks ---------- */
+// Each number's colour, from the site's palette. Partners that make 10 share a colour, the smaller one a tint of the
+// bigger (1 and 9 lavender, 2 and 8 pacific blue, 3 and 7 coral and brick, 4 and 6 lime, 5 sage); the tens go round
+// gold, plum, spring blue, periwinkle, and shades of sage, gold and lavender, then ink.
+const tint = (hex, w) => `color-mix(in srgb,${hex} ${100 - w}%,#fff)`;
+const SMALL = {1: [tint("#8D78AD", 55), "#2A2530"], 9: ["#8D78AD", "#fff"], 2: [tint("#73A7AE", 55), "#2A2530"], 8: ["color-mix(in srgb,#73A7AE 80%,#2A2530)", "#fff"],
+  3: [tint("#E16A4A", 50), "#2A2530"], 7: ["#BD5538", "#fff"], 4: [tint("#B3B94B", 50), "#2A2530"], 6: ["#B3B94B", "#2A2530"], 5: ["#6AA673", "#2A2530"]};
+const TENS = [["#ECA818", "#2A2530"], ["#B94588", "#fff"], ["#4E577D", "#fff"], ["#7885BA", "#fff"], ["color-mix(in srgb,#6AA673 65%,#2A2530)", "#fff"], ["color-mix(in srgb,#ECA818 55%,#2A2530)", "#fff"], ["color-mix(in srgb,#8D78AD 70%,#2A2530)", "#fff"], ["#2A2530", "#ECA818"]];
+const look = v => v < 10 ? SMALL[v] : TENS[Math.round(Math.log2(v / 10)) % TENS.length];
+const catSrc = f => (window.CAT_SRC || {})[f] || `../cats/${f}.webp`;
+const fmt = n => n.toLocaleString("en-GB");
+
+/* ---------- game state ---------- */
+// game: {seed, grid, drops (new tiles so far), start (the grid as dealt), score, moves (left), undos (left), joins,
+//        biggest, history (snapshots for Undo), over, hinted, restarted}
+const STORE = "catdoku.kitten.v1", $ = G.$;
+let saved = G.load(STORE), settings = Object.assign({best: 0, biggest: 0, seen: false}, saved.settings);
+let game = saved.game || null, busy = false;
+// There's no gold paw in an endless game, so no tool is marked as costing it (games.js).
+G.pawLost(() => true);
+const save = () => G.save(STORE, {settings, game});
+const playing = () => game && !game.over && !busy && !$("overlay").classList.contains("show");
+function fresh(seed) {
+  const grid = deal(seed);
+  return {seed, grid, drops: N * N, start: grid.slice(), score: 0, moves: MOVES, undos: UNDOS, joins: 0, biggest: 0, history: [], over: false};
+}
+const snap = () => JSON.stringify({grid: game.grid, drops: game.drops, score: game.score, moves: game.moves, joins: game.joins, biggest: game.biggest});
+
+/* ---------- drawing ---------- */
+const xyOf = i => [i % N, Math.floor(i / N)];
+const place = (el, x, y) => { el.style.transform = `translate(${x * 100}%, ${y * 100}%)`; };
+let tiles = [], chain = [], tapped = false;
+function tileEl(v, i) {
+  const el = document.createElement("div"), [bg, ink] = look(v), d = String(v).length;
+  el.className = "tile" + (d >= 3 ? " d" + Math.min(5, d) : "");
+  el.innerHTML = `<div class="f" style="background:${bg};color:${ink}">${v}</div>`;
+  place(el, ...xyOf(i)); $("grid").append(el); return el;
+}
+// from: where each tile came from (rows), to slide them down into place
+function draw(from) {
+  queueMicrotask(say);
+  const grid = $("grid");
+  if (!grid.querySelector(".slot")) for (let i = 0; i < N * N; i++) { const s = document.createElement("div"); s.className = "slot"; s.dataset.i = i; const [x, y] = xyOf(i); s.style.left = x * 20 + "%"; s.style.top = y * 20 + "%"; grid.append(s); }
+  grid.querySelectorAll(".tile").forEach(e => e.remove());
+  tiles = game.grid.map((v, i) => tileEl(v, i));
+  if (from && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    tiles.forEach((el, i) => { if (from[i] !== Math.floor(i / N)) { el.style.transition = "none"; place(el, i % N, from[i]); } });
+    grid.offsetWidth;   // lay out where they were, then let them fall
+    tiles.forEach((el, i) => { el.style.transition = ""; place(el, ...xyOf(i)); });
+  }
+  showChain(); update();
+}
+function update() {
+  const low = game.moves <= 5;
+  const pips = [...Array(MOVES)].map((_, k) => `<i class="${k < game.moves ? "full" : ""}"></i>`).join("");
+  $("count").innerHTML = `<span>Score <b>${fmt(game.score)}</b></span>` +
+    `<span class="movesbar${low ? " low" : ""}" role="img" aria-label="${game.moves} moves left of ${MOVES}"><span class="pips">${pips}</span><b>${game.moves}</b></span>` +
+    (settings.best ? `<span>Best <b>${fmt(Math.max(settings.best, game.score))}</b></span>` : "");
+  $("hintBtn").disabled = !playing();
+  undo.sync(); G.uses("undoBtn", game.undos);
+  paintHint(); showCursor();
+}
+// The chain being made: a ring on each tile, a line through them, and the total over the last one.
+function showChain() {
+  tiles.forEach(el => el.classList.remove("on", "good"));
+  $("board").querySelectorAll(".total").forEach(e => e.remove());
+  const svg = $("chainline"); svg.innerHTML = "";
+  if (!chain.length || !game) return;
+  const s = chain.reduce((t, i) => t + game.grid[i], 0), good = chain.length >= 2 && isTarget(s);
+  chain.forEach(i => { tiles[i].classList.add("on"); if (good) tiles[i].classList.add("good"); });
+  if (chain.length > 1) svg.innerHTML = `<polyline class="${good ? "good" : ""}" points="${chain.map(i => xyOf(i).map(v => v + .5).join(",")).join(" ")}" stroke-width=".12"/>`;
+  const t = document.createElement("div"), [x, y] = xyOf(chain[chain.length - 1]);
+  t.className = "total" + (good ? " good" : ""); t.textContent = s;
+  t.style.left = (2 + (x + .5) * 19.2) + "%"; t.style.top = (2 + Math.max(.55, y + .05) * 19.2) + "%";
+  $("board").append(t);
+}
+function say() {
+  if (!game) return;
+  const rows = [...Array(N).keys()].map(r => `row ${r + 1}: ${game.grid.slice(r * N, r * N + N).join(", ")}`);
+  const ch = chain.length ? ` Chain so far: ${chain.map(i => game.grid[i]).join(" + ")} = ${chain.reduce((t, i) => t + game.grid[i], 0)}.` : "";
+  G.describe($("grid"), `Number tiles, ${N} by ${N}. ${G.listed(rows, "; ")}.${ch} Arrow keys pick a tile; Space adds it to the chain, and Space on the chain's last tile joins it; Escape lets go.`);
+}
+
+/* ---------- sound ---------- */
+const SND = G.sound.kit;
+G.sound.define({
+  "kt.pick": (t, o) => SND.tone({fs: [[0, 520 * (o.p || 1)], [.05, 620 * (o.p || 1)]], t, dur: .05, vol: .08}),   // a tick as each tile joins the chain, a step higher each time
+  "kt.join": t => SND.tone({fs: [[0, 720], [.08, 300]], t, dur: .08, vol: .2}),   // a plop
+  "kt.big": t => [1047, 1319, 1568].forEach((f, i) => SND.bell({f, t: t + i * .08, dur: .6, vol: .08, ratio: 2.01, index: .7})),   // a chime run: 40 or more
+});
+
+/* ---------- playing ---------- */
+const sumOf = p => p.reduce((t, i) => t + game.grid[i], 0);
+function addToChain(i) {
+  if (!chain.length || (touching(chain[chain.length - 1], i) && !chain.includes(i))) {
+    chain.push(i); G.sound.play("kt.pick", {p: Math.pow(1.06, chain.length)}); showChain(); queueMicrotask(say); return true;
+  }
+  if (chain.length > 1 && chain[chain.length - 2] === i) { chain.pop(); showChain(); queueMicrotask(say); return true; }
+  return false;
+}
+function letGo() { chain = []; tapped = false; showChain(); }
+// Join the chain, if it makes a target; otherwise say why and let it go.
+function finish() {
+  const p = chain.slice(); chain = []; tapped = false;
+  if (p.length < 2) { showChain(); return; }
+  const s = sumOf(p);
+  if (!isTarget(s)) { showChain(); G.note(`${p.map(i => game.grid[i]).join(" + ")} = ${s}. A chain makes 10, 20, 40, 80…`, 2600); G.sound.play("wrong"); return; }
+  game.started = true;
+  undo.push();
+  const r = join(game.grid, p, game.seed, game.drops), back = refund(r.made);
+  Object.assign(game, {grid: r.grid, drops: r.drops, score: game.score + r.made, joins: game.joins + 1, biggest: Math.max(game.biggest, r.made)});
+  game.moves = Math.min(MOVES, game.moves - 1 + back);
+  if (game.demo) game.demoDone = true;
+  draw(r.from);
+  const el = tiles[r.at]; if (el) el.classList.add("pop");
+  G.sound.play(r.made >= 40 ? "kt.big" : "kt.join");
+  if (r.made >= 40) {
+    // Willow's face rises over a join of 40 or more
+    const [x, y] = xyOf(r.at), im = new Image(); im.className = "peek"; im.alt = ""; im.src = catSrc("willow-7");
+    im.style.left = (2 + (x + .5) * 19.2) + "%"; im.style.top = (2 + (y + .5) * 19.2) + "%";
+    $("board").append(im); setTimeout(() => im.remove(), 950);
+    if (!game.demo) G.note(`${fmt(r.made)}! ${back} move${back === 1 ? "" : "s"} back.`, 2000);
+  }
+  if (!game.demo && settings.best && game.score > settings.best && !game.passedBest) { game.passedBest = true; G.note("Past your best!", 2000); }
+  save();
+  if (!game.demo) checkEnd();
+}
+function checkEnd() {
+  if (game.over) return;
+  const out = game.moves <= 0, stuck = !out && !canJoin(game.grid);
+  if (out || stuck) { game.over = out ? "moves" : "stuck"; save(); setTimeout(ended, 450); }
+}
+
+// Pointer: press on a tile and drag across the chain; let go to join it. Or tap tile after tile, and tap the last
+// one again to join. Moving into a tile counts only near its middle, so a corner-to-corner drag doesn't catch the
+// tiles beside it.
+let press = null;
+function cellAt(e, near) {
+  const r = $("grid").getBoundingClientRect(), fx = (e.clientX - r.left) / r.width * N, fy = (e.clientY - r.top) / r.height * N;
+  const x = Math.floor(fx), y = Math.floor(fy);
+  if (x < 0 || y < 0 || x >= N || y >= N) return -1;
+  if (near && (Math.abs(fx - x - .5) > .36 || Math.abs(fy - y - .5) > .36)) return -1;
+  return y * N + x;
+}
+$("board").addEventListener("pointerdown", e => {
+  if (!playing()) return;
+  const i = cellAt(e, false); if (i < 0) return;
+  const last = chain[chain.length - 1];
+  if (tapped && i === last && chain.length > 1) press = {submit: true, moved: false};
+  else {
+    if (!(tapped && touching(last, i) && !chain.includes(i))) chain = [];
+    addToChain(i); press = {moved: false};
+  }
+  try { $("board").setPointerCapture(e.pointerId); } catch (er) {}
+});
+$("board").addEventListener("pointermove", e => {
+  if (!press || !playing()) return;
+  const i = cellAt(e, true); if (i < 0 || i === chain[chain.length - 1]) return;
+  if (addToChain(i)) press.moved = true;
+});
+$("board").addEventListener("pointerup", () => {
+  if (!press) return;
+  const p = press; press = null;
+  if (p.submit || p.moved) finish();
+  else { tapped = true; if (chain.length === 1) G.note("Now tap a tile touching it, or drag.", 1800); }
+});
+$("board").addEventListener("pointercancel", () => { press = null; letGo(); });
+// Keys: the arrows move a cursor; Space adds the tile there to the chain, and Space on its last tile joins it.
+function showCursor() { $("grid").querySelectorAll(".slot.kbcursor").forEach(s => s.classList.remove("kbcursor")); const i = keys ? keys.at() : -1; if (i >= 0) { const s = $("grid").querySelector(`.slot[data-i="${i}"]`); if (s) s.classList.add("kbcursor"); } }
+const keys = G.gridKeys({
+  on: () => playing(), show: () => showCursor(), size: () => [N, N], start: () => 12,
+  act(i) {
+    const last = chain[chain.length - 1];
+    if (i === last && chain.length > 1) { finish(); return; }
+    if (!(chain.length && touching(last, i) && !chain.includes(i)) && !(chain.length > 1 && chain[chain.length - 2] === i)) chain = [];
+    addToChain(i); tapped = true;
+  },
+  escape: () => letGo(),
+});
+// Undo (G.history): three a game. Each step is a snapshot of the board; it can take back the move that ended a game.
+const undo = G.history({game: () => game, take: snap, cap: 30, can: () => !!game && !busy && game.undos > 0,
+  back: (h, g) => { Object.assign(g, JSON.parse(h)); g.over = false; g.undos--; }, after: () => { letGo(); G.closeCard(); draw(); save(); }, restart: true});
+$("restartBtn").onclick = () => {
+  letGo();
+  if (undo.restart(g => Object.assign(g, {grid: g.start.slice(), drops: N * N, score: 0, moves: MOVES, undos: UNDOS, joins: 0, biggest: 0, over: false, passedBest: false})))
+    G.note("Back to the start of this game.", 2500);
+};
+
+/* ---------- hints ---------- */
+// Hint shows the join that makes the biggest tile (with the fewest tiles); shorter chains first, as they're easier to see.
+const hints = G.hinter({game: () => game, key: () => game ? game.grid.join() : "", draw: () => paintHint()});
+function paintHint() { $("grid").querySelectorAll(".slot.hintcell").forEach(s => s.classList.remove("hintcell")); const m = hints.current(); if (m) for (const i of m.cells) $("grid").querySelector(`.slot[data-i="${i}"]`).classList.add("hintcell"); }
+function bestJoin(g) {
+  const c = shortChains(g, 5);
+  if (c.length) { c.sort((a, b) => b.T - a.T || a.p.length - b.p.length); return c[0]; }
+  const budget = {n: 4e5};
+  for (const T of targets(g)) { const p = chainTo(g, T, budget); if (p) return {p, T}; }
+  return null;
+}
+$("hintBtn").onclick = () => {
+  if (!playing()) return;
+  letGo();
+  const b = bestJoin(game.grid);
+  if (!b) { G.note("No join can be found.", 3000); return; }
+  game.hinted = true; save();
+  hints.show({cells: b.p}, `Join the gold tiles: ${b.p.map(i => game.grid[i]).join(" + ")} = ${b.T}.`);
+};
+
+/* ---------- the end ---------- */
+function endPic(f, alt) { const im = new Image(); im.className = "endpic"; im.src = catSrc(f); im.alt = alt; return im; }
+function ended() {
+  if (!game || !game.over) return;
+  const best = game.score > settings.best, was = settings.best;
+  if (best) settings.best = game.score;
+  if (game.biggest > settings.biggest) settings.biggest = game.biggest;
+  // counted once a game, in bands: under 1,000, then 1,000+, 2,000+, 4,000+…
+  if (!game.tracked) { game.tracked = true; G.track(`Kit-Ten scored ${game.score < 1000 ? "under 1,000" : fmt(1000 * 2 ** Math.floor(Math.log2(game.score / 1000))) + "+"}`); }
+  save();
+  const why = game.over === "moves" ? "Out of moves" : "No joins left";
+  const text = `${why === "Out of moves" ? "That was the last move." : "Nothing on the board makes 10, 20, 40…"} You scored ${fmt(game.score)} in ${game.joins} join${game.joins === 1 ? "" : "s"}, with a biggest tile of ${fmt(game.biggest)}.` +
+    (best ? (was ? ` That beats your best of ${fmt(was)}!` : "") : ` Your best is ${fmt(settings.best)}.`);
+  const btns = [["New game", () => { G.closeCard(); newGame(); }, true]];
+  if (game.undos > 0 && undo.size()) btns.push([`Undo (${game.undos} left)`, () => undo.undo()]);
+  btns.push(["Look at the board", G.closeCard]);
+  if (best) G.sound.play("gold");
+  G.loseCard(best ? "A new best!" : why, text, btns, best ? endPic("willow-6", "Willow stretching, pleased with herself") : endPic("willow-5", "Willow curled up asleep"), null, {sound: !best});
+}
+
+/* ---------- new games ---------- */
+function newGame(seed = Math.floor(Math.random() * 2 ** 31)) {
+  letGo(); game = fresh(seed); hints.clear(false); draw(); save();
+  G.track("Kit-Ten new game");
+  helpOnFirstVisit();
+}
+$("linkBtn").onclick = () => { if (game) G.shareCard({name: "Kit-Ten", won: false, what: "game", puzzle: () => ({g: "kitten", N: 1, s: game.seed})}); };
+function openShared(d) {
+  if (!Number.isInteger(d.s) || d.s < 0) { G.note("That share link didn't work.", 5000); return; }
+  newGame(d.s);
+}
+
+/* ---------- how to play ---------- */
+// The first visit plays the walkthrough: one join on the real board (put back afterwards), then the rules in a few
+// words. How to play plays it again.
+function showHelp() { if (game && !game.over) helpOnFirstVisit(true); else G.helpLater(); }
+function helpOnFirstVisit(all) {
+  if (!game || !playing() || document.querySelector(".spot")) return;
+  if (settings.seen && !all) return;
+  const turn = G.yourTurn(() => game, g => { game = g; }, () => { letGo(); draw(); save(); });
+  const c = shortChains(game.grid, 3).filter(x => x.T === 10).sort((a, b) => a.p.length - b.p.length)[0];
+  const steps = [];
+  if (c) steps.push({say: `Drag across ${c.p.map(i => game.grid[i]).join(" + ")} to make 10`, lit: c.p.map(xyOf), ...turn.upTo,
+    enter() { turn.upTo.enter(); game.demo = true; game.demoDone = false; letGo(); },
+    try: {done: () => !!game.demoDone, yes: "10!"}});
+  steps.push({say: "Diagonals count too", lit: [[1, 1], [2, 2], [3, 3]]},
+    {say: "10 + 10 makes 20, then 40, 80…", lit: [...Array(N * N).keys()].map(xyOf)},
+    {say: "Each join uses a move", els: [$("count")]},
+    {say: "40 and up give moves back", els: [$("count")]},
+    {say: "Three undos a game", els: [$("undoBtn")]},
+    {say: "Stuck? Hint shows a join", els: [$("hintBtn")]});
+  G.spotlight({grid: $("grid"), w: N, h: N, steps, done: () => { settings.seen = true; save(); }});
+}
+
+$("newBtn").onclick = () => { G.closeCard(); newGame(); };
+$("helpBtn").onclick = showHelp;
+G.nav("kitten");
+$("sitter").src = catSrc("willow-1");
+const shared = G.readShare("kitten");
+if (game) G.reopen(() => {
+  if (!Array.isArray(game.grid) || game.grid.length !== N * N || game.grid.some(v => !(v >= 1)) || !Number.isInteger(game.seed)) throw new Error("the saved game doesn't fit");
+  delete game.demo; draw(); if (game.over) ended(); else helpOnFirstVisit();
+}, why => { game = null; newGame(); G.note(why, 0); });
+else if (!shared) newGame();
+if (shared) G.offerShare(shared, {name: "Kit-Ten", inProgress: !!(game && game.joins && !game.over), open: openShared, after: helpOnFirstVisit, fresh: game ? null : why => { newGame(); G.note(why, 6000); }});
+window.addEventListener("hashchange", () => { const d = G.readShare("kitten"); if (d) G.offerShare(d, {name: "Kit-Ten", inProgress: !!(game && game.joins && !game.over), open: openShared, after: helpOnFirstVisit}); });
+</script>
+<!-- Visit counts (GoatCounter: no cookies, nothing personal) -->
+<script data-goatcounter="https://rhymes-with-tree.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
