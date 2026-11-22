@@ -63,7 +63,7 @@ const G = (() => {
     ["Bed Hog", "bedhog", "Slide the sprawled cats until there's room for you", "#E16A4A", "teasers", "klotski rush hour sliding block puzzle unblock slide bed hog huarong sleeping cats", "2026-11-09"],
     ["Pounce Up", "pounceup", "Help Rayla pounce up the tallest bookcase in the house", "#7885BA", "prowl", "doodle jump platform jumping climbing bookcase shelves action springs", "2026-11-12"],
     ["Moving Day", "movingday", "Unpack the boxes and find the cats their things", "#ECA818", "quick", "merge game merge mansion travel town gossip harbor merge 2 combine moving boxes unpack treats toys orders", "2026-11-20"],
-    ["Kit-Ten", "kitten", "Join numbers that make 10, then 20, 40, 80…", "#ECA818", "numbers", "make ten make 10 tens add up sums chain join merge 2048 number tiles arithmetic maths math", "2026-11-22"],
+    ["Kit-Ten", "kitten", "Make 10s, then pair them up into 20, 40, 80…", "#ECA818", "numbers", "make ten make 10 tens add up sums chain join merge 2048 number tiles arithmetic maths math", "2026-11-22"],
   ];
   // Games in beta: their pages work (open them by their address), but they're left off the front page, the games menu,
   // search, favorites and the daily challenge until they're finished. Same fields as GAMES.

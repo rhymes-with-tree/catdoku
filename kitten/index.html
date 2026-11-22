@@ -55,15 +55,8 @@
 .total{position:absolute;z-index:3;pointer-events:none;transform:translate(-50%,-100%);min-width:2.2em;padding:.1em .5em 0;border-radius:999px;
   background:#2A2530;color:#F7F8F3;font:800 clamp(16px,6cqw,26px)/1.5 "Baloo 2",ui-rounded,system-ui,sans-serif;text-align:center;white-space:nowrap}
 .total.good{background:#ECA818;color:#2A2530}
-/* the moves left: a bar of pips under the score */
-#count{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap}
+#count{display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap}
 #count b{font-variant-numeric:tabular-nums}
-.movesbar{display:inline-flex;align-items:center;gap:6px}
-.pips{display:inline-grid;grid-template-columns:repeat(20,1fr);gap:2px;width:min(160px,36vw);height:12px}
-.pips i{border-radius:2px;background:var(--line)}
-.pips i.full{background:#E16A4A}
-.pips i.got{background:#6AA673}
-.movesbar.low .pips i.full{background:#BD5538}
 /* Willow: sitting by the title, her face rising over a big join, asleep on the card at the end */
 .sitter{display:block;height:58px;width:auto;margin-bottom:-4px}
 @media (max-height:760px){.sitter{height:42px;margin-bottom:-3px}}
@@ -75,13 +68,13 @@
 </head>
 <body>
 <main>
-  <header><div class="title"><h1>Kit-Ten</h1><img class="sitter" id="sitter" alt="Willow sitting by the title"></div><div class="stripe"></div><p class="tagline">Join numbers that make 10, then 20, 40, 80…</p></header>
+  <header><div class="title"><h1>Kit-Ten</h1><img class="sitter" id="sitter" alt="Willow sitting by the title"></div><div class="stripe"></div><p class="tagline">Make 10s, then pair them up into 20, 40, 80…</p></header>
   <nav class="games" id="games" aria-label="Games"></nav>
 
   <div class="status"><span id="count"></span><button class="timer" id="timer" hidden></button><span class="msg" id="msg" aria-live="polite"></span></div>
 
   <div class="wrap tenboard stage" id="board">
-    <div class="grid" id="grid" tabindex="0" role="application" aria-label="Number tiles. Drag across touching tiles that add up to 10, 20, 40 and so on."></div>
+    <div class="grid" id="grid" tabindex="0" role="application" aria-label="Number tiles. Drag across touching numbers that add up to 10, or across two matching tiles of 10 or more."></div>
     <svg class="chainline" id="chainline" viewBox="0 0 5 5" aria-hidden="true"></svg>
   </div>
   <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
@@ -102,53 +95,36 @@
 <script src="../games.js?v=2026-11-22.2"></script>
 <script>
 /* ---------- rules (plain functions) ---------- */
-// The board: 25 numbers, row by row. A chain is 2 or more tiles, each touching the one before (sideways, up and down
-// or corner to corner), none twice, adding up to 10 × a power of 2. It joins into one tile of that total on its last
-// tile; the others clear, each column falls, and new tiles (1 to 9) drop in at the top.
-const N = 5, MOVES = 20, UNDOS = 3;
-const isTarget = s => s >= 10 && s % 10 === 0 && ((s / 10) & (s / 10 - 1)) === 0;
+// The board: 25 numbers, row by row. Two kinds of join, each of tiles touching the one before (sideways, up and down or
+// corner to corner), none twice: a chain of small numbers (1 to 9) adding up to exactly 10, or two matching tiles of 10
+// or more (10 and 10 make 20, 20 and 20 make 40…). The tiles join into one on the last tile; the others clear, each
+// column falls, and new tiles (1 to 9) drop in at the top. The game's over when nothing on the board will join.
+const N = 5, UNDOS = 3;
 const NB = [...Array(N * N)].map((_, i) => { const x = i % N, y = Math.floor(i / N), o = [];
   for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const X = x + dx, Y = y + dy; if ((dx || dy) && X >= 0 && Y >= 0 && X < N && Y < N) o.push(Y * N + X); }
   return o; });
 const touching = (a, b) => NB[a].includes(b);
-// Moves: a join uses one, and a tile of 40 or more gives some back: 40 one, 80 two, 160 three, and so on.
-const refund = s => Math.max(0, Math.log2(s / 10) - 1);
-// The totals worth looking for on board g: 10, 20, 40… up to everything on it.
-function targets(g) { const tot = g.reduce((a, b) => a + b, 0), T = []; for (let t = 10; t <= tot; t *= 2) T.push(t); return T; }
-// Every chain of up to L tiles that makes a target: [{p (the squares, in order), T}].
-function shortChains(g, L) {
-  const out = [], tg = new Set(targets(g)), mx = Math.max(10, ...tg);
+// What the tiles on path (values vals, in order) join into, or 0 if they don't.
+function joinsTo(vals) {
+  if (vals.length < 2) return 0;
+  if (vals[0] >= 10) return vals.length === 2 && vals[1] === vals[0] ? vals[0] * 2 : 0;
+  return vals.every(v => v < 10) && vals.reduce((a, b) => a + b, 0) === 10 ? 10 : 0;
+}
+// Every join on board g: [{p (the squares, in order), T (what it makes)}]. A pair of tens is listed both ways round,
+// as the tile it lands on is the last one.
+function allJoins(g) {
+  const out = [];
   const dfs = (i, mask, s, path) => {
-    if (path.length >= 2 && tg.has(s)) out.push({p: path.slice(), T: s});
-    if (path.length >= L) return;
-    for (const j of NB[i]) { if (mask & (1 << j)) continue; const t = s + g[j]; if (t > mx) continue; path.push(j); dfs(j, mask | (1 << j), t, path); path.pop(); }
+    if (s === 10) { if (path.length >= 2) out.push({p: path.slice(), T: 10}); return; }
+    for (const j of NB[i]) { if (mask & (1 << j) || g[j] >= 10 || s + g[j] > 10) continue; path.push(j); dfs(j, mask | (1 << j), s + g[j], path); path.pop(); }
   };
-  for (let i = 0; i < N * N; i++) dfs(i, 1 << i, g[i], [i]);
+  for (let i = 0; i < N * N; i++) {
+    if (g[i] < 10) dfs(i, 1 << i, g[i], [i]);
+    else for (const j of NB[i]) if (g[j] === g[i]) out.push({p: [i, j], T: g[i] * 2});
+  }
   return out;
 }
-// One chain of any length that makes total T, or null (null too if it takes too long to look: budget, shared).
-// Where a half-made chain can go next depends only on where it ends and which squares it's used, so a dead end is kept.
-function chainTo(g, T, budget) {
-  const dead = new Set();
-  const dfs = (i, mask, s, path) => {
-    if (--budget.n < 0) return null;
-    if (s === T) return path.length >= 2 ? path.slice() : null;
-    const key = i * 33554432 + mask; if (dead.has(key)) return null;
-    for (const j of NB[i]) { if (mask & (1 << j)) continue; const t = s + g[j]; if (t > T) continue; path.push(j); const r = dfs(j, mask | (1 << j), t, path); path.pop(); if (r) return r; }
-    if (dead.size < 2e5) dead.add(key);
-    return null;
-  };
-  for (let i = 0; i < N * N; i++) { if (g[i] >= T) continue; const r = dfs(i, 1 << i, g[i], [i]); if (r) return r; if (budget.n < 0) return null; }
-  return null;
-}
-// Is there any join left? Short ones first (quick); then longer ones, smallest total first. If the search runs too
-// long it says yes, so a game is never ended while a join might be there.
-function canJoin(g) {
-  if (shortChains(g, 4).length) return true;
-  const budget = {n: 4e5};
-  for (const T of targets(g)) { if (chainTo(g, T, budget)) return true; if (budget.n < 0) return true; }
-  return false;
-}
+const canJoin = g => allJoins(g).length > 0;
 // The new tile that drops in k-th in game seed: the same whatever's been played, so a shared game gets the same tiles.
 function seeded(seed) { return () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 const newTile = (seed, k) => 1 + Math.floor(seeded(seed * 7919 + k)() * 9);
@@ -172,22 +148,23 @@ function join(grid, path, seed, drops) {
   const below = [...gone].filter(i => i % N === at % N && i > at).length;
   return {grid: g, drops, made, at: at + below * N, from};
 }
-function deal(seed) { const grid = [...Array(N * N)].map((_, k) => newTile(seed, k)); return grid; }
+function deal(seed) { return [...Array(N * N)].map((_, k) => newTile(seed, k)); }
+// A seed whose board as dealt has a join on it (nearly all of them).
+function goodSeed() { for (;;) { const s = Math.floor(Math.random() * 2 ** 31); if (canJoin(deal(s))) return s; } }
 
 /* ---------- looks ---------- */
-// Each number's colour, from the site's palette. Partners that make 10 share a colour, the smaller one a tint of the
-// bigger (1 and 9 lavender, 2 and 8 pacific blue, 3 and 7 coral and brick, 4 and 6 lime, 5 sage); the tens go round
-// gold, plum, spring blue, periwinkle, and shades of sage, gold and lavender, then ink.
-const tint = (hex, w) => `color-mix(in srgb,${hex} ${100 - w}%,#fff)`;
-const SMALL = {1: [tint("#8D78AD", 55), "#2A2530"], 9: ["#8D78AD", "#fff"], 2: [tint("#73A7AE", 55), "#2A2530"], 8: ["color-mix(in srgb,#73A7AE 80%,#2A2530)", "#fff"],
-  3: [tint("#E16A4A", 50), "#2A2530"], 7: ["#BD5538", "#fff"], 4: [tint("#B3B94B", 50), "#2A2530"], 6: ["#B3B94B", "#2A2530"], 5: ["#6AA673", "#2A2530"]};
-const TENS = [["#ECA818", "#2A2530"], ["#B94588", "#fff"], ["#4E577D", "#fff"], ["#7885BA", "#fff"], ["color-mix(in srgb,#6AA673 65%,#2A2530)", "#fff"], ["color-mix(in srgb,#ECA818 55%,#2A2530)", "#fff"], ["color-mix(in srgb,#8D78AD 70%,#2A2530)", "#fff"], ["#2A2530", "#ECA818"]];
+// Each number's colour, from the site's palette as it is. Partners that make 10 share a colour (1 and 9 lavender, 2 and
+// 8 pacific blue, 3 and 7 coral, 4 and 6 lime, 5 sage); the tens go round gold, plum, spring blue, brick, periwinkle
+// and ink. The number is in ink or white, whichever reads better on it.
+const SMALL = {1: ["#8D78AD", "#fff"], 9: ["#8D78AD", "#fff"], 2: ["#73A7AE", "#2A2530"], 8: ["#73A7AE", "#2A2530"],
+  3: ["#E16A4A", "#2A2530"], 7: ["#E16A4A", "#2A2530"], 4: ["#B3B94B", "#2A2530"], 6: ["#B3B94B", "#2A2530"], 5: ["#6AA673", "#2A2530"]};
+const TENS = [["#ECA818", "#2A2530"], ["#B94588", "#fff"], ["#4E577D", "#fff"], ["#BD5538", "#fff"], ["#7885BA", "#fff"], ["#2A2530", "#ECA818"]];
 const look = v => v < 10 ? SMALL[v] : TENS[Math.round(Math.log2(v / 10)) % TENS.length];
 const catSrc = f => (window.CAT_SRC || {})[f] || `../cats/${f}.webp`;
 const fmt = n => n.toLocaleString("en-GB");
 
 /* ---------- game state ---------- */
-// game: {seed, grid, drops (new tiles so far), start (the grid as dealt), score, moves (left), undos (left), joins,
+// game: {seed, grid, drops (new tiles so far), start (the grid as dealt), score, undos (left), joins,
 //        biggest, history (snapshots for Undo), over, hinted, restarted}
 const STORE = "catdoku.kitten.v1", $ = G.$;
 let saved = G.load(STORE), settings = Object.assign({best: 0, biggest: 0, seen: false}, saved.settings);
@@ -198,9 +175,9 @@ const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.over && !busy && !$("overlay").classList.contains("show");
 function fresh(seed) {
   const grid = deal(seed);
-  return {seed, grid, drops: N * N, start: grid.slice(), score: 0, moves: MOVES, undos: UNDOS, joins: 0, biggest: 0, history: [], over: false};
+  return {seed, grid, drops: N * N, start: grid.slice(), score: 0, undos: UNDOS, joins: 0, biggest: 0, history: [], over: false};
 }
-const snap = () => JSON.stringify({grid: game.grid, drops: game.drops, score: game.score, moves: game.moves, joins: game.joins, biggest: game.biggest});
+const snap = () => JSON.stringify({grid: game.grid, drops: game.drops, score: game.score, joins: game.joins, biggest: game.biggest});
 
 /* ---------- drawing ---------- */
 const xyOf = i => [i % N, Math.floor(i / N)];
@@ -227,10 +204,7 @@ function draw(from) {
   showChain(); update();
 }
 function update() {
-  const low = game.moves <= 5;
-  const pips = [...Array(MOVES)].map((_, k) => `<i class="${k < game.moves ? "full" : ""}"></i>`).join("");
   $("count").innerHTML = `<span>Score <b>${fmt(game.score)}</b></span>` +
-    `<span class="movesbar${low ? " low" : ""}" role="img" aria-label="${game.moves} moves left of ${MOVES}"><span class="pips">${pips}</span><b>${game.moves}</b></span>` +
     (settings.best ? `<span>Best <b>${fmt(Math.max(settings.best, game.score))}</b></span>` : "");
   $("hintBtn").disabled = !playing();
   undo.sync(); G.uses("undoBtn", game.undos);
@@ -242,7 +216,7 @@ function showChain() {
   $("board").querySelectorAll(".total").forEach(e => e.remove());
   const svg = $("chainline"); svg.innerHTML = "";
   if (!chain.length || !game) return;
-  const s = chain.reduce((t, i) => t + game.grid[i], 0), good = chain.length >= 2 && isTarget(s);
+  const s = chain.reduce((t, i) => t + game.grid[i], 0), good = !!joinsTo(chain.map(i => game.grid[i]));
   chain.forEach(i => { tiles[i].classList.add("on"); if (good) tiles[i].classList.add("good"); });
   if (chain.length > 1) svg.innerHTML = `<polyline class="${good ? "good" : ""}" points="${chain.map(i => xyOf(i).map(v => v + .5).join(",")).join(" ")}" stroke-width=".12"/>`;
   const t = document.createElement("div"), [x, y] = xyOf(chain[chain.length - 1]);
@@ -280,12 +254,16 @@ function finish() {
   const p = chain.slice(); chain = []; tapped = false;
   if (p.length < 2) { showChain(); return; }
   const s = sumOf(p);
-  if (!isTarget(s)) { showChain(); G.note(`${p.map(i => game.grid[i]).join(" + ")} = ${s}. A chain makes 10, 20, 40, 80…`, 2600); G.sound.play("wrong"); return; }
+  const vals = p.map(i => game.grid[i]);
+  if (!joinsTo(vals)) {
+    showChain(); G.sound.play("wrong");
+    G.note(vals.some(v => v >= 10) ? `${vals.join(" + ")}: a ${vals.find(v => v >= 10)} only joins one more ${vals.find(v => v >= 10)}.` : `${vals.join(" + ")} = ${s}. Small numbers must add up to exactly 10.`, 2600);
+    return;
+  }
   game.started = true;
   undo.push();
-  const r = join(game.grid, p, game.seed, game.drops), back = refund(r.made);
+  const r = join(game.grid, p, game.seed, game.drops);
   Object.assign(game, {grid: r.grid, drops: r.drops, score: game.score + r.made, joins: game.joins + 1, biggest: Math.max(game.biggest, r.made)});
-  game.moves = Math.min(MOVES, game.moves - 1 + back);
   if (game.demo) game.demoDone = true;
   draw(r.from);
   const el = tiles[r.at]; if (el) el.classList.add("pop");
@@ -295,7 +273,6 @@ function finish() {
     const [x, y] = xyOf(r.at), im = new Image(); im.className = "peek"; im.alt = ""; im.src = catSrc("willow-7");
     im.style.left = (2 + (x + .5) * 19.2) + "%"; im.style.top = (2 + (y + .5) * 19.2) + "%";
     $("board").append(im); setTimeout(() => im.remove(), 950);
-    if (!game.demo) G.note(`${fmt(r.made)}! ${back} move${back === 1 ? "" : "s"} back.`, 2000);
   }
   if (!game.demo && settings.best && game.score > settings.best && !game.passedBest) { game.passedBest = true; G.note("Past your best!", 2000); }
   save();
@@ -303,8 +280,7 @@ function finish() {
 }
 function checkEnd() {
   if (game.over) return;
-  const out = game.moves <= 0, stuck = !out && !canJoin(game.grid);
-  if (out || stuck) { game.over = out ? "moves" : "stuck"; save(); setTimeout(ended, 450); }
+  if (!canJoin(game.grid)) { game.over = true; save(); setTimeout(ended, 450); }
 }
 
 // Pointer: press on a tile and drag across the chain; let go to join it. Or tap tile after tile, and tap the last
@@ -358,25 +334,30 @@ const undo = G.history({game: () => game, take: snap, cap: 30, can: () => !!game
   back: (h, g) => { Object.assign(g, JSON.parse(h)); g.over = false; g.undos--; }, after: () => { letGo(); G.closeCard(); draw(); save(); }, restart: true});
 $("restartBtn").onclick = () => {
   letGo();
-  if (undo.restart(g => Object.assign(g, {grid: g.start.slice(), drops: N * N, score: 0, moves: MOVES, undos: UNDOS, joins: 0, biggest: 0, over: false, passedBest: false})))
+  if (undo.restart(g => Object.assign(g, {grid: g.start.slice(), drops: N * N, score: 0, undos: UNDOS, joins: 0, biggest: 0, over: false, passedBest: false})))
     G.note("Back to the start of this game.", 2500);
 };
 
 /* ---------- hints ---------- */
-// Hint shows the join that makes the biggest tile (with the fewest tiles); shorter chains first, as they're easier to see.
+// Hint looks one join ahead: of every join, the one whose board after (new tiles and all) has the most joins on it and
+// the fewest tens with no match beside them, with a pair of tens counting for a little more.
 const hints = G.hinter({game: () => game, key: () => game ? game.grid.join() : "", draw: () => paintHint()});
 function paintHint() { $("grid").querySelectorAll(".slot.hintcell").forEach(s => s.classList.remove("hintcell")); const m = hints.current(); if (m) for (const i of m.cells) $("grid").querySelector(`.slot[data-i="${i}"]`).classList.add("hintcell"); }
-function bestJoin(g) {
-  const c = shortChains(g, 5);
-  if (c.length) { c.sort((a, b) => b.T - a.T || a.p.length - b.p.length); return c[0]; }
-  const budget = {n: 4e5};
-  for (const T of targets(g)) { const p = chainTo(g, T, budget); if (p) return {p, T}; }
-  return null;
+function boardValue(h) {
+  const n = allJoins(h).length; if (!n) return -1000;
+  let v = Math.min(n, 12) * 2;
+  for (let i = 0; i < N * N; i++) if (h[i] >= 10 && !NB[i].some(j => h[j] === h[i])) v -= Math.log2(h[i] / 10) + 1;
+  return v;
+}
+function bestJoin(g, seed, drops) {
+  let best = null;
+  for (const m of allJoins(g)) { const v = boardValue(join(g, m.p, seed, drops).grid) + (m.T > 10 ? 3 : 0); if (!best || v > best.v) best = {...m, v}; }
+  return best;
 }
 $("hintBtn").onclick = () => {
   if (!playing()) return;
   letGo();
-  const b = bestJoin(game.grid);
+  const b = bestJoin(game.grid, game.seed, game.drops);
   if (!b) { G.note("No join can be found.", 3000); return; }
   game.hinted = true; save();
   hints.show({cells: b.p}, `Join the gold tiles: ${b.p.map(i => game.grid[i]).join(" + ")} = ${b.T}.`);
@@ -392,8 +373,8 @@ function ended() {
   // counted once a game, in bands: under 1,000, then 1,000+, 2,000+, 4,000+…
   if (!game.tracked) { game.tracked = true; G.track(`Kit-Ten scored ${game.score < 1000 ? "under 1,000" : fmt(1000 * 2 ** Math.floor(Math.log2(game.score / 1000))) + "+"}`); }
   save();
-  const why = game.over === "moves" ? "Out of moves" : "No joins left";
-  const text = `${why === "Out of moves" ? "That was the last move." : "Nothing on the board makes 10, 20, 40…"} You scored ${fmt(game.score)} in ${game.joins} join${game.joins === 1 ? "" : "s"}, with a biggest tile of ${fmt(game.biggest)}.` +
+  const why = "No joins left";
+  const text = `Nothing on the board joins. You scored ${fmt(game.score)} in ${game.joins} join${game.joins === 1 ? "" : "s"}, with a biggest tile of ${fmt(game.biggest)}.` +
     (best ? (was ? ` That beats your best of ${fmt(was)}!` : "") : ` Your best is ${fmt(settings.best)}.`);
   const btns = [["New game", () => { G.closeCard(); newGame(); }, true]];
   if (game.undos > 0 && undo.size()) btns.push([`Undo (${game.undos} left)`, () => undo.undo()]);
@@ -403,7 +384,7 @@ function ended() {
 }
 
 /* ---------- new games ---------- */
-function newGame(seed = Math.floor(Math.random() * 2 ** 31)) {
+function newGame(seed = goodSeed()) {
   letGo(); game = fresh(seed); hints.clear(false); draw(); save();
   G.track("Kit-Ten new game");
   helpOnFirstVisit();
@@ -422,15 +403,14 @@ function helpOnFirstVisit(all) {
   if (!game || !playing() || document.querySelector(".spot")) return;
   if (settings.seen && !all) return;
   const turn = G.yourTurn(() => game, g => { game = g; }, () => { letGo(); draw(); save(); });
-  const c = shortChains(game.grid, 3).filter(x => x.T === 10).sort((a, b) => a.p.length - b.p.length)[0];
+  const c = allJoins(game.grid).filter(x => x.T === 10).sort((a, b) => a.p.length - b.p.length)[0];
   const steps = [];
   if (c) steps.push({say: `Drag across ${c.p.map(i => game.grid[i]).join(" + ")} to make 10`, lit: c.p.map(xyOf), ...turn.upTo,
     enter() { turn.upTo.enter(); game.demo = true; game.demoDone = false; letGo(); },
     try: {done: () => !!game.demoDone, yes: "10!"}});
   steps.push({say: "Diagonals count too", lit: [[1, 1], [2, 2], [3, 3]]},
-    {say: "10 + 10 makes 20, then 40, 80…", lit: [...Array(N * N).keys()].map(xyOf)},
-    {say: "Each join uses a move", els: [$("count")]},
-    {say: "40 and up give moves back", els: [$("count")]},
+    {say: "Two 10s make 20, two 20s 40…", lit: [...Array(N * N).keys()].map(xyOf)},
+    {say: "It ends when nothing joins", lit: [...Array(N * N).keys()].map(xyOf)},
     {say: "Three undos a game", els: [$("undoBtn")]},
     {say: "Stuck? Hint shows a join", els: [$("hintBtn")]});
   G.spotlight({grid: $("grid"), w: N, h: N, steps, done: () => { settings.seen = true; save(); }});
