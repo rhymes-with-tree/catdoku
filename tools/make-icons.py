@@ -1236,9 +1236,9 @@ def boing():
 # Kit-Ten: a 3 by 3 board of number tiles in the game's rainbow colours, with a chain drawn through 3, 5 and 2
 # (corner to corner, as diagonals count) that makes 10, and two pastel 10s beside each other ready to make 20.
 def kitten():
-    tiles = [(3, YELLOW, INK), (1, RED, "#fff"), (4, LIME, INK),
-             (6, TEAL, INK), (5, GREEN, INK), (10, tint(ORANGE, .45), INK),
-             (2, ORANGE, INK), (20, tint(YELLOW, .45), INK), (10, tint(ORANGE, .45), INK)]
+    tiles = [(3, TEAL, INK), (1, "#8D78AD", INK), (4, GREEN, INK),
+             (6, YELLOW, INK), (5, LIME, INK), (10, "#4E577D", "#fff"),
+             (2, PERI, INK), (20, tint("#8D78AD", .7), INK), (10, "#4E577D", "#fff")]
     s, x0, chain = 23, 14.5, (0, 4, 6)
     at = lambda k: (x0 + k % 3 * (s + 1), x0 + k // 3 * (s + 1))
     # the tiles (the chain's ringed), then the chain's line over them, then the numbers on top

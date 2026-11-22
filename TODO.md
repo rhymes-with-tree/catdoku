@@ -84,7 +84,8 @@ Knock It Off's forgiving first two levels, Pounce saving while toys fall, and Wi
   make it fun before it moves out.
 - [ ] **Watch the three games launched on 2026-11-22** (Kit-Ten, Case Clawsed, Day Light; the owner hadn't played the
   new versions yet). Kit-Ten: how often a game reaches 1,280 (scores are counted in bands), and move the kitten's
-  steps if growing up is too rare or too easy; Fred's one kitten picture (`kitten-star`) could make him a fifth.
+  steps if growing up is too rare or too easy (simulated, 2026-11-22: playing the owner's way, or following Hint since
+  it took that up, the kitten grows up in about 35 of 40 games, so 1,280 stays); Fred's one kitten picture (`kitten-star`) could make him a fifth.
   Case Clawsed: solved against started at each level; its own pictures for a case (the knocked-over mug, `c17-11` or
   `gus-7`; cats peeking round a corner, `c16-14`, `c19-21`, `c20-8`, `fred-6`); more kinds of case (a time of day as a
   third thing, cats who saw each other). Day Light: whether the windows and blinds read at a glance on a 7 × 7
