@@ -92,12 +92,12 @@ Knock It Off's forgiving first two levels, Pounce saving while toys fall, and Wi
   in `toys/` to roll.
 - [ ] **Tape Trap: out of beta.** In beta since 2026-11-20. The owner (2026-11-22): it isn't fun yet. Find what would
   make it fun before it moves out.
-- [ ] **Kit-Ten: out of beta.** In beta since 2026-11-22. The owner (2026-11-22): it needs a bit more of a kitten theme;
-  ideas offered in the chat, none picked yet. Then move its row from `BETA` to `GAMES` and take out its `noindex` line.
-  The owner likes a kitten growing up as the game goes on, and more than one cat (2026-11-22). The art for it: four
-  litters of kittens (`kitten-1` to `-8` are Gus and Peanut, `marmalade-kitten-…`, `willow-kitten-…`, and Fred's
-  `kitten-star`), each with the grown-up cat's own pictures; the kitten chirps in `sounds/` (`chirp-…`, `chirp-purr-…`)
-  for a join, and Moonpie's purr for the biggest ones.
+- [ ] **Kit-Ten: out of beta.** In beta since 2026-11-22. The owner asked for more of a kitten theme (2026-11-22): since
+  the same day each game deals one of four kittens, who grows up beside the title as the biggest tile climbs (160
+  playing, 1,280 grown up). The owner plays it and says whether that's kitten enough; then check on GoatCounter how
+  often a game reaches 1,280 (the scores are counted in bands) and move the steps if growing up is too rare or too
+  easy. Fred's one kitten picture (`kitten-star`) could make him a fifth. Then move its row from `BETA` to `GAMES` and
+  take out its `noindex` line.
 - [ ] **Moonpie's purr in more places.** The owner loves the purr in Swap-a-Pom and is thinking of using it in other
   games (2026-11-22). Not decided where yet.
 - [ ] **Twirl's sound on an iPhone** (feedback, 2026-11-16): sometimes no sound at all. Since the same day a tap's sound

@@ -233,6 +233,13 @@ each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the 
   is one of the kittens), with kitten Marmalade and Willow; the mother cats there are general cats, not Gus's or Peanut's
   parents. Kitten Caboodle gives each word one of `kitten-2`, `-3`, `-5`, `-6` and `-8` or Marmalade's and Willow's kittens
   awake (the list `KITTENS`), grey until its word is spelled, and `kitten-7` is on the gold-paw card.
+  Kit-Ten (in beta) deals one of four kittens a game and has them grow up beside its title (the list `KITTENS` in
+  `kitten/index.html`): sitting, then playing from a 160 tile, then grown up from a 1,280, with a picture for the end
+  card pleased (a new best) or asleep, as a kitten and grown up. Gus: `kitten-6`, `kitten-2`, `gus-12`; `kitten-8`
+  and `kitten-4`, `gus-8` and `gus-5`; face `gus-1`. Peanut: `kitten-3`, `kitten-5`, `peanut-12`; `kitten-1` and
+  `kitten-7`, `peanut-9` and `peanut-7`; face `peanut-1`. Marmalade: `marmalade-kitten-1`, `-2`, `marmalade-1`;
+  `marmalade-kitten-5` and `-3`, `marmalade-6` and `marmalade-5`; face `marmalade-7`. Willow: `willow-kitten-1`, `-2`,
+  `willow-1`; `willow-kitten-7` and `-3`, `willow-6` and `willow-5`; face `willow-7`.
   `kitten-1` Gus and Peanut sitting side by side (on Wind Up's gold-paw card); `kitten-2` Gus on his back, paws up; `kitten-3` Peanut sitting, head
   tilted; `kitten-4` Gus curled up asleep; `kitten-5` Peanut batting a purple ball of yarn; `kitten-6` Gus in a cardboard
   box; `kitten-7` Gus asleep on top of Peanut; `kitten-8` Gus walking, tail up. (`kitten-star` is Fred as a kitten; see Fred.)
@@ -248,7 +255,7 @@ each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the 
   `-4` walking (front); `-5` reaching for a butterfly; `-6` in a cardboard box; `-7` curled up (from above); `-8`
   napping (side). Kitten Caboodle uses `marmalade-kitten-1`, `-2`, `-4`, `-5` and `-6` as kittens.
 - **Willow** (`willow-…`, a Siamese: slim and elegant, a short sleek cream coat with dark brown points, striking blue
-  eyes, large ears and a long, slender tail) is a she, and friends with Gus, Peanut and Marmalade. She stars in Window Ledges: `willow-1` (sitting, front) is beside the title, `willow-4` (lying down) lies along the roof ridge, and `willow-6` (stretching) is on the gold-paw card. She stars in Mew Hue too: `willow-2` (standing, side) strolls past the title, her face (`willow-7`) rises over each line that clears, and `willow-5` (asleep, curled up) is on the gold-paw card. She stars in Kit-Ten (in beta) too: `willow-1` sits beside its title, her face (`willow-7`) rises over every join of 40 or more, and the card at the end shows `willow-6` (stretching) after a new best and `willow-5` (asleep, curled up) otherwise. From her sheet, grown up: `willow-1` sitting
+  eyes, large ears and a long, slender tail) is a she, and friends with Gus, Peanut and Marmalade. She stars in Window Ledges: `willow-1` (sitting, front) is beside the title, `willow-4` (lying down) lies along the roof ridge, and `willow-6` (stretching) is on the gold-paw card. She stars in Mew Hue too: `willow-2` (standing, side) strolls past the title, her face (`willow-7`) rises over each line that clears, and `willow-5` (asleep, curled up) is on the gold-paw card. She's one of Kit-Ten's four kittens (in beta; see the kittens). From her sheet, grown up: `willow-1` sitting
   (front); `willow-2` standing (side); `willow-3` from behind; `willow-4` lying down, looking at you; `willow-5` asleep,
   curled up; `willow-6` stretching; `willow-7` her face. As a kitten: `willow-kitten-1` sitting (front); `-2` playing
   with a blue feather; `-3` curled up asleep; `-4` walking (front); `-5` looking up at a butterfly; `-6` in a round
