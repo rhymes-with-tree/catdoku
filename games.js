@@ -74,6 +74,7 @@ const G = (() => {
     ["Tape Trap", "tapetrap", "Lay a square of tape for every cat to sit in", "#ECA818", "logic", "cat trap tape masking tape nearest distance steps voronoi marmalade", "2026-11-20"],
     ["Boing!", "boing", "Place springs to bounce the ball to Ferguson", "#7885BA", "teasers", "incredible machine physics springs bounce ball boing trajectory ferguson", "2026-11-20"],
     ["Pawstcards", "pawstcards", "Guess where Pinecone is from her postcards", "#73A7AE", "prowl", "geography countries wikipedia postcards guess the country clues redacted trivia travel pinecone", "2026-11-11"],
+    ["Kit-Ten", "kitten", "Make 10s, then pair them up into 20, 40, 80…", "#ECA818", "numbers", "make ten make 10 tens add up sums chain join merge 2048 number tiles arithmetic maths math", "2026-11-22"],
   ];
   const rowOf = slug => GAMES.find(g => g[1] === slug) || BETA.find(g => g[1] === slug);
   // The shelves the front page and the games menu sort the games onto, in order: key (also a plain name for it,
@@ -1369,6 +1370,7 @@ const G = (() => {
     movingday: ["Arrow keys: pick a square", "Space or Enter: tap the jar or basket, pick a thing up, then put it down on another", "1 to 4: give a cat what it wants", "Escape: let go"],
     catshuffle: ["Arrow keys: pick a square", "Space: slide the piece there, or turn the knob (Shift turns it back)", "Shift with an arrow: shift its row or column"],
     mewhue: ["Arrow keys: pick a square", "Shift with an arrow: slide its row or column that way"],
+    kitten: ["Arrow keys: pick a tile", "Space or Enter: add it to the chain (on the chain's last tile: join it)", "Escape: let go"],
     zoomies: ["Arrow keys: pick a square", "Space or Enter: pick a square, then another to join the pair (or part it)", "C: the next line colour", "Escape: let go"],
     crossstitch: ["Arrow keys: pick a square", "Space or Enter: stitch it, or take the stitch out", "X or .: a dot, for a square that stays empty", "Backspace: clear the square", "Shift with an arrow: carry what you put down along the row or column"],
     tango: ["Arrow keys: pick a square", "Space or Enter: tap it (one toy, then the other, then empty)"],
