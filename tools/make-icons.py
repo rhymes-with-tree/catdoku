@@ -411,27 +411,26 @@ def nightlight():
     return frame("#221D36", out)
 
 
-# Day Light: a brick block of four flats in the sun, Lady Nimbus (a white cat) in each: three sunny with her asleep,
-# one dark with her awake. A window between the top two, a blind (its cord on the left flat's side) between the left
-# two, another window along the bottom, and plain wall between the right two.
+# Day Light: a block of four flats in the sun, Lady Nimbus (a white cat) in each: three sunny with her asleep, one
+# dark with her awake. Drawn as the game draws the sides (the owner's drawing, 2026-11-22): open gaps for the windows
+# (top and bottom), a thick dark line for the wall (right), and a blind (left) as arrowheads pointing the way the light
+# goes, down, with its cord and pull in the top flat that opens it.
 def daylight():
     out = circle(74, 14, 6, YELLOW, 2)
-    out += f'<rect x="15" y="22" width="70" height="71" rx="3" fill="{RED}" stroke="{INK}" stroke-width="2.5"/>'
+    out += f'<rect x="15" y="22" width="70" height="71" rx="3" fill="{PAPER}" stroke="{INK}" stroke-width="2.5"/>'
     flats = ((21, 28, True), (53, 28, True), (21, 61, True), (53, 61, False))
     for x, y, sunny in flats:
-        out += f'<rect x="{x}" y="{y}" width="26" height="26" rx="2" fill="{"#FBE9B0" if sunny else "#4E577D"}" stroke="{INK}" stroke-width="1.5"/>'
+        out += f'<rect x="{x}" y="{y}" width="26" height="26" rx="2" fill="{"#FBE9B0" if sunny else "#4E577D"}"/>'
         fx, fy = x + 13, y + 15
         out += catface(fx, fy, 7, "#FBF8F0").split("<circle")[0]
         if sunny:
             out += f'<path d="M{fx-4.5} {fy+1}Q{fx-2.7} {fy+2.6} {fx-.9} {fy+1}M{fx+.9} {fy+1}Q{fx+2.7} {fy+2.6} {fx+4.5} {fy+1}" fill="none" stroke="{INK}" stroke-width="1.3" stroke-linecap="round"/>'
         else:
             out += f'<circle cx="{fx-2.7}" cy="{fy+1}" r="1.3" fill="{TEAL}"/><circle cx="{fx+2.7}" cy="{fy+1}" r="1.3" fill="{TEAL}"/>'
-    glass = tint(YELLOW, .45)
-    out += f'<rect x="46" y="35" width="8" height="12" rx="1" fill="{glass}" stroke="{INK}" stroke-width="1.5"/>'   # window, top
-    out += f'<rect x="28" y="53" width="12" height="9" rx="1" fill="{PAPER}" stroke="{INK}" stroke-width="1.5"/>'   # blind, left
-    out += "".join(f'<path d="M29 {55 + k * 2.2}H39" stroke="{PLUM}" stroke-width="1.1"/>' for k in range(3))
-    out += f'<path d="M40 54.5V50" stroke="{INK}" stroke-width="1"/><circle cx="40" cy="49.5" r="1.3" fill="{INK}"/>'
-    out += f'<rect x="46" y="68" width="8" height="12" rx="1" fill="{glass}" stroke="{INK}" stroke-width="1.5"/>'   # window, bottom
+    out += f'<path d="M52 57.5H80" stroke="{INK}" stroke-width="3.5" stroke-linecap="round"/>'   # the wall, between the right two
+    out += "".join(f'<path d="M{x-3} 55.5L{x} 59.5L{x+3} 55.5" fill="none" stroke="{INK}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' for x in (25, 34, 43))
+    out += (f'<path d="M21 57.5Q21 52 26 52H38" fill="none" stroke="{PAPER}" stroke-width="3"/><path d="M21 57.5Q21 52 26 52H38" fill="none" stroke="{INK}" stroke-width="1.2"/>'
+            f'<rect x="37" y="50" width="6" height="4" rx="1.5" fill="{YELLOW}" stroke="{INK}" stroke-width="1"/>')
     return frame(tint(TEAL, .35), out)
 
 
