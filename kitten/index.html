@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kit-Ten</title>
-<script src="../move.js?v=2026-11-22.5"></script>
+<script src="../move.js?v=2026-11-22.6"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-22.5"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-22.6"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-22.5">
+<link rel="stylesheet" href="../games.css?v=2026-11-22.6">
 <style>
 /* Number tiles on a 5 × 5 board. Drag across touching tiles (diagonals too) that add up to 10, 20, 40, 80…: they
    join into one tile of that total where the chain ends, the rest clear, and the columns fall with new tiles from the top. */
@@ -98,7 +98,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-22.5"></script>
+<script src="../games.js?v=2026-11-22.6"></script>
 <script>
 /* ---------- rules (plain functions) ---------- */
 // The board: 25 numbers, row by row. Two kinds of join, each of tiles touching the one before (sideways, up and down or
@@ -397,10 +397,12 @@ $("restartBtn").onclick = () => {
 };
 
 /* ---------- hints ---------- */
-// Hint uses a 6 to 9 whenever one can join (they need particular partners, so they block the board: the owner's own
-// rule, 2026-11-22, which made simulated games about five times longer), and otherwise looks one join ahead: of those
-// joins, the one whose board after (new tiles and all) has the most joins on it and the fewest tens with no match
-// beside them, with a pair of tens counting for a little more.
+// Hint plays the owner's way (2026-11-22), which made simulated games last far longer: of every join, it keeps to
+// those that leave no more small numbers (1 to 9) on the bottom row than there were, so the floor stays all tens;
+// of those, to the ones that use a 6 to 9 if any can (they need particular partners, so they block the board); and of
+// those it takes the one whose board after (new tiles and all) has the most joins on it and the fewest tens with no
+// match beside them, with a pair of tens counting for a little more, landing low and towards the middle so the big
+// tiles build up as a pyramid on the bottom row.
 const hints = G.hinter({game: () => game, key: () => game ? game.grid.join() : "", draw: () => paintHint()});
 function paintHint() { $("grid").querySelectorAll(".slot.hintcell").forEach(s => s.classList.remove("hintcell")); const m = hints.current(); if (m) for (const i of m.cells) $("grid").querySelector(`.slot[data-i="${i}"]`).classList.add("hintcell"); }
 function boardValue(h) {
@@ -409,10 +411,17 @@ function boardValue(h) {
   for (let i = 0; i < N * N; i++) if (h[i] >= 10 && !NB[i].some(j => h[j] === h[i])) v -= Math.log2(h[i] / 10) + 1;
   return v;
 }
+const smallOnFloor = g => g.slice(N * (N - 1)).filter(v => v < 10).length;
 function bestJoin(g, seed, drops) {
+  let ms = allJoins(g).map(m => ({...m, after: join(g, m.p, seed, drops).grid}));
+  const floor = ms.filter(m => smallOnFloor(m.after) <= smallOnFloor(g)); if (floor.length) ms = floor;
+  const big = ms.filter(m => m.T === 10 && m.p.some(i => g[i] >= 6)); if (big.length) ms = big;
   let best = null;
-  const all = allJoins(g), big = all.filter(m => m.T === 10 && m.p.some(i => g[i] >= 6));
-  for (const m of big.length ? big : all) { const v = boardValue(join(g, m.p, seed, drops).grid) + (m.T > 10 ? 3 : 0); if (!best || v > best.v) best = {...m, v}; }
+  for (const m of ms) {
+    const end = m.p[m.p.length - 1], x = end % N, y = Math.floor(end / N);
+    const v = boardValue(m.after) + (m.T > 10 ? 3 + y * .8 - Math.abs(x - 2) * .6 : 0);
+    if (!best || v > best.v) best = {p: m.p, T: m.T, v};
+  }
   return best;
 }
 $("hintBtn").onclick = () => {
