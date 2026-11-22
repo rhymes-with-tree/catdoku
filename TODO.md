@@ -72,16 +72,13 @@ Knock It Off's forgiving first two levels, Pounce saving while toys fall, and Wi
   moves on level N"). Look again with a few weeks of it.
 - [ ] **Weak level 1s to watch** (small samples): Cat Pile 16 → 7, Scratch That 17 → 8, Kitten Caboodle 10 → 5. (Window
   Ledges, 11 → 5, got two gentle levels 1 and 2 on 2026-11-20; see how the new level 1 does.)
-- [ ] **Mewstermind: out of beta again.** Moved back to beta on 2026-11-21 (the owner's call), a day after it
-  returned to the front page, because it isn't fun (the owner). Ideas to try (2026-11-21):
-  witnesses after every guess (other cats saying what they saw, as "Peanut was in the kitchen all evening", so each
-  guess feels like asking round, as in Clue, not Mastermind's bookkeeping); paws that say which part is right, or
-  more than a count; a limit on guesses, so a wrong one costs something.
-  The owner (2026-11-22): it should become more like Clue, or a logic puzzle, with more of a story; as it is it isn't
-  great. It may want a new name once it's changed.
-  Art that could tell the story (2026-11-22): a knocked-over mug as the scene (`c17-11`, with the spill; `gus-7`),
-  cats peeking round a corner as witnesses (`c16-14`, `c19-21`, `c20-8`, `fred-6`), and the many poses no game uses
-  yet: Jan Brady has about 29 of his 41, Dottie about 17, Fred about 14.
+- [ ] **Mewstermind: out of beta again.** Made a logic case file on 2026-11-22 (the owner's pick, after it had been a
+  Mastermind and then a Clue played by paws, which wasn't fun): a story, what each cat says, and a notebook grid
+  (README, its section). Still to do: the owner plays it; a new name if the owner wants one (it isn't a Mastermind
+  any more); a new front-page icon (`icons/stash.svg` still shows the guesses and paws); the case's own pictures,
+  such as the knocked-over mug (`c17-11`, `gus-7`) on the card for that case, and cats peeking round a corner
+  (`c16-14`, `c19-21`, `c20-8`, `fred-6`); more kinds of case (a time of day as a third thing to work out, cats who
+  saw each other); and tuning the levels once there are GoatCounter numbers (solved against started).
 - [ ] **Under the Blanket: out of beta again.** Moved to beta on 2026-11-16 (the owner's call) after its first week on
   the front page: 11 starts at level 1, 6 solves. Still to settle what makes level 1 easier to get into.
   The owner (2026-11-22): it needs re-imagining, perhaps as Under the Bed. Roll a ball under the bed where sleepy cats

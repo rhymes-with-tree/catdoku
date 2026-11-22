@@ -67,7 +67,7 @@ const G = (() => {
   // Games in beta: their pages work (open them by their address), but they're left off the front page, the games menu,
   // search, favorites and the daily challenge until they're finished. Same fields as GAMES.
   const BETA = [
-    ["Mewstermind", "stash", "Work out which cat had the toy, where and when", "#7885BA", "logic", "clue cluedo whodunnit mystery mastermind guess code breaker codebreaker deduction elimination toys rooms times cats", "2026-10-26"],
+    ["Mewstermind", "stash", "Hear what the cats say, and work out who did it", "#7885BA", "logic", "clue cluedo whodunnit mystery logic grid puzzle einstein zebra deduction elimination notebook case detective toys rooms cats", "2026-10-26"],
     ["Under the Blanket", "blanket", "Find the cats with a feather", "#8D78AD", "logic", "black box blackbox rays atoms deflection reflection hidden balls feather wand blanket bugsy", "2026-11-09"],
     ["Day Light", "daylight", "Get every cat napping in the sun, though some point their own way", "#ECA818", "teasers", "lights out flip switch spots arrows night light nap", "2026-11-12"],
     ["Swap-a-Pom", "swapapom", "Swap the pompoms to spell words, with Moonpie for company", "#B94588", "words", "gram jam match 3 three words swap letters scrabble pompoms pom poms moonpie purr", "2026-11-13"],
@@ -1356,7 +1356,7 @@ const G = (() => {
     catburglar: ["Arrow keys: move the crosshair", "Space or Enter: tap there"],
     catpile: ["1 to 3: pick a clump", "Arrow keys: move it", "R: turn it", "Space: put it down"],
     fishbones: ["Arrow keys: go from bone to bone", "Space or Enter: pick one up, then put it down on another", "Escape: let go"],
-    stash: ["1 to 8: put in a toy (Shift: mark it nope)", "Left and right: pick a box", "Backspace: take a toy out", "Enter: check"],
+    stash: ["Tab: move from square to square", "Space or Enter: ✗, then ✓, then clear"],
     knitpick: ["Arrow keys: pick a letter", "Space or Enter: the first letter, then the last"],
     junkdrawer: ["Letters: type a word", "Backspace: take a letter off", "Arrow keys: move round the drawer", "Enter: add the magnet there to your word", "Space (or Enter after typing): try the word", "Escape: let go"],
     birdwatch: ["1 to 9: tap that pane (laid out like a keypad)", "Arrow keys and Space: pick a pane and tap it", "P: pause"],
