@@ -59,6 +59,8 @@
 .total.good{background:#ECA818;color:#2A2530}
 #count{display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap}
 #count b{font-variant-numeric:tabular-nums}
+.th{display:inline-block;width:.2em}
+.tile .n{white-space:nowrap}
 /* The game's kitten: sitting by the title and growing up there, rising over a big join, on the card at the end */
 .sitter{display:block;height:58px;width:auto;margin-bottom:-4px}
 .sitter.grow{animation:grow .6s ease-out}
@@ -204,7 +206,11 @@ function showKitten(grow) {
   im.classList.remove("grow");
   if (grow) { im.offsetWidth; im.classList.add("grow"); }
 }
-const fmt = n => n.toLocaleString("en-GB");
+// Thousands are set off by a narrow no-break space ("1 280"), not a comma, as German readers expect a point there
+// (the owner, 2026-11-22): it reads in any language and never breaks across a line. GoatCounter keeps its commas.
+const fmt = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, "\u202F");
+// On the tiles, the score and the running total the font draws that space too thin to see, so a set gap goes there instead.
+const fmtHTML = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '<span class="th"></span>');
 
 /* ---------- game state ---------- */
 // game: {seed, grid, drops (new tiles so far), start (the grid as dealt), score, undos (left), joins,
@@ -229,7 +235,7 @@ let tiles = [], chain = [], tapped = false;
 function tileEl(v, i) {
   const el = document.createElement("div"), [bg, ink] = look(v), d = String(v).length;
   el.className = "tile" + (d >= 3 ? " d" + Math.min(5, d) : "");
-  el.innerHTML = `<div class="f" style="background:${bg};color:${ink}">${v}</div>`;
+  el.innerHTML = `<div class="f" style="background:${bg};color:${ink}"><span class="n">${fmtHTML(v)}</span></div>`;
   place(el, ...xyOf(i)); $("grid").append(el); return el;
 }
 // from: where each tile came from (rows), to slide them down into place
@@ -247,8 +253,8 @@ function draw(from) {
   showChain(); update();
 }
 function update() {
-  $("count").innerHTML = `<span>Score <b>${fmt(game.score)}</b></span>` +
-    (settings.best ? `<span>Best <b>${fmt(Math.max(settings.best, game.score))}</b></span>` : "");
+  $("count").innerHTML = `<span>Score <b>${fmtHTML(game.score)}</b></span>` +
+    (settings.best ? `<span>Best <b>${fmtHTML(Math.max(settings.best, game.score))}</b></span>` : "");
   $("hintBtn").disabled = !playing();
   undo.sync(); G.uses("undoBtn", game.undos);
   paintHint(); showCursor(); showKitten();
@@ -263,7 +269,7 @@ function showChain() {
   chain.forEach(i => { tiles[i].classList.add("on"); if (good) tiles[i].classList.add("good"); });
   if (chain.length > 1) svg.innerHTML = `<polyline class="${good ? "good" : ""}" points="${chain.map(i => xyOf(i).map(v => v + .5).join(",")).join(" ")}" stroke-width=".12"/>`;
   const t = document.createElement("div"), [x, y] = xyOf(chain[chain.length - 1]);
-  t.className = "total" + (good ? " good" : ""); t.textContent = s;
+  t.className = "total" + (good ? " good" : ""); t.innerHTML = fmtHTML(s);
   t.style.left = (2 + (x + .5) * 19.2) + "%"; t.style.top = (2 + Math.max(.55, y + .05) * 19.2) + "%";
   $("board").append(t);
 }
@@ -301,7 +307,7 @@ function finish() {
   const vals = p.map(i => game.grid[i]);
   if (!joinsTo(vals)) {
     showChain(); G.sound.play("wrong");
-    G.note(vals.some(v => v >= 10) ? `${vals.join(" + ")}: a ${vals.find(v => v >= 10)} only joins one more ${vals.find(v => v >= 10)}.` : `${vals.join(" + ")} = ${s}. Small numbers must add up to exactly 10.`, 2600);
+    G.note(vals.some(v => v >= 10) ? `${vals.map(fmt).join(" + ")}: a ${fmt(vals.find(v => v >= 10))} only joins one more ${fmt(vals.find(v => v >= 10))}.` : `${vals.join(" + ")} = ${s}. Small numbers must add up to exactly 10.`, 2600);
     return;
   }
   game.started = true;
@@ -412,7 +418,7 @@ $("hintBtn").onclick = () => {
   const b = bestJoin(game.grid, game.seed, game.drops);
   if (!b) { G.note("No join can be found.", 3000); return; }
   game.hinted = true; save();
-  hints.show({cells: b.p}, `Join the gold tiles: ${b.p.map(i => game.grid[i]).join(" + ")} = ${b.T}.`);
+  hints.show({cells: b.p}, `Join the gold tiles: ${b.p.map(i => fmt(game.grid[i])).join(" + ")} = ${fmt(b.T)}.`);
 };
 
 /* ---------- the end ---------- */
@@ -423,7 +429,7 @@ function ended() {
   if (best) settings.best = game.score;
   if (game.biggest > settings.biggest) settings.biggest = game.biggest;
   // counted once a game, in bands: under 1,000, then 1,000+, 2,000+, 4,000+…
-  if (!game.tracked) { game.tracked = true; G.track(`Kit-Ten scored ${game.score < 1000 ? "under 1,000" : fmt(1000 * 2 ** Math.floor(Math.log2(game.score / 1000))) + "+"}`); }
+  if (!game.tracked) { game.tracked = true; G.track(`Kit-Ten scored ${game.score < 1000 ? "under 1,000" : (1000 * 2 ** Math.floor(Math.log2(game.score / 1000))).toLocaleString("en-GB") + "+"}`); }
   save();
   const why = "No joins left";
   const text = `Nothing on the board joins. You scored ${fmt(game.score)} in ${game.joins} join${game.joins === 1 ? "" : "s"}, with a biggest tile of ${fmt(game.biggest)}.` +
