@@ -69,7 +69,7 @@ const G = (() => {
   const BETA = [
     ["Mewstermind", "stash", "Hear what the cats say, and work out who did it", "#7885BA", "logic", "clue cluedo whodunnit mystery logic grid puzzle einstein zebra deduction elimination notebook case detective toys rooms cats", "2026-10-26"],
     ["Under the Blanket", "blanket", "Find the cats with a feather", "#8D78AD", "logic", "black box blackbox rays atoms deflection reflection hidden balls feather wand blanket bugsy", "2026-11-09"],
-    ["Day Light", "daylight", "Get the sun into every flat, through the windows and blinds", "#ECA818", "teasers", "lights out flip switch spots night light sun sunshine flats building windows blinds walls white cat", "2026-11-12"],
+    ["Day Light", "daylight", "Get the sun into every flat, through the windows and blinds", "#ECA818", "teasers", "lights out flip switch spots night light sun sunshine flats building windows blinds walls white cat lady nimbus", "2026-11-12"],
     ["Swap-a-Pom", "swapapom", "Swap the pompoms to spell words, with Moonpie for company", "#B94588", "words", "gram jam match 3 three words swap letters scrabble pompoms pom poms moonpie purr", "2026-11-13"],
     ["Tape Trap", "tapetrap", "Lay a square of tape for every cat to sit in", "#ECA818", "logic", "cat trap tape masking tape nearest distance steps voronoi marmalade", "2026-11-20"],
     ["Boing!", "boing", "Place springs to bounce the ball to Ferguson", "#7885BA", "teasers", "incredible machine physics springs bounce ball boing trajectory ferguson", "2026-11-20"],

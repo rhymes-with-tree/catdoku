@@ -114,9 +114,9 @@ cats that point their own way are Day Light (`daylight/`, in beta).
 
 - [ ] **Day Light: out of beta.** Since 2026-11-22 a block of flats (the owner's picture): a window between two flats
   that shine into each other, a blind (its cord on the side that can open it) where only one does, a wall where
-  neither does, and the goal is sun in every flat. Starring the white cat (`c18-29`, `c18-17`, `c19-22`, `c18-16`).
+  neither does, and the goal is sun in every flat. Starring Lady Nimbus (`c18-29`, `c18-17`, `c19-22`, `c18-16`).
   Still to do: the owner plays it and says whether the windows and blinds read at a glance (the panes are small on a
-  7 × 7 building at phone size; flats are about 33 pixels there); a name for the white cat; a front-page icon
+  7 × 7 building at phone size; flats are about 33 pixels there); a front-page icon
   (`icons/daylight.svg` still shows the old sunny room); and its place on the front page and in the daily challenge.
 - [ ] **Star cats from the big unnamed sets.** Zoomies, Bed Hog and Moving Day have no star cat yet. The general cats
   include whole sheets that could each become one, mostly unused (2026-11-22): the black-and-white cat with a blue
