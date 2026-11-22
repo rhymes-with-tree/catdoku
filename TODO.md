@@ -79,15 +79,25 @@ Knock It Off's forgiving first two levels, Pounce saving while toys fall, and Wi
   more than a count; a limit on guesses, so a wrong one costs something.
   The owner (2026-11-22): it should become more like Clue, or a logic puzzle, with more of a story; as it is it isn't
   great. It may want a new name once it's changed.
+  Art that could tell the story (2026-11-22): a knocked-over mug as the scene (`c17-11`, with the spill; `gus-7`),
+  cats peeking round a corner as witnesses (`c16-14`, `c19-21`, `c20-8`, `fred-6`), and the many poses no game uses
+  yet: Jan Brady has about 29 of his 41, Dottie about 17, Fred about 14.
 - [ ] **Under the Blanket: out of beta again.** Moved to beta on 2026-11-16 (the owner's call) after its first week on
   the front page: 11 starts at level 1, 6 solves. Still to settle what makes level 1 easier to get into.
   The owner (2026-11-22): it needs re-imagining, perhaps as Under the Bed. Roll a ball under the bed where sleepy cats
   lie still: a cat grabs the ball if it rolls into her, and bats it away if it passes close by, which makes more sense
   physically than the feather's bends. The current first levels ("training wheels") are hard to learn.
+  Art for it (2026-11-22): cats curled up in beds, baskets and boxes (`ferguson-basket`, `rayla-basket`, `peanut-7`,
+  `willow-kitten-6` and `-7`, `bowtie-7`, `bowtie-tunnel`, `kitten-6`, `marmalade-kitten-6`), and the 32 round toy balls
+  in `toys/` to roll.
 - [ ] **Tape Trap: out of beta.** In beta since 2026-11-20. The owner (2026-11-22): it isn't fun yet. Find what would
   make it fun before it moves out.
 - [ ] **Kit-Ten: out of beta.** In beta since 2026-11-22. The owner (2026-11-22): it needs a bit more of a kitten theme;
   ideas offered in the chat, none picked yet. Then move its row from `BETA` to `GAMES` and take out its `noindex` line.
+  The owner likes a kitten growing up as the game goes on, and more than one cat (2026-11-22). The art for it: four
+  litters of kittens (`kitten-1` to `-8` are Gus and Peanut, `marmalade-kitten-…`, `willow-kitten-…`, and Fred's
+  `kitten-star`), each with the grown-up cat's own pictures; the kitten chirps in `sounds/` (`chirp-…`, `chirp-purr-…`)
+  for a join, and Moonpie's purr for the biggest ones.
 - [ ] **Moonpie's purr in more places.** The owner loves the purr in Swap-a-Pom and is thinking of using it in other
   games (2026-11-22). Not decided where yet.
 - [ ] **Twirl's sound on an iPhone** (feedback, 2026-11-16): sometimes no sound at all. Since the same day a tap's sound
@@ -110,7 +120,13 @@ cats that point their own way are Day Light (`daylight/`, in beta).
   play (2026-11-12): a missing arrow needed marking, so a small red cross now marks each of the plain four ways a cat
   that points its own way leaves out.
   The owner (2026-11-22): the idea is muddy and needs re-imagining. One thought, not settled: opening and closing
-  blinds so sunlight passes through a whole apartment building. It also needs a light-coloured cat.
+  blinds so sunlight passes through a whole apartment building. It also needs a light-coloured cat. A candidate
+  (2026-11-22): the white longhair with blue eyes among the general cats, sitting (`c18-17`, `c18-29`, `c19-46`), lying
+  as if in the sun (`c18-16`, `c19-22`, in no game yet) and from behind (`c19-33`). Check they read as one cat first.
+- [ ] **Star cats from the big unnamed sets.** Zoomies, Bed Hog and Moving Day have no star cat yet. The general cats
+  include whole sheets that could each become one, mostly unused (2026-11-22): the black-and-white cat with a blue
+  collar (`c17-…`, about 25 pictures, about 15 in no game), the grey tabby (`c20-…`, about 20 in no game) and the brown
+  tabby Zoomies already borrows (`c19-…`).
 - [ ] **Moving up and down: watch GoatCounter.** Every game with levels or sizes has `G.ladder` since 2026-11-20
   (README, "Moving up and down"). A level that people now drop back from a lot is too hard a step.
 - [ ] **One new move a level.** The how-to and the on-ramp are divided in a way that isn't ideal: the walkthrough
