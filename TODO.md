@@ -72,13 +72,25 @@ Knock It Off's forgiving first two levels, Pounce saving while toys fall, and Wi
   moves on level N"). Look again with a few weeks of it.
 - [ ] **Weak level 1s to watch** (small samples): Cat Pile 16 → 7, Scratch That 17 → 8, Kitten Caboodle 10 → 5. (Window
   Ledges, 11 → 5, got two gentle levels 1 and 2 on 2026-11-20; see how the new level 1 does.)
-- [ ] **Mewstermind: out of beta again.** Moved back to beta on 2026-11-21 (the owner's call), a day after it
-  returned to the front page, because it isn't fun (the owner). Ideas to try (2026-11-21):
-  witnesses after every guess (other cats saying what they saw, as "Peanut was in the kitchen all evening", so each
-  guess feels like asking round, as in Clue, not Mastermind's bookkeeping); paws that say which part is right, or
-  more than a count; a limit on guesses, so a wrong one costs something.
 - [ ] **Under the Blanket: out of beta again.** Moved to beta on 2026-11-16 (the owner's call) after its first week on
   the front page: 11 starts at level 1, 6 solves. Still to settle what makes level 1 easier to get into.
+  The owner (2026-11-22): it needs re-imagining, perhaps as Under the Bed. Roll a ball under the bed where sleepy cats
+  lie still: a cat grabs the ball if it rolls into her, and bats it away if it passes close by, which makes more sense
+  physically than the feather's bends. The current first levels ("training wheels") are hard to learn.
+  Art for it (2026-11-22): cats curled up in beds, baskets and boxes (`ferguson-basket`, `rayla-basket`, `peanut-7`,
+  `willow-kitten-6` and `-7`, `bowtie-7`, `bowtie-tunnel`, `kitten-6`, `marmalade-kitten-6`), and the 32 round toy balls
+  in `toys/` to roll.
+- [ ] **Tape Trap: out of beta.** In beta since 2026-11-20. The owner (2026-11-22): it isn't fun yet. Find what would
+  make it fun before it moves out.
+- [ ] **Watch the three games launched on 2026-11-22** (Kit-Ten, Case Clawsed, Day Light; the owner hadn't played the
+  new versions yet). Kit-Ten: how often a game reaches 1,280 (scores are counted in bands), and move the kitten's
+  steps if growing up is too rare or too easy; Fred's one kitten picture (`kitten-star`) could make him a fifth.
+  Case Clawsed: solved against started at each level; its own pictures for a case (the knocked-over mug, `c17-11` or
+  `gus-7`; cats peeking round a corner, `c16-14`, `c19-21`, `c20-8`, `fred-6`); more kinds of case (a time of day as a
+  third thing, cats who saw each other). Day Light: whether the windows and blinds read at a glance on a 7 × 7
+  building at phone size (flats about 33 pixels there).
+- [ ] **Moonpie's purr in more places.** The owner loves the purr in Swap-a-Pom and is thinking of using it in other
+  games (2026-11-22). Not decided where yet.
 - [ ] **Twirl's sound on an iPhone** (feedback, 2026-11-16): sometimes no sound at all. Since the same day a tap's sound
   waits for the sound to wake, and sound stuck after a call or another app restarts itself. Check on an iPhone. (The
   report also said it went quieter after zooming the mat; the owner couldn't make that happen.) The silent switch mutes
@@ -94,10 +106,10 @@ Knock It Off's forgiving first two levels, Pounce saving while toys fall, and Wi
 Done the same day: Tunnel Run is turning only, with its sliding rugs behind a Tracks switch; Pounce is Pounce on Three; Night Light is plain rooms only, 15 levels from one tap; its rooms with
 cats that point their own way are Day Light (`daylight/`, in beta).
 
-- [ ] **Day Light: out of beta.** The owner plays it first. Still to settle: a cat of its own (Dottie stands in), its
-  place on the front page and in the daily challenge, and whether the sunny room reads well. From the owner's first
-  play (2026-11-12): a missing arrow needed marking, so a small red cross now marks each of the plain four ways a cat
-  that points its own way leaves out.
+- [ ] **Star cats from the big unnamed sets.** Zoomies, Bed Hog and Moving Day have no star cat yet. The general cats
+  include whole sheets that could each become one, mostly unused (2026-11-22): the black-and-white cat with a blue
+  collar (`c17-…`, about 25 pictures, about 15 in no game), the grey tabby (`c20-…`, about 20 in no game) and the brown
+  tabby Zoomies already borrows (`c19-…`).
 - [ ] **Moving up and down: watch GoatCounter.** Every game with levels or sizes has `G.ladder` since 2026-11-20
   (README, "Moving up and down"). A level that people now drop back from a lot is too hard a step.
 - [ ] **One new move a level.** The how-to and the on-ramp are divided in a way that isn't ideal: the walkthrough
@@ -180,6 +192,9 @@ answer and solver-graded levels.
 
 Pawstcards went up as an unlisted beta on 2026-11-11 (`pawstcards/`, in `BETA` in `games.js`) with 22 countries; it has 42 since the third batch. Before
 it joins `GAMES` (and the front page):
+- first, make it much easier (the owner, 2026-11-22): a friend with an MA in History needed "Pick from 4 countries" on
+  to have a chance. Look at an easier start (fewer, better-known countries first, more telling postcards early,
+  picking from four as the way in) before adding more places;
 - more places, in batches, until it has as many of Catlas's 245 as have good postcards (`tools/pawstcards/NOTES.md`
   says how a batch is made; the owner wants them picked on Fable). The Easy list first, then Medium and Hard;
   territories may have too little written about them;
@@ -210,6 +225,9 @@ Swap-a-Pom went up as an unlisted beta on 2026-11-13 (`swapapom/`, in `BETA` in 
 the front page):
 - the owner plays it, and the level goals are tuned from that (they were set with simulated players, who never make a
   swap with no word, which the owner's rule now allows);
+- the owner (2026-11-22): it's wild. People don't see many words and take a while to find a swap, and once they do the
+  game finds a lot of words at once and it cascades. Rethink the pace: fewer chain reactions (or none) so the words a
+  swap makes are the player's own, and the board kept quieter between swaps;
 - the owner hears the purr on a phone: whether the soft purr while playing is too loud or too quiet (`purring.base`), and
   whether Moonpie should tremble a little the whole time it's on (offered, not asked for yet). On an iPhone the silent
   switch mutes it. She purrs softly the whole time you play, unless sound is off: the owner's call (2026-11-15);
@@ -220,7 +238,7 @@ the front page):
 Boing! went up as an unlisted beta on 2026-11-20 (`boing/`, in `BETA` in `games.js`), from the preview made on 2026-11-13
 and changed the same day on the owner's notes (README, its section). The owner had found it fun but wasn't sure about it.
 Before it joins `GAMES` (and the front page):
-- the owner plays it and decides whether it stays. Ideas offered if it needs more: a faint preview of where the ball would
+- it isn't fun yet (the owner, 2026-11-22). Find what would make it fun before tuning levels. Ideas offered if it needs more: a faint preview of where the ball would
   go from each spring, a faster replay of a go, or making Spring Toss (`IDEAS.md`) instead;
 - tune the levels from the owner's play and the dashboard's started-against-solved counts. It can't be lost (you keep
   trying until the ball lands), so the new-game skill's simulated-player calibration doesn't fit it; what's worth
