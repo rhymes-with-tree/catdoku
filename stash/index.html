@@ -216,13 +216,14 @@ function pickCats(N, rng) {
 }
 
 /* ---------- rooms, and what happened in them ---------- */
-// [emoji, name, upstairs?, what was done there (two to pick from)]
+// [emoji, name, upstairs?, what was done there (to pick from; a crime from another game names it, for the nod below)]
 const ROOMS = [
-  ["🍳", "kitchen", false, ["knocked a mug off the kitchen counter", "licked the butter in the kitchen"]],
+  ["🍳", "kitchen", false, [["knocked a mug off the kitchen counter", "Knock It Off"], "licked the butter in the kitchen"]],
   ["🛏️", "bedroom", true, ["pulled the duvet off the bed in the bedroom", "hid a sock under the bed in the bedroom"]],
-  ["🛋️", "living room", false, ["tipped the plant over in the living room", "scratched the sofa in the living room"]],
+  ["🛋️", "living room", false, ["tipped the plant over in the living room", ["scratched the sofa in the living room", "Scratch That"]]],
   ["🛁", "bathroom", true, ["unrolled the toilet roll all over the bathroom", "knocked the toothbrush into the bathroom sink"]],
-  ["📚", "study", true, ["sat on the keyboard in the study and typed jjjjjjjj", "swept the pens off the desk in the study"]],
+  ["📚", "study", true, ["sat on the keyboard in the study and typed jjjjjjjj", "swept the pens off the desk in the study",
+    ["walked across the keyboard in the study and knocked the keys off", "Keyboard Cat"]]],
   ["🧺", "laundry", false, ["stole a sock from the basket in the laundry", "napped in the clean washing in the laundry"]],
 ];
 // times of day, for the story only: [how a sentence starts]
@@ -263,7 +264,7 @@ function makeCase(level, seed) {
   const cats = pickCats(n, rng), rooms = rng.shuffle([...ROOMS.keys()]).slice(0, n);
   const up = rooms.map(r => ROOMS[r][2]);
   const ans = {R: rng.shuffle([...Array(n).keys()]), T: toys ? rng.shuffle([...Array(n).keys()]) : null};
-  const scene = rng.int(n), deed = rng.int(2), when = rng.int(WHEN.length), all = answersFor(n, toys);
+  const scene = rng.int(n), deed = rng.int(ROOMS[rooms[scene]][3].length), when = rng.int(WHEN.length), all = answersFor(n, toys);
   let said = null;
   for (let k = 0; k < 4; k++) { const s = makeSaid(ans, n, toys, up, scene, hard, rng, all); if (!said || s.length < said.length) said = s; }
   // what each cat says, in order: grouped by who says it
@@ -327,7 +328,9 @@ function words(s) {
 }
 // The rule the case rests on is said every time (the owner, 2026-11-22): every cat was in a different room (and had a
 // different toy), so a ✓ rules the rest of its row and column out.
-const storyText = () => `${WHEN[cs.when]}, someone ${ROOMS[cs.rooms[cs.scene]][3][cs.deed]}. ${hasToys() ? "Every cat was in a different room, with a different toy." : "Every cat was in a different room."} Each cat says what they know. Who did it?`;
+// the crime: its words, and the game it comes from, if any
+const crime = () => { const d = ROOMS[cs.rooms[cs.scene]][3][cs.deed]; return Array.isArray(d) ? d : [d, ""]; };
+const storyText = () => `${WHEN[cs.when]}, someone ${crime()[0]}. ${hasToys() ? "Every cat was in a different room, with a different toy." : "Every cat was in a different room."} Each cat says what they know. Who did it?`;
 // a square of the notebook, in words: "Gus and the kitchen"
 const rowName = (b, r) => b === 2 ? `the ${toyName(r)}` : catName(r);
 const colName = (b, c) => b === 1 ? `the ${toyName(c)}` : `the ${roomName(c)}`;
@@ -493,11 +496,24 @@ function win() {
   const g = game;
   setTimeout(() => { if (game === g) finishCard(); }, 900);
 }
+// A nod when the culprit stars in a game of mischief of their own (the owner, 2026-11-22): "Of course it was" when
+// the crime comes from that very game, "Nobody's surprised" otherwise. [the game, what they get up to there]
+const NOD = {
+  gus: ["Pawlinko", "Gus knocks toys down the climbing wall in Pawlinko"],
+  peanut: ["Pawlinko", "Peanut knocks toys down the climbing wall in Pawlinko"],
+  crunch: ["Cat Mat", "Crunch tips pots of dye over the rug in Cat Mat"],
+  rayla: ["Pounce Up", "Rayla swats things off the bookcase in Pounce Up"],
+  dottie: ["Scratch That", "Dottie has to be lured off the sofa in Scratch That"],
+};
+function nod(who) {
+  const n = NOD[cs.cats[who]];
+  return !n ? "" : n[0] === crime()[1] ? ` Of course it was: ${n[1]}.` : ` Nobody's surprised: ${n[1]}.`;
+}
 function culpritPic() { const c = catOf(cs.cats[cs.ans.R.indexOf(cs.scene)]), im = new Image(); im.className = "stashpic"; im.src = catSrc(c[2]); im.alt = c[1]; return im; }
 function goldPic() { const im = new Image(); im.className = "stashpic"; im.src = catSrc("c17-18"); im.alt = "A black and white cat pouncing on a ball"; return im; }
 function finishCard() {
-  const next = settings.level, who = cs.ans.R.indexOf(cs.scene), deed = ROOMS[cs.rooms[cs.scene]][3][cs.deed];
-  let text = `It was ${catName(who)}! ${WHEN[cs.when]}, ${catName(who)}${hasToys() ? `, with the ${toyName(cs.ans.T[who])},` : ""} ${deed}.`;
+  const next = settings.level, who = cs.ans.R.indexOf(cs.scene), deed = crime()[0];
+  let text = `It was ${catName(who)}! ${WHEN[cs.when]}, ${catName(who)}${hasToys() ? `, with the ${toyName(cs.ans.T[who])},` : ""} ${deed}.${nod(who)}`;
   text += " " + (game.climbed ? game.climbed.line : "");
   G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the case", game.result,
     {title: "Case closed!", gold: goldOK(), pic: [culpritPic()], goldPic: [goldPic()], goldWhy: "Solved with no hints!", next: G.ANOTHER,
