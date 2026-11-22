@@ -1224,10 +1224,26 @@ def boing():
     return frame(tint(PERI, .2), out)
 
 
+# Kit-Ten: a 3 by 3 board of number tiles in the game's rainbow colours, with a chain drawn through 3, 5 and 2
+# (corner to corner, as diagonals count) that makes 10, and two pastel 10s beside each other ready to make 20.
+def kitten():
+    tiles = [(3, YELLOW, INK), (1, RED, "#fff"), (4, LIME, INK),
+             (6, TEAL, INK), (5, GREEN, INK), (10, tint(ORANGE, .45), INK),
+             (2, ORANGE, INK), (20, tint(YELLOW, .45), INK), (10, tint(ORANGE, .45), INK)]
+    s, x0, chain = 23, 14.5, (0, 4, 6)
+    at = lambda k: (x0 + k % 3 * (s + 1), x0 + k // 3 * (s + 1))
+    # the tiles (the chain's ringed), then the chain's line over them, then the numbers on top
+    out = "".join(f'<rect x="{at(k)[0]+1}" y="{at(k)[1]+1}" width="{s-2}" height="{s-2}" rx="4.5" fill="{f}" stroke="{INK}" stroke-width="{2.6 if k in chain else 1.5}"/>'
+                  for k, (n, f, _) in enumerate(tiles))
+    pts = " ".join(f"{at(k)[0] + s / 2},{at(k)[1] + s / 2}" for k in chain)
+    out += f'<polyline points="{pts}" fill="none" stroke="{INK}" stroke-opacity=".55" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>'
+    out += "".join(text(at(k)[0] + s / 2, at(k)[1] + s / 2 + .8, n, 13 if n < 10 else 10.5, ink) for k, (n, _, ink) in enumerate(tiles))
+    return frame(tint(PERI, .2), out)
+
 ICONS = {"catdoku": catdoku, "pounceup": pounceup, "yarn": yarn, "patches": patches, "sunbeams": sunbeams, "toybox": toybox, "pounce": pounce,
          "twirl": twirl, "toebeans": toebeans, "knockitoff": knockitoff, "hideseek": hideseek, "pawlette": pawlette,
          "tangle": tangle, "catwalk": catwalk, "tango": tango, "bubbles": bubbles,
-         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "daylight": daylight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle, "mewhue": mewhue, "pawlinko": pawlinko, "crossstitch": crossstitch, "junkdrawer": junkdrawer, "zoomies": zoomies, "blanket": blanket, "bedhog": bedhog, "movingday": movingday, "swapapom": swapapom, "tapetrap": tapetrap, "boing": boing}
+         "opendoor": opendoor, "tunnelrun": tunnelrun, "copycat": copycat, "nightlight": nightlight, "daylight": daylight, "unravel": unravel, "tailchase": tailchase, "keyboardcat": keyboardcat, "iffits": iffits, "highperch": highperch, "fuzzyspelling": fuzzyspelling, "catastrophe": catastrophe, "laserpointer": laserpointer, "treattime": treattime, "upatree": upatree, "toydoku": toydoku, "pickpile": pickpile, "scratchthat": scratchthat, "magnets": magnets, "purrfect": purrfect, "atlas": atlas, "catburglar": catburglar, "catpile": catpile, "fishbones": fishbones, "stash": stash, "knitpick": knitpick, "birdwatch": birdwatch, "shelflife": shelflife, "meowbile": meowbile, "kittencaboodle": kittencaboodle, "windup": windup, "lmnopom": lmnopom, "windowledges": windowledges, "catshuffle": catshuffle, "mewhue": mewhue, "pawlinko": pawlinko, "crossstitch": crossstitch, "junkdrawer": junkdrawer, "zoomies": zoomies, "blanket": blanket, "bedhog": bedhog, "movingday": movingday, "swapapom": swapapom, "tapetrap": tapetrap, "boing": boing, "kitten": kitten}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")

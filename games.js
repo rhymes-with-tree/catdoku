@@ -63,7 +63,6 @@ const G = (() => {
     ["Bed Hog", "bedhog", "Slide the sprawled cats until there's room for you", "#E16A4A", "teasers", "klotski rush hour sliding block puzzle unblock slide bed hog huarong sleeping cats", "2026-11-09"],
     ["Pounce Up", "pounceup", "Help Rayla pounce up the tallest bookcase in the house", "#7885BA", "prowl", "doodle jump platform jumping climbing bookcase shelves action springs", "2026-11-12"],
     ["Moving Day", "movingday", "Unpack the boxes and find the cats their things", "#ECA818", "quick", "merge game merge mansion travel town gossip harbor merge 2 combine moving boxes unpack treats toys orders", "2026-11-20"],
-    ["Kit-Ten", "kitten", "Make 10s, then pair them up into 20, 40, 80…", "#ECA818", "numbers", "make ten make 10 tens add up sums chain join merge 2048 number tiles arithmetic maths math", "2026-11-22"],
   ];
   // Games in beta: their pages work (open them by their address), but they're left off the front page, the games menu,
   // search, favorites and the daily challenge until they're finished. Same fields as GAMES.
@@ -75,6 +74,7 @@ const G = (() => {
     ["Tape Trap", "tapetrap", "Lay a square of tape for every cat to sit in", "#ECA818", "logic", "cat trap tape masking tape nearest distance steps voronoi marmalade", "2026-11-20"],
     ["Boing!", "boing", "Place springs to bounce the ball to Ferguson", "#7885BA", "teasers", "incredible machine physics springs bounce ball boing trajectory ferguson", "2026-11-20"],
     ["Pawstcards", "pawstcards", "Guess where Pinecone is from her postcards", "#73A7AE", "prowl", "geography countries wikipedia postcards guess the country clues redacted trivia travel pinecone", "2026-11-11"],
+    ["Kit-Ten", "kitten", "Make 10s, then pair them up into 20, 40, 80…", "#ECA818", "numbers", "make ten make 10 tens add up sums chain join merge 2048 number tiles arithmetic maths math", "2026-11-22"],
   ];
   const rowOf = slug => GAMES.find(g => g[1] === slug) || BETA.find(g => g[1] === slug);
   // The shelves the front page and the games menu sort the games onto, in order: key (also a plain name for it,
