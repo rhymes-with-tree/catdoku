@@ -411,23 +411,28 @@ def nightlight():
     return frame("#221D36", out)
 
 
-# Day Light: Night Light's room by day. Black cats on a sunny floor, most napping, one awake on a spring-blue
-# square with an arrow of its own pointing at the cat diagonally below.
+# Day Light: a brick block of four flats in the sun, Lady Nimbus (a white cat) in each: three sunny with her asleep,
+# one dark with her awake. A window between the top two, a blind (its cord on the left flat's side) between the left
+# two, another window along the bottom, and plain wall between the right two.
 def daylight():
-    out = f'<rect x="52" y="12" width="36" height="36" rx="6" fill="#73A7AE" opacity=".55"/>'
-    for r in range(2):
-        for c in range(2):
-            x, y = 30 + c * 40, 32 + r * 38
-            awake = (r, c) == (0, 1)
-            out += (f'<path d="M{x-14} {y+8}C{x-16} {y-2} {x-15} {y-8} {x-13} {y-12}L{x-12} {y-22}L{x-5} {y-14}C{x-2} {y-15} {x+2} {y-15} {x+5} {y-14}'
-                    f'L{x+12} {y-22}L{x+13} {y-12}C{x+15} {y-8} {x+16} {y-2} {x+14} {y+8}C{x+10} {y+16} {x-10} {y+16} {x-14} {y+8}Z" fill="{INK}" opacity="{1 if awake else .3}"/>')
-            if awake:
-                out += (f'<ellipse cx="{x-6}" cy="{y}" rx="4.5" ry="3.8" fill="#D4DB5E"/><ellipse cx="{x+6}" cy="{y}" rx="4.5" ry="3.8" fill="#D4DB5E"/>'
-                        f'<ellipse cx="{x-6}" cy="{y}" rx="1.1" ry="3.2" fill="{INK}"/><ellipse cx="{x+6}" cy="{y}" rx="1.1" ry="3.2" fill="{INK}"/>')
-            else:
-                out += f'<path d="M{x-10} {y}Q{x-6} {y+3} {x-2} {y}M{x+2} {y}Q{x+6} {y+3} {x+10} {y}" fill="none" stroke="{INK}" stroke-width="1.8" stroke-linecap="round" opacity=".55"/>'
-    out += f'<path d="M50 60L62 54L56 48Z" fill="#4E577D" stroke="#FFF6D6" stroke-width="1.5" stroke-linejoin="round"/>'
-    return frame("#FBE9B0", out)
+    out = circle(74, 14, 6, YELLOW, 2)
+    out += f'<rect x="15" y="22" width="70" height="71" rx="3" fill="{RED}" stroke="{INK}" stroke-width="2.5"/>'
+    flats = ((21, 28, True), (53, 28, True), (21, 61, True), (53, 61, False))
+    for x, y, sunny in flats:
+        out += f'<rect x="{x}" y="{y}" width="26" height="26" rx="2" fill="{"#FBE9B0" if sunny else "#4E577D"}" stroke="{INK}" stroke-width="1.5"/>'
+        fx, fy = x + 13, y + 15
+        out += catface(fx, fy, 7, "#FBF8F0").split("<circle")[0]
+        if sunny:
+            out += f'<path d="M{fx-4.5} {fy+1}Q{fx-2.7} {fy+2.6} {fx-.9} {fy+1}M{fx+.9} {fy+1}Q{fx+2.7} {fy+2.6} {fx+4.5} {fy+1}" fill="none" stroke="{INK}" stroke-width="1.3" stroke-linecap="round"/>'
+        else:
+            out += f'<circle cx="{fx-2.7}" cy="{fy+1}" r="1.3" fill="{TEAL}"/><circle cx="{fx+2.7}" cy="{fy+1}" r="1.3" fill="{TEAL}"/>'
+    glass = tint(YELLOW, .45)
+    out += f'<rect x="46" y="35" width="8" height="12" rx="1" fill="{glass}" stroke="{INK}" stroke-width="1.5"/>'   # window, top
+    out += f'<rect x="28" y="53" width="12" height="9" rx="1" fill="{PAPER}" stroke="{INK}" stroke-width="1.5"/>'   # blind, left
+    out += "".join(f'<path d="M29 {55 + k * 2.2}H39" stroke="{PLUM}" stroke-width="1.1"/>' for k in range(3))
+    out += f'<path d="M40 54.5V50" stroke="{INK}" stroke-width="1"/><circle cx="40" cy="49.5" r="1.3" fill="{INK}"/>'
+    out += f'<rect x="46" y="68" width="8" height="12" rx="1" fill="{glass}" stroke="{INK}" stroke-width="1.5"/>'   # window, bottom
+    return frame(tint(TEAL, .35), out)
 
 
 # Unravel: a strand of yarn along part of a pegboard shape, the ball at its end, an arrow on one line.
@@ -777,8 +782,8 @@ def fishbones():
     return frame(PAPER, out)
 
 
-# Mewstermind (a Clue since 2026-11-19): the case along the top, shut (who, where, what), and two guesses under it, each a
-# cat, a room and a toy, with a dark paw print beside it for each part that's right and a dot for each that's wrong.
+# (Case Clawsed: its icon is drawn by stash(), below. Before it, the Clue by paws drew its case along the top, shut, and guesses
+# under it with paw prints; pawprint and house are kept for other icons.)
 def pawprint(x, y, s, fill):
     toes = "".join(f'<ellipse cx="{x+dx*s}" cy="{y+dy*s}" rx="{s*.2}" ry="{s*.24}" fill="{fill}" stroke="{INK}" stroke-width="1"/>'
                    for dx, dy in ((-.5, -.22), (-.18, -.5), (.18, -.5), (.5, -.22)))
@@ -791,20 +796,24 @@ def house(x, y, s, fill):
 
 
 def stash():
-    out = ""
-    for i in range(3):
-        x = 13 + i * 20
-        out += (f'<rect x="{x}" y="11" width="17" height="19" rx="3" fill="{PAPER}" stroke="{INK}" stroke-width="1.8" stroke-dasharray="3 2"/>'
-                + text(x + 8.5, 21, "?", 14, INK))
-    out += f'<path d="M10 37H90" stroke="{INK}" stroke-width="1.6" stroke-dasharray="3 3" opacity=".45"/>'
-    rows = ((("#9A8A78", ORANGE, PERI), 1), (("#221E26", YELLOW, "#E3B9A9"), 2))
-    for r, ((cat, toy, room), right) in enumerate(rows):
-        y = 52 + r * 25
-        out += catface(21.5, y, 8, cat) + house(41.5, y, 8, room) + yarnball(61.5, y, 8, toy)
-        for k in range(3):
-            py = y - 8.5 + k * 8.5
-            out += pawprint(82, py, 4.2, INK) if k < right else f'<circle cx="82" cy="{py}" r="1.8" fill="{INK}" opacity=".25"/>'
-    return frame(tint(TEAL, .3), out)
+    """Case Clawsed: a cat with something to say (a speech bubble), over the notebook: a grid of cats against rooms
+    with a ✓ in each row and ✗s round them."""
+    out = catface(20, 22, 9, "#9A8A78")
+    out += (f'<path d="M36 10H86Q90 10 90 14V30Q90 34 86 34H44L36 40L38 34Q34 34 34 30V14Q34 10 36 10Z" fill="{PAPER}" stroke="{INK}" stroke-width="2" stroke-linejoin="round"/>'
+            f'<path d="M41 18H83M41 26H70" stroke="{INK}" stroke-width="2.4" stroke-linecap="round" opacity=".5"/>')
+    ticks = (1, 2, 0)
+    for r in range(3):
+        y = 47 + r * 15
+        out += circle(20, y + 6.5, 5.5, ("#221E26", "#E8A15A", "#C9C3CF")[r], 1.6)
+        for c in range(3):
+            x = 33 + c * 18
+            out += f'<rect x="{x}" y="{y}" width="16" height="13" rx="2.5" fill="{tint(GREEN, .45) if c == ticks[r] else PAPER}" stroke="{INK}" stroke-width="1.5"/>'
+            cx, cy = x + 8, y + 6.5
+            if c == ticks[r]:
+                out += f'<path d="M{cx-4} {cy}L{cx-1} {cy+3.2}L{cx+4.5} {cy-3.5}" fill="none" stroke="{INK}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'
+            else:
+                out += f'<path d="M{cx-3} {cy-3}L{cx+3} {cy+3}M{cx+3} {cy-3}L{cx-3} {cy+3}" stroke="{RED}" stroke-width="2" stroke-linecap="round"/>'
+    return frame(tint(PERI, .3), out)
 
 
 # Knit Pick: a knitted blanket of letters in plain yarn, one word (KNIT) dyed in a colourway, and Laya peeking over the top.

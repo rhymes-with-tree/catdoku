@@ -72,13 +72,6 @@ Knock It Off's forgiving first two levels, Pounce saving while toys fall, and Wi
   moves on level N"). Look again with a few weeks of it.
 - [ ] **Weak level 1s to watch** (small samples): Cat Pile 16 → 7, Scratch That 17 → 8, Kitten Caboodle 10 → 5. (Window
   Ledges, 11 → 5, got two gentle levels 1 and 2 on 2026-11-20; see how the new level 1 does.)
-- [ ] **Mewstermind: out of beta again.** Made a logic case file on 2026-11-22 (the owner's pick, after it had been a
-  Mastermind and then a Clue played by paws, which wasn't fun): a story, what each cat says, and a notebook grid
-  (README, its section). Still to do: the owner plays it; a new name if the owner wants one (it isn't a Mastermind
-  any more); a new front-page icon (`icons/stash.svg` still shows the guesses and paws); the case's own pictures,
-  such as the knocked-over mug (`c17-11`, `gus-7`) on the card for that case, and cats peeking round a corner
-  (`c16-14`, `c19-21`, `c20-8`, `fred-6`); more kinds of case (a time of day as a third thing to work out, cats who
-  saw each other); and tuning the levels once there are GoatCounter numbers (solved against started).
 - [ ] **Under the Blanket: out of beta again.** Moved to beta on 2026-11-16 (the owner's call) after its first week on
   the front page: 11 starts at level 1, 6 solves. Still to settle what makes level 1 easier to get into.
   The owner (2026-11-22): it needs re-imagining, perhaps as Under the Bed. Roll a ball under the bed where sleepy cats
@@ -89,12 +82,13 @@ Knock It Off's forgiving first two levels, Pounce saving while toys fall, and Wi
   in `toys/` to roll.
 - [ ] **Tape Trap: out of beta.** In beta since 2026-11-20. The owner (2026-11-22): it isn't fun yet. Find what would
   make it fun before it moves out.
-- [ ] **Kit-Ten: out of beta.** In beta since 2026-11-22. The owner asked for more of a kitten theme (2026-11-22): since
-  the same day each game deals one of four kittens, who grows up beside the title as the biggest tile climbs (160
-  playing, 1,280 grown up). The owner plays it and says whether that's kitten enough; then check on GoatCounter how
-  often a game reaches 1,280 (the scores are counted in bands) and move the steps if growing up is too rare or too
-  easy. Fred's one kitten picture (`kitten-star`) could make him a fifth. Then move its row from `BETA` to `GAMES` and
-  take out its `noindex` line.
+- [ ] **Watch the three games launched on 2026-11-22** (Kit-Ten, Case Clawsed, Day Light; the owner hadn't played the
+  new versions yet). Kit-Ten: how often a game reaches 1,280 (scores are counted in bands), and move the kitten's
+  steps if growing up is too rare or too easy; Fred's one kitten picture (`kitten-star`) could make him a fifth.
+  Case Clawsed: solved against started at each level; its own pictures for a case (the knocked-over mug, `c17-11` or
+  `gus-7`; cats peeking round a corner, `c16-14`, `c19-21`, `c20-8`, `fred-6`); more kinds of case (a time of day as a
+  third thing, cats who saw each other). Day Light: whether the windows and blinds read at a glance on a 7 × 7
+  building at phone size (flats about 33 pixels there).
 - [ ] **Moonpie's purr in more places.** The owner loves the purr in Swap-a-Pom and is thinking of using it in other
   games (2026-11-22). Not decided where yet.
 - [ ] **Twirl's sound on an iPhone** (feedback, 2026-11-16): sometimes no sound at all. Since the same day a tap's sound
@@ -112,12 +106,6 @@ Knock It Off's forgiving first two levels, Pounce saving while toys fall, and Wi
 Done the same day: Tunnel Run is turning only, with its sliding rugs behind a Tracks switch; Pounce is Pounce on Three; Night Light is plain rooms only, 15 levels from one tap; its rooms with
 cats that point their own way are Day Light (`daylight/`, in beta).
 
-- [ ] **Day Light: out of beta.** Since 2026-11-22 a block of flats (the owner's picture): a window between two flats
-  that shine into each other, a blind (its cord on the side that can open it) where only one does, a wall where
-  neither does, and the goal is sun in every flat. Starring Lady Nimbus (`c18-29`, `c18-17`, `c19-22`, `c18-16`).
-  Still to do: the owner plays it and says whether the windows and blinds read at a glance (the panes are small on a
-  7 × 7 building at phone size; flats are about 33 pixels there); a front-page icon
-  (`icons/daylight.svg` still shows the old sunny room); and its place on the front page and in the daily challenge.
 - [ ] **Star cats from the big unnamed sets.** Zoomies, Bed Hog and Moving Day have no star cat yet. The general cats
   include whole sheets that could each become one, mostly unused (2026-11-22): the black-and-white cat with a blue
   collar (`c17-…`, about 25 pictures, about 15 in no game), the grey tabby (`c20-…`, about 20 in no game) and the brown

@@ -77,7 +77,7 @@ is beside its title.
 
 Window Ledges sits a few of Purrfect Square's 24 sitting cats (the list `SITTERS`, the same in both pages) on the sills of its windows once every window is lit, picked for each puzzle from its totals, about one window in six and never two side by side.
 
-Mewstermind (since 2026-11-22 a case file) has three to five of the household's cats as suspects, each sitting up from the front (`gus-12`, `peanut-12`, `marmalade-1`, `willow-1`, `moonpie-sit`, `rayla-sit`, `ferguson-sit`, `crunch-3`, `laya-5`, `dottie-18`; the list `CATS` in `stash/index.html`, never two look-alikes together), their faces cropped round beside what they say and along the notebook; the culprit's picture is on the win card, and `c17-18` (pouncing on a ball) on the gold-paw card. Higgins, the witness in the Clue it was before, isn't in it now.
+Case Clawsed (Mewstermind until 2026-11-22) has three to five of the household's cats as suspects, each sitting up from the front (`gus-12`, `peanut-12`, `marmalade-1`, `willow-1`, `moonpie-sit`, `rayla-sit`, `ferguson-sit`, `crunch-3`, `laya-5`, `dottie-18`; the list `CATS` in `stash/index.html`, never two look-alikes together), their faces cropped round beside what they say and along the notebook; the culprit's picture is on the win card, and `c17-18` (pouncing on a ball) on the gold-paw card. Higgins, the witness in the Clue it was before, isn't in it now.
 
 Kitten Caboodle's mother cat, beside her root on the sign, is one of Purrfect Square's 24 sitting cats, picked at random for each litter (the list `MOTHERS` in `kittencaboodle/index.html`).
 
@@ -89,7 +89,7 @@ Moving Day has no star cat yet: the cats placing orders along the top of the roo
 `CATS` in `movingday/index.html`: `c18-6`, `-7`, `-17`, `-19`, `-21`, `c19-1`, `-5` and `-6`), a different few in each room.
 Its things borrow the site's pictures: `fuzzyspelling/pompom.webp` (tinted sage) and `toys/mouse.webp` and `toys/fish.webp`.
 
-Day Light (in beta) stars Lady Nimbus (see below): `c18-29` (sitting) beside the title, `c18-17` (sitting up) waiting in every dark flat, `c19-22` (stretched out) in every sunny one, and `c18-16` (curled up) on the gold-paw card. The same cat is `c19-46` (sitting, looking up) and `c19-33` (from behind), not used yet; `c18-20` looks like her but is drawn with a darker outline.
+Day Light stars Lady Nimbus (see below): `c18-29` (sitting) beside the title, `c18-17` (sitting up) waiting in every dark flat, `c19-22` (stretched out) in every sunny one, and `c18-16` (curled up) on the gold-paw card. The same cat is `c19-46` (sitting, looking up) and `c19-33` (from behind), not used yet; `c18-20` looks like her but is drawn with a darker outline.
 
 Cross Stitch has no star cat yet: one of Purrfect Square's 24 sitting cats (the list `SITTERS`) sits beside its title. Its samplers are cross-stitched from 27 of the site's pictures (the list `PATTERNS` in `crossstitch/index.html`; each fades in behind its finished sampler, and is on the win card with it), at the sizes given: `bugsy-bowtie-boxes` (Bugsy and Bowtie in their boxes, 15), `c14-36` (a ginger cat curled up asleep, 10), `c14-63` (a grey tabby sitting, 15), `gus-3` (Gus sitting, 10, 12, 15), `gus-5` (Gus asleep, 10, 12, 15), `gus-7` (Gus knocking a cup over, 10, 12, 15), `gus-8` (Gus pouncing, 12), `kitten-1` (Gus and Peanut as kittens, 12, 15), `kitten-3` (Peanut as a kitten, 10), `kitten-5` (Peanut as a kitten, batting yarn, 10, 12, 15), `kitten-7` (Gus asleep on Peanut, as kittens, 10, 12), `marmalade-1` (Marmalade sitting, 10), `marmalade-2` (Marmalade standing, 12, 15), `marmalade-4` (Marmalade lying down, 10), `marmalade-6` (Marmalade playing on his back, 12, 15), `marmalade-kitten-1` (Marmalade as a kitten, 10), `marmalade-kitten-2` (Marmalade as a kitten, with his yarn, 10, 12, 15), `marmalade-kitten-5` (Marmalade as a kitten, after a butterfly, 12, 15), `peanut-7` (Peanut asleep in her bed, 10, 12, 15), `peanut-9` (Peanut pouncing, 10), `willow-1` (Willow sitting, 15), `willow-2` (Willow out for a stroll, 12, 15), `willow-5` (Willow curled up asleep, 10), `willow-6` (Willow stretching, 12, 15), `toys/fish` (the toy fish, 8, 10), `toys/mouse` (the toy mouse, 8), `toys/ribbon-tail` (the ribbon ball, 10). The easiest samplers are the toy fish and toy mouse (above), and drawings in the page (`DRAWINGS`): four simple cat shapes, Toe Beans' paw, Fish Bones' fish and the shared ball of yarn from `colorways.js`; no pictures from `cats/`.
 
@@ -235,7 +235,7 @@ each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the 
   is one of the kittens), with kitten Marmalade and Willow; the mother cats there are general cats, not Gus's or Peanut's
   parents. Kitten Caboodle gives each word one of `kitten-2`, `-3`, `-5`, `-6` and `-8` or Marmalade's and Willow's kittens
   awake (the list `KITTENS`), grey until its word is spelled, and `kitten-7` is on the gold-paw card.
-  Kit-Ten (in beta) deals one of four kittens a game and has them grow up beside its title (the list `KITTENS` in
+  Kit-Ten deals one of four kittens a game and has them grow up beside its title (the list `KITTENS` in
   `kitten/index.html`): sitting, then playing from a 160 tile, then grown up from a 1,280, with a picture for the end
   card pleased (a new best) or asleep, as a kitten and grown up. Gus: `kitten-6`, `kitten-2`, `gus-12`; `kitten-8`
   and `kitten-4`, `gus-8` and `gus-5`; face `gus-1`. Peanut: `kitten-3`, `kitten-5`, `peanut-12`; `kitten-1` and
@@ -259,8 +259,7 @@ each `skein-N` is the strands in ink and `skein-N-shape` its outline, which the 
 - **Lady Nimbus** (a fluffy white longhair with blue eyes and pink ears; she's a she; named by the owner on
   2026-11-22) has no sheet of her own: her pictures are among the general cats, and keep their names there.
   `c18-29` sitting (front); `c18-17` sitting up; `c19-46` sitting, looking up; `c18-16` curled up; `c19-22` stretched
-  out; `c19-33` from behind. (`c18-20` looks like her but is drawn with a darker outline.) She stars in Day Light (in
-  beta). `c18-17` is also one of Purrfect Square's sitters.
+  out; `c19-33` from behind. (`c18-20` looks like her but is drawn with a darker outline.) She stars in Day Light. `c18-17` is also one of Purrfect Square's sitters.
 - **Willow** (`willow-…`, a Siamese: slim and elegant, a short sleek cream coat with dark brown points, striking blue
   eyes, large ears and a long, slender tail) is a she, and friends with Gus, Peanut and Marmalade. She stars in Window Ledges: `willow-1` (sitting, front) is beside the title, `willow-4` (lying down) lies along the roof ridge, and `willow-6` (stretching) is on the gold-paw card. She stars in Mew Hue too: `willow-2` (standing, side) strolls past the title, her face (`willow-7`) rises over each line that clears, and `willow-5` (asleep, curled up) is on the gold-paw card. She's one of Kit-Ten's four kittens (in beta; see the kittens). From her sheet, grown up: `willow-1` sitting
   (front); `willow-2` standing (side); `willow-3` from behind; `willow-4` lying down, looking at you; `willow-5` asleep,

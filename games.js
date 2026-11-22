@@ -63,18 +63,18 @@ const G = (() => {
     ["Bed Hog", "bedhog", "Slide the sprawled cats until there's room for you", "#E16A4A", "teasers", "klotski rush hour sliding block puzzle unblock slide bed hog huarong sleeping cats", "2026-11-09"],
     ["Pounce Up", "pounceup", "Help Rayla pounce up the tallest bookcase in the house", "#7885BA", "prowl", "doodle jump platform jumping climbing bookcase shelves action springs", "2026-11-12"],
     ["Moving Day", "movingday", "Unpack the boxes and find the cats their things", "#ECA818", "quick", "merge game merge mansion travel town gossip harbor merge 2 combine moving boxes unpack treats toys orders", "2026-11-20"],
+    ["Case Clawsed", "stash", "Hear what the cats say, and work out who did it", "#7885BA", "logic", "clue cluedo whodunnit mystery logic grid puzzle einstein zebra deduction elimination notebook case detective toys rooms cats", "2026-11-22"],
+    ["Day Light", "daylight", "Get the sun into every flat, through the windows and blinds", "#ECA818", "teasers", "lights out flip switch spots night light sun sunshine flats building windows blinds walls white cat lady nimbus", "2026-11-22"],
+    ["Kit-Ten", "kitten", "Make 10s, then pair them up into 20, 40, 80…", "#ECA818", "quick", "make ten make 10 merge game merge 2 kitten kittens grow up tens add up sums chain join merge 2048 number tiles arithmetic maths math", "2026-11-22"],
   ];
   // Games in beta: their pages work (open them by their address), but they're left off the front page, the games menu,
   // search, favorites and the daily challenge until they're finished. Same fields as GAMES.
   const BETA = [
-    ["Mewstermind", "stash", "Hear what the cats say, and work out who did it", "#7885BA", "logic", "clue cluedo whodunnit mystery logic grid puzzle einstein zebra deduction elimination notebook case detective toys rooms cats", "2026-10-26"],
     ["Under the Blanket", "blanket", "Find the cats with a feather", "#8D78AD", "logic", "black box blackbox rays atoms deflection reflection hidden balls feather wand blanket bugsy", "2026-11-09"],
-    ["Day Light", "daylight", "Get the sun into every flat, through the windows and blinds", "#ECA818", "teasers", "lights out flip switch spots night light sun sunshine flats building windows blinds walls white cat lady nimbus", "2026-11-12"],
     ["Swap-a-Pom", "swapapom", "Swap the pompoms to spell words, with Moonpie for company", "#B94588", "words", "gram jam match 3 three words swap letters scrabble pompoms pom poms moonpie purr", "2026-11-13"],
     ["Tape Trap", "tapetrap", "Lay a square of tape for every cat to sit in", "#ECA818", "logic", "cat trap tape masking tape nearest distance steps voronoi marmalade", "2026-11-20"],
     ["Boing!", "boing", "Place springs to bounce the ball to Ferguson", "#7885BA", "teasers", "incredible machine physics springs bounce ball boing trajectory ferguson", "2026-11-20"],
     ["Pawstcards", "pawstcards", "Guess where Pinecone is from her postcards", "#73A7AE", "prowl", "geography countries wikipedia postcards guess the country clues redacted trivia travel pinecone", "2026-11-11"],
-    ["Kit-Ten", "kitten", "Make 10s, then pair them up into 20, 40, 80…", "#ECA818", "numbers", "make ten make 10 tens add up sums chain join merge 2048 number tiles arithmetic maths math", "2026-11-22"],
   ];
   const rowOf = slug => GAMES.find(g => g[1] === slug) || BETA.find(g => g[1] === slug);
   // The shelves the front page and the games menu sort the games onto, in order: key (also a plain name for it,
@@ -2292,7 +2292,7 @@ const G = (() => {
   // Asked again, a word comes from memory.
   // Where a one-word name may break when it has to go onto two lines (a soft hyphen: "Mewster-" then "mind"),
   // rather than anywhere or not at all (the owner's call, 2026-11-12: Mewstermind split badly at large text).
-  const BREAKS = {Mewstermind: "Mewster\u00ADmind", Purrmutation: "Purr\u00ADmutation"};
+  const BREAKS = {Purrmutation: "Purr\u00ADmutation"};   // (Mewstermind, now Case Clawsed, had one too)
   const breakable = name => BREAKS[name] || name;
   function plainText(html) { const d = document.createElement("div"); d.innerHTML = html; d.querySelectorAll("sup, .reference, style").forEach(x => x.remove()); return d.textContent.replace(/\s+/g, " ").trim(); }
   const meanings = {};
