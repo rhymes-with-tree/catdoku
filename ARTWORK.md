@@ -48,6 +48,10 @@ ones no game uses yet). A sound from another library gets a line here too: where
 
 ## Who's who in `cats/`
 
+**Naming a cat:** when the owner names a cat, give them an entry in the list below (what they look like, she or he, and
+their pictures), and if one of their pictures shows them sitting up from the front, add them to Case Clawsed's
+suspects (`CATS` in `stash/index.html`, with a look-alike group if they look like another suspect at a glance).
+
 **Who gets along:** Fred and Jan Brady are friends, and Gus, Peanut, Marmalade and Willow are all friends with each other. Fred, Dottie, Jan Brady and
 Higgins can appear together, but of those four only Fred and Jan get along: put Dottie or Higgins in a picture
 with the others and they shouldn't look friendly (no cuddling or playing together).
@@ -77,7 +81,7 @@ is beside its title.
 
 Window Ledges sits a few of Purrfect Square's 24 sitting cats (the list `SITTERS`, the same in both pages) on the sills of its windows once every window is lit, picked for each puzzle from its totals, about one window in six and never two side by side.
 
-Case Clawsed (Mewstermind until 2026-11-22) has three to five of the household's cats as suspects, each sitting up from the front (`gus-12`, `peanut-12`, `marmalade-1`, `willow-1`, `moonpie-sit`, `rayla-sit`, `ferguson-sit`, `crunch-3`, `laya-5`, `dottie-18`; the list `CATS` in `stash/index.html`, never two look-alikes together), their faces cropped round beside what they say and along the notebook; the culprit's picture is on the win card, and `c17-18` (pouncing on a ball) on the gold-paw card. Higgins, the witness in the Clue it was before, isn't in it now.
+Case Clawsed (Mewstermind until 2026-11-22) has three to five named cats as suspects, every named cat with a picture of them sitting up from the front (`gus-12`, `peanut-12`, `marmalade-1`, `willow-1`, `moonpie-sit`, `rayla-sit`, `ferguson-sit`, `crunch-3`, `laya-5`, `dottie-18`, and since 2026-11-22 `fred-7`, `jan-brady-27`, `higgins-1`, `bugsy-5`, `bowtie-6` and Lady Nimbus's `c18-29`; the list `CATS` in `stash/index.html`, never two look-alikes together), their faces cropped round beside what they say and along the notebook; the culprit's picture is on the win card, and `c17-18` (pouncing on a ball) on the gold-paw card.
 
 Kitten Caboodle's mother cat, beside her root on the sign, is one of Purrfect Square's 24 sitting cats, picked at random for each litter (the list `MOTHERS` in `kittencaboodle/index.html`).
 
