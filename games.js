@@ -689,6 +689,23 @@ const G = (() => {
   // gold paws at each level or size (kept since 2026-11; earlier ones were counted for the game only)
   const goldAt = (slug, n) => ((load(GOLD).levels || {})[slug] || {})[n] || 0;
   const mastered = slug => !!(load(GOLD).top || {})[slug];
+  // A game made over into a new game at the same address starts its gold paws afresh: Mastered, and the gold paws
+  // counted at each level and in all, on each device once (the owner, 2026-11-22, when Case Clawsed showed Mastered
+  // from Mewstermind). [slug]: the day it was made over.
+  const MADE_OVER = {stash: "2026-11-22"};
+  (() => {
+    const d = load(GOLD), fresh = d.fresh || {};
+    if (Object.keys(MADE_OVER).every(k => fresh[k] === MADE_OVER[k])) return;
+    for (const [k, day] of Object.entries(MADE_OVER)) if (fresh[k] !== day) {
+      for (const part of ["top", "levels", "counts"]) if (d[part]) delete d[part][k];
+      fresh[k] = day;
+    }
+    save(GOLD, {...d, fresh});
+  })();
+  // Where a game keeps its best times (and so its solved count), when it isn't under the game's own address: Case
+  // Clawsed's started afresh as stash4 (stash and stash3 were the games before it).
+  const BEST_NAME = {stash: "stash4"};
+  const bestName = slug => BEST_NAME[slug] || slug;
   // A mastered game's tile keeps its shelf's colour and gets a small gold Mastered label; extra (the front page's "12 solved")
   // joins it as "Mastered · 12 solved", and a phone, short of room, shows just "Mastered" in the gold label.
   const masterPill = (extra = "") => {
@@ -711,7 +728,7 @@ const G = (() => {
     counts[CURRENT] = (counts[CURRENT] || 0) + 1;
     if (result && result.n != null) { const l = levels[CURRENT] || (levels[CURRENT] = {}); l[result.n] = (l[result.n] || 0) + 1; }
     if (top ?? (result && result.n != null && result.n === topLevel())) tops[CURRENT] = true;
-    save(GOLD, {counts, top: tops, levels, seen: [...seen, sig].slice(-30)});
+    save(GOLD, {...d, counts, top: tops, levels, seen: [...seen, sig].slice(-30)});   // ...d keeps the rest (fresh: see MADE_OVER)
   }
   // The owner's Buy Me a Coffee page (2026-11-18): a link at the foot of the front page and a quiet line at the foot of
   // every win card, never in the way of play. A tap opens it in a new tab and counts "Buy me a coffee: front page" or
@@ -3091,5 +3108,5 @@ const G = (() => {
   }
 
   return {COFFEE, coffeeLink, sound, ladder, ANOTHER, CHANGE, MAGNET, tally, emoText, radios, pawLost, pieces, GAMES, BETA, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, loseCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText, breakable,
-          setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, feedbackCard, feedbackFor, toyPicker, pickLook};
+          setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, bestName, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, feedbackCard, feedbackFor, toyPicker, pickLook};
 })();
