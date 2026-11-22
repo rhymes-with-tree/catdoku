@@ -2062,7 +2062,7 @@ const G = (() => {
     {id: "notes", name: "Auto Notes", words: ["On", "By game", "Off"], on: 0},
     {id: "sound", name: "Sound", words: ["On", "By game", "Off"], on: 0},
   ];
-  const STORES = {catdoku: "catdoku.v1", atlas: "catdoku.catlas.v1"};
+  const STORES = {catdoku: "catdoku.v1", atlas: "catdoku.catlas.v1", stash: "catdoku.stash.v4"};
   const storeOf = slug => STORES[slug] || `catdoku.${slug}.v1`;
   const CHECK = ["autoCheck", "Auto check", "Rule breaks turn red as you play", true, {row: "check"}];
   const NOTES = ["autoNotes", "Auto Notes 🔢", "Every maybe filled in for you", false, {row: "notes"}];
@@ -2082,6 +2082,7 @@ const G = (() => {
       ["autoNotes", "Dim used-up magnets", "Magnets no word left to find needs fade", false, {row: "decor", inv: true}]],
     blanket: [["autoCheck", "Auto check", "Slots that don't fit your lumps turn red", true, {row: "check"}],
       ["autoNotes", "Auto Notes 🔢", "A dot on every square the feathers prove has no cat; costs the gold paw", false, {row: "notes", warn: true, paw: true}]],
+    stash: [["autoNotes", "Auto Notes 🔢", "A ✓ crosses off the rest of its row and column", false, {row: "notes"}]],
     crossstitch: [CHECK],
     magnets: [["autoAudit", "Auto grade", "A wrong letter turns red and costs a life", false, {warn: true, paw: true, icon: "heart"}]],   // (named Auto-Audit until 2026-11)
     shelflife: [["shelf", "Shelf", "The pots stand on a shelf", true, {row: "decor"}]],
