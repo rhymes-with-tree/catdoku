@@ -112,14 +112,12 @@ Knock It Off's forgiving first two levels, Pounce saving while toys fall, and Wi
 Done the same day: Tunnel Run is turning only, with its sliding rugs behind a Tracks switch; Pounce is Pounce on Three; Night Light is plain rooms only, 15 levels from one tap; its rooms with
 cats that point their own way are Day Light (`daylight/`, in beta).
 
-- [ ] **Day Light: out of beta.** The owner plays it first. Still to settle: a cat of its own (Dottie stands in), its
-  place on the front page and in the daily challenge, and whether the sunny room reads well. From the owner's first
-  play (2026-11-12): a missing arrow needed marking, so a small red cross now marks each of the plain four ways a cat
-  that points its own way leaves out.
-  The owner (2026-11-22): the idea is muddy and needs re-imagining. One thought, not settled: opening and closing
-  blinds so sunlight passes through a whole apartment building. It also needs a light-coloured cat. A candidate
-  (2026-11-22): the white longhair with blue eyes among the general cats, sitting (`c18-17`, `c18-29`, `c19-46`), lying
-  as if in the sun (`c18-16`, `c19-22`, in no game yet) and from behind (`c19-33`). Check they read as one cat first.
+- [ ] **Day Light: out of beta.** Since 2026-11-22 a block of flats (the owner's picture): a window between two flats
+  that shine into each other, a blind (its cord on the side that can open it) where only one does, a wall where
+  neither does, and the goal is sun in every flat. Starring the white cat (`c18-29`, `c18-17`, `c19-22`, `c18-16`).
+  Still to do: the owner plays it and says whether the windows and blinds read at a glance (the panes are small on a
+  7 × 7 building at phone size; flats are about 33 pixels there); a name for the white cat; a front-page icon
+  (`icons/daylight.svg` still shows the old sunny room); and its place on the front page and in the daily challenge.
 - [ ] **Star cats from the big unnamed sets.** Zoomies, Bed Hog and Moving Day have no star cat yet. The general cats
   include whole sheets that could each become one, mostly unused (2026-11-22): the black-and-white cat with a blue
   collar (`c17-…`, about 25 pictures, about 15 in no game), the grey tabby (`c20-…`, about 20 in no game) and the brown
