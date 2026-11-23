@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Open the Door!</title>
-<script src="../move.js?v=2026-11-22.10"></script>
+<script src="../move.js?v=2026-11-23.1"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-22.10"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-23.1"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-22.10">
+<link rel="stylesheet" href="../games.css?v=2026-11-23.1">
 <style>
 /* A KenKen house: every row and column holds 1 to N once, and walls split the floor into rooms whose numbers
    must make the room's sign. Each room has a door that opens when the room is right; with every door open,
@@ -37,6 +37,16 @@
 .cells{position:absolute;inset:0;display:grid}
 .cell{position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer;background:var(--floor);transition:background .4s}
 .cell.done{background:var(--lit)}
+/* a square with a number is in that number's colour (G.numbers), its number in ink or white; the rooms show by their
+   walls, and a room that's right by its open door. Over a colour the picked square's row and column are washed
+   lighter, the picked square is outlined in ink, the same number as it ringed in white, and a clash ringed in red. */
+.cell.num{background:var(--num)}
+.cell.num .v,.cell.num .sign{color:var(--num-ink)}
+.cell.num.peer{background-image:linear-gradient(rgba(255,255,255,.3),rgba(255,255,255,.3))}
+.cell.num.sel{box-shadow:inset 0 0 0 4px var(--ink);background-image:linear-gradient(rgba(255,255,255,.4),rgba(255,255,255,.4))}
+.cell.num.same{box-shadow:inset 0 0 0 4px #fff}
+.cell.num.same .v{color:var(--num-ink)}
+.cell.num.clash .v{color:#C8392B;background:#fff;border-radius:999px;padding:0 .2em;box-shadow:0 0 0 3px #C8392B}
 .cell.sel{box-shadow:inset 0 0 0 3px #3C8681;z-index:1}
 .cell.peer{background-image:linear-gradient(rgba(60,134,129,.10),rgba(60,134,129,.10))}
 .cell.same .v{color:#3C8681}
@@ -110,7 +120,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-22.10"></script>
+<script src="../games.js?v=2026-11-23.1"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N grid where every row and column holds 1 to N once, cut into rooms (cages). Each room has a sign:
@@ -406,7 +416,8 @@ function draw() {
     const sign = plan.signAt[k] === i ? `<span class="sign${wrong[k] ? " wrong" : ""}">${room.t}${OPS_SHOWN[room.op]}</span>` : "";
     const notes = !g[i] && game.notes[i] ? `<span class="notes" style="grid-template-columns:repeat(${cols},1fr)">${[...Array(N)].map((_, v) => `<span>${game.notes[i] >> (v + 1) & 1 ? v + 1 : ""}</span>`).join("")}</span>` : "";
     const say = `Row ${r + 1}, column ${c + 1}: ${g[i] || "empty"}${sign ? `. Room sign ${room.t}${OPS[room.op]}` : ""}`;
-    html += `<div class="${cls}" data-i="${i}" role="button" aria-label="${say}" style="--floor:${floor};--lit:${lit}">${sign}${g[i] ? `<span class="v">${g[i]}</span>` : notes}</div>`;
+    const [bg, ink] = g[i] ? G.numbers.look(g[i]) : [];   // a number's square is in its colour (G.numbers)
+    html += `<div class="${cls}${g[i] ? " num" : ""}" data-i="${i}" role="button" aria-label="${say}" style="--floor:${floor};--lit:${lit}${g[i] ? `;--num:${bg};--num-ink:${ink}` : ""}">${sign}${g[i] ? `<span class="v">${g[i]}</span>` : notes}</div>`;
   }
   el.innerHTML = html;
   drawWalls(right);
@@ -484,7 +495,7 @@ const openFor = i => { const N = game.N, r = Math.floor(i / N), c = i % N; let m
 G.sound.define({"door.run": G.sound.get("catRuns")});
 const broken = () => { const c = check(); return c.clash.size + c.wrong.filter(Boolean).length; };
 let wasWrong = null, wasRight = null;
-const pad = G.pad({broken, game: () => game, max: () => game.N, sel: () => sel, select: i => { sel = i; },
+const pad = G.pad({colours: true, broken, game: () => game, max: () => game.N, sel: () => sel, select: i => { sel = i; },
   peers: i => { const N = game.N, r = Math.floor(i / N), c = i % N, ps = []; for (let j = 0; j < N; j++) ps.push(r * N + j, j * N + c); return ps; }, open: openFor, auto: () => settings.autoNotes, playing,
   push: () => undo.push(), before: i => guesses.before(i), changing: () => { const c = check(); wasWrong = c.wrong; wasRight = c.right; }, draw, save,
   after: changed => {
@@ -696,6 +707,7 @@ $("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
 $("helpBtn").onclick = showHelp;
 
 G.nav("opendoor");
+G.numbers.watch(() => { if (game) { pad.make(); draw(); } });   // the number colours: redrawn if they change, and asked about once
 G.checkClock(game);
 G.setupTimer({name: "opendoor", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
 $("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
