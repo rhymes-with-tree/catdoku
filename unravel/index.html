@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Unravel</title>
-<script src="../move.js?v=2026-11-23.3"></script>
+<script src="../move.js?v=2026-11-23.4"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-23.3"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-23.4"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-23.3">
+<link rel="stylesheet" href="../games.css?v=2026-11-23.4">
 <style>
 /* Pegs on a board with a shape chalked between them. The cat unrolls one strand of yarn along the shape,
    peg to peg, and the ball shrinks as it goes. Every line once, in one go. */
@@ -35,7 +35,7 @@
 .pegboard{position:relative;width:100%;margin:0 auto;background:var(--panel);border:3px solid var(--ink);border-radius:12px;
   touch-action:none;user-select:none;-webkit-user-select:none;cursor:pointer}
 .pegboard svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
-.line{stroke:#B9A88C;stroke-width:.07;stroke-dasharray:.14 .1;stroke-linecap:round}
+.line{stroke:var(--chalk,#B9A88C);stroke-width:.07;stroke-dasharray:.14 .1;stroke-linecap:round}
 .shade{fill:none;stroke:var(--ink);stroke-opacity:.28;stroke-width:.3;stroke-linecap:round;stroke-linejoin:round}
 .trail{fill:none;stroke-width:.22;stroke-linecap:round;stroke-linejoin:round}
 .twist{fill:none;stroke:#fff;stroke-opacity:.45;stroke-width:.07;stroke-dasharray:.08 .08;stroke-linecap:round;stroke-linejoin:round}
@@ -76,8 +76,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-23.3"></script>
-<script src="../colorways.js?v=2026-11-23.3"></script>
+<script src="../games.js?v=2026-11-23.4"></script>
+<script src="../colorways.js?v=2026-11-23.4"></script>
 <script>
 /* ---------- shapes (plain functions, also run in a background worker) ---------- */
 // Levels: [columns, rows of pegs, lines to cover, diagonals allowed, pegs the strand must cross itself at (go
@@ -242,6 +242,23 @@ function makeShape(n) {
 // game: {level, W, H, edges ([a, b] lines), path (pegs the strand has visited, in order), color, restarted, hinted, won}
 const STORE = "catdoku.unravel.v1", MAX_LEVEL = 6;
 const COLORS = ["#E16A4A", "#B94588", "#73A7AE", "#6AA673", "#7885BA", "#ECA818", "#BD5538"];
+// The strand changes colour along its length, from the puzzle's colour through the next two round the wheel (PAINTS),
+// each line its own place along that blend, so the colours show the order it went in; the ball is the colour the
+// strand has got to. The board is a woven rug in the colour across the wheel from the puzzle's, with a border band, and
+// the lines still to cover are dashed in its darker shade (the owner's call, 2026-11-23: until then one colour of
+// yarn on a plain board, with tan lines).
+const PAINTS = ["#E16A4A", "#BD5538", "#ECA818", "#B3B94B", "#6AA673", "#73A7AE", "#7885BA", "#4E577D", "#8D78AD", "#B94588"];   // round the wheel
+const wheelAt = () => Math.max(0, PAINTS.indexOf(game.color));
+const strandAt = j => { const i = wheelAt(), ramp = [0, 1, 2].map(d => PAINTS[(i + d) % PAINTS.length]), n = T().total;
+  return rampAt(ramp, n > 1 ? Math.min(1, j / (n - 1)) : 0); };
+function dressBoard() {
+  const c = PAINTS[(wheelAt() + 5) % PAINTS.length], b = $("board");
+  // the softest colours (spring blue, lavender, periwinkle) tinted more, or their pale field comes out grey
+  const k = {"#4E577D": 44, "#8D78AD": 36, "#7885BA": 36}[c] || 28, tint = d => `color-mix(in oklch,${c} ${k + d}%,#fff)`;
+  b.style.background = `repeating-linear-gradient(0deg,${tint(0)} 0 7px,${tint(7)} 7px 9px)`;
+  b.style.boxShadow = `inset 0 0 0 7px ${c},inset 0 0 0 10px ${tint(0)},inset 0 0 0 12px ${c}`;
+  b.style.setProperty("--chalk", `color-mix(in srgb,${c} 55%,#2A2530)`);
+}
 const $ = G.$;
 let state = G.load(STORE);
 let settings = Object.assign({level: 1}, state.settings);
@@ -276,6 +293,7 @@ function draw() {
   queueMicrotask(say);   // once the drawing is done
   const {W, H} = game, svg = $("art"), used = usedOf(), path = game.path, end = path[path.length - 1], t = T();
   const board = $("board");
+  dressBoard();
   board.style.width = `min(100%, ${W * 92}px)`; board.style.aspectRatio = `${W} / ${H}`;
   board.parentElement.style.setProperty("--aspect", H / W + 0.03);   // its height for each pixel across (games.css)
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
@@ -301,7 +319,7 @@ function draw() {
     const key = edgeKey(path[k - 1], path[k]), L = t.lines[key], o = seen[key] = (seen[key] || 0) + 1;
     segs.push(seg(L.a, L.b, L.k === 2 ? (o === 1 ? -DOUBLE : DOUBLE) : 0));
   }
-  for (const cls of ["shade", "trail", "twist"]) for (const sg of segs) svg.append(svgEl("line", {...sg, class: cls, ...(cls === "trail" ? {stroke: game.color} : {})}));
+  for (const cls of ["shade", "trail", "twist"]) segs.forEach((sg, j) => svg.append(svgEl("line", {...sg, class: cls, ...(cls === "trail" ? {stroke: strandAt(j)} : {})})));
   const nexts = path.length && !game.won ? new Set(movesFrom(t, end, used)) : new Set();
   for (const p of pegsOf()) {
     const [cx, cy] = pt(p), open = t.at[p].some(key => (used[key] || 0) < t.lines[key].need);
@@ -316,7 +334,7 @@ function draw() {
   if (path.length && !game.won) {
     const [cx, cy] = pt(end), r = .16 + .2 * (1 - covered() / t.total);
     const g = svgEl("g", {transform: `translate(${cx} ${cy})`});
-    g.append(yarnBall(game.color, r));
+    g.append(yarnBall(strandAt(Math.max(0, segs.length - 1)), r));
     svg.append(g);
   }
   if (kbAt >= 0 && kbAt < game.W * game.H) { const [cx, cy] = pt(kbAt); svg.append(svgEl("circle", {cx, cy, r: .36, class: "kbring"})); }
