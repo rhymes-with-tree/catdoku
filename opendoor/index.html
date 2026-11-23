@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Open the Door!</title>
-<script src="../move.js?v=2026-11-23.8"></script>
+<script src="../move.js?v=2026-11-23.9"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-23.8"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-23.9"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-23.8">
+<link rel="stylesheet" href="../games.css?v=2026-11-23.9">
 <style>
 /* A KenKen house: every row and column holds 1 to N once, and walls split the floor into rooms whose numbers
    must make the room's sign. Each room has a door that opens when the room is right; with every door open,
@@ -120,7 +120,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-23.8"></script>
+<script src="../games.js?v=2026-11-23.9"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N grid where every row and column holds 1 to N once, cut into rooms (cages). Each room has a sign:
@@ -542,24 +542,68 @@ function hint() {
     const i = wrong.includes(sel) ? sel : wrong[0];
     sel = i; hints.show({i, kind: "hintBad"}, `That one's wrong${G.andMore(wrong.length - 1)}`);
   } else {
-    const empty = (i => !g[i]), left = k => plan.rooms[k].cells.filter(empty).length;
-    const cands = g.map((_, i) => i).filter(empty).sort((a, b) => left(plan.at[a]) - left(plan.at[b]) || a - b);
-    const i = cands.includes(sel) ? sel : cands[0];
-    const why = whyNumber(i);   // pick the square and say why, then its number; the player puts it in
+    const {i, why} = nextStep(g);   // the square to work out next and why, then its number; the player puts it in
     sel = i; hints.show({i, kind: "hinted"}, hints.level() ? `The glowing square is a ${sol[i]}${why[1]}.` : why[0]);
   }
 }
-// Why a hinted square takes its number: the only number its row and column leave, or the only one that makes its
-// room's sign once it's the room's last square. [what to say first, without the number; what to add to the number]
-function whyNumber(i) {
-  const N = game.N, g = game.grid, r = Math.floor(i / N), c = i % N, room = plan.rooms[plan.at[i]];
-  const free = [...Array(N)].map((_, v) => v + 1).filter(v => ![...Array(N)].some((_, j) => g[r * N + j] === v || g[j * N + c] === v));
-  if (free.length === 1) return ["Only one number fits in the glowing square: its row and column have the rest.", ": its row and column have the rest"];
-  if (room.cells.length > 1 && room.cells.every(k => k === i || g[k])) {
-    const fits = free.filter(v => cageValue(room.op, room.cells.map(k => k === i ? v : g[k])) === room.t);
-    if (fits.length === 1) return [`The glowing square is the last in its room, and only one number makes ${room.t}${OPS[room.op]}.`, `: it's the last square in its room, and only a ${fits[0]} makes ${room.t}${OPS[room.op]}`];
+// The square to work out next from the board as it is, by the steps the puzzle maker checks every house with
+// (solveRooms), simplest first: a square its row and column leave one number; the only place left for a number in
+// a row or column; a square where, of all the ways its room can make its sign, only one number fits. When none of
+// those settles a square yet, the rooms' ways rule numbers out (as notes would), and it looks again: then it's the
+// first square that settles, with a word that it took more than one step. Squares of the room nearest full, or the
+// picked square, first among equals. [what to say first, without the number; what to add to the number]
+function nextStep(g) {
+  const N = game.N, all = [...Array(N)].map((_, v) => v + 1), row = i => Math.floor(i / N), col = i => i % N;
+  const dom = g.map((v, i) => v ? [v] : all.filter(v => ![...Array(N)].some((_, j) => g[row(i) * N + j] === v || g[j * N + col(i)] === v)));
+  const empty = i => !g[i], left = k => plan.rooms[k].cells.filter(empty).length;
+  const best = list => list.sort((a, b) => (b.i === sel) - (a.i === sel) || left(plan.at[a.i]) - left(plan.at[b.i]) || a.i - b.i)[0];
+  const sign = room => `${room.t}${OPS[room.op]}`;
+  for (let round = 0; round < 4 * N * N; round++) {
+    const later = round > 0, found = [];
+    // one number left in a square
+    for (let i = 0; i < N * N; i++) if (empty(i) && dom[i].length === 1) found.push({i, why: later
+      ? ["Work out the ways the rooms around the glowing square can make their signs: they leave it only one number.", ": the ways the rooms around it can make their signs leave only that"]
+      : ["Only one number fits in the glowing square: its row and column have the rest.", ": its row and column have the rest"]});
+    if (found.length) return best(found);
+    // the only place left for a number in a row or column
+    for (let a = 0; a < N; a++) for (const line of ["row", "column"]) for (const v of all) {
+      const at = [...Array(N)].map((_, b) => line === "row" ? a * N + b : b * N + a).filter(i => dom[i].includes(v));
+      if (at.length === 1 && empty(at[0])) found.push({i: at[0], why: [
+        `The glowing square is the only place left in its ${line} for one of the numbers${later ? ", once the rooms' ways are worked out" : ""}.`,
+        `: it's the only place left in its ${line} for a ${v}${later ? ", once the rooms' ways are worked out" : ""}`]});
+    }
+    if (found.length) return best(found);
+    // each room: the ways its numbers could go, given what each square can still be
+    let changed = false;
+    plan.rooms.forEach(room => {
+      const cells = room.cells, seen = cells.map(() => new Set()), vals = [];
+      const go = q => {
+        if (q === cells.length) { if (cageValue(room.op, vals) === room.t) vals.forEach((v, j) => seen[j].add(v)); return; }
+        for (const v of dom[cells[q]]) {
+          if (vals.some((u, j) => u === v && (row(cells[j]) === row(cells[q]) || col(cells[j]) === col(cells[q])))) continue;
+          vals[q] = v; go(q + 1);
+        }
+        vals.length = q;
+      };
+      go(0);
+      cells.forEach((i, j) => {
+        const keep = dom[i].filter(v => seen[j].has(v));
+        if (keep.length && keep.length < dom[i].length) {
+          dom[i] = keep; changed = true;
+          if (empty(i) && keep.length === 1 && !later) found.push({i, why: cells.length === 1
+            ? ["The glowing square is a room on its own: its number is on the sign.", ": it's a room on its own"]
+            : cells.every(k => k === i || g[k])
+            ? [`The glowing square is the last in its room, and only one number makes ${sign(room)}.`, `: it's the last square in its room, and only a ${keep[0]} makes ${sign(room)}`]
+            : [`Of all the ways its room can make ${sign(room)}, only one number fits the glowing square.`, `: of all the ways its room can make ${sign(room)}, only a ${keep[0]} fits there`]});
+        }
+      });
+    });
+    if (found.length) return best(found);
+    if (!changed) break;
   }
-  return [`The glowing square's room is the nearest to full. Its row and column leave ${free.length} numbers.`, ""];
+  // (a house the maker checked never gets here, but a 9 × 9 may need a guess): the square with the fewest numbers left
+  const i = g.map((_, i) => i).filter(empty).sort((a, b) => dom[a].length - dom[b].length || a - b)[0];
+  return {i, why: [`Nothing can be worked out for certain here: this house may need a guess. The glowing square has ${dom[i].length} numbers left.`, ": a guess, as this house may need one"]};
 }
 $("hintBtn").onclick = hint;
 $("restartBtn").onclick = () => {
