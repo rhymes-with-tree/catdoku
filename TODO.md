@@ -15,7 +15,8 @@ README, Hosting and the move). It waits for the new site to answer, so it's on `
 - [ ] then make the repository private, which turns GitHub Pages off; the old address stops working for good
 - [x] Email Routing for lapcatpuzzles.com in Cloudflare (Compute, Email Service): domain onboarded 2026-11-17; the
   destination address and a hello@ rule set up by the owner (2026-11-20)
-- [ ] after the switch, the Pawprints numbers carry on in one line (the paths keep `/catdoku`); check a day's worth
+- [x] after the switch, the Pawprints numbers carry on in one line (the paths keep `/catdoku`); checked 2026-11-23:
+  every page counted since 2026-11-17 is under `/catdoku/`, with no gap in the days
 
 ## Junk Drawer: checks not yet run
 
@@ -66,12 +67,25 @@ and L-M-N-O-Pom, High Perch's trees left standing, smaller first sizes in Catdok
 Knock It Off's forgiving first two levels, Pounce saving while toys fall, and Window Ledges' two gentle levels):
 
 - [ ] **Toe Beans: levels 9 and 10?** 0 solves in 9 starts, but five of those ended with Close enough, 1 to 6 away,
-  which is the game working as meant. Leave unless the owner finds them too hard.
+  which is the game working as meant. Leave unless the owner finds them too hard. (By 2026-11-23: level 9 12 → 3,
+  level 10 22 → 12; Close enough no longer counts as a solve in Pawprints since that day.)
 - [ ] **Pounce: check level 1.** 23 → 12, though the move limits were tuned for a near-certain win. Running out of
   moves wasn't counted, so that may be people looking in and leaving; it's counted from 2026-11-12 ("Pounce out of
   moves on level N"). Look again with a few weeks of it.
 - [ ] **Weak level 1s to watch** (small samples): Cat Pile 16 → 7, Scratch That 17 → 8, Kitten Caboodle 10 → 5. (Window
-  Ledges, 11 → 5, got two gentle levels 1 and 2 on 2026-11-20; see how the new level 1 does.)
+  Ledges, 11 → 5, got two gentle levels 1 and 2 on 2026-11-20; see how the new level 1 does: no one has started it
+  yet, by 2026-11-23.)
+- [ ] **Open the Door!: levels 2 and 6, and a Hint that reasons** (Pawprints, to 2026-11-23, with the levels before
+  2026-11-12 moved to their new numbers): level 2 8 → 2, level 6 (7 × 7) 30 → 13, level 7 (8 × 8) 12 → 5, level 8
+  (9 × 9, may need a guess) 7 → 0. Level 7 can be worked out without a guess (12 houses made and checked,
+  2026-11-23: one answer each, and the solver never had to guess), but its logic includes checking every way a room's
+  numbers could go against the notes. Hint doesn't follow that logic: it lights the empty square in the fullest room,
+  and unless only one number fits there it says "its row and column leave 4 numbers", then gives the number. A Hint
+  that points at the square the solver settles next, and says why (which room's ways, or which row's last place),
+  would help most on levels 6 to 8.
+- [ ] **Hide & Seek: the first size** (Pawprints, to 2026-11-23): 9 × 9 has 44 floors started, 19 cleared and 16 out
+  of lives. Perhaps a gentler first floor (fewer cats, or a first tap that always opens a patch).
+- [ ] **Fish Bones: levels 5 to 7** (small samples, to 2026-11-23): 7 → 3, 6 → 2 and 5 → 2. Watch.
 - [ ] **Under the Blanket: out of beta again.** Moved to beta on 2026-11-16 (the owner's call) after its first week on
   the front page: 11 starts at level 1, 6 solves. Still to settle what makes level 1 easier to get into.
   The owner (2026-11-22): it needs re-imagining, perhaps as Under the Bed. Roll a ball under the bed where sleepy cats
@@ -90,6 +104,8 @@ Knock It Off's forgiving first two levels, Pounce saving while toys fall, and Wi
   `gus-7`; cats peeking round a corner, `c16-14`, `c19-21`, `c20-8`, `fred-6`); more kinds of case (a time of day as a
   third thing, cats who saw each other). Day Light: whether the windows and blinds read at a glance on a 7 × 7
   building at phone size (flats about 33 pixels there).
+  First numbers (to 2026-11-23): Kit-Ten 5 games started and 6 scores sent: 4,000+ twice, 8,000+ twice, 16,000+ and 32,000+. Case Clawsed 8 cases started, 7
+  solved. Day Light level 1 6 → 4, and 1 of those 4 went on to level 2.
 - [ ] **Moonpie's purr in more places.** The owner loves the purr in Swap-a-Pom and is thinking of using it in other
   games (2026-11-22). Not decided where yet.
 - [ ] **Twirl's sound on an iPhone** (feedback, 2026-11-16): sometimes no sound at all. Since the same day a tap's sound
@@ -100,7 +116,9 @@ Knock It Off's forgiving first two levels, Pounce saving while toys fall, and Wi
   feedback. Since 2026-11-20 leaving a page lets its sound go and the first tap back makes it again, and a sound whose
   clock has stopped starts afresh. Check both on an iPhone: Bed Hog, front page, Back, tap; and send feedback, then tap.
 - [ ] **Somewhere to go past the hardest level.** (Twirl has levels 21 to 24 since 2026-11-15.) Toy Box's level 21 is a fifth of its starts; Twirl and Knock It Off
-  at 20 are the same.
+  at 20 are the same. Others reaching their top level (Pawprints, to 2026-11-23): Fair Play's level 6 most of all
+  (59 started, 53 won), Cat Mat's 10 (16 → 16), If It Fits' 4 (10 → 10),
+  Toe Beans' 10 (22 → 12) and Pawlette's 5 (13 → 9).
 
 ### The owner's notes on the list, and what was decided (2026-11-12)
 
@@ -124,7 +142,8 @@ cats that point their own way are Day Light (`daylight/`, in beta).
   two-cat blanket). Next to look at: which other games teach everything up front.
 - [ ] **Toy Box, Twirl and Knock It Off need more** past their hardest level. The owner's picks (2026-11-15), and more
   ideas of the same kind to choose from; each would be one new thing a level, from the level after the top one:
-  - Knock It Off, picked (2026-11-15): a second cat to switch to, the lazy Susan (its four squares turn a quarter
+  - Knock It Off, picked (2026-11-15): a second cat to switch to (Ezer, the owner, 2026-11-21: he likes to play on
+    beds especially, so perhaps a bed to knock things off; his pictures are still to come), the lazy Susan (its four squares turn a quarter
     each time the cat steps on it), a spray bottle that watches a row (the cat can't end a move in its line), and the
     robot vacuum that moves each turn. The tray (it carries what's on it) is still being considered. Not picked: the
     puddle, laundry basket, sleeping dog, stack of cups, the human coming home.
@@ -146,11 +165,25 @@ cats that point their own way are Day Light (`daylight/`, in beta).
   out each time the top size is wound): whether one Shake a run is right, and whether its basket should be deeper.
 - [ ] **Zen:** look for more games that could have one (Pounce on Three and Bubbles do).
 
+## From Pawprints' notes (2026-11-23)
+
+- [ ] **Pounce on Three: "null is not an object (evaluating 't.k')"** (an error, 2026-11-07; also `S.g[a].k`). A
+  toy's kind is read from a square that's already empty, probably a tap landing just as a match clears. Check the
+  square before reading `.k` in the tap handler, or ignore taps while toys are clearing. Not seen since, though the
+  game has been played little since then either (on 8, 15, 16, 21 and 22 Nov, mostly level 19).
+- [ ] **Pawprints: the other games whose levels were renumbered.** Before a renumbering a level's moments carry the old
+  number, so the Levels section counts two puzzles as one. Open the Door! is fixed (`LEVEL_MOVES` in
+  `.claude/skills/dashboard/pull.py`, 2026-11-23). Still to add, from each page's own notes on it: Window Ledges
+  (2026-11-20, 1 to 5 became 3 to 7), Twirl (2026-11-16, 26 to 29 became 25 to 28), Under the Blanket (twice on
+  2026-11-12: a single day can't tell the two apart, so perhaps leave that day out), Night Light (twice), Wind Up
+  (13 to 21 in a new order, 2026-11-21), Pounce Up (a new order, 2026-11-20) and Pawlinko.
+
 ## Star cats decided, waiting for pictures
 
 Pangur Bán (Pangur) for Cat Burglar and Fitzwilliam Darcy (Fitz) for Pawlette (the owner, 2026-11-12; `ARTWORK.md`,
 "Stars decided"). Once their pictures are in `cats/`, put each into its game. Crow (like Ferguson, only much sleeker)
-will star in Crow's Drawers, not made yet (`IDEAS.md`); add Crow's poses to `ARTWORK.md` when they come.
+will star in Crow's Drawers, not made yet (`IDEAS.md`); add Crow's poses to `ARTWORK.md` when they come. Ezer will be
+Knock It Off's second cat (the owner, 2026-11-21; under "Toy Box, Twirl and Knock It Off need more").
 
 ## Pounce Up: tune the goals
 

@@ -68,6 +68,8 @@ tagline and front-page icon as Bowtie has in Tunnel Run. **Crow**, the shop cat 
 https://theravenswing.com/; the shop wants the publicity, so name it and link to it; the game's shop is the site's own version, drawn in the
 site's colours, not the shop's), is to star
 in Crow's Drawers, dowsing for things hidden in the shop's apothecary drawers (the owner, 2026-11-13; see `IDEAS.md`).
+**Ezer** is to be Knock It Off's second cat, the one to switch to (the owner, 2026-11-21: he likes to play on beds
+especially); no pictures of him yet.
 Crow looks like Ferguson (a black cat with yellow eyes) but much sleeker, not fluffy; the owner will have pictures soon.
 
 Purrfect Square puts one of 24 general cats, picked at random each visit, beside its title: those sitting up and facing out

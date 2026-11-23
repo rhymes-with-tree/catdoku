@@ -40,7 +40,12 @@ ROW_RE = re.compile(r"^(.+) in a row: (.+)$")
 OLD_NAMES = {"Pounce": "pounce", "Fuzzy Spelling": "fuzzyspelling", "Cat-astrophe": "catastrophe", "Toy Tango": "tango",
              "Cat Shuffle": "catshuffle", "Nip Trip": "pawlette"}
 # a folder that held a different game before: its page opens count from the day the game in it now went live
-REMADE = {"stash": "2026-11-22"}   # Case Clawsed (Toy Stash and Mewstermind, a Mastermind, before)
+REMADE = {"stash": "2026-11-22"}
+# a game whose levels were renumbered: a moment sent before the day it went live carries the old number, so it's
+# moved to the level that's the same puzzle now ([(the day the new numbers began, old number → new number)])
+LEVEL_MOVES = {
+    "opendoor": [("2026-11-12", lambda n: n + 1 if n >= 3 else n)],   # × got a level of its own at 3: 3 to 7 became 4 to 8
+}   # Case Clawsed (Toy Stash and Mewstermind, a Mastermind, before)
 
 
 def get(path, **q):
@@ -177,8 +182,12 @@ def main():
             lv = LEVEL_RE.search(p)
             if lv and "endless" not in p.lower():   # each numbered level, for where people stop
                 for d, n in days.items():
-                    key = (d, g[1], int(lv.group(1)))
-                    row = levels.setdefault(key, {"day": d, "slug": g[1], "game": g[0], "shelf": g[3], "level": int(lv.group(1)), "started": 0, "solved": 0, "lost": 0})
+                    num = int(lv.group(1))
+                    for began, move in LEVEL_MOVES.get(g[1], []):
+                        if d < began:
+                            num = move(num)
+                    key = (d, g[1], num)
+                    row = levels.setdefault(key, {"day": d, "slug": g[1], "game": g[0], "shelf": g[3], "level": num, "started": 0, "solved": 0, "lost": 0})
                     row[f] += n
 
     code = open(__file__, encoding="utf-8").read()
