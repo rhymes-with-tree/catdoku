@@ -23,7 +23,7 @@ TZ = ZoneInfo("America/New_York")
 SINCE = date(2026, 9, 1)   # before the counter's first day, so every day it has is pulled
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
-START_RE = re.compile(r"\b(started|new (puzzle|tangle|table|trip|board|floor|tower|round|skein|keyboard))\b", re.I)   # games.js
+START_RE = re.compile(r"\b(started|new (puzzle|tangle|table|trip|board|floor|tower|round|skein|keyboard|game|case))\b", re.I)   # games.js
 # what each game sends on a win and on a loss (their G.track calls; a moment that's neither isn't counted)
 # (Cat Burglar: "caught" is a win, "got away" a loss; its "round over …: 2 caught" is neither)
 SOLVED_RE = re.compile(r"\b(solved|won|done|finished|complete|dyed|cleared|untangled|genius|caught)\b", re.I)

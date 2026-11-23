@@ -844,7 +844,7 @@ const G = (() => {
   // A visit ends after 30 minutes with no page opened and no puzzle started. A puzzle "started" is any moment a game
   // already counts as one (a name with "new …" or "started"). Nothing about the player goes with it.
   const VISIT = "catdoku.visit.v1", VISIT_GAP = 30 * 60e3;
-  const START_RE = /\b(started|new (puzzle|tangle|table|trip|board|floor|tower|round|skein|keyboard))\b/i;
+  const START_RE = /\b(started|new (puzzle|tangle|table|trip|board|floor|tower|round|skein|keyboard|game|case))\b/i;
   const gameName = slug => (GAMES.find(g => g[1] === slug) || BETA.find(g => g[1] === slug) || [slug])[0];
   const runs = n => n >= 10 ? "10+" : n >= 6 ? "6-9" : String(n);
   const lasted = ms => { const m = ms / 60e3; return m < 1 ? "under 1 min" : m < 5 ? "1-5 min" : m < 15 ? "5-15 min" : m < 30 ? "15-30 min" : m < 60 ? "30-60 min" : "1 hour or more"; };
