@@ -36,7 +36,10 @@ owner can ask for one any time.
    script's own text in `meta`); the page adds up the days the timeline picks. It takes a
    minute or two: GoatCounter allows a few requests a second and the script waits when it's refused. The game names
    and shelves come from `games.js`, so a new game shows up by itself; a game whose win or loss moment uses a new verb
-   needs it added to `SOLVED_RE` or `LOST_RE` (Cat Burglar's "caught" is a win and "got away" a loss).
+   needs it added to `SOLVED_RE` or `LOST_RE` (Cat Burglar's "caught" is a win and "got away" a loss), and a game whose moments
+   start with a name other than its own needs that name added to `OLD_NAMES` (its old names, such as Mewstermind for
+   Case Clawsed, and Pounce, which Pounce on Three's moments still say). A game whose start moment says something new
+   ("new case") needs it added to `START_RE` here and in `games.js` alike.
 2. **Read the feedback.** The Google Drive connector's `read_file_content` on the sheet "Website Feedback Form
    (Responses)" (`1uOKFrs2O5aLL4sAZhFbTwMQ6yWZjVyqGH55RUpl4PiE`, tab Form Responses 1). Columns: Timestamp, Kind,
    Message, Game, Details, Contact, Build, Browser, Device (the page's address), Text. The connector can cut a long
