@@ -58,7 +58,9 @@
 .num.back-top{padding-top:26%}
 .num.back-left{padding-left:26%}
 .num.done{opacity:.4}
-.num.over,.num.short{color:#C8392B}   /* short: too few posts, shown once the floor is full */
+.num b{font:inherit}
+/* short: too few posts, shown once the floor is full; red on a white chip, to show on any fabric */
+.num.over b,.num.short b{color:#C8392B;background:#fff;border-radius:999px;padding:0 .16em;box-shadow:0 0 0 .05em #C8392B}
 .dot{position:absolute;left:50%;top:50%;width:16%;height:16%;border-radius:50%;background:#5E5866;transform:translate(-50%,-50%);opacity:.6}
 .sq.bad svg .ring{display:block}
 .ring{display:none}
@@ -219,8 +221,13 @@ const postSVG = scratched => `<svg viewBox="0 0 100 100" aria-hidden="true">
 const POST = postSVG(false), SCRATCHED = postSVG(true);
 // Furniture seen from above. A row of furniture squares is one sofa, with its back along the top, an arm
 // at each end and a seat cushion a square; a column is a sofa on its side, back along the left; a square on
-// its own is an armchair. Each sofa has its own fabric, from the site's colours.
-const FABRICS = ["#7885BA", "#B94588", "#6AA673", "#E16A4A", "#8D78AD", "#4E577D"];
+// its own is an armchair. Each sofa's fabric is in the number colours (G.numbers; the owner's design, 2026-11-23): a
+// sofa whose numbers all share a colour is that colour all over (a 0 takes 10's colour); one with numbers of more
+// than one colour has a throw pillow in each number's colour, on a fabric of its own; and furniture with no number
+// takes a colour from 5 to 9, which no number here has (they go up to 4), picked from where it sits. Until then each
+// sofa had a fabric of its own from the site's colours.
+const FILLER = [5, 6, 7, 8, 9];
+const colourOf = v => v === 0 ? 10 : v;   // a number's place in the number colours
 function furniture() {
   const {N, g} = game, wall = (x, y) => x >= 0 && y >= 0 && x < N && y < N && g[y * N + x] !== -1;
   // squares with furniture beside them in the row are row sofas; the rest join up in columns; each sofa gets a fabric
@@ -231,6 +238,9 @@ function furniture() {
     for (let j = i; j < N * N && g[j] !== -1 && row[j] === row[i] && group[j] < 0 && (!row[i] || Math.floor(j / N) === Math.floor(i / N)); j += step(i)) group[j] = k;
     k++;
   }
+  // each sofa's number colours, one of each
+  const sofaColours = [...Array(k)].map(() => []);
+  g.forEach((v, i) => { if (v >= 0 && !sofaColours[group[i]].includes(colourOf(v))) sofaColours[group[i]].push(colourOf(v)); });
   return g.map((v, i) => {
     if (v === -1) return null;
     const x = i % N, y = Math.floor(i / N), same = (a, b) => wall(a, b) && group[b * N + a] === group[i];
@@ -238,11 +248,13 @@ function furniture() {
     // drawn as a sofa piece with its back along the top: arms where the sofa ends on the left and right
     // (a column is turned a quarter, so its bottom end is the left)
     const armL = row[i] ? !same(x - 1, y) : col ? !same(x, y + 1) : true, armR = row[i] ? !same(x + 1, y) : col ? !same(x, y - 1) : true;
-    return {c: FABRICS[group[i] % FABRICS.length], armL, armR, side: col, key: `${group[i] % FABRICS.length}${+armL}${+armR}${+col}`};
+    const kinds = sofaColours[group[i]], one = kinds.length === 1, filler = FILLER[(group[i] * 3 + N) % FILLER.length];
+    const c = G.numbers.look(one ? kinds[0] : filler)[0], pillow = !one && v >= 0 ? G.numbers.look(colourOf(v))[0] : "";
+    return {c, pillow, armL, armR, side: col, key: `${c}${pillow}${+armL}${+armR}${+col}`};
   });
 }
 function sofaSVG(f) {
-  const c = f.c, frame = `color-mix(in srgb,${c} 88%,#fff)`, seat = `color-mix(in srgb,${c} 40%,#fff)`, edge = `color-mix(in srgb,${c} 60%,#2A2530)`;
+  const c = f.c, frame = `color-mix(in srgb,${c} 72%,#2A2530)`, seat = c, edge = `color-mix(in srgb,${c} 55%,#2A2530)`;
   // the frame runs past the square's edge where the sofa carries on, so its pieces join up
   const l = f.armL ? 3 : -3, r = f.armR ? 97 : 103, sl = f.armL ? 25 : -3, sr = f.armR ? 75 : 103;
   const s = `<rect x="${l}" y="3" width="${r - l}" height="94" rx="${f.armL && f.armR ? 16 : 0}" fill="${frame}"/>`
@@ -250,7 +262,8 @@ function sofaSVG(f) {
     + (f.armR ? `<path d="M${r - 16} 3 H${r} V97 H${r - 16}" fill="none" stroke="#2A2530" stroke-width="3" stroke-linejoin="round"/>` : "")
     + `<path d="M${l} 3 H${r} M${l} 97 H${r}" stroke="#2A2530" stroke-width="3"/>`
     + `<rect x="${sl}" y="30" width="${sr - sl}" height="64" rx="${f.armL || f.armR ? 10 : 0}" fill="${seat}" stroke="${edge}" stroke-width="2.5"/>`
-    + `<path d="M${Math.max(l, 0) + 8} 17 H${Math.min(r, 100) - 8}" stroke="${edge}" stroke-width="2" stroke-linecap="round" opacity=".45"/>`;
+    + `<path d="M${Math.max(l, 0) + 8} 17 H${Math.min(r, 100) - 8}" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".35"/>`
+    + (f.pillow ? `<circle cx="50" cy="62" r="27" fill="${f.pillow}" stroke="#2A2530" stroke-width="3"/>` : "");
   return `<svg viewBox="0 0 100 100" aria-hidden="true"><g${f.side ? ' transform="rotate(-90 50 50)"' : ""}>${s}</g></svg>`;
 }
 const CAT_SRC = {};  // filled with embedded pictures when the page is bundled into one file
@@ -323,7 +336,7 @@ function draw() {
       + (live && live.cells.includes(i) ? " hintcell" + (live.bad ? " bad" : "") : "") + (guessed.has(i) && s[i] === 1 ? " guessed" : "");
     if (d.dataset.want !== want) {
       d.dataset.want = want;
-      if (g[i] !== -1) d.innerHTML = sofaSVG(sofas[i]) + (g[i] >= 0 ? `<span class="num ${sofas[i].side ? "back-left" : "back-top"}">${g[i]}</span>` : "");
+      if (g[i] !== -1) d.innerHTML = sofaSVG(sofas[i]) + (g[i] >= 0 ? `<span class="num ${sofas[i].side ? "back-left" : "back-top"}" style="color:${G.numbers.look(colourOf(g[i]))[1]}"><b>${g[i]}</b></span>` : "");
       else if (s[i] === 1) d.innerHTML = !game.won ? POST : SCRATCHED.replace('class="claw"', `class="claw" style="animation-delay:${(i * 37) % 600}ms"`)
         + (i === dottieAt() ? `<img class="scratcher" src="${catSrc("dottie-6")}" alt="Dottie scratching the post">` : "");
       else d.innerHTML = s[i] === 0 ? `<span class="dot"></span>` : "";
@@ -582,6 +595,7 @@ G.switch({id: "checkTgl", label: "Auto check", line: "Rule breaks turn red as yo
   change: () => { if (game) draw(); }});
 
 G.nav("scratchthat");
+G.numbers.watch(() => { if (game) draw(); });   // the number colours: the furniture is redrawn if they change, and asked about once
 G.checkClock(game);
 G.setupTimer({name: "scratchthat", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level",
   emptyText: "Save the furniture in a room and your times will show up here. They're kept on this device only."});
