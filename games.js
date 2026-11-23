@@ -1276,7 +1276,8 @@ const G = (() => {
   }
 
   /* ---------- number colours ---------- */
-  // Games whose numbers each have a colour (Kit-Ten's tiles, Wind Up's balls of yarn) take them from here, in the
+  // Games whose numbers each have a colour (Kit-Ten's tiles, Wind Up's balls of yarn, High Perch's and Open the
+  // Door's squares and pads, Treat Time's treats, Catwalk's badges) take them from here, in the
   // order the player picked, one choice for every game (the owner's call, 2026-11-23). Style 1, the rainbow, is
   // Kit-Ten's order round the colour wheel (the owner's chart, 2026-11-22), and every player starts on it; Style 2 is
   // Wind Up's, which jumps about so neighbouring numbers differ in colour and lightness. Each list is 1 to 10; past 10
@@ -2932,7 +2933,12 @@ const G = (() => {
         b.onclick = () => { if (long) { long = false; return; } if (stuck !== null && stuck !== v) { stuck = null; o.draw(); } o.after(put(v)); };
         pad.append(b);
       };
-      for (let v = 1; v <= o.max(); v++) { const b = document.createElement("button"); b.textContent = v; hold(b, v); }
+      for (let v = 1; v <= o.max(); v++) {
+        const b = document.createElement("button"); b.textContent = v;
+        // a game whose numbers have colours (o.colours) colours its pad to match (G.numbers)
+        if (o.colours) { const [bg, ink] = numbers.look(v); b.classList.add("num"); b.style.setProperty("--num", bg); b.style.setProperty("--num-ink", ink); }
+        hold(b, v);
+      }
       // the eraser, as Toydoku's (not ⌫)
       const er = document.createElement("button"); er.className = "erase"; er.innerHTML = iconSVG("erase"); er.setAttribute("aria-label", "Erase"); hold(er, 0);
     }

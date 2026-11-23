@@ -40,6 +40,14 @@
 .sq.peer{fill:#EFE6F2}
 .sq.sel{fill:#E3D6EE}
 .sq.given{fill:#EADBC2}
+/* a square with a tree is in its height's colour (G.numbers); the picked square and its row and column are washed
+   lighter over it, the picked one outlined too */
+.sq.num{fill:var(--num)}
+.wash{fill:#fff;opacity:.32;pointer-events:none}
+.wash.sel{opacity:.5;stroke:var(--ink);stroke-width:6}
+/* a given height, or one that breaks a rule, sits on a cream chip so it reads (and the red shows) on any colour */
+.chip{fill:#F7EFE1;stroke:var(--ink);stroke-width:2.5;pointer-events:none}
+.chip.clash{fill:#fff;stroke:#C8392B;stroke-width:4}
 .tree{pointer-events:none}
 .ht{font-size:36px;font-weight:800;fill:var(--ink);text-anchor:middle;dominant-baseline:central;paint-order:stroke fill;stroke:#F7EFE1;stroke-width:7px;stroke-linejoin:round;pointer-events:none}
 .given .ht,.ht.given{stroke:#EADBC2}
@@ -296,11 +304,17 @@ function draw() {
   let out = "";
   for (let i = 0; i < N * N; i++) {
     const x = i % N * 100, y = Math.floor(i / N) * 100, r = Math.floor(i / N), c = i % N, given = isGiven(i);
-    const cls = ["sq", i === sel ? "sel" : sel >= 0 && (r === sr || c === sc) ? "peer" : "", given ? "given" : ""].filter(Boolean).join(" ");
-    out += `<rect class="${cls}" data-i="${i}" x="${x}" y="${y}" width="100" height="100"/>`;
+    const lit = i === sel ? "sel" : sel >= 0 && (r === sr || c === sc) ? "peer" : "";
+    const cls = ["sq", lit, given ? "given" : "", g[i] ? "num" : ""].filter(Boolean).join(" ");
+    // a tree's square is in its height's colour (G.numbers)
+    const [bg, ink] = g[i] ? G.numbers.look(g[i]) : [];
+    out += `<rect class="${cls}" data-i="${i}" x="${x}" y="${y}" width="100" height="100"${g[i] ? ` style="--num:${bg}"` : ""}/>`;
     if (g[i]) {
+      if (lit) out += `<rect class="wash ${lit}" x="${x + (lit === "sel" ? 3 : 0)}" y="${y + (lit === "sel" ? 3 : 0)}" width="${lit === "sel" ? 94 : 100}" height="${lit === "sel" ? 94 : 100}"/>`;
       out += treeSvg(x, y, g[i], N);
-      out += `<text class="ht${given ? " given" : ""}${clash.has(i) ? " clash" : ""}" x="${x + 20}" y="${y + 24}">${g[i]}</text>`;
+      const bad = clash.has(i), chip = given || bad;
+      if (chip) out += `<circle class="chip${bad ? " clash" : ""}" cx="${x + 20}" cy="${y + 24}" r="19"/>`;
+      out += `<text class="ht${given ? " given" : ""}${bad ? " clash" : ""}" x="${x + 20}" y="${y + 24}"${chip ? ` style="stroke:none"` : ` style="fill:${ink};stroke:${bg}"`}>${g[i]}</text>`;
     } else if (game.notes[i]) {
       const cols = Math.ceil(Math.sqrt(N));
       for (let v = 1; v <= N; v++) if (game.notes[i] >> v & 1) {
@@ -355,7 +369,7 @@ const openFor = i => { const N = game.N, r = Math.floor(i / N), c = i % N; let m
 // A tree built is a wood clack (G.pad plays it, and the logic games' note, take-out and rule-break sounds).
 G.sound.define({"hp.tree": t => G.sound.kit.modal({t, parts: [[700, 1, .06], [1800, .4, .03]], vol: .3})});
 const broken = () => { const c = check(); return c.clash.size + c.badSign.filter(Boolean).length + c.lookState.filter(x => x === "bad").length; };
-const pad = G.pad({sound: "hp.tree", broken, game: () => game, max: () => game.N, sel: () => sel, select: i => { sel = i; }, editable: i => !isGiven(i),
+const pad = G.pad({sound: "hp.tree", colours: true, broken, game: () => game, max: () => game.N, sel: () => sel, select: i => { sel = i; }, editable: i => !isGiven(i),
   peers: i => { const N = game.N, r = Math.floor(i / N), c = i % N, ps = []; for (let j = 0; j < N; j++) ps.push(r * N + j, j * N + c); return ps; }, open: openFor, auto: () => settings.autoNotes, playing,
   push: () => undo.push(), before: i => guesses.before(i), draw, save,
   after: changed => { if (!changed) return; if (game.grid.every((h, i) => h === game.sol[i])) { win(); return; } draw(); save(); }});
@@ -546,6 +560,7 @@ $("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
 $("helpBtn").onclick = showHelp;
 
 G.nav("highperch");
+G.numbers.watch(() => { if (game) { pad.make(); draw(); } });   // the number colours: redrawn if they change, and asked about once
 G.checkClock(game);
 G.setupTimer({name: "highperch", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
 $("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
