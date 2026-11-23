@@ -23,16 +23,24 @@ TZ = ZoneInfo("America/New_York")
 SINCE = date(2026, 9, 1)   # before the counter's first day, so every day it has is pulled
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
-START_RE = re.compile(r"\b(started|new (puzzle|tangle|table|trip|board|floor|tower|round|skein|keyboard))\b", re.I)   # games.js
+START_RE = re.compile(r"\b(started|new (puzzle|tangle|table|trip|board|floor|tower|round|skein|keyboard|game|case))\b", re.I)   # games.js
 # what each game sends on a win and on a loss (their G.track calls; a moment that's neither isn't counted)
-# (Cat Burglar: "caught" is a win, "got away" a loss; its "round over …: 2 caught" is neither)
-SOLVED_RE = re.compile(r"\b(solved|won|done|finished|complete|dyed|cleared|untangled|genius|caught)\b", re.I)
-LOST_RE = re.compile(r"\b(fell|out of (moves|swaps)|stuck|overflowed|gave up|got away|lost|over|missed|woke the human|piled up|tangled|put out)\b", re.I)
-NEITHER_RE = re.compile(r"\bround over\b", re.I)
+# (Cat Burglar: "caught" is a win, "got away" a loss; its "round over …: 2 caught" is neither, and so is Toe Beans'
+# "finished level 3 5 away", stopping short of the number)
+SOLVED_RE = re.compile(r"\b(solved|won|done|finished|complete|dyed|cleared|untangled|genius|caught|built)\b", re.I)
+LOST_RE = re.compile(r"\b(fell|out of (moves|swaps|lives)|stuck|overflowed|gave up|got away|lost|over|missed|woke the human|piled up|tangled|put out)\b", re.I)
+NEITHER_RE = re.compile(r"\b(round over|finished level \d+ \d+ away)\b", re.I)
 LEVEL_RE = re.compile(r"\blevel (\d+)\b", re.I)
 VISIT_RE = re.compile(r"^(Visit opened on|First game|Visit length|Games in a visit): (.+)$")
 AFTER_RE = re.compile(r"^After (.+): (.+)$")
 ROW_RE = re.compile(r"^(.+) in a row: (.+)$")
+# a game's moments keep the name it had when they were sent, so its old names are still its own
+# (not Toy Stash and Mewstermind, the Mastermind game that stash/ held before it became Case Clawsed: a different game,
+# so its numbers stay apart, under no game)
+OLD_NAMES = {"Pounce": "pounce", "Fuzzy Spelling": "fuzzyspelling", "Cat-astrophe": "catastrophe", "Toy Tango": "tango",
+             "Cat Shuffle": "catshuffle", "Nip Trip": "pawlette"}
+# a folder that held a different game before: its page opens count from the day the game in it now went live
+REMADE = {"stash": "2026-11-22"}   # Case Clawsed (Toy Stash and Mewstermind, a Mastermind, before)
 
 
 def get(path, **q):
@@ -107,7 +115,9 @@ def main():
     # 2. each game, each day
     games = games_list()
     by_slug = {g[1]: g for g in games}
-    names = sorted(((norm(g[0]), g) for g in games), key=lambda x: -len(x[0]))   # longest first: Pounce Up before Pounce
+    names = sorted([(norm(g[0]), g) for g in games] + [(norm(old), by_slug[s]) for old, s in OLD_NAMES.items() if s in by_slug],
+                   key=lambda x: -len(x[0]))   # longest first: Pounce Up before Pounce
+    now_called = {old: by_slug[s][0] for old, s in OLD_NAMES.items() if s in by_slug}   # the visit tally's labels too
 
     def game_of(event):
         e = norm(event)
@@ -134,7 +144,8 @@ def main():
             m = re.match(r"^/catdoku/([a-z0-9]+)/?$", p)
             if m and m.group(1) in by_slug:
                 for d, n in days.items():
-                    gd(by_slug[m.group(1)], d)["opens"] += n
+                    if d >= REMADE.get(m.group(1), ""):
+                        gd(by_slug[m.group(1)], d)["opens"] += n
             continue
         if p.startswith("Error"):
             for d, n in days.items():
@@ -151,6 +162,7 @@ def main():
             else:
                 kind = {"Visit opened on": "Opened on"}.get(v.group(1), v.group(1))
                 label, run = v.group(2), ""
+            label, run = now_called.get(label, label), now_called.get(run, run)
             for d, n in days.items():
                 key = (d, kind, label, run)
                 visits[key] = {"day": d, "kind": kind, "label": label, "run": run, "count": visits.get(key, {}).get("count", 0) + n}
