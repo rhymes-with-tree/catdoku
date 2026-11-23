@@ -35,8 +35,12 @@ VISIT_RE = re.compile(r"^(Visit opened on|First game|Visit length|Games in a vis
 AFTER_RE = re.compile(r"^After (.+): (.+)$")
 ROW_RE = re.compile(r"^(.+) in a row: (.+)$")
 # a game's moments keep the name it had when they were sent, so its old names are still its own
+# (not Toy Stash and Mewstermind, the Mastermind game that stash/ held before it became Case Clawsed: a different game,
+# so its numbers stay apart, under no game)
 OLD_NAMES = {"Pounce": "pounce", "Fuzzy Spelling": "fuzzyspelling", "Cat-astrophe": "catastrophe", "Toy Tango": "tango",
-             "Cat Shuffle": "catshuffle", "Nip Trip": "pawlette", "Toy Stash": "stash", "Mewstermind": "stash"}
+             "Cat Shuffle": "catshuffle", "Nip Trip": "pawlette"}
+# a folder that held a different game before: its page opens count from the day the game in it now went live
+REMADE = {"stash": "2026-11-22"}   # Case Clawsed (Toy Stash and Mewstermind, a Mastermind, before)
 
 
 def get(path, **q):
@@ -140,7 +144,8 @@ def main():
             m = re.match(r"^/catdoku/([a-z0-9]+)/?$", p)
             if m and m.group(1) in by_slug:
                 for d, n in days.items():
-                    gd(by_slug[m.group(1)], d)["opens"] += n
+                    if d >= REMADE.get(m.group(1), ""):
+                        gd(by_slug[m.group(1)], d)["opens"] += n
             continue
         if p.startswith("Error"):
             for d, n in days.items():
