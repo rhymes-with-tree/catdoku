@@ -1278,7 +1278,7 @@ const G = (() => {
   /* ---------- number colours ---------- */
   // Games whose numbers each have a colour (Kit-Ten's tiles, Wind Up's balls of yarn, High Perch's and Open the
   // Door's squares and pads, Treat Time's treats, Catwalk's badges,
-  // Scratch That's furniture, Hide & Seek's labels) take them from here, in the
+  // Scratch That's furniture, Hide & Seek's marker numbers) take them from here, in the
   // order the player picked, one choice for every game (the owner's call, 2026-11-23). Style 1, the rainbow, is
   // Kit-Ten's order round the colour wheel (the owner's chart, 2026-11-22), and every player starts on it; Style 2 is
   // Wind Up's, which jumps about so neighbouring numbers differ in colour and lightness. Each list is 1 to 10; past 10
