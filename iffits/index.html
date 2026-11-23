@@ -40,6 +40,7 @@
 .spotFill{fill:var(--spot);stroke:var(--spot);stroke-width:.03;stroke-linejoin:round}
 .spotLine{fill:none;stroke:var(--spot-edge);stroke-width:.03;stroke-dasharray:.09 .07;opacity:.8}
 .trayLine{stroke:var(--spot-edge);stroke-width:.025;stroke-dasharray:.12 .1;opacity:.5}
+.rug{pointer-events:none}
 .part{cursor:grab}
 .part .art{pointer-events:none}
 .part.lift{filter:drop-shadow(0 .12px .18px rgba(42,37,48,.45));cursor:grabbing}
@@ -257,11 +258,23 @@ function homePose(i, k, f) { return poseAt(i, k, f, HOME[i][0], HOME[i][1]); }
 // palette, a different one for each puzzle, so the finished box reads as one shape; a darker edge shows where the
 // pieces meet (the owner's call, 2026-11-23: until then they were plain cardboard in a few shades, with tape, and UP
 // printed on the slanted piece). The colour comes from the puzzle's answer, so a shared puzzle has the same one.
+// The box's spot on the floor is a pale tint of the same colour, edged in its darker shade, so it's plain where the
+// pieces go. The floor is a woven rug in the colour across the wheel from the pieces (PAINTS is in order round the
+// wheel, so five along): its field a soft tint, a full-strength border band, and fringe at the top and bottom.
 const PAINTS = ["#E16A4A", "#BD5538", "#ECA818", "#B3B94B", "#6AA673", "#73A7AE", "#7885BA", "#4E577D", "#8D78AD", "#B94588"];   // all ten
-function paint() {
-  let h = 0; for (const ch of JSON.stringify(game.sol)) h = (Math.imul(h, 31) + ch.charCodeAt(0)) | 0;
-  const c = PAINTS[Math.abs(h) % PAINTS.length];
-  return [c, `color-mix(in srgb,${c} 58%,#2A2530)`];
+const dark = c => `color-mix(in srgb,${c} 58%,#2A2530)`;
+function paintAt() { let h = 0; for (const ch of JSON.stringify(game.sol)) h = (Math.imul(h, 31) + ch.charCodeAt(0)) | 0; return Math.abs(h) % PAINTS.length; }
+function paint() { const c = PAINTS[paintAt()]; return [c, dark(c)]; }
+const rugOf = () => PAINTS[(paintAt() + 5) % PAINTS.length];
+function drawRug(svg) {
+  const c = rugOf(), g = el("g", {class: "rug", "aria-hidden": "true"}, svg);
+  el("rect", {x: 0, y: 0, width: VW, height: VH, fill: `color-mix(in oklch,${c} 30%,#fff)`}, g);
+  let d = ""; for (let y = 0.06; y < VH; y += 0.12) d += `M0 ${y.toFixed(2)}H${VW}`;   // the weave
+  el("path", {d, stroke: dark(c), "stroke-width": 0.012, opacity: 0.18}, g);
+  el("rect", {x: 0.32, y: 0.32, width: VW - 0.64, height: VH - 0.64, rx: 0.08, fill: "none", stroke: c, "stroke-width": 0.22}, g);
+  el("rect", {x: 0.55, y: 0.55, width: VW - 1.1, height: VH - 1.1, rx: 0.05, fill: "none", stroke: c, "stroke-width": 0.05}, g);
+  let f = ""; for (let x = 0.36; x < VW - 0.3; x += 0.13) f += `M${x.toFixed(2)} 0V0.2M${x.toFixed(2)} ${VH - 0.2}V${VH}`;   // fringe
+  el("path", {d: f, stroke: dark(c), "stroke-width": 0.035, "stroke-linecap": "round", opacity: 0.7}, g);
 }
 const NS = "http://www.w3.org/2000/svg";
 const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
@@ -321,6 +334,9 @@ let parts = [];
 function draw() {
   layOut();
   const svg = $("svg"); svg.innerHTML = ""; svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+  drawRug(svg);
+  const [c, edge] = paint(), floor = $("board");   // the spot: a pale tint of the pieces' colour, edged in its shade
+  floor.style.setProperty("--spot", `color-mix(in oklch,${c} 38%,#fff)`); floor.style.setProperty("--spot-edge", edge);
   const spot = el("g", {id: "box"}, svg);
   for (const p of target) el("polygon", {points: pts(p), class: "spotFill"}, spot);
   el("path", {d: outline.map(([a, b]) => `M${a[0].toFixed(4)} ${a[1].toFixed(4)}L${b[0].toFixed(4)} ${b[1].toFixed(4)}`).join(""), class: "spotEdge"}, spot);
