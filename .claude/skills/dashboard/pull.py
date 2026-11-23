@@ -42,9 +42,30 @@ OLD_NAMES = {"Pounce": "pounce", "Fuzzy Spelling": "fuzzyspelling", "Cat-astroph
 # a folder that held a different game before: its page opens count from the day the game in it now went live
 REMADE = {"stash": "2026-11-22"}
 # a game whose levels were renumbered: a moment sent before the day it went live carries the old number, so it's
-# moved to the level that's the same puzzle now ([(the day the new numbers began, old number → new number)])
+# moved to the level that's the same puzzle now, or left out (None) when that puzzle has gone. Each is (day, level)
+# → level, from the page's own notes on the move; the day a move went live counts as after it (days are all GoatCounter
+# keeps, not times).
+NIGHT_PLAIN = [0, 3, 6, 9, 10, 11, 12, 13, 14, 15]   # nightlight/index.html, PLAIN: where each plain room of 1 to 9 went
+POUNCEUP_OLD = [0, 1, 8, 5, 7, 4, 2, 9, 6, 11, 10, 3, 12]   # pounceup/index.html, OLD: old level n is now OLD[n]
+WINDUP_ORDER = {15: 16, 16: 17, 17: 20, 18: 15, 19: 18, 20: 19}   # windup/index.html, REORDER
 LEVEL_MOVES = {
-    "opendoor": [("2026-11-12", lambda n: n + 1 if n >= 3 else n)],   # × got a level of its own at 3: 3 to 7 became 4 to 8
+    # × got a level of its own at 3: 3 to 7 became 4 to 8
+    "opendoor": lambda d, n: n + 1 if d < "2026-11-12" and n >= 3 else n,
+    # two beginner's blocks came in front: 1 to 5 became 3 to 7
+    "windowledges": lambda d, n: n + 2 if d < "2026-11-20" else n,
+    # level 25 (tiny ribbons) went: 26 to 29 became 25 to 28
+    "twirl": lambda d, n: n if d >= "2026-11-16" or n < 25 else None if n == 25 else n - 1,
+    # two levels put in front on 2026-11-12, both that day (so that day's moments count as after both)
+    "blanket": lambda d, n: n + 2 if d < "2026-11-12" else n,
+    # until 2026-11-02, 10 levels with arrows from 3 (3 up became 12 up); on 2026-11-12 the arrows (10 to 19) went to
+    # Day Light, a different game by its launch, so they're left out, and the plain rooms 1 to 9 became PLAIN's
+    "nightlight": lambda d, n: n if d >= "2026-11-12" else (lambda m: NIGHT_PLAIN[m] if m < 10 else None)(n + 9 if d < "2026-11-02" and n >= 3 else n),
+    # levels 13 to 21 in a new order
+    "windup": lambda d, n: WINDUP_ORDER.get(n, n) if d < "2026-11-21" else n,
+    # the levels put in a new order
+    "pounceup": lambda d, n: POUNCEUP_OLD[n] if d < "2026-11-20" and 0 < n < len(POUNCEUP_OLD) else n,
+    # two easy levels came in front of the first eight
+    "pawlinko": lambda d, n: n + 2 if d < "2026-11-06" else n,
 }   # Case Clawsed (Toy Stash and Mewstermind, a Mastermind, before)
 
 
@@ -183,9 +204,10 @@ def main():
             if lv and "endless" not in p.lower():   # each numbered level, for where people stop
                 for d, n in days.items():
                     num = int(lv.group(1))
-                    for began, move in LEVEL_MOVES.get(g[1], []):
-                        if d < began:
-                            num = move(num)
+                    if g[1] in LEVEL_MOVES:
+                        num = LEVEL_MOVES[g[1]](d, num)
+                        if num is None:
+                            continue
                     key = (d, g[1], num)
                     row = levels.setdefault(key, {"day": d, "slug": g[1], "game": g[0], "shelf": g[3], "level": num, "started": 0, "solved": 0, "lost": 0})
                     row[f] += n

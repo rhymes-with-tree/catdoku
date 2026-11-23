@@ -40,8 +40,8 @@ owner can ask for one any time.
    start with a name other than its own needs that name added to `OLD_NAMES` (its old names, such as Cat-astrophe for
    Cat Mat, and Pounce, which Pounce on Three's moments still say). Not a game remade into a different one in the same
    folder: Mewstermind, a Mastermind, isn't counted as Case Clawsed, and `REMADE` counts `stash/`'s page opens only
-   from the day Case Clawsed went live. A game whose levels are renumbered needs an entry in `LEVEL_MOVES` (the day the
-   new numbers began, and old number → new), or the Levels section counts old and new puzzles as one. A game whose start moment says something new
+   from the day Case Clawsed went live. A game whose levels are renumbered needs an entry in `LEVEL_MOVES` (a moment's
+   day and old number → its number now, or None for a puzzle that's gone), or the Levels section counts old and new puzzles as one. A game whose start moment says something new
    ("new case") needs it added to `START_RE` here and in `games.js` alike.
 2. **Read the feedback.** The Google Drive connector's `read_file_content` on the sheet "Website Feedback Form
    (Responses)" (`1uOKFrs2O5aLL4sAZhFbTwMQ6yWZjVyqGH55RUpl4PiE`, tab Form Responses 1). Columns: Timestamp, Kind,
