@@ -1275,6 +1275,70 @@ const G = (() => {
     return from[Math.floor(Math.random() * from.length)];
   }
 
+  /* ---------- number colours ---------- */
+  // Games whose numbers each have a colour (Kit-Ten's tiles, Wind Up's balls of yarn) take them from here, in the
+  // order the player picked, one choice for every game (the owner's call, 2026-11-23). Style 1, the rainbow, is
+  // Kit-Ten's order round the colour wheel (the owner's chart, 2026-11-22), and every player starts on it; Style 2 is
+  // Wind Up's, which jumps about so neighbouring numbers differ in colour and lightness. Each list is 1 to 10; past 10
+  // a game goes round again or tints them, as it likes. The first time a player meets coloured numbers (after this
+  // came in), a card asks which they prefer; Settings has the same choice. Kept in catdoku.numbers.v1: {style, asked}.
+  const numbers = (() => {
+    const KEY = "catdoku.numbers.v1", DARK = "#4E577D", INK = "#2A2530";
+    const STYLES = {
+      1: ["#8D78AD", "#7885BA", "#73A7AE", "#6AA673", "#B3B94B", "#ECA818", "#E16A4A", "#BD5538", "#B94588", DARK],
+      2: ["#ECA818", DARK, "#E16A4A", "#73A7AE", "#B94588", "#B3B94B", "#7885BA", "#BD5538", "#8D78AD", "#6AA673"],
+    };
+    const LINE = "Style 1 is more intuitive for some people; Style 2 makes it easier to tell numbers apart.";
+    const style = () => load(KEY).style === 2 ? 2 : 1;
+    const colours = (s = style()) => STYLES[s];
+    // n's colour and the ink for a number on it: dark, or white on spring blue (as Kit-Ten's 10 has always been)
+    const look = (n, s) => { const bg = colours(s)[(n - 1) % 10]; return [bg, bg === DARK ? "#fff" : INK]; };
+    const watchers = [];
+    function set(s) { save(KEY, {...load(KEY), style: s, asked: true}); for (const f of watchers) f(); }
+    // 1 to 10 in a row of squares, in one style (the same shape and numbers for both, so only the colours differ)
+    function strip(s) {
+      const el = document.createElement("span"); el.className = "numStrip"; el.setAttribute("aria-hidden", "true");
+      for (let n = 1; n <= 10; n++) { const [bg, ink] = look(n, s), q = document.createElement("span"); q.style.background = bg; q.style.color = ink; q.textContent = n; el.append(q); }
+      return el;
+    }
+    // the choice: the line, then the two styles as radio buttons, each its name over its strip. A tap picks it at once.
+    function picker() {
+      const box = document.createElement("div"); box.className = "numPick";
+      const p = document.createElement("p"); p.className = "numLine"; p.textContent = LINE;
+      const row = document.createElement("div"); row.className = "numWays"; row.setAttribute("role", "radiogroup"); row.setAttribute("aria-label", "Number colours");
+      const btns = [1, 2].map(s => {
+        const b = document.createElement("button"); b.type = "button"; b.className = "numWay"; b.setAttribute("role", "radio");
+        b.setAttribute("aria-label", s === 1 ? "Style 1: the rainbow, in order round the colour wheel" : "Style 2: mixed, so neighbouring numbers look different");
+        const name = document.createElement("span"); name.className = "numName"; name.textContent = `Style ${s}`;
+        b.append(name, strip(s)); b.onclick = () => { set(s); sync(); }; row.append(b); return b;
+      });
+      const sync = () => btns.forEach((b, k) => b.setAttribute("aria-checked", String(style() === k + 1)));
+      sync(); box.append(p, row); box.sync = sync;
+      return box;
+    }
+    // Once, when nothing else (a walkthrough or a card) is up, a card asks which the player prefers.
+    function ask(tries = 0) {
+      if (load(KEY).asked || !$("overlay")) return;
+      if (!tries) { setTimeout(() => ask(1), 1200); return; }   // give a first-visit walkthrough time to start
+      if (document.querySelector(".spot") || $("overlay").classList.contains("show")) { if (tries < 400) setTimeout(() => ask(tries + 1), 1500); return; }
+      save(KEY, {...load(KEY), asked: true});   // asked once, whatever they do with it
+      const media = picker(), more = document.createElement("p"); more.className = "pickNote"; more.textContent = "You can change this any time in Settings.";
+      media.append(more);
+      openCard("Which do you prefer?", "", [["Done", closeCard, true]], media);
+    }
+    // A game with coloured numbers: redraw (called when the style changes, here or in Settings in another tab or
+    // before coming back) and, the first time, ask.
+    function watch(redraw) {
+      watchers.push(redraw);
+      let was = style();
+      const back = () => { if (style() !== was) { was = style(); redraw(); } };
+      watchers.push(() => { was = style(); });
+      addEventListener("pageshow", back); addEventListener("focus", back);
+      ask();
+    }
+    return {STYLES, style, colours, look, set, strip, picker, watch};
+  })();
+
   /* ---------- first-time spotlight ---------- */
   // Teach a game on its own board: each step dims the whole screen except some squares (and, if it
   // names them, other things on the page such as a key above the board), outlines them in red, can
@@ -3109,5 +3173,5 @@ const G = (() => {
   }
 
   return {COFFEE, coffeeLink, sound, ladder, ANOTHER, CHANGE, MAGNET, tally, emoText, radios, pawLost, pieces, GAMES, BETA, GROUPS, SHELF_COLOUR, onShelf, favorites, favStar, matches, $, nav, daily, dailyStreak, dailyDoneToday, dailyWon, dailyLine, load, save, builder, openCard, closeCard, winCard, loseCard, homeBtn, sizeUp, otherSize, levelMenu, note, helpLater, cellAt, hinter, HINT, HINT_MS, gridKeys, nearestThatWay, CURSOR, track, reopen, fullScreen, zoom: zoomer, lives, history: undoList, pad: digitPad, admire, uses, sideways, relabel, icon: iconSVG, guesser, yourTurn, describe, at, listed, andMore, slower, switch: makeSwitch, SETTINGS, ROWS, readSetting, writeSetting, pendingOf, rowMode, setRow, rowGames, meaning, plainText, breakable,
-          setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, goldPaw, goldPaws, mastered, masterPill, bestName, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, feedbackCard, feedbackFor, toyPicker, pickLook};
+          setupTimer, freshClock, streak, breakStreak, spotlight, toysOff, saveToys, needToys, numbers, goldPaw, goldPaws, mastered, masterPill, bestName, shareResult, checkClock, finishClock, timeLineEl, showBests, readShare, offerShare, shareCard, sendLink, feedbackCard, feedbackFor, toyPicker, pickLook};
 })();

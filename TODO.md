@@ -17,6 +17,16 @@ README, Hosting and the move). It waits for the new site to answer, so it's on `
   destination address and a hello@ rule set up by the owner (2026-11-20)
 - [ ] after the switch, the Pawprints numbers carry on in one line (the paths keep `/catdoku`); check a day's worth
 
+## Number colours in more games
+
+Kit-Ten and Wind Up take their number colours from the player's choice (`G.numbers`, Style 1 or 2; README, Number
+colours). The owner asked to see the same in High Perch, Open the Door, Treat Time and Catwalk, and mock-ups were made
+(2026-11-23), not yet decided. What each would lose, to sort out first:
+- [ ] High Perch: full-colour squares cover the picked square's row and column highlight, and the darker given squares
+- [ ] Open the Door: each room's pastel floor, and the lighter floor that shows a room's sum is right (walls still mark rooms)
+- [ ] Treat Time: nothing lost (the Keep ring and the faded put-back treats still show over coloured fish)
+- [ ] Catwalk: the badge's green (all its catwalks) and red (too many); the cat settling on a finished perch would still show it
+
 ## Junk Drawer: checks not yet run
 
 The new-game skill's tests that weren't run when Junk Drawer was built (rhymes-with-tree/catdoku#234):
