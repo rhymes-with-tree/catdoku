@@ -25,12 +25,11 @@ REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")
 
 START_RE = re.compile(r"\b(started|new (puzzle|tangle|table|trip|board|floor|tower|round|skein|keyboard|game|case))\b", re.I)   # games.js
 # what each game sends on a win and on a loss (their G.track calls; a moment that's neither isn't counted)
-# (Cat Burglar: "caught" is a win, "got away" a loss; its "round over …: 2 caught" is neither)
+# (Cat Burglar: "caught" is a win, "got away" a loss; its "round over …: 2 caught" is neither, and so is Toe Beans'
+# "finished level 3 5 away", stopping short of the number)
 SOLVED_RE = re.compile(r"\b(solved|won|done|finished|complete|dyed|cleared|untangled|genius|caught|built)\b", re.I)
-# (Toe Beans: "finished level 3 5 away" is giving up short of the number, so a loss, not a win)
-MISSED_RE = re.compile(r"\bfinished level \d+ \d+ away\b", re.I)
 LOST_RE = re.compile(r"\b(fell|out of (moves|swaps|lives)|stuck|overflowed|gave up|got away|lost|over|missed|woke the human|piled up|tangled|put out)\b", re.I)
-NEITHER_RE = re.compile(r"\bround over\b", re.I)
+NEITHER_RE = re.compile(r"\b(round over|finished level \d+ \d+ away)\b", re.I)
 LEVEL_RE = re.compile(r"\blevel (\d+)\b", re.I)
 VISIT_RE = re.compile(r"^(Visit opened on|First game|Visit length|Games in a visit): (.+)$")
 AFTER_RE = re.compile(r"^After (.+): (.+)$")
@@ -166,7 +165,7 @@ def main():
         g = game_of(p)
         if not g or p.startswith("Daily challenge") or "feedback sent" in p or "Favorited" in p:
             continue
-        f = None if NEITHER_RE.search(p) else "started" if START_RE.search(p) else "lost" if MISSED_RE.search(p) else "solved" if SOLVED_RE.search(p) else "lost" if LOST_RE.search(p) else None
+        f = None if NEITHER_RE.search(p) else "started" if START_RE.search(p) else "solved" if SOLVED_RE.search(p) else "lost" if LOST_RE.search(p) else None
         if f:
             for d, n in days.items():
                 gd(g, d)[f] += n
