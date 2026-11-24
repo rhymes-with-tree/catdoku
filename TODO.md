@@ -182,6 +182,10 @@ cats that point their own way are Day Light (`daylight/`, in beta).
   square. Case Clawsed has only a click handler now (`tap` in `stash/index.html`). On a phone the drag mustn't
   scroll the page (`touch-action: none` on the grids), and with the grids as a carousel (above), a drag that starts on
   a square marks, while a swipe from outside the squares moves along.
+- [ ] **The gold-paw card shows the culprit** (the owner, 2026-11-24). `finishCard` in `stash/index.html` gives the
+  plain win card the culprit (`culpritPic`) but the gold-paw card always the same picture (`goldPic`, `c17-18`, a black
+  and white cat pouncing on a ball). Use the culprit there too; the gold paw itself marks it out. (Each cat has one
+  sitting-up picture in `CATS`; a pleased-with-themselves pose per cat could come later, from `ARTWORK.md`.)
 - [ ] **No clue sets that just say it the long way round** (the owner, 2026-11-24: "too bad"). Laya said "I was in the
   🧺 laundry or the 🛏️ bedroom." and "I was in the 📺 living room or the 🧺 laundry.": together that's only "I was in
   the laundry", in two lines. `makeSaid` in `stash/index.html` picks statements at random until one answer fits, and
