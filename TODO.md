@@ -175,6 +175,13 @@ cats that point their own way are Day Light (`daylight/`, in beta).
 - [ ] **Say that it's everyone, not just who did it.** The case closes only once every cat's room (and, from level 3,
   toy) is ticked, but that isn't plain: the story, the walkthrough and the goal in the status line should say you're
   working out where every cat was and what each had, not only the culprit.
+- [ ] **Drag to put down ✗s** (the owner, 2026-11-24: "like other games"). Pressing a square and dragging across
+  others (finger or mouse) marks each one passed over with ✗, as Catdoku's drag paints paws (`pointerdown`,
+  `pointermove`, `pointerup` on the board with pointer capture, in `catdoku/index.html`); a plain tap still goes
+  ✗, ✓, clear. Within one grid only; it doesn't put a ✗ over a ✓, one drag is one Undo, and the ✗ sound plays once a
+  square. Case Clawsed has only a click handler now (`tap` in `stash/index.html`). On a phone the drag mustn't
+  scroll the page (`touch-action: none` on the grids), and with the grids as a carousel (above), a drag that starts on
+  a square marks, while a swipe from outside the squares moves along.
 - [ ] **No clue sets that just say it the long way round** (the owner, 2026-11-24: "too bad"). Laya said "I was in the
   🧺 laundry or the 🛏️ bedroom." and "I was in the 📺 living room or the 🧺 laundry.": together that's only "I was in
   the laundry", in two lines. `makeSaid` in `stash/index.html` picks statements at random until one answer fits, and
