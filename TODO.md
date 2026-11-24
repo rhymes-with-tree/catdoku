@@ -82,6 +82,8 @@ Knock It Off's forgiving first two levels, Pounce saving while toys fall, and Wi
 - [ ] **Hide & Seek: the first size** (Pawprints, to 2026-11-23): 9 × 9 has 44 floors started, 19 cleared and 16 out
   of lives. Perhaps a gentler first floor (fewer cats, or a first tap that always opens a patch).
 - [ ] **Fish Bones: levels 5 to 7** (small samples, to 2026-11-23): 7 → 3, 6 → 2 and 5 → 2. Watch.
+- [ ] **Moving Day: out of beta again.** Moved back to beta on 2026-11-24 (the owner's call), four days after it
+  joined the front page. For the owner to say what it needs before it goes back.
 - [ ] **Case Clawsed: out of beta again.** Moved back to beta on 2026-11-24 (the owner's call), two days after it
   returned to the front page as a case file; the owner's notes below are what it's waiting on.
 - [ ] **Under the Blanket: out of beta again.** Moved to beta on 2026-11-16 (the owner's call) after its first week on
