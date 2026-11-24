@@ -161,6 +161,21 @@ cats that point their own way are Day Light (`daylight/`, in beta).
   out each time the top size is wound): whether one Shake a run is right, and whether its basket should be deeper.
 - [ ] **Zen:** look for more games that could have one (Pounce on Three and Bubbles do).
 
+## Case Clawsed: the owner's notes (2026-11-24)
+
+- [ ] **Never the same crime twice in a row.** The crime is a room's deed (`crime()` in `stash/index.html`:
+  `ROOMS[cs.rooms[cs.scene]][3][cs.deed]`), picked from the case's seed; keep the last one played and deal again (or
+  step to the next deed) when it comes up the same. A shared case keeps its own crime.
+- [ ] **The crime big on the screen first.** The case opens with the story large ("In the evening, someone unrolled
+  the toilet roll all over the bathroom."), filling the space above the notebook; a tap on it shrinks it to the size
+  it is now (`#story`), and the notebook takes its place. Reduce motion: no shrinking, just the switch.
+- [ ] **The three notebook grids as a carousel.** Where?, What? and Toy where? (from level 3) sit side by side when
+  they fit, otherwise one above the other; make them one at a time, swiped across (as the front page's shelves are:
+  exactly one along a swipe), with tabs or dots showing which is out. Level 1 and 2's single grid is unchanged.
+- [ ] **Say that it's everyone, not just who did it.** The case closes only once every cat's room (and, from level 3,
+  toy) is ticked, but that isn't plain: the story, the walkthrough and the goal in the status line should say you're
+  working out where every cat was and what each had, not only the culprit.
+
 ## Hints: are they explanatory? (the owner, 2026-11-24; not started)
 
 Go through every game's Hint (55 pages use `G.hinter`) and see whether each one explains, or only reveals. README's
