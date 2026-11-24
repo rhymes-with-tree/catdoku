@@ -175,6 +175,14 @@ cats that point their own way are Day Light (`daylight/`, in beta).
 - [ ] **Say that it's everyone, not just who did it.** The case closes only once every cat's room (and, from level 3,
   toy) is ticked, but that isn't plain: the story, the walkthrough and the goal in the status line should say you're
   working out where every cat was and what each had, not only the culprit.
+- [ ] **No clue sets that just say it the long way round** (the owner, 2026-11-24: "too bad"). Laya said "I was in the
+  🧺 laundry or the 🛏️ bedroom." and "I was in the 📺 living room or the 🧺 laundry.": together that's only "I was in
+  the laundry", in two lines. `makeSaid` in `stash/index.html` picks statements at random until one answer fits, and
+  nothing stops two of one cat's `either`s sharing a room. Keep a case from having two things about the same cat's room
+  (or toy) that together leave only one: two `either`s with a room in common, an `either` and a `notin` of one of its
+  two rooms, a `floor` that leaves one of an `either`'s rooms. It matters more than looks: on level 6 (cagey cats)
+  no cat is meant to say outright where she was, and a pair like this does; and an `either` can name the room the
+  crime was done in, which `in` never does, so a pair could have the culprit owning up.
 
 ## Hints: are they explanatory? (the owner, 2026-11-24; not started)
 
