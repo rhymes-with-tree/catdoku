@@ -161,6 +161,48 @@ cats that point their own way are Day Light (`daylight/`, in beta).
   out each time the top size is wound): whether one Shake a run is right, and whether its basket should be deeper.
 - [ ] **Zen:** look for more games that could have one (Pounce on Three and Bubbles do).
 
+## Moving Day: the rework
+
+Moving Day went back in beta on 2026-11-24 (the owner's call: "we're on to something with all of this but I'm not
+quite there yet"). The owner's tester found it plain and static (two kinds of thing, plenty of moves) and wanted
+strategy, motion and chances to feel clever, not stress; the on-ramp was too slow and the levels too alike. A playable
+preview of the rework was built with the owner (2026-11-24); its source is in `tools/movingday/` (`rules.js`, the
+page `page.html`, `build.py` to bundle it, `sim3.js` and `rand.js` for the simulated players), and the owner has it
+as a private artifact. What it does, all decided with the owner:
+- **The goal is to move in:** unpack every box and put everything away; clear the floor to win. Tapping a box spills
+  what's inside onto the nearest free floor. Two of the same make the next one along, and a finished thing goes to its
+  place: furniture standing on the board itself (shoe rack, bookcase, cupboard, counter, sofa, bed, desk…), which shows
+  what's been put away on it. The front door sits in the bottom wall, flush with the outline. Empty boxes stay: flatten
+  two together and take them out the front door. The last odd ones of a kind go away as they are.
+- **Rooms in colour:** each room its own walls and floor (hallway boards and a runner, kitchen tiles, living room,
+  bedroom carpet, study, the whole flat), painted furniture, box labels in each kind's colour (MISC with a rainbow stripe), confetti
+  when something's put away. The owner found the first look bleak; this was the answer.
+- **Energy (the owner: "moving is hard work"):** from level 3, unpacking, merging, moving a thing and putting it away
+  each cost 1; food dragged onto the mug gives it back (two biscuits make a plate, worth more). Run out and you nap.
+- **Naps are the fun:** the owner, "chaotic and fun", and wants them even for careful players, who avoid the cat
+  madness. Cats sit on cushions on the board, hungry again after every nap; feed one what it asks for and it naps with
+  you; any you haven't fed get up to mischief, in Case Clawsed's words where it has them ("knocked the set of mugs out
+  of the cupboard", "pushed the pile of cushions off the sofa", tipping a box out, hiding a sock in a box, curling up in an
+  empty box, licking the butter). A fourth nap is bedtime and the room is lost. The gold paw is no mischief, hints or
+  restarts. The culprits are any named cat (the owner: not only a kitten). A nod to a cat's own game shows only when
+  what it did here is what it does there (the owner: Bowtie curling up in a box has nothing to do with Bird Watch).
+  Cats are finicky: they only take what they ask for, but a treat no cat is asking for, any cat will take (so it never
+  sticks on the floor).
+- **Twelve levels, one new thing each:** hallway (1 basics; 2 labels, empty boxes, the door), kitchen (3 energy, naps
+  and hungry cats; 4 things that go together, kettle and mug for tea, bread and butter for toast; 5 fish treats; 6 a bigger
+  kitchen, three cats, two mischiefs a nap), living room (7 flat-pack: four planks make a bookcase kit, built on its
+  pencilled outline; 8 labels a cat wrote, with a paw print, that may be wrong), bedroom (9 the box cutter is packed, and
+  until it's out unpacking costs 2; 10 breakages, mended with the glue), study (11 boxes stacked two high), 12 the whole
+  flat. Every room is dealt only if a careful simulated player clears it with a nap or two and no mischief; a careless
+  one (snacks at once, feeds whoever) loses more to bedtime as the levels go on (about 100% won to level 5, 82%, 70%,
+  42%, 78%, 50%, 40%, 5% at level 12).
+- **Tried and dropped:** carrying from further away costing more (it made no difference to clever play); running out
+  of room as a way to lose (with three or four kinds of thing, something can always merge or go away).
+- **Still to do:** the owner and the tester play it and say what's not quite there; whether level 12 is too hard and
+  level 8's cat labels too much luck; the new drawings are first drafts; then the port into `movingday/` (the
+  walkthrough, moving up and down, Share, keys), the README section, `IDEAS.md` and `ARTWORK.md`, and moving its row
+  from `BETA` back to `GAMES` (and the `noindex` line out). Players' saves (`catdoku.movingday.v1`) will start afresh.
+
 ## Case Clawsed: the owner's notes (2026-11-24)
 
 - [ ] **Never the same crime twice in a row.** The crime is a room's deed (`crime()` in `stash/index.html`:

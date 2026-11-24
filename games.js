@@ -62,7 +62,6 @@ const G = (() => {
     ["Zoomies", "zoomies", "Retrace the cat's 3 a.m. zoomies around the house", "#4E577D", "lines", "signpost arrows path numbers jumps queen chain link zoomies", "2026-11-08"],
     ["Bed Hog", "bedhog", "Slide the sprawled cats until there's room for you", "#E16A4A", "teasers", "klotski rush hour sliding block puzzle unblock slide bed hog huarong sleeping cats", "2026-11-09"],
     ["Pounce Up", "pounceup", "Help Rayla pounce up the tallest bookcase in the house", "#7885BA", "prowl", "doodle jump platform jumping climbing bookcase shelves action springs", "2026-11-12"],
-    ["Moving Day", "movingday", "Unpack the boxes and find the cats their things", "#ECA818", "quick", "merge game merge mansion travel town gossip harbor merge 2 combine moving boxes unpack treats toys orders", "2026-11-20"],
     ["Case Clawsed", "stash", "Hear what the cats say, and work out who did it", "#7885BA", "logic", "clue cluedo whodunnit mystery logic grid puzzle einstein zebra deduction elimination notebook case detective toys rooms cats", "2026-11-22"],
     ["Day Light", "daylight", "Get the sun into every flat, through the windows and blinds", "#ECA818", "teasers", "lights out flip switch spots night light sun sunshine flats building windows blinds walls white cat lady nimbus", "2026-11-22"],
     ["Kit-Ten", "kitten", "Make 10s, then pair them up into 20, 40, 80…", "#ECA818", "quick", "make ten make 10 merge game merge 2 kitten kittens grow up tens add up sums chain join merge 2048 number tiles arithmetic maths math", "2026-11-22"],
@@ -75,6 +74,7 @@ const G = (() => {
     ["Tape Trap", "tapetrap", "Lay a square of tape for every cat to sit in", "#ECA818", "logic", "cat trap tape masking tape nearest distance steps voronoi marmalade", "2026-11-20"],
     ["Boing!", "boing", "Place springs to bounce the ball to Ferguson", "#7885BA", "teasers", "incredible machine physics springs bounce ball boing trajectory ferguson", "2026-11-20"],
     ["Pawstcards", "pawstcards", "Guess where Pinecone is from her postcards", "#73A7AE", "prowl", "geography countries wikipedia postcards guess the country clues redacted trivia travel pinecone", "2026-11-11"],
+    ["Moving Day", "movingday", "Unpack the boxes and find the cats their things", "#ECA818", "quick", "merge game merge mansion travel town gossip harbor merge 2 combine moving boxes unpack treats toys orders", "2026-11-20"],
   ];
   const rowOf = slug => GAMES.find(g => g[1] === slug) || BETA.find(g => g[1] === slug);
   // The shelves the front page and the games menu sort the games onto, in order: key (also a plain name for it,
