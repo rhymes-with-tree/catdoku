@@ -161,6 +161,21 @@ cats that point their own way are Day Light (`daylight/`, in beta).
   out each time the top size is wound): whether one Shake a run is right, and whether its basket should be deeper.
 - [ ] **Zen:** look for more games that could have one (Pounce on Three and Bubbles do).
 
+## Hints: are they explanatory? (the owner, 2026-11-24; not started)
+
+Go through every game's Hint (55 pages use `G.hinter`) and see whether each one explains, or only reveals. README's
+"Hints" sets the rule: a hint shows, it never plays for you, and it says what to do there. The model is Open the Door!'s
+since 2026-11-23 (`nextStep`): it glows the square to work out next by the same steps the puzzle maker checks with,
+says why (its row and column leave one number; the only place left in a row or column; of all the ways its room can
+make its sign, only one number fits), and gives the answer only when pressed again. Before that it lit a square in the
+room nearest full and mostly gave the number with no reason.
+
+For each game, note: does the hint point at a step that can be worked out from the board as it stands (not just
+the answer's next square), and does it say why in the game's own terms? Where a game has a solver, the hint could
+follow the solver's steps, as Open the Door!'s does. List the games that only reveal, then pick which to fix first
+(the logic games with big boards most likely: Catdoku, Toydoku, High Perch, Window Ledges, Treat Time, Scratch That,
+Cross Stitch, Zoomies).
+
 ## Star cats decided, waiting for pictures
 
 Pangur Bán (Pangur) for Cat Burglar and Fitzwilliam Darcy (Fitz) for Pawlette (the owner, 2026-11-12; `ARTWORK.md`,
