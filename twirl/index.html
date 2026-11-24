@@ -476,7 +476,11 @@ let S = null, loading = false, now = 0, moving = [], tugs = [], drawOrder = [];
 G.pawLost(() => !S || S.over || S.d.helped || S.d.restarted || S.d.hearts < HEARTS || S.d.livesUsed > HEARTS);
 // lastLevel: the level you're up to, kept while you play Endless (which saves as level ROLL)
 const lastLevel = () => { const st = G.load(STORE); return st.level !== ROLL && st.level !== undefined ? st.level : st.lastLevel ?? 1; };
-const save = () => { if (S) { S.d.ms = S.ms; G.save(STORE, {level: S.level, d: S.d, lastLevel: S.level === ROLL ? lastLevel() : S.level, levels: MAX_LEVEL}); } };
+// A won mat saves only the level to play next (S.next, from win): the timer saves again when the page is hidden, and
+// writing the won mat back then left an empty board to come back to, whose New ribbons ended the win streak (feedback,
+// 2026-11-24). levels: MAX_LEVEL always, or the next load renumbers the levels again as if from before 2026-11-16.
+const save = () => { if (!S) return; if (S.next !== undefined) { G.save(STORE, {level: S.next, lastLevel: S.next, levels: MAX_LEVEL}); return; }
+  S.d.ms = S.ms; G.save(STORE, {level: S.level, d: S.d, lastLevel: S.level === ROLL ? lastLevel() : S.level, levels: MAX_LEVEL}); };
 
 function start(level, d) {
   if (!d.ribbons || !d.W || (d.ribbons[0] && !d.ribbons[0].cells)) throw new Error("the saved level is from another version of the game");
@@ -626,7 +630,7 @@ function win() {
   const result = G.finishClock(S);
   // A level finished on the first three lives without restarting moves you up; otherwise you stay on it.
   const helped = S.d.helped || S.d.livesUsed > HEARTS, c = steps.end(S.d, S.level, helped, {none: "You had a hint, a restart or more lives, so it doesn't count toward moving up."}), next = c.next;
-  G.save(STORE, {level: next});
+  S.next = next; save();
   build.prefetch(next);
   const text = `Level ${S.level} done. ${c.line}`;
   const game = S;
