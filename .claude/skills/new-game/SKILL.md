@@ -6,7 +6,8 @@ description: Add a new game to the Catdoku site, from a playable preview to a fi
 # Adding a game
 
 Each game is one page, `<slug>/index.html`, using the shared `games.css` and `games.js` (the `G` object).
-The front page and every game's menu list the games in `G.GAMES`.
+The front page and every game's menu list the games in `G.GAMES`. Give the game a line in the front page's `PICK` (in `index.html`) too, for Help me pick: its
+mood, what it's played with and the well-known game it's like, if any.
 
 **Access is never a reason to drop or shrink an idea.** The owner is always happy to add network access, connectors
 or other permissions a game needs (a museum's API, an image host, a data source). When something is blocked, or a
