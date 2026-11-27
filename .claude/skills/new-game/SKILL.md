@@ -187,6 +187,7 @@ in its notes.
   `hashchange`, call `G.readShare(slug)`, then `G.offerShare(d, {name, inProgress, open, after})`.
   `readShare` only returns data with `g` equal to the slug and a truthy `N`; check every other field
   before using it. A puzzle opened with progress isn't timed (`game.timed = false`).
+- **Numbers in colour:** wherever a game shows numbers (on squares, tiles, tags, a pad), give each its colour from `G.numbers` (`look(n)` gives the colour and the ink for the number on it; past 10 they come round again), so the same number is the same colour across the site, and call `G.numbers.watch(redraw)` once the game is up. Propose anything else only for a real reason (the owner, 2026-11-27). Colour comes in full, not as pale tints of the palette: a pale tint is for a backdrop the pieces sit on.
 - **How to play:** a first-visit walkthrough with `G.spotlight({grid, w, h, steps, done})`, and the How
   to play button plays it again. There's no rules card, so every rule, control and tip goes in a step,
   ending with "Stuck? Hint …" pointing at `hintBtn`. Keep it succinct: one short line per step (six
