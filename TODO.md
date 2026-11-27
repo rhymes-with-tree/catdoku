@@ -192,10 +192,22 @@ built with the owner as a playable preview (2026-11-24) and has been the beta ga
   42%, 78%, 50%, 40%, 5% at level 12).
 - **Tried and dropped:** carrying from further away costing more (it made no difference to clever play); running out
   of room as a way to lose (with three or four kinds of thing, something can always merge or go away).
-- **Still to do:** the owner and the tester play it and say what's not quite there; whether level 12 is too hard and
-  level 8's cat labels too much luck; the new drawings are first drafts; a walkthrough on the real room in place of the
-  How to play card; then move its row from `BETA` back to `GAMES` (with the date it joins), and take out the Beta
-  label and the `noindex` line.
+- **Still to do:**
+  - [ ] the owner and the tester play the beta and say what's not quite there yet;
+  - [ ] level 12 (the whole flat): a careless player wins only about 5% of rooms; more food if it feels unfair;
+  - [ ] level 8: a label a cat wrote can be wrong with no way to tell, so it's more luck than skill; maybe a wrong one
+    gives a hint instead (a crossed-out word);
+  - [ ] the hallway (levels 1 and 2) may still be too easy: a little energy there, or one level instead of two;
+  - [ ] running out of room never loses a room (with three or four kinds of thing, something can always merge or go
+    away); if it should be a real risk, later rooms need more kinds of thing, so odd ones pile up;
+  - [ ] the new drawings are first drafts (cushions, socks, pillows, teddy, frames, pens, notebooks, planks, the kit,
+    the box cutter, the glue, and the sofa, window, drawers, bed and desk);
+  - [ ] the finished room could come to life before the win card (a rug unrolls, the cats curl up somewhere cosy),
+    offered as colour for the reward and not built;
+  - [ ] a walkthrough on the real room in place of the How to play card, which is now just the owner's four lines
+    (2026-11-27), so the later levels' rules are only in each level's tip;
+  - [ ] then move its row from `BETA` back to `GAMES` (with the date it joins), and take out the Beta label and the
+    `noindex` line.
 
 ## Case Clawsed: the owner's notes (2026-11-24)
 
