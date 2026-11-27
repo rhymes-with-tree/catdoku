@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Laser Pointer</title>
-<script src="../move.js?v=2026-11-27.10"></script>
+<script src="../move.js?v=2026-11-27.11"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-27.10"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-27.11"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-27.10">
+<link rel="stylesheet" href="../games.css?v=2026-11-27.11">
 <style>
 /* A room seen from above: a wooden floor inside a wall, with a laser pointer poking in at one edge. Cats sit on
    some squares and mirrors stand on others; tap a mirror to tip it the other way. The red dot runs straight and
@@ -53,7 +53,10 @@
 .ahead{fill:none;stroke:var(--beam);stroke-width:4;stroke-dasharray:4 10;stroke-linecap:round;opacity:.45;pointer-events:none}
 .dot{fill:var(--dot);pointer-events:none}
 .dotglow{fill:var(--beam);opacity:.35;pointer-events:none}
-.pen .body{fill:#3E3848}
+.pen .body{fill:var(--pen,#3E3848)}
+/* each cat sits on a stitched mat (the owner, 2026-11-27) */
+.mat{stroke:#2A2530;stroke-width:3}
+.mat-stitch{fill:none;stroke:rgba(255,255,255,.6);stroke-width:2.5;stroke-dasharray:6 5}
 .pen .tip{fill:#C9CED8;stroke:#3E3848;stroke-width:2}
 .pen .button{fill:var(--beam)}
 /* cats: eyes shut until the dot runs past, then wide open and watching it */
@@ -104,7 +107,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-27.10"></script>
+<script src="../games.js?v=2026-11-27.11"></script>
 <script>
 /* ---------- laser puzzles (plain functions, also run in a background worker) ---------- */
 // The room is N × N squares. The laser pointer sits just off one edge and shines in along a row or column.
@@ -398,6 +401,9 @@ function say() {
   const seen = catAt.filter(i => path.has(i)).length;
   G.describe($("svg"), `Room, ${N} by ${N}. The laser shines in at ${G.at(game.start, N)}, heading ${["up", "right", "down", "left"][game.dir]}. Mirrors: ${G.listed(mirs, "; ")}. Cats at ${G.listed(catAt.map(i => G.at(i, N)), "; ")}. The dot passes ${seen} of ${catAt.length}. Arrow keys pick a mirror; Space tips it.`);
 }
+const WALLS = ["#73A7AE", "#6AA673", "#7885BA", "#8D78AD", "#B94588", "#B3B94B", "#4E577D", "#ECA818"];   // no coral or brick: the beam is red
+const PENS = ["#4E577D", "#B94588", "#BD5538", "#6AA673", "#2A2530", "#7885BA", "#E16A4A", "#8D78AD"];
+const MATS = ["#8D78AD", "#7885BA", "#73A7AE", "#6AA673", "#B3B94B", "#ECA818", "#E16A4A", "#BD5538", "#B94588"];
 function draw() {
   queueMicrotask(say);   // once the drawing is done
   const N = game.N, S = N * 100, svg = $("svg");
@@ -417,6 +423,15 @@ function draw() {
   el("path", {class: "beam", id: "beam"}, svg);
   el("path", {class: "ahead", id: "ahead"}, svg);
   mirrors = []; cats = []; catAt = []; lookAt = {};
+  // Each room has its own look, the same every time it's drawn (from where its mirrors stand): the wall round the floor
+  // in a palette colour, the laser pointer in another, and the cats' mats in turn round the palette, or, where they go
+  // in order, each in its number's colour (G.numbers) (the owner, 2026-11-27)
+  let h = game.start * 31 + N;
+  for (const t of game.tilt) h = (h * 7 + t + 2) % 1000003;
+  const wall = WALLS[h % WALLS.length], penCol = PENS.filter(c => c !== wall)[Math.floor(h / 7) % (PENS.length - 1)];
+  const room = svg.closest(".room"); room.style.setProperty("--wall", wall); room.style.setProperty("--wall-in", `color-mix(in srgb,${wall} 78%,#2A2530)`); room.style.setProperty("--pen", penCol);
+  const mats = MATS.filter(c => c !== wall);
+  let nCat = 0;
   for (let i = 0; i < N * N; i++) {
     const [cx, cy] = centre(i);
     if (game.tilt[i] >= 0) {
@@ -430,6 +445,9 @@ function draw() {
       mirrors[i] = t;
     } else if (game.cat[i]) {
       const g = el("g", {class: "cat", transform: `translate(${cx} ${cy + 6})`}, svg);
+      const matCol = order() ? G.numbers.look(game.cat[i])[0] : mats[(Math.floor(h / 13) + nCat++ * 3) % mats.length];
+      el("rect", {class: "mat", x: -44, y: -40, width: 88, height: 82, rx: 16, fill: matCol}, g);
+      el("rect", {class: "mat-stitch", x: -36, y: -32, width: 72, height: 66, rx: 11}, g);
       drawCat(g, (i * 7 + game.N) % COATS.length, order() ? game.cat[i] : 0);
       cats[i] = g; catAt.push(i);
     }
@@ -921,6 +939,7 @@ $("newBtn").onclick = () => { G.closeCard(); newPuzzle(); };
 $("helpBtn").onclick = showHelp;
 
 G.nav("laserpointer");
+G.numbers.watch(() => { if (game && order() && !(live && live.on)) draw(); });   // the mats' number colours, where the cats go in order
 G.checkClock(game);
 G.setupTimer({name: "laserpointer", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
 $("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
