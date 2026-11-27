@@ -153,9 +153,9 @@ def main():
         return None
 
     def error_game(p):
-        """The game an error came from, by the page's address in it ("laserpointer/:393"); games.js is every game's."""
+        """The game an error came from, by the page's address in it ("laserpointer/:393", or "twirl builder:73" from a puzzle builder); games.js is every game's."""
         p = p.replace("github.io/catdoku/", "/").replace("catdoku/games.js", "games.js")
-        slugs = [t for t in re.findall(r"([a-z0-9]+)/", p) if t in by_slug]
+        slugs = [t for t in re.findall(r"([a-z0-9]+)(?:/| builder:)", p) if t in by_slug]   # "twirl builder:73", a puzzle builder's
         return by_slug[slugs[-1]][0] if slugs else ("Every game (games.js)" if "games.js" in p else "")
 
     game_days, visits, errors, levels = {}, {}, [], {}
