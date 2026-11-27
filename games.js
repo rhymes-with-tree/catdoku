@@ -531,20 +531,22 @@ const G = (() => {
   // The win card's main button is G.ANOTHER and its level picker's words are G.CHANGE, in the games that use it:
   // Night Light, Day Light, Open the Door!, Toe Beans, all of Cat Math and twenty more so far (TODO.md has the rest).
   const LADDER = "catdoku.ladder.v1", ANOTHER = "Give me another!", CHANGE = "Change the difficulty:";
-  // label(n) names a step on the card ("level 4", or a size such as "8 × 8" where the game goes by sizes).
-  function ladder(name, max, min = 1, label = n => `level ${n}`) {
+  // label(n) names a step on the card ("level 4", or a size such as "8 × 8" where the game goes by sizes). wins is how
+  // many clean wins move you up: 1 in a game whose levels are already a fine ramp (Mew Hue), where three at each of
+  // dozens of small steps would only slow the climb.
+  function ladder(name, max, min = 1, label = n => `level ${n}`, {wins: need = 3} = {}) {
     const step = (level, win) => {
       const all = load(LADDER), was = all[name], t = was && was.l === level ? was : {l: level, w: 0, x: 0};
       if (win) t.w++; else t.x++;
-      const up = win && t.w >= 3 && level < max, down = !win && t.x >= 3 && level > min, next = level + (up ? 1 : down ? -1 : 0);
+      const up = win && t.w >= need && level < max, down = !win && t.x >= 3 && level > min, next = level + (up ? 1 : down ? -1 : 0);
       all[name] = up || down ? {l: next, w: 0, x: 0} : t; save(LADDER, all);
       return {level, next, up, down, wins: t.w, losses: t.x, top: level >= max};
     };
     const at = n => label(n);
-    const say = (r, what = "misses") => r.up ? `That's 3 wins at ${at(r.level)}: up to ${at(r.next)}!`
+    const say = (r, what = "misses") => r.up ? (need === 1 ? `Up to ${at(r.next)}!` : `That's ${need} wins at ${at(r.level)}: up to ${at(r.next)}!`)
       : r.down ? `That's 3 ${what} at ${at(r.level)}, so next comes ${at(r.next)}.`
-      : r.top ? `That's the hardest ${/^level/.test(at(r.level)) ? "level" : /×/.test(at(r.level)) ? "size" : "one"}.` : r.wins === 2 ? `2 of 3 wins at ${at(r.level)}: one more moves you up.`
-      : r.wins ? `${Math.min(3, r.wins)} of 3 wins at ${at(r.level)}.` : "";
+      : r.top ? `That's the hardest ${/^level/.test(at(r.level)) ? "level" : /×/.test(at(r.level)) ? "size" : "one"}.` : need > 1 && r.wins === need - 1 ? `${r.wins} of ${need} wins at ${at(r.level)}: one more moves you up.`
+      : r.wins ? `${Math.min(need, r.wins)} of ${need} wins at ${at(r.level)}.` : "";
     // end(state, level, missed): for a game that counts a puzzle once, when it ends (a win, a win with help or a loss),
     // rather than at each hint. Kept on the state, so a loss, a revive and then a win count once. Gives {next, up,
     // down, missed, line}: line is the card's words, `none` when a missed puzzle didn't move you down.
