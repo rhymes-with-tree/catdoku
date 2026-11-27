@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Tail Chase</title>
-<script src="../move.js?v=2026-11-27.11"></script>
+<script src="../move.js?v=2026-11-27.12"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-27.11"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-27.12"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-27.11">
+<link rel="stylesheet" href="../games.css?v=2026-11-27.12">
 <style>
 /* A cat chases toys round a rug, a strand of yarn trailing behind it that grows with every toy. Don't run into
    the edge of the rug, the yarn, or anything left lying about. */
@@ -79,8 +79,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-27.11"></script>
-<script src="../tablethings.js?v=2026-11-27.11"></script>
+<script src="../games.js?v=2026-11-27.12"></script>
+<script src="../tablethings.js?v=2026-11-27.12"></script>
 <script>
 /* ---------- levels ---------- */
 // Level n: [squares across the rug, toys to catch, milliseconds per step at the start and at the end, things in
@@ -180,6 +180,11 @@ function pickToy() {
   return from[Math.floor(Math.random() * from.length)];
 }
 const YARN = ["#E16A4A", "#B94588", "#73A7AE", "#6AA673", "#7885BA", "#ECA818"];
+// the rug for a yarn colour (across the wheel from it), and the yarn's run of colours: from its own round the palette,
+// leaving out the rug's
+const RUGS = {"#E16A4A": "#73A7AE", "#B94588": "#6AA673", "#73A7AE": "#BD5538", "#6AA673": "#8D78AD", "#7885BA": "#B3B94B", "#ECA818": "#7885BA"};
+const rugColour = g => RUGS[g.color] || "#7885BA";
+const wayOf = g => { const k = Math.max(0, YARN.indexOf(g.color)), r = rugColour(g); return [...YARN.slice(k), ...YARN.slice(0, k)].filter(c => c !== r); };
 
 /* ---------- game ---------- */
 // game: {level, N, snake ([x, y] from the head back), dir, queue (turns waiting), toy {x, y, f}, caught, target,
@@ -291,11 +296,15 @@ function paint() {
   if (cv.width !== Math.round(r.width * dpr)) { cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr); }
   const N = game.N, c = cv.width / N;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  // the rug: soft stripes and a faint grid of the weave
-  ctx.fillStyle = "#E9D3B4"; ctx.fillRect(0, 0, cv.width, cv.height);
-  for (let y = 0; y < N; y++) if (y % 2) { ctx.fillStyle = "rgba(201,154,107,.18)"; ctx.fillRect(0, y * c, cv.width, c); }
-  ctx.strokeStyle = "rgba(140,90,60,.08)"; ctx.lineWidth = 1 * dpr;
-  for (let i = 1; i < N; i++) { ctx.beginPath(); ctx.moveTo(i * c, 0); ctx.lineTo(i * c, cv.height); ctx.stroke(); }
+  // the rug, in a palette colour across the wheel from the yarn (the owner, 2026-11-27): soft stripes on every other row
+  // and the weave's grid both ways, light enough to count squares by on any colour
+  const rug = rugColour(game);
+  cv.parentElement.style.borderColor = `color-mix(in srgb,${rug} 55%,#2A2530)`;
+  ctx.fillStyle = rug; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = "rgba(255,255,255,.13)";
+  for (let y = 0; y < N; y++) if (y % 2) ctx.fillRect(0, y * c, cv.width, c);
+  ctx.strokeStyle = "rgba(255,255,255,.3)"; ctx.lineWidth = 1 * dpr;
+  for (let i = 1; i < N; i++) { ctx.beginPath(); ctx.moveTo(i * c, 0); ctx.lineTo(i * c, cv.height); ctx.moveTo(0, i * c); ctx.lineTo(cv.width, i * c); ctx.stroke(); }
   const at = ([x, y]) => [(x + .5) * c, (y + .5) * c];
   // catnip, drawn into the rug under everything
   for (const xy of game.nip) { const im = pic(NIP_PIC), [tx, ty] = at(xy); if (im.complete && im.naturalWidth) ctx.drawImage(im, tx - c * .55, ty - c * .55, c * 1.1, c * 1.1); }
@@ -313,9 +322,15 @@ function paint() {
   const pts = game.snake.map(at);
   const strand = (style, w, dash) => { ctx.save(); ctx.strokeStyle = style; ctx.lineWidth = w; ctx.lineCap = "round"; ctx.lineJoin = "round"; if (dash) ctx.setLineDash(dash);
     ctx.beginPath(); pts.forEach(([x, y], k) => k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke(); ctx.restore(); };
-  strand("rgba(42,37,48,.25)", c * .22); strand(game.color, c * .15); strand("rgba(255,255,255,.5)", c * .045, [c * .07, c * .07]);
+  // the yarn changes colour every few squares, round the palette from its own colour, never the rug's
+  const way = wayOf(game), colAt = k => way[Math.floor((pts.length - 1 - k) / 3) % way.length];
+  strand("rgba(42,37,48,.25)", c * .22);
+  ctx.save(); ctx.lineWidth = c * .15; ctx.lineCap = "round";
+  for (let k = 1; k < pts.length; k++) { ctx.strokeStyle = colAt(k); ctx.beginPath(); ctx.moveTo(...pts[k - 1]); ctx.lineTo(...pts[k]); ctx.stroke(); }
+  ctx.restore();
+  strand("rgba(255,255,255,.5)", c * .045, [c * .07, c * .07]);
   const [ex, ey] = pts[pts.length - 1];
-  ctx.fillStyle = game.color; ctx.strokeStyle = "#2A2530"; ctx.lineWidth = c * .04;
+  ctx.fillStyle = colAt(pts.length - 1); ctx.strokeStyle = "#2A2530"; ctx.lineWidth = c * .04;
   ctx.beginPath(); ctx.arc(ex, ey, c * .19, 0, 7); ctx.fill(); ctx.stroke();
   ctx.strokeStyle = "rgba(255,255,255,.5)"; ctx.lineWidth = c * .03;
   for (const k of [-.12, .05, .2]) { ctx.beginPath(); ctx.ellipse(ex, ey, c * .17, c * (.06 + Math.abs(k) * .5), .6 + k * 3, 0, 7); ctx.stroke(); }
