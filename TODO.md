@@ -18,14 +18,6 @@ README, Hosting and the move). It waits for the new site to answer, so it's on `
 - [x] after the switch, the Pawprints numbers carry on in one line (the paths keep `/catdoku`); checked 2026-11-23:
   every page counted since 2026-11-17 is under `/catdoku/`, with no gap in the days
 
-## Walkthroughs and notes: fewer words, no strategy
-
-The owner (2026-11-27): the instructions are too wordy, so people skip them. Players learn a game by playing once
-they know the basic rules, and explaining every issue or way to win leaves no chance to feel clever. Go through
-every game's walkthrough, tips and new-level notes (Wind Up's `NEW_SAY` and the like) and cut each to the basic rule,
-taking out strategy and tricks. The new-game skill says this now for new games.
-- [ ] every game's walkthrough, tips and level notes
-
 ## Junk Drawer: checks not yet run
 
 The new-game skill's tests that weren't run when Junk Drawer was built (rhymes-with-tree/catdoku#234):
@@ -489,8 +481,8 @@ will recheck this list, and add games 43–52, before any of it is built.
 - Answered 2026-11-08 (build .20), for the owner to look over: Laser Pointer's cats never need the dot again once
   it's passed them, as a cat stays awake and only its first sighting counts for the order. Mirrors do, but only on
   the moving levels, 11–15, and there by design: every moving room has a mirror the dot meets twice that must be
-  tipped between the two visits (the walkthrough says "It comes back to some mirrors… Tip them again after it
-  bounces", and Hint says when to wait). In levels 1–10 a mirror is set once; the dot sometimes bounces off both
+  tipped between the two visits (Hint says when to wait; the walkthrough no longer says so, since 2026-11-27, as
+  it's the players' to find). In levels 1–10 a mirror is set once; the dot sometimes bounces off both
   its faces, with the same slant both times. Checked by making 12 rooms a level through the page's own
   `makeRoom`: every moving room had such a mirror, and no still room did. README now says so for levels 1–10.
 
