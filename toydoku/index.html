@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Toydoku</title>
-<script src="../move.js?v=2026-11-27.10"></script>
+<script src="../move.js?v=2026-11-27.11"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-27.10"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-27.11"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-27.10">
+<link rel="stylesheet" href="../games.css?v=2026-11-27.11">
 <style>
 /* Sudoku with toys: every row, column and box holds one of each toy. The Numbers switch shows 1 to N instead. */
 .gridwrap{background:var(--panel);border:3px solid var(--ink);border-radius:10px;overflow:hidden;
@@ -50,8 +50,13 @@
 .toy{pointer-events:none}
 .ring{fill:none;stroke:#C8392B;stroke-width:6;pointer-events:none}
 .num{font-size:58px;font-weight:600;fill:#4E577D;text-anchor:middle;dominant-baseline:central;pointer-events:none}
-.num.given{font-weight:800;fill:var(--ink)}
-.num.clash{fill:#C8392B}
+.num.given{font-weight:800}
+.num{fill:var(--num-ink,#4E577D)}
+.num.clash{fill:#fff;stroke:#C8392B;stroke-width:6px;paint-order:stroke}
+/* Numbers on: a square with a number is in its colour; picked, or in the picked square's lines, washed lighter */
+.sq.col{fill:var(--num)}
+.sq.col.peer,.sq.col.same{fill:color-mix(in srgb,var(--num) 70%,#fff)}
+.sq.col.sel{fill:color-mix(in srgb,var(--num) 55%,#fff)}
 .nt{font-size:24px;font-weight:600;fill:var(--ink-soft);text-anchor:middle;dominant-baseline:central;pointer-events:none}
 /* Laid out like Sudoku.com: four tools under the board, then one row of plain toys (or numbers), and the rest
    of the buttons below that. */
@@ -124,7 +129,7 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-27.10"></script>
+<script src="../games.js?v=2026-11-27.11"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N grid in boxes of bw × bh squares: every row, column and box holds each of the N toys once. Toys are
@@ -338,11 +343,19 @@ const TOY_SRC = {}, CAT_SRC = {};  // filled with embedded pictures when the pag
 const toySrc = f => TOY_SRC[f] || `../toys/${f}.webp?v=${window.SITE_BUILD || ""}`;  // a new version gets new pictures
 const catSrc = f => CAT_SRC[f] || `../cats/${f}.webp`;
 const nameOf = f => { for (const k of KINDS) for (const [g, n] of k.looks) if (g === f) return n; return "toy"; };
-// N toys in N different colours, from colours with a toy in play first (and then any, if too many are left out).
+// N toys in N different colours, from colours with a toy in play first (and then any, if too many are left out). Each
+// number's toy is one in that number's colour (G.numbers: the 3 a pacific blue toy, the 6 a gold one) wherever a
+// colour in play has one, so a toy is the colour its number would be with Numbers on (the owner, 2026-11-27); the
+// numbers whose colour has no toy (lavender and spring blue, in Style 1) get the colours left.
 function pickToys(N) {
   const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   const on = k => k.looks.some(([f]) => !offToys.has(f));
-  const kinds = shuffle(KINDS.filter(on)).concat(shuffle(KINDS.filter(k => !on(k)))).slice(0, N);
+  const left = shuffle(KINDS.filter(on)).concat(shuffle(KINDS.filter(k => !on(k)))), kinds = new Array(N).fill(null);
+  G.numbers.colours().slice(0, N).forEach((c, v) => {
+    const k = left.find(k => on(k) && k.c.toUpperCase() === c.toUpperCase());
+    if (k) { kinds[v] = k; left.splice(left.indexOf(k), 1); }
+  });
+  for (let v = 0; v < N; v++) if (!kinds[v]) kinds[v] = left.shift();
   return kinds.map(k => k.looks[G.pickLook(k, offToys)][0]);
 }
 
@@ -405,7 +418,8 @@ function draw() {
     const [r, c] = rc(i), x = c * 100, y = r * 100;
     const peer = sel >= 0 && (r === sr || c === sc || boxOf(i) === boxOf(sel));
     const cls = ["sq", isGiven(i) ? "given" : "", i === sel ? "sel" : sv && g[i] === sv ? "same" : peer ? "peer" : ""].filter(Boolean).join(" ");
-    out += `<rect class="${cls}" data-i="${i}" x="${x}" y="${y}" width="100" height="100"/>`;
+    // with Numbers on, a square with a number is in that number's colour (G.numbers), as in Open the Door!
+    out += `<rect class="${cls}${nums && g[i] ? " col" : ""}" data-i="${i}" x="${x}" y="${y}" width="100" height="100"${nums && g[i] ? ` style="--num:${G.numbers.look(g[i])[0]}"` : ""}/>`;
   }
   for (const i of guesses.list()) if (game.grid[i]) { const [r, c] = rc(i); out += `<rect class="guess" x="${c * 100 + 4}" y="${r * 100 + 4}" width="92" height="92" rx="12"/>`; }
   for (let k = 1; k < N; k++) {
@@ -416,7 +430,7 @@ function draw() {
   for (let i = 0; i < N * N; i++) {
     const [r, c] = rc(i), x = c * 100, y = r * 100, v = g[i], delay = game.won && running ? ` style="animation-delay:${(r + c) * 45}ms"` : "";
     if (v) {
-      if (nums) out += `<text class="num${isGiven(i) ? " given" : ""}${clash.has(i) || (game.wrong || []).includes(i) ? " clash" : ""}" x="${x + 50}" y="${y + 54}"${delay}>${v}</text>`;
+      if (nums) out += `<text class="num${isGiven(i) ? " given" : ""}${clash.has(i) || (game.wrong || []).includes(i) ? " clash" : ""}" x="${x + 50}" y="${y + 54}" style="--num-ink:${G.numbers.look(v)[1]}${delay ? `;animation-delay:${(r + c) * 45}ms` : ""}">${v}</text>`;
       else {
         if (clash.has(i) || (game.wrong || []).includes(i)) out += `<circle class="ring" cx="${x + 50}" cy="${y + 50}" r="44"/>`;
         out += `<image class="toy" href="${toySrc(game.toys[v - 1])}" x="${x + 9}" y="${y + 9}" width="82" height="82"${delay}/>`;
@@ -466,7 +480,7 @@ function makePad() {
   pad.style.gridTemplateColumns = `repeat(${N}, minmax(0, 64px))`;
   for (let v = 1; v <= N; v++) {
     const b = document.createElement("button");
-    if (settings.numbers) b.textContent = v;
+    if (settings.numbers) { b.textContent = v; const [bg, ink] = G.numbers.look(v); b.style.background = bg; b.style.color = ink; }
     else { const im = document.createElement("img"); im.src = toySrc(game.toys[v - 1]); im.alt = ""; b.append(im); }
     b.setAttribute("aria-label", toyName(v)); padButton(b, v); pad.append(b);
   }
@@ -858,6 +872,7 @@ G.switch({id: "autoTgl", label: "Auto\u00a0Notes\u00a0🔢", line: "Every maybe 
 $("layaTitle").src = catSrc("laya-2");
 
 G.nav("toydoku");
+G.numbers.watch(() => { if (game) { makePad(); draw(); } });   // the number colours: redrawn if they change, and asked about once
 G.checkClock(game);
 G.setupTimer({name: "toydoku", game: () => game, playing: g => !g.won, save, label: levelName, noun: "level"});
 $("bestBtn").onclick = () => G.showBests("Best times", game ? game.level : settings.level);
