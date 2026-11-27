@@ -18,13 +18,20 @@ README, Hosting and the move). It waits for the new site to answer, so it's on `
 - [x] after the switch, the Pawprints numbers carry on in one line (the paths keep `/catdoku`); checked 2026-11-23:
   every page counted since 2026-11-17 is under `/catdoku/`, with no gap in the days
 
-## Walkthroughs and notes: fewer words, no strategy
+## Colour: pale versions of the palette
 
-The owner (2026-11-27): the instructions are too wordy, so people skip them. Players learn a game by playing once
-they know the basic rules, and explaining every issue or way to win leaves no chance to feel clever. Go through
-every game's walkthrough, tips and new-level notes (Wind Up's `NEW_SAY` and the like) and cut each to the basic rule,
-taking out strategy and tricks. The new-game skill says this now for new games.
-- [ ] every game's walkthrough, tips and level notes
+The owner (2026-11-27): Catdoku's colours and the number colours (Kit-Ten, Wind Up…) are just right; what's wrong is
+the games that use pale, pastel versions of the palette instead of the colours themselves. Earlier work (2026-11-22
+and 23) rated every game's colour on a ratings page (https://claude.ai/artifact/6zV3ssjJUZajc5hf9zpQK2) and gave
+If It Fits, Copycat, Yarn, Unravel and Catwalk more colour.
+- [x] score the word and map games, put aside then (2026-11-27, the same measure, a fresh load): Swap-a-Pom 3,
+  Spelling String 2, Keyboard Cat 2, Junk Drawer 1.5, Catlas 1.5, and 1 for Fridge Magnets, Up a Tree, Kitten
+  Caboodle, Fish Bones, Knit Pick and L-M-N-O-Pom (letters on cream or wood, the colour mostly in the words)
+- [ ] the games whose boards are mostly a pastel of a palette colour, measured the same day (share of the board pale
+  but tinted): Catwalk's rug (74%), Unravel's rug (59%), Under the Blanket's squares (46%), Bird Watch's sky (33%),
+  Open the Door!'s rooms (30%), Bed Hog's bed and cat spots (14%), Pick of the Pile's frame (13%), Tape Trap's
+  floor (11%), Day Light's flats (9%), and If It Fits' rug (its pale gold reads as cream to the measure); for the
+  owner to choose which go to full colour
 
 ## Junk Drawer: checks not yet run
 
@@ -489,8 +496,8 @@ will recheck this list, and add games 43–52, before any of it is built.
 - Answered 2026-11-08 (build .20), for the owner to look over: Laser Pointer's cats never need the dot again once
   it's passed them, as a cat stays awake and only its first sighting counts for the order. Mirrors do, but only on
   the moving levels, 11–15, and there by design: every moving room has a mirror the dot meets twice that must be
-  tipped between the two visits (the walkthrough says "It comes back to some mirrors… Tip them again after it
-  bounces", and Hint says when to wait). In levels 1–10 a mirror is set once; the dot sometimes bounces off both
+  tipped between the two visits (Hint says when to wait; the walkthrough no longer says so, since 2026-11-27, as
+  it's the players' to find). In levels 1–10 a mirror is set once; the dot sometimes bounces off both
   its faces, with the same slant both times. Checked by making 12 rooms a level through the page's own
   `makeRoom`: every moving room had such a mirror, and no still room did. README now says so for levels 1–10.
 
