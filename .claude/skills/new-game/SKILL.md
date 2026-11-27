@@ -191,7 +191,10 @@ in its notes.
   to play button plays it again. There's no rules card, so every rule, control and tip goes in a step,
   ending with "Stuck? Hint …" pointing at `hintBtn`. Keep it succinct: one short line per step (six
   words or fewer, like "One 🐱 in every row" or "Tap twice for a 🐱"), one idea each, and only the steps a new player needs; leave out anything
-  the board already makes obvious. Follow Apple's onboarding guidance (`HIG.md`, "Onboarding"):
+  the board already makes obvious. Say the basic rules, never strategy, tricks or the ways to win: players find
+  those out by playing, and finding them is the fun (the owner, 2026-11-27: wordy instructions get skipped, and
+  explaining every way to win leaves no chance to feel clever). The same goes for a level's note on what's new.
+  Follow Apple's onboarding guidance (`HIG.md`, "Onboarding"):
   - **Brief:** the first visit at most about six steps. `G.spotlight` keeps back, on a first visit, every step that only
     points at a button or setting in `.actions`, `.bar` or `.toggles` (by id, or an id inside it) and shows each later
     as a one-off tip, so write those as steps of their own (no `lit`, `marks` or `enter`), each pointing at one control

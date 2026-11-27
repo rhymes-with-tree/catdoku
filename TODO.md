@@ -18,6 +18,14 @@ README, Hosting and the move). It waits for the new site to answer, so it's on `
 - [x] after the switch, the Pawprints numbers carry on in one line (the paths keep `/catdoku`); checked 2026-11-23:
   every page counted since 2026-11-17 is under `/catdoku/`, with no gap in the days
 
+## Walkthroughs and notes: fewer words, no strategy
+
+The owner (2026-11-27): the instructions are too wordy, so people skip them. Players learn a game by playing once
+they know the basic rules, and explaining every issue or way to win leaves no chance to feel clever. Go through
+every game's walkthrough, tips and new-level notes (Wind Up's `NEW_SAY` and the like) and cut each to the basic rule,
+taking out strategy and tricks. The new-game skill says this now for new games.
+- [ ] every game's walkthrough, tips and level notes
+
 ## Junk Drawer: checks not yet run
 
 The new-game skill's tests that weren't run when Junk Drawer was built (rhymes-with-tree/catdoku#234):
@@ -287,8 +295,8 @@ Mew Hue's 33 levels are in order of how often a simple player (the best-looking 
 no step between neighbours of more than about 10 points and a breather where something new comes in (README,
 "Mew Hue"). How to do it is in the new-game skill, "Calibrating difficulty" (Moving Day was the
 first new game set that way, 2026-11-20). The same is worth doing for games that can be lost through luck plus your own choices (2026-11-20):
-- **Wind Up:** levels 1 to 21 done (2026-11-20 and 21, README "Wind Up"; the bot is `tools/windup/bot.js`). 13 to 21
-  were reordered (old 15 to 20 moved; saves moved with them). Watch GoatCounter's overflows on 7 to 21 against it,
+- **Wind Up:** levels 1 to 22 done (2026-11-20, 21 and 27, README "Wind Up"; the bot is `tools/windup/bot.js`). 13 to 21
+  were reordered (old 15 to 20 moved; saves moved with them). Watch GoatCounter's overflows on 7 to 22 against it,
   and level 19 (hurry), which the bot can't feel.
 - **L-M-N-O-Pom:** the points goals (40 to 260) and speeds are by hand. The simulated player needs a fixed thinking
   time per piece, since speed is part of it.
