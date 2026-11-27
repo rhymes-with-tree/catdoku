@@ -26,14 +26,6 @@ every game's walkthrough, tips and new-level notes (Wind Up's `NEW_SAY` and the 
 taking out strategy and tricks. The new-game skill says this now for new games.
 - [ ] every game's walkthrough, tips and level notes
 
-## Wind Up: level 22
-
-Built 2026-11-27 from the owner's sketch (shelves, a floor wedge, a net always open in one corner), on branch
-`claude/ecstatic-hamilton-e1c0f7`, not yet merged. Two ways to win a size 8: wind small yarn at the far end of the
-wedge, or build on a 5 stuck over the net (it lets up to a 4 through). The bot, which never aims for the net, wins
-14 of 30.
-- [ ] the owner to play it (preview artifact), then README "Wind Up", the level list's count, and a PR
-
 ## Junk Drawer: checks not yet run
 
 The new-game skill's tests that weren't run when Junk Drawer was built (rhymes-with-tree/catdoku#234):
@@ -303,8 +295,8 @@ Mew Hue's 33 levels are in order of how often a simple player (the best-looking 
 no step between neighbours of more than about 10 points and a breather where something new comes in (README,
 "Mew Hue"). How to do it is in the new-game skill, "Calibrating difficulty" (Moving Day was the
 first new game set that way, 2026-11-20). The same is worth doing for games that can be lost through luck plus your own choices (2026-11-20):
-- **Wind Up:** levels 1 to 21 done (2026-11-20 and 21, README "Wind Up"; the bot is `tools/windup/bot.js`). 13 to 21
-  were reordered (old 15 to 20 moved; saves moved with them). Watch GoatCounter's overflows on 7 to 21 against it,
+- **Wind Up:** levels 1 to 22 done (2026-11-20, 21 and 27, README "Wind Up"; the bot is `tools/windup/bot.js`). 13 to 21
+  were reordered (old 15 to 20 moved; saves moved with them). Watch GoatCounter's overflows on 7 to 22 against it,
   and level 19 (hurry), which the bot can't feel.
 - **L-M-N-O-Pom:** the points goals (40 to 260) and speeds are by hand. The simulated player needs a fixed thinking
   time per piece, since speed is part of it.
