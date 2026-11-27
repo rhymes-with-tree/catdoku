@@ -160,7 +160,10 @@ const LV = [null,
   {goal: 10, pool: 5, line: 100, pom: [.06, 3], shape: "slope+ledge", net: true, tall: 90, hurry: 3},
   {goal: 10, pool: 5, line: 72, pom: [.03, 3], shape: "tapeFull+hump", net: true, tall: 90},
   // level 21 (the owner's idea, 2026-11-15): the basket balances on a pivot under its middle and leans with the yarn's weight
-  {goal: 10, pool: 5, line: 120, pom: [.08, 3], shape: "", net: true, tall: 90, weigh: true}];
+  {goal: 10, pool: 5, line: 120, pom: [.08, 3], shape: "", net: true, tall: 90, weigh: true},
+  // level 22 (the owner's sketch, 2026-11-27): shelves up the basket, tilted so the yarn zigzags down from one to the
+  // next, over a wedge of floor with an open net beside it in one corner, always open, that anything up to a size 5 falls through
+  {goal: 10, pool: 5, line: 72, pom: [.03, 3], shape: "shelves+pit", net: true, tall: 110}];
 const GOALS = LV.map(v => v && v.goal), MAX_LEVEL = LV.length - 1;
 // Endless (the owner's idea, 2026-11-15): no top. Each time the biggest ball there's room for is wound (a 10 at first),
 // the basket zooms out a step: every ball keeps its number but is drawn and rolls a size smaller (rad), the smallest
@@ -191,7 +194,7 @@ const aN = n => (/^(8|11|18)/.test(String(n)) ? "an " : "a ") + n;   // "an 11",
 // seconds, the basket is shaken, and the small balls (sizes 1 to 3) fall through. It counts as a helper (see FREE).
 const hasNet = g => !!LV[g.level].net;
 const NET_AT = .36, NET_FOR = 3, NET_HOLE = RAD[3];   // the floor can drop once the basket is this full, is a net this many seconds, and lets balls up to size 3 through
-const SHAPE_WORDS = {slope: "sloped floor", slopeR: "sloped floor", hump: "hump", ledge: "ledge", ledgeR: "ledge", ledges: "ledges", round: "round corners", springs: "springs", tape: "sticky tape", tapeFull: "sticky tape"};
+const SHAPE_WORDS = {slope: "sloped floor", slopeR: "sloped floor", hump: "hump", ledge: "ledge", ledgeR: "ledge", ledges: "ledges", round: "round corners", shelves: "shelves", pit: "an open net", springs: "springs", tape: "sticky tape", tapeFull: "sticky tape"};
 const NEW_WORDS = {nip: "catnip", unr: "unravelling yarn", tip: "a basket that tips", hurry: "hurry!", weigh: "a basket that leans with the weight"};
 const levelName = n => { if (n === ENDLESS) return "Endless"; const v = LV[n], bits = [...new Set(v.shape.split("+").filter(Boolean).map(k => SHAPE_WORDS[k]))]; for (const k in NEW_WORDS) if (v[k]) bits.unshift(NEW_WORDS[k]); if (v.pom[0]) bits.push("fluffballs"); if (v.net && n <= 12) bits.push("drop the floor");
   return `Level ${n} · size ${v.goal} ball` + (bits.length ? ", " + bits.join(", ") : ""); };
@@ -225,6 +228,18 @@ const SHAPE = {
   tapeFull: rnd => [3, W - 3].map(x => ({pts: [[x, LV[17].line + 12], [x, H - 4]], hr: 4, tape: true})),
   tape: rnd => { const y1 = H - span(rnd, 150, 260), y2 = H - span(rnd, 120, 230);
     return [{pts: [[3, y1], [3, y1 + 70]], hr: 4, tape: true}, {pts: [[W - 3, y2], [W - 3, y2 + 70]], hr: 4, tape: true}]; },
+  // shelves (level 22, from the owner's sketch): planks across the basket, each tilted to tip the yarn off its low end
+  // onto the next one down, measured from the top so they keep their places under the line; a short one and a flat one
+  // near the top turn the drops aside
+  shelves: rnd => { const j = d => span(rnd, -d, d), y = d => span(rnd, 0, d);
+    const a = SHELF_Y + y(8), b = SHELF_Y + y(10), c = SHELF_Y + y(12), e = SHELF_Y + y(12);
+    return [[[76 + j(6), 94 + a], [111, 120 + a]], [[133 + j(8), 91 + a], [249 + j(10), 112 + a]],
+      [[133 + j(10), 169 + b], [328 + j(8), 147 + b]], [[76, 200 + c], [108, 225 + c], [297 + j(10), 245 + c]],
+      [[158 + j(10), 349 + e], [324 + j(8), 321 + e]]].map(pts => ({pts, hr: 5})); },
+  // an open net (level 22): a wedge of floor sloping away from one corner, and in the corner a gap in it, always a net, as
+  // wide as a size 5 ball, so the small yarn that rolls in falls out (PIT_W)
+  pit: rnd => { const h = span(rnd, 50, 66), x = PIT_W;
+    return [{pts: [[x, H], [x, H - h], [W, H - 2]], hr: 3, fill: [[x, H], [x, H - h], [W, H - 2], [W, H]], net: true}, {pts: [[0, H], [x - 3, H]], hr: 0, pit: true}]; },
   round: rnd => { const R = span(rnd, 46, 74); return [-1, 1].map(side => {   // a curved corner each side of the floor: an arc of radius R, filled in behind
     const pts = Array.from({length: 9}, (_, k) => { const f = Math.PI / 2 * (k / 8), phi = side < 0 ? Math.PI - f : f; return [(side < 0 ? R : W - R) + R * Math.cos(phi), H - R + R * Math.sin(phi)]; });
     return {pts, hr: 3, fill: [...pts, [side < 0 ? 0 : W, H]], net: true};
@@ -237,6 +252,9 @@ function basketFor(seed, v) {
   const fx = ([x, y]) => [W - x, y];
   return shapes.map(sh => ({...sh, pts: sh.pts.map(fx), fill: sh.fill && sh.fill.map(fx)}));
 }
+const PIT_W = RAD[5] * 2 + 4;   // the open net's width: a size 5 falls through it, a 6 can't
+const SHELF_Y = 36;
+   // the open net's width: a size 5 falls through it, a 6 can't
 const POM_TOP = 6;   // puffballs wind up to this size; two of the biggest puff away (in Endless, a size higher with each zoom: pomTop)
 const pomTop = () => POM_TOP + tierOf();
 const SHAKE_FOR = .9;   // seconds the basket wobbles after a shake
@@ -398,6 +416,9 @@ function netTick(g) {
   if (g.net > 0 && (g.net = Math.max(0, g.net - STEP)) === 0) status();
   for (const b of g.balls) if (!b.falling && throughNet(g, b) && (b.y > H - b.r + 1 ||
     g.shapes.some(sh => sh.net && sh.pts.some((_, k) => { const hit = k < Math.max(1, sh.pts.length - 1) && nearOnShape(b, sh, k); return hit && hit.d < b.r + sh.hr + 1; })))) b.falling = true;
+  // the open net (level 22): a ball down on the floor over it falls through, whenever
+  for (const sh of g.shapes) if (sh.pit) { const lo = Math.min(sh.pts[0][0], sh.pts[1][0]), hi = Math.max(sh.pts[0][0], sh.pts[1][0]);
+    for (const b of g.balls) if (!b.falling && !b.stuck && b.y >= H - b.r - 1.5 && b.x - b.r > lo - 3 && b.x + b.r < hi + 6) b.falling = true; }
   const out = g.balls.filter(b => b.falling && b.y - b.r > H + M + 4);
   if (out.length) { g.balls = g.balls.filter(b => !out.includes(b)); g.fell += out.length; status(); }
 }
@@ -493,7 +514,7 @@ function step(g, h) {
     if (a.x <= a.r + .4) contact(null, a, 1, 0);
     if (a.x >= W - a.r - .4) contact(null, a, -1, 0);
     g.shapes.forEach((sh, si) => { for (let k = 0; k < Math.max(1, sh.pts.length - 1); k++) {
-      if (sh.net && throughNet(g, a)) continue;
+      if (sh.pit || (sh.net && throughNet(g, a))) continue;
       const hit = nearOnShape(a, sh, k); if (!hit || hit.d >= a.r + sh.hr + .4) continue;
       let push = 0;
       // (not a ball poking above the line: stuck there, it would end the game)
@@ -542,7 +563,7 @@ function step(g, h) {
     for (const b of B) {
       if (b.stuck) continue;
       for (const sh of g.shapes) for (let k = 0; k < Math.max(1, sh.pts.length - 1); k++) {
-        if (sh.net && throughNet(g, b)) continue;
+        if (sh.pit || (sh.net && throughNet(g, b))) continue;
         const hit = nearOnShape(b, sh, k), need = hit && b.r + sh.hr - SLOP;
         if (hit && hit.d < need) { const pen = Math.min(need - hit.d, 3) * .6; b.x += hit.nx * pen; b.y += hit.ny * pen; }
       }
@@ -718,6 +739,7 @@ function paint() {
   // shapes in the basket (a hump, ledges, round corners), in ink a little lightened
   ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip(); ctx.fillStyle = ctx.strokeStyle = "#59555E"; ctx.lineCap = ctx.lineJoin = "round";
   for (const sh of g.shapes) {
+    if (sh.pit) continue;   // the open net is drawn in the floor, with the walls
     if (sh.fill && sh.net && g.net > 0) {   // a sloped floor or a round corner dropped to net with the floor
       ctx.save(); ctx.beginPath(); sh.fill.forEach(([x, y], k) => k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.clip();
       ctx.strokeStyle = "#BB871E"; ctx.lineWidth = 2;
@@ -790,6 +812,14 @@ function paint() {
   wall(); ctx.strokeStyle = "#2A2530"; ctx.lineWidth = M + 3; ctx.stroke();
   wall(); ctx.strokeStyle = "#BB871E"; ctx.lineWidth = M - 3; ctx.stroke();
   wall(); ctx.strokeStyle = "rgba(42,37,48,.3)"; ctx.setLineDash([3, 5]); ctx.stroke(); ctx.setLineDash([]);
+  // the open net (level 22): its stretch of the floor always a net, with the yarn colour of the wicker at its ends
+  for (const sh of g.shapes) if (sh.pit) {
+    const lo = Math.max(18, Math.min(sh.pts[0][0], sh.pts[1][0])), hi = Math.min(W - 18, Math.max(sh.pts[0][0], sh.pts[1][0]));
+    ctx.save(); ctx.beginPath(); ctx.rect(lo, H - 1, hi - lo, M + 4); ctx.clip(); ctx.fillStyle = "#FCF2DC"; ctx.fillRect(lo, H - 1, hi - lo, M + 4);
+    ctx.strokeStyle = "#BB871E"; ctx.lineWidth = 2;
+    for (let x = lo - M - 14; x < hi + M; x += 14) { ctx.beginPath(); ctx.moveTo(x, H - 1); ctx.lineTo(x + M + 2, H + M + 1); ctx.moveTo(x + M + 2, H - 1); ctx.lineTo(x, H + M + 1); ctx.stroke(); }
+    ctx.restore();
+  }
   // a dropped floor: the bottom of the basket shown as a net, its holes open
   if (g.net > 0) {
     ctx.save(); ctx.beginPath(); ctx.rect(20, H - 1, W - 40, M + 2); ctx.clip(); ctx.fillStyle = "#FCF2DC"; ctx.fillRect(0, H - 1, W, M + 2);
@@ -1011,7 +1041,8 @@ const NEW_SAY = {nip: ["Catnip winds any ball one size up", "nextCv"],
   unr: ["Loose yarn unravels: wind it to save it", "nextCv"], springs: ["Springs bounce balls, but sometimes tangle", null],
   tape: ["Tape catches yarn, and it unravels, even wound", null], tip: ["The basket tips back and forth", null],
   hurry: ["Hurry! Wait too long and Gus drops it", null],
-  weigh: ["The basket leans with the weight: keep it level", null]};
+  weigh: ["The basket leans with the weight: keep it level", null],
+  pit: ["Small yarn falls through the open net", null]};
 function newThing() {
   if (!game || !settings.seenHelp || game.level <= 12 || isEndless(game) || document.querySelector(".spot") || $("overlay").classList.contains("show")) return;
   const v = LV[game.level], key = Object.keys(NEW_SAY).find(k => v[k] || v.shape.split("+").map(x => x.replace("Full", "")).includes(k));
