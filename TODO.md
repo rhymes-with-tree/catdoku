@@ -18,22 +18,6 @@ README, Hosting and the move). It waits for the new site to answer, so it's on `
 - [x] after the switch, the Pawprints numbers carry on in one line (the paths keep `/catdoku`); checked 2026-11-23:
   every page counted since 2026-11-17 is under `/catdoku/`, with no gap in the days
 
-## Colour: pale versions of the palette
-
-The owner (2026-11-27): Catdoku's colours and the number colours (Kit-Ten, Wind Up…) are just right; what's wrong is
-the games that use pale, pastel versions of the palette instead of the colours themselves. Earlier work (2026-11-22
-and 23) rated every game's colour on a ratings page (https://claude.ai/artifact/6zV3ssjJUZajc5hf9zpQK2) and gave
-If It Fits, Copycat, Yarn, Unravel and Catwalk more colour.
-- [x] score the word and map games, put aside then (2026-11-27, the same measure, a fresh load): Swap-a-Pom 3,
-  Spelling String 2, Keyboard Cat 2, Junk Drawer 1.5, Catlas 1.5, and 1 for Fridge Magnets, Up a Tree, Kitten
-  Caboodle, Fish Bones, Knit Pick and L-M-N-O-Pom (letters on cream or wood, the colour mostly in the words)
-- [x] the boards that are mostly a pastel of a palette colour, mocked up on live boards (2026-11-27): Bed Hog's quilt
-  is spring blue and every cat's blanket its full colour, and Day Light's sunny flats full gold (the owner's picks);
-  Under the Blanket's quilt in full colour wasn't better, and the rest (Catwalk's and Unravel's rugs, Bird Watch's
-  sky, Pick of the Pile's frame, Tape Trap's floor, If It Fits' rug) are pale backdrops that full colour would crowd
-- [x] Open the Door!: a room's empty squares are a pale tint of its sign's number colour (6+ is pale 6), each filled
-  square its own number's colour (2026-11-27)
-
 ## Junk Drawer: checks not yet run
 
 The new-game skill's tests that weren't run when Junk Drawer was built (rhymes-with-tree/catdoku#234):
