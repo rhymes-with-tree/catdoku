@@ -74,7 +74,7 @@ const G = (() => {
     ["Tape Trap", "tapetrap", "Lay a square of tape for every cat to sit in", "#ECA818", "logic", "cat trap tape masking tape nearest distance steps voronoi marmalade", "2026-11-20"],
     ["Boing!", "boing", "Place springs to bounce the ball to Ferguson", "#7885BA", "teasers", "incredible machine physics springs bounce ball boing trajectory ferguson", "2026-11-20"],
     ["Pawstcards", "pawstcards", "Guess where Pinecone is from her postcards", "#73A7AE", "prowl", "geography countries wikipedia postcards guess the country clues redacted trivia travel pinecone", "2026-11-11"],
-    ["Moving Day", "movingday", "Unpack the boxes and find the cats their things", "#ECA818", "quick", "merge game merge mansion travel town gossip harbor merge 2 combine moving boxes unpack treats toys orders", "2026-11-20"],
+    ["Moving Day", "movingday", "Unpack the boxes and put everything away", "#ECA818", "quick", "merge game merge mansion travel town gossip harbor merge 2 combine moving boxes unpack put away tidy energy nap cats mischief", "2026-11-20"],
   ];
   const rowOf = slug => GAMES.find(g => g[1] === slug) || BETA.find(g => g[1] === slug);
   // The shelves the front page and the games menu sort the games onto, in order: key (also a plain name for it,
@@ -691,8 +691,8 @@ const G = (() => {
   const mastered = slug => !!(load(GOLD).top || {})[slug];
   // A game made over into a new game at the same address starts its gold paws afresh: Mastered, and the gold paws
   // counted at each level and in all, on each device once (the owner, 2026-11-22, when Case Clawsed showed Mastered
-  // from Mewstermind). [slug]: the day it was made over.
-  const MADE_OVER = {stash: "2026-11-22"};
+  // from Mewstermind; Moving Day, made over into the move-in game, too). [slug]: the day it was made over.
+  const MADE_OVER = {stash: "2026-11-22", movingday: "2026-11-27"};
   (() => {
     const d = load(GOLD), fresh = d.fresh || {};
     if (Object.keys(MADE_OVER).every(k => fresh[k] === MADE_OVER[k])) return;
@@ -703,8 +703,9 @@ const G = (() => {
     save(GOLD, {...d, fresh});
   })();
   // Where a game keeps its best times (and so its solved count), when it isn't under the game's own address: Case
-  // Clawsed's started afresh as stash4 (stash and stash3 were the games before it).
-  const BEST_NAME = {stash: "stash4"};
+  // Clawsed's started afresh as stash4 (stash and stash3 were the games before it), and Moving Day's as movingday2 when
+  // it became the move-in game (2026-11-27).
+  const BEST_NAME = {stash: "stash4", movingday: "movingday2"};
   const bestName = slug => BEST_NAME[slug] || slug;
   // A mastered game's tile keeps its shelf's colour and gets a small gold Mastered label; extra (the front page's "12 solved")
   // joins it as "Mastered · 12 solved", and a phone, short of room, shows just "Mastered" in the gold label.
@@ -1450,7 +1451,7 @@ const G = (() => {
     lmnopom: ["Left and right: move", "Up or X: turn", "Down: fall faster", "Space or Enter: drop", "P: pause", "S: swat"],
     windowledges: ["Arrow keys: pick a window", "1 to 9: put in a digit (Shift: a note)", "Backspace or 0: take it out", "N or P: notes on or off", "Escape: let go"],
     bedhog: ["Arrow keys: pick a square", "Space or Enter: pick up the cat there, then put it down", "Arrow keys, holding a cat: slide it", "Escape: put it back"],
-    movingday: ["Arrow keys: pick a square", "Space or Enter: tap the jar or basket, pick a thing up, then put it down on another", "1 to 4: give a cat what it wants", "Escape: let go"],
+    movingday: ["Arrow keys: move round the room", "Space or Enter: unpack a box, pick a thing up, then put it down on another", "A: put the thing picked up away", "E: eat it", "1 to 3: give it to a cat", "Escape: let go"],
     catshuffle: ["Arrow keys: pick a square", "Space: slide the piece there, or turn the knob (Shift turns it back)", "Shift with an arrow: shift its row or column"],
     mewhue: ["Arrow keys: pick a square", "Shift with an arrow: slide its row or column that way"],
     kitten: ["Arrow keys: pick a tile", "Space or Enter: add it to the chain (on the chain's last tile: join it)", "Escape: let go"],

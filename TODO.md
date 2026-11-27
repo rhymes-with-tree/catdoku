@@ -123,7 +123,7 @@ Knock It Off's forgiving first two levels, Pounce saving while toys fall, and Wi
 Done the same day: Tunnel Run is turning only, with its sliding rugs behind a Tracks switch; Pounce is Pounce on Three; Night Light is plain rooms only, 15 levels from one tap; its rooms with
 cats that point their own way are Day Light (`daylight/`, in beta).
 
-- [ ] **Star cats from the big unnamed sets.** Zoomies, Bed Hog and Moving Day have no star cat yet. The general cats
+- [ ] **Star cats from the big unnamed sets.** Zoomies and Bed Hog have no star cat yet (Moving Day uses the named cats since its rework). The general cats
   include whole sheets that could each become one, mostly unused (2026-11-22): the black-and-white cat with a blue
   collar (`c17-…`, about 25 pictures, about 15 in no game), the grey tabby (`c20-…`, about 20 in no game) and the brown
   tabby Zoomies already borrows (`c19-…`).
@@ -167,10 +167,9 @@ cats that point their own way are Day Light (`daylight/`, in beta).
 
 Moving Day went back in beta on 2026-11-24 (the owner's call: "we're on to something with all of this but I'm not
 quite there yet"). The owner's tester found it plain and static (two kinds of thing, plenty of moves) and wanted
-strategy, motion and chances to feel clever, not stress; the on-ramp was too slow and the levels too alike. A playable
-preview of the rework was built with the owner (2026-11-24); its source is in `tools/movingday/` (`rules.js`, the
-page `page.html`, `build.py` to bundle it, `sim3.js` and `rand.js` for the simulated players), and the owner has it
-as a private artifact. What it does, all decided with the owner:
+strategy, motion and chances to feel clever, not stress; the on-ramp was too slow and the levels too alike. The rework was
+built with the owner as a playable preview (2026-11-24) and has been the beta game at `movingday/` since 2026-11-27
+(README, "Moving Day"); the simulated players are in `tools/movingday/`. What it does, all decided with the owner:
 - **The goal is to move in:** unpack every box and put everything away; clear the floor to win. Tapping a box spills
   what's inside onto the nearest free floor. Two of the same make the next one along, and a finished thing goes to its
   place: furniture standing on the board itself (shoe rack, bookcase, cupboard, counter, sofa, bed, desk…), which shows
@@ -201,9 +200,9 @@ as a private artifact. What it does, all decided with the owner:
 - **Tried and dropped:** carrying from further away costing more (it made no difference to clever play); running out
   of room as a way to lose (with three or four kinds of thing, something can always merge or go away).
 - **Still to do:** the owner and the tester play it and say what's not quite there; whether level 12 is too hard and
-  level 8's cat labels too much luck; the new drawings are first drafts; then the port into `movingday/` (the
-  walkthrough, moving up and down, Share, keys), the README section, `IDEAS.md` and `ARTWORK.md`, and moving its row
-  from `BETA` back to `GAMES` (and the `noindex` line out). Players' saves (`catdoku.movingday.v1`) will start afresh.
+  level 8's cat labels too much luck; the new drawings are first drafts; a walkthrough on the real room in place of the
+  How to play card; then move its row from `BETA` back to `GAMES` (with the date it joins), and take out the Beta
+  label and the `noindex` line.
 
 ## Case Clawsed: the owner's notes (2026-11-24)
 

@@ -91,9 +91,10 @@ Pawlinko curls a napping cat from Sunbeams (the `NAPPERS` list in `cattower.js`)
 
 Cat Pile lays the napping cats from Sunbeams (the `SLEEPERS` list, the same in both pages) on its clumps' blankets, a straight one or a round one in each spot, and `c14-36` curls up beside its title.
 
-Moving Day has no star cat yet: the cats placing orders along the top of the room are general cats sitting up (the list
-`CATS` in `movingday/index.html`: `c18-6`, `-7`, `-17`, `-19`, `-21`, `c19-1`, `-5` and `-6`), a different few in each room.
-Its things borrow the site's pictures: `fuzzyspelling/pompom.webp` (tinted sage) and `toys/mouse.webp` and `toys/fish.webp`.
+Moving Day has no star cat: since the move-in game (2026-11-27) its cats are the named cats with a picture of them
+sitting up, Case Clawsed's list (`CATS` in `movingday/index.html`), two or three to a room on cushions, never two
+look-alikes. Its things are drawn in the page, and borrow Copycat's boxes (`boxes.js`), Treat Time's fish biscuit
+(`treats.js`) and Knock It Off's mug, bowl, pile of books and succulent (`tablethings.js`).
 
 Day Light stars Lady Nimbus (see below): `c18-29` (sitting) beside the title, `c18-17` (sitting up) waiting in every dark flat, `c19-22` (stretched out) in every sunny one, and `c18-16` (curled up) on the gold-paw card. The same cat is `c19-46` (sitting, looking up) and `c19-33` (from behind), not used yet; `c18-20` looks like her but is drawn with a darker outline.
 
