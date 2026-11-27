@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Mew Hue</title>
-<script src="../move.js?v=2026-11-27.12"></script>
+<script src="../move.js?v=2026-11-27.13"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-27.12"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-27.13"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-27.12">
+<link rel="stylesheet" href="../games.css?v=2026-11-27.13">
 <style>
 /* Blocks of paint, each with a mark: red a bar down, yellow a bar across, blue a ring. Drag a row
    or column and its blocks slide to that end. Two different marks mix, and the mix carries both (orange is a
@@ -78,6 +78,15 @@
 .blk.charmed .b svg{width:72%;height:72%}
 .trayart{position:absolute;transform:translate(0,-50%);pointer-events:none;z-index:2}
 .paintboard .trayart{margin:0}
+/* chapter 4: a sunbeam across a row (over the blocks), its pane in the frame, springs in the frame, scratching posts */
+.sunbeam{position:absolute;left:-3%;width:106%;height:20%;background:color-mix(in srgb,var(--sun) 30%,transparent);border-top:1.5px dashed var(--sun);border-bottom:1.5px dashed var(--sun);
+  transform:skewY(-1.5deg);pointer-events:none;z-index:2;mix-blend-mode:multiply}
+.trayart.pane{width:4.6%;height:11%;margin-left:-2.3%!important;border-radius:3px;background:#FFF6DC;border:2px solid #2A2530;box-sizing:border-box}
+.trayart.pane::after{content:"";position:absolute;inset:2px;background:var(--sun)}
+.trayart.spring{width:10%;height:5%;margin-left:-3.5%!important;margin-right:-3.5%!important}
+.trayart.spring svg{display:block;width:100%;height:100%}
+.post{position:absolute;height:20%;width:3%;margin-left:-1.5%;pointer-events:none;z-index:2;border-radius:3px;border:1.5px solid #2A2530;box-sizing:border-box;
+  background:repeating-linear-gradient(160deg,#C9A66B 0 5px,#8E6E3A 5px 6.5px)}
 /* a carousel row's arrows: Purrmutation's Shift arrows, ink at half strength */
 .trayart.turnarrow{transform:none;display:grid;place-items:center;cursor:pointer;pointer-events:auto}
 .trayart.turnarrow svg{width:70%;height:70%;fill:#2A2530;opacity:.5;transition:opacity .15s}
@@ -127,7 +136,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-27.12"></script>
+<script src="../games.js?v=2026-11-27.13"></script>
 <script>
 /* ---------- marks, colours and rules (plain functions) ---------- */
 // Colours by number: 0 red (a bar down), 1 orange (bar down and across), 2 yellow (a bar across), 3 green (across
@@ -247,22 +256,47 @@ function wither(g, grid) {
   });
   return turned;
 }
-// A move's lines, added to the game: lines that count, the colours made (for need goals) and coats taken.
+// Lines that bask: the sunbeam's own row, cleared in the sunbeam's colour.
+const basking = (tray, lines) => !tray.sun ? [] : lines.filter(x => x.c === tray.sun[1] && x.cells.every(i => Math.floor(i / N) === tray.sun[0]));
+// A move's lines, added to the game: lines that count, the colours made (for need goals), coats taken and basking
+// (which has the next block fall in with a charm).
 function tally(g, c) {
   g.lines += counts(g.level, c.lines).length; g.got = [...(g.got || []), ...c.lines.map(x => x.c)];
   g.coats = (g.coats || 0) + c.lines.filter(x => x.coat).length;
+  const b = basking(trayFor(g), c.lines).length; if (b) { g.basks = (g.basks || 0) + b; g.reward = true; }
 }
 // The tray (chapter 2 on): rows that turn round instead of sliding (carousel rows), and a pair of linked cat flaps,
 // each [row, side] (side 0 the left end, 1 the right), on two other rows. Picked from the board's seed, so a share
 // link gets the same tray.
-function trayOf(level, seed) {
+// Chapter 4 adds a sunbeam (sun: [row, colour], the colour of its window's pane, one the level drops), springs ([row,
+// side] each) and scratching posts ([row, x]: between squares x and x + 1). Each piece has a row of its own.
+function trayOf(level, seed, order = [0, 1, 2]) {
   const L = LEVELS[level] || {}, r = seeded(seed * 104729 + 17), rows = [0, 1, 2, 3, 4];
   for (let k = rows.length - 1; k > 0; k--) { const j = Math.floor(r() * (k + 1)); [rows[k], rows[j]] = [rows[j], rows[k]]; }
-  const n = L.turn || 0, turn = rows.slice(0, n).sort();
-  const flaps = L.flaps ? [[rows[n], r() < .5 ? 0 : 1], [rows[n + 1], r() < .5 ? 0 : 1]] : null;
-  return {turn, flaps, paint: level >= PAINT_FROM};
+  let at = 0; const take = () => rows[at++];
+  const turn = []; for (let k = 0; k < (L.turn || 0); k++) turn.push(take()); turn.sort();
+  const flaps = L.flaps ? [[take(), r() < .5 ? 0 : 1], [take(), r() < .5 ? 0 : 1]] : null;
+  let sun = null;
+  if (L.sun) { const d = boardColours(level, seed, order).drops, prim = [0, 2, 4].filter(c => d[c]); sun = [take(), prim[Math.floor(r() * prim.length)]]; }
+  const springs = [], posts = [];
+  for (let k = 0; k < (L.springs || 0); k++) springs.push([take(), r() < .5 ? 0 : 1]);
+  for (let k = 0; k < (L.posts || 0); k++) posts.push([take(), 1 + Math.floor(r() * 2)]);
+  return {turn, flaps, sun, springs, posts, paint: level >= PAINT_FROM};
 }
-const noTray = {turn: [], flaps: null};
+// Slide a sunbeam's row: blocks in the sun are lazy, so each moves one square at most (combining, swapping or painting
+// as a slide would).
+function lazySlide(g, L, paint) {
+  const out = {moves: [], merged: [], vanish: [], painted: []}, done = new Set();
+  for (let k = 1; k < L.length; k++) {
+    const i = L[k], j = L[k - 1];
+    if (g[i] < 0 || isStone(col(g[i])) || (g[j] >= 0 && done.has(j))) continue;
+    const r = slideLine(g, [j, i], paint);
+    for (const key in out) out[key].push(...r[key]);
+    r.merged.forEach(x => done.add(x));
+  }
+  return out;
+}
+const noTray = {turn: [], flaps: null, sun: null, springs: [], posts: []};
 // A move: {k: "line", ax, l, back} slides a row or column (and, on a row with a cat flap, sends the block that reaches
 // the flap's end out through it and in at the other flap, if it can land there); {k: "turn", l, back} turns a carousel
 // row one square (left when back), the end block coming round to the other end and nothing combining; {k: "step", i,
@@ -282,8 +316,11 @@ function applyMove(g, m, tray = noTray) {
     const r = slideLine(h, [ny * N + nx, m.i], tray.paint);
     return {grid: h, ...r, changed: r.moves.length > 0 || r.painted.length > 0};
   }
-  const L = lineOf(m.ax, m.l, m.back), r = slideLine(h, L, tray.paint);
-  let thru = null;
+  // a row with a scratching post: only the part the drag started in slides (part 0 left of the post, 1 right)
+  const post = !m.ax && (tray.posts || []).find(([row]) => row === m.l);
+  const L = lineOf(m.ax, m.l, m.back).filter(i => !post || (i % N <= post[1]) === !m.part);
+  const lazy = !m.ax && tray.sun && tray.sun[0] === m.l, r = lazy ? lazySlide(h, L, tray.paint) : slideLine(h, L, tray.paint);
+  let thru = null, boing = null;
   const fl = !m.ax && tray.flaps ? tray.flaps.findIndex(([row, side]) => row === m.l && side === (m.back ? 0 : 1)) : -1;
   if (fl >= 0 && h[L[0]] >= 0) {
     const [row, side] = tray.flaps[1 - fl], to = row * N + (side ? N - 1 : 0), from = L[0], v = h[from];
@@ -295,29 +332,45 @@ function applyMove(g, m, tray = noTray) {
     }
     if (thru) { const mv = r.moves.find(x => x.to === from); if (mv) mv.to = to; else r.moves.push({from, to}); }
   }
-  return {grid: h, ...r, thru, changed: r.moves.length > 0 || r.painted.length > 0};
+  // a spring at the end the row slides to: the block that reaches it bounces back to the far end of the row, landing
+  // there if it's empty or combining with what's there
+  const sp = !m.ax && (tray.springs || []).find(([row, side]) => row === m.l && side === (m.back ? 0 : 1));
+  if (sp && h[L[0]] >= 0 && !isStone(col(h[L[0]]))) {
+    const from = L[0], to = L[L.length - 1], v = h[from];
+    if (h[to] < 0) { h[to] = v; h[from] = -1; boing = [from, to]; }
+    else if (to !== from && !isStone(col(h[to]))) {
+      const c = combine(col(h[to]), col(v));
+      if (c === VANISH) { h[to] = -1; h[from] = -1; r.vanish.push(to); boing = [from, to]; }
+      else if (c >= 0) { h[to] = withCharm(c, c === 6 ? 0 : charmOf(h[to]) || charmOf(v)); h[from] = -1; r.merged.push(to); boing = [from, to]; }
+    }
+    if (boing) { const mv = r.moves.find(x => x.to === from); if (mv) mv.to = to; else r.moves.push({from, to}); }
+  }
+  return {grid: h, ...r, thru, boing, changed: r.moves.length > 0 || r.painted.length > 0};
 }
 // The move a drag (or Shift and an arrow key) from square i makes: a kitten's own block steps alone, a carousel row
 // turns, and anything else slides its line.
 function moveFor(g, tray, i, [ax, l, back]) {
   if (charmOf(g[i]) === KITTEN) return {k: "step", i, ax, back};
   if (!ax && tray.turn.includes(l)) return {k: "turn", l, back};
-  return {k: "line", ax, l, back};
+  const post = !ax && (tray.posts || []).find(([row]) => row === l);
+  return post ? {k: "line", ax, l, back, part: i % N <= post[1] ? 0 : 1} : {k: "line", ax, l, back};
 }
 // Every move that would change something.
 function allMoves(g, tray = noTray) {
   const out = [];
   for (let l = 0; l < N; l++) for (const ax of [0, 1]) for (const back of [false, true]) {
-    const m = !ax && tray.turn.includes(l) ? {k: "turn", l, back} : {k: "line", ax, l, back};
-    if (applyMove(g, m, tray).changed) out.push(m);
+    const post = !ax && (tray.posts || []).some(([row]) => row === l);
+    const ms = !ax && tray.turn.includes(l) ? [{k: "turn", l, back}] : post ? [0, 1].map(part => ({k: "line", ax, l, back, part})) : [{k: "line", ax, l, back}];
+    for (const m of ms) if (applyMove(g, m, tray).changed) out.push(m);
   }
   g.forEach((v, i) => { if (charmOf(v) === KITTEN) for (const ax of [0, 1]) for (const back of [false, true]) { const m = {k: "step", i, ax, back}; if (applyMove(g, m, tray).changed) out.push(m); } });
   return out;
 }
 // The squares a move lights up: its line, or the kitten and where it goes.
-function moveCells(m) {
+function moveCells(m, tray = noTray) {
   if (m.k === "step") { const d = m.back ? -1 : 1; return [m.i, m.i + (m.ax ? d * N : d)]; }
-  return lineOf(m.k === "turn" ? 0 : m.ax, m.l, true);
+  const post = m.part != null && (tray.posts || []).find(([row]) => row === m.l);
+  return lineOf(m.k === "turn" ? 0 : m.ax, m.l, true).filter(i => !post || (i % N <= post[1]) === !m.part);
 }
 // Levels, in order of how hard they came out in simulated play (a player taking the best-looking slide). Each one has
 // a name; a goal (lines to clear; only stone counts with stone) or a task (MIX and PRIM, from the board's seed, name a
@@ -399,9 +452,22 @@ const LEVELS = [null,
   {name: "Past the mix", task: M => ({need: [M]}), ready: .8, paw: .12},
   {name: "Catnip kittens", goal: 5, catnip: .1, kitten: .1, black: BW, white: BW},
   {name: "Clean slate", task: () => ({lines: 3, without: [6]}), catnip: .1, paw: .1, turn: 1, black: BW, white: BW},
+  // Chapter 4, sun and springs (the owner's plan, 2026-11-27). sun: a sunbeam across a row, in one of the colours that
+  // fall; springs and posts: how many. Bask goals ask for lines of the sunbeam's colour in the beam (sunBoost: how often
+  // a falling block is the sunbeam's colour instead). Simulated play (150 boards each): about 100, 77, 100, 75, 100,
+  // 61, 63, 56 and 37% won.
+  {name: "A sunbeam", goal: 2, pair: 2, mix: true, sun: true, intro: "sun"},
+  {name: "Basking", task: () => ({bask: 1}), sun: true, sunBoost: .3, intro: "bask"},
+  {name: "A spring", goal: 2, pair: 0, mix: true, springs: 1, intro: "spring"},
+  {name: "Which way first", task: M => ({need: [M]}), springs: 1},
+  {name: "Scratching post", goal: 2, pair: 1, mix: true, posts: 1, intro: "post"},
+  {name: "Posts", goal: 3, posts: 2},
+  {name: "Warm spring", task: () => ({bask: 2}), sun: true, sunBoost: .42, springs: 1},
+  {name: "Post in the sun", goal: 4, sun: true, posts: 1, black: BW, white: BW},
+  {name: "Sunny side", task: () => ({bask: 1, lines: 3}), sun: true, springs: 1, posts: 1, black: BW, white: BW},
 ];
 // The chapters: where each starts, and its name, for the level picker.
-const CHAPTERS = [[1, "The basics"], [34, "Turning the tray"], [44, "Catnip and stone"]];
+const CHAPTERS = [[1, "The basics"], [34, "Turning the tray"], [44, "Catnip and stone"], [54, "Sun and springs"]];
 // Stone takes a coat of paint from painted stone's own level on.
 const PAINT_FROM = 46;
 // Which of a move's lines count towards a "lines" goal: on the stone level only stone; in chapter 1 any line; from
@@ -418,6 +484,7 @@ function goalDone(g) {
   if (!spec.task) return g.lines >= spec.goal;
   const t = taskOf(g.level, g.seed), got = (g.got || []).slice();
   if (t.coat) return (g.coats || 0) >= t.coat;
+  if (t.bask) return (g.basks || 0) >= t.bask && (!t.lines || g.lines >= t.lines);
   if (t.need) return t.need.every(c => { const k = got.indexOf(c); if (k < 0) return false; got.splice(k, 1); return true; });
   return g.lines >= t.lines && !g.grid.some(c => t.without.includes(col(c)));
 }
@@ -519,6 +586,8 @@ function drop(g) {
   const i = empty[Math.floor(r() * empty.length)], spec = LEVELS[g.level];
   const sp = boardColours(g.level, g.seed, g.order);
   let c = pickDrop(sp.drops, r());
+  // sunBoost: on basking levels, the sunbeam's colour falls a little more often
+  if (spec.sunBoost && r() < spec.sunBoost) c = trayFor(g).sun[1];
   if (spec.catnip && r() < spec.catnip) {
     // a leaf for each colour this level can make (the colours that fall, and their mixes), or nipLeaves of them
     const can = [0, 1, 2, 3, 4, 5].filter(x => sp.drops[x] || x % 2 && [[0, 2], [2, 4], [0, 4]][(x - 1) / 2].every(p => sp.drops[p]));
@@ -528,12 +597,14 @@ function drop(g) {
     if (spec.kitten && c <= 5 && r() < spec.kitten) c = withCharm(c, KITTEN);
     else if (spec.paw && c <= 5 && r() < spec.paw) c = withCharm(c, PAW);
   }
+  // after basking, the next block brings a charm (a kitten or a paw)
+  if (g.reward && col(c) <= 5) { c = withCharm(col(c), r() < .5 ? KITTEN : PAW); g.reward = false; }
   g.grid[i] = c; return i;
 }
 // A board's tray (worked out again for a board saved before there were trays).
-const trayFor = g => g.tray || (g.tray = trayOf(g.level, g.seed));
+const trayFor = g => g.tray || (g.tray = trayOf(g.level, g.seed, g.order));
 function deal(level, seed, order) {
-  const g = {level, seed, order: (order || settings.order).slice(), grid: new Array(N * N).fill(-1), tray: trayOf(level, seed), drops: 0, lines: 0, got: [], moves: 0, mixes: MIXES, history: [], won: false, lost: false, ...G.freshClock()};
+  const g = {level, seed, order: (order || settings.order).slice(), grid: new Array(N * N).fill(-1), tray: trayOf(level, seed, order || settings.order), drops: 0, lines: 0, got: [], moves: 0, mixes: MIXES, history: [], won: false, lost: false, ...G.freshClock()};
   for (let k = 0; k < 4; k++) drop(g);
   g.start = JSON.stringify({grid: g.grid, drops: g.drops});
   return g;
@@ -574,8 +645,22 @@ function blk(v, i) {
 // turn the row that way), and the cat flaps are set in the frame, numbered so you can see they're a pair. A board
 // with any of them gets a wider frame.
 const ARROW = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M7 5L3 1.5v7z"/></svg>';
+// The spring is the owner's standing spring (toys/spring-up.webp), tinted gold as Wind Up tints it, laid on its side.
+let springSrc = null;
+function springPic(then) {
+  if (springSrc) return springSrc;
+  const im = new Image(); im.onload = () => {
+    const c = document.createElement("canvas"); c.width = im.naturalWidth; c.height = im.naturalHeight; const x = c.getContext("2d");
+    x.drawImage(im, 0, 0); x.globalCompositeOperation = "multiply"; x.fillStyle = "#F2C35A"; x.fillRect(0, 0, c.width, c.height);
+    x.globalCompositeOperation = "screen"; x.fillStyle = "rgba(236,168,24,.35)"; x.fillRect(0, 0, c.width, c.height);
+    x.globalCompositeOperation = "destination-in"; x.drawImage(im, 0, 0);
+    springSrc = c.toDataURL(); then();
+  };
+  im.src = "../toys/spring-up.webp"; return null;
+}
 function drawTray() {
-  const t = trayFor(game), board = $("board"), framed = t.turn.length > 0 || !!t.flaps;
+  const t = trayFor(game), board = $("board"), framed = t.turn.length > 0 || !!t.flaps || !!t.sun || !!(t.springs || []).length || !!(t.posts || []).length;
+  $("grid").querySelectorAll(".trayin").forEach(e => e.remove());
   board.classList.toggle("framed", framed);
   board.querySelectorAll(".trayart").forEach(e => e.remove());
   const IN = framed ? 7 : 2, cell = (100 - 2 * IN) / N, mid = y => `${IN + (y + .5) * cell}%`;
@@ -589,6 +674,15 @@ function drawTray() {
     board.append(a);
   }
   if (t.flaps) t.flaps.forEach(([y, side]) => art("flap", y, side, "<b>1</b>"));
+  // a sunbeam: light in its pane's colour across the row, over the blocks, and the pane in the frame at the left
+  if (t.sun) {
+    const [y, c] = t.sun, b = document.createElement("div"); b.className = "trayin sunbeam"; b.style.top = y * 20 + "%"; b.style.setProperty("--sun", COLOURS[c].hex); $("grid").append(b);
+    art("pane", y, 0, "", `A sunbeam through a ${COLOURS[c].name} pane`); board.querySelector(".trayart.pane:last-child").style.setProperty("--sun", COLOURS[c].hex);
+  }
+  // springs, in the frame at the end of their rows
+  for (const [y, side] of t.springs || []) { const src = springPic(() => game && draw()); if (src) art("spring", y, side, `<svg viewBox="0 0 200 97" aria-hidden="true"><image href="${src}" width="97" height="200" transform="${side ? "translate(200 0) rotate(90)" : "translate(0 97) rotate(-90)"}"/></svg>`); }
+  // scratching posts, on the line between two squares
+  for (const [y, x] of t.posts || []) { const e = document.createElement("div"); e.className = "trayin post"; e.style.top = y * 20 + "%"; e.style.left = (x + 1) * 20 + "%"; $("grid").append(e); }
 }
 function draw() {
   queueMicrotask(say);
@@ -605,6 +699,9 @@ const tick = (ok, inner) => `<span class="need${ok ? " ok" : ""}">${ok ? "✓ " 
 function taskText(g, plain) {
   const t = taskOf(g.level, g.seed), got = (g.got || []).slice(), nm = c => COLOURS[c].name;
   if (t.coat) { const n = Math.min(g.coats || 0, t.coat); return plain ? `a line through painted stone` : tick(n >= t.coat, `${chip(6)} a line through painted stone`); }
+  if (t.bask) { const sun = trayFor(g).sun, b = Math.min(g.basks || 0, t.bask), what = `${t.bask === 1 ? "a" : t.bask} ${nm(sun[1])} line${t.bask === 1 ? "" : "s"} in the sunbeam`;
+    if (plain) return what + (t.lines ? `, and ${t.lines} lines` : "");
+    return tick(b >= t.bask, `☀ ${chip(sun[1])} ${t.bask > 1 ? `${b} of ${t.bask}` : "in the sunbeam"}`) + (t.lines ? " " + tick(g.lines >= t.lines, `${Math.min(g.lines, t.lines)} of ${t.lines} lines`) : ""); }
   if (t.need) return t.need.map(c => { const k = got.indexOf(c), ok = k >= 0; if (ok) got.splice(k, 1); return plain ? `a ${nm(c)} line` : tick(ok, `${chip(c)} line`); }).join(plain ? " and " : " ");
   const left = g.grid.filter(c => t.without.includes(col(c))).length, none = t.without.map(c => plain ? nm(c) : chip(c)).join(plain ? " or " : "");
   return plain ? `${t.lines} lines, then no ${none} left` : `${tick(g.lines >= t.lines, `${Math.min(g.lines, t.lines)} of ${t.lines} lines`)} ${tick(!left, `no ${none} left`)}`;
@@ -625,7 +722,10 @@ function say() {
   if (!game) return;
   const t = trayFor(game), side = s => s ? "right" : "left";
   const rows = [...Array(N).keys()].map(r => `row ${r + 1}${t.turn.includes(r) ? " (turns round)" : ""}: ${[...Array(N).keys()].map(c => { const v = game.grid[r * N + c]; return squareName(v); }).join(", ")}`);
-  const flaps = t.flaps ? ` Cat flaps at the ${side(t.flaps[0][1])} of row ${t.flaps[0][0] + 1} and the ${side(t.flaps[1][1])} of row ${t.flaps[1][0] + 1}.` : "";
+  const flaps = (t.flaps ? ` Cat flaps at the ${side(t.flaps[0][1])} of row ${t.flaps[0][0] + 1} and the ${side(t.flaps[1][1])} of row ${t.flaps[1][0] + 1}.` : "") +
+    (t.sun ? ` A ${COLOURS[t.sun[1]].name} sunbeam across row ${t.sun[0] + 1}: its blocks move one square at a time.` : "") +
+    (t.springs || []).map(([y, sd]) => ` A spring at the ${side(sd)} of row ${y + 1}.`).join("") +
+    (t.posts || []).map(([y, x]) => ` A scratching post in row ${y + 1}, after square ${x + 1}.`).join("");
   G.describe($("grid"), `Blocks of paint, ${N} by ${N}. ${G.listed(rows, "; ")}.${flaps} Arrow keys pick a square; Shift with an arrow slides its row or column that way (a kitten moves alone).`);
 }
 
@@ -667,6 +767,7 @@ function doMove(m) {
     if (made.includes(6)) G.sound.play("mh.stone"); else if (made.some(c => c % 2)) G.sound.play("mh.mix"); else if (made.length || r.vanish.length) G.sound.play("mh.join");
     if (game.demo) {}   // the walkthrough says it
     else if (r.thru) G.note("Through the cat flap!", 1800);
+    else if (r.boing) G.note("Boing! Back to the far end.", 1800);
     else if (r.painted.length) G.note(`The stone takes a coat of ${COLOURS[col(after[r.painted[0]]) - 10].name}.`, 2200);
     else if (ripe.length) G.note(`The catnip's down to its last leaf: it's ${COLOURS[col(after[ripe[0]])].name} now.`, 2400);
     else if (r.vanish.length) G.note("Black wipes them both out!", 2000);
@@ -682,6 +783,7 @@ function doMove(m) {
       if (c.lines.length && !game.demo) { G.note(c.lines.length > 1 ? `${c.lines.length} lines at once!` : c.lines[0].c === 6 ? "A line of stone!" : "A whole line!", 2000); }
       if (spec.stone && c.lines.length && !counted) G.note("This level only counts lines of stone.", 2500);
       else if (!spec.stone && !spec.task && c.lines.length && !counted) G.note("Stone lines tidy up, but they don't count here.", 2500);
+      if (basking(trayFor(game), c.lines).length && !game.demo) G.note("Basking in the sun: the next block brings a charm!", 2600);
       if (goalDone(game)) { busy = false; draw(); win(); return; }
       const i = drop(game);
       busy = false; draw(); if (i >= 0 && blocks[i]) blocks[i].classList.add("fresh"); if (i >= 0) G.sound.play("mh.new");
@@ -719,7 +821,7 @@ function showGhost(m) {
   clearGhost();
   const r = applyMove(game.grid, m, trayFor(game)), h = r.grid, c = clearLines(h.slice());
   r.painted.forEach(i => { const g = document.createElement("div"); g.className = "ghost"; const [x, y] = xyOf(i); g.style.left = x * 20 + "%"; g.style.top = y * 20 + "%"; g.innerHTML = "<span>🖌</span>"; $("grid").append(g); });
-  moveCells(m).forEach(i => $("grid").querySelector(`.slot[data-i="${i}"]`).classList.add("lit"));
+  moveCells(m, trayFor(game)).forEach(i => $("grid").querySelector(`.slot[data-i="${i}"]`).classList.add("lit"));
   const put = (i, t) => { const g = document.createElement("div"); g.className = "ghost"; const [x, y] = xyOf(i); g.style.left = x * 20 + "%"; g.style.top = y * 20 + "%"; g.innerHTML = `<span>${t}</span>`; $("grid").append(g); };
   r.merged.forEach(i => put(i, col(h[i]) === 6 ? "●" : "+")); r.vanish.forEach(i => put(i, "✕"));
   if (r.thru && !r.merged.includes(r.thru[1]) && !r.vanish.includes(r.thru[1])) put(r.thru[1], "↩");
@@ -773,6 +875,8 @@ function score(g, spec) {
 function taskValue(g, lines, h) {
   const t = taskOf(g.level, g.seed);
   if (t.coat) return lines.filter(x => x.coat).length * 1000 + h.filter(v => col(v) >= 10).length * 40;
+  if (t.bask) { const tr = trayFor(g), sunRow = lineOf(0, tr.sun[0], true);
+    return basking(tr, lines).length * 1000 + (t.lines && g.lines < t.lines ? counts(g.level, lines).length * 600 : 0) + sunRow.filter(i => counts_as(h[i]).includes(tr.sun[1])).length ** 2 * 15; }
   if (t.need) { const want = t.need.slice(); for (const c of g.got || []) { const k = want.indexOf(c); if (k >= 0) want.splice(k, 1); }
     return lines.filter(x => { const k = want.indexOf(x.c); if (k < 0) return false; want.splice(k, 1); return true; }).length * 1000; }
   return (g.lines < t.lines ? counts(g.level, lines).length * 1000 : 0) - h.filter(c => t.without.includes(col(c))).length * 60;
@@ -795,7 +899,7 @@ $("hintBtn").onclick = () => {
   game.hinted = true; save();
   const m = best.m, way = (ax, back) => ax ? (back ? "up" : "down") : (back ? "left" : "right"), clears = best.c.lines.length ? ": it clears a line" : "";
   const text = m.k === "step" ? `Nudge the gold kitten ${way(m.ax, m.back)}${clears}.` : m.k === "turn" ? `Turn the gold row ${way(0, m.back)}${clears}.` : `Slide the gold ${m.ax ? "column" : "row"} ${way(m.ax, m.back)}${clears}.`;
-  hints.show({cells: moveCells(m)}, text);
+  hints.show({cells: moveCells(m, trayFor(game))}, text);
 };
 
 /* ---------- endings ---------- */
@@ -895,6 +999,11 @@ function helpOnFirstVisit(all) {
   if (intro === "painted") { const [p, , q] = sp.key[0]; steps.push(demo("Slide this row left into the stone", [[11, 6], [14, p], [6, q]], row2, `The stone took a coat of ${COLOURS[p].name}. It counts as ${COLOURS[p].name} in a line now, and stays stone underneath`, {turn: [], flaps: null, paint: true})); }
   if (intro === "coatstays") steps.push({say: "A line of stone takes the stone, and leaves any coat behind as a plain block", els: [$("grid")]});
   if (intro === "paw") steps.push(demo("Drag this row left: the paw swaps past", [[10, pa], [11, pm], [14, withCharm(pb, PAW)]], row2, "The paw swapped places instead of mixing"));
+  if (intro === "sun") steps.push(demo("Blocks in a sunbeam are lazy. Drag this row right", [[10, pa], [11, pb], [6, pm]], row2, "Each moved just one square", {...noTray, sun: [2, pa]}),
+    {say: "The sunbeam's colour is its window's pane", lit: [xyOf(10)]});
+  if (intro === "bask") steps.push({say: "Clear a line of the sunbeam's colour in the beam, and the next block brings a charm", els: [$("count")]});
+  if (intro === "spring") steps.push(demo("Slide this row right, into the spring", [[12, pa], [10, pm]], row2, "Boing! It bounced back to the far end. Which way you slide changes what meets what", {...noTray, springs: [[2, 1]]}));
+  if (intro === "post") steps.push(demo("This row has a post. Drag the right side left", [[10, pa], [13, pb]], [12, 13, 14].map(xyOf), "Only that side moved: a post splits its row in two. A row still clears when all five match", {...noTray, posts: [[2, 1]]}));
   if (intro === "flaps") steps.push(demo("Slide this row right, out through the cat flap", [[7, pa], [16, pa], [17, pa], [18, pa], [19, pa]], [5, 6, 7, 8, 9].map(xyOf), "In through the other flap: a whole line!", {turn: [], flaps: [[1, 1], [3, 0]]}));
   if (!steps.length) { settings.seen[n] = true; save(); return; }
   steps[steps.length - 1].leave = turn.upTo.leave;   // put the real board back after the last demo
