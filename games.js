@@ -3159,7 +3159,9 @@ const G = (() => {
     track(`Error: ${msg}${where ? ` (${where})` : ""}`);
     const m = $("msg"); if (m) m.textContent = `Something went wrong: ${msg}`;
   }
-  window.addEventListener("error", e => reportError(e.message, `${(e.filename || "").split("/").slice(-2).join("/")}:${e.lineno}`));
+  // An error in a puzzle builder (a worker made from a Blob, so its address is a made-up blob: one) says the page it
+  // came from, as the blob's address names no game (Pawprints, 2026-11-27).
+  window.addEventListener("error", e => { const f = e.filename || ""; reportError(e.message, `${/^blob:/.test(f) ? `${location.pathname.split("/").filter(s => s && !/\.html$/.test(s)).pop() || "home"} builder` : f.split("/").slice(-2).join("/")}:${e.lineno}`); });
   window.addEventListener("unhandledrejection", e => reportError(String((e.reason && e.reason.message) || e.reason)));
   // Reopen a saved puzzle. If that fails, report why and start a fresh puzzle instead of
   // leaving an empty board.

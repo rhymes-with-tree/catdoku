@@ -45,8 +45,11 @@ owner can ask for one any time.
    ("new case") needs it added to `START_RE` here and in `games.js` alike.
 2. **Read the feedback.** The Google Drive connector's `read_file_content` on the sheet "Website Feedback Form
    (Responses)" (`1uOKFrs2O5aLL4sAZhFbTwMQ6yWZjVyqGH55RUpl4PiE`, tab Form Responses 1). Columns: Timestamp, Kind,
-   Message, Game, Details, Contact, Build, Browser, Device (the page's address), Text. The connector can cut a long
-   message short; say so in the note ("the sheet cuts it off here") rather than guess the rest.
+   Message, Game, Details, Contact, Build, Browser, Device (the page's address), Text. Read each message whole: the
+   table at the top can cut a long one short, but the column list under it (Table Columns, the Message column's
+   sample data) has it in full, line breaks and all. Only if neither has the end, say so in the note ("the sheet cuts
+   it off here") rather than guess the rest. Note each row's Contact (how they asked to be reached) for the chat
+   message in step 6, never for the files.
 3. **Write the notes.** Read the dashboard's current `notes.json` first (`Artifact` `read` with the dashboard's url and
    the `path` of the `datasets/notes` source's blob id) and keep its notes, updating their status. Add one note for
    each new feedback row, and one for each new error in `errors.json` (one note for an error that repeats). For each,
@@ -72,7 +75,9 @@ owner can ask for one any time.
    `passed`, or fix what it names. `still_loading` or `checking` that doesn't move means the owner hasn't got it open;
    say so.
 6. **Tell the owner** in chat (or, in the morning task, in the session's last message, which reaches their phone), briefly: what's new since the last update (new notes and their suggested fixes, figures
-   that moved a lot, games that stand out), and the link. Offer to make any Open fix.
+   that moved a lot, games that stand out), and the link. Offer to make any Open fix. For each note that wants a
+   reply and is ready for one (Fixed or Done and not yet answered), say who to follow up with, by the Contact they
+   left, and what to tell them; the chat is only the owner's, so the contact goes there and never in a note or file.
 
 ## Changing the page
 
