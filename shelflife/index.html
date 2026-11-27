@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Shelf Life</title>
-<script src="../move.js?v=2026-11-27.14"></script>
+<script src="../move.js?v=2026-11-27.15"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-27.14"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-27.15"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-27.14">
+<link rel="stylesheet" href="../games.css?v=2026-11-27.15">
 <style>
 /* A pale painted shelf of cubbies in the yarn shop, each holding a skein of yarn. The balls shade smoothly from
    corner to corner, until Fred knocks them about; the balls with a tag stay put. */
@@ -78,8 +78,8 @@
   </div>
 </main>
 
-<script src="../games.js?v=2026-11-27.14"></script>
-<script src="../colorways.js?v=2026-11-27.14"></script>
+<script src="../games.js?v=2026-11-27.15"></script>
+<script src="../colorways.js?v=2026-11-27.15"></script>
 <script>
 /* ---------- shelves (plain functions, also run in a background worker) ---------- */
 // Levels: [columns, rows, which cubbies have a cat napping in them, how close the colours may get (the least
@@ -101,8 +101,10 @@ function catsAt(W, H, kind) {
 }
 // The four corners' colours: four palette colours from one side of the colour wheel (so the blends between them
 // stay colourful rather than going grey), each paled, darkened or left much as it is, with one corner pale and the
-// one across from it dark, so the shelf runs from light to dark.
-function pickCorners() {
+// one across from it dark, so the shelf runs from light to dark. Rich (levels 1 to 4, the owner, 2026-11-27): each
+// corner a third more colourful (OKLab chroma), keeping the run from light to dark, so the balls are fuller in colour
+// and, if anything, further apart.
+function pickCorners(rich) {
   const PAL = ["#BD5538", "#E16A4A", "#73A7AE", "#ECA818", "#B3B94B", "#6AA673", "#B94588", "#7885BA", "#4E577D", "#8D78AD"];
   const mixHex = (a, b, t) => "#" + [1, 3, 5].map(i => Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - t) + parseInt(b.slice(i, i + 2), 16) * t).toString(16).padStart(2, "0")).join("");
   const hue = c => { const [, a, b] = hexLab(c); return (Math.atan2(b, a) * 180 / Math.PI + 360) % 360; };
@@ -116,7 +118,8 @@ function pickCorners() {
   // corners go top left, top right, bottom left, bottom right, so across from corner i is corner 3 - i
   const li = how.findIndex(h => h && h[0] === "#FFFFFF"), di = how.findIndex(h => h && h[0] !== "#FFFFFF");
   if (li + di !== 3) { const want = 3 - li, t = how[want]; how[want] = how[di]; how[di] = t; }
-  return pal.map((c, i) => how[i] ? mixHex(c, how[i][0], how[i][1]) : mixHex(c, "#FFFFFF", Math.random() * .15));
+  const out = pal.map((c, i) => how[i] ? mixHex(c, how[i][0], how[i][1]) : mixHex(c, "#FFFFFF", Math.random() * .15));
+  return rich ? out.map(c => { const [L, a, b] = hexLab(c); return labHex([L, a * 1.35, b * 1.35]); }) : out;
 }
 // Every cubby's colour, blended between the four corners.
 function shelfLab(W, H, corners) {
@@ -149,7 +152,8 @@ function emptiesFor(W, H, cats, k) {
 // A shelf: its corners' colours, the empty cubbies, and the ball in each cubby (a ball is numbered by the cubby it
 // belongs in, -1 for none). Every loose ball starts out of its place.
 function makeShelf(n) {
-  const [W, H, kind, close, empty] = levelOf(n), corners = pickCorners(), labs = shelfLab(W, H, corners), d = nearest(labs);
+  // the first four levels are in richer colours (pickCorners), with the same spacing as the rest
+  const rich = n <= 4, [W, H, kind, close, empty] = levelOf(n), corners = pickCorners(rich), labs = shelfLab(W, H, corners), d = nearest(labs);
   if (d < close || d > close * 2) return null;
   // and not grey in the middle
   const [, a, b] = labs[(H >> 1) * W + (W >> 1)];
@@ -204,7 +208,7 @@ const hints = G.hinter({game: () => game, key: () => game ? JSON.stringify(game.
 const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !busy && !$("overlay").classList.contains("show");
 const levelName = n => { const [W, H, , , e] = levelOf(n); return `Level ${n} · ${W} × ${H}${e ? `, ${e} to spin` : ""}`; };
-const build = G.builder([levelOf, hexLab, catsAt, pickCorners, shelfLab, nearest, emptiesFor, makeShelf], "makeShelf");
+const build = G.builder([levelOf, hexLab, labHex, catsAt, pickCorners, shelfLab, nearest, emptiesFor, makeShelf], "makeShelf");
 const swaps = () => game.history.filter(h => h[0] === "s").length;
 
 // Work out the shelf's colours, cats and empty cubbies from the game.

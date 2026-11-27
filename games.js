@@ -2176,10 +2176,12 @@ const G = (() => {
     windup: [NUMBERS("Each toy shows a number too")], movingday: [NUMBERS("Each thing shows its step")],
     pickpile: [["dim", "Dim stuck blocks", "Blocks that can't come off yet are dimmed", true, {row: "decor", inv: true}]],
     tunnelrun: [["tracks", "Tracks", "Rugs where whole rows and columns slide", false, {icon: "swap", words: ["Turning rugs", "Sliding tracks"]}]],
+    boing: [["stripes", "Stripes", "Striped wallpaper", true, {row: "decor", at: ["catdoku.boing.prefs.v1", "stripes"]}]],
+    knockitoff: [["gingham", "Gingham", "A checked tablecloth", true, {row: "decor"}]],
     toebeans: [["pattern", "Pattern", "Dots on the mat", true, {row: "decor"}], ["rev", "Reverse", "Count back down from the total to the start", false, {icon: "swap", words: ["Match the Paw", "Paw = 0"]}]],
     twirl: [["twisty", "Twisty ribbons", "Off, every ribbon is drawn flat", true, {row: "decor", at: ["catdoku.twirl.prefs.v1", "twisty"]}],
       ["grid", "Grid", "Faint lines mark out the mat's squares", false, {at: ["catdoku.twirl.prefs.v1", "grid"]}]],
-    pounceup: [["autoPounce", "Pounce by herself", "Rayla pounces again each time she lands, without waiting for a tap", false]],
+    pounceup: [["stripes", "Stripes", "Striped wallpaper behind the shelves", true, {row: "decor"}], ["autoPounce", "Pounce by herself", "Rayla pounces again each time she lands, without waiting for a tap", false]],
     atlas: [["style", "Answer", "How you answer", "list", {icon: "chat", opts: [["pick", "Pick from 4 names"], ["list", "Type, with a list to choose from"], ["type", "Type it, no help"]],
       short: {pick: "4 Choices", list: "Full List", type: "Just Type"}}]],
   };
