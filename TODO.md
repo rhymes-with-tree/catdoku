@@ -27,11 +27,12 @@ If It Fits, Copycat, Yarn, Unravel and Catwalk more colour.
 - [x] score the word and map games, put aside then (2026-11-27, the same measure, a fresh load): Swap-a-Pom 3,
   Spelling String 2, Keyboard Cat 2, Junk Drawer 1.5, Catlas 1.5, and 1 for Fridge Magnets, Up a Tree, Kitten
   Caboodle, Fish Bones, Knit Pick and L-M-N-O-Pom (letters on cream or wood, the colour mostly in the words)
-- [ ] the games whose boards are mostly a pastel of a palette colour, measured the same day (share of the board pale
-  but tinted): Catwalk's rug (74%), Unravel's rug (59%), Under the Blanket's squares (46%), Bird Watch's sky (33%),
-  Open the Door!'s rooms (30%), Bed Hog's bed and cat spots (14%), Pick of the Pile's frame (13%), Tape Trap's
-  floor (11%), Day Light's flats (9%), and If It Fits' rug (its pale gold reads as cream to the measure); for the
-  owner to choose which go to full colour
+- [x] the boards that are mostly a pastel of a palette colour, mocked up on live boards (2026-11-27): Bed Hog's quilt
+  is spring blue and every cat's blanket its full colour, and Day Light's sunny flats full gold (the owner's picks);
+  Under the Blanket's quilt in full colour wasn't better, and the rest (Catwalk's and Unravel's rugs, Bird Watch's
+  sky, Pick of the Pile's frame, Tape Trap's floor, If It Fits' rug) are pale backdrops that full colour would crowd
+- [ ] Open the Door!: the owner asked whether an empty square's pale floor could match its right number's colour.
+  That would give the answer away, so asked what they had in mind (2026-11-27)
 
 ## Junk Drawer: checks not yet run
 
