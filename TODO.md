@@ -281,6 +281,47 @@ Also to check from play (raised 2026-11-11, not decided):
 - a tap on a shelf only a little above her (under 35 units) counts as a tap on her own shelf, so she walks instead of
   pouncing, and can knock something off on the tidy level.
 
+## Mew Hue: new pieces and chapters 2 to 9 (the owner, 2026-11-27)
+
+Worked out with the owner on a page of drawings, https://claude.ai/artifact/XMivySnEz7RtvtVcMhLxrx (private to the
+owner): every piece drawn on a Mew Hue board with what it does, and the 108 levels. Mew Hue grows from 33 levels to 108
+in nine chapters; today's 33 stay as chapter 1, unchanged, so saves, share links and best times carry on.
+
+What was settled:
+- **Three layers, three looks.** Paint is what a block is made of (a whole block with a mark). Charms change how a block
+  moves, and a charmed block shows the charm's glyph in place of its mark, on every colour (a mix keeps its pale inner
+  ring). The tray is the board itself: pieces between squares, where they meet, across a row like light, or on the
+  frame. Nothing new may look like a colour.
+- **Teaching:** each new thing comes in on a calm board with one colour left out (two colours and their mix, in the
+  player's own order, as levels 1 to 3 do), then with all three, then in goal levels. Black and white come back only
+  for each chapter's last levels. Each chapter starts easier than the last one ended, and the simulated player places
+  the levels inside it.
+- **Stone has two layers** once it can be painted: the first colour that bumps bare stone gives it a coat; a line of the
+  colour takes the coat and leaves bare stone, and a line of stone takes the stone and leaves the coat as a plain block.
+  From chapter 2, a line of stone still clears but counts only towards stone goals.
+- **The sleepy cat and ice both stay.** They happen to a block already on the board (a cat curls up, preferring a
+  sunbeam; a draught frosts one over, never in a sunbeam), rather than falling in.
+- **Catnip** is the site's catnip, a leaf in each of the six colours in a ring; it counts as any colour with a leaf left,
+  drops a leaf at random each move, and on its last leaf the leaf grows until it becomes that colour's tile.
+- **Two charms meeting** start a mood (which one depends on the pair). The magnet stays after a pull.
+- **Helpers** you earn (basking in a sunbeam, a plus, finishing a row and column in one move, a clean board) wait on a
+  shelf under the board, as Mix it up does.
+
+The chapters (the page has every level's colours, pieces and goal):
+- [x] **2 · Turning the tray** (34 to 43): carousel row, kitten, cat flaps; a carousel row has Purrmutation's Shift arrows, so the look is the same across games (built 2026-11-27; README "Mew Hue")
+- [x] **3 · Catnip and stone** (44 to 53): catnip, painted stone, paw (built 2026-11-27; README "Mew Hue")
+- [x] **4 · Sun and springs** (54 to 62): sunbeam and basking, spring (the site's `toys/spring-up.webp`, tinted gold as
+  Wind Up does), scratching post (built 2026-11-27; README "Mew Hue")
+- [ ] **5 · Water, boxes and yarn** (63 to 72): water, the helper shelf, cardboard box (`boxes.js`), yarn ball (stops at
+  another yarn ball, a post, stone, a sleepy cat or ice), tape (`tablethings.js`)
+- [ ] **6 · Surprises** (73 to 82): turn knob (Purrmutation's `KNOB` and `.knob` look, unchanged, so it's the same in both games), gift wrap (Toy Box's), wet paint, sleepy cat, ice, and
+  the fish treat and hot water bottle helpers
+- [ ] **7 · Pull and paint** (83 to 88): magnet, paint arrow
+- [ ] **8 · Moods** (89 to 99): silvervine, two charms meeting, valerian root, zoomies, Tatarian honeysuckle wood (only
+  its wood is cat-safe, so it's drawn as wood), laser pointer, knocked over, spook hop
+- [ ] **9 · Shapes** (100 to 108): 2 × 2 boxes, diagonals, the small plus (five squares; two whole lines can't wait for
+  each other), crossing lines
+
 ## Calibrate level ladders with a simulated player, as Mew Hue's were
 
 Mew Hue's 33 levels are in order of how often a simple player (the best-looking slide each time) won each one, with
