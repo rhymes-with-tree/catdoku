@@ -2143,7 +2143,7 @@ const G = (() => {
       ["autoExclude", "Auto Notes 🐾", "🐾 go round each 🐱 for you", false, {row: "notes"}]],
     yarn: [NUMBERS("Each ball shows its place in the run")],
     patches: [["fabric", "Fabric patterns", "Each fabric has a pattern as well as a color", true, {row: "decor"}], CHECK],
-    sunbeams: [CHECK, ["glass", "Stained glass", "Off, every sunbeam is plain gold sunlight", true, {row: "decor"}]], tango: [CHECK],
+    sunbeams: [CHECK, ["cats", "Cats", "Cats nap in the sunbeams", true, {row: "decor"}], ["glass", "Stained glass", "Off, every sunbeam is plain gold sunlight", true, {icon: "palette"}]], tango: [CHECK],
     scratchthat: [CHECK],
     highperch: [CHECK, NOTES], opendoor: [NOTES], windowledges: [["sets", "Show sets", "The digits that can make each ledge's total", true, {icon: "sets"}], NOTES],
     toydoku: [GRADE("toy"), CHECK, ["numbers", "Numbers", "Digits in place of toys", false, {icon: "digits", words: ["Show toys", "Show numbers"]}], NOTES],
