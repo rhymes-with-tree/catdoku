@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Mew Hue</title>
-<script src="../move.js?v=2026-11-27.14"></script>
+<script src="../move.js?v=2026-11-27.15"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-27.14"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-27.15"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-27.14">
+<link rel="stylesheet" href="../games.css?v=2026-11-27.15">
 <style>
 /* Blocks of paint, each with a mark: red a bar down, yellow a bar across, blue a ring. Drag a row
    or column and its blocks slide to that end. Two different marks mix, and the mix carries both (orange is a
@@ -75,6 +75,7 @@
 .card img.goldpic{display:block;width:62%;max-width:240px;height:auto;margin:0 auto 14px}
 /* the tray (chapter 2 on): a wider frame, a track behind a carousel row with a turn badge at each end, cat flaps */
 .paintboard.framed .grid{inset:7%}
+.paintboard.framed.boxed .grid{inset:12%}
 .blk.charmed .b svg{width:72%;height:72%}
 .trayart{position:absolute;transform:translate(0,-50%);pointer-events:none;z-index:2}
 .paintboard .trayart{margin:0}
@@ -87,6 +88,16 @@
 .trayart.spring svg{display:block;width:100%;height:100%}
 .post{position:absolute;height:20%;width:3%;margin-left:-1.5%;pointer-events:none;z-index:2;border-radius:3px;border:1.5px solid #2A2530;box-sizing:border-box;
   background:repeating-linear-gradient(160deg,#C9A66B 0 5px,#8E6E3A 5px 6.5px)}
+/* chapter 5: water, a box on the frame, tape */
+.blk.water .b{background:#CFE6EA;box-shadow:inset 0 0 0 2px #8DBEC6,inset 0 -4px 0 rgba(42,37,48,.12),0 2px 3px rgba(42,37,48,.25)}
+.trayart.cbox{width:11%;aspect-ratio:1;margin:0 .5%!important;cursor:pointer;pointer-events:auto}
+.trayart.cbox>svg{width:100%;height:100%;display:block}
+.trayart.cbox .held{position:absolute;inset:20%}
+.trayart.cbox .held .blk{position:static;width:100%;height:100%;transform:none!important}
+.tape{position:absolute;width:7%;height:20%;margin-left:-3.5%;pointer-events:none;z-index:2;transform:rotate(-6deg)}
+.tape svg{width:100%;height:100%;display:block}
+/* the helper shelf (chapter 5 on): earned helpers, used when you choose */
+.helperBtn.armed{background:color-mix(in srgb,#ECA818 22%,var(--panel));border-color:#B57F0A}
 /* a carousel row's arrows: Purrmutation's Shift arrows, ink at half strength */
 .trayart.turnarrow{transform:none;display:grid;place-items:center;cursor:pointer;pointer-events:auto}
 .trayart.turnarrow svg{width:70%;height:70%;fill:#2A2530;opacity:.5;transition:opacity .15s}
@@ -136,7 +147,9 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-27.14"></script>
+<script src="../boxes.js?v=2026-11-27.15"></script>
+<script src="../tablethings.js?v=2026-11-27.15"></script>
+<script src="../games.js?v=2026-11-27.15"></script>
 <script>
 /* ---------- marks, colours and rules (plain functions) ---------- */
 // Colours by number: 0 red (a bar down), 1 orange (bar down and across), 2 yellow (a bar across), 3 green (across
@@ -147,10 +160,13 @@ const N = 5;
 // moves, mixes, shuffles, saves and undoes with its block: col() is the colour alone, charmOf() the charm (0 for none).
 // Chapter 3 adds catnip (9), which carries the colours it still has a leaf for as bits × 256 (red 1, orange 2, yellow
 // 4…), and painted stone (10 to 15): stone with a coat of colour 0 to 5 on it.
-const KITTEN = 1, PAW = 2, NIP = 9;
-const col = v => v < 0 ? v : v & 15, charmOf = v => v < 0 ? 0 : v >> 4 & 15, withCharm = (c, k) => c < 0 || !k ? c : c | k << 4;
+// Chapter 5 adds water (its number is WATERV, and col() gives WATER, 16), and the yarn ball and tape as charms: a taped
+// block's tape runs to the block on its right (TAPER) or its left (TAPEL).
+const KITTEN = 1, PAW = 2, YARN = 3, TAPER = 4, TAPEL = 5, NIP = 9, WATER = 16, WATERV = 1 << 14;
+const col = v => v < 0 ? v : v >= WATERV ? WATER : v & 15, charmOf = v => v < 0 || v >= WATERV ? 0 : v >> 4 & 15, withCharm = (c, k) => c < 0 || !k ? c : c | k << 4;
 const leavesOf = v => (v >> 8) & 63, catnip = bits => NIP | bits << 8, leafList = v => [0, 1, 2, 3, 4, 5].filter(c => leavesOf(v) >> c & 1);
-const isStone = c => c === 6 || c >= 10, coatOf = c => c >= 10 ? c - 10 : -1;
+const isPainted = c => c >= 10 && c <= 15, isStone = c => c === 6 || isPainted(c), isMix = c => c === 1 || c === 3 || c === 5;
+const taped = v => charmOf(v) === TAPER || charmOf(v) === TAPEL, PARTS = {1: [0, 2], 3: [2, 4], 5: [0, 4]};
 // What two bumping blocks make: the same primary joins into one; two different primaries mix; a primary and the
 // one mix that doesn't hold its mark (its complement) set into stone; anything else just bumps (-1).
 // Levels 10 to 12 add black (7) and white (8). Black wipes out whatever it bumps, and itself (VANISH), except white: black
@@ -158,7 +174,7 @@ const isStone = c => c === 6 || c >= 10, coatOf = c => c >= 10 ? c - 10 : -1;
 const VANISH = -2;
 function combine(a, b) {
   if (a === 7 || b === 7) return a === 8 || b === 8 ? 6 : VANISH;
-  if (a === NIP || b === NIP) return -1;   // catnip never mixes
+  if (a === NIP || b === NIP || a === WATER || b === WATER) return -1;   // catnip never mixes; water splits mixes (slideLine)
   if (a === 6 || b === 6 || a === 8 || b === 8) return -1;
   const prim = c => c % 2 === 0;
   if (prim(a) && prim(b)) return a === b ? a : {"0,2": 1, "2,4": 3, "0,4": 5}[[a, b].sort().join()];
@@ -178,27 +194,44 @@ function slideLine(g, L, paint) {
   let seg = [], wall = -1;   // the stone the blocks of seg slide up against (-1: the end of the line)
   const flush = () => {
     const out = [];   // {c, k (charm), v (catnip's number), at, from, done}
-    for (const i of seg) {
-      const v = g[i]; if (v < 0) continue;
+    // a yarn ball rolls past plain blocks to the front of its stretch, stopping behind another yarn ball
+    const order = seg.filter(i => g[i] >= 0), rolled = new Set();
+    for (let a = 1; a < order.length; a++) if (charmOf(g[order[a]]) === YARN) {
+      let b = a; while (b > 0 && charmOf(g[order[b - 1]]) !== YARN) b--;
+      if (b < a) rolled.add(order[a]);
+      order.splice(b, 0, ...order.splice(a, 1));
+    }
+    for (const i of order) {
+      const v = g[i];
       const c = col(v), k = charmOf(v), last = out[out.length - 1], at = seg[out.length];
-      if (last && k === PAW) {   // the paw swaps with the block it bumps
+      if (rolled.has(i)) {   // it rolled: it doesn't combine on the way
+        out.push({c, k, v, at, from: i, done: true}); if (at !== i) moves.push({from: i, to: at}); continue;
+      }
+      // water and a mix: the mix splits back into its two colours, side by side, and the water's used up
+      if (last && !last.done && (last.c === WATER && isMix(c) || c === WATER && isMix(last.c))) {
+        const [a, b] = PARTS[last.c === WATER ? c : last.c];
+        Object.assign(last, {c: a, k: 0, done: true}); merged.push(last.at);
+        out.push({c: b, k: 0, at, from: i, done: true}); merged.push(at); if (at !== i) moves.push({from: i, to: at});
+        continue;
+      }
+      if (last && k === PAW && !taped(last.v)) {   // the paw swaps with the block it bumps
         const mv = moves.find(x => x.to === last.at); if (mv) mv.to = at; else moves.push({from: last.at, to: at});
         moves.push({from: i, to: last.at});
         out.splice(out.length - 1, 1, {c, k, v, at: last.at, from: i, done: true}, {...last, at});
         continue;
       }
-      if (last && !last.done) {
+      if (last && !last.done && !taped(v) && !taped(last.v)) {   // taped blocks don't combine
         const r = combine(last.c, c);
         if (r === VANISH) { moves.push({from: i, to: last.at}); vanish.push(last.at); out.pop(); continue; }
         if (r >= 0) { last.c = r; last.k = r === 6 ? 0 : last.k || k; last.done = true; moves.push({from: i, to: last.at}); merged.push(last.at); continue; }
       }
       // white takes the colour of a block it bumps, whichever of them is moving (neither merges)
       let cc = c;
-      if (c === 8 && at !== i && last && last.c >= 0 && last.c <= 5) { cc = last.c; merged.push(at); }
-      else if (last && !last.done && last.c === 8 && c >= 0 && c <= 5 && at !== i) { last.c = c; last.done = true; merged.push(last.at); }
+      if (c === 8 && at !== i && last && last.c >= 0 && last.c <= 5 && !taped(last.v)) { cc = last.c; merged.push(at); }
+      else if (last && !last.done && last.c === 8 && c >= 0 && c <= 5 && at !== i && !taped(v)) { last.c = c; last.done = true; merged.push(last.at); }
       out.push({c: cc, k, v, at, from: i, done: cc !== c}); if (at !== i) moves.push({from: i, to: at});
     }
-    seg.forEach((i, k) => { const o = out[k]; g[i] = !o ? -1 : o.c === NIP ? o.v : withCharm(o.c, o.k); });
+    seg.forEach((i, k) => { const o = out[k]; g[i] = !o ? -1 : o.c === NIP ? o.v : o.c === WATER ? WATERV : withCharm(o.c, o.k); });
     // up against stone: a paw swaps with it, and a colour gives bare stone a coat
     if (wall >= 0 && out.length) {
       const o = out[0];
@@ -207,6 +240,8 @@ function slideLine(g, L, paint) {
         const mv = moves.find(x => x.from === o.from); if (mv) mv.to = wall; else moves.push({from: o.from, to: wall});
         moves.push({from: wall, to: seg[0]});
       } else if (paint && g[wall] === 6 && o.c <= 5) { g[wall] = 10 + o.c; painted.push(wall); }
+      // water against bare stone: it splits back into a colour and the mix that set it (picked by where it is)
+      else if (o.c === WATER && g[wall] === 6) { const p = [0, 2, 4][wall % 3]; g[wall] = p; g[seg[0]] = {0: 3, 2: 5, 4: 1}[p]; merged.push(wall, seg[0]); }
     }
     seg = [];
   };
@@ -216,7 +251,7 @@ function slideLine(g, L, paint) {
 }
 // What a square can count as in a line of colour: its colour; catnip, any colour it still has a leaf for; painted
 // stone, its coat; bare stone, none (it makes lines of stone).
-const counts_as = v => { const c = col(v); return c === NIP ? leafList(v) : c >= 10 ? [c - 10] : c === 6 ? [] : [c]; };
+const counts_as = v => { const c = col(v); return c === NIP ? leafList(v) : isPainted(c) ? [c - 10] : c === 6 || c === WATER ? [] : [c]; };
 // Whole rows and columns of one colour, or of stone, clear. Each line takes only what matched it: a line of colour
 // takes painted stone's coat and leaves the stone, bare; a line of stone takes the stone and leaves any coat as a plain
 // block. Stone next to a cleared square crumbles (painted stone leaving its coat). Returns the lines ({cells, c, coat:
@@ -228,8 +263,8 @@ function clearLines(g) {
     if (L.some(i => g[i] < 0)) continue;
     let opts = null;
     for (const i of L) { const o = counts_as(g[i]); opts = opts ? opts.filter(x => o.includes(x)) : o; if (!opts.length) break; }
-    if (opts.length) { const took = L.filter(i => col(g[i]) >= 10); lines.push({cells: L, c: opts[0], coat: took.length > 0}); L.forEach(i => (col(g[i]) >= 10 ? coat : gone).add(i)); }
-    else if (L.every(i => isStone(col(g[i])))) { lines.push({cells: L, c: 6}); L.forEach(i => (col(g[i]) >= 10 ? stone : gone).add(i)); }
+    if (opts.length) { const took = L.filter(i => isPainted(col(g[i]))); lines.push({cells: L, c: opts[0], coat: took.length > 0}); L.forEach(i => (isPainted(col(g[i])) ? coat : gone).add(i)); }
+    else if (L.every(i => isStone(col(g[i])))) { lines.push({cells: L, c: 6}); L.forEach(i => (isPainted(col(g[i])) ? stone : gone).add(i)); }
   }
   const hit = new Set([...coat, ...stone, ...gone]), crumble = [];
   for (const i of hit) for (const j of [i - N, i + N, i % N ? i - 1 : -1, i % N < N - 1 ? i + 1 : -1]) if (j >= 0 && j < N * N && !hit.has(j) && isStone(col(g[j])) && !crumble.includes(j)) crumble.push(j);
@@ -281,7 +316,29 @@ function trayOf(level, seed, order = [0, 1, 2]) {
   const springs = [], posts = [];
   for (let k = 0; k < (L.springs || 0); k++) springs.push([take(), r() < .5 ? 0 : 1]);
   for (let k = 0; k < (L.posts || 0); k++) posts.push([take(), 1 + Math.floor(r() * 2)]);
-  return {turn, flaps, sun, springs, posts, paint: level >= PAINT_FROM};
+  // chapter 5: cardboard boxes ([row, side]), each holding one block, kept in the grid after its 25 squares
+  const boxes = []; for (let k = 0; k < (L.boxes || 0); k++) boxes.push([take(), r() < .5 ? 0 : 1]);
+  return {turn, flaps, sun, springs, posts, boxes, paint: level >= PAINT_FROM};
+}
+// Tape that no longer joins two blocks side by side comes off.
+function untape(h) {
+  for (let i = 0; i < N * N; i++) {
+    const k = charmOf(h[i]), ok = k === TAPER ? i % N < N - 1 && charmOf(h[i + 1]) === TAPEL : k === TAPEL ? i % N > 0 && charmOf(h[i - 1]) === TAPER : true;
+    if (!ok) h[i] = col(h[i]);
+  }
+}
+// After a column slides, a taped block's partner (in the next column) comes along the same distance, if its way is
+// clear; otherwise the tape comes off (untape).
+function tapeAlong(h, moves) {
+  for (const m of moves.slice()) {
+    if (m.to === m.from || m.to >= N * N || m.from >= N * N) continue;
+    const k = charmOf(h[m.to]); if (k !== TAPER && k !== TAPEL) continue;
+    const pf = m.from + (k === TAPER ? 1 : -1), d = (m.to - m.from) / N, pt = pf + d * N, step = Math.sign(d) * N;
+    if (!taped(h[pf]) || pt < 0 || pt >= N * N) continue;
+    let clear = true; for (let q = pf + step; ; q += step) { if (h[q] >= 0) { clear = false; break; } if (q === pt) break; }
+    if (clear) { h[pt] = h[pf]; h[pf] = -1; moves.push({from: pf, to: pt}); }
+  }
+  untape(h);
 }
 // Slide a sunbeam's row: blocks in the sun are lazy, so each moves one square at most (combining, swapping or painting
 // as a slide would).
@@ -296,7 +353,7 @@ function lazySlide(g, L, paint) {
   }
   return out;
 }
-const noTray = {turn: [], flaps: null, sun: null, springs: [], posts: []};
+const noTray = {turn: [], flaps: null, sun: null, springs: [], posts: [], boxes: []};
 // A move: {k: "line", ax, l, back} slides a row or column (and, on a row with a cat flap, sends the block that reaches
 // the flap's end out through it and in at the other flap, if it can land there); {k: "turn", l, back} turns a carousel
 // row one square (left when back), the end block coming round to the other end and nothing combining; {k: "step", i,
@@ -308,12 +365,19 @@ function applyMove(g, m, tray = noTray) {
   if (m.k === "turn") {
     const L = lineOf(0, m.l, true), was = L.map(i => g[i]), moves = [];
     L.forEach((i, k) => { const from = m.back ? (k + 1) % N : (k + N - 1) % N; h[i] = was[from]; if (was[from] >= 0) moves.push({from: L[from], to: i, wrap: Math.abs(from - k) > 1}); });
+    untape(h);
     return {grid: h, moves, merged: [], vanish: [], painted: [], changed: L.some(i => h[i] !== g[i])};
+  }
+  if (m.k === "unbox") {   // put the boxed block back at the end of its row, if that square's empty
+    const [row, side] = tray.boxes[m.b], to = row * N + (side ? N - 1 : 0), from = N * N + m.b;
+    if (h[from] < 0 || h[to] >= 0) return {grid: h, moves: [], merged: [], vanish: [], painted: [], changed: false};
+    h[to] = h[from]; h[from] = -1;
+    return {grid: h, moves: [], merged: [], vanish: [], painted: [], unboxed: to, changed: true};
   }
   if (m.k === "step") {
     const [x, y] = [m.i % N, Math.floor(m.i / N)], d = m.back ? -1 : 1, nx = m.ax ? x : x + d, ny = m.ax ? y + d : y;
     if (nx < 0 || ny < 0 || nx >= N || ny >= N) return {grid: h, moves: [], merged: [], vanish: [], painted: [], changed: false};
-    const r = slideLine(h, [ny * N + nx, m.i], tray.paint);
+    const r = slideLine(h, [ny * N + nx, m.i], tray.paint); untape(h);
     return {grid: h, ...r, changed: r.moves.length > 0 || r.painted.length > 0};
   }
   // a row with a scratching post: only the part the drag started in slides (part 0 left of the post, 1 right)
@@ -345,7 +409,14 @@ function applyMove(g, m, tray = noTray) {
     }
     if (boing) { const mv = r.moves.find(x => x.to === from); if (mv) mv.to = to; else r.moves.push({from, to}); }
   }
-  return {grid: h, ...r, thru, boing, changed: r.moves.length > 0 || r.painted.length > 0};
+  // a cardboard box at the end the row slides to: the block that reaches it drops in, if the box is empty
+  let boxed = -1;
+  const bx = !m.ax ? (tray.boxes || []).findIndex(([row, side]) => row === m.l && side === (m.back ? 0 : 1)) : -1;
+  if (bx >= 0 && h[L[0]] >= 0 && !isStone(col(h[L[0]])) && h[N * N + bx] < 0) {
+    const v = h[L[0]]; h[N * N + bx] = taped(v) ? col(v) : v; h[L[0]] = -1; boxed = bx;
+  }
+  if (m.ax) tapeAlong(h, r.moves); else untape(h);
+  return {grid: h, ...r, thru, boing, boxed, changed: r.moves.length > 0 || r.painted.length > 0 || boxed >= 0};
 }
 // The move a drag (or Shift and an arrow key) from square i makes: a kitten's own block steps alone, a carousel row
 // turns, and anything else slides its line.
@@ -363,11 +434,13 @@ function allMoves(g, tray = noTray) {
     const ms = !ax && tray.turn.includes(l) ? [{k: "turn", l, back}] : post ? [0, 1].map(part => ({k: "line", ax, l, back, part})) : [{k: "line", ax, l, back}];
     for (const m of ms) if (applyMove(g, m, tray).changed) out.push(m);
   }
-  g.forEach((v, i) => { if (charmOf(v) === KITTEN) for (const ax of [0, 1]) for (const back of [false, true]) { const m = {k: "step", i, ax, back}; if (applyMove(g, m, tray).changed) out.push(m); } });
+  (tray.boxes || []).forEach((_, b) => { const m = {k: "unbox", b}; if (applyMove(g, m, tray).changed) out.push(m); });
+  g.forEach((v, i) => { if (i < N * N && charmOf(v) === KITTEN) for (const ax of [0, 1]) for (const back of [false, true]) { const m = {k: "step", i, ax, back}; if (applyMove(g, m, tray).changed) out.push(m); } });
   return out;
 }
 // The squares a move lights up: its line, or the kitten and where it goes.
 function moveCells(m, tray = noTray) {
+  if (m.k === "unbox") { const [row, side] = tray.boxes[m.b]; return [row * N + (side ? N - 1 : 0)]; }
   if (m.k === "step") { const d = m.back ? -1 : 1; return [m.i, m.i + (m.ax ? d * N : d)]; }
   const post = m.part != null && (tray.posts || []).find(([row]) => row === m.l);
   return lineOf(m.k === "turn" ? 0 : m.ax, m.l, true).filter(i => !post || (i % N <= post[1]) === !m.part);
@@ -465,9 +538,25 @@ const LEVELS = [null,
   {name: "Warm spring", task: () => ({bask: 2}), sun: true, sunBoost: .42, springs: 1},
   {name: "Post in the sun", goal: 4, sun: true, posts: 1, black: BW, white: BW},
   {name: "Sunny side", task: () => ({bask: 1, lines: 3}), sun: true, springs: 1, posts: 1, black: BW, white: BW},
+  // Chapter 5, water, boxes and yarn (the owner's plan, 2026-11-27). water: how often a falling block is water;
+  // yarn and tape: how often a falling block has a yarn ball, or is taped to a block beside it; boxes: how many.
+  // From The shelf on, a clean win earns a helper. Simulated play (two runs of 150 boards, no helpers): about 99, 86, 70,
+  // 100, 70, 96, 99, 56, 42 and 27% won.
+  {name: "Water", goal: 2, pair: 0, mix: true, water: .1, intro: "water"},
+  {name: "Undo a mix", goal: 2, third: .3, water: .1},
+  {name: "The shelf", goal: 2, water: .08, intro: "shelf"},
+  {name: "A box", goal: 2, pair: 1, mix: true, boxes: 1, intro: "box"},
+  {name: "For later", task: M => ({need: [M]}), boxes: 1},
+  {name: "Yarn ball", goal: 2, pair: 2, mix: true, yarn: .15, intro: "yarn"},
+  {name: "Tape", goal: 2, pair: 0, mix: true, tape: .2, intro: "tape"},
+  {name: "Roll and stick", goal: 2, yarn: .1, tape: .15, posts: 1},
+  {name: "Wash the stone", task: () => ({lines: 3, without: [6]}), water: .1},
+  {name: "Box of tricks", goal: 4, boxes: 1, yarn: .1, tape: .12, black: BW, white: BW},
 ];
 // The chapters: where each starts, and its name, for the level picker.
-const CHAPTERS = [[1, "The basics"], [34, "Turning the tray"], [44, "Catnip and stone"], [54, "Sun and springs"]];
+const CHAPTERS = [[1, "The basics"], [34, "Turning the tray"], [44, "Catnip and stone"], [54, "Sun and springs"], [63, "Water, boxes and yarn"]];
+// From this level a clean win earns a helper for the shelf.
+const HELPERS_FROM = 65;
 // Stone takes a coat of paint from painted stone's own level on.
 const PAINT_FROM = 46;
 // Which of a move's lines count towards a "lines" goal: on the stone level only stone; in chapter 1 any line; from
@@ -551,7 +640,7 @@ function drawKey(g) {
   $("rules").innerHTML = boardColours(g.level, g.seed, g.order).key.map(bar => {
     const bg = bar.length > 1 ? `linear-gradient(90deg,${bar.map((c, k) => `${COLOURS[c].hex} ${(k / (bar.length - 1) * 100).toFixed(0)}%`).join(",")})` : COLOURS[bar[0]].hex;
     return `<div class="keybar" style="background:${bg}" aria-label="${bar.map(c => COLOURS[c].name).join(", then ")}">${bar.map(keyMark).join("")}</div>`;
-  }).join("") + (LEVELS[g.level].catnip ? `<div class="keybar nipkey" aria-label="Catnip: any colour it still has a leaf for">${catnipArt(catnip(63))}<span>any colour</span></div>` : "");
+  }).join("") + (LEVELS[g.level].water ? `<div class="keybar nipkey" aria-label="Water: washes a mix back into its two colours">${WATER_ART}<span>washes a mix</span></div>` : "") + (LEVELS[g.level].catnip ? `<div class="keybar nipkey" aria-label="Catnip: any colour it still has a leaf for">${catnipArt(catnip(63))}<span>any colour</span></div>` : "");
 }
 
 /* ---------- game state ---------- */
@@ -581,7 +670,7 @@ const save = () => G.save(STORE, {settings, game});
 const playing = () => game && !game.won && !game.lost && !busy && !$("overlay").classList.contains("show");
 const levelName = n => LEVELS[n].name;
 function drop(g) {
-  const r = seeded(g.seed * 7919 + g.drops++), empty = g.grid.map((c, i) => c < 0 ? i : -1).filter(i => i >= 0);
+  const r = seeded(g.seed * 7919 + g.drops++), empty = g.grid.map((c, i) => c < 0 && i < N * N ? i : -1).filter(i => i >= 0);
   if (!empty.length) return -1;
   const i = empty[Math.floor(r() * empty.length)], spec = LEVELS[g.level];
   const sp = boardColours(g.level, g.seed, g.order);
@@ -596,20 +685,28 @@ function drop(g) {
   } else {
     if (spec.kitten && c <= 5 && r() < spec.kitten) c = withCharm(c, KITTEN);
     else if (spec.paw && c <= 5 && r() < spec.paw) c = withCharm(c, PAW);
+    else if (spec.yarn && c <= 5 && r() < spec.yarn) c = withCharm(c, YARN);
+    else if (spec.water && r() < spec.water) c = WATERV;
   }
   // after basking, the next block brings a charm (a kitten or a paw)
   if (g.reward && col(c) <= 5) { c = withCharm(col(c), r() < .5 ? KITTEN : PAW); g.reward = false; }
-  g.grid[i] = c; return i;
+  g.grid[i] = c;
+  // tape: now and then a plain block lands taped to a plain block beside it
+  if (spec.tape && c <= 5 && r() < spec.tape) {
+    const side = [i % N < N - 1 ? i + 1 : -1, i % N > 0 ? i - 1 : -1].filter(j => j >= 0 && g.grid[j] >= 0 && g.grid[j] <= 5);
+    if (side.length) { const j = side[Math.floor(r() * side.length)]; g.grid[i] = withCharm(c, j > i ? TAPER : TAPEL); g.grid[j] = withCharm(g.grid[j], j > i ? TAPEL : TAPER); }
+  }
+  return i;
 }
 // A board's tray (worked out again for a board saved before there were trays).
 const trayFor = g => g.tray || (g.tray = trayOf(g.level, g.seed, g.order));
 function deal(level, seed, order) {
-  const g = {level, seed, order: (order || settings.order).slice(), grid: new Array(N * N).fill(-1), tray: trayOf(level, seed, order || settings.order), drops: 0, lines: 0, got: [], moves: 0, mixes: MIXES, history: [], won: false, lost: false, ...G.freshClock()};
+  const g = {level, seed, order: (order || settings.order).slice(), grid: new Array(N * N + (LEVELS[level].boxes || 0)).fill(-1), tray: trayOf(level, seed, order || settings.order), drops: 0, lines: 0, got: [], moves: 0, mixes: MIXES, history: [], won: false, lost: false, ...G.freshClock()};
   for (let k = 0; k < 4; k++) drop(g);
   g.start = JSON.stringify({grid: g.grid, drops: g.drops});
   return g;
 }
-const snap = () => JSON.stringify({grid: game.grid, drops: game.drops, lines: game.lines, got: game.got || [], moves: game.moves, mixes: game.mixes});
+const snap = () => JSON.stringify({grid: game.grid, drops: game.drops, lines: game.lines, got: game.got || [], moves: game.moves, mixes: game.mixes, coats: game.coats || 0, basks: game.basks || 0, reward: !!game.reward, helpers: {...(settings.helpers || {})}});
 // Every move that would change this game's board.
 const slides = g => allMoves(g.grid, trayFor(g));
 
@@ -618,7 +715,7 @@ const xyOf = i => [i % N, Math.floor(i / N)];
 const place = (el, i) => { const [x, y] = xyOf(i); el.style.transform = `translate(${x * 100}%, ${y * 100}%)`; };
 let blocks = [];   // the element on each square
 // A charm's glyph, drawn in place of the block's mark, in the mark's ink.
-const GLYPHS = {[KITTEN]: `<path d="M3 11.5L4.2 2.2L9.5 7H14.5L19.8 2.2L21 11.5A9 9 0 1 1 3 11.5Z"/>`,
+const GLYPHS = {[YARN]: `<circle cx="12" cy="12" r="10.6"/>`, [KITTEN]: `<path d="M3 11.5L4.2 2.2L9.5 7H14.5L19.8 2.2L21 11.5A9 9 0 1 1 3 11.5Z"/>`,
   [PAW]: `<ellipse cx="12" cy="15.6" rx="8" ry="7"/><ellipse cx="3.6" cy="8.4" rx="2.4" ry="2.8"/><ellipse cx="8.6" cy="3.8" rx="2.4" ry="2.8"/><ellipse cx="15.4" cy="3.8" rx="2.4" ry="2.8"/><ellipse cx="20.4" cy="8.4" rx="2.4" ry="2.8"/>`};
 // Catnip: the site's catnip leaves and flowers (tablethings.js), a leaf in each colour it can still be, set round in a
 // ring in colour-wheel order; a dropped leaf leaves a dashed outline. In a 100 box.
@@ -633,12 +730,17 @@ function catnipArt(v) {
 // Painted stone: the stone's scratched marks, faded, under its coat colour's own mark, with a wash of the coat round
 // the edge.
 const paintedArt = coat => `<svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="#fff" opacity=".35">${COLOURS[6].marks.join("")}</g><g fill="${COLOURS[coat].hex}" stroke="#F7F8F3" stroke-width="1.6" style="paint-order:stroke">${COLOURS[coat].marks.join("")}</g></svg>`;
-const glyph = (c, k) => { const ink = inkFor(COLOURS[c].hex); return `<svg viewBox="0 0 24 24" fill="${ink}" aria-hidden="true">${GLYPHS[k]}</svg>`; };
+// (the yarn ball's strands are cut back in the block's own colour)
+const YARN_CUT = `<g fill="none" stroke-width="1.6" stroke-linecap="round"><path d="M2.4 9C7.5 10 12 7 13.2 1.6"/><path d="M4.4 15.6C10 15.8 15.8 11.6 17.8 3.4"/><path d="M8.6 21.6C13.4 20.4 18.6 16.6 21.4 10.4"/></g>`;
+const glyph = (c, k) => { const ink = inkFor(COLOURS[c].hex); return `<svg viewBox="0 0 24 24" fill="${ink}" aria-hidden="true">${GLYPHS[k]}${k === YARN ? `<g stroke="${COLOURS[c].hex}">${YARN_CUT}</g>` : ""}</svg>`; };
+// Water: pale glass with a droplet and a shine.
+const WATER_ART = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3C15.5 8.5 18 11.5 18 15A6 6 0 0 1 6 15C6 11.5 8.5 8.5 12 3Z" fill="none" stroke="#2A6F7A" stroke-width="2.6"/><path d="M9.2 15.6A3 3 0 0 0 11.6 18.4" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>`;
 function blk(v, i) {
   const c = col(v), k = charmOf(v), el = document.createElement("div");
   if (c === NIP) { el.className = "blk catnip"; el.innerHTML = `<div class="b">${catnipArt(v)}</div>`; }
-  else if (c >= 10) { el.className = "blk stone painted"; el.innerHTML = `<div class="b" style="background:${COLOURS[6].hex};--coat:${COLOURS[c - 10].hex}">${paintedArt(c - 10)}</div>`; }
-  else { el.className = "blk" + (c === 6 ? " stone" : c % 2 ? " full" : "") + (k ? " charmed" : ""); el.innerHTML = `<div class="b" style="background:${COLOURS[c].hex}">${k ? glyph(c, k) : mark(c)}</div>`; }
+  else if (c === WATER) { el.className = "blk water"; el.innerHTML = `<div class="b">${WATER_ART}</div>`; }
+  else if (isPainted(c)) { el.className = "blk stone painted"; el.innerHTML = `<div class="b" style="background:${COLOURS[6].hex};--coat:${COLOURS[c - 10].hex}">${paintedArt(c - 10)}</div>`; }
+  else { const g = k && GLYPHS[k]; el.className = "blk" + (c === 6 ? " stone" : c % 2 ? " full" : "") + (g ? " charmed" : ""); el.innerHTML = `<div class="b" style="background:${COLOURS[c].hex}">${g ? glyph(c, k) : mark(c)}</div>`; }
   place(el, i); $("grid").append(el); return el;
 }
 // The tray's pieces: a carousel row gets Purrmutation's Shift arrows, one at each end of it on the frame (tap one to
@@ -658,12 +760,14 @@ function springPic(then) {
   };
   im.src = "../toys/spring-up.webp"; return null;
 }
+// The frame's width, as a share of the board: wider with tray pieces, wider still with a box on it.
+const insetOf = () => $("board").classList.contains("boxed") ? 12 : $("board").classList.contains("framed") ? 7 : 2;
 function drawTray() {
-  const t = trayFor(game), board = $("board"), framed = t.turn.length > 0 || !!t.flaps || !!t.sun || !!(t.springs || []).length || !!(t.posts || []).length;
+  const t = trayFor(game), board = $("board"), framed = t.turn.length > 0 || !!t.flaps || !!t.sun || !!(t.springs || []).length || !!(t.posts || []).length || !!(t.boxes || []).length;
   $("grid").querySelectorAll(".trayin").forEach(e => e.remove());
-  board.classList.toggle("framed", framed);
+  board.classList.toggle("framed", framed); board.classList.toggle("boxed", !!(t.boxes || []).length);
   board.querySelectorAll(".trayart").forEach(e => e.remove());
-  const IN = framed ? 7 : 2, cell = (100 - 2 * IN) / N, mid = y => `${IN + (y + .5) * cell}%`;
+  const IN = insetOf(), cell = (100 - 2 * IN) / N, mid = y => `${IN + (y + .5) * cell}%`;
   const art = (cls, y, side, html, label) => { const e = document.createElement("div"); e.className = `trayart ${cls}`; e.style.top = mid(y); e.style[side ? "right" : "left"] = `${IN / 2}%`; e.innerHTML = html; if (label) e.setAttribute("aria-label", label); board.append(e); };
   for (const y of t.turn) for (const side of [0, 1]) {
     const a = document.createElement("div"); a.className = "trayart turnarrow"; a.setAttribute("role", "button");
@@ -681,6 +785,17 @@ function drawTray() {
   }
   // springs, in the frame at the end of their rows
   for (const [y, side] of t.springs || []) { const src = springPic(() => game && draw()); if (src) art("spring", y, side, `<svg viewBox="0 0 200 97" aria-hidden="true"><image href="${src}" width="97" height="200" transform="${side ? "translate(200 0) rotate(90)" : "translate(0 97) rotate(-90)"}"/></svg>`); }
+  // cardboard boxes (Copycat's open box) on the frame at the end of their rows, each with the block it's holding;
+  // tap one to put its block back
+  (t.boxes || []).forEach(([y, side], b) => {
+    const v = game.grid[N * N + b], e = document.createElement("div"); e.className = "trayart cbox"; e.setAttribute("role", "button");
+    e.setAttribute("aria-label", v >= 0 ? `A box holding ${squareName(v)}: tap to put it back` : "An empty box");
+    e.style.top = mid(y); e.style[side ? "right" : "left"] = "0";
+    e.innerHTML = OPENBOX + (v >= 0 ? `<div class="held">${blk(v, 0).outerHTML}</div>` : "");
+    $("grid").lastChild.remove();   // (blk put a copy on the board; only the box's own copy is wanted)
+    e.addEventListener("click", () => doMove({k: "unbox", b}));
+    board.append(e);
+  });
   // scratching posts, on the line between two squares
   for (const [y, x] of t.posts || []) { const e = document.createElement("div"); e.className = "trayin post"; e.style.top = y * 20 + "%"; e.style.left = (x + 1) * 20 + "%"; $("grid").append(e); }
 }
@@ -688,8 +803,10 @@ function draw() {
   queueMicrotask(say);
   const grid = $("grid");
   if (!grid.querySelector(".slot")) for (let i = 0; i < N * N; i++) { const s = document.createElement("div"); s.className = "slot"; s.dataset.i = i; const [x, y] = xyOf(i); s.style.left = x * 20 + "%"; s.style.top = y * 20 + "%"; grid.append(s); }
-  grid.querySelectorAll(".blk,.ghost").forEach(e => e.remove());
-  blocks = game.grid.map((c, i) => c >= 0 ? blk(c, i) : null);
+  grid.querySelectorAll(".blk,.ghost,.tape").forEach(e => e.remove());
+  blocks = game.grid.map((c, i) => c >= 0 && i < N * N ? blk(c, i) : null);
+  // tape: the site's strip of tape across the line between a taped pair
+  game.grid.forEach((v, i) => { if (i < N * N && charmOf(v) === TAPER) { const e = document.createElement("div"); e.className = "tape"; const [x, y] = xyOf(i); e.style.left = (x + 1) * 20 + "%"; e.style.top = y * 20 + "%"; e.innerHTML = `<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${TABLE.TAPE}</svg>`; $("grid").append(e); } });
   drawTray(); drawKey(game);
   update();
 }
@@ -714,10 +831,11 @@ function update() {
   $("hintBtn").disabled = !playing();
   undo.sync();
   G.uses("shuffleBtn", game.mixes); $("shuffleBtn").disabled = !playing();
+  drawShelf();
   paintHint(); showCursor();
 }
 const squareName = v => { const c = col(v); if (v < 0) return "empty"; if (c === NIP) return `catnip (${G.listed(leafList(v).map(x => COLOURS[x].name), " or ")})`;
-  if (c >= 10) return `${COLOURS[c - 10].name}-painted stone`; return COLOURS[c].name + (charmOf(v) === KITTEN ? " kitten" : charmOf(v) === PAW ? " paw" : ""); };
+  if (isPainted(c)) return `${COLOURS[c - 10].name}-painted stone`; if (c === WATER) return "water"; return COLOURS[c].name + ({[KITTEN]: " kitten", [PAW]: " paw", [YARN]: " yarn ball", [TAPER]: " (taped to the right)", [TAPEL]: " (taped to the left)"}[charmOf(v)] || ""); };
 function say() {
   if (!game) return;
   const t = trayFor(game), side = s => s ? "right" : "left";
@@ -725,7 +843,8 @@ function say() {
   const flaps = (t.flaps ? ` Cat flaps at the ${side(t.flaps[0][1])} of row ${t.flaps[0][0] + 1} and the ${side(t.flaps[1][1])} of row ${t.flaps[1][0] + 1}.` : "") +
     (t.sun ? ` A ${COLOURS[t.sun[1]].name} sunbeam across row ${t.sun[0] + 1}: its blocks move one square at a time.` : "") +
     (t.springs || []).map(([y, sd]) => ` A spring at the ${side(sd)} of row ${y + 1}.`).join("") +
-    (t.posts || []).map(([y, x]) => ` A scratching post in row ${y + 1}, after square ${x + 1}.`).join("");
+    (t.posts || []).map(([y, x]) => ` A scratching post in row ${y + 1}, after square ${x + 1}.`).join("") +
+    (t.boxes || []).map(([y, sd], b) => ` A box at the ${side(sd)} of row ${y + 1}${game.grid[N * N + b] >= 0 ? `, holding ${squareName(game.grid[N * N + b])}` : ", empty"}.`).join("");
   G.describe($("grid"), `Blocks of paint, ${N} by ${N}. ${G.listed(rows, "; ")}.${flaps} Arrow keys pick a square; Shift with an arrow slides its row or column that way (a kitten moves alone).`);
 }
 
@@ -749,6 +868,7 @@ const dragMove = (i, d) => doMove(moveFor(game.grid, trayFor(game), i, d));
 function doMove(m) {
   if (!playing()) return;
   const r = applyMove(game.grid, m, trayFor(game)), after = r.grid, ripe = game.demo ? [] : wither(game, after);
+  const waters = g => g.filter(v => col(v) === WATER).length, washed = !r.vanish.length && waters(after) < waters(game.grid);
   if (!r.changed) { G.note(m.k === "step" ? "The kitten can't go that way." : m.k === "turn" ? "Turning that row wouldn't change anything." : "Nothing in that line can move that way.", 1800); G.sound.play("wrong"); return; }
   game.started = true;
   undo.push();
@@ -768,6 +888,8 @@ function doMove(m) {
     if (game.demo) {}   // the walkthrough says it
     else if (r.thru) G.note("Through the cat flap!", 1800);
     else if (r.boing) G.note("Boing! Back to the far end.", 1800);
+    else if (r.boxed >= 0) G.note("Into the box. Tap the box to put it back.", 2200);
+    else if (washed) G.note("The water washed it back into two colours.", 2200);
     else if (r.painted.length) G.note(`The stone takes a coat of ${COLOURS[col(after[r.painted[0]]) - 10].name}.`, 2200);
     else if (ripe.length) G.note(`The catnip's down to its last leaf: it's ${COLOURS[col(after[ripe[0]])].name} now.`, 2400);
     else if (r.vanish.length) G.note("Black wipes them both out!", 2000);
@@ -794,7 +916,7 @@ function doMove(m) {
     new Set([...c.lines.flatMap(x => x.cells), ...c.crumble]).forEach(i => blocks[i] && blocks[i].classList.add("gone"));
     G.sound.play("mh.clear"); if (c.crumble.length) G.sound.play("mh.crumble", {}, .2);
     // Willow's face rises over the middle of each line that clears
-    const IN = $("board").classList.contains("framed") ? 7 : 2, cell = (100 - 2 * IN) / N;
+    const IN = insetOf(), cell = (100 - 2 * IN) / N;
     for (const ln of c.lines) {
       const [x, y] = xyOf(ln.cells[2]), im = new Image(); im.className = "peek"; im.alt = ""; im.src = catSrc("willow-7");
       im.style.left = (IN + (x + .5) * cell) + "%"; im.style.top = (IN + (y + .5) * cell) + "%";
@@ -815,7 +937,7 @@ $("board").addEventListener("pointermove", e => {
   const d = dragOf(touch, e);
   if (String(d) !== String(touch.d)) { touch.d = d; d ? showGhost(moveFor(game.grid, trayFor(game), touch.i, d)) : clearGhost(); }
 });
-$("board").addEventListener("pointerup", e => { if (!touch) return; const d = dragOf(touch, e), i = touch.i; touch = null; clearGhost(); if (d) dragMove(i, d); else G.note(charmOf(game.grid[i]) === KITTEN ? "Drag the kitten to move just it, one square." : "Drag a row or column to slide it.", 2000); });
+$("board").addEventListener("pointerup", e => { if (!touch) return; const d = dragOf(touch, e), i = touch.i; touch = null; clearGhost(); if (!d && game.arm) { useHelper(i); return; } if (d) dragMove(i, d); else G.note(charmOf(game.grid[i]) === KITTEN ? "Drag the kitten to move just it, one square." : "Drag a row or column to slide it.", 2000); });
 $("board").addEventListener("pointercancel", () => { touch = null; clearGhost(); });
 function showGhost(m) {
   clearGhost();
@@ -837,12 +959,12 @@ const keys = G.gridKeys({
     if (e && e.shiftKey) { dragMove(i, dx ? [0, y, dx < 0] : [1, x, dy < 0]); return i; }
     return Math.max(0, Math.min(N - 1, y + dy)) * N + Math.max(0, Math.min(N - 1, x + dx));
   },
-  act: () => false,
+  act: i => { if (game && game.arm) { useHelper(i); return true; } return false; },
 });
 // Undo (G.history): each step is a snapshot of the board (JSON, the newest 50 kept in game.history). It can take back a
 // lost board (from the Stuck! card), and Restart can be undone too.
 const undo = G.history({game: () => game, take: snap, cap: 50, can: () => !!game && !busy && !game.won,
-  back: (h, g) => { g.lost = false; Object.assign(g, JSON.parse(h)); }, after: () => { G.closeCard(); draw(); save(); }, restart: true});
+  back: (h, g) => { g.lost = false; const o = JSON.parse(h); if (o.helpers) { settings.helpers = o.helpers; delete o.helpers; } Object.assign(g, o); }, after: () => { G.closeCard(); draw(); save(); }, restart: true});
 $("restartBtn").onclick = () => {
   if (undo.restart(g => Object.assign(g, JSON.parse(g.start), {lines: 0, got: [], moves: 0, mixes: MIXES, lost: false})))
     G.note("Back to the start of the level. Undo brings it back.", 3500);
@@ -851,16 +973,53 @@ $("restartBtn").onclick = () => {
 $("shuffleBtn").onclick = () => {
   if (!playing() || !game.mixes) return;
   undo.push(); game.mixes--; game.mixed = true;
-  const r = seeded(game.seed * 31 + game.moves * 7 + game.mixes), free = game.grid.map((c, i) => isStone(col(c)) ? -1 : i).filter(i => i >= 0);
+  const r = seeded(game.seed * 31 + game.moves * 7 + game.mixes), free = game.grid.map((c, i) => isStone(col(c)) || i >= N * N ? -1 : i).filter(i => i >= 0);
   const vals = free.map(i => game.grid[i]);
   for (let k = vals.length - 1; k > 0; k--) { const j = Math.floor(r() * (k + 1)); [vals[k], vals[j]] = [vals[j], vals[k]]; }
   free.forEach((i, k) => { game.grid[i] = vals[k]; });
+  untape(game.grid);   // (tape only holds blocks side by side)
   // shuffling can't leave a whole line done for you
   clearLines(game.grid);
   game.lost = false; G.closeCard(); draw(); save(); G.note("The cat mixed it up!", 2000);
   if (!slides(game).length) lose();   // still nothing can slide: say so again
 };
 
+/* ---------- helpers ---------- */
+// Helpers you earn (from HELPERS_FROM): a clean win puts one on the shelf under the board, kept on this device. Tap one,
+// then the block to use it on: a kitten or paw goes on a plain block, and a water drop washes a mix back into its two
+// colours (the second going to an empty square beside it). Using one isn't a move: no block falls, and Undo gives it
+// back. It doesn't cost the gold paw.
+const HELPERS = [["water", "Water drop"], ["kitten", "Kitten"], ["paw", "Paw"]];
+const helpersOn = () => game && game.level >= HELPERS_FROM;
+function drawShelf() {
+  const box = document.querySelector(".actions.helpers"), have = settings.helpers || {};
+  for (const [k, name] of HELPERS) {
+    let b = $("help_" + k);
+    if (!b) { b = document.createElement("button"); b.id = "help_" + k; b.className = "helperBtn"; b.textContent = name; b.onclick = () => armHelper(k); box.append(b); }
+    G.uses(b.id, helpersOn() ? have[k] || 0 : 0); b.classList.toggle("armed", !!game && game.arm === k);
+  }
+}
+function armHelper(k) {
+  if (!playing()) return;
+  game.arm = game.arm === k ? null : k; drawShelf();
+  if (game.arm) G.note(k === "water" ? "Tap a mix to wash it back into two colours." : `Tap a plain block to give it a ${k}.`, 3000);
+}
+function useHelper(i) {
+  const k = game.arm, v = game.grid[i], c = col(v); game.arm = null;
+  const fail = say => { G.note(say, 2200); G.sound.play("wrong"); drawShelf(); };
+  let h = game.grid.slice();
+  if (k === "water") {
+    if (!isMix(c)) return fail("Water only washes a mix.");
+    const [x, y] = xyOf(i), near = [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]].filter(([a, b]) => a >= 0 && b >= 0 && a < N && b < N).map(([a, b]) => b * N + a).filter(j => h[j] < 0);
+    if (!near.length) return fail("It needs an empty square beside it.");
+    h[i] = PARTS[c][0]; h[near[0]] = PARTS[c][1];
+  } else {
+    if (c > 5 || charmOf(v)) return fail(`A ${k} only goes on a plain block.`);
+    h[i] = withCharm(c, k === "kitten" ? KITTEN : PAW);
+  }
+  undo.push(); settings.helpers[k]--; game.grid = h; draw(); save(); G.sound.play("mh.mix");
+  if (blocks[i]) blocks[i].classList.add("pop");
+}
 /* ---------- hints ---------- */
 // Hint tries every slide and shows the best: lines that count, then blocks lining up, then room.
 const hints = G.hinter({game: () => game, key: () => game ? game.grid.join() : "", draw: () => paintHint()});
@@ -874,7 +1033,7 @@ function score(g, spec) {
 // more are wanted, then fewer of the colours that mustn't be left.
 function taskValue(g, lines, h) {
   const t = taskOf(g.level, g.seed);
-  if (t.coat) return lines.filter(x => x.coat).length * 1000 + h.filter(v => col(v) >= 10).length * 40;
+  if (t.coat) return lines.filter(x => x.coat).length * 1000 + h.filter(v => isPainted(col(v))).length * 40;
   if (t.bask) { const tr = trayFor(g), sunRow = lineOf(0, tr.sun[0], true);
     return basking(tr, lines).length * 1000 + (t.lines && g.lines < t.lines ? counts(g.level, lines).length * 600 : 0) + sunRow.filter(i => counts_as(h[i]).includes(tr.sun[1])).length ** 2 * 15; }
   if (t.need) { const want = t.need.slice(); for (const c of g.got || []) { const k = want.indexOf(c); if (k >= 0) want.splice(k, 1); }
@@ -913,8 +1072,11 @@ function win() {
   settings.level = next; $("levelSel").value = next; save();
   G.track(`Mew Hue won level ${game.level}`);
   const gold = !game.restarted && !game.hinted && !game.mixed, spec = levelSpec(game.level);
+  // a clean win from the shelf's level on earns a helper
+  let earned = "";
+  if (gold && game.level >= HELPERS_FROM) { const [k, name] = HELPERS[Math.floor(Math.random() * HELPERS.length)]; settings.helpers = settings.helpers || {}; settings.helpers[k] = (settings.helpers[k] || 0) + 1; earned = ` You earned a helper: ${name.toLowerCase()}!`; save(); }
   let text = spec.task ? `Done: ${taskText(game, true)}, in ${game.moves} moves.` : `You cleared ${game.lines} ${spec.stone ? "line" : "line"}${game.lines === 1 ? "" : "s"}${spec.stone ? " of stone" : ""} in ${game.moves} moves.`;
-  text += " " + (game.climbed.up ? `Up to level ${next}, ${levelName(next).toLowerCase()}!` : game.climbed.line);
+  text += " " + (game.climbed.up ? `Up to level ${next}, ${levelName(next).toLowerCase()}!` : game.climbed.line) + earned;
   setTimeout(() => G.winCard(text, () => { G.closeCard(); startLevel(next); }, "Admire the board", game.result,
     {title: "Lined up!", gold, goldWhy: "No hints, mix-ups or restarts!", goldTitle: "Willow's having a nap!", goldPic: [goldPic()], next: G.ANOTHER,
      after: G.otherSize($("levelSel"), next, startLevel, G.CHANGE)}), 500);
@@ -964,7 +1126,7 @@ function helpOnFirstVisit(all) {
   let was = 0;
   // a demo: blocks set out ([square, colour]…), the squares to light, what to do, and what you see after
   const demo = (say, put, lit, yes, tray) => ({say, lit, ...turn.from, try: {done: () => game.moves !== was, yes},
-    enter() { turn.from.enter(); const g = new Array(N * N).fill(-1); for (const [i, c] of put) g[i] = c; Object.assign(game, {grid: g, demo: true, tray: tray || noTray}); was = game.moves; hints.clear(false); draw(); }});
+    enter() { turn.from.enter(); const g = new Array(N * N + ((tray || noTray).boxes || []).length).fill(-1); for (const [i, c] of put) g[i] = c; Object.assign(game, {grid: g, demo: true, tray: tray || noTray}); was = game.moves; hints.clear(false); draw(); }});
   // slide a row left: a on the left, b further along, so b slides up to a
   const meet = (a, b, yes) => demo("Drag this row left", [[10, a], [13, b]], row2, yes);
   const pair = k => PAIRS[game.order[k]];
@@ -1004,6 +1166,12 @@ function helpOnFirstVisit(all) {
   if (intro === "bask") steps.push({say: "Clear a line of the sunbeam's colour in the beam, and the next block brings a charm", els: [$("count")]});
   if (intro === "spring") steps.push(demo("Slide this row right, into the spring", [[12, pa], [10, pm]], row2, "Boing! It bounced back to the far end. Which way you slide changes what meets what", {...noTray, springs: [[2, 1]]}));
   if (intro === "post") steps.push(demo("This row has a post. Drag the right side left", [[10, pa], [13, pb]], [12, 13, 14].map(xyOf), "Only that side moved: a post splits its row in two. A row still clears when all five match", {...noTray, posts: [[2, 1]]}));
+  if (intro === "water") steps.push(demo("Slide this row left: water meets the mix", [[10, WATERV], [13, pm]], row2, `The water washed the ${COLOURS[pm].name} back into ${COLOURS[pa].name} and ${COLOURS[pb].name}`));
+  if (intro === "shelf") { settings.helpers = settings.helpers || {}; if (!Object.values(settings.helpers).some(n => n > 0)) settings.helpers.water = 1;
+    drawShelf(); steps.push({say: "Win a board with no hints or mix-ups and you earn a helper. Here's one to start", els: [$("help_water")]}); }
+  if (intro === "box") steps.push(demo("Slide this row right, into the box", [[12, pa], [10, pm]], row2, "It's in the box. Tap the box to put it back at the end of the row when you want it", {...noTray, boxes: [[2, 1]]}));
+  if (intro === "yarn") steps.push(demo("Drag this row left: the yarn ball rolls", [[10, pa], [11, pm], [14, withCharm(pb, YARN)]], row2, "It rolled past them to the front, without mixing"));
+  if (intro === "tape") steps.push(demo("These two are taped. Drag this column down", [[6, withCharm(pa, TAPER)], [7, withCharm(pa, TAPEL)], [21, pb], [22, pb]], [1, 6, 11, 16, 21].map(xyOf), "Its partner came down too. Taped blocks never mix"));
   if (intro === "flaps") steps.push(demo("Slide this row right, out through the cat flap", [[7, pa], [16, pa], [17, pa], [18, pa], [19, pa]], [5, 6, 7, 8, 9].map(xyOf), "In through the other flap: a whole line!", {turn: [], flaps: [[1, 1], [3, 0]]}));
   if (!steps.length) { settings.seen[n] = true; save(); return; }
   steps[steps.length - 1].leave = turn.upTo.leave;   // put the real board back after the last demo
