@@ -568,7 +568,14 @@ const G = (() => {
     const box = document.createElement("span"); box.className = "pickbox";
     const shown = document.createElement("span"); shown.className = "pickshown";
     const pick = document.createElement("select"); pick.setAttribute("aria-label", text);
-    for (const o of sel.options) { const c = new Option(o.textContent, o.value); c.selected = +o.value === current; pick.append(c); }
+    // the page's groups (Mew Hue's chapters) come too
+    let grp = null;
+    for (const o of sel.options) {
+      const c = new Option(o.textContent, o.value); c.selected = +o.value === current;
+      const g = o.parentElement.tagName === "OPTGROUP" ? o.parentElement : null;
+      if (g && (!grp || grp.label !== g.label)) { grp = document.createElement("optgroup"); grp.label = g.label; pick.append(grp); }
+      (g ? grp : pick).append(c);
+    }
     const show = () => { shown.textContent = pick.selectedIndex >= 0 ? pick.options[pick.selectedIndex].textContent : ""; };
     pick.onchange = () => { show(); closeCard(); choose(+pick.value); };
     show(); box.append(shown, pick); wrap.append(text, box);
@@ -595,7 +602,12 @@ const G = (() => {
       // leaving a started, unsolved puzzle ends the win streak (freshClock), so say so before it's dealt
       const g = T && T.game(), st = T ? streak(T.name).streak : 0;
       if (g && g.started && !g.result && st) { const w = document.createElement("p"); w.className = "menutip warn"; w.textContent = `A new one ends your ${st}-win streak`; menu.append(w); }
+      let group = null;
       for (const op of sel.options) {
+        // a heading for each of the select's groups (Mew Hue's chapters)
+        const og = op.parentElement.tagName === "OPTGROUP" ? op.parentElement.label : null;
+        if (og && og !== group) { const h = document.createElement("p"); h.className = "menutip menuhead"; h.setAttribute("role", "presentation"); h.textContent = og; menu.append(h); }
+        group = og;
         const b = document.createElement("button"), on = op.value === sel.value, text = op.textContent.trim();
         b.type = "button"; b.setAttribute("role", "menuitemradio"); b.setAttribute("aria-checked", String(on)); b.disabled = op.disabled;
         b.textContent = /^\d/.test(text) ? `${word} ${text}` : text;   // "1 · 4 × 4" reads "Level 1 · 4 × 4"

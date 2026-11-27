@@ -308,7 +308,7 @@ What was settled:
   shelf under the board, as Mix it up does.
 
 The chapters (the page has every level's colours, pieces and goal):
-- [ ] **2 · Turning the tray** (34 to 43): carousel row, kitten, cat flaps
+- [x] **2 · Turning the tray** (34 to 43): carousel row, kitten, cat flaps (built 2026-11-27; README "Mew Hue")
 - [ ] **3 · Catnip and stone** (44 to 53): catnip, painted stone, paw
 - [ ] **4 · Sun and springs** (54 to 62): sunbeam and basking, spring (the site's `toys/spring-up.webp`, tinted gold as
   Wind Up does), scratching post
