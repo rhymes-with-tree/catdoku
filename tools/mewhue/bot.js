@@ -32,8 +32,8 @@ const N = +nArg, SEED0 = +seedArg, CAP = 400;
         const g = deal(level, SEED0 + k, [0, 1, 2]);
         for (let t = 0; t < CAP; t++) {
           const best = bestMove(g); if (!best) break;
-          const h = applyMove(g.grid, best.m, trayFor(g)).grid, c = clearLines(h);
-          g.grid = h; g.moves++; g.lines += counts(level, c.lines).length; g.got.push(...c.lines.map(x => x.c));
+          const h = applyMove(g.grid, best.m, trayFor(g)).grid; wither(g, h); const c = clearLines(h);
+          g.grid = h; g.moves++; tally(g, c);
           if (goalDone(g)) { won++; took.push(g.moves); break; }
           drop(g);
           if (!slides(g).length) break;

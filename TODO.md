@@ -308,13 +308,13 @@ What was settled:
   shelf under the board, as Mix it up does.
 
 The chapters (the page has every level's colours, pieces and goal):
-- [x] **2 · Turning the tray** (34 to 43): carousel row, kitten, cat flaps (built 2026-11-27; README "Mew Hue")
-- [ ] **3 · Catnip and stone** (44 to 53): catnip, painted stone, paw
+- [x] **2 · Turning the tray** (34 to 43): carousel row, kitten, cat flaps; a carousel row has Purrmutation's Shift arrows, so the look is the same across games (built 2026-11-27; README "Mew Hue")
+- [x] **3 · Catnip and stone** (44 to 53): catnip, painted stone, paw (built 2026-11-27; README "Mew Hue")
 - [ ] **4 · Sun and springs** (54 to 62): sunbeam and basking, spring (the site's `toys/spring-up.webp`, tinted gold as
   Wind Up does), scratching post
 - [ ] **5 · Water, boxes and yarn** (63 to 72): water, the helper shelf, cardboard box (`boxes.js`), yarn ball (stops at
   another yarn ball, a post, stone, a sleepy cat or ice), tape (`tablethings.js`)
-- [ ] **6 · Surprises** (73 to 82): turn knob (Purrmutation's), gift wrap (Toy Box's), wet paint, sleepy cat, ice, and
+- [ ] **6 · Surprises** (73 to 82): turn knob (Purrmutation's `KNOB` and `.knob` look, unchanged, so it's the same in both games), gift wrap (Toy Box's), wet paint, sleepy cat, ice, and
   the fish treat and hot water bottle helpers
 - [ ] **7 · Pull and paint** (83 to 88): magnet, paint arrow
 - [ ] **8 · Moods** (89 to 99): silvervine, two charms meeting, valerian root, zoomies, Tatarian honeysuckle wood (only
