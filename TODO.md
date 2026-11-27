@@ -18,6 +18,22 @@ README, Hosting and the move). It waits for the new site to answer, so it's on `
 - [x] after the switch, the Pawprints numbers carry on in one line (the paths keep `/catdoku`); checked 2026-11-23:
   every page counted since 2026-11-17 is under `/catdoku/`, with no gap in the days
 
+## Walkthroughs and notes: fewer words, no strategy
+
+The owner (2026-11-27): the instructions are too wordy, so people skip them. Players learn a game by playing once
+they know the basic rules, and explaining every issue or way to win leaves no chance to feel clever. Go through
+every game's walkthrough, tips and new-level notes (Wind Up's `NEW_SAY` and the like) and cut each to the basic rule,
+taking out strategy and tricks. The new-game skill says this now for new games.
+- [ ] every game's walkthrough, tips and level notes
+
+## Wind Up: level 22
+
+Built 2026-11-27 from the owner's sketch (shelves, a floor wedge, a net always open in one corner), on branch
+`claude/ecstatic-hamilton-e1c0f7`, not yet merged. Two ways to win a size 8: wind small yarn at the far end of the
+wedge, or build on a 5 stuck over the net (it lets up to a 4 through). The bot, which never aims for the net, wins
+14 of 30.
+- [ ] the owner to play it (preview artifact), then README "Wind Up", the level list's count, and a PR
+
 ## Junk Drawer: checks not yet run
 
 The new-game skill's tests that weren't run when Junk Drawer was built (rhymes-with-tree/catdoku#234):
