@@ -31,8 +31,8 @@ If It Fits, Copycat, Yarn, Unravel and Catwalk more colour.
   is spring blue and every cat's blanket its full colour, and Day Light's sunny flats full gold (the owner's picks);
   Under the Blanket's quilt in full colour wasn't better, and the rest (Catwalk's and Unravel's rugs, Bird Watch's
   sky, Pick of the Pile's frame, Tape Trap's floor, If It Fits' rug) are pale backdrops that full colour would crowd
-- [ ] Open the Door!: the owner asked whether an empty square's pale floor could match its right number's colour.
-  That would give the answer away, so asked what they had in mind (2026-11-27)
+- [x] Open the Door!: a room's empty squares are a pale tint of its sign's number colour (6+ is pale 6), each filled
+  square its own number's colour (2026-11-27)
 
 ## Junk Drawer: checks not yet run
 

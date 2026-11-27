@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Open the Door!</title>
-<script src="../move.js?v=2026-11-27.6"></script>
+<script src="../move.js?v=2026-11-27.7"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-27.6"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-27.7"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-27.6">
+<link rel="stylesheet" href="../games.css?v=2026-11-27.7">
 <style>
 /* A KenKen house: every row and column holds 1 to N once, and walls split the floor into rooms whose numbers
    must make the room's sign. Each room has a door that opens when the room is right; with every door open,
@@ -120,7 +120,7 @@
 
 </main>
 
-<script src="../games.js?v=2026-11-27.6"></script>
+<script src="../games.js?v=2026-11-27.7"></script>
 <script>
 /* ---------- puzzles (plain functions, also run in a background worker) ---------- */
 // An N × N grid where every row and column holds 1 to N once, cut into rooms (cages). Each room has a sign:
@@ -347,22 +347,16 @@ const OPS = {"+": "+", "-": "−", "x": "×", "/": "÷", "": ""};
 const OPS_SHOWN = {...OPS, "/": '<svg class="opdiv" viewBox="0 0 10 10" aria-hidden="true"><circle cx="5" cy="1.7" r="1.35"/><rect x=".6" y="4.15" width="8.8" height="1.7" rx=".85"/><circle cx="5" cy="8.3" r="1.35"/></svg>'};
 const levelName = n => { const [N, ops, logic] = levelOf(n); return `Level ${n} · ${N} × ${N}${{"+": ", + only", "+-": ", + and − only", "+-x": ", +, − and × only"}[ops] || ""}${logic ? "" : ", may need a guess"}`; };
 const build = G.builder([levelOf, newSign, randomLatin, cageValue, makeRooms, pickSign, solveRooms, makePuzzle], "makePuzzle");
-// floor colours for the rooms (no two rooms side by side match), and each one lit up once its room is right
-const FLOORS = [["#EFE2CC", "#FFF4D6"], ["#DDE7D6", "#F1FBE6"], ["#E2DDEC", "#F6F1FF"], ["#EDD9D3", "#FFEFE8"], ["#D8E4E6", "#EEFAFB"]];
+// A room's floor is a pale tint of its sign's number colour (G.numbers; past 10 they come round again), so a 6+ room
+// is pale 6 until its squares are filled in, each then in its own number's colour (the owner, 2026-11-27).
+const floorOf = t => { const c = G.numbers.colours()[(t - 1) % 10]; return [`color-mix(in srgb,${c} 30%,#F7F8F3)`, `color-mix(in srgb,${c} 45%,#F7F8F3)`]; };
 
-// Everything about the rooms that doesn't change while playing: which room each square is in, floor colours,
+// Everything about the rooms that doesn't change while playing: which room each square is in,
 // where each room's sign goes, and its door.
 let plan = null;
 function makePlan() {
   const N = game.N, rooms = game.cages.map(([cells, t, op]) => ({cells, t, op})), at = new Array(N * N);
   rooms.forEach((r, k) => r.cells.forEach(i => at[i] = k));
-  // next-door rooms get different floors
-  const floor = [];
-  rooms.forEach((r, k) => {
-    const near = new Set();
-    for (const i of r.cells) for (const j of nbrs(N, i)) if (at[j] !== k && floor[at[j]] !== undefined) near.add(floor[at[j]]);
-    floor[k] = [0, 1, 2, 3, 4].find(f => !near.has(f)) ?? k % FLOORS.length;
-  });
   // A door for each room, in one of its walls: a wall shared with another room where it can, never one
   // that already has a door. An edge is [x1, y1, x2, y2] in squares; `into` is the side its room is on.
   const used = new Set(), doors = [];
@@ -383,7 +377,7 @@ function makePlan() {
       if (!used.has(key)) { used.add(key); doors[k] = d; break; }
     }
   });
-  plan = {rooms, at, floor, doors, signAt: rooms.map(r => Math.min(...r.cells))};
+  plan = {rooms, at, doors, signAt: rooms.map(r => Math.min(...r.cells))};
   wasOpen = game.grid.some(Boolean) ? check().right.slice() : [];
 }
 function nbrs(N, i) { const r = Math.floor(i / N), c = i % N, out = []; if (r) out.push(i - N); if (r < N - 1) out.push(i + N); if (c) out.push(i - 1); if (c < N - 1) out.push(i + 1); return out; }
@@ -409,7 +403,7 @@ function draw() {
   const flash = hints.current(), guessed = new Set(guesses.list());
   let html = "";
   for (let i = 0; i < N * N; i++) {
-    const k = plan.at[i], room = plan.rooms[k], [floor, lit] = FLOORS[plan.floor[k]];
+    const k = plan.at[i], room = plan.rooms[k], [floor, lit] = floorOf(room.t);
     const r = Math.floor(i / N), c = i % N, peer = sel >= 0 && i !== sel && (r === sr || c === sc);
     const cls = ["cell", right[k] || (forceOpen === k) ? "done" : "", i === sel ? "sel" : "", peer ? "peer" : "", guessed.has(i) && g[i] ? "guessed" : "",
       clash.has(i) ? "clash" : "", flash && flash.i === i ? flash.kind : "", sel >= 0 && g[sel] && g[i] === g[sel] && i !== sel ? "same" : ""].filter(Boolean).join(" ");
