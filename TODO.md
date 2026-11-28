@@ -296,8 +296,9 @@ What was settled:
   player's own order, as levels 1 to 3 do), then with all three, then in goal levels. Black and white come back only
   for each chapter's last levels. Each chapter starts easier than the last one ended, and the simulated player places
   the levels inside it.
-- **Stone has two layers** once it can be painted: the first colour that bumps bare stone gives it a coat; a line of the
-  colour takes the coat and leaves bare stone, and a line of stone takes the stone and leaves the coat as a plain block.
+- **Sandstone** (2026-11-28) is the only stone that takes paint, so grey stone never changes partway through the game.
+- **Painted sandstone has two layers:** a colour that slides up against sandstone soaks in as its coat; a line of the
+  colour takes the coat and leaves bare sandstone, and a line of stone takes the stone and leaves the coat as a plain block.
   From chapter 2, a line of stone still clears but counts only towards stone goals.
 - **The sleepy cat and ice both stay.** They happen to a block already on the board (a cat curls up, preferring a
   sunbeam; a draught frosts one over, never in a sunbeam), rather than falling in.
