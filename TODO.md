@@ -314,8 +314,8 @@ The chapters (the page has every level's colours, pieces and goal):
   Wind Up does), scratching post (built 2026-11-27; README "Mew Hue")
 - [x] **5 · Water, boxes and yarn** (63 to 72): water, the helper shelf, cardboard box (`boxes.js`), yarn ball, tape
   (`tablethings.js`) (built 2026-11-27; README "Mew Hue")
-- [ ] **6 · Surprises** (73 to 82): turn knob (Purrmutation's `KNOB` and `.knob` look, unchanged, so it's the same in both games), gift wrap (Toy Box's), wet paint, sleepy cat, ice, and
-  the fish treat and hot water bottle helpers
+- [x] **6 · Surprises** (73 to 82): turn knob (Purrmutation's, unchanged), gift wrap, wet paint, sleepy cat, ice, and the
+  fish treat and hot water bottle helpers (built 2026-11-28; README "Mew Hue")
 - [ ] **7 · Pull and paint** (83 to 88): magnet, paint arrow
 - [ ] **8 · Moods** (89 to 99): silvervine, two charms meeting, valerian root, zoomies, Tatarian honeysuckle wood (only
   its wood is cat-safe, so it's drawn as wood), laser pointer, knocked over, spook hop

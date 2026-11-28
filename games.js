@@ -2383,7 +2383,8 @@ const G = (() => {
         if (mark && !same()) { mark = null; if (said) hintSay("", 0, said); said = ""; }   // its words go with it
         return mark;
       },
-      clear(redraw = true) { clearTimeout(timer); if (mark) { mark = null; if (redraw) o.draw(); } },
+      // (its words go too, as they do when the board changes; they used to stay)
+      clear(redraw = true) { clearTimeout(timer); if (said) { hintSay("", 0, said); said = ""; } if (mark) { mark = null; if (redraw) o.draw(); } },
     };
   }
 
