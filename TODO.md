@@ -268,8 +268,9 @@ Knock It Off's second cat (the owner, 2026-11-21; under "Toy Box, Twirl and Knoc
 ## Pounce Up: tune the goals
 
 Pounce Up joined the front page on 2026-11-12. Its level goals (`TASKS` in `pounceup/index.html`: the counts, the
-race's 90 seconds, the candle level's share of candles) were set from an autopilot's play, which is clumsier than a
-person; tune them from the owner's play and the Send feedback notes. The levels were put in a new order on
+race's seconds, the candle level's share of candles) were set from an autopilot's play, which is clumsier than a
+person; tune them from the owner's play and the Send feedback notes. The race went from 90 to 120 seconds on
+2026-11-28 (the owner found it a little hard). The levels were put in a new order on
 2026-11-20 (README, "Pounce Up"), so the goals' counts may want a look on their new levels: the tidy climb is now
 level 3, with nothing but things to knock off around, and catnip is the last level.
 

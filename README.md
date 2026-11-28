@@ -586,7 +586,7 @@ Every bookcase is built from a seed, a shelf at a time, just ahead of the window
 6. 120 ft: tape, which she hops off: tape everywhere.
 7. 140 ft: fish treats: get 8.
 8. 160 ft: springs, which throw her about 12½ ft: bounce on 3.
-9. 185 ft: sliding shelves (over half of them): a race, the basket in 90 seconds.
+9. 185 ft: sliding shelves (over half of them): a race, the basket in 120 seconds (90 until 2026-11-28, when the owner found it a little hard: a flawless climb, with no pause on any shelf, takes 68 to 80).
 10. 210 ft: cracked shelves, which give way: cracked shelves everywhere.
 11. 240 ft: catnip, lying on a shelf: she rolls in it, then it's a dice roll (1 in 5 too mellow, 3 in 5 zoomies straight up, 1 in 5 much bigger ZOOMIES): roll in it 3 times.
 
