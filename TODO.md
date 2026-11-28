@@ -304,7 +304,8 @@ What was settled:
   sunbeam; a draught frosts one over, never in a sunbeam), rather than falling in.
 - **Catnip** is the site's catnip, a leaf in each of the six colours in a ring; it counts as any colour with a leaf left,
   drops a leaf at random each move, and on its last leaf the leaf grows until it becomes that colour's tile.
-- **Two charms meeting** start a mood (which one depends on the pair). The magnet stays after a pull.
+- **Two charms meeting** (2026-11-28, one rule all game): the block that moved keeps its charm, and a note says so.
+  Moods come from things on the frame and from earned helpers, not from charms meeting. The magnet stays after a pull.
 - **Helpers** you earn (basking in a sunbeam, a plus, finishing a row and column in one move, a clean board) wait on a
   shelf under the board, as Mix it up does.
 

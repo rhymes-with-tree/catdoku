@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Mew Hue</title>
-<script src="../move.js?v=2026-11-28.2"></script>
+<script src="../move.js?v=2026-11-28.3"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-28.2"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-28.3"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-28.2">
+<link rel="stylesheet" href="../games.css?v=2026-11-28.3">
 <style>
 /* Blocks of paint, each with a mark: red a bar down, yellow a bar across, blue a ring. Drag a row
    or column and its blocks slide to that end. Two different marks mix, and the mix carries both (orange is a
@@ -170,9 +170,9 @@
 
 </main>
 
-<script src="../boxes.js?v=2026-11-28.2"></script>
-<script src="../tablethings.js?v=2026-11-28.2"></script>
-<script src="../games.js?v=2026-11-28.2"></script>
+<script src="../boxes.js?v=2026-11-28.3"></script>
+<script src="../tablethings.js?v=2026-11-28.3"></script>
+<script src="../games.js?v=2026-11-28.3"></script>
 <script>
 /* ---------- marks, colours and rules (plain functions) ---------- */
 // Colours by number: 0 red (a bar down), 1 orange (bar down and across), 2 yellow (a bar across), 3 green (across
@@ -224,7 +224,9 @@ function lineOf(axis, l, back) { const L = [...Array(N)].map((_, k) => axis ? k 
 // slides up against bare stone gives it a coat of that colour. Returns the moves ({from, to}), the squares where
 // blocks combined or vanished, and stone that was painted (only when paint is on: from painted stone's level).
 function slideLine(g, L, paint) {
-  const moves = [], merged = [], vanish = [], painted = [];
+  // met: two charms meeting in a mix ([square, the charm that moved and stays, the charm that went]); from chapter 2 to
+  // the end, the block that moved keeps its charm (the owner's call, 2026-11-28: one rule all game)
+  const moves = [], merged = [], vanish = [], painted = [], met = [];
   let seg = [], wall = -1;   // the stone the blocks of seg slide up against (-1: the end of the line)
   const flush = () => {
     const out = [], wet = [];   // out: {c, k (charm), v (catnip's number), at, from, done}; wet: [square, colour]
@@ -257,7 +259,8 @@ function slideLine(g, L, paint) {
       if (last && !last.done && !taped(v) && !taped(last.v)) {   // taped blocks don't combine
         const r = combine(last.c, c);
         if (r === VANISH) { moves.push({from: i, to: last.at}); vanish.push(last.at); out.pop(); continue; }
-        if (r >= 0) { if (k === WET && at !== i) wet.push([i, c]); last.c = r; last.k = r === 6 ? 0 : keeps(last.k) || keeps(k); last.done = true; moves.push({from: i, to: last.at}); merged.push(last.at); continue; }
+        if (r >= 0) { if (k === WET && at !== i) wet.push([i, c]); if (r !== 6 && keeps(k) && keeps(last.k)) met.push([last.at, k, last.k]);
+          last.c = r; last.k = r === 6 ? 0 : keeps(k) || keeps(last.k); last.done = true; moves.push({from: i, to: last.at}); merged.push(last.at); continue; }
       }
       // white takes the colour of a block it bumps, whichever of them is moving (neither merges)
       let cc = c;
@@ -287,7 +290,7 @@ function slideLine(g, L, paint) {
   };
   for (const i of L) { if (isStone(col(g[i])) || isHeld(g[i])) { flush(); wall = i; } else seg.push(i); }
   flush();
-  return {moves, merged, vanish, painted};
+  return {moves, merged, vanish, painted, met};
 }
 // What a square can count as in a line of colour: its colour; catnip, any colour it still has a leaf for; painted
 // stone, its coat; bare stone, none (it makes lines of stone).
@@ -406,7 +409,7 @@ function tapeAlong(h, moves) {
 // Slide a sunbeam's row: blocks in the sun are lazy, so each moves one square at most (combining, swapping or painting
 // as a slide would).
 function lazySlide(g, L, paint) {
-  const out = {moves: [], merged: [], vanish: [], painted: []}, done = new Set();
+  const out = {moves: [], merged: [], vanish: [], painted: [], met: []}, done = new Set();
   for (let k = 1; k < L.length; k++) {
     const i = L[k], j = L[k - 1];
     if (g[i] < 0 || isStone(col(g[i])) || isHeld(g[i]) || (g[j] >= 0 && done.has(j))) continue;
@@ -465,7 +468,7 @@ function applyMove(g, m, tray = noTray) {
     else {
       const c = isStone(col(h[to])) ? -1 : combine(col(h[to]), col(v));
       if (c === VANISH) { h[to] = -1; h[from] = -1; r.vanish.push(to); thru = [from, to]; }
-      else if (c >= 0) { h[to] = withCharm(c, c === 6 ? 0 : keeps(charmOf(h[to])) || keeps(charmOf(v))); h[from] = -1; r.merged.push(to); thru = [from, to]; }
+      else if (c >= 0) { h[to] = withCharm(c, c === 6 ? 0 : keeps(charmOf(v)) || keeps(charmOf(h[to]))); h[from] = -1; r.merged.push(to); thru = [from, to]; }
     }
     if (thru) { const mv = r.moves.find(x => x.to === from); if (mv) mv.to = to; else r.moves.push({from, to}); }
   }
@@ -478,7 +481,7 @@ function applyMove(g, m, tray = noTray) {
     else if (to !== from && !isStone(col(h[to]))) {
       const c = combine(col(h[to]), col(v));
       if (c === VANISH) { h[to] = -1; h[from] = -1; r.vanish.push(to); boing = [from, to]; }
-      else if (c >= 0) { h[to] = withCharm(c, c === 6 ? 0 : keeps(charmOf(h[to])) || keeps(charmOf(v))); h[from] = -1; r.merged.push(to); boing = [from, to]; }
+      else if (c >= 0) { h[to] = withCharm(c, c === 6 ? 0 : keeps(charmOf(v)) || keeps(charmOf(h[to]))); h[from] = -1; r.merged.push(to); boing = [from, to]; }
     }
     if (boing) { const mv = r.moves.find(x => x.to === from); if (mv) mv.to = to; else r.moves.push({from, to}); }
   }
@@ -1019,6 +1022,7 @@ function doMove(m) {
     const made = r.merged.map(i => col(after[i]));
     if (made.includes(6)) G.sound.play("mh.stone"); else if (made.some(c => c % 2)) G.sound.play("mh.mix"); else if (made.length || r.vanish.length) G.sound.play("mh.join");
     if (game.demo) {}   // the walkthrough says it
+    else if ((r.met || []).length) { const CH = {[KITTEN]: "kitten", [PAW]: "paw", [YARN]: "yarn ball"}, [, stays, went] = r.met[0]; G.note(`Two charms met: the ${CH[stays]} moved, so it stays, and the ${CH[went]} goes.`, 2600); }
     else if (r.thru) G.note("Through the cat flap!", 1800);
     else if (r.boing) G.note("Boing! Back to the far end.", 1800);
     else if (r.boxed >= 0) G.note("Into the box. Tap the box to put it back.", 2200);
