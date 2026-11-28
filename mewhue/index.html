@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Mew Hue</title>
-<script src="../move.js?v=2026-11-28.4"></script>
+<script src="../move.js?v=2026-11-28.5"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-28.4"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-28.5"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-28.4">
+<link rel="stylesheet" href="../games.css?v=2026-11-28.5">
 <style>
 /* Blocks of paint, each with a mark: red a bar down, yellow a bar across, blue a ring. Drag a row
    or column and its blocks slide to that end. Two different marks mix, and the mix carries both (orange is a
@@ -179,9 +179,9 @@
 
 </main>
 
-<script src="../boxes.js?v=2026-11-28.4"></script>
-<script src="../tablethings.js?v=2026-11-28.4"></script>
-<script src="../games.js?v=2026-11-28.4"></script>
+<script src="../boxes.js?v=2026-11-28.5"></script>
+<script src="../tablethings.js?v=2026-11-28.5"></script>
+<script src="../games.js?v=2026-11-28.5"></script>
 <script>
 /* ---------- marks, colours and rules (plain functions) ---------- */
 // Colours by number: 0 red (a bar down), 1 orange (bar down and across), 2 yellow (a bar across), 3 green (across
@@ -207,7 +207,11 @@ const taped = v => charmOf(v) === TAPER || charmOf(v) === TAPEL, PARTS = {1: [0,
 // Chapter 6: gift wrap (GIFT) and wet paint (WET) are charms; so are a cat asleep on a block (NAP) and ice (ICE + the
 // slides left, 1 to 3). A sleeping cat and ice hold their block still, as stone does.
 const GIFT = 6, WET = 7, NAP = 8, ICE = 8;
-const iceLeft = v => charmOf(v) > ICE ? charmOf(v) - ICE : 0, isHeld = v => charmOf(v) >= NAP;
+const iceLeft = v => charmOf(v) > ICE && charmOf(v) <= ICE + 3 ? charmOf(v) - ICE : 0, isHeld = v => charmOf(v) >= NAP && charmOf(v) <= ICE + 3;
+// Chapter 7: the magnet (MAG) and the paint arrow (ARROW), whose way is kept in the bits above the charm: 0 right,
+// 1 left, 2 down, 3 up. Neither pairs into a mood. The magnet stays through a mix; the paint arrow is used up.
+const MAG = 12, ARROW = 13, arrowDir = v => (v >> 8) & 3, arrowStep = d => [1, -1, N, -N][d];
+const withArrow = (c, d) => c | ARROW << 4 | d << 8;
 // Two charms meeting (the owner's call, 2026-11-28, the same from chapter 2 to the end): when a charmed block bumps
 // another, both charms are used up and the pair's mood starts, for five moves. Kitten, paw and yarn ball pair up.
 const pairs = k => k === KITTEN || k === PAW || k === YARN;
@@ -220,7 +224,7 @@ function pairUp(moved, still, at, met) {
   return keeps(a) || keeps(b);
 }
 // the charms that stay with a block through a mix (gift wrap comes off, wet paint dries)
-const keeps = k => k === KITTEN || k === PAW || k === YARN ? k : 0;
+const keeps = k => k === KITTEN || k === PAW || k === YARN || k === MAG ? k : 0;
 // What two bumping blocks make: the same primary joins into one; two different primaries mix; a primary and the
 // one mix that doesn't hold its mark (its complement) set into stone; anything else just bumps (-1).
 // Levels 10 to 12 add black (7) and white (8). Black wipes out whatever it bumps, and itself (VANISH), except white: black
@@ -268,6 +272,10 @@ function slideLine(g, L, paint) {
         Object.assign(last, {c: a, k: 0, done: true}); merged.push(last.at);
         out.push({c: b, k: 0, at, from: i, done: true}); merged.push(at); if (at !== i) moves.push({from: i, to: at});
         continue;
+      }
+      if (last && k === ARROW && L.length > 1 && arrowStep(arrowDir(v)) === L[0] - L[1]) {   // the paint arrow paints, and is used up
+        for (const o of out) if (o.c <= 5 || o.c === 7 || o.c === 8 || o.c === NIP || o.c === WATER) { o.c = c; o.k = keeps(o.k); merged.push(o.at); }
+        out.push({c, k: 0, v, at, from: i, done: true}); if (at !== i) moves.push({from: i, to: at}); continue;
       }
       if (last && pairs(k) && pairs(last.k)) { met.push([last.at, k, last.k]); last.k = 0; k = 0; }   // two charms meet: both are used up
       if (last && k === PAW && !taped(last.v)) {   // the paw swaps with the block it bumps
@@ -377,6 +385,7 @@ function tally(g, c) {
   g.lines += counts(g.level, c.lines).length; g.got = [...(g.got || []), ...c.lines.map(x => x.c)];
   g.coats = (g.coats || 0) + c.lines.filter(x => x.coat).length;
   const b = basking(trayFor(g), c.lines).length; if (b) { g.basks = (g.basks || 0) + b; g.reward = true; }
+  if (c.lines.length >= 2) g.doubles = (g.doubles || 0) + 1;
 }
 // The tray (chapter 2 on): rows that turn round instead of sliding (carousel rows), and a pair of linked cat flaps,
 // each [row, side] (side 0 the left end, 1 the right), on two other rows. Picked from the board's seed, so a share
@@ -510,6 +519,14 @@ function applyMove0(g, m, tray = noTray) {
     h[to] = h[from]; h[from] = -1;
     return {grid: h, moves: [], merged: [], vanish: [], painted: [], unboxed: to, changed: true};
   }
+  if (m.k === "pull") {
+    const out = {moves: [], merged: [], vanish: [], painted: [], met: []}, [x, y] = [m.i % N, Math.floor(m.i / N)];
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const L = []; let a = x + dx, b = y + dy; while (a >= 0 && b >= 0 && a < N && b < N) { L.push(b * N + a); a += dx; b += dy; }
+      if (L.length) { const r = slideLine(h, L, tray.paint); for (const key in out) out[key].push(...r[key]); }
+    }
+    untape(h); return {grid: h, ...out, changed: out.moves.length > 0 || out.merged.length > 0};
+  }
   if (m.k === "step") {
     const [x, y] = [m.i % N, Math.floor(m.i / N)], d = m.back ? -1 : 1, nx = m.ax ? x : x + d, ny = m.ax ? y + d : y;
     if (nx < 0 || ny < 0 || nx >= N || ny >= N) return {grid: h, moves: [], merged: [], vanish: [], painted: [], changed: false};
@@ -587,6 +604,7 @@ function allMoves(g, tray = noTray) {
   }
   for (const i of tray.knobs || []) for (const back of [false, true]) { const m = {k: "knob", i, back}; if (applyMove(g, m, tray).changed) out.push(m); }
   (tray.boxes || []).forEach((_, b) => { const m = {k: "unbox", b}; if (applyMove(g, m, tray).changed) out.push(m); });
+  g.forEach((v, i) => { if (i < N * N && charmOf(v) === MAG) { const m = {k: "pull", i}; if (applyMove(g, m, tray).changed) out.push(m); } });
   g.forEach((v, i) => { if (i < N * N && charmOf(v) === KITTEN) for (const ax of [0, 1]) for (const back of [false, true]) { const m = {k: "step", i, ax, back}; if (applyMove(g, m, tray).changed) out.push(m); } });
   return out;
 }
@@ -599,6 +617,7 @@ function stuck(g) {
 }
 // The squares a move lights up: its line, or the kitten and where it goes.
 function moveCells(m, tray = noTray) {
+  if (m.k === "pull") return [...new Set([...lineOf(0, Math.floor(m.i / N), true), ...lineOf(1, m.i % N, true)])];
   if (m.k === "all") return [...Array(N * N).keys()];
   if (m.k === "zoom" || m.k === "swap") { const d = m.ax ? N : 1; return [m.i, m.i + (m.back ? -d : d)].filter(j => j >= 0 && j < N * N); }
   if (m.k === "turnline") return lineOf(m.ax, m.l, true);
@@ -731,9 +750,18 @@ const LEVELS = [null,
   {name: "Ice", goal: 2, pair: 1, mix: true, ice: .08, intro: "ice"},
   {name: "Draughty", goal: 3, sun: true, ice: .08, intro: "bottle"},
   {name: "Full house", goal: 2, nap: .06, ice: .06, knobs: 1, gift: .08, black: BW, white: BW},
+  // Chapter 7, pull and paint (the owner's plan, 2026-11-27). magnet and arrow: how often a falling block has a magnet or a
+  // paint arrow (pointing a way picked as it falls). Pull goals ask for a line made by a magnet's pull. Simulated play
+  // (2026-11-28): about 100, 99, 100, 72, 53 and 38% won.
+  {name: "A magnet", goal: 2, pair: 0, mix: true, magnet: .1, intro: "magnet"},
+  {name: "Pull together", task: () => ({pull: 1}), pair: 2, mix: true, magnet: .16},
+  {name: "Paint arrow", goal: 2, pair: 1, mix: true, arrow: .12, intro: "arrow"},
+  {name: "Paint the sandstone", task: () => ({coat: 1}), stone: true, others: .3, sand: .14, arrow: .12},
+  {name: "Pull and paint", goal: 4, magnet: .08, arrow: .08, sun: true, black: BW, white: BW},
+  {name: "The whole kit", task: M => ({need: [1, 3, 5].filter(c => c !== M)}), ready: 1.3, magnet: .06, arrow: .06, kitten: .06, paw: .06, black: BW, white: BW},
 ];
 // The chapters: where each starts, and its name, for the level picker.
-const CHAPTERS = [[1, "The basics"], [34, "Turning the tray"], [44, "Catnip and stone"], [54, "Sun and springs"], [63, "Water, boxes and yarn"], [73, "Surprises"]];
+const CHAPTERS = [[1, "The basics"], [34, "Turning the tray"], [44, "Catnip and stone"], [54, "Sun and springs"], [63, "Water, boxes and yarn"], [73, "Surprises"], [83, "Pull and paint"]];
 // From this level a clean win earns a helper for the shelf.
 const HELPERS_FROM = 65;
 // Stone takes a coat of paint from painted stone's own level on.
@@ -753,6 +781,8 @@ function goalDone(g) {
   const t = taskOf(g.level, g.seed), got = (g.got || []).slice();
   if (t.coat) return (g.coats || 0) >= t.coat && (!t.need || t.need.every(c => { const k = got.indexOf(c); if (k < 0) return false; got.splice(k, 1); return true; }));
   if (t.bask) return (g.basks || 0) >= t.bask && (!t.lines || g.lines >= t.lines);
+  if (t.double) return (g.doubles || 0) >= t.double;
+  if (t.pull) return (g.pulls || 0) >= t.pull;
   if (t.need) return t.need.every(c => { const k = got.indexOf(c); if (k < 0) return false; got.splice(k, 1); return true; });
   return g.lines >= t.lines && !g.grid.some(c => t.without.includes(asStone(col(c))));
 }
@@ -865,6 +895,8 @@ function drop(g) {
     else if (spec.water && r() < spec.water) c = WATERV;
     else if (spec.gift && c <= 5 && r() < spec.gift) c = withCharm(c, GIFT);
     else if (spec.wet && c <= 5 && r() < spec.wet) c = withCharm(c, WET);
+    else if (spec.magnet && c <= 5 && r() < spec.magnet) c = withCharm(c, MAG);
+    else if (spec.arrow && c <= 5 && r() < spec.arrow) c = withArrow(c, Math.floor(r() * 4));
   }
   // after basking, the next block brings a charm (a kitten or a paw)
   if (g.reward && col(c) <= 5) { c = withCharm(col(c), r() < .5 ? KITTEN : PAW); g.reward = false; }
@@ -895,7 +927,7 @@ function deal(level, seed, order) {
   g.start = JSON.stringify({grid: g.grid, drops: g.drops});
   return g;
 }
-const snap = () => JSON.stringify({mood: game.mood || null, grid: game.grid, drops: game.drops, lines: game.lines, got: game.got || [], moves: game.moves, mixes: game.mixes, coats: game.coats || 0, basks: game.basks || 0, reward: !!game.reward, helpers: {...(settings.helpers || {})}});
+const snap = () => JSON.stringify({mood: game.mood || null, grid: game.grid, drops: game.drops, lines: game.lines, got: game.got || [], moves: game.moves, mixes: game.mixes, coats: game.coats || 0, basks: game.basks || 0, pulls: game.pulls || 0, doubles: game.doubles || 0, reward: !!game.reward, helpers: {...(settings.helpers || {})}});
 // Every move that would change this game's board.
 const rulesFor = g => g.mood ? {...trayFor(g), mood: g.mood.kind} : trayFor(g);
 const slides = g => allMoves(g.grid, rulesFor(g));
@@ -910,7 +942,8 @@ const xyOf = i => [i % N, Math.floor(i / N)];
 const place = (el, i) => { const [x, y] = xyOf(i); el.style.transform = `translate(${x * 100}%, ${y * 100}%)`; };
 let blocks = [];   // the element on each square
 // A charm's glyph, drawn in place of the block's mark, in the mark's ink.
-const GLYPHS = {[NAP]: `<path d="M2 23C2 18.6 4 16.4 6.6 15.6L8.2 9.4L11.6 14.6H14.4L17.8 9.4L19.4 15.6C22 16.4 22 18.6 22 23Z"/>`, [YARN]: `<circle cx="12" cy="12" r="10.6"/>`, [KITTEN]: `<path d="M3 11.5L4.2 2.2L9.5 7H14.5L19.8 2.2L21 11.5A9 9 0 1 1 3 11.5Z"/>`,
+const GLYPHS = {[MAG]: `<path d="M2.5 2H9.5V12.5A2.5 2.5 0 0 0 14.5 12.5V2H21.5V12.5A9.5 9.5 0 0 1 2.5 12.5Z"/>`,
+  [ARROW]: `<path d="M1 7H12.5V1.5L23.5 12L12.5 22.5V17H1Z"/>`, [NAP]: `<path d="M2 23C2 18.6 4 16.4 6.6 15.6L8.2 9.4L11.6 14.6H14.4L17.8 9.4L19.4 15.6C22 16.4 22 18.6 22 23Z"/>`, [YARN]: `<circle cx="12" cy="12" r="10.6"/>`, [KITTEN]: `<path d="M3 11.5L4.2 2.2L9.5 7H14.5L19.8 2.2L21 11.5A9 9 0 1 1 3 11.5Z"/>`,
   [PAW]: `<ellipse cx="12" cy="15.6" rx="8" ry="7"/><ellipse cx="3.6" cy="8.4" rx="2.4" ry="2.8"/><ellipse cx="8.6" cy="3.8" rx="2.4" ry="2.8"/><ellipse cx="15.4" cy="3.8" rx="2.4" ry="2.8"/><ellipse cx="20.4" cy="8.4" rx="2.4" ry="2.8"/>`};
 // Catnip: the site's catnip leaves and flowers (tablethings.js), a leaf in each colour it can still be, set round in a
 // ring in colour-wheel order; a dropped leaf leaves a dashed outline. In a 100 box.
@@ -931,7 +964,8 @@ const paintedArt = coat => `<svg viewBox="0 0 24 24" aria-hidden="true"><g fill=
 const YARN_CUT = `<g fill="none" stroke-width="1.6" stroke-linecap="round"><path d="M2.4 9C7.5 10 12 7 13.2 1.6"/><path d="M4.4 15.6C10 15.8 15.8 11.6 17.8 3.4"/><path d="M8.6 21.6C13.4 20.4 18.6 16.6 21.4 10.4"/></g>`;
 // (a sleeping cat is its ears over the edge, and zzz)
 const ZZZ = `<path d="M2.6 5H6.2L2.6 8.6H6.2M9.2 2.6H13.4L9.2 6.8H13.4M16 .6H21L16 5.6H21" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>`;
-const glyph = (c, k) => { const ink = inkFor(COLOURS[c].hex); return `<svg viewBox="0 0 24 24" fill="${ink}" aria-hidden="true">${GLYPHS[k]}${k === YARN ? `<g stroke="${COLOURS[c].hex}">${YARN_CUT}</g>` : ""}${k === NAP ? `<g stroke="${ink}">${ZZZ}</g>` : ""}</svg>`; };
+const glyph = (c, k, v = 0) => { const ink = inkFor(COLOURS[c].hex), turn = k === ARROW ? ` transform="rotate(${[0, 180, 90, 270][arrowDir(v)]} 12 12)"` : "";
+  return `<svg viewBox="0 0 24 24" fill="${ink}" aria-hidden="true"><g${turn}>${GLYPHS[k]}</g>${k === MAG ? `<path d="M2.5 6.4H9.5M14.5 6.4H21.5" stroke="${COLOURS[c].hex}" stroke-width="2"/>` : ""}${k === YARN ? `<g stroke="${COLOURS[c].hex}">${YARN_CUT}</g>` : ""}${k === NAP ? `<g stroke="${ink}">${ZZZ}</g>` : ""}</svg>`; };
 // Gift wrap, as in Toy Box: paper with dots, a ribbon and a bow, hiding the colour.
 const GIFT_ART = `<svg viewBox="0 0 24 24" preserveAspectRatio="none" aria-hidden="true"><rect width="24" height="24" fill="#F2AEBB"/><g fill="#fff" opacity=".85">${[[5, 5], [19, 5.5], [5.5, 19], [19, 19], [12, 3], [3, 12], [21, 12], [12, 21.5]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.1"/>`).join("")}</g><rect x="10" width="4" height="24" fill="#9874CA"/><rect y="10" width="24" height="4" fill="#9874CA"/><path d="M12 12C7 7 5.5 12 12 12C17 7 18.5 12 12 12Z" fill="#B597DD" stroke="#6F4FA0" stroke-width=".8"/></svg>`;
 // Water: pale glass with a droplet and a shine.
@@ -943,14 +977,14 @@ function blk(v, i) {
   else if (c === SAND) { el.className = "blk stone sand"; el.innerHTML = `<div class="b">${SAND_ART}</div>`; }
   else if (isPainted(c)) { el.className = "blk stone painted sand"; el.innerHTML = `<div class="b"><span class="coat" style="background:${COLOURS[c - 10].hex}">${mark(c - 10)}</span></div>`; }
   else if (k === GIFT) { el.className = "blk gift"; el.innerHTML = `<div class="b">${GIFT_ART}</div>`; }
-  else { const g = k && GLYPHS[k]; el.className = "blk" + (k === WET ? " wet" : "") + (iceLeft(v) ? " iced" : "") + (c === 6 ? " stone" : c % 2 ? " full" : "") + (g ? " charmed" : ""); el.innerHTML = `<div class="b" style="background:${COLOURS[c].hex}">${g ? glyph(c, k) : mark(c)}</div>`; }
+  else { const g = k && GLYPHS[k]; el.className = "blk" + (k === WET ? " wet" : "") + (iceLeft(v) ? " iced" : "") + (c === 6 ? " stone" : c % 2 ? " full" : "") + (g ? " charmed" : ""); el.innerHTML = `<div class="b" style="background:${COLOURS[c].hex}">${g ? glyph(c, k, v) : mark(c)}</div>`; }
   if (iceLeft(v)) el.querySelector(".b").insertAdjacentHTML("beforeend", `<span class="frost"><i>${"●".repeat(iceLeft(v))}${"○".repeat(3 - iceLeft(v))}</i></span>`);
   place(el, i); $("grid").append(el); return el;
 }
 // The tray's pieces: a carousel row gets Purrmutation's Shift arrows, one at each end of it on the frame (tap one to
 // turn the row that way), and the cat flaps are set in the frame, numbered so you can see they're a pair. A board
 // with any of them gets a wider frame.
-const ARROW = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M7 5L3 1.5v7z"/></svg>';
+const SHIFT_ARROW = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M7 5L3 1.5v7z"/></svg>';
 const KNOB = '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M25 16a9 9 0 1 1-2.6-6.4"/><path d="M23 4v6h-6"/></svg>';
 // The spring is the owner's standing spring (toys/spring-up.webp), tinted gold as Wind Up tints it, laid on its side.
 let springSrc = null;
@@ -978,7 +1012,7 @@ function drawTray() {
     const a = document.createElement("div"); a.className = "trayart turnarrow"; a.setAttribute("role", "button");
     a.setAttribute("aria-label", `Turn row ${y + 1} ${side ? "right" : "left"}`);
     Object.assign(a.style, {top: `${IN + y * cell}%`, height: `${cell}%`, width: `${IN}%`, [side ? "right" : "left"]: "0"});
-    a.innerHTML = ARROW; a.firstChild.style.transform = side ? "" : "rotate(180deg)";
+    a.innerHTML = SHIFT_ARROW; a.firstChild.style.transform = side ? "" : "rotate(180deg)";
     a.addEventListener("click", () => doMove({k: "turn", l: y, back: !side}));
     board.append(a);
   }
@@ -1036,6 +1070,8 @@ function taskText(g, plain) {
   if (t.coat) { const n = Math.min(g.coats || 0, t.coat), stoneDone = !t.need || got.includes(6);
     if (plain) return `a line through painted sandstone${t.need ? " and a line of stone" : ""}`;
     return tick(n >= t.coat, `a line through painted sandstone`) + (t.need ? " " + tick(stoneDone, `${chip(6)} line`) : ""); }
+  if (t.pull) return plain ? "a line from a magnet's pull" : tick((g.pulls || 0) >= t.pull, "a line from a magnet's pull");
+  if (t.double) return plain ? "two lines in one move" : tick((g.doubles || 0) >= t.double, "two lines in one move");
   if (t.bask) { const sun = trayFor(g).sun, b = Math.min(g.basks || 0, t.bask), what = `${t.bask === 1 ? "a" : t.bask} ${nm(sun[1])} line${t.bask === 1 ? "" : "s"} in the sunbeam`;
     if (plain) return what + (t.lines ? `, and ${t.lines} lines` : "");
     return tick(b >= t.bask, `☀ ${chip(sun[1])} ${t.bask > 1 ? `${b} of ${t.bask}` : "in the sunbeam"}`) + (t.lines ? " " + tick(g.lines >= t.lines, `${Math.min(g.lines, t.lines)} of ${t.lines} lines`) : ""); }
@@ -1057,7 +1093,7 @@ function update() {
 }
 const squareName = v => { const c = col(v); if (v < 0) return "empty"; if (c === NIP) return `catnip (${G.listed(leafList(v).map(x => COLOURS[x].name), " or ")})`;
   if (c === SAND) return "sandstone"; if (isPainted(c)) return `${COLOURS[c - 10].name}-painted sandstone`; if (c === WATER) return "water"; if (charmOf(v) === GIFT) return "a present"; if (iceLeft(v)) return `${COLOURS[c].name}, frozen for ${iceLeft(v)} more slide${iceLeft(v) > 1 ? "s" : ""}`;
-  return COLOURS[c].name + ({[KITTEN]: " kitten", [PAW]: " paw", [YARN]: " yarn ball", [TAPER]: " (taped to the right)", [TAPEL]: " (taped to the left)", [WET]: " wet paint", [NAP]: " with a cat asleep on it"}[charmOf(v)] || ""); };
+  return COLOURS[c].name + (charmOf(v) === ARROW ? ` paint arrow pointing ${["right", "left", "down", "up"][arrowDir(v)]}` : "") + ({[MAG]: " magnet", [KITTEN]: " kitten", [PAW]: " paw", [YARN]: " yarn ball", [TAPER]: " (taped to the right)", [TAPEL]: " (taped to the left)", [WET]: " wet paint", [NAP]: " with a cat asleep on it"}[charmOf(v)] || ""); };
 function say() {
   if (!game) return;
   const t = trayFor(game), side = s => s ? "right" : "left";
@@ -1109,6 +1145,7 @@ function doMove(m) {
     const made = r.merged.map(i => col(after[i]));
     if (made.includes(6)) G.sound.play("mh.stone"); else if (made.some(c => c % 2)) G.sound.play("mh.mix"); else if (made.length || r.vanish.length) G.sound.play("mh.join");
     if (game.demo) {}   // the walkthrough says it
+    else if (m.k === "pull") G.note("The magnet pulled its row and column in.", 1800);
     else if (r.thru) G.note("Through the cat flap!", 1800);
     else if (r.boing) G.note("Boing! Back to the far end.", 1800);
     else if (r.boxed >= 0) G.note("Into the box. Tap the box to put it back.", 2200);
@@ -1126,7 +1163,7 @@ function doMove(m) {
       // a walkthrough demo: show what happened, nothing more (no new block, no lines counted)
       if (game.demo) { busy = false; draw(); return; }
       const counted = counts(game.level, c.lines).length;
-      tally(game, c);
+      tally(game, c); if (m.k === "pull" && c.lines.length) game.pulls = (game.pulls || 0) + 1;
       if (c.lines.length && !game.demo) { G.note(c.lines.length > 1 ? `${c.lines.length} lines at once!` : c.lines[0].c === 6 ? "A line of stone!" : "A whole line!", 2000); }
       if (spec.stone && c.lines.length && !counted) G.note("This level only counts lines of stone.", 2500);
       else if (!spec.stone && !spec.task && c.lines.length && !counted) G.note("Stone lines tidy up, but they don't count here.", 2500);
@@ -1173,7 +1210,7 @@ $("board").addEventListener("pointermove", e => {
   const d = dragOf(touch, e);
   if (String(d) !== String(touch.d)) { touch.d = d; d ? showGhost(moveFor(game.grid, rulesFor(game), touch.i, d)) : clearGhost(); }
 });
-$("board").addEventListener("pointerup", e => { if (!touch) return; const d = dragOf(touch, e), i = touch.i; touch = null; clearGhost(); if (!d && game.arm) { useHelper(i); return; } if (d) dragMove(i, d); else G.note(charmOf(game.grid[i]) === KITTEN ? "Drag the kitten to move just it, one square." : "Drag a row or column to slide it.", 2000); });
+$("board").addEventListener("pointerup", e => { if (!touch) return; const d = dragOf(touch, e), i = touch.i; touch = null; clearGhost(); if (!d && game.arm) { useHelper(i); return; } if (!d && charmOf(game.grid[i]) === MAG && !game.mood) { doMove({k: "pull", i}); return; } if (d) dragMove(i, d); else G.note(charmOf(game.grid[i]) === KITTEN ? "Drag the kitten to move just it, one square." : "Drag a row or column to slide it.", 2000); });
 $("board").addEventListener("pointercancel", () => { touch = null; clearGhost(); });
 function showGhost(m) {
   clearGhost();
@@ -1195,7 +1232,7 @@ const keys = G.gridKeys({
     if (e && e.shiftKey) { dragMove(i, dx ? [0, y, dx < 0] : [1, x, dy < 0]); return i; }
     return Math.max(0, Math.min(N - 1, y + dy)) * N + Math.max(0, Math.min(N - 1, x + dx));
   },
-  act: i => { if (game && game.arm) { useHelper(i); return true; } return false; },
+  act: i => { if (game && game.arm) { useHelper(i); return true; } if (game && charmOf(game.grid[i]) === MAG) { doMove({k: "pull", i}); return true; } return false; },
 });
 // Undo (G.history): each step is a snapshot of the board (JSON, the newest 50 kept in game.history). It can take back a
 // lost board (from the Stuck! card), and Restart can be undone too.
@@ -1244,7 +1281,7 @@ function moodStarted(kind) {
 // then the block to use it on: a kitten or paw goes on a plain block, and a water drop washes a mix back into its two
 // colours (the second going to an empty square beside it). Using one isn't a move: no block falls, and Undo gives it
 // back. It doesn't cost the gold paw.
-const HELPERS = [["water", "Water drop", 63], ["kitten", "Kitten", 0], ["paw", "Paw", 0], ["treat", "Fish treat", 79], ["bottle", "Hot water bottle", 81]];
+const HELPERS = [["water", "Water drop", 63], ["kitten", "Kitten", 0], ["paw", "Paw", 0], ["treat", "Fish treat", 79], ["bottle", "Hot water bottle", 81], ["magnet", "Magnet", 84]];
 const helpersOn = () => game && game.level >= HELPERS_FROM;
 function drawShelf() {
   const box = document.querySelector(".actions.helpers"), have = settings.helpers || {};
@@ -1273,7 +1310,7 @@ function useHelper(i) {
     h[i] = PARTS[c][0]; h[near[0]] = PARTS[c][1];
   } else {
     if (c > 5 || charmOf(v)) return fail(`A ${k} only goes on a plain block.`);
-    h[i] = withCharm(c, k === "kitten" ? KITTEN : PAW);
+    h[i] = withCharm(c, k === "kitten" ? KITTEN : k === "magnet" ? MAG : PAW);
   }
   undo.push(); settings.helpers[k]--; game.grid = h; draw(); save(); G.sound.play("mh.mix");
   if (blocks[i]) blocks[i].classList.add("pop");
@@ -1289,9 +1326,11 @@ function score(g, spec) {
 }
 // On a goal level, how much a slide's lines (and the board after) help: a line of a colour still needed, or lines while
 // more are wanted, then fewer of the colours that mustn't be left.
-function taskValue(g, lines, h) {
+function taskValue(g, lines, h, m) {
   const t = taskOf(g.level, g.seed);
   if (t.coat) return (g.coats < t.coat ? lines.filter(x => x.coat).length * 1000 : 0) + (t.need && !(g.got || []).includes(6) ? lines.filter(x => x.c === 6).length * 1000 : 0) + h.filter(v => isPainted(col(v))).length * 40;
+  if (t.double) return (lines.length >= 2 ? 3000 : lines.length * 300);
+  if (t.pull) return m && m.k === "pull" ? lines.length * 1000 + 50 : lines.length * 100;
   if (t.bask) { const tr = trayFor(g), sunRow = lineOf(0, tr.sun[0], true);
     return basking(tr, lines).length * 1000 + (t.lines && g.lines < t.lines ? counts(g.level, lines).length * 600 : 0) + sunRow.filter(i => counts_as(h[i]).includes(tr.sun[1])).length ** 2 * 15; }
   if (t.need) { const want = t.need.slice(); for (const c of g.got || []) { const k = want.indexOf(c); if (k >= 0) want.splice(k, 1); }
@@ -1304,7 +1343,7 @@ function bestMove(g) {
   const spec = levelSpec(g.level); let best = null;
   for (const m of slides(g)) {
     const r = applyMove(g.grid, m, rulesFor(g)), h = r.grid; wither(g, h); thaw(g, h); const c = clearLines(h);
-    const sc = (spec.task ? taskValue(g, c.lines, h) : counts(g.level, c.lines).length * 1000) + c.lines.length * 200 + score(h, spec);
+    const sc = (spec.task ? taskValue(g, c.lines, h, m) : counts(g.level, c.lines).length * 1000) + c.lines.length * 200 + score(h, spec);
     if (!best || sc > best.sc) best = {sc, m, c};
   }
   return best;
@@ -1315,7 +1354,7 @@ $("hintBtn").onclick = () => {
   if (!best) { G.note("Nothing can slide. Try Mix it up, or Undo.", 3000); return; }
   game.hinted = true; save();
   const m = best.m, way = (ax, back) => ax ? (back ? "up" : "down") : (back ? "left" : "right"), clears = best.c.lines.length ? ": it clears a line" : "";
-  const text = m.k === "all" ? `Slide every ${m.ax ? "column" : "row"} ${way(m.ax, m.back)}${clears}.` : m.k === "zoom" ? `Send the gold block ${way(m.ax, m.back)}${clears}.` : m.k === "swap" ? `Swap the gold blocks${clears}.` : m.k === "turnline" ? `Turn the gold ${m.ax ? "column" : "row"} ${way(m.ax, m.back)}${clears}.` : m.k === "diag" ? `Slide the gold diagonal${clears}.` : m.k === "knob" ? `Turn the gold knob ${m.back ? "back (press and hold)" : "(tap it)"}${clears}.` : m.k === "unbox" ? "Tap the box to put its block back." : m.k === "step" ? `Nudge the gold kitten ${way(m.ax, m.back)}${clears}.` : m.k === "turn" ? `Turn the gold row ${way(0, m.back)}${clears}.` : `Slide the gold ${m.ax ? "column" : "row"} ${way(m.ax, m.back)}${clears}.`;
+  const text = m.k === "pull" ? `Tap the gold magnet${clears}.` : m.k === "all" ? `Slide every ${m.ax ? "column" : "row"} ${way(m.ax, m.back)}${clears}.` : m.k === "zoom" ? `Send the gold block ${way(m.ax, m.back)}${clears}.` : m.k === "swap" ? `Swap the gold blocks${clears}.` : m.k === "turnline" ? `Turn the gold ${m.ax ? "column" : "row"} ${way(m.ax, m.back)}${clears}.` : m.k === "diag" ? `Slide the gold diagonal${clears}.` : m.k === "knob" ? `Turn the gold knob ${m.back ? "back (press and hold)" : "(tap it)"}${clears}.` : m.k === "unbox" ? "Tap the box to put its block back." : m.k === "step" ? `Nudge the gold kitten ${way(m.ax, m.back)}${clears}.` : m.k === "turn" ? `Turn the gold row ${way(0, m.back)}${clears}.` : `Slide the gold ${m.ax ? "column" : "row"} ${way(m.ax, m.back)}${clears}.`;
   hints.show({cells: moveCells(m, rulesFor(game))}, text);
 };
 
@@ -1445,6 +1484,8 @@ function helpOnFirstVisit(all) {
   if (intro === "ice") steps.push(demo("Ice: frozen for three slides. Slide any row", [[16, withCharm(pa, ICE + 3)], [10, pb]], row2, "Two slides to go. A draught can freeze any block, but never one in a sunbeam"));
   if (intro === "bottle") { settings.helpers = settings.helpers || {}; settings.helpers.bottle = (settings.helpers.bottle || 0) + 1; drawShelf();
     steps.push({say: "Ice in a sunbeam thaws twice as fast. A hot water bottle thaws it at once: here's one", els: [$("help_bottle")]}); }
+  if (intro === "magnet") steps.push(demo("A magnet. Tap it: its row and column pull in", [[12, withCharm(pb, MAG)], [10, pa], [14, pa], [2, pa], [22, pm]], [2, 7, 10, 11, 12, 13, 14, 17, 22].map(xyOf), "Everything in its row and column slid in beside it. The magnet stays, so you can pull again later"));
+  if (intro === "arrow") steps.push(demo("A paint arrow. Slide this row the way it points", [[10, withArrow(pa, 0)], [12, pm], [13, pb], [14, pm]], row2, `It painted everything ahead of it ${COLOURS[pa].name}, and it's used up. It only paints the way it points`));
   if (intro === "flaps") steps.push(demo("Slide this row right, out through the cat flap", [[7, pa], [16, pa], [17, pa], [18, pa], [19, pa]], [5, 6, 7, 8, 9].map(xyOf), "In through the other flap: a whole line!", {turn: [], flaps: [[1, 1], [3, 0]]}));
   if (!steps.length) { settings.seen[n] = true; save(); return; }
   steps[steps.length - 1].leave = turn.upTo.leave;   // put the real board back after the last demo

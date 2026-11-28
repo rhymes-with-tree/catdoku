@@ -33,7 +33,7 @@ const N = +nArg, SEED0 = +seedArg, CAP = 400;
         for (let t = 0; t < CAP; t++) {
           const best = bestMove(g); if (!best) break;
           const r0 = applyMove(g.grid, best.m, rulesFor(g)), h = r0.grid; wither(g, h); thaw(g, h); const c = clearLines(h); wake(g, h, c.lines); moodAfter(g, r0);
-          g.grid = h; g.moves++; tally(g, c);
+          g.grid = h; g.moves++; tally(g, c); if (best.m.k === 'pull' && c.lines.length) g.pulls = (g.pulls || 0) + 1;
           if (goalDone(g)) { won++; took.push(g.moves); break; }
           drop(g);
           const c2 = clearLines(g.grid); if (c2.lines.length) { wake(g, g.grid, c2.lines); tally(g, c2); if (goalDone(g)) { won++; took.push(g.moves); break; } }
