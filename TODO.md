@@ -322,8 +322,9 @@ The chapters (the page has every level's colours, pieces and goal):
 - [x] **7 · Pull and paint** (83 to 88): magnet, paint arrow (built 2026-11-28; README "Mew Hue")
 - [x] **8 · All the moods** (89 to 95): boards where charms come often so moods meet, mood goals, and the laser pointer
   helper (built 2026-11-28; README "Mew Hue")
-- [ ] **9 · Shapes** (100 to 108): 2 × 2 boxes, diagonals, the small plus (five squares; two whole lines can't wait for
-  each other), crossing lines
+- [x] **9 · Shapes** (96 to 103): box, diagonal and plus mats on the tray; a shape clears only on its mat, and a plus
+  brings a charm. Crossing lines was dropped: almost never possible, and it would have changed earlier chapters (built
+  2026-11-28; README "Mew Hue")
 
 ## Calibrate level ladders with a simulated player, as Mew Hue's were
 
