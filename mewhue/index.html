@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Mew Hue</title>
-<script src="../move.js?v=2026-11-28.6"></script>
+<script src="../move.js?v=2026-11-28.7"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-28.6"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-28.7"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-28.6">
+<link rel="stylesheet" href="../games.css?v=2026-11-28.7">
 <style>
 /* Blocks of paint, each with a mark: red a bar down, yellow a bar across, blue a ring. Drag a row
    or column and its blocks slide to that end. Two different marks mix, and the mix carries both (orange is a
@@ -113,6 +113,10 @@
 .knob svg{width:66%;height:66%;fill:none;stroke:#2A2530;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
 .knob::after{content:"";position:absolute;left:50%;top:50%;width:44px;height:44px;transform:translate(-50%,-50%)}
 .knob.hinted{background:#ECA818}
+/* mats (chapter 9): a woven rug square under each square where a shape counts */
+.mat{position:absolute;width:20%;height:20%;border-radius:8px;pointer-events:none;
+  background:repeating-linear-gradient(45deg,var(--rug) 0 3px,color-mix(in srgb,var(--rug) 70%,#fff) 3px 6px),repeating-linear-gradient(-45deg,transparent 0 3px,rgba(255,255,255,.25) 3px 6px)}
+.mat-box{--rug:#8FB7D4}.mat-plus{--rug:#E7A1B4}.mat-diag{--rug:#A8C79A}
 /* moods: the whole board's look while one is on, and a tag with the moves left */
 .paintboard.mooded{transition:background-color .3s,border-color .3s}
 .paintboard.mood-silvervine{background:#E4E2EC;border-color:#8E96A3;box-shadow:inset 0 0 0 4px #C9CFD8}
@@ -179,9 +183,9 @@
 
 </main>
 
-<script src="../boxes.js?v=2026-11-28.6"></script>
-<script src="../tablethings.js?v=2026-11-28.6"></script>
-<script src="../games.js?v=2026-11-28.6"></script>
+<script src="../boxes.js?v=2026-11-28.7"></script>
+<script src="../tablethings.js?v=2026-11-28.7"></script>
+<script src="../games.js?v=2026-11-28.7"></script>
 <script>
 /* ---------- marks, colours and rules (plain functions) ---------- */
 // Colours by number: 0 red (a bar down), 1 orange (bar down and across), 2 yellow (a bar across), 3 green (across
@@ -326,15 +330,18 @@ const counts_as = v => { const c = col(v); return c === NIP ? leafList(v) : isPa
 // takes painted stone's coat and leaves the stone, bare; a line of stone takes the stone and leaves any coat as a plain
 // block. Stone next to a cleared square crumbles (painted stone leaving its coat). Returns the lines ({cells, c, coat:
 // whether it took a coat}) and the stone that crumbled.
-function clearLines(g) {
-  const lines = [], coat = new Set(), stone = new Set(), gone = new Set();
-  for (let l = 0; l < N; l++) for (const ax of [0, 1]) {
-    const L = lineOf(ax, l, true);
+// Chapter 9 (the owner's call, 2026-11-28): shapes clear only on their mats (tray.mats), a woven mat on the tray for
+// a 2 × 2 box, a plus of five or a corner-to-corner diagonal, so nothing that cleared before behaves differently.
+function clearLines(g, tray) {
+  const lines = [], coat = new Set(), stone = new Set(), gone = new Set(), cands = [];
+  for (let l = 0; l < N; l++) for (const ax of [0, 1]) cands.push({cells: lineOf(ax, l, true)});
+  for (const mt of (tray && tray.mats) || []) cands.push({cells: mt.cells, shape: mt.kind});
+  for (const {cells: L, shape} of cands) {
     if (L.some(i => g[i] < 0)) continue;
     let opts = null;
     for (const i of L) { const o = counts_as(g[i]); opts = opts ? opts.filter(x => o.includes(x)) : o; if (!opts.length) break; }
-    if (opts.length) { const took = L.filter(i => isPainted(col(g[i]))); lines.push({cells: L, c: opts[0], coat: took.length > 0}); L.forEach(i => (isPainted(col(g[i])) ? coat : gone).add(i)); }
-    else if (L.every(i => isStone(col(g[i])))) { lines.push({cells: L, c: 6}); L.forEach(i => (isPainted(col(g[i])) ? stone : gone).add(i)); }
+    if (opts.length) { const took = L.filter(i => isPainted(col(g[i]))); lines.push({cells: L, c: opts[0], coat: took.length > 0, shape}); L.forEach(i => (isPainted(col(g[i])) ? coat : gone).add(i)); }
+    else if (!shape && L.every(i => isStone(col(g[i])))) { lines.push({cells: L, c: 6}); L.forEach(i => (isPainted(col(g[i])) ? stone : gone).add(i)); }
   }
   const hit = new Set([...coat, ...stone, ...gone]), crumble = [];
   for (const i of hit) for (const j of [i - N, i + N, i % N ? i - 1 : -1, i % N < N - 1 ? i + 1 : -1]) if (j >= 0 && j < N * N && !hit.has(j) && isStone(col(g[j])) && !crumble.includes(j)) crumble.push(j);
@@ -386,6 +393,8 @@ function tally(g, c) {
   g.coats = (g.coats || 0) + c.lines.filter(x => x.coat).length;
   const b = basking(trayFor(g), c.lines).length; if (b) { g.basks = (g.basks || 0) + b; g.reward = true; }
   if (c.lines.length >= 2) g.doubles = (g.doubles || 0) + 1;
+  for (const x of c.lines) if (x.shape) { g.shapes = {...(g.shapes || {})}; g.shapes[x.shape] = (g.shapes[x.shape] || 0) + 1; if (x.shape === "plus") g.reward = true; }
+
 }
 // The tray (chapter 2 on): rows that turn round instead of sliding (carousel rows), and a pair of linked cat flaps,
 // each [row, side] (side 0 the left end, 1 the right), on two other rows. Picked from the board's seed, so a share
@@ -412,7 +421,20 @@ function trayOf(level, seed, order = [0, 1, 2]) {
   const boxes = []; for (let k = 0; k < (L.boxes || 0); k++) boxes.push([take(), r() < .5 ? 0 : 1]);
   // chapter 6: turn knobs, each at the corner where square i meets the squares right, below and below-right of it
   const knobs = []; for (let k = 0; k < (L.knobs || 0); k++) { let i; do { i = Math.floor(r() * 4) * N + Math.floor(r() * 4); } while (knobs.includes(i)); knobs.push(i); }
-  return {turn, flaps, sun, springs, posts, boxes, knobs, paint: level >= PAINT_FROM};
+  // chapter 9: mats where a shape counts: a 2 × 2 box, a plus of five, a corner-to-corner diagonal
+  // (mats never share a square: the diagonal goes down first, and the others are fitted round it)
+  const mats = [], used = new Set(), place = kind => {
+    if (kind === "diag") return r() < .5 ? [0, 6, 12, 18, 24] : [4, 8, 12, 16, 20];
+    for (let k = 0; k < 40; k++) {
+      let cells;
+      if (kind === "box") { const i = Math.floor(r() * 4) * N + Math.floor(r() * 4); cells = [i, i + 1, i + N, i + N + 1]; }
+      else { const i = (1 + Math.floor(r() * 3)) * N + 1 + Math.floor(r() * 3); cells = [i - N, i - 1, i, i + 1, i + N]; }
+      if (!cells.some(i => used.has(i))) return cells;
+    }
+    return null;
+  };
+  for (const kind of [...(L.mats || [])].sort((a, b) => (b === "diag") - (a === "diag"))) { const cells = place(kind); if (cells) { cells.forEach(i => used.add(i)); mats.push({kind, cells}); } }
+  return {turn, flaps, sun, springs, posts, boxes, knobs, mats, paint: level >= PAINT_FROM};
 }
 // Tape that no longer joins two blocks side by side comes off.
 function untape(h) {
@@ -447,7 +469,7 @@ function lazySlide(g, L, paint) {
   }
   return out;
 }
-const noTray = {turn: [], flaps: null, sun: null, springs: [], posts: [], boxes: [], knobs: []};
+const noTray = {turn: [], flaps: null, sun: null, springs: [], posts: [], boxes: [], knobs: [], mats: []};
 // A move: {k: "line", ax, l, back} slides a row or column (and, on a row with a cat flap, sends the block that reaches
 // the flap's end out through it and in at the other flap, if it can land there); {k: "turn", l, back} turns a carousel
 // row one square (left when back), the end block coming round to the other end and nothing combining; {k: "step", i,
@@ -613,7 +635,7 @@ function stuck(g) {
   const ms = slides(g); if (!ms.length) return true;
   if (ms.some(m => m.k !== "turn" && m.k !== "knob")) return false;
   if (g.grid.some((v, i) => i < N * N && v < 0)) return false;
-  return !ms.some(m => clearLines(applyMove(g.grid, m, rulesFor(g)).grid).lines.length);
+  return !ms.some(m => clearLines(applyMove(g.grid, m, rulesFor(g)).grid, trayFor(g)).lines.length);
 }
 // The squares a move lights up: its line, or the kitten and where it goes.
 function moveCells(m, tray = noTray) {
@@ -769,16 +791,28 @@ const LEVELS = [null,
   {name: "Yarn pairs", goal: 2, yarn: .14, paw: .1},
   {name: "Moody tray", goal: 2, kitten: .1, paw: .1, yarn: .08, turn: 1, sun: true},
   {name: "Mood and lines", task: () => ({moods: 2, lines: 3}), kitten: .1, paw: .1, yarn: .1, black: BW, white: BW},
+  // Chapter 9, shapes (the owner's plan, 2026-11-28): a shape clears only on its mat, and a plus brings a charm on the
+  // next block. Mostly mixes fall (mixes, every), since two of a primary join when they meet, which makes shapes of
+  // primaries nearly impossible (spice: a pinch of primaries). Simulated play (2026-11-28): about 91, 85, 94, 63, 94,
+  // 51, 41 and 28% won.
+  {name: "Boxes", task: () => ({shape: {box: 1}}), mixes: true, mats: ["box"], intro: "boxmat"},
+  {name: "More boxes", task: () => ({shape: {box: 2}}), mixes: true, mats: ["box"]},
+  {name: "Corner to corner", task: () => ({shape: {diag: 1}}), mixes: true, mats: ["diag"], intro: "diagmat"},
+  {name: "Diagonals", task: () => ({shape: {diag: 1}}), mixes: true, spice: .1, mats: ["diag"]},
+  {name: "A plus", task: () => ({shape: {plus: 1}}), mixes: true, mats: ["plus"], intro: "plusmat"},
+  {name: "Shape up", task: () => ({shape: {box: 1, plus: 1}}), mixes: true, spice: .1, mats: ["box", "plus"]},
+  {name: "Every mix, every way", task: M => ({shape: {plus: 1}, need: [1, 3, 5].filter(c => c !== M)}), mixes: true, spice: .25, mats: ["plus"]},
+  {name: "Everything", task: () => ({lines: 4, without: [7, 8]}), kitten: .06, paw: .06, catnip: .06, turn: 1, sun: true, mats: ["box"], black: BW, white: BW},
 ];
 // The chapters: where each starts, and its name, for the level picker.
-const CHAPTERS = [[1, "The basics"], [34, "Turning the tray"], [44, "Catnip and stone"], [54, "Sun and springs"], [63, "Water, boxes and yarn"], [73, "Surprises"], [83, "Pull and paint"], [89, "All the moods"]];
+const CHAPTERS = [[1, "The basics"], [34, "Turning the tray"], [44, "Catnip and stone"], [54, "Sun and springs"], [63, "Water, boxes and yarn"], [73, "Surprises"], [83, "Pull and paint"], [89, "All the moods"], [96, "Shapes"]];
 // From this level a clean win earns a helper for the shelf.
 const HELPERS_FROM = 65;
 // Stone takes a coat of paint from painted stone's own level on.
 const PAINT_FROM = 46;   // (no longer used for painting: only sandstone takes paint, wherever it falls)
 // Which of a move's lines count towards a "lines" goal: on the stone level only stone; in chapter 1 any line; from
 // chapter 2 any line but stone (stone lines clear but count only towards stone goals).
-const counts = (level, lines) => lines.filter(x => LEVELS[level].stone ? x.c === 6 : x.c !== 6 || level < CHAPTERS[1][0]);
+const counts = (level, lines) => lines.filter(x => !x.shape).filter(x => LEVELS[level].stone ? x.c === 6 : x.c !== 6 || level < CHAPTERS[1][0]);
 const MAX_LEVEL = LEVELS.length - 1;
 // What was level n before the levels were filled out (2026-11-09) is now level OLD[n].
 const OLD = [0, 1, 2, 3, 4, 5, 9, 11, 12, 13, 25, 28, 29, 30, 32, 33];
@@ -794,6 +828,8 @@ function goalDone(g) {
   if (t.double) return (g.doubles || 0) >= t.double;
   if (t.pull) return (g.pulls || 0) >= t.pull;
   if (t.moods) return (g.moods || 0) >= t.moods && (!t.lines || g.lines >= t.lines);
+  if (t.cross) return (g.crosses || 0) >= t.cross;
+  if (t.shape) { if (!Object.entries(t.shape).every(([k, n]) => ((g.shapes || {})[k] || 0) >= n)) return false; if (!t.need && !t.lines) return true; }
   if (t.need) return t.need.every(c => { const k = got.indexOf(c); if (k < 0) return false; got.splice(k, 1); return true; });
   return g.lines >= t.lines && !g.grid.some(c => t.without.includes(asStone(col(c))));
 }
@@ -805,7 +841,10 @@ function goalDone(g) {
 function boardColours(level, seed, order) {
   const L = LEVELS[level], PAIRS = [[0, 2, 1], [0, 4, 5], [2, 4, 3]], COMP = {0: 3, 2: 5, 4: 1}, PRIM = [0, 2, 4], k = seed % 3, d = {};
   if (L.pair != null) { const [a, b, m] = PAIRS[order[L.pair]]; d[a] = 1; d[b] = 1; if (L.pair === 2 || L.mix) d[m] = .5; return {drops: d, key: [[a, m, b]]}; }
-  if (L.mixes) { const two = [1, 3, 5].filter((_, i) => i !== k); d[two[0]] = 1; d[two[1]] = 1; return {drops: d, key: [[two[0]], [two[1]]]}; }
+  if (L.mixes) { const two = [1, 3, 5].filter((_, i) => i !== k); d[two[0]] = 1; d[two[1]] = 1;
+    // spice (chapter 9): a pinch of all three primaries too
+    if (L.spice) { PRIM.forEach(c => { d[c] = L.spice; }); return {drops: d, key: [[0, 1, 2, 3, 4, 5, 0]]}; }
+    return {drops: d, key: [[two[0]], [two[1]]]}; }
   if (L.stone) {
     const p = PRIM[k]; d[p] = 3; d[COMP[p]] = 1;
     if (!L.others) return {drops: d, key: [[p, 6, COMP[p]]]};
@@ -938,7 +977,7 @@ function deal(level, seed, order) {
   g.start = JSON.stringify({grid: g.grid, drops: g.drops});
   return g;
 }
-const snap = () => JSON.stringify({mood: game.mood || null, grid: game.grid, drops: game.drops, lines: game.lines, got: game.got || [], moves: game.moves, mixes: game.mixes, coats: game.coats || 0, basks: game.basks || 0, pulls: game.pulls || 0, doubles: game.doubles || 0, moods: game.moods || 0, reward: !!game.reward, helpers: {...(settings.helpers || {})}});
+const snap = () => JSON.stringify({mood: game.mood || null, grid: game.grid, drops: game.drops, lines: game.lines, got: game.got || [], moves: game.moves, mixes: game.mixes, coats: game.coats || 0, basks: game.basks || 0, pulls: game.pulls || 0, doubles: game.doubles || 0, moods: game.moods || 0, shapes: game.shapes || {}, crosses: game.crosses || 0, reward: !!game.reward, helpers: {...(settings.helpers || {})}});
 // Every move that would change this game's board.
 const rulesFor = g => g.mood ? {...trayFor(g), mood: g.mood.kind} : trayFor(g);
 const slides = g => allMoves(g.grid, rulesFor(g));
@@ -1058,6 +1097,8 @@ function drawTray() {
     k.addEventListener("contextmenu", e => { e.preventDefault(); clearTimeout(held); held = null; doMove({k: "knob", i, back: true}); });
     $("grid").append(k);
   }
+  // mats: a woven mat round each square where a shape counts, in the shape's own colour
+  for (const mt of t.mats || []) for (const i of mt.cells) { const e = document.createElement("div"), [x, y] = xyOf(i); e.className = `trayin mat mat-${mt.kind}`; e.style.left = x * 20 + "%"; e.style.top = y * 20 + "%"; $("grid").prepend(e); }
   // scratching posts, on the line between two squares
   for (const [y, x] of t.posts || []) { const e = document.createElement("div"); e.className = "trayin post"; e.style.top = y * 20 + "%"; e.style.left = (x + 1) * 20 + "%"; $("grid").append(e); }
 }
@@ -1076,11 +1117,15 @@ function draw() {
 // A goal level's goal, for the status line: each line it needs with its colour's mark (ticked once done), or the
 // lines so far and the colours that mustn't be left.
 const tick = (ok, inner) => `<span class="need${ok ? " ok" : ""}">${ok ? "✓ " : ""}${inner}</span>`;
-function taskText(g, plain) {
-  const t = taskOf(g.level, g.seed), got = (g.got || []).slice(), nm = c => COLOURS[c].name;
+function taskText(g, plain, only) {
+  const t = only || taskOf(g.level, g.seed), got = (g.got || []).slice(), nm = c => COLOURS[c].name;
   if (t.coat) { const n = Math.min(g.coats || 0, t.coat), stoneDone = !t.need || got.includes(6);
     if (plain) return `a line through painted sandstone${t.need ? " and a line of stone" : ""}`;
     return tick(n >= t.coat, `a line through painted sandstone`) + (t.need ? " " + tick(stoneDone, `${chip(6)} line`) : ""); }
+  if (t.cross) return plain ? "a row and a column finished in one move" : tick((g.crosses || 0) >= t.cross, "a row and a column in one move");
+  if (t.shape) { const SH = {box: "box", diag: "diagonal", plus: "plus"}, part = Object.entries(t.shape).map(([k, n]) => plain ? `${n === 1 ? "a" : n} ${SH[k]}${n > 1 ? (k === "box" ? "es" : "s") : ""}` : tick(((g.shapes || {})[k] || 0) >= n, n > 1 ? `${Math.min((g.shapes || {})[k] || 0, n)} of ${n} ${SH[k]}${k === "box" ? "es" : "s"}` : `a ${SH[k]}`));
+    const rest = t.need ? (plain ? " and " : " ") + taskText({...g, level: g.level}, plain, {need: t.need}) : "";
+    return part.join(plain ? " and " : " ") + rest; }
   if (t.moods) { const what = t.moods === 1 ? "a mood" : `${t.moods} moods`, n = Math.min(g.moods || 0, t.moods);
     if (plain) return `start ${what}${t.lines ? ` and clear ${t.lines} lines` : ""}`;
     return tick(n >= t.moods, t.moods === 1 ? "start a mood" : `${n} of ${t.moods} moods`) + (t.lines ? " " + tick(g.lines >= t.lines, `${Math.min(g.lines, t.lines)} of ${t.lines} lines`) : ""); }
@@ -1116,6 +1161,7 @@ function say() {
     (t.sun ? ` A ${COLOURS[t.sun[1]].name} sunbeam across row ${t.sun[0] + 1}: its blocks move one square at a time.` : "") +
     (t.springs || []).map(([y, sd]) => ` A spring at the ${side(sd)} of row ${y + 1}.`).join("") +
     (t.posts || []).map(([y, x]) => ` A scratching post in row ${y + 1}, after square ${x + 1}.`).join("") +
+    (t.mats || []).map(mt => ` A ${({box: "box", plus: "plus", diag: "diagonal"})[mt.kind]} mat on ${G.listed(mt.cells.map(i => `row ${Math.floor(i / N) + 1} column ${i % N + 1}`))}.`).join("") +
     (t.knobs || []).map(i => ` A turn knob where rows ${Math.floor(i / N) + 1} and ${Math.floor(i / N) + 2} meet columns ${i % N + 1} and ${i % N + 2}.`).join("") +
     (t.boxes || []).map(([y, sd], b) => ` A box at the ${side(sd)} of row ${y + 1}${game.grid[N * N + b] >= 0 ? `, holding ${squareName(game.grid[N * N + b])}` : ", empty"}.`).join("");
   G.describe($("grid"), `Blocks of paint, ${N} by ${N}. ${G.listed(rows, "; ")}.${flaps} Arrow keys pick a square; Shift with an arrow slides its row or column that way (a kitten moves alone).`);
@@ -1169,7 +1215,7 @@ function doMove(m) {
     else if (r.vanish.length) G.note("Black wipes them both out!", 2000);
     else if (made.includes(6)) G.note("All three marks: it's set into stone!", 2200);
     else { const mix = made.find(c => c % 2); if (mix != null) G.note(`${Cap(COLOURS[mix].name)}: two marks, so it won't mix again.`, 2000); }
-    const cleared = after.slice(), c = clearLines(cleared), woke = wake(game, cleared, c.lines);
+    const cleared = after.slice(), c = clearLines(cleared, trayFor(game)), woke = wake(game, cleared, c.lines);
     const finish = () => {
       game.grid = cleared; game.moves++;
       if (!game.demo) { const was = game.mood && game.mood.kind; moodAfter(game, r); const now = game.mood && game.mood.kind;
@@ -1178,7 +1224,7 @@ function doMove(m) {
       if (game.demo) { busy = false; draw(); return; }
       const counted = counts(game.level, c.lines).length;
       tally(game, c); if (m.k === "pull" && c.lines.length) game.pulls = (game.pulls || 0) + 1;
-      if (c.lines.length && !game.demo) { G.note(c.lines.length > 1 ? `${c.lines.length} lines at once!` : c.lines[0].c === 6 ? "A line of stone!" : "A whole line!", 2000); }
+      if (c.lines.length && !game.demo) { const sh = c.lines.find(x => x.shape); G.note(sh ? ({box: "A box!", plus: "A plus! The next block brings a charm.", diag: "A diagonal!"})[sh.shape] : c.lines.length > 1 ? `${c.lines.length} lines at once!` : c.lines[0].c === 6 ? "A line of stone!" : "A whole line!", 2000); }
       if (spec.stone && c.lines.length && !counted) G.note("This level only counts lines of stone.", 2500);
       else if (!spec.stone && !spec.task && c.lines.length && !counted) G.note("Stone lines tidy up, but they don't count here.", 2500);
       if (basking(trayFor(game), c.lines).length && !game.demo) G.note("Basking in the sun: the next block brings a charm!", 2600);
@@ -1186,7 +1232,7 @@ function doMove(m) {
       if (goalDone(game)) { busy = false; draw(); win(); return; }
       game.arrived = null; const i = drop(game);
       busy = false; draw();
-      const dropped = game.grid.slice(), c2 = clearLines(dropped);
+      const dropped = game.grid.slice(), c2 = clearLines(dropped, trayFor(game));
       if (c2.lines.length) {
         busy = true; wake(game, dropped, c2.lines);
         new Set([...c2.lines.flatMap(x => x.cells), ...c2.crumble]).forEach(j => blocks[j] && blocks[j].classList.add("gone"));
@@ -1228,7 +1274,7 @@ $("board").addEventListener("pointerup", e => { if (!touch) return; const d = dr
 $("board").addEventListener("pointercancel", () => { touch = null; clearGhost(); });
 function showGhost(m) {
   clearGhost();
-  const r = applyMove(game.grid, m, rulesFor(game)), h = r.grid, c = clearLines(h.slice());
+  const r = applyMove(game.grid, m, rulesFor(game)), h = r.grid, c = clearLines(h.slice(), trayFor(game));
   r.painted.forEach(i => { const g = document.createElement("div"); g.className = "ghost"; const [x, y] = xyOf(i); g.style.left = x * 20 + "%"; g.style.top = y * 20 + "%"; g.innerHTML = "<span>🖌</span>"; $("grid").append(g); });
   moveCells(m, rulesFor(game)).forEach(i => $("grid").querySelector(`.slot[data-i="${i}"]`).classList.add("lit"));
   const put = (i, t) => { const g = document.createElement("div"); g.className = "ghost"; const [x, y] = xyOf(i); g.style.left = x * 20 + "%"; g.style.top = y * 20 + "%"; g.innerHTML = `<span>${t}</span>`; $("grid").append(g); };
@@ -1266,7 +1312,7 @@ $("shuffleBtn").onclick = () => {
   free.forEach((i, k) => { game.grid[i] = vals[k]; });
   untape(game.grid);   // (tape only holds blocks side by side)
   // shuffling can't leave a whole line done for you
-  clearLines(game.grid);
+  clearLines(game.grid, trayFor(game));
   game.lost = false; G.closeCard(); draw(); save(); G.note("The cat mixed it up!", 2000);
   if (stuck(game)) lose();   // still nothing can slide: say so again
 };
@@ -1348,10 +1394,19 @@ function score(g, spec) {
 }
 // On a goal level, how much a slide's lines (and the board after) help: a line of a colour still needed, or lines while
 // more are wanted, then fewer of the colours that mustn't be left.
-function taskValue(g, lines, h, m) {
-  const t = taskOf(g.level, g.seed);
+// how near each mat is to being one colour (for the hint and the simple player)
+function matScore(g, h) {
+  let sc = 0;
+  for (const mt of trayFor(g).mats || []) { const cnt = {}; for (const i of mt.cells) for (const c of counts_as(h[i])) cnt[c] = (cnt[c] || 0) + 1; sc += Math.max(0, ...Object.values(cnt)) ** 2 * 12; }
+  return sc;
+}
+function taskValue(g, lines, h, m, only) {
+  const t = only || taskOf(g.level, g.seed);
   if (t.coat) return (g.coats < t.coat ? lines.filter(x => x.coat).length * 1000 : 0) + (t.need && !(g.got || []).includes(6) ? lines.filter(x => x.c === 6).length * 1000 : 0) + h.filter(v => isPainted(col(v))).length * 40;
   if (t.double) return (lines.length >= 2 ? 3000 : lines.length * 300);
+  if (t.cross) { const plain = lines.filter(x => !x.shape); return plain.length >= 2 ? 3000 : plain.length * 300; }
+  if (t.shape) { const want = Object.entries(t.shape).filter(([k, n]) => ((g.shapes || {})[k] || 0) < n).map(([k]) => k);
+    return lines.filter(x => want.includes(x.shape)).length * 1200 + (t.need ? taskValue(g, lines, h, m, {need: t.need}) : 0) + matScore(g, h); }
   if (t.moods) { const r = m ? applyMove(g.grid, m, rulesFor(g)) : null; return (r && (r.met || []).some(x => moodOf(x[1], x[2])) && (g.moods || 0) < t.moods ? 2000 : 0) + (t.lines && g.lines < t.lines ? counts(g.level, lines).length * 600 : 0) + h.filter(v => pairs(charmOf(v))).length * 30; }
   if (t.pull) return m && m.k === "pull" ? lines.length * 1000 + 50 : lines.length * 100;
   if (t.bask) { const tr = trayFor(g), sunRow = lineOf(0, tr.sun[0], true);
@@ -1365,7 +1420,7 @@ function taskValue(g, lines, h, m) {
 function bestMove(g) {
   const spec = levelSpec(g.level); let best = null;
   for (const m of slides(g)) {
-    const r = applyMove(g.grid, m, rulesFor(g)), h = r.grid; wither(g, h); thaw(g, h); const c = clearLines(h);
+    const r = applyMove(g.grid, m, rulesFor(g)), h = r.grid; wither(g, h); thaw(g, h); const c = clearLines(h, trayFor(g));
     const sc = (spec.task ? taskValue(g, c.lines, h, m) : counts(g.level, c.lines).length * 1000) + c.lines.length * 200 + score(h, spec);
     if (!best || sc > best.sc) best = {sc, m, c};
   }
@@ -1511,6 +1566,9 @@ function helpOnFirstVisit(all) {
   if (intro === "arrow") steps.push(demo("A paint arrow. Slide this row the way it points", [[10, withArrow(pa, 0)], [12, pm], [13, pb], [14, pm]], row2, `It painted everything ahead of it ${COLOURS[pa].name}, and it's used up. It only paints the way it points`));
   if (intro === "laser") { settings.helpers = settings.helpers || {}; settings.helpers.laser = (settings.helpers.laser || 0) + 1; drawShelf();
     steps.push({say: "Start a mood: bring two charms together. A laser pointer moves any block to any empty square: here's one", els: [$("help_laser")]}); }
+  if (intro === "boxmat") steps.push(demo("A box mat: four of one colour on it clear. Slide this row left", [[6, pm], [7, pm], [11, pm], [10, pb], [14, pm]], row2, "A box! Shapes only count on their mats", {...noTray, mats: [{kind: "box", cells: [6, 7, 11, 12]}]}));
+  if (intro === "diagmat") steps.push(demo("A diagonal mat. Slide this row left to finish it", [[0, pm], [6, pm], [18, pm], [24, pm], [10, pb], [11, pm], [14, pm]], row2, "A diagonal!", {...noTray, mats: [{kind: "diag", cells: [0, 6, 12, 18, 24]}]}));
+  if (intro === "plusmat") steps.push(demo("A plus mat. Slide this row left to finish the plus", [[7, pm], [11, pm], [13, pm], [17, pm], [10, pb], [14, pm]], row2, "A plus! The next block brings a charm", {...noTray, mats: [{kind: "plus", cells: [7, 11, 12, 13, 17]}]}));
   if (intro === "flaps") steps.push(demo("Slide this row right, out through the cat flap", [[7, pa], [16, pa], [17, pa], [18, pa], [19, pa]], [5, 6, 7, 8, 9].map(xyOf), "In through the other flap: a whole line!", {turn: [], flaps: [[1, 1], [3, 0]]}));
   if (!steps.length) { settings.seen[n] = true; save(); return; }
   steps[steps.length - 1].leave = turn.upTo.leave;   // put the real board back after the last demo
