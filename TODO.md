@@ -320,8 +320,8 @@ The chapters (the page has every level's colours, pieces and goal):
 - [x] **6 · Surprises** (73 to 82): turn knob (Purrmutation's, unchanged), gift wrap, wet paint, sleepy cat, ice, and the
   fish treat and hot water bottle helpers (built 2026-11-28; README "Mew Hue")
 - [x] **7 · Pull and paint** (83 to 88): magnet, paint arrow (built 2026-11-28; README "Mew Hue")
-- [ ] **8 · All the moods** (89 on): the moods themselves came in with their charms (chapters 2, 3 and 5); this chapter
-  is boards where charms come often so moods meet and mix, and the laser pointer as a helper
+- [x] **8 · All the moods** (89 to 95): boards where charms come often so moods meet, mood goals, and the laser pointer
+  helper (built 2026-11-28; README "Mew Hue")
 - [ ] **9 · Shapes** (100 to 108): 2 × 2 boxes, diagonals, the small plus (five squares; two whole lines can't wait for
   each other), crossing lines
 
