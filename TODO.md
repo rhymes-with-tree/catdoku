@@ -304,7 +304,9 @@ What was settled:
   sunbeam; a draught frosts one over, never in a sunbeam), rather than falling in.
 - **Catnip** is the site's catnip, a leaf in each of the six colours in a ring; it counts as any colour with a leaf left,
   drops a leaf at random each move, and on its last leaf the leaf grows until it becomes that colour's tile.
-- **Two charms meeting** start a mood (which one depends on the pair). The magnet stays after a pull.
+- **Two charms meeting start a mood** (2026-11-28), the same from chapter 2 to the end: kitten + kitten silvervine,
+  kitten + paw zoomies, paw + paw valerian root, kitten + yarn spook hop, paw + yarn honeysuckle wood, yarn + yarn
+  knocked over (built 2026-11-28). Laser pointer is left for a helper. The magnet stays after a pull.
 - **Helpers** you earn (basking in a sunbeam, a plus, finishing a row and column in one move, a clean board) wait on a
   shelf under the board, as Mix it up does.
 
@@ -318,8 +320,8 @@ The chapters (the page has every level's colours, pieces and goal):
 - [x] **6 · Surprises** (73 to 82): turn knob (Purrmutation's, unchanged), gift wrap, wet paint, sleepy cat, ice, and the
   fish treat and hot water bottle helpers (built 2026-11-28; README "Mew Hue")
 - [ ] **7 · Pull and paint** (83 to 88): magnet, paint arrow
-- [ ] **8 · Moods** (89 to 99): silvervine, two charms meeting, valerian root, zoomies, Tatarian honeysuckle wood (only
-  its wood is cat-safe, so it's drawn as wood), laser pointer, knocked over, spook hop
+- [ ] **8 · All the moods** (89 on): the moods themselves came in with their charms (chapters 2, 3 and 5); this chapter
+  is boards where charms come often so moods meet and mix, and the laser pointer as a helper
 - [ ] **9 · Shapes** (100 to 108): 2 × 2 boxes, diagonals, the small plus (five squares; two whole lines can't wait for
   each other), crossing lines
 

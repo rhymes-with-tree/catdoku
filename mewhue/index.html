@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Mew Hue</title>
-<script src="../move.js?v=2026-11-28.2"></script>
+<script src="../move.js?v=2026-11-28.4"></script>
 <meta name="apple-mobile-web-app-title" content="Lap Cat 🧩">
 <script>
 // A home-screen app can keep showing an old saved copy of this page. Check for a newer
 // version when the page opens, and reload once to get it. Bump BUILD and version.txt together.
 (function () {
-  var BUILD = "2026-11-28.2"; window.SITE_BUILD = BUILD;
+  var BUILD = "2026-11-28.4"; window.SITE_BUILD = BUILD;
   fetch("../version.txt?t=" + Date.now(), {cache: "no-store"}).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
     v = v.trim(); var tried = null;
     try { tried = sessionStorage.getItem("catdoku.reloadedFor"); } catch (e) {}
@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../games.css?v=2026-11-28.2">
+<link rel="stylesheet" href="../games.css?v=2026-11-28.4">
 <style>
 /* Blocks of paint, each with a mark: red a bar down, yellow a bar across, blue a ring. Drag a row
    or column and its blocks slide to that end. Two different marks mix, and the mix carries both (orange is a
@@ -113,6 +113,15 @@
 .knob svg{width:66%;height:66%;fill:none;stroke:#2A2530;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
 .knob::after{content:"";position:absolute;left:50%;top:50%;width:44px;height:44px;transform:translate(-50%,-50%)}
 .knob.hinted{background:#ECA818}
+/* moods: the whole board's look while one is on, and a tag with the moves left */
+.paintboard.mooded{transition:background-color .3s,border-color .3s}
+.paintboard.mood-silvervine{background:#E4E2EC;border-color:#8E96A3;box-shadow:inset 0 0 0 4px #C9CFD8}
+.paintboard.mood-zoomies{background:#D5D9EC;border-color:#2F3A6B}
+.paintboard.mood-valerian{background:#EADFD2;border-color:#8A6A4A}
+.paintboard.mood-spook{background:#ECE4F6;border-color:#9874CA}
+.paintboard.mood-honeysuckle{background:#F3E6CF;border-color:#B98F5A}
+.paintboard.mood-knocked{transform:rotate(-1.2deg)}
+.moodtag{display:inline-block;font-size:13px;font-weight:800;padding:1px 10px;border-radius:999px;background:#2A2530;color:#F7F8F3;letter-spacing:.02em}
 /* the helper shelf (chapter 5 on): earned helpers, used when you choose */
 .helperBtn.armed{background:color-mix(in srgb,#ECA818 22%,var(--panel));border-color:#B57F0A}
 /* a carousel row's arrows: Purrmutation's Shift arrows, ink at half strength */
@@ -170,9 +179,9 @@
 
 </main>
 
-<script src="../boxes.js?v=2026-11-28.2"></script>
-<script src="../tablethings.js?v=2026-11-28.2"></script>
-<script src="../games.js?v=2026-11-28.2"></script>
+<script src="../boxes.js?v=2026-11-28.4"></script>
+<script src="../tablethings.js?v=2026-11-28.4"></script>
+<script src="../games.js?v=2026-11-28.4"></script>
 <script>
 /* ---------- marks, colours and rules (plain functions) ---------- */
 // Colours by number: 0 red (a bar down), 1 orange (bar down and across), 2 yellow (a bar across), 3 green (across
@@ -199,6 +208,17 @@ const taped = v => charmOf(v) === TAPER || charmOf(v) === TAPEL, PARTS = {1: [0,
 // slides left, 1 to 3). A sleeping cat and ice hold their block still, as stone does.
 const GIFT = 6, WET = 7, NAP = 8, ICE = 8;
 const iceLeft = v => charmOf(v) > ICE ? charmOf(v) - ICE : 0, isHeld = v => charmOf(v) >= NAP;
+// Two charms meeting (the owner's call, 2026-11-28, the same from chapter 2 to the end): when a charmed block bumps
+// another, both charms are used up and the pair's mood starts, for five moves. Kitten, paw and yarn ball pair up.
+const pairs = k => k === KITTEN || k === PAW || k === YARN;
+const MOOD_OF = {"1,1": "silvervine", "1,2": "zoomies", "2,2": "valerian", "1,3": "spook", "2,3": "honeysuckle", "3,3": "knocked"};
+const moodOf = (a, b) => MOOD_OF[[a, b].sort().join()];
+// a mix where the two blocks' charms might meet: returns the charm the result keeps, noting a meeting in met
+function pairUp(moved, still, at, met) {
+  const a = charmOf(moved), b = charmOf(still);
+  if (pairs(a) && pairs(b)) { met.push([at, a, b]); return 0; }
+  return keeps(a) || keeps(b);
+}
 // the charms that stay with a block through a mix (gift wrap comes off, wet paint dries)
 const keeps = k => k === KITTEN || k === PAW || k === YARN ? k : 0;
 // What two bumping blocks make: the same primary joins into one; two different primaries mix; a primary and the
@@ -224,7 +244,8 @@ function lineOf(axis, l, back) { const L = [...Array(N)].map((_, k) => axis ? k 
 // slides up against bare stone gives it a coat of that colour. Returns the moves ({from, to}), the squares where
 // blocks combined or vanished, and stone that was painted (only when paint is on: from painted stone's level).
 function slideLine(g, L, paint) {
-  const moves = [], merged = [], vanish = [], painted = [];
+  // met: two charms meeting ([square, the moving block's charm, the other's]), which starts their mood
+  const moves = [], merged = [], vanish = [], painted = [], met = [];
   let seg = [], wall = -1;   // the stone the blocks of seg slide up against (-1: the end of the line)
   const flush = () => {
     const out = [], wet = [];   // out: {c, k (charm), v (catnip's number), at, from, done}; wet: [square, colour]
@@ -237,7 +258,7 @@ function slideLine(g, L, paint) {
     }
     for (const i of order) {
       const v = g[i];
-      const c = col(v), k = charmOf(v), last = out[out.length - 1], at = seg[out.length];
+      const c = col(v), last = out[out.length - 1], at = seg[out.length]; let k = charmOf(v);
       if (rolled.has(i)) {   // it rolled: it doesn't combine on the way
         out.push({c, k, v, at, from: i, done: true}); if (at !== i) moves.push({from: i, to: at}); continue;
       }
@@ -248,6 +269,7 @@ function slideLine(g, L, paint) {
         out.push({c: b, k: 0, at, from: i, done: true}); merged.push(at); if (at !== i) moves.push({from: i, to: at});
         continue;
       }
+      if (last && pairs(k) && pairs(last.k)) { met.push([last.at, k, last.k]); last.k = 0; k = 0; }   // two charms meet: both are used up
       if (last && k === PAW && !taped(last.v)) {   // the paw swaps with the block it bumps
         const mv = moves.find(x => x.to === last.at); if (mv) mv.to = at; else moves.push({from: last.at, to: at});
         moves.push({from: i, to: last.at});
@@ -257,7 +279,7 @@ function slideLine(g, L, paint) {
       if (last && !last.done && !taped(v) && !taped(last.v)) {   // taped blocks don't combine
         const r = combine(last.c, c);
         if (r === VANISH) { moves.push({from: i, to: last.at}); vanish.push(last.at); out.pop(); continue; }
-        if (r >= 0) { if (k === WET && at !== i) wet.push([i, c]); last.c = r; last.k = r === 6 ? 0 : keeps(last.k) || keeps(k); last.done = true; moves.push({from: i, to: last.at}); merged.push(last.at); continue; }
+        if (r >= 0) { if (k === WET && at !== i) wet.push([i, c]); last.c = r; last.k = r === 6 ? 0 : keeps(k) || keeps(last.k); last.done = true; moves.push({from: i, to: last.at}); merged.push(last.at); continue; }
       }
       // white takes the colour of a block it bumps, whichever of them is moving (neither merges)
       let cc = c;
@@ -287,7 +309,7 @@ function slideLine(g, L, paint) {
   };
   for (const i of L) { if (isStone(col(g[i])) || isHeld(g[i])) { flush(); wall = i; } else seg.push(i); }
   flush();
-  return {moves, merged, vanish, painted};
+  return {moves, merged, vanish, painted, met};
 }
 // What a square can count as in a line of colour: its colour; catnip, any colour it still has a leaf for; painted
 // stone, its coat; bare stone, none (it makes lines of stone).
@@ -406,7 +428,7 @@ function tapeAlong(h, moves) {
 // Slide a sunbeam's row: blocks in the sun are lazy, so each moves one square at most (combining, swapping or painting
 // as a slide would).
 function lazySlide(g, L, paint) {
-  const out = {moves: [], merged: [], vanish: [], painted: []}, done = new Set();
+  const out = {moves: [], merged: [], vanish: [], painted: [], met: []}, done = new Set();
   for (let k = 1; k < L.length; k++) {
     const i = L[k], j = L[k - 1];
     if (g[i] < 0 || isStone(col(g[i])) || isHeld(g[i]) || (g[j] >= 0 && done.has(j))) continue;
@@ -423,8 +445,53 @@ const noTray = {turn: [], flaps: null, sun: null, springs: [], posts: [], boxes:
 // ax, back} moves a kitten's block alone, one square, combining as a slide would. Returns the board after, the
 // blocks' moves, where blocks combined or vanished, a block through a flap (thru: [from, to]), and whether anything
 // changed.
+// While a mood is on (tray.mood), a drag does something else (moveFor, allMoves): silvervine slides every row (or every
+// column) at once; zoomies sends one block on its own as far as it goes; valerian root swaps two blocks side by side;
+// honeysuckle wood turns any row or column round; the spook hop slides diagonals too; and knocked over drops the blocks
+// to the bottom of their columns after every move.
 function applyMove(g, m, tray = noTray) {
+  const r = applyMove0(g, m, tray);
+  if (tray.mood === "knocked" && r.changed) for (let l = 0; l < N; l++) { const f = slideLine(r.grid, lineOf(1, l, false), tray.paint); r.merged.push(...f.merged); r.vanish.push(...f.vanish); (r.met = r.met || []).push(...(f.met || [])); }
+  return r;
+}
+const none = h => ({grid: h, moves: [], merged: [], vanish: [], painted: [], met: [], changed: false});
+function applyMove0(g, m, tray = noTray) {
   const h = g.slice();
+  if (m.k === "all") {   // silvervine: every row, or every column, slides
+    const out = {moves: [], merged: [], vanish: [], painted: [], met: []};
+    for (let l = 0; l < N; l++) { const r = slideLine(h, lineOf(m.ax, l, m.back), tray.paint); for (const key in out) out[key].push(...r[key]); }
+    untape(h); return {grid: h, ...out, changed: out.moves.length > 0 || out.painted.length > 0};
+  }
+  if (m.k === "zoom") {   // zoomies: one block, on its own, as far as it goes (combining with what it reaches, as a slide would)
+    if (h[m.i] < 0 || isStone(col(h[m.i])) || isHeld(h[m.i])) return none(h);
+    const d = m.ax ? N : 1, step = m.back ? -d : d, ok = j => j >= 0 && j < N * N && (m.ax || Math.floor(j / N) === Math.floor(m.i / N));
+    let at = m.i; while (ok(at + step) && h[at + step] < 0) at += step;
+    const v = h[m.i]; h[m.i] = -1; h[at] = v;
+    const moves = at !== m.i ? [{from: m.i, to: at}] : [];
+    let r = {moves: [], merged: [], vanish: [], painted: [], met: []};
+    if (ok(at + step) && h[at + step] >= 0) r = slideLine(h, [at + step, at], tray.paint);
+    const mv = r.moves.find(x => x.from === at); if (mv && moves.length) moves[0].to = mv.to; else if (mv) moves.push(mv);
+    untape(h); return {grid: h, ...r, moves, changed: moves.length > 0 || r.merged.length > 0 || r.vanish.length > 0};
+  }
+  if (m.k === "swap") {   // valerian root: swap with the block next to it
+    const j = m.i + (m.ax ? (m.back ? -N : N) : (m.back ? -1 : 1));
+    if (j < 0 || j >= N * N || (!m.ax && Math.floor(j / N) !== Math.floor(m.i / N))) return none(h);
+    if ([m.i, j].some(q => h[q] >= 0 && (isStone(col(h[q])) || isHeld(h[q]))) || h[m.i] === h[j]) return none(h);
+    [h[m.i], h[j]] = [h[j], h[m.i]]; untape(h);
+    return {grid: h, moves: [h[j] >= 0 ? {from: m.i, to: j} : null, h[m.i] >= 0 ? {from: j, to: m.i} : null].filter(Boolean), merged: [], vanish: [], painted: [], met: [], changed: true};
+  }
+  if (m.k === "turnline") {   // honeysuckle wood: any row or column turns round
+    const L = lineOf(m.ax, m.l, true), was = L.map(i => g[i]), moves = [];
+    L.forEach((i, k) => { const from = m.back ? (k + 1) % N : (k + N - 1) % N; h[i] = was[from]; if (was[from] >= 0) moves.push({from: L[from], to: i}); });
+    untape(h); return {grid: h, moves, merged: [], vanish: [], painted: [], met: [], changed: L.some(i => h[i] !== g[i])};
+  }
+  if (m.k === "diag") {   // the spook hop: a diagonal slides, towards the corner the drag points at
+    const [x0, y0] = [m.i % N, Math.floor(m.i / N)], L = [];
+    let x = x0, y = y0; while (x + m.dx >= 0 && x + m.dx < N && y + m.dy >= 0 && y + m.dy < N) { x += m.dx; y += m.dy; }
+    while (x >= 0 && x < N && y >= 0 && y < N) { L.push(y * N + x); x -= m.dx; y -= m.dy; }
+    const r = slideLine(h, L, tray.paint); untape(h);
+    return {grid: h, ...r, changed: r.moves.length > 0 || r.painted.length > 0};
+  }
   if (m.k === "turn") {
     const L = lineOf(0, m.l, true), was = L.map(i => g[i]), moves = [];
     L.forEach((i, k) => { const from = m.back ? (k + 1) % N : (k + N - 1) % N; h[i] = was[from]; if (was[from] >= 0) moves.push({from: L[from], to: i, wrap: Math.abs(from - k) > 1}); });
@@ -465,7 +532,7 @@ function applyMove(g, m, tray = noTray) {
     else {
       const c = isStone(col(h[to])) ? -1 : combine(col(h[to]), col(v));
       if (c === VANISH) { h[to] = -1; h[from] = -1; r.vanish.push(to); thru = [from, to]; }
-      else if (c >= 0) { h[to] = withCharm(c, c === 6 ? 0 : keeps(charmOf(h[to])) || keeps(charmOf(v))); h[from] = -1; r.merged.push(to); thru = [from, to]; }
+      else if (c >= 0) { h[to] = withCharm(c, c === 6 ? 0 : pairUp(v, h[to], to, r.met)); h[from] = -1; r.merged.push(to); thru = [from, to]; }
     }
     if (thru) { const mv = r.moves.find(x => x.to === from); if (mv) mv.to = to; else r.moves.push({from, to}); }
   }
@@ -478,7 +545,7 @@ function applyMove(g, m, tray = noTray) {
     else if (to !== from && !isStone(col(h[to]))) {
       const c = combine(col(h[to]), col(v));
       if (c === VANISH) { h[to] = -1; h[from] = -1; r.vanish.push(to); boing = [from, to]; }
-      else if (c >= 0) { h[to] = withCharm(c, c === 6 ? 0 : keeps(charmOf(h[to])) || keeps(charmOf(v))); h[from] = -1; r.merged.push(to); boing = [from, to]; }
+      else if (c >= 0) { h[to] = withCharm(c, c === 6 ? 0 : pairUp(v, h[to], to, r.met)); h[from] = -1; r.merged.push(to); boing = [from, to]; }
     }
     if (boing) { const mv = r.moves.find(x => x.to === from); if (mv) mv.to = to; else r.moves.push({from, to}); }
   }
@@ -493,7 +560,14 @@ function applyMove(g, m, tray = noTray) {
 }
 // The move a drag (or Shift and an arrow key) from square i makes: a kitten's own block steps alone, a carousel row
 // turns, and anything else slides its line.
-function moveFor(g, tray, i, [ax, l, back]) {
+function moveFor(g, tray, i, d) {
+  const mood = tray.mood;
+  if (d[0] === "d") return {k: "diag", i, dx: d[1], dy: d[2]};
+  const [ax, l, back] = d;
+  if (mood === "silvervine") return {k: "all", ax, back};
+  if (mood === "zoomies") return {k: "zoom", i, ax, back};
+  if (mood === "valerian") return {k: "swap", i, ax, back};
+  if (mood === "honeysuckle") return {k: "turnline", ax, l, back};
   if (!ax && tray.turn.includes(l)) return {k: "turn", l, back};
   if (charmOf(g[i]) === KITTEN) { const st = {k: "step", i, ax, back}; if (applyMove(g, st, tray).changed) return st; }
   const post = !ax && (tray.posts || []).find(([row]) => row === l);
@@ -501,7 +575,11 @@ function moveFor(g, tray, i, [ax, l, back]) {
 }
 // Every move that would change something.
 function allMoves(g, tray = noTray) {
-  const out = [];
+  const out = [], mood = tray.mood, add = m => { if (applyMove(g, m, tray).changed) out.push(m); };
+  if (mood === "silvervine") { for (const ax of [0, 1]) for (const back of [false, true]) add({k: "all", ax, back}); return out; }
+  if (mood === "honeysuckle") { for (let l = 0; l < N; l++) for (const ax of [0, 1]) for (const back of [false, true]) add({k: "turnline", ax, l, back}); return out; }
+  if (mood === "zoomies" || mood === "valerian") { for (let i = 0; i < N * N; i++) if (g[i] >= 0) for (const ax of [0, 1]) for (const back of [false, true]) add({k: mood === "zoomies" ? "zoom" : "swap", i, ax, back}); return out; }
+  if (mood === "spook") for (let i = 0; i < N * N; i++) if (g[i] >= 0) for (const [dx, dy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) add({k: "diag", i, dx, dy});
   for (let l = 0; l < N; l++) for (const ax of [0, 1]) for (const back of [false, true]) {
     const post = !ax && (tray.posts || []).some(([row]) => row === l);
     const ms = !ax && tray.turn.includes(l) ? [{k: "turn", l, back}] : post ? [0, 1].map(part => ({k: "line", ax, l, back, part})) : [{k: "line", ax, l, back}];
@@ -517,10 +595,14 @@ function stuck(g) {
   const ms = slides(g); if (!ms.length) return true;
   if (ms.some(m => m.k !== "turn" && m.k !== "knob")) return false;
   if (g.grid.some((v, i) => i < N * N && v < 0)) return false;
-  return !ms.some(m => clearLines(applyMove(g.grid, m, trayFor(g)).grid).lines.length);
+  return !ms.some(m => clearLines(applyMove(g.grid, m, rulesFor(g)).grid).lines.length);
 }
 // The squares a move lights up: its line, or the kitten and where it goes.
 function moveCells(m, tray = noTray) {
+  if (m.k === "all") return [...Array(N * N).keys()];
+  if (m.k === "zoom" || m.k === "swap") { const d = m.ax ? N : 1; return [m.i, m.i + (m.back ? -d : d)].filter(j => j >= 0 && j < N * N); }
+  if (m.k === "turnline") return lineOf(m.ax, m.l, true);
+  if (m.k === "diag") { const out = []; let [x, y] = [m.i % N, Math.floor(m.i / N)]; while (x >= 0 && y >= 0 && x < N && y < N) { out.push(y * N + x); x += m.dx; y += m.dy; } return out; }
   if (m.k === "unbox") { const [row, side] = tray.boxes[m.b]; return [row * N + (side ? N - 1 : 0)]; }
   if (m.k === "knob") return [m.i, m.i + 1, m.i + N, m.i + N + 1];
   if (m.k === "step") { const d = m.back ? -1 : 1; return [m.i, m.i + (m.ax ? d * N : d)]; }
@@ -610,16 +692,16 @@ const LEVELS = [null,
   {name: "Clean slate", task: () => ({lines: 2, without: [6]}), catnip: .1, paw: .1, turn: 1, black: BW, white: BW},
   // Chapter 4, sun and springs (the owner's plan, 2026-11-27). sun: a sunbeam across a row, in one of the colours that
   // fall; springs and posts: how many. Bask goals ask for lines of the sunbeam's colour in the beam (sunBoost: how often
-  // a falling block is the sunbeam's colour instead). Simulated play (150 boards each): about 100, 77, 100, 75, 100,
-  // 61, 63, 56 and 37% won.
+  // a falling block is the sunbeam's colour instead). Simulated play (150 boards each, 2026-11-28): about 100, 77, 100,
+  // 69, 100, 66, 62, 52 and 36% won.
   {name: "A sunbeam", goal: 2, pair: 2, mix: true, sun: true, intro: "sun"},
   {name: "Basking", task: () => ({bask: 1}), sun: true, sunBoost: .3, intro: "bask"},
   {name: "A spring", goal: 2, pair: 0, mix: true, springs: 1, intro: "spring"},
-  {name: "Which way first", task: M => ({need: [M]}), springs: 1},
+  {name: "Which way first", task: M => ({need: [M]}), ready: .6, springs: 1},
   {name: "Scratching post", goal: 2, pair: 1, mix: true, posts: 1, intro: "post"},
-  {name: "Posts", goal: 3, posts: 2},
+  {name: "Posts", goal: 2, posts: 2},
   {name: "Warm spring", task: () => ({bask: 2}), sun: true, sunBoost: .42, springs: 1},
-  {name: "Post in the sun", goal: 4, sun: true, posts: 1, black: BW, white: BW},
+  {name: "Post in the sun", goal: 3, sun: true, posts: 1, black: BW, white: BW},
   {name: "Sunny side", task: () => ({bask: 1, lines: 3}), sun: true, springs: 1, posts: 1, black: BW, white: BW},
   // Chapter 5, water, boxes and yarn (the owner's plan, 2026-11-27). water: how often a falling block is water;
   // yarn and tape: how often a falling block has a yarn ball, or is taped to a block beside it; boxes: how many.
@@ -637,13 +719,13 @@ const LEVELS = [null,
   {name: "Box of tricks", goal: 4, boxes: 1, yarn: .1, tape: .12, black: BW, white: BW},
   // Chapter 6, surprises (the owner's plan, 2026-11-27). knobs: how many turn knobs; gift and wet: how often a falling
   // block is gift-wrapped or wet; nap and ice: how often, as a move ends, a cat curls up on a block or a draught frosts
-  // one over (at most two of each at once). Simulated play (150 boards each): about 91, 83, 100, 100, 71, 100, 73,
-  // 100, 65 and 40% won.
+  // one over (at most two of each at once). Simulated play (2026-11-28, with moods): about 94, 74, 100, 100, 79, 100,
+  // 69, 100, 63 and 39% won.
   {name: "A knob", goal: 2, pair: 0, mix: true, knobs: 1, intro: "knob"},
   {name: "Round goes the stone", task: () => ({need: [6]}), stone: true, others: .3, sand: .08, knobs: 2},
   {name: "Gift wrap", goal: 2, pair: 1, mix: true, gift: .15, intro: "gift"},
   {name: "Wet paint", goal: 2, pair: 2, mix: true, wet: .12, intro: "wet"},
-  {name: "Presents", task: M => ({need: [M]}), gift: .12, wet: .08},
+  {name: "Presents", task: M => ({need: [M]}), ready: .7, gift: .12, wet: .08},
   {name: "A sleepy cat", goal: 2, pair: 0, mix: true, nap: .08, intro: "nap"},
   {name: "Cats in the sun", task: () => ({bask: 1}), sun: true, sunBoost: .4, nap: .08, intro: "treat"},
   {name: "Ice", goal: 2, pair: 1, mix: true, ice: .08, intro: "ice"},
@@ -813,9 +895,15 @@ function deal(level, seed, order) {
   g.start = JSON.stringify({grid: g.grid, drops: g.drops});
   return g;
 }
-const snap = () => JSON.stringify({grid: game.grid, drops: game.drops, lines: game.lines, got: game.got || [], moves: game.moves, mixes: game.mixes, coats: game.coats || 0, basks: game.basks || 0, reward: !!game.reward, helpers: {...(settings.helpers || {})}});
+const snap = () => JSON.stringify({mood: game.mood || null, grid: game.grid, drops: game.drops, lines: game.lines, got: game.got || [], moves: game.moves, mixes: game.mixes, coats: game.coats || 0, basks: game.basks || 0, reward: !!game.reward, helpers: {...(settings.helpers || {})}});
 // Every move that would change this game's board.
-const slides = g => allMoves(g.grid, trayFor(g));
+const rulesFor = g => g.mood ? {...trayFor(g), mood: g.mood.kind} : trayFor(g);
+const slides = g => allMoves(g.grid, rulesFor(g));
+// After a move: a mood that's on has one move fewer to go, and two charms meeting start theirs.
+function moodAfter(g, r) {
+  if (g.mood && --g.mood.left <= 0) g.mood = null;
+  if (r.met && r.met.length) { const [, a, b] = r.met[0], kind = moodOf(a, b); if (kind) g.mood = {kind, left: 5}; }
+}
 
 /* ---------- drawing ---------- */
 const xyOf = i => [i % N, Math.floor(i / N)];
@@ -937,6 +1025,7 @@ function draw() {
   // tape: the site's strip of tape across the line between a taped pair
   game.grid.forEach((v, i) => { if (i < N * N && charmOf(v) === TAPER) { const e = document.createElement("div"); e.className = "tape"; const [x, y] = xyOf(i); e.style.left = (x + 1) * 20 + "%"; e.style.top = y * 20 + "%"; e.innerHTML = `<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${TABLE.TAPE}</svg>`; $("grid").append(e); } });
   drawTray(); drawKey(game);
+  const b = $("board"); Object.keys(MOODS).forEach(k => b.classList.toggle("mood-" + k, !!game.mood && game.mood.kind === k)); b.classList.toggle("mooded", !!game.mood);
   update();
 }
 // A goal level's goal, for the status line: each line it needs with its colour's mark (ticked once done), or the
@@ -958,7 +1047,8 @@ function update() {
   const spec = levelSpec(game.level);
   // lines cleared of the goal, with a line of three tiles of one colour, stone for stone lines (G.tally), then the bar
   const got = Math.min(game.lines, spec.goal), tiles = Array(3).fill(spec.stone ? "#5E5866" : "#ECA818");
-  $("count").innerHTML = spec.task ? `Level ${game.level} · ${taskText(game)}` : `Level ${game.level} · ${G.tally(null, got, spec.goal, tiles.map((c, i) => `<rect x="${.5 + i * 5.2}" y="5" width="4.8" height="6" rx="1.2" fill="${c}" stroke="#2A2530" stroke-width=".9"/>`).join(""), `${got} of ${spec.goal} ${spec.stone ? "stone " : ""}line${spec.goal === 1 ? "" : "s"}`)} <span class="goalbar"><i style="width:${Math.min(100, game.lines / spec.goal * 100)}%"></i></span>`;
+  const moodTag = game.mood ? ` <span class="moodtag">${MOODS[game.mood.kind].name} · ${game.mood.left}</span>` : "";
+  $("count").innerHTML = spec.task ? `Level ${game.level} · ${taskText(game)}${moodTag}` : `Level ${game.level} · ${G.tally(null, got, spec.goal, tiles.map((c, i) => `<rect x="${.5 + i * 5.2}" y="5" width="4.8" height="6" rx="1.2" fill="${c}" stroke="#2A2530" stroke-width=".9"/>`).join(""), `${got} of ${spec.goal} ${spec.stone ? "stone " : ""}line${spec.goal === 1 ? "" : "s"}`)} <span class="goalbar"><i style="width:${Math.min(100, game.lines / spec.goal * 100)}%"></i></span>${moodTag}`;
   $("hintBtn").disabled = !playing();
   undo.sync();
   G.uses("shuffleBtn", game.mixes); $("shuffleBtn").disabled = !playing();
@@ -997,10 +1087,10 @@ G.sound.define({
   "mh.new": t => SND.tone({fs: [[0, 780], [.08, 325]], t, dur: .08, vol: .1}),   // a quiet plop
 });
 // A drag from square i: the move it makes (moveFor), played.
-const dragMove = (i, d) => doMove(moveFor(game.grid, trayFor(game), i, d));
+const dragMove = (i, d) => doMove(moveFor(game.grid, rulesFor(game), i, d));
 function doMove(m) {
   if (!playing()) return;
-  const r = applyMove(game.grid, m, trayFor(game)), after = r.grid, ripe = game.demo ? [] : wither(game, after); thaw(game, after);
+  const r = applyMove(game.grid, m, rulesFor(game)), after = r.grid, ripe = game.demo ? [] : wither(game, after); thaw(game, after);
   const waters = g => g.filter(v => col(v) === WATER).length, washed = !r.vanish.length && waters(after) < waters(game.grid);
   if (!r.changed) { G.note(m.k === "step" ? "The kitten can't go that way." : m.k === "turn" ? "Turning that row wouldn't change anything." : "Nothing in that line can move that way.", 1800); G.sound.play("wrong"); return; }
   game.started = true;
@@ -1031,6 +1121,8 @@ function doMove(m) {
     const cleared = after.slice(), c = clearLines(cleared), woke = wake(game, cleared, c.lines);
     const finish = () => {
       game.grid = cleared; game.moves++;
+      if (!game.demo) { const was = game.mood && game.mood.kind; moodAfter(game, r); const now = game.mood && game.mood.kind;
+        if (now && (r.met || []).length) moodStarted(now); else if (was && !now) G.note(`The ${MOODS[was].name.toLowerCase()} wore off.`, 2200); }
       // a walkthrough demo: show what happened, nothing more (no new block, no lines counted)
       if (game.demo) { busy = false; draw(); return; }
       const counted = counts(game.level, c.lines).length;
@@ -1073,20 +1165,21 @@ function doMove(m) {
 let touch = null;
 const cellAt = e => { const r = $("grid").getBoundingClientRect(), x = Math.floor((e.clientX - r.left) / r.width * N), y = Math.floor((e.clientY - r.top) / r.height * N); return x < 0 || y < 0 || x >= N || y >= N ? -1 : y * N + x; };
 const dragOf = (t, e) => { const dx = e.clientX - t.x, dy = e.clientY - t.y; if (Math.max(Math.abs(dx), Math.abs(dy)) < 16) return null;
+  if (game && game.mood && game.mood.kind === "spook" && Math.abs(Math.abs(dx) - Math.abs(dy)) < .45 * Math.max(Math.abs(dx), Math.abs(dy))) return ["d", Math.sign(dx), Math.sign(dy)];
   const [x, y] = xyOf(t.i); return Math.abs(dx) > Math.abs(dy) ? [0, y, dx < 0] : [1, x, dy < 0]; };
 $("board").addEventListener("pointerdown", e => { if (!playing()) return; const i = cellAt(e); if (i < 0) return; touch = {x: e.clientX, y: e.clientY, i, d: null}; try { $("board").setPointerCapture(e.pointerId); } catch (er) {} });
 $("board").addEventListener("pointermove", e => {
   if (!touch || !playing()) return;
   const d = dragOf(touch, e);
-  if (String(d) !== String(touch.d)) { touch.d = d; d ? showGhost(moveFor(game.grid, trayFor(game), touch.i, d)) : clearGhost(); }
+  if (String(d) !== String(touch.d)) { touch.d = d; d ? showGhost(moveFor(game.grid, rulesFor(game), touch.i, d)) : clearGhost(); }
 });
 $("board").addEventListener("pointerup", e => { if (!touch) return; const d = dragOf(touch, e), i = touch.i; touch = null; clearGhost(); if (!d && game.arm) { useHelper(i); return; } if (d) dragMove(i, d); else G.note(charmOf(game.grid[i]) === KITTEN ? "Drag the kitten to move just it, one square." : "Drag a row or column to slide it.", 2000); });
 $("board").addEventListener("pointercancel", () => { touch = null; clearGhost(); });
 function showGhost(m) {
   clearGhost();
-  const r = applyMove(game.grid, m, trayFor(game)), h = r.grid, c = clearLines(h.slice());
+  const r = applyMove(game.grid, m, rulesFor(game)), h = r.grid, c = clearLines(h.slice());
   r.painted.forEach(i => { const g = document.createElement("div"); g.className = "ghost"; const [x, y] = xyOf(i); g.style.left = x * 20 + "%"; g.style.top = y * 20 + "%"; g.innerHTML = "<span>🖌</span>"; $("grid").append(g); });
-  moveCells(m, trayFor(game)).forEach(i => $("grid").querySelector(`.slot[data-i="${i}"]`).classList.add("lit"));
+  moveCells(m, rulesFor(game)).forEach(i => $("grid").querySelector(`.slot[data-i="${i}"]`).classList.add("lit"));
   const put = (i, t) => { const g = document.createElement("div"); g.className = "ghost"; const [x, y] = xyOf(i); g.style.left = x * 20 + "%"; g.style.top = y * 20 + "%"; g.innerHTML = `<span>${t}</span>`; $("grid").append(g); };
   r.merged.forEach(i => put(i, col(h[i]) === 6 ? "●" : "+")); r.vanish.forEach(i => put(i, "✕"));
   if (r.thru && !r.merged.includes(r.thru[1]) && !r.vanish.includes(r.thru[1])) put(r.thru[1], "↩");
@@ -1127,6 +1220,25 @@ $("shuffleBtn").onclick = () => {
   if (stuck(game)) lose();   // still nothing can slide: say so again
 };
 
+/* ---------- moods ---------- */
+// Each mood: its name, what the board does, and a line for the first time it comes up.
+const MOODS = {
+  silvervine: {name: "Silvervine", what: "every row (or column) slides at once"},
+  zoomies: {name: "Zoomies", what: "drag one block on its own, any way, as far as it goes"},
+  valerian: {name: "Valerian root", what: "drag a block to swap it with the one beside it"},
+  spook: {name: "Spook hop", what: "drag on a slant to slide a diagonal too"},
+  honeysuckle: {name: "Honeysuckle wood", what: "every row and column turns round instead of sliding"},
+  knocked: {name: "Knocked over", what: "the blocks fall to the bottom after every move"},
+};
+const CHARM_NAME = {[KITTEN]: "kitten", [PAW]: "paw", [YARN]: "yarn ball"};
+function moodStarted(kind) {
+  const m = MOODS[kind]; draw();
+  settings.seenMood = settings.seenMood || {};
+  if (!settings.seenMood[kind]) {
+    settings.seenMood[kind] = true; save();
+    setTimeout(() => G.spotlight({grid: $("grid"), w: N, h: N, finish: false, steps: [{say: `Two charms met: ${m.name}! For five moves, ${m.what}`, els: [$("board")]}]}), 300);
+  } else G.note(`${m.name}! For five moves, ${m.what}.`, 3000);
+}
 /* ---------- helpers ---------- */
 // Helpers you earn (from HELPERS_FROM): a clean win puts one on the shelf under the board, kept on this device. Tap one,
 // then the block to use it on: a kitten or paw goes on a plain block, and a water drop washes a mix back into its two
@@ -1191,7 +1303,7 @@ function taskValue(g, lines, h) {
 function bestMove(g) {
   const spec = levelSpec(g.level); let best = null;
   for (const m of slides(g)) {
-    const r = applyMove(g.grid, m, trayFor(g)), h = r.grid; wither(g, h); thaw(g, h); const c = clearLines(h);
+    const r = applyMove(g.grid, m, rulesFor(g)), h = r.grid; wither(g, h); thaw(g, h); const c = clearLines(h);
     const sc = (spec.task ? taskValue(g, c.lines, h) : counts(g.level, c.lines).length * 1000) + c.lines.length * 200 + score(h, spec);
     if (!best || sc > best.sc) best = {sc, m, c};
   }
@@ -1203,8 +1315,8 @@ $("hintBtn").onclick = () => {
   if (!best) { G.note("Nothing can slide. Try Mix it up, or Undo.", 3000); return; }
   game.hinted = true; save();
   const m = best.m, way = (ax, back) => ax ? (back ? "up" : "down") : (back ? "left" : "right"), clears = best.c.lines.length ? ": it clears a line" : "";
-  const text = m.k === "knob" ? `Turn the gold knob ${m.back ? "back (press and hold)" : "(tap it)"}${clears}.` : m.k === "unbox" ? "Tap the box to put its block back." : m.k === "step" ? `Nudge the gold kitten ${way(m.ax, m.back)}${clears}.` : m.k === "turn" ? `Turn the gold row ${way(0, m.back)}${clears}.` : `Slide the gold ${m.ax ? "column" : "row"} ${way(m.ax, m.back)}${clears}.`;
-  hints.show({cells: moveCells(m, trayFor(game))}, text);
+  const text = m.k === "all" ? `Slide every ${m.ax ? "column" : "row"} ${way(m.ax, m.back)}${clears}.` : m.k === "zoom" ? `Send the gold block ${way(m.ax, m.back)}${clears}.` : m.k === "swap" ? `Swap the gold blocks${clears}.` : m.k === "turnline" ? `Turn the gold ${m.ax ? "column" : "row"} ${way(m.ax, m.back)}${clears}.` : m.k === "diag" ? `Slide the gold diagonal${clears}.` : m.k === "knob" ? `Turn the gold knob ${m.back ? "back (press and hold)" : "(tap it)"}${clears}.` : m.k === "unbox" ? "Tap the box to put its block back." : m.k === "step" ? `Nudge the gold kitten ${way(m.ax, m.back)}${clears}.` : m.k === "turn" ? `Turn the gold row ${way(0, m.back)}${clears}.` : `Slide the gold ${m.ax ? "column" : "row"} ${way(m.ax, m.back)}${clears}.`;
+  hints.show({cells: moveCells(m, rulesFor(game))}, text);
 };
 
 /* ---------- endings ---------- */

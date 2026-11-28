@@ -32,7 +32,7 @@ const N = +nArg, SEED0 = +seedArg, CAP = 400;
         const g = deal(level, SEED0 + k, [0, 1, 2]);
         for (let t = 0; t < CAP; t++) {
           const best = bestMove(g); if (!best) break;
-          const h = applyMove(g.grid, best.m, trayFor(g)).grid; wither(g, h); thaw(g, h); const c = clearLines(h); wake(g, h, c.lines);
+          const r0 = applyMove(g.grid, best.m, rulesFor(g)), h = r0.grid; wither(g, h); thaw(g, h); const c = clearLines(h); wake(g, h, c.lines); moodAfter(g, r0);
           g.grid = h; g.moves++; tally(g, c);
           if (goalDone(g)) { won++; took.push(g.moves); break; }
           drop(g);
